@@ -43,8 +43,6 @@ type problem =
 
 type scores = {r2_score : float; rmse_score : float}
 
-let best_scores = {r2_score = 1.0; rmse_score = 0.0}
-
 let scores_to_csv_column scores bench_name =
   [
     ["R2_score_" ^ bench_name; "RMSE_score_" ^ bench_name];
@@ -303,21 +301,17 @@ let to_scipy m =
   let rows = Maths.row_dim m in
   Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
 
-let wrap_python_function ~input ~output solver =
+let median_of_output output =
   (* Scipy's functions expect a column vector on output. *)
-  let output =
-    Matrix.of_col
-    @@ map_rows
-         (fun row ->
-           Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
-         output
-  in
-  let input = to_scipy input in
-  let output = to_scipy output in
-  solver input output
+  Matrix.of_col
+  @@ map_rows
+       (fun row -> Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
+       output
 
 let wrap_python_solver ~input ~output solver =
-  wrap_python_function ~input ~output solver |> of_scipy
+  let input = to_scipy input in
+  let output = to_scipy output in
+  solver input output |> of_scipy
 
 let ridge ~alpha ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
@@ -331,29 +325,40 @@ let nnls ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
       Scikit.LinearModel.nnls ~input ~output)
 
-let r2_score ~input ~output ~weights =
+let predict_output ~input ~weights =
+  let input = to_scipy input in
   let weights = to_scipy weights in
-  wrap_python_function ~input ~output (fun input output ->
-      Scikit.r2_score ~input ~output ~weights)
+  Scikit.predict_output ~input ~weights
 
-let rmse_score ~input ~output ~weights =
-  let weights = to_scipy weights in
-  wrap_python_function ~input ~output (fun input output ->
-      Scikit.rmse_score ~input ~output ~weights)
+let r2_score ~output ~prediction =
+  let output = to_scipy output in
+  Scikit.r2_score ~output ~prediction
+
+let rmse_score ~output ~prediction =
+  let output = to_scipy output in
+  Scikit.rmse_score ~output ~prediction
 
 let solve_problem : problem -> solver -> solution =
  fun problem solver ->
   match problem with
-  | Degenerate _ -> {mapping = []; weights = empty_matrix; scores = best_scores}
+  | Degenerate {predicted; measured} ->
+      let prediction = to_scipy predicted |> Scikit_matrix.to_numpy in
+      let output = median_of_output measured in
+      let r2_score = r2_score ~output ~prediction in
+      let rmse_score = rmse_score ~output ~prediction in
+      let scores = {r2_score; rmse_score} in
+      {mapping = []; weights = empty_matrix; scores}
   | Non_degenerate {input; output; nmap; _} ->
+      let output = median_of_output output in
       let weights =
         match solver with
         | Ridge {alpha} -> ridge ~alpha ~input ~output
         | Lasso {alpha; positive} -> lasso ~alpha ~positive ~input ~output
         | NNLS -> nnls ~input ~output
       in
-      let r2_score = r2_score ~input ~output ~weights in
-      let rmse_score = rmse_score ~input ~output ~weights in
+      let prediction = predict_output ~input ~weights in
+      let r2_score = r2_score ~prediction ~output in
+      let rmse_score = rmse_score ~prediction ~output in
       let scores = {r2_score; rmse_score} in
       let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
