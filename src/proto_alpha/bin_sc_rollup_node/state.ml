@@ -32,7 +32,7 @@ let reorganization_window_length = 10
 module Store = struct
   (** Table from blocks hashes to unit. The entry is present iff the block
       identified by that hash is fully processed by the rollup node. *)
-  module ProcessedHashes =
+  module Processed_hashes =
     Store.Make_append_only_map
       (struct
         let path = ["tezos"; "processed_blocks"]
@@ -52,7 +52,7 @@ module Store = struct
         let encoding = Data_encoding.unit
       end)
 
-  module LastProcessedHead =
+  module Last_processed_head =
     Store.Make_mutable_value
       (struct
         let path = ["tezos"; "processed_head"]
@@ -67,7 +67,7 @@ module Store = struct
         let encoding = Layer1.head_encoding
       end)
 
-  module LastFinalizedHead =
+  module Last_finalized_head =
     Store.Make_mutable_value
       (struct
         let path = ["tezos"; "finalized_head"]
@@ -136,16 +136,16 @@ let level_of_hash store hash =
 
 let mark_processed_head store Layer1.({hash; level = _} as head) =
   let open Lwt_syntax in
-  let* () = Store.ProcessedHashes.add store hash () in
-  Store.LastProcessedHead.set store head
+  let* () = Store.Processed_hashes.add store hash () in
+  Store.Last_processed_head.set store head
 
-let is_processed store head = Store.ProcessedHashes.mem store head
+let is_processed store head = Store.Processed_hashes.mem store head
 
-let last_processed_head_opt store = Store.LastProcessedHead.find store
+let last_processed_head_opt store = Store.Last_processed_head.find store
 
-let mark_finalized_head store head = Store.LastFinalizedHead.set store head
+let mark_finalized_head store head = Store.Last_finalized_head.set store head
 
-let get_finalized_head_opt store = Store.LastFinalizedHead.find store
+let get_finalized_head_opt store = Store.Last_finalized_head.find store
 
 let set_block_level_and_hash store Layer1.{hash; level} =
   let open Lwt_syntax in
