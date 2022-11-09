@@ -1344,7 +1344,6 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                             ~previous_savepoint
                             ~new_savepoint
                         in
-
                         (* The merge operation succeeded, the store is now idle. *)
                         block_store.merging_thread <- None ;
                         let* () = write_status block_store Idle in

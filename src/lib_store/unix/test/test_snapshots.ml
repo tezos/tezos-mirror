@@ -732,5 +732,4 @@ let tests speed =
     in
     test_rolling () :: test_drag_after_import () :: generated_tests
   in
-
   ("snapshots", test_cases)

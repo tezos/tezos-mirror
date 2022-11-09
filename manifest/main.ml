@@ -5204,6 +5204,10 @@ let _octez_store_tests =
           alias_rule
             "runtest"
             ~package:"tezos-store"
+            ~action:(run_exe "test_consistency" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
             ~action:(run_exe "test_block_store" []);
           alias_rule
             "runtest"
