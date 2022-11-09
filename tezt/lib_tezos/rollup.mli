@@ -253,6 +253,9 @@ module Dal : sig
         a given slot header and shard id *)
     val shard :
       slot_header:string -> shard_id:int -> (Dal_node.t, string) RPC_core.t
+
+    (** [dac_store_preimage data] posts [data] on dac/store_preimage *)
+    val dac_store_preimage : string -> (Dal_node.t, string) RPC_core.t
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox
