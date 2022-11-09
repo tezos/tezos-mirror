@@ -176,6 +176,27 @@ let get_output_proof () =
         commitment_hash
       >>= fun () -> return_unit)
 
+let get_output_message_encoding () =
+  Tezos_clic.command
+    ~desc:"Get output message encoding."
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["encode"; "outbox"; "message"]
+    @@ Tezos_clic.string
+         ~name:"transactions"
+         ~desc:"A JSON description of the transactions"
+    @@ Tezos_clic.stop)
+    (fun () transactions (cctxt : #Configuration.sc_client_context) ->
+      let open Lwt_result_syntax in
+      let open Protocol.Alpha_context.Sc_rollup.Outbox.Message in
+      let* message = parse_transactions transactions in
+      let encoded_message = serialize message in
+      (match encoded_message with
+      | Ok encoded_message ->
+          let encoded_message = unsafe_to_string encoded_message in
+          cctxt#message "%a" Hex.pp (Hex.of_string encoded_message)
+      | Error _ -> cctxt#message "Error while encoding outbox message.")
+      >>= fun () -> return_unit)
+
 (** [call_get cctxt raw_url] executes a GET RPC call against the [raw_url]. *)
 let call_get (cctxt : #Configuration.sc_client_context) raw_url =
   let open Lwt_result_syntax in
@@ -250,6 +271,7 @@ let all () =
     get_sc_rollup_addresses_command ();
     get_state_value_command ();
     get_output_proof ();
+    get_output_message_encoding ();
     rpc_get_command;
     Keys.generate_keys ();
     Keys.list_keys ();
