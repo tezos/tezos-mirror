@@ -44,13 +44,8 @@ let user_migratable_node_init ~migration_level ~migrate_to =
 
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
-let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
+let perform_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
     ~migrate_to =
-  Test.register
-    ~__FILE__
-    ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
-    ~tags:["protocol"; "migration"; "sandbox"]
-  @@ fun () ->
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, _node = user_migratable_node_init ~migration_level ~migrate_to in
@@ -100,7 +95,12 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
-    test_protocol_migration
+    Test.register
+      ~__FILE__
+      ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
+      ~tags:["protocol"; "migration"; "sandbox"]
+    @@ fun () ->
+    perform_protocol_migration
       ~blocks_per_cycle
       ~migration_level
       ~migrate_from
