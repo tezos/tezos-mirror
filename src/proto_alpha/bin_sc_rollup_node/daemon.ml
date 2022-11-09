@@ -387,7 +387,6 @@ module Make (PVM : Pvm.S) = struct
           ~data_dir:configuration.data_dir
           ~signers
       in
-
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr
@@ -398,11 +397,11 @@ module Make (PVM : Pvm.S) = struct
     start ()
 end
 
-let run ~data_dir (cctxt : Protocol_client_context.full) =
+let run ~data_dir (configuration : Configuration.t)
+    (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
-  let* configuration = Configuration.load ~data_dir in
   let dal_cctxt =
     Dal_node_client.make_unix_cctxt
       ~addr:configuration.dal_node_addr
