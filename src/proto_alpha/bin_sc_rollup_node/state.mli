@@ -51,3 +51,7 @@ val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
 (** [level_of_hash store hash] returns the level for Tezos block hash [hash] if
     it is known by the rollup node. *)
 val level_of_hash : Store.t -> Block_hash.t -> int32 tzresult Lwt.t
+
+(** [set_block_level_and_has store head] registers the correspondences
+    [head.level |-> head.hash] and [head.hash |-> head.level] in the store. *)
+val set_block_level_and_hash : Store.t -> Layer1.head -> unit Lwt.t

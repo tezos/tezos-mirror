@@ -191,6 +191,7 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
     let* ctxt = Inbox.process_head node_ctxt head in
     let* () = Dal_slots_tracker.process_head node_ctxt head in
+    let*! () = State.set_block_level_and_hash node_ctxt.store head in
     let* () = process_l1_block_operations ~finalized:false node_ctxt head in
     (* Avoid storing and publishing commitments if the head is not final. *)
     (* Avoid triggering the pvm execution if this has been done before for
