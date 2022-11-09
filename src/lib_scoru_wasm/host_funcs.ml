@@ -276,7 +276,7 @@ module Aux = struct
     in
     extract_error_code res
 
-  let chunk_max_size = 4069l
+  let chunk_max_size = 4096l
 
   let store_write ~durable ~memory ~key_offset ~key_length ~value_offset ~src
       ~num_bytes =
