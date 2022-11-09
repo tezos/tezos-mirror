@@ -3183,10 +3183,13 @@ let octez_layer2_store =
     ~synopsis:"Tezos: layer2 storage utils"
     ~deps:
       [
+        index;
         octez_base |> open_ ~m:"TzPervasives";
         irmin_pack;
         irmin_pack_unix;
         irmin;
+        aches_lwt;
+        octez_stdlib_unix |> open_;
         octez_context_encoding;
       ]
     ~linkall:true

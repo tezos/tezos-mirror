@@ -6,12 +6,16 @@
  (package tezos-layer2-store)
  (instrumentation (backend bisect_ppx))
  (libraries
+  index
   tezos-base
   irmin-pack
   irmin-pack.unix
   irmin
+  aches-lwt
+  tezos-stdlib-unix
   tezos-context.encoding)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives))
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix))
