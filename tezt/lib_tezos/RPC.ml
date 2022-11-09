@@ -801,6 +801,23 @@ let get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
     ]
     Fun.id
 
+let get_chain_block_context_sc_rollup_commitment ?(chain = "main")
+    ?(block = "head") ~sc_rollup ~hash () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "sc_rollup";
+      sc_rollup;
+      "commitment";
+      hash;
+    ]
+    Fun.id
+
 let get_chain_block_context_sc_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =
   make

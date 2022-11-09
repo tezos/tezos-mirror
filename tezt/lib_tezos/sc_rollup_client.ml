@@ -94,9 +94,9 @@ let spawn_command ?hooks sc_client command =
     sc_client.path
     (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
 
-let sc_rollup_address sc_client =
+let sc_rollup_address ?hooks sc_client =
   let* out =
-    spawn_command sc_client ["get"; "sc"; "rollup"; "address"]
+    spawn_command ?hooks sc_client ["get"; "sc"; "rollup"; "address"]
     |> Process.check_and_read_stdout
   in
   return (String.trim out)
