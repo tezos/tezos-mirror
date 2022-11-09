@@ -337,18 +337,5 @@ The heuristic is implemented in function ``split_key``. For example,
 any request of the form ``rolls/owner/snapshot/i/j/tail`` is transformed
 into a request of the form ``rolls/owner/snapshot/i/j`` to obtain data for all
 possible values of ``tail`` at once.
-For the moment the heuristics cannot be specified on the command line. However,
-it would be possible to do so. Please contact us for requesting such a change,
-see the :ref:`Support <proxy_server_support>` section.
-
-.. _proxy_server_support:
-
-Support
-~~~~~~~
-
-The proxy server is a project led by `evertedsphere <https://gitlab.com/evertedsphere>`_.
-To contact us:
-
-* We are on the `Tezos-dev slack <https://tezos-dev.slack.com>`_, or
-* create an issue on `Tezos' Gitlab <https://gitlab.com/tezos/tezos/-/issues>`_
-  and assign it to us.
+For the moment the heuristics cannot be specified on the command line, but
+this can be implemented in the future.
