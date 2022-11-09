@@ -44,10 +44,6 @@ include
   Store.Make_nested_map
     (struct
       let path = ["dal"; "slot_headers"]
-
-      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
-         This value is currently not used, but required by the module type. *)
-      let keep_last_n_entries_in_memory = Some 10
     end)
     (struct
       type key = Block_hash.t

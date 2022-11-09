@@ -36,9 +36,6 @@ module Make (B : BACKEND) = struct
 
     type value = V.value
 
-    (* Ignored for now. *)
-    let _ = S.keep_last_n_entries_in_memory
-
     let path = S.path
 
     let make_key key = B.make_key_path path @@ K.to_path_representation key
@@ -146,8 +143,6 @@ module Make (B : BACKEND) = struct
 
     module Map_as_value = struct
       type value = V.value Secondary_key_map.t
-
-      let _ = S.keep_last_n_entries_in_memory
 
       let encoding =
         Data_encoding.conv
