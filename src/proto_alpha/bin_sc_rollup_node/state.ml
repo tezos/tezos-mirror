@@ -23,12 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3433
-   Check what the actual value of `reorganization_window_length`
-   should be, and if we want to make it configurable.
-*)
-(* let reorganization_window_length = 10 *)
-
 module Store = struct
   (** Table from blocks hashes to unit. The entry is present iff the block
       identified by that hash is fully processed by the rollup node. *)
@@ -100,8 +94,6 @@ module Store = struct
     Store.Make_append_only_map
       (struct
         let path = ["tezos"; "blocks_hashes"]
-
-        let keep_last_n_entries_in_memory = Some reorganization_window_length
       end)
       (struct
         type key = Block_hash.t
