@@ -109,6 +109,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Contract_hash_fun.register ~protocols ;
   Contract_hash_with_origination.register ~protocols ;
   Contract_opcodes.register ~protocols ;
+  Contract_mini_scenarios.register ~protocols ;
   Create_contract.register ~protocols ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols ;
