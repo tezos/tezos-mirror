@@ -28,6 +28,7 @@ end
 
 module DAC = struct
   module Hashing_scheme = Dac_pages_encoding.Merkle_tree.V0
+  module Hash_storage = Dac_preimage_data_manager.Reveal_hash
 
   module S = struct
     let dac_store_preimage =
