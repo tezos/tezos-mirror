@@ -94,7 +94,7 @@ let bls12_381_signature =
   external_lib ~js_compatible:true "bls12-381-signature" version
 
 let bls12_381_polynomial =
-  let version = V.at_least "0.1.0" in
+  let version = V.at_least "0.1.3" in
   external_lib ~js_compatible:false "tezos-bls12-381-polynomial" version
 
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
@@ -179,10 +179,10 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.4.0" && less_than "3.5.0")
+let irmin = external_lib "irmin" V.(at_least "3.4.3" && less_than "3.5.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "3.4.0" && less_than "3.5.0")
+  external_lib "irmin-pack" V.(at_least "3.4.3" && less_than "3.5.0")
 
 let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
@@ -311,7 +311,11 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 let resto_directory =
   external_lib ~js_compatible:true "resto-directory" resto_version
 
-let ringo = external_lib ~js_compatible:true "ringo" V.(at_least "0.9")
+let ringo =
+  external_lib
+    ~js_compatible:true
+    "ringo"
+    V.(at_least "0.9" && less_than "1.0.0")
 
 let ringo_lwt = external_lib "ringo-lwt" V.(at_least "0.9")
 
@@ -411,7 +415,7 @@ let octez_stdlib =
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
-    ~ocaml:V.(at_least "4.12")
+    ~ocaml:V.(at_least "4.14")
     ~js_compatible:true
     ~inline_tests:ppx_expect
 
@@ -609,7 +613,7 @@ let octez_hacl =
     "tezos-hacl"
     ~path:"src/lib_hacl"
     ~synopsis:"Tezos: thin layer around hacl-star"
-    ~ocaml:V.(at_least "4.08")
+    ~ocaml:V.(at_least "4.14")
     ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
     ~js_of_ocaml:
       [
@@ -1131,6 +1135,7 @@ let lazy_containers =
     ~synopsis:
       "A collection of lazy containers whose contents is fetched from \
        arbitrary backend on-demand"
+    ~ocaml:V.(at_least "4.14")
     ~deps:[octez_lwt_result_stdlib; zarith]
 
 let _lazy_containers_tests =
@@ -1171,6 +1176,7 @@ let octez_webassembly_interpreter =
     ~extra_authors:["WebAssembly Authors"]
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
+    ~ocaml:V.(at_least "4.14")
     ~deps:[octez_lwt_result_stdlib; zarith; lazy_containers |> open_]
     ~preprocess:[pps ppx_deriving_show]
 
@@ -1836,7 +1842,6 @@ let tezos_protocol_environment_sigs =
   public_lib
     "tezos-protocol-environment.sigs"
     ~path:"src/lib_protocol_environment/sigs"
-    ~ocaml:V.(at_least "4.12")
     ~deps:[tezos_protocol_environment_sigs_internals]
     ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
     ~dune:
@@ -1896,6 +1901,10 @@ preventing the protocols from, say, directly writing to disk.
 On the other side, it provides the shell with specific call-sites in the
 protocols. These are the only entry-points into the otherwise black-box
 protocols.|}
+    ~ocaml:
+      V.(
+        (* Should be in sync with scripts/version.sh *)
+        at_least "4.14.0" && less_than "4.15")
     ~deps:
       [
         zarith;
@@ -1996,10 +2005,6 @@ let octez_protocol_compiler_lib =
     "octez-protocol-compiler"
     ~path:"src/lib_protocol_compiler"
     ~synopsis:"Tezos: economic-protocol compiler"
-    ~ocaml:
-      V.(
-        (* Should be in sync with scripts/version.sh *)
-        at_least "4.14.0" && less_than "4.15")
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
