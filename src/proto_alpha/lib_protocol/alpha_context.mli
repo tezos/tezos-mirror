@@ -774,6 +774,8 @@ module Constants : sig
 
   val michelson_maximum_type_size : int
 
+  val sc_rollup_message_size_limit : int
+
   (** Constants parameterized by context. See {!Constants_parametric_repr}. *)
   module Parametric : sig
     type dal = {

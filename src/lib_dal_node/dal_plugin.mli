@@ -36,6 +36,10 @@ module type T = sig
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
     (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
+
+  module RPC : sig
+    val rpc_services : unit RPC_directory.directory
+  end
 end
 
 val register : (module T) -> unit

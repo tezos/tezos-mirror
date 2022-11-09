@@ -131,6 +131,8 @@ let register ctxt =
   |> register_show_slot_pages ctxt
   |> register_monitor_slot_headers ctxt
 
+let merge dir plugin_dir = RPC_directory.merge dir plugin_dir
+
 let start configuration dir =
   let open Lwt_syntax in
   let Configuration.{rpc_addr; rpc_port; _} = configuration in

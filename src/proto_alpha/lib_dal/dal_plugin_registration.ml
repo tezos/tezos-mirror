@@ -55,6 +55,8 @@ module Plugin = struct
            return
              ( Dal.Slot_index.to_int slot.Dal.Slot.Header.id.index,
                slot.Dal.Slot.Header.commitment ))
+
+  module RPC = RPC
 end
 
 let () = Dal_plugin.register (module Plugin)

@@ -1111,6 +1111,29 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
             "Invalid value in rollup state (current = %L, expected = %R)") ;
       return ()
 
+(* DAC tests *)
+let test_dal_node_handles_dac_store_preimage =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node handles dac store preimage"
+    ~tags:["dac"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* _node, _client, dal_node = init_dal_node protocol in
+  let preimage = "test" in
+  let* actual_rh =
+    RPC.call dal_node (Rollup.Dal.RPC.dac_store_preimage preimage)
+  in
+  (* Expected reveal hash equals to the result of
+     [Tezos_dal_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
+  *)
+  let expected_rh = "scrrh1Y5hijnFNJPb96EFTY9SjZ4epyaYF9xU3Eid9KCj9vda25H8W" in
+  Check.(
+    (actual_rh = expected_rh)
+      string
+      ~error_msg:"Invalid root hash returned (Current:%L <> Expected: %R)") ;
+  return ()
+
 let register ~protocols =
   test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
   test_slot_management_logic protocols ;
@@ -1129,4 +1152,5 @@ let register ~protocols =
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
-  test_slots_attestation_operation_behavior protocols
+  test_slots_attestation_operation_behavior protocols ;
+  test_dal_node_handles_dac_store_preimage protocols

@@ -112,6 +112,18 @@ module Handler = struct
               let* dal_constants, dal_parameters =
                 init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
               in
+              let dir = RPC_server.register ctxt in
+              let plugin_prefix = RPC_path.(open_root / "plugin") in
+              let plugin_dir =
+                RPC_directory.prefix plugin_prefix Plugin.RPC.rpc_services
+              in
+              let dir_with_plugin = RPC_server.merge dir plugin_dir in
+              let* rpc_server = RPC_server.(start config dir_with_plugin) in
+              let _ = RPC_server.install_finalizer rpc_server in
+              let*! () =
+                Event.(
+                  emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
+              in
               Node_context.set_ready
                 ctxt
                 (module Plugin)
@@ -209,9 +221,4 @@ let run ~data_dir cctxt =
   let config = {config with data_dir} in
   let*! store = Store.init config in
   let ctxt = Node_context.init config store in
-  let* rpc_server = RPC_server.(start config (register ctxt)) in
-  let _ = RPC_server.install_finalizer rpc_server in
-  let*! () =
-    Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
-  in
   daemonize (Handler.new_head config ctxt cctxt :: Handler.new_slot_header ctxt)

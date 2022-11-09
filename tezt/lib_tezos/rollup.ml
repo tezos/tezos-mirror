@@ -592,6 +592,15 @@ module Dal = struct
     let shard ~slot_header ~shard_id =
       make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
       json |> JSON.encode
+
+    let dac_store_preimage preimage =
+      let preimage =
+        JSON.parse
+          ~origin:"dal_node_dac_store_preimage_rpc"
+          (encode_bytes_to_hex_string preimage)
+      in
+      let data = JSON.unannotate preimage in
+      make ~data PUT ["plugin"; "dac"; "store_preimage"] JSON.as_string
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox
