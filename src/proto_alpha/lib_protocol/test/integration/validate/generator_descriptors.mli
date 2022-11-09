@@ -122,7 +122,7 @@ type descriptor = {
 type op_kind =
   | KEndorsement
   | KPreendorsement
-  | KDalslotavail
+  | KDalattestation
   | KBallotExp
   | KBallotProm
   | KProposals

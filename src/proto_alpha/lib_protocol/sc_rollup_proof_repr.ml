@@ -204,33 +204,33 @@ module Dal_proofs = struct
       is in the following boundaries:
       - page_published_level > origination_level: this means that the slot
         of the page was published after the rollup origination ;
-      - page_published_level + dal_endorsement_lag < commit_level: this
+      - page_published_level + dal_attestation_lag < commit_level: this
         means that the slot of the page has been confirmed before the
         [commit_level]. According to the definition in
         {!Sc_rollup_commitment_repr}, [commit_level] (aka inbox_level
         in that module) is the level (excluded) up to which the PVM consumed
         all messages and DAL/DAC inputs before producing the related commitment.
   *)
-  let page_level_is_valid ~dal_endorsement_lag ~origination_level ~commit_level
+  let page_level_is_valid ~dal_attestation_lag ~origination_level ~commit_level
       page_id =
-    (* [dal_endorsement_lag] is supposed to be positive. *)
+    (* [dal_attestation_lag] is supposed to be positive. *)
     let page_published_level =
       Dal_slot_repr.(page_id.Page.slot_id.Header.published_level)
     in
     let open Raw_level_repr in
     let not_too_old = page_published_level > origination_level in
     let not_too_recent =
-      add page_published_level dal_endorsement_lag < commit_level
+      add page_published_level dal_attestation_lag < commit_level
     in
     not_too_old && not_too_recent
 
-  let verify ~metadata ~dal_endorsement_lag ~commit_level dal_parameters page_id
+  let verify ~metadata ~dal_attestation_lag ~commit_level dal_parameters page_id
       dal_snapshot proof =
     let open Result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         ~commit_level
         page_id
     then
@@ -244,13 +244,13 @@ module Dal_proofs = struct
       return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input))
     else return_none
 
-  let produce ~metadata ~dal_endorsement_lag ~commit_level dal_parameters
+  let produce ~metadata ~dal_attestation_lag ~commit_level dal_parameters
       page_id ~page_info confirmed_slots_history history_cache =
     let open Result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         ~commit_level
         page_id
     then
@@ -269,7 +269,7 @@ module Dal_proofs = struct
 end
 
 let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
-    ~dal_endorsement_lag ~pvm_name proof =
+    ~dal_attestation_lag ~pvm_name proof =
   let open Lwt_result_syntax in
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
@@ -299,7 +299,7 @@ let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
         Dal_proofs.verify
           ~metadata
           dal_parameters
-          ~dal_endorsement_lag
+          ~dal_attestation_lag
           ~commit_level
           page_id
           dal_snapshot
@@ -375,7 +375,7 @@ module type PVM_with_context_and_state = sig
 
     val dal_parameters : Dal_slot_repr.parameters
 
-    val dal_endorsement_lag : int
+    val dal_attestation_lag : int
   end
 end
 
@@ -439,7 +439,7 @@ let produce ~metadata pvm_and_state commit_level =
         Dal_proofs.produce
           ~metadata
           dal_parameters
-          ~dal_endorsement_lag
+          ~dal_attestation_lag
           ~commit_level
           page_id
           ~page_info

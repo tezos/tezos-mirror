@@ -55,7 +55,7 @@
 
    - an input [dal:<LVL>:<SID>:<PID>] is interpreted as a directive to request
      the DAL page whose index is <PID> belonging to slot index <SID> confirmed
-     at level <LVL> (i.e published at level LVL - endorsement_lag) ;
+     at level <LVL> (i.e published at level LVL - attestation_lag) ;
 
    If a message is not syntactically correct or does not evaluate
    correctly, the machine stops its evaluation and waits for the next

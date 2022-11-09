@@ -36,7 +36,7 @@ module type S = sig
 
   val eval_block_inbox :
     metadata:Sc_rollup.Metadata.t ->
-    dal_endorsement_lag:int ->
+    dal_attestation_lag:int ->
     fuel:fuel ->
     Node_context.t ->
     Tezos_crypto.Block_hash.t ->
@@ -65,7 +65,7 @@ module Make
   some [message_index] at a given [level] and this is the
   [start_tick] of this message processing. If some [failing_ticks]
   are planned by the loser mode, they will be made. *)
-  let eval_until_input ~metadata ~dal_endorsement_lag data_dir store level
+  let eval_until_input ~metadata ~dal_attestation_lag data_dir store level
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let eval_tick fuel tick failing_ticks state =
@@ -122,7 +122,7 @@ module Make
                 go fuel (Int64.succ current_tick) failing_ticks next_state)
         | Needs_reveal (Request_dal_page page_id) -> (
             let* content_opt =
-              Dal_pages_request.page_content ~dal_endorsement_lag store page_id
+              Dal_pages_request.page_content ~dal_attestation_lag store page_id
             in
             let*! next_state =
               PVM.set_input (Reveal (Dal_page content_opt)) state
@@ -147,13 +147,13 @@ module Make
   step that requires an input. This function is controlled by
   some [fuel] and may introduce intended failures at some given
   [failing_ticks]. *)
-  let feed_input ~metadata ~dal_endorsement_lag data_dir store level
+  let feed_input ~metadata ~dal_attestation_lag data_dir store level
       message_index ~fuel ~failing_ticks state input =
     let open Lwt_result_syntax in
     let* state, fuel, tick, failing_ticks =
       eval_until_input
         ~metadata
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         data_dir
         store
         level
@@ -184,7 +184,7 @@ module Make
     let* state, _fuel, tick, _failing_ticks =
       eval_until_input
         ~metadata
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         data_dir
         store
         level
@@ -196,7 +196,7 @@ module Make
     in
     return (state, tick)
 
-  let eval_block_inbox ~metadata ~dal_endorsement_lag ~fuel
+  let eval_block_inbox ~metadata ~dal_attestation_lag ~fuel
       (Node_context.{data_dir; store; loser_mode; _} as node_context) hash
       (state : state) : (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t
       =
@@ -237,7 +237,7 @@ module Make
           let* state, executed_ticks =
             feed_input
               ~metadata
-              ~dal_endorsement_lag
+              ~dal_attestation_lag
               data_dir
               node_context
               level

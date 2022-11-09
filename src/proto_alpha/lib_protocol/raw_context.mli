@@ -398,7 +398,7 @@ module Dal : sig
      assumes that a shard belongs to the interval [0; number_of_shards
      - 1]. Otherwise, for each shard outside this interval, it is a
      no-op. *)
-  val record_available_shards : t -> Dal_endorsement_repr.t -> int list -> t
+  val record_available_shards : t -> Dal_attestation_repr.t -> int list -> t
 
   (** [register_slot_header ctxt slot_header] returns a new context
      where the new candidate [slot] have been taken into
@@ -418,11 +418,11 @@ module Dal : sig
      [0;number_of_slots - 1], returns [false]. *)
   val is_slot_index_available : t -> Dal_slot_repr.Index.t -> bool
 
-  (** [shards_of_endorser ctxt ~endorser] returns the shard assignment
-     of the DAL committee of the current level for [endorser]. This
+  (** [shards_of_attestor ctxt ~attestor] returns the shard assignment
+     of the DAL committee of the current level for [attestor]. This
      function never returns an empty list. *)
-  val shards_of_endorser :
-    t -> endorser:Signature.Public_key_hash.t -> int list option
+  val shards_of_attestor :
+    t -> attestor:Signature.Public_key_hash.t -> int list option
 
   (** The DAL committee is a subset of the Tenderbake committee.  A
      shard from [0;number_of_shards] is associated to a public key
@@ -444,12 +444,12 @@ module Dal : sig
      \exists (start,n), find pkh_to_shards pkh = Some (start,n) /\
      start <= shard <= start + n -1
 
-      - Given an endorser, all its shards assignement are contiguous
+      - Given an attestor, all its shards assignement are contiguous
      *)
   type committee = {
     pkh_to_shards :
-      (Dal_endorsement_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_endorsement_repr.Shard_map.t;
+      (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
   }
 
   (** [compute_committee ctxt pkh_from_tenderbake_slot] computes the

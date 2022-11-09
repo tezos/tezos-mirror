@@ -47,7 +47,7 @@ let manager_pass = `PManager
 
 let all_passes = [`PConsensus; `PAnonymous; `PVote; `PManager]
 
-let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_slot]
+let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_attestation]
 
 let anonymous_kinds =
   [
@@ -104,7 +104,7 @@ let pp_kind fmt k =
     (match k with
     | `KPreendorsement -> "KPreendorsement"
     | `KEndorsement -> "KEndorsement"
-    | `KDal_slot -> "KDal_slot"
+    | `KDal_attestation -> "KDal_attestation"
     | `KSeed_nonce_revelation -> "KSeed_nonce_revelation"
     | `KVdf_revelation -> "KVdf_revelation"
     | `KDouble_endorsement -> "KDouble_endorsement"
@@ -398,16 +398,12 @@ let generate_endorsement =
   let+ cc = generate_consensus_content in
   Endorsement cc
 
-let generate_dal_slot =
+let generate_dal_attestation =
   let open QCheck2.Gen in
-  let+ endorser = random_pkh in
-  Dal_slot_availability
-    Dal.Endorsement.
-      {
-        endorser;
-        slot_availability = Dal.Endorsement.empty;
-        level = Raw_level.root;
-      }
+  let+ attestor = random_pkh in
+  Dal_attestation
+    Dal.Attestation.
+      {attestor; attestation = Dal.Attestation.empty; level = Raw_level.root}
 
 let generate_vdf_revelation =
   let open QCheck2.Gen in
@@ -836,7 +832,7 @@ let generate_operation =
     match kind with
     | `KPreendorsement -> generate_operation generate_preendorsement
     | `KEndorsement -> generate_operation generate_endorsement
-    | `KDal_slot -> generate_operation generate_dal_slot
+    | `KDal_attestation -> generate_operation generate_dal_attestation
     | `KSeed_nonce_revelation ->
         generate_operation generate_seed_nonce_revelation
     | `KVdf_revelation -> generate_operation generate_vdf_revelation

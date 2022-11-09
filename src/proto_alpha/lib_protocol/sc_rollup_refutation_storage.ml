@@ -298,7 +298,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
   let* move_result =
     Sc_rollup_game_repr.play
       dal.cryptobox_parameters
-      ~dal_endorsement_lag:dal.endorsement_lag
+      ~dal_attestation_lag:dal.attestation_lag
       ~stakers
       metadata
       game

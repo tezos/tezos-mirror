@@ -261,7 +261,7 @@ type block_metadata = {
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
-  dal_slot_availability : bool Array.t option;
+  dal_attestation : bool Array.t option;
       (** This field is [None] if and only if the [DAL] feature flag is disabled. *)
 }
 

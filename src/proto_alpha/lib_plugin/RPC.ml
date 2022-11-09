@@ -849,7 +849,7 @@ module Scripts = struct
     (match packed_operation.protocol_data with
     | Operation_data {contents = Single (Preendorsement _); _}
     | Operation_data {contents = Single (Endorsement _); _}
-    | Operation_data {contents = Single (Dal_slot_availability _); _} ->
+    | Operation_data {contents = Single (Dal_attestation _); _} ->
         error Run_operation_does_not_support_consensus_operations
     | _ -> ok ())
     >>?= fun () ->

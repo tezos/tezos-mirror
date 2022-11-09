@@ -62,7 +62,7 @@ let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
 
 (* Values of type `confirmations_info` are used to catalog the status of slots
    published in a given block hash. These values record whether
-   the slot has been confirmed after the endorsement_lag has passed. *)
+   the slot has been confirmed after the attestation_lag has passed. *)
 type confirmations_info = {
   (* The hash of the block in which the slots have been published. *)
   published_block_hash : Tezos_crypto.Block_hash.t;
@@ -87,7 +87,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
   *)
   let open Lwt_result_syntax in
   let lag =
-    node_ctxt.Node_context.protocol_constants.parametric.dal.endorsement_lag
+    node_ctxt.Node_context.protocol_constants.parametric.dal.attestation_lag
   in
   (* we are downloading endorsemented for slots at level [level], so
      we need to download the data at level [level - lag].
@@ -109,13 +109,13 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           ~none:(TzTrace.make @@ Cannot_read_block_metadata hash)
           metadata
       in
-      (* `metadata.protocol_data.dal_slot_availability` is `None` if we are behind
+      (* `metadata.protocol_data.dal_attestation` is `None` if we are behind
           the `Dal feature flag`: in this case we return an empty slot endorsement.
       *)
       let confirmed_slots =
         Option.value
-          ~default:Dal.Endorsement.empty
-          metadata.protocol_data.dal_slot_availability
+          ~default:Dal.Attestation.empty
+          metadata.protocol_data.dal_attestation
       in
       let*! published_slots_indexes =
         Store.Dal_slots_headers.list_secondary_keys
@@ -124,7 +124,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       in
       let confirmed_slots_indexes_list =
         List.filter
-          (Dal.Endorsement.is_available confirmed_slots)
+          (Dal.Attestation.is_attested confirmed_slots)
           published_slots_indexes
       in
       let*? confirmed_slots_indexes =
@@ -296,13 +296,13 @@ module Confirmed_slots_history = struct
   (** Depending on the rollup's origination level and on the DAL's endorsement
       lag, the rollup node should start processing confirmed slots and update its
       slots_history and slots_history's cache entries in the store after
-      [origination_level + endorsement_lag] blocks. This function checks if
+      [origination_level + attestation_lag] blocks. This function checks if
       that level is reached or not.  *)
   let should_process_dal_slots node_ctxt block_level =
     let open Node_context in
     let lag =
       Int32.of_int
-        node_ctxt.Node_context.protocol_constants.parametric.dal.endorsement_lag
+        node_ctxt.Node_context.protocol_constants.parametric.dal.attestation_lag
     in
     let block_level = Raw_level.to_int32 block_level in
     let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in

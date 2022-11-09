@@ -1274,8 +1274,8 @@ let build_proof ~player_client start_tick (game : Game.t) =
       let dal_parameters =
         Default_parameters.constants_test.dal.cryptobox_parameters
 
-      let dal_endorsement_lag =
-        Default_parameters.constants_test.dal.endorsement_lag
+      let dal_attestation_lag =
+        Default_parameters.constants_test.dal.attestation_lag
     end
   end in
   let*! proof = Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level in

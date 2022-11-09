@@ -316,7 +316,7 @@ let test_invalid_serialized_inbox_proof () =
          Raw_level.root
          dal_snapshot
          dal_parameters.cryptobox_parameters
-         ~dal_endorsement_lag:dal_parameters.endorsement_lag
+         ~dal_attestation_lag:dal_parameters.attestation_lag
          ~pvm_name:"arith"
          proof
   in

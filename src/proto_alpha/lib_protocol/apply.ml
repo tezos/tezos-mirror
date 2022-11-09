@@ -2001,7 +2001,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   match operation.protocol_data.contents with
   | Single (Preendorsement _) -> ctxt
   | Single (Endorsement _) -> ctxt
-  | Single (Dal_slot_availability _) -> ctxt
+  | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_endorsement_evidence _
@@ -2186,7 +2186,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preendorsement ctxt mode consensus_content |> Lwt.return
   | Single (Endorsement consensus_content) ->
       record_endorsement ctxt mode consensus_content
-  | Single (Dal_slot_availability op) ->
+  | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
          This is a temporary operation. We do no check for the
@@ -2197,11 +2197,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          endorsement encoding. However, once the DAL will be ready, this
          operation should be merged with an endorsement or at least
          refined. *)
-      Dal_apply.apply_data_availability ctxt op >>?= fun ctxt ->
+      Dal_apply.apply_attestation ctxt op >>?= fun ctxt ->
       return
-        ( ctxt,
-          Single_result (Dal_slot_availability_result {delegate = op.endorser})
-        )
+        (ctxt, Single_result (Dal_attestation_result {delegate = op.attestor}))
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
@@ -2709,7 +2707,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     may_start_new_cycle ctxt
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
-  let* ctxt, dal_slot_availability = Dal_apply.finalisation ctxt in
+  let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
   let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_end_of_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
@@ -2733,7 +2731,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         balance_updates;
         liquidity_baking_toggle_ema;
         implicit_operations_results;
-        dal_slot_availability;
+        dal_attestation;
       }
   in
   (ctxt, receipt)
@@ -2856,7 +2854,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
-              dal_slot_availability = None;
+              dal_attestation = None;
             } )
   | Application
       {

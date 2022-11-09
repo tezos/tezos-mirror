@@ -71,7 +71,7 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
-  type dal_slot_availability = Dal_slot_availability_kind
+  type dal_attestation = Dal_attestation_kind
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -221,7 +221,7 @@ val pp_consensus_content : Format.formatter -> consensus_content -> unit
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
-  | Dal_slot_availability of Chain_id.t
+  | Dal_attestation of Chain_id.t
 
 val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -268,9 +268,9 @@ and _ contents =
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
      Temporary operation to avoid modifying endorsement encoding. *)
-  | Dal_slot_availability :
-      Dal_endorsement_repr.operation
-      -> Kind.dal_slot_availability contents
+  | Dal_attestation :
+      Dal_attestation_repr.operation
+      -> Kind.dal_attestation contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -667,7 +667,7 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Endorsement} and {!Preendorsement} > {!Dal_slot_availability} >
+   {!Endorsement} and {!Preendorsement} > {!Dal_attestation} >
    {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
@@ -683,7 +683,7 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    and comparing an {!Endorsement] to a {!Preendorsement}, the
    {!Endorsement} is better.
 
-   Two {!Dal_slot_availability} ops are compared in the lexicographic
+   Two {!Dal_attestation} ops are compared in the lexicographic
    order of the pair of their number of endorsed slots as available
    and their endorsers.
 
@@ -738,7 +738,7 @@ module Encoding : sig
 
   val endorsement_case : Kind.endorsement case
 
-  val dal_slot_availability_case : Kind.dal_slot_availability case
+  val dal_attestation_case : Kind.dal_attestation case
 
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 

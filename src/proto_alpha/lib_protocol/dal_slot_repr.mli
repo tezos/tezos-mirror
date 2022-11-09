@@ -47,7 +47,7 @@ val parameters_encoding : parameters Data_encoding.t
     The purpose of the data-availability layer is to increase the
    bandwidth of the layer 1 thanks to the distribution of "slots". A
    slot is never posted directly onto the layer 1 blocks but on the
-   data-availability layer. The producer of a slot sill has to post a
+   data-availability layer. The producer of a slot still has to post a
    slot header onto the layer 1. A slot header is an abstract datatype
    certifying that the corresponding slot has some maximum size
    (provided by the layer 1). In other words, the whole data contained

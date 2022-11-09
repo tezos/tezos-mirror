@@ -136,8 +136,8 @@ let covalidation_sanity () =
           | Single (Preendorsement _), _ -> assert false
           | Single (Endorsement _), KEndorsement -> return_unit
           | Single (Endorsement _), _ -> assert false
-          | Single (Dal_slot_availability _), KDalslotavail -> return_unit
-          | Single (Dal_slot_availability _), _ -> assert false
+          | Single (Dal_attestation _), KDalattestation -> return_unit
+          | Single (Dal_attestation _), _ -> assert false
           | Single (Seed_nonce_revelation _), KNonce -> return_unit
           | Single (Seed_nonce_revelation _), _ -> assert false
           | Single (Vdf_revelation _), KVdf -> return_unit

@@ -71,7 +71,7 @@ let default_dal =
     {
       feature_enable = false;
       number_of_slots = 256;
-      endorsement_lag = 1;
+      attestation_lag = 1;
       availability_threshold = 50;
       cryptobox_parameters = default_cryptobox_parameters;
     }

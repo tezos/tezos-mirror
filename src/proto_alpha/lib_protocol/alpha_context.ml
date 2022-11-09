@@ -105,8 +105,8 @@ module Dal = struct
     include Dal_slot_repr.Index
   end
 
-  module Endorsement = struct
-    include Dal_endorsement_repr
+  module Attestation = struct
+    include Dal_attestation_repr
     include Raw_context.Dal
   end
 

@@ -172,25 +172,24 @@ let make_run_operation_input ?chain_id t client =
       ])
 
 module Consensus = struct
-  type t = Slot_availability of {endorsement : bool array; level : int}
+  type t = Dal_attestation of {attestation : bool array; level : int}
 
-  let slot_availability ~endorsement ~level =
-    Slot_availability {endorsement; level}
+  let dal_attestation ~attestation ~level = Dal_attestation {attestation; level}
 
   let json signer = function
-    | Slot_availability {endorsement; level} ->
-        let string_of_bool_vector endorsement =
+    | Dal_attestation {attestation; level} ->
+        let string_of_bool_vector attestation =
           let aux (acc, n) b =
             let bit = if b then 1 else 0 in
             (acc lor (bit lsl n), n + 1)
           in
-          Array.fold_left aux (0, 0) endorsement |> fst |> string_of_int
+          Array.fold_left aux (0, 0) attestation |> fst |> string_of_int
         in
         `O
           [
-            ("kind", Ezjsonm.string "dal_slot_availability");
-            ("endorser", Ezjsonm.string signer.Account.public_key_hash);
-            ("endorsement", Ezjsonm.string (string_of_bool_vector endorsement));
+            ("kind", Ezjsonm.string "dal_attestation");
+            ("attestor", Ezjsonm.string signer.Account.public_key_hash);
+            ("attestation", Ezjsonm.string (string_of_bool_vector attestation));
             ("level", Ezjsonm.int level);
           ]
 

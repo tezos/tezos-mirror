@@ -225,14 +225,14 @@ end
 
 type dal_committee = {
   pkh_to_shards :
-    (Dal_endorsement_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-  shard_to_pkh : Signature.Public_key_hash.t Dal_endorsement_repr.Shard_map.t;
+    (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+  shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
 }
 
 let empty_dal_committee =
   {
     pkh_to_shards = Signature.Public_key_hash.Map.empty;
-    shard_to_pkh = Dal_endorsement_repr.Shard_map.empty;
+    shard_to_pkh = Dal_attestation_repr.Shard_map.empty;
   }
 
 type back = {
@@ -273,7 +273,7 @@ type back = {
 
          - We need to provide an incentive to avoid byzantines to post
      dummy slot headers. *)
-  dal_endorsement_slot_accountability : Dal_endorsement_repr.Accountability.t;
+  dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
   dal_committee : dal_committee;
 }
 
@@ -829,8 +829,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         dal_slot_fee_market =
           Dal_slot_repr.Slot_market.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_endorsement_slot_accountability =
-          Dal_endorsement_repr.Accountability.init
+        dal_attestation_slot_accountability =
+          Dal_attestation_repr.Accountability.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_committee = empty_dal_committee;
       };
@@ -935,7 +935,7 @@ let prepare_first_block ~level ~timestamp ctxt =
           {
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
-            endorsement_lag = c.dal.endorsement_lag;
+            attestation_lag = c.dal.endorsement_lag;
             availability_threshold = c.dal.availability_threshold;
             cryptobox_parameters;
           }
@@ -1510,13 +1510,13 @@ module Dal = struct
         Dal_register_invalid_slot_header {length; slot_header})
 
   let record_available_shards ctxt slots shards =
-    let dal_endorsement_slot_accountability =
-      Dal_endorsement_repr.Accountability.record_shards_availability
-        ctxt.back.dal_endorsement_slot_accountability
+    let dal_attestation_slot_accountability =
+      Dal_attestation_repr.Accountability.record_shards_availability
+        ctxt.back.dal_attestation_slot_accountability
         slots
         shards
     in
-    {ctxt with back = {ctxt.back with dal_endorsement_slot_accountability}}
+    {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
 
   let register_slot_header ctxt slot_header =
     match
@@ -1543,15 +1543,15 @@ module Dal = struct
       ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
         .number_of_shards
     in
-    Dal_endorsement_repr.Accountability.is_slot_available
-      ctxt.back.dal_endorsement_slot_accountability
+    Dal_attestation_repr.Accountability.is_slot_available
+      ctxt.back.dal_attestation_slot_accountability
       ~threshold
       ~number_of_shards
 
   type committee = dal_committee = {
     pkh_to_shards :
-      (Dal_endorsement_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_endorsement_repr.Shard_map.t;
+      (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
   }
 
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
@@ -1568,7 +1568,7 @@ module Dal = struct
      Tenderbake committee. Consequently, either we decide to have a
      new consensus operation which does not count for Tenderbake,
      and/or we take into account for the model of DAL that at every
-     level, a percentage of DAL endorsements cannot be received. *)
+     level, a percentage of DAL attestations cannot be received. *)
   let compute_committee ctxt pkh_from_tenderbake_slot =
     let Constants_parametric_repr.
           {
@@ -1596,7 +1596,7 @@ module Dal = struct
         shard_to_pkh =
           List.fold_left
             (fun shard_to_pkh slot ->
-              Dal_endorsement_repr.Shard_map.add slot pkh shard_to_pkh)
+              Dal_attestation_repr.Shard_map.add slot pkh shard_to_pkh)
             committee.shard_to_pkh
             Misc.(slot_index --> (slot_index + (power - 1)));
       }
@@ -1638,7 +1638,7 @@ module Dal = struct
   let init_committee ctxt committee =
     {ctxt with back = {ctxt.back with dal_committee = committee}}
 
-  let shards_of_endorser ctxt ~endorser:pkh =
+  let shards_of_attestor ctxt ~attestor:pkh =
     let rec make acc (initial_shard_index, power) =
       if Compare.Int.(power <= 0) then List.rev acc
       else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)

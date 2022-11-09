@@ -417,7 +417,7 @@ val loser_of_results : alice_result:bool -> bob_result:bool -> player option
     player and returns a [Ongoing] status. Otherwise, it returns a
     [Ended <game_result>] status.
 
-    The provided DAL parameters and [dal_endorsement_lag] are used in case the
+    The provided DAL parameters and [dal_attestation_lag] are used in case the
     game needs to check that a page's content is part of a slot (using the
     slot's commitment).
 *)
@@ -426,7 +426,7 @@ val play :
      Providing DAL parameters here is not resilient to their change during
      protocol upgrade. *)
   Dal_slot_repr.parameters ->
-  dal_endorsement_lag:int ->
+  dal_attestation_lag:int ->
   stakers:Index.t ->
   Sc_rollup_metadata_repr.t ->
   t ->

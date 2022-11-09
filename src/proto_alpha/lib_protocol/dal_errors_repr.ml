@@ -26,7 +26,7 @@
 type error +=
   | Dal_feature_disabled
   | Dal_slot_index_above_hard_limit
-  | Dal_endorsement_unexpected_size of {expected : int; got : int}
+  | Dal_attestation_unexpected_size of {expected : int; got : int}
   | Dal_publish_slot_header_future_level of {
       provided : Raw_level_repr.t;
       expected : Raw_level_repr.t;
@@ -42,10 +42,10 @@ type error +=
   | Dal_publish_slot_header_candidate_with_low_fees of {
       proposed_fees : Tez_repr.t;
     }
-  | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
+  | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
-  | Dal_data_availibility_endorser_not_in_committee of {
-      endorser : Signature.Public_key_hash.t;
+  | Dal_data_availibility_attestor_not_in_committee of {
+      attestor : Signature.Public_key_hash.t;
       level : Level_repr.t;
     }
   | Dal_operation_for_old_level of {
@@ -73,20 +73,20 @@ let () =
     (fun () -> Dal_feature_disabled) ;
 
   let description =
-    "The endorsement for data availability has a different size"
+    "The attestation for data availability has a different size"
   in
   register_error_kind
     `Permanent
-    ~id:"dal_endorsement_unexpected_size"
-    ~title:"DAL endorsement unexpected size"
+    ~id:"dal_attestation_unexpected_size"
+    ~title:"DAL attestation unexpected size"
     ~description
     ~pp:(fun ppf (expected, got) ->
       Format.fprintf ppf "%s: Expected %d. Got %d." description expected got)
     (obj2 (req "expected_size" int31) (req "got" int31))
     (function
-      | Dal_endorsement_unexpected_size {expected; got} -> Some (expected, got)
+      | Dal_attestation_unexpected_size {expected; got} -> Some (expected, got)
       | _ -> None)
-    (fun (expected, got) -> Dal_endorsement_unexpected_size {expected; got}) ;
+    (fun (expected, got) -> Dal_attestation_unexpected_size {expected; got}) ;
   let description = "Slot index above hard limit" in
   register_error_kind
     `Permanent
@@ -197,11 +197,11 @@ let () =
       | _ -> None)
     (fun proposed_fees ->
       Dal_publish_slot_header_candidate_with_low_fees {proposed_fees}) ;
-  let description = "The endorsement for data availability is a too big" in
+  let description = "The attestation for data availability is a too big" in
   register_error_kind
     `Permanent
-    ~id:"dal_endorsement_size_limit_exceeded"
-    ~title:"DAL endorsement exceeded the limit"
+    ~id:"dal_attestation_size_limit_exceeded"
+    ~title:"DAL attestation exceeded the limit"
     ~description
     ~pp:(fun ppf (maximum_size, got) ->
       Format.fprintf
@@ -212,11 +212,11 @@ let () =
         got)
     (obj2 (req "maximum_size" int31) (req "got" int31))
     (function
-      | Dal_endorsement_size_limit_exceeded {maximum_size; got} ->
+      | Dal_attestation_size_limit_exceeded {maximum_size; got} ->
           Some (maximum_size, got)
       | _ -> None)
     (fun (maximum_size, got) ->
-      Dal_endorsement_size_limit_exceeded {maximum_size; got}) ;
+      Dal_attestation_size_limit_exceeded {maximum_size; got}) ;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3114
      Better error message. *)
   let description = "A slot header for this slot was already proposed" in
@@ -275,24 +275,24 @@ let () =
     (fun (current, given) -> Dal_operation_for_future_level {current; given}) ;
   register_error_kind
     `Permanent
-    ~id:"Dal_data_availibility_endorser_not_in_committee"
-    ~title:"The endorser is not part of the DAL committee for this level"
-    ~description:"The endorser is not part of the DAL committee for this level"
-    ~pp:(fun ppf (endorser, level) ->
+    ~id:"Dal_data_availibility_attestor_not_in_committee"
+    ~title:"The attestor is not part of the DAL committee for this level"
+    ~description:"The attestor is not part of the DAL committee for this level"
+    ~pp:(fun ppf (attestor, level) ->
       Format.fprintf
         ppf
-        "The endorser %a is not part of the DAL committee for the level %a"
+        "The attestor %a is not part of the DAL committee for the level %a"
         Signature.Public_key_hash.pp
-        endorser
+        attestor
         Level_repr.pp
         level)
     Data_encoding.(
       obj2
-        (req "endorser" Signature.Public_key_hash.encoding)
+        (req "attestor" Signature.Public_key_hash.encoding)
         (req "level" Level_repr.encoding))
     (function
-      | Dal_data_availibility_endorser_not_in_committee {endorser; level} ->
-          Some (endorser, level)
+      | Dal_data_availibility_attestor_not_in_committee {attestor; level} ->
+          Some (attestor, level)
       | _ -> None)
-    (fun (endorser, level) ->
-      Dal_data_availibility_endorser_not_in_committee {endorser; level})
+    (fun (attestor, level) ->
+      Dal_data_availibility_attestor_not_in_committee {attestor; level})

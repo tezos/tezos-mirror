@@ -156,12 +156,11 @@ module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
 
-  (** [slot_availability ~endorsement ~level] crafts a data-availability
-      consensus to endorse at [level] slot headers published at level
-      [level - endorsement_lag].
-      For each slot, the value of the booleans indicates whether the data is
-      available. *)
-  val slot_availability : endorsement:bool array -> level:int -> t
+  (** [dal_attestation ~attestation ~level] crafts a slot attestation
+     operation to attest at [level] slot headers published at level
+     [level - attestation_lag].  For each slot, the value of the
+     booleans indicates whether the data is deemed available. *)
+  val dal_attestation : attestation:bool array -> level:int -> t
 
   (** [operation] constructs an operation from a consensus
      operation. the [client] is used to fetch the branch and the

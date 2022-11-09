@@ -39,7 +39,7 @@ module Kind = struct
 
   type endorsement = endorsement_consensus_kind consensus
 
-  type dal_slot_availability = Dal_slot_availability_kind
+  type dal_attestation = Dal_attestation_kind
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -216,12 +216,12 @@ let pp_consensus_content ppf content =
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
-  | Dal_slot_availability of Chain_id.t
+  | Dal_attestation of Chain_id.t
 
 let bytes_of_consensus_watermark = function
   | Preendorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
-  | Dal_slot_availability chain_id
+  | Dal_attestation chain_id
   (* We reuse the watermark of an endorsement. This is because this
      operation is temporary and aims to be merged with an endorsement
      later on. Moreover, there is a leak of abstraction with the shell
@@ -245,7 +245,7 @@ let of_watermark = function
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | '\x14' ->
             Option.map
-              (fun chain_id -> Dal_slot_availability chain_id)
+              (fun chain_id -> Dal_attestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -274,9 +274,9 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
-  | Dal_slot_availability :
-      Dal_endorsement_repr.operation
-      -> Kind.dal_slot_availability contents
+  | Dal_attestation :
+      Dal_attestation_repr.operation
+      -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
@@ -1397,29 +1397,27 @@ module Encoding = struct
                   @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
-  let dal_slot_availability_encoding =
+  let dal_attestation_encoding =
     obj3
-      (req "endorser" Signature.Public_key_hash.encoding)
-      (req "endorsement" Dal_endorsement_repr.encoding)
+      (req "attestor" Signature.Public_key_hash.encoding)
+      (req "attestation" Dal_attestation_repr.encoding)
       (req "level" Raw_level_repr.encoding)
 
-  let dal_slot_availability_case =
+  let dal_attestation_case =
     Case
       {
         tag = 22;
-        name = "dal_slot_availability";
-        encoding = dal_slot_availability_encoding;
+        name = "dal_attestation";
+        encoding = dal_attestation_encoding;
         select =
-          (function
-          | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
+          (function Contents (Dal_attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_slot_availability
-                 Dal_endorsement_repr.{endorser; slot_availability; level}) ->
-            (endorser, slot_availability, level));
+          (fun (Dal_attestation
+                 Dal_attestation_repr.{attestor; attestation; level}) ->
+            (attestor, attestation, level));
         inj =
-          (fun (endorser, slot_availability, level) ->
-            Dal_slot_availability
-              Dal_endorsement_repr.{endorser; slot_availability; level});
+          (fun (attestor, attestation, level) ->
+            Dal_attestation Dal_attestation_repr.{attestor; attestation; level});
       }
 
   let seed_nonce_revelation_case =
@@ -1777,7 +1775,7 @@ module Encoding = struct
          [
            make endorsement_case;
            make preendorsement_case;
-           make dal_slot_availability_case;
+           make dal_attestation_case;
            make seed_nonce_revelation_case;
            make vdf_revelation_case;
            make double_endorsement_evidence_case;
@@ -1889,7 +1887,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Failing_noop _) -> None
   | Single (Preendorsement _) -> Some consensus_pass
   | Single (Endorsement _) -> Some consensus_pass
-  | Single (Dal_slot_availability _) -> Some consensus_pass
+  | Single (Dal_attestation _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
@@ -1979,9 +1977,9 @@ let check_signature (type kind) key chain_id
             ~watermark:(to_watermark (Endorsement chain_id))
             (Contents_list contents)
             signature
-      | Single (Dal_slot_availability _) as contents ->
+      | Single (Dal_attestation _) as contents ->
           check
-            ~watermark:(to_watermark (Dal_slot_availability chain_id))
+            ~watermark:(to_watermark (Dal_attestation chain_id))
             (Contents_list contents)
             signature
       | Single
@@ -2089,8 +2087,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Preendorsement _, _ -> None
   | Endorsement _, Endorsement _ -> Some Eq
   | Endorsement _, _ -> None
-  | Dal_slot_availability _, Dal_slot_availability _ -> Some Eq
-  | Dal_slot_availability _, _ -> None
+  | Dal_attestation _, Dal_attestation _ -> Some Eq
+  | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation _ -> Some Eq
@@ -2259,9 +2257,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     The [weight] of an {!Endorsement} or {!Preendorsement} depends on
    its {!endorsement_infos}.
 
-    The [weight] of a {!Dal_slot_availability} depends on the pair of
-   the size of its bitset, {!Dal_endorsement_repr.t}, and the
-   signature of its endorser {! Signature.Public_key_hash.t}.
+    The [weight] of a {!Dal_attestation} depends on the pair of
+   the size of its bitset, {!Dal_attestation_repr.t}, and the
+   signature of its attestor {! Signature.Public_key_hash.t}.
 
    The [weight] of a voting operation depends on the pair of its
    [period] and [source].
@@ -2291,8 +2289,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
 type _ weight =
   | Weight_endorsement : endorsement_infos -> consensus_pass_type weight
   | Weight_preendorsement : endorsement_infos -> consensus_pass_type weight
-  | Weight_dal_slot_availability :
-      (* endorser * num_attestations * level *)
+  | Weight_dal_attestation :
+      (* attestor * num_attestations * level *)
       (Signature.Public_key_hash.t * int * int32)
       -> consensus_pass_type weight
   | Weight_proposals :
@@ -2393,14 +2391,13 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_endorsement
             (endorsement_infos_from_consensus_content consensus_content) )
-  | Single
-      (Dal_slot_availability
-        Dal_endorsement_repr.{endorser; slot_availability; level}) ->
+  | Single (Dal_attestation Dal_attestation_repr.{attestor; attestation; level})
+    ->
       W
         ( Consensus,
-          Weight_dal_slot_availability
-            ( endorser,
-              Dal_endorsement_repr.occupied_size_in_bits slot_availability,
+          Weight_dal_attestation
+            ( attestor,
+              Dal_attestation_repr.occupied_size_in_bits attestation,
               Raw_level_repr.to_int32 level ) )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
@@ -2528,19 +2525,19 @@ let compare_baking_infos infos1 infos2 =
     (infos1.round, infos1.bh_hash)
     (infos2.round, infos2.bh_hash)
 
-(** Two valid {!Dal_slot_availability} are compared in the
-   lexicographic order of their pairs of bitsets size and endorser
+(** Two valid {!Dal_attestation} are compared in the
+   lexicographic order of their pairs of bitsets size and attestor
    hash. *)
-let compare_dal_slot_availability (endorser1, endorsements1, level1)
-    (endorser2, endorsements2, level2) =
+let compare_dal_attestation (attestor1, endorsements1, level1)
+    (attestor2, endorsements2, level2) =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
          ~cmp_snd:Compare.Int.compare)
     ~cmp_snd:Signature.Public_key_hash.compare
-    ((level1, endorsements1), endorser1)
-    ((level2, endorsements2), endorser2)
+    ((level1, endorsements1), attestor1)
+    ((level2, endorsements2), attestor2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
@@ -2550,9 +2547,9 @@ let compare_dal_slot_availability (endorser1, endorsements1, level1)
    comparison on {!endorsement_infos} for {!Endorsement} and
    {!Preendorsement}: see {!endorsement_infos} for more details.
 
-    {!Dal_slot_availability} is smaller than the other kinds of
-   consensus operations. Two valid {!Dal_slot_availability} are
-   compared by {!compare_dal_slot_availability}. *)
+    {!Dal_attestation} is smaller than the other kinds of
+   consensus operations. Two valid {!Dal_attestation} are
+   compared by {!compare_dal_attestation}. *)
 let compare_consensus_weight w1 w2 =
   match (w1, w2) with
   | Weight_endorsement infos1, Weight_endorsement infos2 ->
@@ -2563,16 +2560,14 @@ let compare_consensus_weight w1 w2 =
       compare_endorsement_infos ~prioritized_position:Fstpos infos1 infos2
   | Weight_preendorsement infos1, Weight_endorsement infos2 ->
       compare_endorsement_infos ~prioritized_position:Sndpos infos1 infos2
-  | ( Weight_dal_slot_availability (endorser1, size1, lvl1),
-      Weight_dal_slot_availability (endorser2, size2, lvl2) ) ->
-      compare_dal_slot_availability
-        (endorser1, size1, lvl1)
-        (endorser2, size2, lvl2)
-  | ( Weight_dal_slot_availability _,
-      (Weight_endorsement _ | Weight_preendorsement _) ) ->
+  | ( Weight_dal_attestation (attestor1, size1, lvl1),
+      Weight_dal_attestation (attestor2, size2, lvl2) ) ->
+      compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
+  | Weight_dal_attestation _, (Weight_endorsement _ | Weight_preendorsement _)
+    ->
       -1
-  | ( (Weight_endorsement _ | Weight_preendorsement _),
-      Weight_dal_slot_availability _ ) ->
+  | (Weight_endorsement _ | Weight_preendorsement _), Weight_dal_attestation _
+    ->
       1
 
 (** {5 Comparison of valid voting operations} *)

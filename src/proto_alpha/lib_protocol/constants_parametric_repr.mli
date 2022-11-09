@@ -28,7 +28,7 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  endorsement_lag : int;
+  attestation_lag : int;
   availability_threshold : int;
   cryptobox_parameters : Dal.parameters;
 }
