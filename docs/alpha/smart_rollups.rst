@@ -346,8 +346,12 @@ can be obtained through
 
      xxd -ps -c 0 <kernel.wasm>
 
-To experiment, we propose that you use the value for ``${KERNEL}``
+To experiment, we propose that you use the value ``${KERNEL}``
 defined in the :download:`given file <sr_boot_kernel.sh>`.
+
+.. code:: sh
+
+     source sr_boot_kernel.sh # defines shell variable KERNEL
 
 If everything went well, the origination command results in:
 
