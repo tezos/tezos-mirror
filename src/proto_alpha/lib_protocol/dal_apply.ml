@@ -90,7 +90,7 @@ let validate_publish_slot_header ctxt Dal.Slot.Header.{id = {index; _}; _} =
   error_unless
     Compare.Int.(
       Dal.Slot_index.compare index number_of_slots <= 0
-      || Dal.Slot_index.compare index Dal.Slot_index.zero >= 0)
+      && Dal.Slot_index.compare index Dal.Slot_index.zero >= 0)
     (Dal_publish_slot_header_invalid_index
        {given = index; maximum = number_of_slots})
 
