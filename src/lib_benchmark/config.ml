@@ -84,6 +84,7 @@ let rec merge_on ja jb =
       (* List.rev is just aesthetic, it maintains the order of the object fields.
          Convenient for fields like [min] and [max] *)
       `O (List.rev tl)
+  | `Null, _ -> jb
   | _ -> ja
 
 let get_config ((module Bench) : Benchmark.t) (config : t) : Data_encoding.json
