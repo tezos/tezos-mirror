@@ -51,6 +51,11 @@
 (rule
  (alias runtest)
  (package tezos-store)
+ (action (run %{exe:test_consistency.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
  (action (run %{exe:test_block_store.exe})))
 
 (rule
