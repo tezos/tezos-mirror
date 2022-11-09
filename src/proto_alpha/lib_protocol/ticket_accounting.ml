@@ -83,23 +83,21 @@ let ticket_balances_of_value ctxt ~include_lazy ty value =
   let* tickets, ctxt =
     Ticket_scanner.tickets_of_value ~include_lazy ctxt ty value
   in
-  let*? list, ctxt =
-    List.fold_left_e
-      (fun (acc, ctxt) ticket ->
-        let open Tzresult_syntax in
-        let token, amount =
-          Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
-        in
-        let+ ctxt =
-          Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
-        in
-        ( (token, Script_int.to_zint (amount :> Script_int.n Script_int.num))
-          :: acc,
-          ctxt ))
-      ([], ctxt)
-      tickets
+  let accum_ticket_balances (acc, ctxt) ticket =
+    let open Tzresult_syntax in
+    let token, amount =
+      Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
+    in
+    let+ ctxt =
+      Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
+    in
+    ( (token, Script_int.to_zint (amount :> Script_int.n Script_int.num)) :: acc,
+      ctxt )
   in
-  Ticket_token_map.of_list ctxt list
+  let*? token_amounts, ctxt =
+    List.fold_left_e accum_ticket_balances ([], ctxt) tickets
+  in
+  Ticket_token_map.of_list ctxt token_amounts
 
 let update_ticket_balances ctxt ~total_storage_diff token destinations =
   let open Lwt_tzresult_syntax in
