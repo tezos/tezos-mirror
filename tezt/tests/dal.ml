@@ -1196,6 +1196,25 @@ let test_dal_node_imports_dac_member =
   let* () = Dal_node.terminate dal_node in
   unit
 
+let test_dal_node_dac_threshold_not_reached =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node displays warning if dac threshold is not reached"
+    ~tags:["dac"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let run_dal = Dal_node.run ~wait_ready:false in
+  let dal_node = Dal_node.create ~node ~client () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.Dac.set_parameters ~threshold:1 dal_node in
+  let error_promise =
+    Dal_node.wait_for dal_node "dac_threshold_not_reached.v0" (fun _ -> Some ())
+  in
+  let* () = run_dal dal_node in
+  let* () = error_promise in
+  Dal_node.terminate dal_node
+
 let register ~protocols =
   test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
   test_slot_management_logic protocols ;
@@ -1216,4 +1235,5 @@ let register ~protocols =
     protocols ;
   test_slots_attestation_operation_behavior protocols ;
   test_dal_node_handles_dac_store_preimage protocols ;
-  test_dal_node_imports_dac_member protocols
+  test_dal_node_imports_dac_member protocols ;
+  test_dal_node_dac_threshold_not_reached protocols
