@@ -73,7 +73,7 @@ module Types = struct
     chain_db : Distributed_db.chain_db;
     block_validator : Block_validator.t;
     (* callback to chain_validator *)
-    notify_new_block : Store.Block.t -> unit;
+    notify_new_block : Block_validator.new_block -> unit;
     notify_termination : unit -> unit;
     limits : Shell_limits.peer_validator_limits;
   }
@@ -482,9 +482,9 @@ let on_launch _ name parameters : (_, launch_error) result Lwt.t =
       last_validated_head = Store.Block.header genesis;
       last_advertised_head = Store.Block.header genesis;
     }
-  and notify_new_block block =
+  and notify_new_block ({block; _} as new_block) =
     pv.last_validated_head <- Store.Block.header block ;
-    parameters.notify_new_block block
+    parameters.notify_new_block new_block
   in
   Prometheus.Counter.inc_one metrics.connections ;
   Lwt.return (Ok pv)

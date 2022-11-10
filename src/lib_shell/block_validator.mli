@@ -28,6 +28,16 @@
 
 type t
 
+(** Type of a validated block *)
+type new_block = {
+  block : Store.Block.t;  (** The block itself. *)
+  resulting_context_hash : Tezos_crypto.Context_hash.t;
+      (** The context hash resulting of [block]'s application.
+
+          It may be the same one as contained in its header depending
+          on the protocol expected semantics. *)
+}
+
 (** [create limits ddb bvp start_testchain] creates a
    [Block_validator].
 
@@ -95,7 +105,7 @@ val validate :
   t ->
   ?canceler:Lwt_canceler.t ->
   ?peer:P2p_peer.Id.t ->
-  ?notify_new_block:(Store.Block.t -> unit) ->
+  ?notify_new_block:(new_block -> unit) ->
   ?precheck_and_notify:bool ->
   Distributed_db.chain_db ->
   Tezos_crypto.Block_hash.t ->
