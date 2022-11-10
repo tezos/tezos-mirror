@@ -5,8 +5,6 @@
 
 # Ignoring package octez-dal-node, it only contains tests or private targets
 
-# Ignoring package octez-proxy-server, it only contains tests or private targets
-
 # Ignoring package octez-snoop, it only contains tests or private targets
 
 # Ignoring package octez-wasm-repl, it only contains tests or private targets
@@ -319,6 +317,13 @@ opam:octez-protocol-compiler:
     - .rules_template__trigger_opam_batch_5
   variables:
     package: octez-protocol-compiler
+
+opam:octez-proxy-server:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-proxy-server
 
 opam:octez-sc-rollup-client-alpha:
   extends:
@@ -673,7 +678,7 @@ opam:tezos-client-alpha:
 opam:tezos-client-base:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-client-base
 
@@ -792,7 +797,7 @@ opam:tezos-embedded-protocol-005-PsBabyM1:
 opam:tezos-embedded-protocol-006-PsCARTHA:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-006-PsCARTHA
 
@@ -1268,7 +1273,7 @@ opam:tezos-protocol-plugin-011-PtHangz2:
 opam:tezos-protocol-plugin-011-PtHangz2-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-protocol-plugin-011-PtHangz2-registerer
 
@@ -1352,7 +1357,7 @@ opam:tezos-protocol-updater:
 opam:tezos-proxy:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-proxy
 
@@ -1583,7 +1588,7 @@ opam:tezos-webassembly-interpreter:
 opam:tezos-webassembly-interpreter-extra:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-webassembly-interpreter-extra
 
