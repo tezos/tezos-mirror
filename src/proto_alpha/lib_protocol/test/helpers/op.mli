@@ -47,7 +47,7 @@ val pack_operation :
 val sign :
   ?watermark:Tezos_crypto.Signature.watermark ->
   Tezos_crypto.Signature.secret_key ->
-  Context.t ->
+  Tezos_crypto.Block_hash.t ->
   packed_contents_list ->
   packed_operation
 
@@ -59,7 +59,7 @@ val endorsement :
   ?block_payload_hash:Block_payload_hash.t ->
   endorsed_block:Block.t ->
   Context.t ->
-  ?signing_context:Context.t ->
+  ?pred_branch:Tezos_crypto.Block_hash.t ->
   unit ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
@@ -71,7 +71,7 @@ val preendorsement :
   ?block_payload_hash:Block_payload_hash.t ->
   endorsed_block:Block.t ->
   Context.t ->
-  ?signing_context:Context.t ->
+  ?pred_branch:Tezos_crypto.Block_hash.t ->
   unit ->
   Kind.preendorsement Operation.t tzresult Lwt.t
 

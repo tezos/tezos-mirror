@@ -128,7 +128,11 @@ let test_non_normalized_slot () =
     incorrect block predecessor. *)
 let test_wrong_endorsement_predecessor () =
   init_genesis () >>=? fun (genesis, b) ->
-  Op.endorsement ~endorsed_block:b (B genesis) ~signing_context:(B b) ()
+  Op.endorsement
+    ~endorsed_block:b
+    (B genesis)
+    ~pred_branch:(Context.branch (B b))
+    ()
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b >>= fun res ->

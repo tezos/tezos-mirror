@@ -251,7 +251,7 @@ let test_unparsable_script () =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding
       encoded_op
-    |> Op.sign account.sk (B b)
+    |> Op.sign account.sk (Context.branch (B b))
   in
   (* Ensure that the application fails with [Ill_typed_contract]. *)
   let* i = Incremental.begin_construction b in
@@ -292,7 +292,7 @@ let test_unparsable_script () =
     Data_encoding.Binary.of_string_exn
       Operation.contents_list_encoding
       encoded_bad_op
-    |> Op.sign account.sk (B b)
+    |> Op.sign account.sk (Context.branch (B b))
   in
   (* Ensure that the operation is valid but the application fails with
      [Lazy_script_decode]. *)
