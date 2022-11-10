@@ -430,7 +430,9 @@ module Inner = struct
       let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
       for page = 0 to t.pages_per_slot - 1 do
         for elt = 0 to t.page_length - 1 do
-          if !offset > t.slot_size then ()
+          (* [!offset >= t.slot_size] because we don't want to read past
+             the buffer [slot] bounds. *)
+          if !offset >= t.slot_size then ()
           else if elt = t.page_length - 1 then (
             let dst = Bytes.create t.remaining_bytes in
             Bytes.blit slot !offset dst 0 t.remaining_bytes ;
