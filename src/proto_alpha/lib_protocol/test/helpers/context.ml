@@ -31,6 +31,10 @@ type t = B of Block.t | I of Incremental.t
 
 let branch = function B b -> b.hash | I i -> (Incremental.predecessor i).hash
 
+let pred_branch = function
+  | B b -> b.header.shell.predecessor
+  | I i -> (Incremental.predecessor i).hash
+
 let level = function B b -> b.header.shell.level | I i -> Incremental.level i
 
 let get_level ctxt =

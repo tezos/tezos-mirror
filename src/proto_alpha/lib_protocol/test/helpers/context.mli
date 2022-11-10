@@ -32,6 +32,8 @@ type t = B of Block.t | I of Incremental.t
 
 val branch : t -> Tezos_crypto.Block_hash.t
 
+val pred_branch : t -> Tezos_crypto.Block_hash.t
+
 val get_level : t -> Raw_level.t tzresult
 
 (** Either retrieve the alpha context (in the [Incremental] case) or
