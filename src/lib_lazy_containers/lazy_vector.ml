@@ -304,6 +304,8 @@ module Mutable = struct
 
     val cons : 'a -> 'a t -> unit
 
+    val pop : 'a t -> 'a Lwt.t
+
     val snapshot : 'a t -> 'a Vector.t
   end
 
@@ -337,6 +339,12 @@ module Mutable = struct
       i
 
     let cons a map_ref = map_ref := Vector.cons a !map_ref
+
+    let pop map_ref =
+      let open Lwt.Syntax in
+      let+ v, map = Vector.pop !map_ref in
+      map_ref := map ;
+      v
 
     let snapshot map_ref = !map_ref
   end

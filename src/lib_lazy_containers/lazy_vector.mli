@@ -244,6 +244,8 @@ module Mutable : sig
 
     val cons : 'a -> 'a t -> unit
 
+    val pop : 'a t -> 'a Lwt.t
+
     val snapshot : 'a t -> 'a Vector.t
   end
 
