@@ -89,7 +89,9 @@ let repl tree inboxes level =
     in
     match input with
     | Some command ->
-        (* TODO: actually do the command *)
+        let* tree, inboxes, level =
+          Commands.handle_command command tree inboxes level
+        in
         loop tree inboxes level
     | None -> return tree
   in
