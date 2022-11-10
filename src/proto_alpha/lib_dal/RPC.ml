@@ -40,23 +40,25 @@ module DAC = struct
         RPC_path.(open_root / "dac" / "store_preimage")
   end
 
-  let handle_serialize_dac_store_preimage data =
-    let for_each_page _ = return () in
+  let handle_serialize_dac_store_preimage reveal_data_dir data =
+    let for_each_page (hash, page_contents) =
+      Hash_storage.save_bytes reveal_data_dir hash page_contents
+    in
     let size = Protocol.Alpha_context.Constants.sc_rollup_message_size_limit in
     Hashing_scheme.serialize_payload ~max_page_size:size data ~for_each_page
 
-  let register_serialize_dac_store_preimage =
+  let register_serialize_dac_store_preimage reveal_data_dir =
     Registration.register0_noctxt
       ~chunked:false
       S.dac_store_preimage
       (fun () input ->
         map_proto_error
-          (handle_serialize_dac_store_preimage input)
+          (handle_serialize_dac_store_preimage reveal_data_dir input)
           Cannot_serialize_page_payload)
 
-  let register () =
+  let register reveal_data_dir =
     (RPC_directory.empty : unit RPC_directory.t)
-    |> register_serialize_dac_store_preimage
+    |> register_serialize_dac_store_preimage reveal_data_dir
 end
 
-let rpc_services = DAC.register ()
+let rpc_services ~reveal_data_dir = DAC.register reveal_data_dir

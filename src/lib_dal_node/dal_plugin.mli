@@ -38,7 +38,8 @@ module type T = sig
     (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
 
   module RPC : sig
-    val rpc_services : unit Tezos_rpc.Directory.directory
+    val rpc_services :
+      reveal_data_dir:string -> unit Tezos_rpc.Directory.directory
   end
 end
 

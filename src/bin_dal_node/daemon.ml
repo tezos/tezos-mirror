@@ -113,9 +113,12 @@ module Handler = struct
                 init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
               in
               let dir = RPC_server.register ctxt in
+              let reveal_data_dir = config.Configuration.dac.reveal_data_dir in
               let plugin_prefix = Tezos_rpc.Path.(open_root / "plugin") in
               let plugin_dir =
-                Tezos_rpc.Directory.prefix plugin_prefix Plugin.RPC.rpc_services
+                Tezos_rpc.Directory.prefix
+                  plugin_prefix
+                  (Plugin.RPC.rpc_services ~reveal_data_dir)
               in
               let dir_with_plugin = RPC_server.merge dir plugin_dir in
               let* rpc_server = RPC_server.(start config dir_with_plugin) in
