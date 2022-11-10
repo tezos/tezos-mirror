@@ -227,7 +227,13 @@ let replay_one_block strict main_chain_store validator_process block =
   if Store.Block.level block <= savepoint_level then
     tzfail Cannot_replay_below_savepoint
   else
-    let expected_context_hash = Store.Block.context_hash block in
+    let* protocol = Store.Block.protocol_hash main_chain_store block in
+    let* (module Proto) = Registered_protocol.get_result protocol in
+    let* expected_context_hash =
+      if Proto.expected_context_hash = `Current then
+        return (Store.Block.context_hash block)
+      else Store.Block.resulting_context_hash main_chain_store block
+    in
     let* metadata = Store.Block.get_block_metadata main_chain_store block in
     let expected_block_receipt_bytes = Store.Block.block_metadata metadata in
     let expected_operation_receipts =
@@ -271,8 +277,6 @@ let replay_one_block strict main_chain_store validator_process block =
       when_
         (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
         (fun () ->
-          let* protocol = Store.Block.protocol_hash main_chain_store block in
-          let* (module Proto) = Registered_protocol.get_result protocol in
           let to_json block =
             Data_encoding.Json.construct Proto.block_header_metadata_encoding
             @@ Data_encoding.Binary.of_bytes_exn

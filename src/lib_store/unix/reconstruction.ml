@@ -25,7 +25,6 @@
 
 type failure_kind =
   | Nothing_to_reconstruct
-  | Context_hash_mismatch of Block_header.t * Context_hash.t * Context_hash.t
   | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
 
@@ -41,22 +40,12 @@ let failure_kind_encoding =
         (fun () -> Nothing_to_reconstruct);
       case
         (Tag 1)
-        ~title:"context_hash_mismatch"
-        (obj3
-           (req "block_header" Block_header.encoding)
-           (req "expected" Context_hash.encoding)
-           (req "got" Context_hash.encoding))
-        (function
-          | Context_hash_mismatch (h, e, g) -> Some (h, e, g) | _ -> None)
-        (fun (h, e, g) -> Context_hash_mismatch (h, e, g));
-      case
-        (Tag 2)
         ~title:"cannot_read_block_hash"
         Block_hash.encoding
         (function Cannot_read_block_hash h -> Some h | _ -> None)
         (fun h -> Cannot_read_block_hash h);
       case
-        (Tag 3)
+        (Tag 2)
         ~title:"cannot_read_block_level"
         int32
         (function Cannot_read_block_level l -> Some l | _ -> None)
@@ -65,18 +54,6 @@ let failure_kind_encoding =
 
 let failure_kind_pp ppf = function
   | Nothing_to_reconstruct -> Format.fprintf ppf "nothing to reconstruct"
-  | Context_hash_mismatch (h, e, g) ->
-      Format.fprintf
-        ppf
-        "resulting context hash for block %a (level %ld) does not match. \
-         Context hash expected %a, got %a"
-        Block_hash.pp
-        (Block_header.hash h)
-        h.shell.level
-        Context_hash.pp
-        e
-        Context_hash.pp
-        g
   | Cannot_read_block_hash h ->
       Format.fprintf ppf "Unexpected missing block in store: %a" Block_hash.pp h
   | Cannot_read_block_level l ->
@@ -156,14 +133,6 @@ let cemented_metadata_status cemented_store
           in
           search (Int32.succ start_level) (Int32.pred end_level))
 
-let check_context_hash_consistency block_validation_result block_header =
-  let expected = block_header.Block_header.shell.context in
-  let got = block_validation_result.Block_validation.context_hash in
-  fail_unless
-    (Context_hash.equal expected got)
-    (Reconstruction_failure
-       (Context_hash_mismatch (block_header, expected, got)))
-
 (* We assume that the given list is not empty. *)
 let compute_block_metadata_hash block_metadata =
   Some (Block_metadata_hash.hash_bytes [block_metadata])
@@ -193,20 +162,20 @@ let compute_all_operations_metadata_hash block =
 let apply_context context_index chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
-    ~predecessor_block block =
+    ~predecessor_block ~expected_context_hash block =
   let open Lwt_result_syntax in
   let block_header = Store.Block.header block in
   let operations = Store.Block.operations block in
   let predecessor_block_header = Store.Block.header predecessor_block in
-  let context_hash = predecessor_block_header.shell.context in
-  let* predecessor_context =
-    let*! o = Context_ops.checkout context_index context_hash in
-    match o with
-    | Some ctxt -> return ctxt
-    | None ->
-        tzfail
-          (Store_errors.Cannot_checkout_context
-             (Store.Block.hash predecessor_block, context_hash))
+  let predecessor_resulting_context_hash =
+    if
+      expected_context_hash
+      = Tezos_protocol_environment__Environment_context.Resulting_context
+    then Store.Block.context_hash predecessor_block
+    else Store.Block.context_hash block
+  in
+  let*! predecessor_context =
+    Context_ops.checkout_exn context_index predecessor_resulting_context_hash
   in
   let apply_environment =
     {
@@ -217,6 +186,7 @@ let apply_context context_index chain_id ~user_activated_upgrades
       predecessor_context;
       predecessor_block_metadata_hash;
       predecessor_ops_metadata_hash;
+      predecessor_resulting_context_hash;
       user_activated_upgrades;
       user_activated_protocol_overrides;
       operation_metadata_size_limit;
@@ -239,7 +209,6 @@ let apply_context context_index chain_id ~user_activated_upgrades
        block to the next one.
     *)
   in
-  let* () = check_context_hash_consistency validation_store block_header in
   return
     ( validation_store.message,
       validation_store.max_operations_ttl,
@@ -248,7 +217,7 @@ let apply_context context_index chain_id ~user_activated_upgrades
       ops_metadata )
 
 (** Returns the protocol environment version of a given protocol level. *)
-let protocol_env_of_protocol_level chain_store protocol_level block_hash =
+let protocol_of_protocol_level chain_store protocol_level block_hash =
   let open Lwt_result_syntax in
   let* protocol_hash =
     let*! o = Store.Chain.find_protocol chain_store ~protocol_level in
@@ -256,12 +225,10 @@ let protocol_env_of_protocol_level chain_store protocol_level block_hash =
     | Some ph -> return ph
     | None -> tzfail (Store_errors.Cannot_find_protocol protocol_level)
   in
-  match Registered_protocol.get protocol_hash with
-  | None ->
-      tzfail
-        (Block_validator_errors.Unavailable_protocol
-           {block = block_hash; protocol = protocol_hash})
-  | Some (module Proto) -> return Proto.environment_version
+  trace
+    (Block_validator_errors.Unavailable_protocol
+       {block = block_hash; protocol = protocol_hash})
+    (Registered_protocol.get_result protocol_hash)
 
 (* Restores the block and operations metadata hash of a given block,
    if needed. *)
@@ -342,6 +309,12 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
               "Cannot read block in cemented store. The storage is corrupted."
         | Some b -> return b
       in
+      let* (module Proto) =
+        protocol_of_protocol_level
+          chain_store
+          (Store.Block.proto_level block)
+          (Store.Block.hash block)
+      in
       let* ( message,
              max_operations_ttl,
              last_allowed_fork_level,
@@ -386,17 +359,13 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
             ~predecessor_block_metadata_hash
             ~predecessor_ops_metadata_hash
             ~predecessor_block
+            ~expected_context_hash:Proto.expected_context_hash
             block
       in
       let*! () =
         Event.(emit reconstruct_block_success) (Store.Block.descriptor block)
       in
-      let* block_protocol_env =
-        protocol_env_of_protocol_level
-          chain_store
-          (Store.Block.proto_level block)
-          (Store.Block.hash block)
-      in
+      let block_protocol_env = Proto.environment_version in
       let reconstructed_block =
         restore_block_contents
           chain_store
@@ -420,7 +389,7 @@ let store_chunk cemented_store chunk =
     | Some e -> return e
   in
   let* _, higher_env_version =
-    match List.hd (List.rev chunk) with
+    match List.last_opt chunk with
     | None -> failwith "Cannot read chunk to cement."
     | Some e -> return e
   in
@@ -561,13 +530,13 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
                 let* available_metadata =
                   List.map_es
                     (fun br ->
-                      let* proto_env_version =
-                        protocol_env_of_protocol_level
+                      let* (module Proto) =
+                        protocol_of_protocol_level
                           chain_store
                           (Block_repr.proto_level br)
                           (Block_repr.hash br)
                       in
-                      return (br, proto_env_version))
+                      return (br, Proto.environment_version))
                     brs
                 in
                 let* () =
@@ -616,9 +585,15 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
         List.iter_es
           (fun fs ->
             let* () =
-              Floating_block_store.iter_with_pred_s
-                (fun (block, predecessors) ->
+              Floating_block_store.iter_with_info_s
+                (fun (block, info) ->
                   let level = Block_repr.level block in
+                  let* (module Proto) =
+                    protocol_of_protocol_level
+                      chain_store
+                      (Block_repr.proto_level block)
+                      (Block_repr.hash block)
+                  in
                   (* If the block is genesis then just retrieve its metadata. *)
                   let* ( message,
                          max_operations_ttl,
@@ -697,6 +672,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                                 (Store.Block.all_operations_metadata_hash
                                    predecessor_block)
                               ~predecessor_block
+                              ~expected_context_hash:Proto.expected_context_hash
                               block
                           in
                           let*! () =
@@ -735,16 +711,10 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                               block_metadata,
                               operations_metadata )
                   in
-                  let* block_protocol_env =
-                    protocol_env_of_protocol_level
-                      chain_store
-                      (Block_repr.proto_level block)
-                      (Block_repr.hash block)
-                  in
                   let reconstructed_block =
                     restore_block_contents
                       chain_store
-                      block_protocol_env
+                      Proto.environment_version
                       ~block_metadata
                       ~operations_metadata
                       message
@@ -755,7 +725,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                   let* () =
                     Floating_block_store.append_block
                       new_ro_store
-                      predecessors
+                      info
                       reconstructed_block
                   in
                   let*! () = notify () in

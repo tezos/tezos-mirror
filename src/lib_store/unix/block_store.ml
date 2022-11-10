@@ -240,7 +240,7 @@ let mem block_store key =
                  block_store.cemented_store
                  predecessor_hash))
 
-let read_block ~read_metadata block_store key_kind =
+let read_block block_store ~read_metadata key_kind =
   let open Lwt_result_syntax in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       (* Resolve the hash *)
@@ -317,7 +317,67 @@ let read_block_metadata block_store key_kind =
                       block_store.cemented_store
                       level)))
 
-let store_block block_store block =
+let resulting_context_hash block_store ~fetch_expect_predecessor_context key =
+  (* Hypothesis: there is an intersection of at least 1 block with the
+     end of the cementing store and the beginning of the floating
+     store.
+     Indeed, there are [max_op_ttl] blocks below the checkpoint
+     kept in the floating store, so that this window of blocks
+     overlaps with the content of the cemented store. Thus, looking
+     at the successor of the last cemented block should never occur,
+     as this case would be tackled by the floating store's looking. *)
+  let open Lwt_result_syntax in
+  let ( let*? ) t k =
+    let* v_opt = t in
+    match v_opt with None -> return_none | Some v -> k v
+  in
+  Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
+      (* Resolve the hash *)
+      let*? adjusted_hash = get_hash block_store key in
+      if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
+        return_some (Block_repr.context block_store.genesis_block)
+      else
+        (* First look in the floating stores *)
+        let*! resulting_context_opt =
+          List.find_map_s
+            (fun store ->
+              Floating_block_store.find_resulting_context_hash
+                store
+                adjusted_hash)
+            (block_store.rw_floating_block_store
+           :: block_store.ro_floating_block_stores)
+        in
+        match resulting_context_opt with
+        | Some resulting_context_hash -> return_some resulting_context_hash
+        | None ->
+            (* If not found, look at the context of the direct
+               successor of the looked up block in the cemented store. *)
+            let cemented_store = block_store.cemented_store in
+            let* expect_predecessor = fetch_expect_predecessor_context () in
+            if expect_predecessor then
+              let*? block_level =
+                return
+                  (Cemented_block_store.get_cemented_block_level
+                     cemented_store
+                     adjusted_hash)
+              in
+              let*? succ_block =
+                Cemented_block_store.get_cemented_block_by_level
+                  cemented_store
+                  ~read_metadata:false
+                  (Int32.succ block_level)
+              in
+              return_some (Block_repr.context succ_block)
+            else
+              let*? block =
+                Cemented_block_store.get_cemented_block_by_hash
+                  cemented_store
+                  ~read_metadata:false
+                  adjusted_hash
+              in
+              return_some (Block_repr.context block))
+
+let store_block block_store block resulting_context_hash =
   let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
@@ -330,7 +390,7 @@ let store_block block_store block =
           Floating_block_store.append_block
             ~log_metrics:true
             block_store.rw_floating_block_store
-            predecessors
+            {predecessors; resulting_context_hash}
             block))
 
 let cement_blocks ?(check_consistency = true) ~write_metadata block_store
@@ -902,15 +962,19 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
               let block_hash = Block_repr_unix.raw_get_block_hash block_bytes in
               if Block_hash.Set.mem block_predecessor !visited then (
                 visited := Block_hash.Set.add block_hash !visited ;
-                let*! predecessors =
+                let*! {predecessors; resulting_context_hash} =
                   let*! pred_opt =
-                    Floating_block_store.find_predecessors store block_hash
+                    Floating_block_store.find_info store block_hash
                   in
                   Lwt.return (WithExceptions.Option.get ~loc:__LOC__ pred_opt)
                 in
                 Floating_block_store.raw_append
                   new_store
-                  (block_hash, block_bytes, total_block_length, predecessors))
+                  ( block_hash,
+                    block_bytes,
+                    total_block_length,
+                    predecessors,
+                    resulting_context_hash ))
               else return_unit)
           store)
       [ro_store; rw_store]
@@ -1534,7 +1598,12 @@ let create ?block_cache_limit chain_dir ~genesis_block =
   let* block_store =
     load chain_dir ?block_cache_limit ~genesis_block ~readonly:false
   in
-  let* () = store_block block_store genesis_block in
+  let* () =
+    store_block
+      block_store
+      genesis_block
+      genesis_block.contents.header.shell.context
+  in
   return block_store
 
 let register_gc_callback block_store gc_callback =
@@ -1574,3 +1643,104 @@ let close block_store =
   List.iter_s
     Floating_block_store.close
     (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
+
+(***************** Upgrade to V3 *****************)
+
+let v_3_0_upgrade chain_dir ~cleanups ~finalizers =
+  let open Lwt_result_syntax in
+  let get_floating_paths kind =
+    let legacy_floating_blocks_dir =
+      Naming.floating_blocks_dir chain_dir kind
+    in
+    let legacy_floating_index_dir =
+      Naming.dir_path
+        (Naming.floating_blocks_index_dir legacy_floating_blocks_dir)
+    in
+    let legacy_floating_blocks_file =
+      Naming.floating_blocks_file legacy_floating_blocks_dir
+    in
+    let new_floating_index_dir =
+      Naming.dir_path
+        (Naming.floating_blocks_index_dir legacy_floating_blocks_dir)
+      ^ ".new"
+    in
+    ( Naming.dir_path legacy_floating_blocks_dir,
+      legacy_floating_index_dir,
+      legacy_floating_blocks_file,
+      new_floating_index_dir )
+  in
+  let all_kinds = Naming.[RO; RW; RW_TMP; RO_TMP] in
+  let upgrade_floating_index kind =
+    let ( legacy_floating_blocks_dir,
+          legacy_floating_index_dir,
+          legacy_floating_blocks_file,
+          new_floating_index_dir ) =
+      get_floating_paths kind
+    in
+    let*! should_upgrade = Lwt_unix.file_exists legacy_floating_blocks_dir in
+    if not should_upgrade then return_unit
+    else
+      let clean_failed_upgrade () =
+        let*! exists = Lwt_unix.file_exists new_floating_index_dir in
+        if exists then Lwt_utils_unix.remove_dir new_floating_index_dir
+        else Lwt.return_unit
+      in
+      let finalize () =
+        let*! exists = Lwt_unix.file_exists new_floating_index_dir in
+        if exists then
+          let*! () = Lwt_utils_unix.remove_dir legacy_floating_index_dir in
+          Lwt_unix.rename new_floating_index_dir legacy_floating_index_dir
+        else Lwt.return_unit
+      in
+      finalizers := finalize :: !finalizers ;
+      cleanups := clean_failed_upgrade :: !cleanups ;
+      let legacy_index =
+        Floating_block_index.Legacy.v
+          ~log_size:Floating_block_store.default_floating_blocks_log_size
+          ~readonly:true
+          legacy_floating_index_dir
+      in
+      let new_index =
+        Floating_block_index.v
+          ~log_size:Floating_block_store.default_floating_blocks_log_size
+          ~readonly:false
+          new_floating_index_dir
+      in
+      let*! fd =
+        Lwt_unix.openfile
+          (Naming.file_path legacy_floating_blocks_file)
+          [Unix.O_CLOEXEC; Unix.O_RDONLY]
+          0o444
+      in
+      Lwt.finalize
+        (fun () ->
+          (* Iterate over the existing stores and retrieve their context hash. *)
+          let* () =
+            Floating_block_store.raw_iterate_fd
+              (fun (block_b, _len) ->
+                let block_hash = Block_repr_unix.raw_get_block_hash block_b in
+                let block_context = Block_repr_unix.raw_get_context block_b in
+                let {
+                  Floating_block_index.Legacy.Legacy_block_info.offset;
+                  predecessors;
+                } =
+                  Floating_block_index.Legacy.find legacy_index block_hash
+                in
+                let resulting_context_hash = block_context in
+                let new_value =
+                  Floating_block_index.Block_info.
+                    {offset; predecessors; resulting_context_hash}
+                in
+                Floating_block_index.replace new_index block_hash new_value ;
+                return_unit)
+              fd
+          in
+          return_unit)
+        (fun () ->
+          Floating_block_index.flush new_index ;
+          Floating_block_index.close new_index ;
+          Floating_block_index.Legacy.close legacy_index ;
+          let*! () = Lwt_unix.close fd in
+          Lwt.return_unit)
+  in
+  protect (fun () -> List.iter_es upgrade_floating_index all_kinds)

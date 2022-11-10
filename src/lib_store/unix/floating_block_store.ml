@@ -41,11 +41,16 @@ type t = {
   scheduler : Lwt_idle_waiter.t;
 }
 
+type info = {
+  predecessors : Block_hash.t list;
+  resulting_context_hash : Context_hash.t;
+}
+
 (* The log_size corresponds to the maximum size of the memory zone
    allocated in memory before flushing it onto the disk. It is
    basically a cache which is use for the index. The cache size is
    `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
-let floating_blocks_log_size = 10_000
+let default_floating_blocks_log_size = 10_000
 
 let default_block_buffer_size = 500_000
 
@@ -58,39 +63,46 @@ let mem floating_store hash =
       Lwt.return
         (Floating_block_index.mem floating_store.floating_block_index hash))
 
-let find_predecessors floating_store hash =
+let find_info floating_store hash =
   Lwt_idle_waiter.task floating_store.scheduler (fun () ->
       try
-        let {predecessors; _} =
+        let {predecessors; resulting_context_hash; _} =
           Floating_block_index.find floating_store.floating_block_index hash
         in
-        Lwt.return_some predecessors
+        Lwt.return_some {predecessors; resulting_context_hash}
       with Not_found -> Lwt.return_none)
 
-let read_block_and_predecessors floating_store hash =
+let ( let*? ) t k =
   let open Lwt_syntax in
+  let* v_opt = t in
+  match v_opt with None -> return_none | Some v -> k v
+
+let find_predecessors floating_store hash =
+  let*? {predecessors; _} = find_info floating_store hash in
+  Lwt.return_some predecessors
+
+let find_resulting_context_hash floating_store hash =
+  let*? {resulting_context_hash; _} = find_info floating_store hash in
+  Lwt.return_some resulting_context_hash
+
+let read_block_and_info floating_store hash =
   Lwt_idle_waiter.task floating_store.scheduler (fun () ->
       Option.catch_os (fun () ->
-          let {offset; predecessors} =
+          let {offset; predecessors; resulting_context_hash} =
             Floating_block_index.find floating_store.floating_block_index hash
           in
-          let* o =
+          let*? block, _ =
             Block_repr_unix.pread_block floating_store.fd ~file_offset:offset
           in
-          match o with
-          | Some (block, _) -> Lwt.return_some (block, predecessors)
-          | None ->
-              (* May be the case when a stored block is corrupted *)
-              Lwt.return_none))
+          Lwt.return_some (block, {predecessors; resulting_context_hash})))
 
 let read_block floating_store hash =
   let open Lwt_syntax in
-  let* o = read_block_and_predecessors floating_store hash in
-  match o with
-  | Some (block, _) -> Lwt.return_some block
-  | None -> Lwt.return_none
+  let*? block, _ = read_block_and_info floating_store hash in
+  return_some block
 
-let locked_write_block floating_store ~offset ~block ~predecessors =
+let locked_write_block floating_store ~offset ~block ~predecessors
+    ~resulting_context_hash =
   let open Lwt_result_syntax in
   let* block_bytes =
     match Data_encoding.Binary.to_bytes_opt Block_repr.encoding block with
@@ -108,16 +120,21 @@ let locked_write_block floating_store ~offset ~block ~predecessors =
   Floating_block_index.replace
     floating_store.floating_block_index
     block.Block_repr.hash
-    {offset; predecessors} ;
+    {offset; predecessors; resulting_context_hash} ;
   return block_length
 
-let append_block ?(flush = true) ?(log_metrics = false) floating_store
-    predecessors (block : Block_repr.t) =
+let append_block floating_store ?(flush = true) ?(log_metrics = false)
+    ({predecessors; resulting_context_hash} : info) (block : Block_repr.t) =
   let open Lwt_result_syntax in
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
       let*! offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
       let* written_len =
-        locked_write_block floating_store ~offset ~block ~predecessors
+        locked_write_block
+          floating_store
+          ~offset
+          ~block
+          ~predecessors
+          ~resulting_context_hash
       in
       if flush then
         Floating_block_index.flush floating_store.floating_block_index ;
@@ -127,16 +144,20 @@ let append_block ?(flush = true) ?(log_metrics = false) floating_store
           (Int.to_float written_len) ;
       return_unit)
 
-let append_all floating_store
-    (blocks : (Block_hash.t list * Block_repr.t) Seq.t) =
+let append_all floating_store (blocks : (Block_repr.t * info) Seq.t) =
   let open Lwt_result_syntax in
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
       let*! eof_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
       let* _last_offset =
         Seq.fold_left_es
-          (fun offset (predecessors, block) ->
+          (fun offset (block, ({predecessors; resulting_context_hash} : info)) ->
             let* written_len =
-              locked_write_block floating_store ~offset ~block ~predecessors
+              locked_write_block
+                floating_store
+                ~offset
+                ~block
+                ~predecessors
+                ~resulting_context_hash
             in
             return (offset + written_len))
           eof_offset
@@ -162,14 +183,14 @@ let iter_s_raw_fd f fd =
   loop eof_offset
 
 (* May raise [Not_found] if index does not contain the block. *)
-let iter_with_pred_s_raw_fd f fd block_index =
+let iter_with_info_s_raw_fd f fd block_index =
   protect (fun () ->
       iter_s_raw_fd
         (fun block ->
-          let {predecessors; _} =
+          let {predecessors; resulting_context_hash; _} =
             Floating_block_index.find block_index block.hash
           in
-          f (block, predecessors))
+          f (block, {predecessors; resulting_context_hash}))
         fd)
 
 let folder f floating_store =
@@ -204,13 +225,13 @@ let fold_left_s f e floating_store =
       return !acc)
     floating_store
 
-let fold_left_with_pred_s f e floating_store =
+let fold_left_with_info_s f e floating_store =
   let open Lwt_result_syntax in
   folder
     (fun fd ->
       let acc = ref e in
       let* () =
-        iter_with_pred_s_raw_fd
+        iter_with_info_s_raw_fd
           (fun (b, preds) ->
             let* new_acc = f !acc (b, preds) in
             acc := new_acc ;
@@ -224,8 +245,8 @@ let fold_left_with_pred_s f e floating_store =
 (* Iter sequentially on every blocks in the file *)
 let iter_s f floating_store = fold_left_s (fun () e -> f e) () floating_store
 
-let iter_with_pred_s f floating_store =
-  fold_left_with_pred_s (fun () e -> f e) () floating_store
+let iter_with_info_s f floating_store =
+  fold_left_with_info_s (fun () e -> f e) () floating_store
 
 let retrieve_block_from_stores floating_stores block_hash =
   let open Lwt_result_syntax in
@@ -248,7 +269,7 @@ let raw_copy_block ~block_buffer ~src_floating_stores ~block_hash
     ~dst_floating_store =
   let open Lwt_result_syntax in
   protect (fun () ->
-      let* {offset; predecessors}, src_floating_store =
+      let* {offset; predecessors; resulting_context_hash}, src_floating_store =
         retrieve_block_from_stores src_floating_stores block_hash
       in
       let length_size = 4 in
@@ -285,7 +306,7 @@ let raw_copy_block ~block_buffer ~src_floating_stores ~block_hash
       Floating_block_index.replace
         dst_floating_store.floating_block_index
         block_hash
-        {offset = new_offset; predecessors} ;
+        {offset = new_offset; predecessors; resulting_context_hash} ;
       return_unit)
 
 let raw_copy_all ~src_floating_stores ~block_hashes ~dst_floating_store =
@@ -306,7 +327,7 @@ let raw_retrieve_blocks_seq ~src_floating_stores ~block_hashes =
   List.to_seq block_hashes
   |> Seq.map (fun block_hash ->
          protect (fun () ->
-             let* {offset; predecessors = _}, src_floating_store =
+             let* {offset; _}, src_floating_store =
                retrieve_block_from_stores src_floating_stores block_hash
              in
              let length_size = 4 in
@@ -375,8 +396,51 @@ let raw_iterate f floating_store =
   in
   protect (fun () -> folder iterate floating_store)
 
+let raw_iterate_fd f fd =
+  let open Lwt_result_syntax in
+  let block_buffer = ref (Bytes.create default_block_buffer_size) in
+  let block_size_buffer = Bytes.create 4 in
+  let iterate fd =
+    let*! end_of_file_offset = Lwt_unix.lseek fd 0 Unix.SEEK_END in
+    let rec loop current_offset =
+      if current_offset = end_of_file_offset then return_unit
+      else
+        let*! () =
+          Lwt_utils_unix.read_bytes
+            ~file_offset:current_offset
+            ~pos:0
+            ~len:4
+            fd
+            block_size_buffer
+        in
+        let block_length =
+          Bytes.get_int32_be block_size_buffer 0 |> Int32.to_int
+        in
+        let required_length = block_length + 4 in
+        let buffer_length = Bytes.length !block_buffer in
+        if buffer_length < required_length then
+          block_buffer := Bytes.create required_length ;
+        let*! () =
+          Lwt_utils_unix.read_bytes
+            ~file_offset:current_offset
+            ~pos:0
+            ~len:required_length
+            fd
+            !block_buffer
+        in
+        let* () = f (!block_buffer, required_length) in
+        loop (current_offset + required_length)
+    in
+    loop 0
+  in
+  protect (fun () -> iterate fd)
+
 let raw_append floating_store
-    (block_hash, block_bytes, required_length, predecessors) =
+    ( block_hash,
+      block_bytes,
+      required_length,
+      predecessors,
+      resulting_context_hash ) =
   let open Lwt_result_syntax in
   protect @@ fun () ->
   let*! new_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
@@ -390,7 +454,7 @@ let raw_append floating_store
   Floating_block_index.replace
     floating_store.floating_block_index
     block_hash
-    {offset = new_offset; predecessors} ;
+    {offset = new_offset; predecessors; resulting_context_hash} ;
   return_unit
 
 let init chain_dir ~readonly kind =
@@ -421,7 +485,7 @@ let init chain_dir ~readonly kind =
   in
   let floating_block_index =
     Floating_block_index.v
-      ~log_size:floating_blocks_log_size
+      ~log_size:default_floating_blocks_log_size
       ~readonly
       (Naming.dir_path floating_index_dir)
   in
@@ -440,8 +504,8 @@ let append_floating_store ~from ~into =
   let open Lwt_result_syntax in
   protect (fun () ->
       let* () =
-        iter_with_pred_s
-          (fun (block, preds) -> append_block ~flush:false into preds block)
+        iter_with_info_s
+          (fun (block, info) -> append_block ~flush:false into info block)
           from
       in
       Floating_block_index.flush ~with_fsync:true into.floating_block_index ;
@@ -509,7 +573,7 @@ let full_integrity_check chain_dir kind =
           in
           let index =
             Floating_block_index.v
-              ~log_size:floating_blocks_log_size
+              ~log_size:default_floating_blocks_log_size
               ~readonly:false
               floating_blocks_index_dir_path
           in
@@ -577,7 +641,7 @@ let fix_integrity chain_dir kind =
                     iter_s
                       (fun block ->
                         let*! o =
-                          find_predecessors
+                          find_info
                             inconsistent_floating_store
                             (Block_repr.hash block)
                         in

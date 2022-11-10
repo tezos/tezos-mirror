@@ -77,6 +77,12 @@ let testchains_dir dir = mk_dir dir "testchains"
 let protocol_levels_file dir =
   make_encoded_file dir ~filename:"protocol_levels" Protocol_levels.encoding
 
+let legacy_protocol_levels_file dir =
+  make_encoded_file
+    dir
+    ~filename:"protocol_levels"
+    Protocol_levels.Legacy.encoding
+
 let genesis_block_file dir =
   make_encoded_file dir ~filename:"genesis" Block_repr.encoding
 

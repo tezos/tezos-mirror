@@ -2328,21 +2328,27 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let protocol_levels =
         Protocol_levels.(
           filter
-            (fun level {block; _} ->
+            (fun level {activation_block; _} ->
+              let block = activation_block.block in
               level >= Store.Block.proto_level minimum_block
               || Store.Block.is_genesis chain_store (fst block))
             protocol_levels)
+      in
+      let* pred_resulting_context =
+        Store.Block.resulting_context_hash chain_store pred_block
       in
       return
         ( export_mode,
           export_block,
           pred_block,
+          pred_resulting_context,
           protocol_levels,
           (return_unit, floating_block_stream) )
     in
     let* ( export_mode,
            export_block,
            pred_block,
+           pred_resulting_context,
            protocol_levels,
            (return_unit, floating_block_stream) ) =
       Store.Unsafe.open_for_snapshot_export
@@ -2355,6 +2361,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       ( export_mode,
         export_block,
         pred_block,
+        pred_resulting_context,
         protocol_levels,
         (return_unit, floating_block_stream) )
 
@@ -2417,10 +2424,14 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 Compare.Int32.(
                   max_cemented_level > Store.Block.level export_block)
           in
+          let* pred_resulting_context =
+            Store.Block.resulting_context_hash chain_store pred_block
+          in
           return
             ( export_mode,
               export_block,
               pred_block,
+              pred_resulting_context,
               protocol_levels,
               cemented_table,
               (ro_fd, rw_fd),
@@ -2434,6 +2445,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let* ( export_mode,
            export_block,
            pred_block,
+           pred_resulting_context,
            protocol_levels,
            cemented_table,
            (floating_ro_fd, floating_rw_fd),
@@ -2480,6 +2492,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       ( export_mode,
         export_block,
         pred_block,
+        pred_resulting_context,
         protocol_levels,
         (reading_thread, floating_block_stream) )
 
@@ -2512,6 +2525,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           let* ( export_mode,
                  export_block,
                  pred_block,
+                 pred_resulting_context,
                  protocol_levels,
                  (reading_thread, floating_block_stream) ) =
             if rolling then
@@ -2531,18 +2545,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
              now, it is performed outside the lock to allow the node from
              getting stuck while waiting a merge. *)
           let*! context_index = Context.init ~readonly:true context_dir in
-          let*! context =
-            Context.checkout_exn
-              context_index
-              (Store.Block.context_hash export_block)
-          in
           (* Retrieve predecessor block metadata hash and operations
              metadata hash from the context of the exported block *)
-          let*! predecessor_block_metadata_hash =
-            Context.find_predecessor_block_metadata_hash context
+          let predecessor_block_metadata_hash =
+            Store.Block.block_metadata_hash pred_block
           in
-          let*! predecessor_ops_metadata_hash =
-            Context.find_predecessor_ops_metadata_hash context
+          let predecessor_ops_metadata_hash =
+            Store.Block.all_operations_metadata_hash pred_block
           in
           let*! () =
             Exporter.write_block_data
@@ -2556,7 +2565,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
             Exporter.dump_context
               snapshot_exporter
               context_index
-              (Store.Block.context_hash pred_block)
+              pred_resulting_context
               ~on_disk
               progress_display_mode
           in
@@ -2758,7 +2767,7 @@ module type IMPORTER = sig
     unit tzresult Lwt.t
 
   val load_protocol_table :
-    t -> Protocol_levels.activation_block Protocol_levels.t tzresult Lwt.t
+    t -> Protocol_levels.protocol_info Protocol_levels.t tzresult Lwt.t
 
   val load_and_validate_protocol_filenames :
     t -> Protocol_hash.t list tzresult Lwt.t
@@ -2858,7 +2867,6 @@ module Raw_importer : IMPORTER = struct
             ~in_memory
             ~progress_display_mode
         in
-        (* FIXME: Is this test really usefull? *)
         let*! current = Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR in
         let*! stats = Lwt_unix.fstat fd in
         let total = stats.Lwt_unix.st_size in
@@ -2876,9 +2884,37 @@ module Raw_importer : IMPORTER = struct
       Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
     with
     | Some table -> return table
-    | None ->
-        tzfail
-          (Cannot_read {kind = `Protocol_table; path = protocol_tbl_filename})
+    | None -> (
+        (* Try with legacy's encoding *)
+        match
+          Data_encoding.Binary.of_string_opt
+            Protocol_levels.Legacy.encoding
+            table_bytes
+        with
+        | Some table ->
+            Protocol_levels.Legacy.fold_es
+              (fun proto_level activation_block map ->
+                let protocol_info =
+                  {
+                    Protocol_levels.protocol =
+                      activation_block.Protocol_levels.Legacy.protocol;
+                    activation_block =
+                      {
+                        Protocol_levels.block = activation_block.block;
+                        commit_info = activation_block.commit_info;
+                      };
+                    (* Only snapshot with legacy semantics will have
+                       legacy encoding. *)
+                    expect_predecessor_context = false;
+                  }
+                in
+                return (Protocol_levels.add proto_level protocol_info map))
+              table
+              Protocol_levels.empty
+        | None ->
+            tzfail
+              (Cannot_read
+                 {kind = `Protocol_table; path = protocol_tbl_filename}))
 
   let load_and_validate_protocol_filenames t =
     let open Lwt_result_syntax in
@@ -3133,15 +3169,49 @@ module Tar_importer : IMPORTER = struct
       Onthefly.load_from_filename t.tar ~filename:protocol_tbl_filename
     in
     match o with
-    | Some str ->
-        let _ofs, res =
-          Data_encoding.Binary.read_exn
+    | Some str -> (
+        let res =
+          Data_encoding.Binary.read_opt
             Protocol_levels.encoding
             str
             0
             (String.length str)
         in
-        return res
+        match res with
+        | Some (_ofs, res) -> return res
+        | None -> (
+            (* Try with legacy's encoding *)
+            match
+              Data_encoding.Binary.read_opt
+                Protocol_levels.Legacy.encoding
+                str
+                0
+                (String.length str)
+            with
+            | Some (_ofs, table) ->
+                Protocol_levels.Legacy.fold_es
+                  (fun proto_level activation_block map ->
+                    let protocol_info =
+                      {
+                        Protocol_levels.protocol =
+                          activation_block.Protocol_levels.Legacy.protocol;
+                        activation_block =
+                          {
+                            Protocol_levels.block = activation_block.block;
+                            commit_info = activation_block.commit_info;
+                          };
+                        (* Only snapshot with legacy semantics will have
+                           legacy encoding. *)
+                        expect_predecessor_context = false;
+                      }
+                    in
+                    return (Protocol_levels.add proto_level protocol_info map))
+                  table
+                  Protocol_levels.empty
+            | None ->
+                tzfail
+                  (Cannot_read
+                     {kind = `Protocol_table; path = protocol_tbl_filename})))
     | None ->
         tzfail
           (Cannot_read {kind = `Protocol_table; path = protocol_tbl_filename})
@@ -3483,21 +3553,26 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     Event.(emit import_loading ())
 
-  let check_context_hash_consistency validation_store block_header =
+  let check_context_hash_consistency ~expect_predecessor_context
+      validation_store block_header =
+    (* FIXME: provide the resulting block context in the snapshot and
+       check against it when the [expect_predecessor_context]
+       semantics is used. *)
     fail_unless
-      (Context_hash.equal
-         validation_store.Tezos_validation.Block_validation.context_hash
-         block_header.Block_header.shell.context)
+      (expect_predecessor_context
+      || Context_hash.equal
+           validation_store.Tezos_validation.Block_validation.context_hash
+           block_header.Block_header.shell.context)
       (Inconsistent_context_hash
          {
            expected = block_header.Block_header.shell.context;
            got = validation_store.Tezos_validation.Block_validation.context_hash;
          })
 
-  let restore_and_apply_context snapshot_importer ?user_expected_block
-      ~context_index ~user_activated_upgrades ~user_activated_protocol_overrides
-      ~operation_metadata_size_limit ~legacy ~in_memory ~progress_display_mode
-      snapshot_metadata genesis chain_id =
+  let restore_and_apply_context snapshot_importer protocol_levels
+      ?user_expected_block ~context_index ~user_activated_upgrades
+      ~user_activated_protocol_overrides ~operation_metadata_size_limit ~legacy
+      ~in_memory ~progress_display_mode snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
     (* Start by committing genesis *)
     let* genesis_ctxt_hash =
@@ -3535,23 +3610,39 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         (Inconsistent_imported_block
            (block_header_hash, snapshot_metadata.block_hash))
     in
+    let expected_context_hash, expect_predecessor_context =
+      match
+        Protocol_levels.find
+          predecessor_header.shell.proto_level
+          protocol_levels
+      with
+      | None -> Stdlib.failwith "unknown protocol"
+      | Some {Protocol_levels.expect_predecessor_context; _} ->
+          if expect_predecessor_context then
+            (block_header.Block_header.shell.context, expect_predecessor_context)
+          else
+            ( predecessor_header.Block_header.shell.context,
+              expect_predecessor_context )
+    in
+    let predecessor_resulting_context_hash = expected_context_hash in
     (* Restore context *)
     let* () =
       Importer.restore_context
         snapshot_importer
         context_index
-        ~expected_context_hash:predecessor_header.Block_header.shell.context
+        ~expected_context_hash
         ~nb_context_elements:snapshot_metadata.context_elements
         ~legacy
         ~in_memory
         ~progress_display_mode
     in
-    let pred_context_hash = predecessor_header.shell.context in
     let* predecessor_context =
-      let*! o = Context.checkout context_index pred_context_hash in
+      let*! o =
+        Context.checkout context_index predecessor_resulting_context_hash
+      in
       match o with
       | Some ch -> return ch
-      | None -> tzfail (Inconsistent_context pred_context_hash)
+      | None -> tzfail (Inconsistent_context predecessor_resulting_context_hash)
     in
     let predecessor_context =
       Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
@@ -3563,6 +3654,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         chain_id;
         predecessor_block_header = predecessor_header;
         predecessor_context;
+        predecessor_resulting_context_hash;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         user_activated_upgrades;
@@ -3592,6 +3684,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let* () =
       check_context_hash_consistency
+        ~expect_predecessor_context
         block_validation_result.validation_store
         block_header
     in
@@ -3688,10 +3781,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ?patch_context
         dst_context_dir
     in
+    (* Restore protocols *)
+    let* protocol_levels =
+      restore_protocols snapshot_importer progress_display_mode
+    in
     (* Restore context *)
     let* block_data, genesis_context_hash, block_validation_result =
       restore_and_apply_context
         snapshot_importer
+        protocol_levels
         ?user_expected_block
         ~context_index
         ~user_activated_upgrades
@@ -3705,10 +3803,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~in_memory
     in
     (* Restore store *)
-    (* Restore protocols *)
-    let* protocol_levels =
-      restore_protocols snapshot_importer progress_display_mode
-    in
     (* Restore cemented dir *)
     let* () =
       restore_cemented_blocks
@@ -3721,7 +3815,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     let* reading_thread, floating_blocks_stream =
       read_floating_blocks snapshot_importer ~genesis_hash:genesis.block
     in
-    let {Block_validation.validation_store; block_metadata; ops_metadata} =
+    let {
+      Block_validation.validation_store;
+      block_metadata;
+      ops_metadata;
+      shell_header_hash = _;
+    } =
       block_validation_result
     in
     let contents =
@@ -3781,6 +3880,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~genesis_context_hash
             ~floating_blocks_stream
             ~new_head_with_metadata
+            ~new_head_resulting_context_hash:validation_store.context_hash
             ~protocol_levels
             ~history_mode)
     in

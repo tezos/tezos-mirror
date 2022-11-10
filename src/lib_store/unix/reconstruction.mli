@@ -53,7 +53,6 @@
 
 type failure_kind =
   | Nothing_to_reconstruct
-  | Context_hash_mismatch of Block_header.t * Context_hash.t * Context_hash.t
   | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
 

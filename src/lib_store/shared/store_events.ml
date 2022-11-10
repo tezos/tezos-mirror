@@ -465,3 +465,20 @@ let notify_merge_error =
        {errs}"
     ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
     ("errs", Error_monad.trace_encoding)
+
+let upgrade_store_failed =
+  declare_1
+    ~section
+    ~level:Internal_event.Error
+    ~name:"upgrade_store_failed"
+    ~msg:"store upgrade failed, cleaning up temporary files: {errs}"
+    ~pp1:(fun ppf -> Format.fprintf ppf "%a" Error_monad.pp_print_trace)
+    ("errs", Error_monad.trace_encoding)
+
+let upgrade_store_started =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"upgrade_store_started"
+    ~msg:"upgrading the store"
+    ()

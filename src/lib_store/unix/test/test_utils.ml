@@ -473,6 +473,7 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
         ( Block_repr.block_metadata metadata,
           Block_repr.block_metadata_hash raw_block );
       ops_metadata;
+      shell_header_hash = Block_validation.Shell_header_hash.zero;
     }
   in
   let* r =

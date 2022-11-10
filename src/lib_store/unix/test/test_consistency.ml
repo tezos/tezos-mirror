@@ -83,6 +83,7 @@ let init_protocols store history_mode =
             chain_store
             ~pred
             ~protocol_level
+            ~expect_predecessor_context:true
             (first_block_of_cycle, proto_hash)
         in
         let*! () =
@@ -96,7 +97,7 @@ let init_protocols store history_mode =
   let*! _savepoint, savepoint_level = Store.Chain.savepoint chain_store in
   let* () =
     Protocol_levels.iter_es
-      (fun proto_level activation_block ->
+      (fun proto_level {Protocol_levels.activation_block; _} ->
         let activation_block_hash, activation_block_level =
           activation_block.Protocol_levels.block
         in
@@ -200,7 +201,7 @@ let check_protocol_levels_availability chain_store ~expected_protocols
         in
         match recovered_activation_block with
         | None -> assert false
-        | Some {Protocol_levels.commit_info; _} ->
+        | Some {Protocol_levels.activation_block = {commit_info; _}; _} ->
             assert (Option.is_some commit_info)
       else assert false ;
       return_unit)

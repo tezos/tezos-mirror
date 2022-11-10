@@ -78,3 +78,8 @@ val raw_get_block_predecessor : bytes -> Block_hash.t
     [block_buffer] if there is any. Returns [None] if no metadata is
     present. *)
 val raw_get_last_allowed_fork_level : bytes -> int -> int32 option
+
+(** [raw_get_context block_buffer] introspects the
+    context of the block contained in
+    [block_buffer]. *)
+val raw_get_context : bytes -> Context_hash.t

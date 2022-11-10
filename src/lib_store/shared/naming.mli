@@ -86,7 +86,13 @@ val chain_config_file :
 val protocol_levels_file :
   [< `Chain_dir] directory ->
   ( [`Protocol_levels],
-    Protocol_levels.activation_block Protocol_levels.t )
+    Protocol_levels.protocol_info Protocol_levels.t )
+  encoded_file
+
+val legacy_protocol_levels_file :
+  [< `Chain_dir] directory ->
+  ( [`Protocol_levels],
+    Protocol_levels.Legacy.activation_block Protocol_levels.Legacy.t )
   encoded_file
 
 val genesis_block_file :
@@ -212,7 +218,7 @@ val snapshot_version_file :
 val snapshot_protocol_levels_file :
   [< `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
   ( [`Snapshot_protocol_levels],
-    Protocol_levels.activation_block Protocol_levels.t )
+    Protocol_levels.protocol_info Protocol_levels.t )
   encoded_file
 
 val snapshot_tar_root : [`Tar_archive] directory

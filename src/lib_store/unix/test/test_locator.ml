@@ -126,6 +126,7 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
             };
           block_metadata = (zero, None);
           ops_metadata = Block_validation.No_metadata_hash [];
+          shell_header_hash = Block_validation.Shell_header_hash.zero;
         }
       in
       let* _ =
@@ -203,6 +204,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
             {empty_result with last_allowed_fork_level};
           block_metadata = (zero, block_metadata_hash);
           ops_metadata = Block_validation.No_metadata_hash [];
+          shell_header_hash = Block_validation.Shell_header_hash.zero;
         }
       in
       let* o =
@@ -222,6 +224,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
             Store.Chain.may_update_protocol_level
               chain_store
               ~protocol_level:proto_level
+              ~expect_predecessor_context:true
               (b, genesis_protocol)
           in
           loop remaining_fork_points (lvl + 1) header

@@ -89,7 +89,7 @@ and chain_state = {
   checkpoint_data : block_descriptor Stored_data.t;
   (* Following fields are safe to update directly *)
   protocol_levels_data :
-    Protocol_levels.activation_block Protocol_levels.t Stored_data.t;
+    Protocol_levels.protocol_info Protocol_levels.t Stored_data.t;
   invalid_blocks_data : invalid_block Block_hash.Map.t Stored_data.t;
   forked_chains_data : Block_hash.t Chain_id.Map.t Stored_data.t;
   (* In memory-only: *)
@@ -151,6 +151,33 @@ let locked_is_acceptable_block chain_state (hash, level) =
         if Compare.Int32.(level = target_level) then
           Lwt.return @@ Block_hash.equal hash target_hash
         else Lwt.return_true
+
+let find_protocol_info chain_store ~protocol_level =
+  let open Lwt_syntax in
+  Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
+      let* protocol_levels = Stored_data.get protocol_levels_data in
+      return (Protocol_levels.find protocol_level protocol_levels))
+
+let expect_predecessor_context_hash_exn chain_store protocol_level =
+  let open Lwt_syntax in
+  let* protocol_info = find_protocol_info chain_store ~protocol_level in
+  match protocol_info with
+  | Some {expect_predecessor_context; _} -> return expect_predecessor_context
+  | None ->
+      Format.ksprintf
+        Stdlib.failwith
+        "cannot find protocol info for level: %d"
+        protocol_level
+
+let expect_predecessor_context_hash chain_store ~protocol_level =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let*! b =
+        expect_predecessor_context_hash_exn chain_store protocol_level
+      in
+      return b)
+    (fun _ -> tzfail (Protocol_not_found {protocol_level}))
 
 module Block = struct
   type nonrec block = block
@@ -375,6 +402,7 @@ module Block = struct
         };
       block_metadata;
       ops_metadata;
+      shell_header_hash = _;
     } =
       validation_result
     in
@@ -463,12 +491,6 @@ module Block = struct
             known_invalid
             Store_errors.(Cannot_store_block (hash, Invalid_block))
         in
-        let* () =
-          fail_unless
-            (Context_hash.equal block_header.shell.context context_hash)
-            (Validation_errors.Inconsistent_hash
-               (context_hash, block_header.shell.context))
-        in
         let contents =
           {
             Block_repr.header = block_header;
@@ -496,7 +518,9 @@ module Block = struct
             }
         in
         let block = {Block_repr.hash; contents; metadata} in
-        let* () = Block_store.store_block chain_store.block_store block in
+        let* () =
+          Block_store.store_block chain_store.block_store block context_hash
+        in
         let*! () =
           Store_events.(emit store_block) (hash, block_header.shell.level)
         in
@@ -545,6 +569,27 @@ module Block = struct
       Store_events.(emit store_prechecked_block) (hash, block_header.shell.level)
     in
     return_unit
+
+  let resulting_context_hash chain_store block =
+    let open Lwt_result_syntax in
+    let* expect_predecessor_context =
+      expect_predecessor_context_hash
+        chain_store
+        ~protocol_level:(Block_repr.proto_level block)
+    in
+    let hash = Block_repr.hash block in
+    let* resulting_context_hash_opt =
+      Block_store.resulting_context_hash
+        ~expect_predecessor_context
+        chain_store.block_store
+        (Block (hash, 0))
+    in
+    match resulting_context_hash_opt with
+    | None ->
+        tzfail
+          (Resulting_context_hash_not_found
+             {hash; level = Block_repr.level block})
+    | Some resulting_context_hash -> return resulting_context_hash
 
   let context_exn chain_store block =
     let context_index = chain_store.global_store.context_index in
@@ -1065,7 +1110,7 @@ module Chain = struct
           in
           match Protocol_levels.find proto_level protocol_levels with
           | None -> Lwt.return_none
-          | Some {block; _} -> (
+          | Some {activation_block = {block; _}; _} -> (
               let block_activation_level = snd block in
               (* proto level's lower bound found, now retrieving the upper bound *)
               let head_proto_level =
@@ -1082,7 +1127,7 @@ module Chain = struct
                   Protocol_levels.find (succ proto_level) protocol_levels
                 with
                 | None -> Lwt.return_none
-                | Some {block; _} -> (
+                | Some {activation_block = {block; _}; _} -> (
                     let next_activation_level = snd block in
                     let last_level_in_protocol =
                       Int32.(pred next_activation_level)
@@ -1581,6 +1626,12 @@ module Chain = struct
         ~some:(fun metadata -> Block.last_allowed_fork_level metadata)
         (Block_repr.metadata genesis_block)
     in
+    let expect_predecessor_context =
+      (* This depends on the genesis protocol. It should be false but
+         we cannot retrieved registered protocols due to unix
+         dependencies. *)
+      false
+    in
     let* protocol_levels_data =
       Stored_data.init
         (Naming.protocol_levels_file chain_dir)
@@ -1589,9 +1640,10 @@ module Chain = struct
             add
               genesis_proto_level
               {
-                block = genesis_descr;
                 protocol = genesis_protocol;
-                commit_info = genesis_commit_info;
+                activation_block =
+                  {block = genesis_descr; commit_info = genesis_commit_info};
+                expect_predecessor_context;
               }
               empty)
     in
@@ -1751,6 +1803,9 @@ module Chain = struct
 
   (* Protocols *)
 
+  let expect_predecessor_context_hash chain_store ~protocol_level =
+    expect_predecessor_context_hash chain_store ~protocol_level
+
   let compute_commit_info chain_store block =
     let open Lwt_result_syntax in
     let index = chain_store.global_store.context_index in
@@ -1760,7 +1815,8 @@ module Chain = struct
         let* commit_info = get_commit_info index block in
         return_some commit_info)
 
-  let set_protocol_level chain_store ~protocol_level (block, protocol_hash) =
+  let set_protocol_level chain_store ~protocol_level
+      (block, protocol_hash, expect_predecessor_context) =
     let open Lwt_result_syntax in
     Shared.locked_use chain_store.chain_state (fun {protocol_levels_data; _} ->
         let* commit_info_opt =
@@ -1773,9 +1829,13 @@ module Chain = struct
                   add
                     protocol_level
                     {
-                      block = Block.descriptor block;
                       protocol = protocol_hash;
-                      commit_info = commit_info_opt;
+                      activation_block =
+                        {
+                          block = Block.descriptor block;
+                          commit_info = commit_info_opt;
+                        };
+                      expect_predecessor_context;
                     }
                     protocol_levels))
         in
@@ -1790,21 +1850,25 @@ module Chain = struct
         in
         return_unit)
 
+  let find_protocol_info chain_store ~protocol_level =
+    find_protocol_info chain_store ~protocol_level
+
   let find_activation_block chain_store ~protocol_level =
     let open Lwt_syntax in
-    Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
-        let* protocol_levels = Stored_data.get protocol_levels_data in
-        Lwt.return (Protocol_levels.find protocol_level protocol_levels))
+    let* protocol_info = find_protocol_info chain_store ~protocol_level in
+    match protocol_info with
+    | Some {activation_block; _} -> return_some activation_block
+    | None -> return_none
 
   let find_protocol chain_store ~protocol_level =
     let open Lwt_syntax in
-    let* o = find_activation_block chain_store ~protocol_level in
-    match o with
-    | None -> Lwt.return_none
-    | Some {Protocol_levels.protocol; _} -> Lwt.return_some protocol
+    let* protocol_info = find_protocol_info chain_store ~protocol_level in
+    match protocol_info with
+    | Some {protocol; _} -> return_some protocol
+    | None -> return_none
 
   let may_update_protocol_level chain_store ?pred ?protocol_level
-      (block, protocol_hash) =
+      ~expect_predecessor_context (block, protocol_hash) =
     let open Lwt_result_syntax in
     let* pred =
       match pred with
@@ -1820,21 +1884,60 @@ module Chain = struct
       match o with
       | Some {block = bh, _; _} ->
           if Block_hash.(bh <> Block.hash block) then
-            set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+            set_protocol_level
+              chain_store
+              ~protocol_level
+              (block, protocol_hash, expect_predecessor_context)
           else return_unit
       | None ->
-          set_protocol_level chain_store ~protocol_level (block, protocol_hash)
+          set_protocol_level
+            chain_store
+            ~protocol_level
+            (block, protocol_hash, expect_predecessor_context)
     else return_unit
 
   let may_update_ancestor_protocol_level chain_store ~head =
     let open Lwt_result_syntax in
     let head_proto_level = Block.proto_level head in
-    let*! o =
-      find_activation_block chain_store ~protocol_level:head_proto_level
-    in
+    let*! o = find_protocol_info chain_store ~protocol_level:head_proto_level in
     match o with
-    | None -> return_unit
-    | Some {block; protocol; _} -> (
+    | None ->
+        (* If no activation block is registered for a given protocol
+           level, we search for the activation block. This activation
+           block is expected to be found above the savepoint. If not,
+           the savepoint will be considered as the activation
+           block. *)
+        let*! _, savepoint_level = savepoint chain_store in
+        let rec find_activation_block lower_bound block =
+          let*! pred = Block.read_predecessor_opt chain_store block in
+          match pred with
+          | None -> return block
+          | Some pred ->
+              let pred_proto_level = Block.proto_level pred in
+              if Compare.Int.(pred_proto_level <= Int.pred head_proto_level)
+              then return block
+              else if Compare.Int32.(Block.level pred <= lower_bound) then
+                return pred
+              else find_activation_block lower_bound pred
+        in
+        let* activation_block = find_activation_block savepoint_level head in
+        let protocol_level = Block.proto_level head in
+        (* The head must have an associated context stored. *)
+        let* context = Block.context chain_store head in
+        let*! activated_protocol = Context_ops.get_protocol context in
+        (* This depends on the protocol but registered protocols
+           cannot be retrieved due to unix dependencies. *)
+        let expected_predecessor_context = true in
+        set_protocol_level
+          chain_store
+          ~protocol_level
+          (activation_block, activated_protocol, expected_predecessor_context)
+    | Some
+        {
+          Protocol_levels.protocol;
+          activation_block = {block; _};
+          expect_predecessor_context;
+        } -> (
         let*! _, savepoint_level = savepoint chain_store in
         if Compare.Int32.(savepoint_level > snd block) then
           (* the block is too far in the past *)
@@ -1858,7 +1961,10 @@ module Chain = struct
               match o with
               | None -> return_unit
               | Some ancestor ->
-                  may_update_protocol_level chain_store (ancestor, protocol)))
+                  may_update_protocol_level
+                    chain_store
+                    ~expect_predecessor_context
+                    (ancestor, protocol)))
 
   let all_protocol_levels chain_store =
     Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
@@ -1878,7 +1984,7 @@ module Chain = struct
         let* protocol =
           if Compare.Int32.(Block.level pred < save_point_level) then
             let* o =
-              find_activation_block
+              find_protocol_info
                 chain_store
                 ~protocol_level:(Block.proto_level pred)
             in
@@ -2161,8 +2267,9 @@ let rec make_pp_chain_store (chain_store : chain_store) =
             forked_chains,
             active_testchain ))
   in
-  let pp_protocol_level fmt
-      (proto_level, {Protocol_levels.block; protocol; commit_info}) =
+  let pp_proto_info fmt
+      (proto_level, {Protocol_levels.protocol; activation_block; _}) =
+    let Protocol_levels.{block; commit_info} = activation_block in
     Format.fprintf
       fmt
       "proto level: %d, transition block: %a, protocol: %a, commit info: %a"
@@ -2221,7 +2328,7 @@ let rec make_pp_chain_store (chain_store : chain_store) =
         caboose
         (option_pp ~default:"n/a" pp_block_descriptor)
         target
-        (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_protocol_level)
+        (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_proto_info)
         (Protocol_levels.bindings protocol_levels_data)
         (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
         (Block_hash.Map.bindings invalid_blocks_data |> List.map fst)
@@ -2261,3 +2368,5 @@ module Unsafe = struct
 
   let block_of_repr = Fun.id
 end
+
+let v_3_0_upgrade ~store_dir:_ _genesis = Lwt_result_syntax.return_unit

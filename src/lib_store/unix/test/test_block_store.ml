@@ -142,7 +142,11 @@ let test_storing_and_access_predecessors block_store =
   let*! blocks, _head =
     make_raw_block_list ~kind:`Full (genesis_hash, -1l) 50
   in
-  let* () = List.iter_es (Block_store.store_block block_store) blocks in
+  let* () =
+    List.iter_es
+      (fun b -> Block_store.store_block block_store b Context_hash.zero)
+      blocks
+  in
   let* () = assert_presence_in_block_store block_store blocks in
   let* () =
     List.iter_es
@@ -231,7 +235,11 @@ let test_simple_merge block_store =
     Block_repr.metadata head |> WithExceptions.Option.get ~loc:__LOC__
   in
   let all_blocks = List.concat cycles in
-  let* () = List.iter_es (Block_store.store_block block_store) all_blocks in
+  let* () =
+    List.iter_es
+      (fun b -> Block_store.store_block block_store b Context_hash.zero)
+      all_blocks
+  in
   let* () =
     Block_store.merge_stores
       block_store
@@ -260,7 +268,11 @@ let test_consecutive_concurrent_merges block_store =
     Block_repr.metadata head |> WithExceptions.Option.get ~loc:__LOC__
   in
   let all_blocks = List.concat cycles in
-  let* () = List.iter_es (Block_store.store_block block_store) all_blocks in
+  let* () =
+    List.iter_es
+      (fun b -> Block_store.store_block block_store b Context_hash.zero)
+      all_blocks
+  in
   let cycles_to_merge =
     List.fold_left
       (fun (acc, pred_cycle_lafl) cycle ->
@@ -321,7 +333,11 @@ let test_ten_cycles_merge block_store =
       ~nb_cycles:10
   in
   let all_blocks = List.concat cycles in
-  let* () = List.iter_es (Block_store.store_block block_store) all_blocks in
+  let* () =
+    List.iter_es
+      (fun b -> Block_store.store_block block_store b Context_hash.zero)
+      all_blocks
+  in
   let* () =
     Block_store.merge_stores
       block_store
@@ -352,7 +368,11 @@ let test_merge_with_branches block_store =
     make_n_initial_consecutive_cycles block_store ~cycle_length:100 ~nb_cycles:2
   in
   let all_blocks = List.concat cycles in
-  let* () = List.iter_es (Block_store.store_block block_store) all_blocks in
+  let* () =
+    List.iter_es
+      (fun b -> Block_store.store_block block_store b Context_hash.zero)
+      all_blocks
+  in
   let branches_fork_points_to_gc = [20; 40; 60; 80; 98] in
   (* 448 => we also keep the checkpoint *)
   let* blocks_to_gc =
@@ -378,7 +398,11 @@ let test_merge_with_branches block_store =
                     {metadata with Block_repr.last_allowed_fork_level = 99l})
                   block.metadata)
           blocks ;
-        let* () = List.iter_es (Block_store.store_block block_store) blocks in
+        let* () =
+          List.iter_es
+            (fun b -> Block_store.store_block block_store b Context_hash.zero)
+            blocks
+        in
         return blocks)
       branches_fork_points_to_gc
   in
@@ -406,7 +430,11 @@ let test_merge_with_branches block_store =
                     {metadata with Block_repr.last_allowed_fork_level = 199l})
                   block.metadata)
           blocks ;
-        let* () = List.iter_es (Block_store.store_block block_store) blocks in
+        let* () =
+          List.iter_es
+            (fun b -> Block_store.store_block block_store b Context_hash.zero)
+            blocks
+        in
         return blocks)
       branches_fork_points_to_keep
   in
@@ -439,7 +467,11 @@ let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
     make_n_initial_consecutive_cycles block_store ~cycle_length ~nb_cycles
   in
   let all_blocks = List.concat cycles in
-  let* () = List.iter_es (Block_store.store_block block_store) all_blocks in
+  let* () =
+    List.iter_es
+      (fun b -> Block_store.store_block block_store b Context_hash.zero)
+      all_blocks
+  in
   let* () =
     assert_presence_in_block_store ~with_metadata:true block_store all_blocks
   in

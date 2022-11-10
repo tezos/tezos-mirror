@@ -131,10 +131,38 @@ module Protocol_levels : sig
      allowing us to remove the option. *)
   type activation_block = {
     block : block_descriptor;
-    protocol : Protocol_hash.t;
     commit_info : commit_info option;
   }
 
+  (** The type for protocol info.
+
+    [expect_predecessor_context] is a flag which reflects what is
+   referenced by the context hash of a block, depending on its
+   protocol. If the flag is true, the block contains the
+   predecessors context (context before the application of the
+   block). Otherwise, it contains the resulting context hash of the
+   application of the block. *)
+  type protocol_info = {
+    protocol : Protocol_hash.t;
+    activation_block : activation_block;
+    expect_predecessor_context : bool;
+  }
+
+  val activation_block_encoding : activation_block Data_encoding.t
+
   (** Encoding for the protocol level's association map. *)
-  val encoding : activation_block t Data_encoding.t
+  val encoding : protocol_info t Data_encoding.t
+
+  module Legacy : sig
+    type activation_block = {
+      block : block_descriptor;
+      protocol : Protocol_hash.t;
+      commit_info : commit_info option;
+    }
+
+    include Map.S with type key = int
+
+    (** Encoding for the protocol level's association map. *)
+    val encoding : activation_block t Data_encoding.t
+  end
 end

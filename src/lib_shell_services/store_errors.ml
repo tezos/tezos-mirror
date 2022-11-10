@@ -25,8 +25,13 @@
 
 type error +=
   | Block_not_found of {hash : Tezos_crypto.Block_hash.t; distance : int}
+  | Resulting_context_hash_not_found of {
+      hash : Tezos_crypto.Block_hash.t;
+      level : int32;
+    }
   | Bad_level of {head_level : Int32.t; given_level : Int32.t}
   | Block_metadata_not_found of Tezos_crypto.Block_hash.t
+  | Protocol_not_found of {protocol_level : int}
   | Cannot_switch_history_mode of {
       previous_mode : History_mode.t;
       next_mode : History_mode.t;
@@ -44,7 +49,7 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"store.not_found"
+    ~id:"store.block_not_found"
     ~title:"Block not found"
     ~description:"Block not found"
     ~pp:(fun ppf (block_hash, distance) ->
@@ -55,10 +60,28 @@ let () =
         Tezos_crypto.Block_hash.pp
         block_hash)
     Data_encoding.(
-      obj1 (req "block_not_found" @@ tup2 Tezos_crypto.Block_hash.encoding int8))
+      obj1 (req "block_not_found" @@ tup2 Tezos_crypto.Block_hash.encoding int31))
     (function
       | Block_not_found {hash; distance} -> Some (hash, distance) | _ -> None)
     (fun (hash, distance) -> Block_not_found {hash; distance}) ;
+  register_error_kind
+    `Permanent
+    ~id:"store.resulting_context_hash_not_found"
+    ~title:"Resulting context hash not found"
+    ~description:"Resulting context hash not found"
+    ~pp:(fun ppf (block_hash, level) ->
+      Format.fprintf
+        ppf
+        "Cannot find the resulting context hash for the block %a (level: %ld)."
+        Tezos_crypto.Block_hash.pp
+        block_hash
+        level)
+    Data_encoding.(
+      obj1 (req "block_not_found" @@ tup2 Tezos_crypto.Block_hash.encoding int32))
+    (function
+      | Resulting_context_hash_not_found {hash; level} -> Some (hash, level)
+      | _ -> None)
+    (fun (hash, level) -> Resulting_context_hash_not_found {hash; level}) ;
   register_error_kind
     `Permanent
     ~id:"store.bad_level"
@@ -91,6 +114,17 @@ let () =
     (function
       | Block_metadata_not_found block_hash -> Some block_hash | _ -> None)
     (fun block_hash -> Block_metadata_not_found block_hash) ;
+  register_error_kind
+    `Permanent
+    ~id:"store.protocol_not_found"
+    ~title:"Protocol not found"
+    ~description:"Protocol not found"
+    ~pp:(fun ppf protocol_level ->
+      Format.fprintf ppf "Unable to find protocol %d." protocol_level)
+    Data_encoding.(obj1 (req "protocol_level" int31))
+    (function
+      | Protocol_not_found {protocol_level} -> Some protocol_level | _ -> None)
+    (fun protocol_level -> Protocol_not_found {protocol_level}) ;
   register_error_kind
     `Permanent
     ~id:"config_file.cannot_switch_history_mode"

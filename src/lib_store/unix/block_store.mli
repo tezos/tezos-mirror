@@ -208,12 +208,21 @@ val mem : block_store -> key -> bool tzresult Lwt.t
    unknown. *)
 val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
 
-(** [read_block ~read_metadata block_store key] reads the block [key]
-   in [block_store] if present. Return [None] if the block is
-   unknown. If [read_metadata] is set to [true] it tries to retreive
-   the metadata but do not fail if it is not available. *)
+(** [resulting_context_hash block_store ~fetch_expect_predecessor_context key]
+    retrieves the resulting context hash from the block application,
+    corresponding to the given [key]. *)
+val resulting_context_hash :
+  block_store ->
+  fetch_expect_predecessor_context:(unit -> bool tzresult Lwt.t) ->
+  key ->
+  Context_hash.t option tzresult Lwt.t
+
+(** [read_block block_store ~read_metadata key] reads the block [key]
+    in [block_store] if present. Return [None] if the block is
+    unknown. If [read_metadata] is set to [true] it tries to retreive
+    the metadata but do not fail if it is not available. *)
 val read_block :
-  read_metadata:bool -> block_store -> key -> Block_repr.t option tzresult Lwt.t
+  block_store -> read_metadata:bool -> key -> Block_repr.t option tzresult Lwt.t
 
 (** [read_block_metadata block_store key] reads the metadata for the
    block [key] in [block_store] if present. Return [None] if the block
@@ -221,9 +230,11 @@ val read_block :
 val read_block_metadata :
   block_store -> key -> Block_repr.metadata option tzresult Lwt.t
 
-(** [store_block block_store block] stores the [block] in the current
-   [RW] floating store. *)
-val store_block : block_store -> Block_repr.t -> unit tzresult Lwt.t
+(** [store_block block_store block resulting_context_hash] stores the
+    [block] in the current [RW] floating store with its associated
+    [resulting_context_hash]. *)
+val store_block :
+  block_store -> Block_repr.t -> Context_hash.t -> unit tzresult Lwt.t
 
 (** [cement_blocks ?check_consistency ~write_metadata block_store
     chunk_iterator]
@@ -351,3 +362,14 @@ val close : block_store -> unit Lwt.t
 (** [may_recover_merge block_store] recovers, if needed, from a
    [block_store] where the merge procedure was interrupted. *)
 val may_recover_merge : block_store -> unit tzresult Lwt.t
+
+(** Upgrade a v_2 to v_3 block store by retrieving
+    [resulting_context_hash] of all blocks present in the floating
+    stores and updating their index.
+
+    {b Warning} Not backward-compatible. *)
+val v_3_0_upgrade :
+  [`Chain_dir] Naming.directory ->
+  cleanups:(unit -> unit Lwt.t) list ref ->
+  finalizers:(unit -> unit Lwt.t) list ref ->
+  unit tzresult Lwt.t

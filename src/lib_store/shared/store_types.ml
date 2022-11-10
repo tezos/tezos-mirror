@@ -148,24 +148,71 @@ module Protocol_levels = struct
 
   type activation_block = {
     block : block_descriptor;
-    protocol : Protocol_hash.t;
     commit_info : commit_info option;
   }
 
   let activation_block_encoding =
     let open Data_encoding in
     conv
-      (fun {block; protocol; commit_info} -> (block, protocol, commit_info))
-      (fun (block, protocol, commit_info) -> {block; protocol; commit_info})
-      (obj3
+      (fun {block; commit_info} -> (block, commit_info))
+      (fun (block, commit_info) -> {block; commit_info})
+      (obj2
          (req "block" block_descriptor_encoding)
-         (req "protocol" Protocol_hash.encoding)
          (opt "commit_info" commit_info_encoding))
+
+  type protocol_info = {
+    protocol : Protocol_hash.t;
+    activation_block : activation_block;
+    expect_predecessor_context : bool;
+  }
+
+  let protocol_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {protocol; activation_block; expect_predecessor_context} ->
+        (protocol, activation_block, expect_predecessor_context))
+      (fun (protocol, activation_block, expect_predecessor_context) ->
+        {protocol; activation_block; expect_predecessor_context})
+      (obj3
+         (req "protocol" Protocol_hash.encoding)
+         (req "activation_block" activation_block_encoding)
+         (req "expect_predecessor_context" bool))
 
   let encoding =
     Data_encoding.conv
       (fun map -> bindings map)
       (fun bindings ->
         List.fold_left (fun map (k, v) -> add k v map) empty bindings)
-      Data_encoding.(list (tup2 uint8 activation_block_encoding))
+      Data_encoding.(list (tup2 uint8 protocol_info_encoding))
+
+  module Legacy = struct
+    type activation_block = {
+      block : block_descriptor;
+      protocol : Protocol_hash.t;
+      commit_info : commit_info option;
+    }
+
+    include Map.Make (struct
+      type t = int
+
+      let compare = Compare.Int.compare
+    end)
+
+    let legacy_activation_block_encoding =
+      let open Data_encoding in
+      conv
+        (fun {block; protocol; commit_info} -> (block, protocol, commit_info))
+        (fun (block, protocol, commit_info) -> {block; protocol; commit_info})
+        (obj3
+           (req "block" block_descriptor_encoding)
+           (req "protocol" Protocol_hash.encoding)
+           (opt "commit_info" commit_info_encoding))
+
+    let encoding =
+      Data_encoding.conv
+        (fun map -> bindings map)
+        (fun bindings ->
+          List.fold_left (fun map (k, v) -> add k v map) empty bindings)
+        Data_encoding.(list (tup2 uint8 legacy_activation_block_encoding))
+  end
 end

@@ -429,10 +429,7 @@ module Block : sig
      the newly created block is returned.
 
       If the block was successfully stored, then the block is removed
-     from the prechecked block cache.
-
-      {b Warning} The store will refuse to store blocks with no
-     associated context's commit. *)
+     from the prechecked block cache. *)
   val store_block :
     chain_store ->
     block_header:Block_header.t ->
@@ -450,8 +447,17 @@ module Block : sig
     operations:Operation.t trace trace ->
     unit tzresult Lwt.t
 
-  (** [context_exn chain_store block] checkouts the context of the
-      [block]. *)
+  (** [resulting_context_hash chain_store block] returns the resulting
+      context hash of the [block]. This context depends on the
+      [block]'s protocol associated semantics, i.e., it can either be
+      the one contained in its block header or the stored result of
+      its application. *)
+  val resulting_context_hash :
+    chain_store -> block -> Context_hash.t tzresult Lwt.t
+
+  (** [context_exn chain_store block] checkouts the {b resulting}
+      context of the [block] which may differ from its block header's
+      one depending on the block's associated protocol semantics. *)
   val context_exn :
     chain_store -> block -> Tezos_protocol_environment.Context.t Lwt.t
 
@@ -865,6 +871,11 @@ module Chain : sig
 
   (** {2 Chain's protocols} *)
 
+  (** [find_protocol_info chain_store ~protocol_level] returns the
+     protocol info associated to the given [protocol_level]. *)
+  val find_protocol_info :
+    t -> protocol_level:int -> Protocol_levels.protocol_info option Lwt.t
+
   (** [find_activation_block chain_store ~protocol_level] returns the
       block that activated the protocol of level [protocol_level]. *)
   val find_activation_block :
@@ -877,31 +888,41 @@ module Chain : sig
   val find_protocol :
     chain_store -> protocol_level:int -> Protocol_hash.t option Lwt.t
 
+  (** [expects_predecessor_context_hash chain_store ~protocol_level]
+      returns whether or not a protocol requires the context hash of a
+      block to target resulting context of it's predecessor. This
+      depends on the environment of each protocol.*)
+  val expect_predecessor_context_hash :
+    chain_store -> protocol_level:int -> bool tzresult Lwt.t
+
   (** [all_protocol_levels chain_store] returns all the protocols
       registered in [chain_store]. *)
   val all_protocol_levels :
-    chain_store -> Protocol_levels.activation_block Protocol_levels.t Lwt.t
+    chain_store -> Protocol_levels.protocol_info Protocol_levels.t Lwt.t
 
   (** [may_update_protocol_level chain_store ?pred ?protocol_level
-      (block, ph)] updates the protocol level for the protocol [ph] in
-      [chain_store] with the activation [block]. If [pred] is not
-      provided, it reads the [block]'s predecessor and check that the
-      [block]'s protocol level is increasing compared to its
-      predecessor. If [protocol_level] is provided, we use this value
-      instead of the protocol level found in [block]. If a previous
-      entry is found, it overwrites it. *)
+      ~expect_predecessor_context (block, ph)] updates the protocol
+      level for the protocol [ph] in [chain_store] with the activation
+      [block]. If [pred] is not provided, it reads the [block]'s
+      predecessor and check that the [block]'s protocol level is
+      increasing compared to its predecessor. If [protocol_level] is
+      provided, we use this value instead of the protocol level found
+      in [block]. If a previous entry is found, it overwrites it. The
+      [expect_predecessor_context] argument specifies which context
+      hash semantics should be used. *)
   val may_update_protocol_level :
     chain_store ->
     ?pred:Block.block ->
     ?protocol_level:int ->
+    expect_predecessor_context:bool ->
     Block.block * Protocol_hash.t ->
     unit tzresult Lwt.t
 
   (** [may_update_ancestor_protocol_level chain_store ~head] tries to
-     find the activation block of the [head]'s protocol, checks that
-     its an ancestor and tries to update it if that's not the case. If
-     the registered activation block is not reachable (already
-     pruned), this function does nothing. *)
+      find the activation block of the [head]'s protocol, checks that
+      its an ancestor and tries to update it if that's not the
+      case. If the registered activation block is not reachable
+      (already pruned), this function does nothing. *)
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
@@ -1004,6 +1025,12 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
+(** Upgrade a v_2 to v_3 store by rewriting the block store and the
+    protocol level's table.
+
+    {b Warning} Not backward-compatible. *)
+val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
+
 (**/**)
 
 (** Unsafe set of functions intended for internal store manipulation
@@ -1045,13 +1072,14 @@ module Unsafe : sig
       [chain_store] without checks. *)
   val set_caboose : chain_store -> block_descriptor -> unit tzresult Lwt.t
 
-  (** [set_protocol_level chain_store protocol_level
-      (block, ph)] updates the protocol level for the protocol [ph] in
-      [chain_store] with the activation [block]. *)
+  (** [set_protocol_level chain_store protocol_level (block, ph,
+      expect_predecessor_context)] updates the protocol level for the
+      protocol [ph] in [chain_store] with the activation
+      [block] and specifies the [expect_predecessor_context] semantics. *)
   val set_protocol_level :
     chain_store ->
     protocol_level:int ->
-    Block.block * Protocol_hash.t ->
+    Block.block * Protocol_hash.t * bool ->
     unit tzresult Lwt.t
 
   (** Snapshots utility functions *)
@@ -1075,9 +1103,10 @@ module Unsafe : sig
 
   (** [restore_from_snapshot ?notify ~store_dir ~context_index
       ~genesis ~genesis_context_hash ~floating_blocks_stream
-      ~new_head_with_metadata ~protocol_levels ~history_mode]
-      initialises a coherent store in [store_dir] with all the given
-      info retrieved from a snapshot. *)
+      ~new_head_with_metadata ~new_head_resulting_context_hash
+      ~protocol_levels ~history_mode] initialises a coherent store in
+      [store_dir] with all the given info retrieved from a
+      snapshot. *)
   val restore_from_snapshot :
     ?notify:(unit -> unit Lwt.t) ->
     [`Store_dir] Naming.directory ->
@@ -1085,7 +1114,8 @@ module Unsafe : sig
     genesis_context_hash:Context_hash.t ->
     floating_blocks_stream:Block_repr.block Lwt_stream.t ->
     new_head_with_metadata:Block_repr.block ->
-    protocol_levels:Protocol_levels.activation_block Protocol_levels.t ->
+    new_head_resulting_context_hash:Context_hash.t ->
+    protocol_levels:Protocol_levels.protocol_info Protocol_levels.t ->
     history_mode:History_mode.t ->
     unit tzresult Lwt.t
 end
