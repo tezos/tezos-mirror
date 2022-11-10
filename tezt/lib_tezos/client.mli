@@ -1742,6 +1742,14 @@ val contract_storage :
 val contract_code :
   ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
 
+(** Get contract entrypoint type for a contract. *)
+val contract_entrypoint_type :
+  entrypoint:string -> contract:string -> t -> string Lwt.t
+
+(** Same as [contract_entrypoint_type], but do not wait for the process to exit. *)
+val spawn_contract_entrypoint_type :
+  entrypoint:string -> contract:string -> t -> Process.t
+
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
 
