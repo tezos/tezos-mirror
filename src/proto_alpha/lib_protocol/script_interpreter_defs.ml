@@ -769,15 +769,6 @@ type ('a, 'b, 'c, 'd) cont_instrumentation =
 
 let id x = x
 
-type ('a, 's, 'b, 't, 'r, 'f) step_type =
-  outdated_context * step_constants ->
-  local_gas_counter ->
-  ('a, 's, 'b, 't) kinstr ->
-  ('b, 't, 'r, 'f) continuation ->
-  'a ->
-  's ->
-  ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
-
 type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   ('a, 'b, 'e, 'f) cont_instrumentation ->
   outdated_context * step_constants ->

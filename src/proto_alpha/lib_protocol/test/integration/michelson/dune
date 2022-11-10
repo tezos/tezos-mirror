@@ -14,6 +14,7 @@
   tezos-micheline
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
+  tezos-protocol-plugin-alpha
   tezos-protocol-alpha.parameters)
  (flags
   (:standard)
@@ -25,7 +26,8 @@
   -open Tezos_client_alpha
   -open Tezos_micheline
   -open Tezos_benchmark_alpha
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_plugin_alpha))
 
 (rule
  (alias runtest)

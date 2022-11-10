@@ -499,28 +499,32 @@ module Scripts = struct
       unparse_stack (stack_ty, stack)
 
     let trace_logger ctxt : Script_typed_ir.logger =
-      let log : log_element list ref = ref [] in
-      let log_interp _ ctxt loc sty stack =
-        log := Log (ctxt, loc, stack, sty) :: !log
-      in
-      let log_entry _ _ctxt _loc _sty _stack = () in
-      let log_exit _ ctxt loc sty stack =
-        log := Log (ctxt, loc, stack, sty) :: !log
-      in
-      let log_control _ = () in
-      let get_log () =
-        List.fold_left_es
-          (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
-            let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
-            trace
-              Plugin_errors.Cannot_serialize_log
-              (unparse_stack ctxt (stack, stack_ty))
-            >>=? fun stack -> return (ctxt, (loc, consumed_gas, stack) :: l))
-          (ctxt, [])
-          (List.rev !log)
-        >>=? fun (_ctxt, res) -> return (Some (List.rev res))
-      in
-      {log_exit; log_entry; log_interp; get_log; log_control}
+      Script_interpreter_logging.make
+        (module struct
+          let log : log_element list ref = ref []
+
+          let log_interp _ ctxt loc sty stack =
+            log := Log (ctxt, loc, stack, sty) :: !log
+
+          let log_entry _ _ctxt _loc _sty _stack = ()
+
+          let log_exit _ ctxt loc sty stack =
+            log := Log (ctxt, loc, stack, sty) :: !log
+
+          let log_control _ = ()
+
+          let get_log () =
+            List.fold_left_es
+              (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
+                let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
+                trace
+                  Plugin_errors.Cannot_serialize_log
+                  (unparse_stack ctxt (stack, stack_ty))
+                >>=? fun stack -> return (ctxt, (loc, consumed_gas, stack) :: l))
+              (ctxt, [])
+              (List.rev !log)
+            >>=? fun (_ctxt, res) -> return (Some (List.rev res))
+        end)
 
     let execute ctxt step_constants ~script ~entrypoint ~parameter =
       let logger = trace_logger ctxt in

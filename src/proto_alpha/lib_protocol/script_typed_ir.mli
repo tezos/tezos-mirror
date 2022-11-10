@@ -1331,19 +1331,60 @@ and logger = {
       (** [log_interp] is called at each call of the internal function
           [interp]. [interp] is called when starting the interpretation of
           a script and subsequently at each [Exec] instruction. *)
-  log_entry : 'a 's 'b 'f. ('a, 's, 'b, 'f, 'a, 's) logging_function;
-      (** [log_entry] is called {i before} executing each instruction but
-          {i after} gas for this instruction has been successfully
-          consumed. *)
-  log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
-      (** [log_control] is called {i before} the interpretation of the
-          current continuation. *)
-  log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
-      (** [log_exit] is called {i after} executing each instruction. *)
   get_log : unit -> execution_trace option tzresult Lwt.t;
       (** [get_log] allows to obtain an execution trace, if any was
           produced. *)
+  klog : 'a 's 'r 'f. ('a, 's, 'r, 'f) klog;
+      (** [klog] is called on [KLog] inserted when instrumenting
+          continuations. *)
+  ilog : 'a 's 'b 't 'r 'f. ('a, 's, 'b, 't, 'r, 'f) ilog;
+      (** [ilog] is called on [ILog] inserted when instrumenting
+          instructions. *)
+  log_kinstr : 'a 'b 'c 'd. ('a, 'b, 'c, 'd) log_kinstr;
+      (** [log_kinstr] instruments an instruction with [ILog]. *)
 }
+
+and ('a, 's, 'r, 'f) klog =
+  logger ->
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'r, 'f) continuation ->
+  ('a, 's, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
+
+and ('a, 's, 'b, 't, 'r, 'f) ilog =
+  logger ->
+  logging_event ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'b, 't, 'r, 'f) step_type
+
+and ('a, 's, 'b, 't, 'r, 'f) step_type =
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's, 'b, 't) kinstr ->
+  ('b, 't, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
+
+and ('a, 'b, 'c, 'd) log_kinstr =
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('a, 'b, 'c, 'd) kinstr
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =

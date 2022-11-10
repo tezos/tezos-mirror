@@ -1223,11 +1223,53 @@ and execution_trace = (Script.location * Gas.Arith.fp * Script.expr list) list
 
 and logger = {
   log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
-  log_entry : 'a 's 'b 'f. ('a, 's, 'b, 'f, 'a, 's) logging_function;
-  log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
-  log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
   get_log : unit -> execution_trace option tzresult Lwt.t;
+  klog : 'a 's 'r 'f. ('a, 's, 'r, 'f) klog;
+  ilog : 'a 's 'b 't 'r 'f. ('a, 's, 'b, 't, 'r, 'f) ilog;
+  log_kinstr : 'a 'b 'c 'd. ('a, 'b, 'c, 'd) log_kinstr;
 }
+
+and ('a, 's, 'r, 'f) klog =
+  logger ->
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'r, 'f) continuation ->
+  ('a, 's, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
+
+and ('a, 's, 'b, 't, 'r, 'f) ilog =
+  logger ->
+  logging_event ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'b, 't, 'r, 'f) step_type
+
+and ('a, 's, 'b, 't, 'r, 'f) step_type =
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's, 'b, 't) kinstr ->
+  ('b, 't, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
+
+and ('a, 'b, 'c, 'd) log_kinstr =
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('a, 'b, 'c, 'd) kinstr
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =

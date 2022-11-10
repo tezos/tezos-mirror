@@ -1482,17 +1482,24 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
     (stack : bef_top * bef) =
   let trace = ref [] in
   (* Logger definition *)
-  let log_interp _instr _ctxt _log _stack_ty _stack = () in
-  let log_entry :
-      type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
-   fun kinstr ctxt _loc _stack_ty stack ->
-    trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
-    match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+  let logger =
+    Script_interpreter_logging.make
+      (module struct
+        let log_interp _instr _ctxt _log _stack_ty _stack = ()
+
+        let log_entry :
+            type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
+         fun kinstr ctxt _loc _stack_ty stack ->
+          trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
+          match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+
+        let log_control kont = trace := extract_control_trace kont :: !trace
+
+        let log_exit _instr _ctxt _log _stack_ty _stack = ()
+
+        let get_log () = Environment.Error_monad.return_none
+      end)
   in
-  let log_control kont = trace := extract_control_trace kont :: !trace in
-  let log_exit _instr _ctxt _log _stack_ty _stack = () in
-  let get_log () = Environment.Error_monad.return_none in
-  let logger = {log_interp; log_entry; log_control; log_exit; get_log} in
   try
     let res =
       Lwt_main.run
@@ -1520,17 +1527,24 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
     (stack : bef_top * bef) =
   let trace = ref [] in
   (* Logger definition *)
-  let log_interp _instr _ctxt _log _stack_ty _stack = () in
-  let log_entry :
-      type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
-   fun kinstr ctxt _loc _stack_ty stack ->
-    trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
-    match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+  let logger =
+    Script_interpreter_logging.make
+      (module struct
+        let log_interp _instr _ctxt _log _stack_ty _stack = ()
+
+        let log_entry :
+            type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
+         fun kinstr ctxt _loc _stack_ty stack ->
+          trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
+          match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
+
+        let log_control kont = trace := extract_control_trace kont :: !trace
+
+        let log_exit _instr _ctxt _log _stack_ty _stack = ()
+
+        let get_log () = Environment.Error_monad.return_none
+      end)
   in
-  let log_control kont = trace := extract_control_trace kont :: !trace in
-  let log_exit _instr _ctxt _log _stack_ty _stack = () in
-  let get_log () = Environment.Error_monad.return_none in
-  let logger = {log_interp; log_entry; log_control; log_exit; get_log} in
   try
     let res =
       let _gas_counter, outdated_ctxt =

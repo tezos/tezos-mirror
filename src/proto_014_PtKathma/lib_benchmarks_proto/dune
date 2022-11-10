@@ -21,6 +21,7 @@
   tezos-014-PtKathma-test-helpers
   tezos-sapling
   tezos-client-014-PtKathma
+  tezos-protocol-plugin-014-PtKathma
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
@@ -39,4 +40,5 @@
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_014_PtKathma_test_helpers
-  -open Tezos_client_014_PtKathma))
+  -open Tezos_client_014_PtKathma
+  -open Tezos_protocol_plugin_014_PtKathma))

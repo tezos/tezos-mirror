@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
-(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,8 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Mempool = Mempool
-module View_helpers = View_helpers
-module RPC = RPC
-module Metrics = Metrics
-module Script_interpreter_logging = Script_interpreter_logging
+open Protocol
+open Environment
+open Error_monad
+open Script_typed_ir
+
+module type Logger_base = sig
+  val log_interp : ('a, 's, 'b, 'f, 'c, 'u) logging_function
+
+  val log_entry : ('a, 's, 'b, 'f, 'a, 's) logging_function
+
+  val log_control : ('a, 's, 'b, 'f) continuation -> unit
+
+  val log_exit : ('a, 's, 'b, 'f, 'c, 'u) logging_function
+
+  val get_log : unit -> execution_trace option tzresult Lwt.t
+end
+
+val make : (module Logger_base) -> logger
