@@ -140,3 +140,38 @@ let compare_input_buffer_messages i1 i2 =
   in
   if cmp_lvl = 0 then Z.compare i1.message_counter i2.message_counter
   else cmp_lvl
+
+(* [pp_output ppf bytes] is a pretty printer for Sc_rollup.Outbox messages that
+   also handles deserialization from raw bytes. If the message cannot be
+   decoded, it prints its hexadecimal representation. *)
+let pp_output ppf bytes =
+  let pp_message ppf
+      Sc_rollup.Outbox.Message.{unparsed_parameters; destination; entrypoint} =
+    let json =
+      Data_encoding.Json.construct Script_repr.expr_encoding unparsed_parameters
+    in
+    Format.fprintf
+      ppf
+      "@[{ unparsed_parameters: %a@; destination: %a@; entrypoint: %a }@]"
+      Data_encoding.Json.pp
+      json
+      Contract_hash.pp
+      destination
+      Entrypoint.pp
+      entrypoint
+  in
+  let pp_batch ppf
+      Sc_rollup.Outbox.Message.(Atomic_transaction_batch {transactions}) =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+      pp_message
+      ppf
+      transactions
+  in
+  match
+    Sc_rollup.Outbox.Message.(
+      deserialize (unsafe_of_string (Bytes.to_string bytes)))
+  with
+  | Error _ ->
+      Format.fprintf ppf "Unknown encoding: %a" Hex.pp (Hex.of_bytes bytes)
+  | Ok msgs -> pp_batch ppf msgs

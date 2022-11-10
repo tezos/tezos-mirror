@@ -37,6 +37,7 @@ type eval_step =
 (* Possible commands for the REPL. *)
 type commands =
   | Show_inbox
+  | Show_outbox of int32
   | Show_status
   | Step of eval_step
   | Load_inputs
@@ -54,6 +55,10 @@ let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
   match command with
   | ["show"; "inbox"] -> Show_inbox
+  | ["show"; "outbox"; "at"; "level"; level] -> (
+      match Int32.of_string_opt level with
+      | Some l -> Show_outbox l
+      | None -> Unknown s)
   | ["show"; "status"] -> Show_status
   | ["step"; step] -> (
       match parse_eval_step step with Some s -> Step s | None -> Unknown s)
@@ -281,6 +286,41 @@ let show_inbox tree =
     (Z.to_string size)
     (pp_messages ())
 
+(* [show_outbox_gen tree level] prints the outbox messages for a given level. *)
+let show_outbox_gen tree level =
+  let open Lwt_syntax in
+  let* output_buffer = Wasm.Internal_for_tests.get_output_buffer tree in
+  let* level_vector =
+    Tezos_lazy_containers.Lazy_vector.Mutable.Int32Vector.get
+      level
+      output_buffer
+  in
+  let* messages =
+    Tezos_lazy_containers.Lazy_vector.(
+      Mutable.ZVector.snapshot level_vector |> ZVector.to_list)
+  in
+  let pp_messages () =
+    Format.asprintf
+      "%a"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+         Messages.pp_output)
+      messages
+  in
+  let size =
+    Tezos_lazy_containers.Lazy_vector.Mutable.ZVector.num_elements level_vector
+  in
+  Lwt_io.printf
+    "Outbox has %s messages:\n%s\n%!"
+    (Z.to_string size)
+    (pp_messages ())
+
+(* [show_outbox tree level] prints the outbox messages for a given level. *)
+let show_outbox tree level =
+  Lwt.catch
+    (fun () -> show_outbox_gen tree level)
+    (fun _ -> Lwt_io.printf "No outbox found at level %ld\n%!" level)
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c tree inboxes level =
@@ -297,6 +337,9 @@ let handle_command c tree inboxes level =
       return ~tree ()
   | Show_inbox ->
       let*! () = show_inbox tree in
+      return ()
+  | Show_outbox level ->
+      let*! () = show_outbox tree level in
       return ()
   | Unknown s ->
       let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
