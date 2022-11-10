@@ -38,7 +38,7 @@ let get_inbox ctxt =
   let* inbox = Store.Inbox.get ctxt in
   return (inbox, ctxt)
 
-let assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
+let _assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
   let nb_messages_in_commitment_period =
     Int64.add
       (Sc_rollup_inbox_repr.number_of_messages_during_commitment_period inbox)
@@ -76,9 +76,14 @@ let add_messages ctxt messages =
       (0, 0, ctxt)
       messages
   in
-  let* () =
-    assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages
-  in
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+     In the current setup, we can stop the chain when hitting the
+     limit. *)
+  (* let* () = *)
+  (*   assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages *)
+  (* in *)
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3292
 
      The carbonation needs to be activated again with the new internal inbox's
