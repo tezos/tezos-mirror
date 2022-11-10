@@ -39,6 +39,7 @@ val create :
   ?rpc_host:string ->
   ?rpc_port:int ->
   node:Node.t ->
+  client:Client.t ->
   unit ->
   t
 
@@ -57,11 +58,12 @@ val endpoint : t -> string
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 
-(** [run ?wait_ready ?env node] launches the given dal node where env is a map
-    of environment variable.
+(** [run ?wait_ready ?env node] launches the given dal
+    node where env is a map of environment variable.
 
     If [wait_ready] is [true], the promise waits for the dal node to be ready.
-    [true] by default *)
+    [true] by default.
+*)
 val run : ?wait_ready:bool -> ?env:string String_map.t -> t -> unit Lwt.t
 
 (** Send SIGTERM and wait for the process to terminate.
@@ -93,8 +95,24 @@ val wait : t -> Unix.process_status Lwt.t
     allowing tests to run faster, without the need of large file. Default is
     [true] in tezt.
 *)
-
 val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
+
+(** DAC related functions. *)
+module Dac : sig
+  (** [set_parameters ?threshold dal_node] Runs
+    [octez-dal-node set dac parameters --data-dir data_dir], where
+    [data_dit = dal_node.persistent_stated.data_dir]. If the optional integer
+    parameter [~threshold] is passed, then the dal node configuration file is
+    updated with the dac threshold indicated. If no optional arguments are
+    passed, the configuration file of the dal node is left unchanged.
+*)
+  val set_parameters : ?threshold:int -> t -> unit Lwt.t
+
+  (** [add_committee_member dal_node] runs
+    [octez-dal-node add data availability committee member alias --data-dir data-dir],
+    where [data-dir = dal_node.persistent_state.data_dir]. *)
+  val add_committee_member : address:string -> t -> unit Lwt.t
+end
 
 module Config_file : sig
   (** DAL node configuration files. *)

@@ -132,8 +132,8 @@ let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
   let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
-let with_dal_node tezos_node f key =
-  let dal_node = Dal_node.create ~node:tezos_node () in
+let with_dal_node tezos_node tezos_client f key =
+  let dal_node = Dal_node.create ~node:tezos_node ~client:tezos_client () in
   let* _dir = Dal_node.init_config dal_node in
   f key dal_node
 
@@ -147,7 +147,7 @@ let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
     (fun protocol ->
       setup ?commitment_period ?challenge_window ~protocol ?dal_enable
       @@ fun _parameters _cryptobox node client ->
-      with_dal_node node @@ fun key dal_node ->
+      with_dal_node node client @@ fun key dal_node ->
       ( with_fresh_rollup ~dal_node
       @@ fun sc_rollup_address sc_rollup_node _filename ->
         scenario protocol dal_node sc_rollup_node sc_rollup_address node client
@@ -681,7 +681,7 @@ let init_dal_node protocol =
     let nodes_args = Node.[Synchronisation_threshold 0] in
     Client.init_with_protocol `Client ~parameter_file ~protocol ~nodes_args ()
   in
-  let dal_node = Dal_node.create ~node () in
+  let dal_node = Dal_node.create ~node ~client () in
   let* _dir = Dal_node.init_config dal_node in
   let* () = Dal_node.run dal_node in
   return (node, client, dal_node)
@@ -811,10 +811,10 @@ let test_dal_node_test_slots_propagation =
     ~title:"dal node slots propagation"
     ~tags:["dal"; "dal_node"]
   @@ fun protocol ->
-  let* node, _client, dal_node1 = init_dal_node protocol in
-  let dal_node2 = Dal_node.create ~node () in
-  let dal_node3 = Dal_node.create ~node () in
-  let dal_node4 = Dal_node.create ~node () in
+  let* node, client, dal_node1 = init_dal_node protocol in
+  let dal_node2 = Dal_node.create ~node ~client () in
+  let dal_node3 = Dal_node.create ~node ~client () in
+  let dal_node4 = Dal_node.create ~node ~client () in
   let* _ = Dal_node.init_config dal_node2 in
   let* _ = Dal_node.init_config dal_node3 in
   let* _ = Dal_node.init_config dal_node4 in
@@ -849,7 +849,7 @@ let test_dal_node_startup =
   let* node, client =
     Client.init_with_protocol `Client ~protocol:previous_protocol ~nodes_args ()
   in
-  let dal_node = Dal_node.create ~node () in
+  let dal_node = Dal_node.create ~node ~client () in
   let* _dir = Dal_node.init_config dal_node in
   let* () = run_dal dal_node in
   let* () =
@@ -1170,6 +1170,51 @@ let test_dal_node_handles_dac_store_preimage =
       ~error_msg:"Invalid root hash returned (Current:%L <> Expected: %R)") ;
   return ()
 
+let test_dal_node_imports_dac_member =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node imports dac members sk_uris"
+    ~tags:["dac"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let run_dal = Dal_node.run ~wait_ready:false in
+  let* dac_member = Client.bls_gen_keys ~alias:"dac_member" client in
+  let* dac_member_info = Client.bls_show_address ~alias:dac_member client in
+  let dac_member_address = dac_member_info.aggregate_public_key_hash in
+  let dal_node = Dal_node.create ~node ~client () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.Dac.set_parameters ~threshold:1 dal_node in
+  let* () =
+    Dal_node.Dac.add_committee_member ~address:dac_member_address dal_node
+  in
+  let ready_promise =
+    Dal_node.wait_for dal_node "dac_is_ready.v0" (fun _ -> Some ())
+  in
+  let* () = run_dal dal_node in
+  let* () = ready_promise in
+  let* () = Dal_node.terminate dal_node in
+  unit
+
+let test_dal_node_dac_threshold_not_reached =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node displays warning if dac threshold is not reached"
+    ~tags:["dac"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let run_dal = Dal_node.run ~wait_ready:false in
+  let dal_node = Dal_node.create ~node ~client () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.Dac.set_parameters ~threshold:1 dal_node in
+  let error_promise =
+    Dal_node.wait_for dal_node "dac_threshold_not_reached.v0" (fun _ -> Some ())
+  in
+  let* () = run_dal dal_node in
+  let* () = error_promise in
+  Dal_node.terminate dal_node
+
 let register ~protocols =
   test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
   test_slot_management_logic protocols ;
@@ -1189,4 +1234,6 @@ let register ~protocols =
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   test_slots_attestation_operation_behavior protocols ;
-  test_dal_node_handles_dac_store_preimage protocols
+  test_dal_node_handles_dac_store_preimage protocols ;
+  test_dal_node_imports_dac_member protocols ;
+  test_dal_node_dac_threshold_not_reached protocols

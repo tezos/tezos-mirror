@@ -68,6 +68,14 @@ let node_is_ready =
     ~level:Notice
     ()
 
+let dac_is_ready =
+  declare_0
+    ~section
+    ~name:"dac_is_ready"
+    ~msg:"The Data Availability Committee is ready"
+    ~level:Notice
+    ()
+
 let data_dir_not_found =
   declare_1
     ~section
@@ -129,6 +137,38 @@ let daemon_error =
     ~level:Notice
     ~pp1:Error_monad.pp_print_trace
     ("error", Error_monad.trace_encoding)
+
+let dac_threshold_not_reached =
+  declare_2
+    ~section
+    ~name:"dac_threshold_not_reached"
+    ~msg:
+      "Only {provided} out of {required} dac accounts are available for \
+       signing messages"
+    ~level:Warning
+    ("provided", Data_encoding.int31)
+    ("required", Data_encoding.int31)
+
+let dac_account_not_available =
+  declare_1
+    ~section
+    ~name:"dac_account_not_available"
+    ~msg:
+      "There is no account with public key {tz4_account} in the Tezos client \
+       wallet. This account won't be used for signing DAC root hash pages."
+    ~level:Warning
+    ("tz4_account", Aggregate_signature.Public_key_hash.encoding)
+
+let dac_account_cannot_sign =
+  declare_1
+    ~section
+    ~name:"dac_account_cannot_sign"
+    ~msg:
+      "There is an account with public key {tz4_account} in the Tezos client \
+       wallet, but its secret key URI is not available. This account won't be \
+       used for signing DAC root hash pages."
+    ~level:Warning
+    ("tz4_account", Aggregate_signature.Public_key_hash.encoding)
 
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
