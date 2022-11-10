@@ -64,3 +64,30 @@ let read_file file =
         let buffer = Bytes.make (Int64.to_int len) '\000' in
         let+ () = read_into_exactly ic buffer 0 (Int64.to_int len) in
         Bytes.to_string buffer))
+
+(* [find_key_in_durable] retrieves the given [key] from the durable storage in
+   the tree. Returns `None` if the key does not exists. *)
+let find_key_in_durable tree key =
+  let open Lwt_syntax in
+  let* durable = Wasm_utils.wrap_as_durable_storage tree in
+  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+  Tezos_scoru_wasm.Durable.find_value durable key
+
+(* [print_durable ~depth tree] prints the keys from the durable storage and
+   their value in their hexadecimal representation. *)
+let print_durable ?(depth = 10) tree =
+  let open Lwt_syntax in
+  Test_encodings_util.Context.Tree.fold
+    ~depth:(`Le depth)
+    tree
+    ["durable"]
+    ~order:`Sorted
+    ~init:()
+    ~f:(fun key tree () ->
+      let+ value = Test_encodings_util.Context.Tree.find tree [] in
+      let value = Option.value ~default:(Bytes.create 0) value in
+      Format.printf
+        "/%s\n  %a\n%!"
+        (String.concat "/" key)
+        Hex.pp
+        (Hex.of_bytes value))

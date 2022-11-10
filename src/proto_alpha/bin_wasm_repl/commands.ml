@@ -39,6 +39,7 @@ type commands =
   | Show_inbox
   | Show_outbox of int32
   | Show_status
+  | Show_durable_storage
   | Step of eval_step
   | Load_inputs
   | Unknown of string
@@ -60,6 +61,7 @@ let parse_commands s =
       | Some l -> Show_outbox l
       | None -> Unknown s)
   | ["show"; "status"] -> Show_status
+  | ["show"; "durable"; "storage"] -> Show_durable_storage
   | ["step"; step] -> (
       match parse_eval_step step with Some s -> Step s | None -> Unknown s)
   | ["load"; "inputs"] -> Load_inputs
@@ -321,6 +323,9 @@ let show_outbox tree level =
     (fun () -> show_outbox_gen tree level)
     (fun _ -> Lwt_io.printf "No outbox found at level %ld\n%!" level)
 
+(* [show_durable] prints the durable storage from the tree. *)
+let show_durable tree = Repl_helpers.print_durable ~depth:10 tree
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c tree inboxes level =
@@ -340,6 +345,9 @@ let handle_command c tree inboxes level =
       return ()
   | Show_outbox level ->
       let*! () = show_outbox tree level in
+      return ()
+  | Show_durable_storage ->
+      let*! () = show_durable tree in
       return ()
   | Unknown s ->
       let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
