@@ -15,6 +15,8 @@
 # Insert code owner declarations here!
 # ************************************
 
+/docs/                       @NicVolanschi
+
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_openapi             @romain.nl
