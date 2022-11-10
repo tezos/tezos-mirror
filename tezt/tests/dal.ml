@@ -109,13 +109,14 @@ let setup ?(endorsement_lag = 1) ?commitment_period ?challenge_window
 
 type test = {variant : string; tags : string list; description : string}
 
-let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
+let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
+    bootstrap1_key =
   let* rollup_address =
     Client.Sc_rollup.originate
       ~hooks
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
-      ~kind:"arith"
+      ~kind:pvm_name
       ~boot_sector:""
       ~parameters_ty:"unit"
       tezos_client
@@ -131,6 +132,15 @@ let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
+  let* () =
+    match dal_node with
+    | None -> return ()
+    | Some dal_node ->
+        let reveal_data_dir =
+          Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name
+        in
+        Dal_node.Dac.set_parameters ~reveal_data_dir dal_node
+  in
   let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
@@ -140,7 +150,7 @@ let with_dal_node tezos_node tezos_client f key =
   f key dal_node
 
 let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
-    ?dal_enable {variant; tags; description} scenario =
+    ?dal_enable {variant; tags; description} ?(pvm_name = "arith") scenario =
   let tags = tags @ [variant] in
   regression_test
     ~__FILE__
@@ -150,7 +160,7 @@ let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
       setup ?commitment_period ?challenge_window ~protocol ?dal_enable
       @@ fun _parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
-      ( with_fresh_rollup ~dal_node
+      ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node _filename ->
         scenario protocol dal_node sc_rollup_node sc_rollup_address node client
       )
