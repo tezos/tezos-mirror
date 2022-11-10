@@ -597,7 +597,7 @@ module Inner = struct
   let commit t p = Srs_g1.pippenger t.srs.raw.srs_g1 p
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
-     SRS's length - 1. We take d = k - 1 since we don't want to commit
+     SRS's length - 1. We take d = t.k - 1 since we don't want to commit
      polynomials with degree greater than polynomials to be erasure-encoded.
 
      We consider the bilinear groups (G_1, G_2, G_T) with G_1=<g> and G_2=<h>.
@@ -605,24 +605,45 @@ module Inner = struct
      that can be committed
      - Verify: checks if e(commit(p), commit(X^{d-n})) = e(commit(p X^{d-n}), h)
      using the commitments for p and p X^{d-n}, and computing the commitment for
-     X^{d-n} on G_2.*)
+     X^{d-n} on G_2. *)
 
-  let prove_commitment t p =
-    commit t Polynomials.(mul (of_coefficients [(Scalar.(copy one), 0)]) p)
+  (* Proves that degree(p) < t.k *)
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4192
 
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3389
-
-     Generalize this function to pass the degree in parameter. *)
-  let verify_commitment t cm proof =
-    let open Bls12_381 in
-    let check =
-      match Srs_g2.get t.srs.raw.srs_g2 0 with
-      | exception Invalid_argument _ -> false
-      | commit_xk ->
-          Pairing.pairing_check
-            [(cm, commit_xk); (proof, G2.(negate (copy one)))]
+     Generalize this function to pass the slot_size in parameter. *)
+  let prove_commitment (t : t) p =
+    let max_allowed_committed_poly_degree = t.k - 1 in
+    let max_committable_degree = Srs_g1.size t.srs.raw.srs_g1 - 1 in
+    let offset_monomial_degree =
+      max_committable_degree - max_allowed_committed_poly_degree
     in
-    check
+    (* Note: this reallocates a buffer of size (Srs_g1.size t.srs.raw.srs_g1)
+       (2^21 elements in practice), so roughly 100MB. We can get rid of the
+       allocation by giving an offset for the SRS in Pippenger. *)
+    let p_with_offset =
+      Polynomials.mul_xn p offset_monomial_degree Scalar.(copy zero)
+    in
+    (* proof = commit(p X^offset_monomial_degree), with deg p < t.k *)
+    commit t p_with_offset
+
+  (* Verifies that the degree of the committed polynomial is < t.k *)
+  let verify_commitment (t : t) cm proof =
+    let max_allowed_committed_poly_degree = t.k - 1 in
+    let max_committable_degree = Srs_g1.size t.srs.raw.srs_g1 - 1 in
+    let offset_monomial_degree =
+      max_committable_degree - max_allowed_committed_poly_degree
+    in
+    assert (offset_monomial_degree < Srs_g2.size t.srs.raw.srs_g2) ;
+    let committed_offset_monomial =
+      Srs_g2.get t.srs.raw.srs_g2 offset_monomial_degree
+    in
+    match committed_offset_monomial with
+    | exception Invalid_argument _ -> false
+    | _ ->
+        let open Bls12_381 in
+        (* checking that cm * committed_offset_monomial = proof *)
+        Pairing.pairing_check
+          [(cm, committed_offset_monomial); (proof, G2.(negate (copy one)))]
 
   let inverse domain =
     let n = Array.length domain in
@@ -877,8 +898,8 @@ module Internal_for_tests = struct
       Bls12_381.Fr.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let srs_g1 = Srs_g1.generate_insecure size secret in
-    let srs_g2 = Srs_g2.generate_insecure size secret in
+    let srs_g1 = Srs_g1.generate_insecure (size + 1) secret in
+    let srs_g2 = Srs_g2.generate_insecure (size + 1) secret in
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters

@@ -81,10 +81,12 @@ module type VERIFIER = sig
   (** An encoding for the proof of a commitment. *)
   val commitment_proof_encoding : commitment_proof Data_encoding.t
 
-  (** [verify_commitment srs commitment proof] checks whether
+  (** [verify_commitment t commitment proof] checks whether
      [commitment] is valid. In particular, it checks
      that the size of the data committed via [commitment] does not
-     exceed [C.slot_size]. The verification time is constant. *)
+     exceed [t.slot_size]. The verification time is constant.
+
+      Fails if the size of the srs on the group G2 is too small. *)
   val verify_commitment : t -> commitment -> commitment_proof -> bool
 
   (** The original slot can be split into a list of pages of size
