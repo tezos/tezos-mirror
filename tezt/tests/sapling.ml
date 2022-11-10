@@ -32,61 +32,20 @@
 
 open Tezt_tezos
 
+let sapling_contract_path ?(script = "sapling_contract.tz") protocol =
+  sf
+    "./src/%s/lib_protocol/test/integration/michelson/contracts/%s"
+    (Protocol.directory protocol)
+    script
+
 module Helpers = struct
-  module Re = struct
-    let extract_sapling_address client_output =
-      client_output =~* rex ".*?(zet1\\w{65}.*)" |> Option.get
-
-    let extract_sapling_balance client_output =
-      client_output
-      =~* rex "Total Sapling funds ?(\\d*)ꜩ"
-      |> Option.get |> int_of_string
-
-    let mutez_of_string s =
-      match String.split_on_char '.' s with
-      | [int] -> int_of_string int * 1_000_000
-      | [int; dec] ->
-          let zeroes_to_add = 6 - String.length dec in
-          if zeroes_to_add < 0 then
-            failwith (Format.sprintf "Decimal part too long in %S" s)
-          else int_of_string (int ^ dec ^ String.make zeroes_to_add '0')
-      | _ -> failwith (Format.sprintf "Malformed mutez string %S" s)
-
-    (* These regexs only work from protocol J, before there is no field
-       `storage fees`. *)
-    let balance_diff ~dst client_output =
-      let fees =
-        let re = ".*fees.* \\.* \\+ꜩ?(\\d*[.\\d*]*)" in
-        let res = matches client_output (rex re) in
-        List.map mutez_of_string res |> List.fold_left ( + ) 0
-      in
-      let amount_pos =
-        let re = dst ^ ".*\\+ꜩ?(\\d*[.\\d*]*)" in
-        match matches client_output (rex re) with
-        | [s] -> mutez_of_string s
-        | _ -> 0
-      in
-      let amount_neg =
-        let re = dst ^ ".*\\-ꜩ?(\\d*[.\\d*]*)" in
-        match matches client_output (rex re) with
-        | [s] -> mutez_of_string s
-        | _ -> 0
-      in
-      (amount_pos - amount_neg, fees)
-  end
-
   let init protocol contract =
     let* node = Node.init [Node.Synchronisation_threshold 0; Connections 0] in
     let* client = Client.init ~endpoint:(Node node) () in
     let* () = Client.activate_protocol ~protocol client in
     Log.info "Activated protocol." ;
     let* contract_address =
-      let prg =
-        sf
-          "./src/%s/lib_protocol/test/integration/michelson/contracts/%s"
-          (Protocol.directory protocol)
-          contract
-      in
+      let prg = sapling_contract_path protocol in
       Client.originate_contract
         ~wait:"none"
         ~init:"{}"
@@ -102,153 +61,120 @@ module Helpers = struct
     return (client, contract_address)
 
   let gen_user (client, contract) name =
-    let* () =
-      Client.spawn_command
-        client
-        ["sapling"; "gen"; "key"; name; "--unencrypted"]
-      |> Process.check
+    let* (_ : string list) =
+      Client.sapling_gen_key ~name ~unencrypted:true client
     in
     let* () =
-      Client.spawn_command
-        client
-        [
-          "sapling";
-          "use";
-          "key";
-          name;
-          "for";
-          "contract";
-          contract;
-          "--memo-size";
-          "8";
-        ]
-      |> Process.check
+      Client.sapling_use_key ~sapling_key:name ~contract ~memo_size:8 client
     in
-    let* client_output =
-      Client.spawn_command client ["sapling"; "gen"; "address"; name]
-      |> Process.check_and_read_stdout
-    in
-    return @@ Re.extract_sapling_address client_output
+    let* address, _index = Client.sapling_gen_address ~name client in
+    return address
 
-  let balance (client, contract) name =
-    let* client_output =
-      Client.spawn_command
-        client
-        ["sapling"; "get"; "balance"; "for"; name; "in"; "contract"; contract]
-      |> Process.check_and_read_stdout
+  let check_balance ~__LOC__ (client, contract) name amount =
+    let* balance =
+      Client.sapling_get_balance ~sapling_key:name ~contract client
     in
-    return @@ Re.extract_sapling_balance client_output
-
-  let assert_balance client name amount =
-    let* balance = balance client name in
-    assert (balance = amount) ;
+    Check.(
+      (balance = amount)
+        Tez.typ
+        ~error_msg:"Expected sapling balance in contract %R, got %L"
+        ~__LOC__) ;
     unit
 
   let shield ?(expect_failure = false) (client, contract) src dst amount_tez =
-    let* client_output =
-      Client.spawn_command
-        client
-        (["--wait"; "none"]
-        @ [
-            "sapling";
-            "shield";
-            string_of_int amount_tez;
-            "from";
-            Account.(src.alias);
-            "to";
-            dst;
-            "using";
-            contract;
-            "--burn-cap";
-            "2";
-          ])
-      |> Process.check_and_read_stdout ~expect_failure
-    in
-    if expect_failure then return (0, 0)
+    if expect_failure then
+      let* () =
+        Client.spawn_sapling_shield
+          ~qty:amount_tez
+          ~src_tz:Account.(src.alias)
+          ~dst_sap:dst
+          ~sapling_contract:contract
+          ~burn_cap:(Tez.of_int 2)
+          client
+        |> Process.check_error
+      in
+      return Tez.(zero, zero)
     else
+      let* balance_diff =
+        Client.sapling_shield
+          ~qty:amount_tez
+          ~src_tz:Account.(src.alias)
+          ~dst_sap:dst
+          ~sapling_contract:contract
+          ~burn_cap:(Tez.of_int 2)
+          client
+      in
       let* () = Client.bake_for_and_wait client in
       Log.info "shield" ;
-      return @@ Re.balance_diff ~dst:contract client_output
+      return balance_diff
 
   let transfer ?(expect_failure = false) (client, contract) src dst amount_tez =
     let temp_sapling_transaction_file = Temp.file "sapling_transaction" in
-    let* () =
-      Client.spawn_command
+    if expect_failure then
+      Client.spawn_sapling_forge_transaction
+        ~qty:amount_tez
+        ~src_sap:src
+        ~dst_sap:dst
+        ~sapling_contract:contract
+        ~file:temp_sapling_transaction_file
         client
-        [
-          "sapling";
-          "forge";
-          "transaction";
-          string_of_int amount_tez;
-          "from";
-          src;
-          "to";
-          dst;
-          "using";
-          contract;
-          "--file";
-          temp_sapling_transaction_file;
-        ]
-      |> Process.check ~expect_failure
-    in
-    if expect_failure then unit
+      |> Process.check_error
     else
       let* () =
-        Client.spawn_command
+        Client.sapling_forge_transaction
+          ~qty:amount_tez
+          ~src_sap:src
+          ~dst_sap:dst
+          ~sapling_contract:contract
+          ~file:temp_sapling_transaction_file
           client
-          (["--wait"; "none"]
-          @ [
-              "sapling";
-              "submit";
-              temp_sapling_transaction_file;
-              "from";
-              Constant.bootstrap1.alias;
-              "using";
-              contract;
-              "--burn-cap";
-              "1";
-            ])
-        |> Process.check
+      in
+      let* () =
+        Client.sapling_submit
+          ~burn_cap:Tez.one
+          ~file:temp_sapling_transaction_file
+          ~alias_tz:Constant.bootstrap1.alias
+          ~sapling_contract:contract
+          client
       in
       let* () = Client.bake_for_and_wait client in
       Log.info "transfer" ;
       unit
 
   let unshield ?(expect_failure = false) (client, contract) src dst amount_tez =
-    let* client_output =
-      Client.spawn_command
-        client
-        (["--wait"; "none"]
-        @ [
-            "sapling";
-            "unshield";
-            string_of_int amount_tez;
-            "from";
-            src;
-            "to";
-            Account.(dst.alias);
-            "using";
-            contract;
-            "--burn-cap";
-            "1";
-          ])
-      |> Process.check_and_read_stdout ~expect_failure
-    in
-    if expect_failure then return (0, 0)
+    if expect_failure then
+      let* () =
+        Client.spawn_sapling_unshield
+          ~burn_cap:Tez.one
+          ~qty:amount_tez
+          ~src_sap:src
+          ~dst_tz:Account.(dst.alias)
+          ~sapling_contract:contract
+          client
+        |> Process.check_error
+      in
+      return Tez.(zero, zero)
     else
+      let* balance_diff =
+        Client.sapling_unshield
+          ~burn_cap:Tez.one
+          ~qty:amount_tez
+          ~src_sap:src
+          ~dst_tz:Account.(dst.alias)
+          ~sapling_contract:contract
+          client
+      in
       let* () = Client.bake_for_and_wait client in
       Log.info "unshield" ;
-      return @@ Re.balance_diff ~dst:contract client_output
+      return balance_diff
 
   let balance_tz1 (client, _contract) pkh =
     let* balance_tez =
       RPC.Client.call client
       @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
     in
-    return (Tez.to_mutez balance_tez)
+    return balance_tez
 end
-
-let contract = "sapling_contract.tz"
 
 module Insufficient_funds = struct
   let shield =
@@ -258,11 +184,16 @@ module Insufficient_funds = struct
       ~tags:["sapling"]
     @@ fun protocol ->
     let open Helpers in
-    let* c = init protocol contract in
+    let* c = init protocol (sapling_contract_path protocol) in
     let alice_tz1 = Constant.bootstrap2 in
     let* alice_address = gen_user c "alice" in
     let* _ =
-      shield ~expect_failure:true c alice_tz1 alice_address 1_000_000_000
+      shield
+        ~expect_failure:true
+        c
+        alice_tz1
+        alice_address
+        (Tez.of_int 1_000_000_000)
     in
     unit
 
@@ -273,12 +204,14 @@ module Insufficient_funds = struct
       ~tags:["sapling"]
     @@ fun protocol ->
     let open Helpers in
-    let* c = init protocol contract in
+    let* c = init protocol (sapling_contract_path protocol) in
     let alice_tz1 = Constant.bootstrap2 in
     let* alice_address = gen_user c "alice" in
     let* bob_address = gen_user c "bob" in
-    let* _ = shield c alice_tz1 alice_address 10 in
-    let* () = transfer ~expect_failure:true c "alice" bob_address 11 in
+    let* _ = shield c alice_tz1 alice_address (Tez.of_int 10) in
+    let* () =
+      transfer ~expect_failure:true c "alice" bob_address (Tez.of_int 11)
+    in
     unit
 
   let unshield =
@@ -288,13 +221,13 @@ module Insufficient_funds = struct
       ~tags:["sapling"]
     @@ fun protocol ->
     let open Helpers in
-    let* c = init protocol contract in
+    let* c = init protocol (sapling_contract_path protocol) in
     let alice_tz1 = Constant.bootstrap2 in
     let* alice_address = gen_user c "alice" in
     let* bob_address = gen_user c "bob" in
-    let* _ = shield c alice_tz1 alice_address 10 in
-    let* () = transfer c "alice" bob_address 10 in
-    let* _ = unshield ~expect_failure:true c "bob" alice_tz1 11 in
+    let* _ = shield c alice_tz1 alice_address (Tez.of_int 10) in
+    let* () = transfer c "alice" bob_address (Tez.of_int 10) in
+    let* _ = unshield ~expect_failure:true c "bob" alice_tz1 (Tez.of_int 11) in
     unit
 end
 
@@ -308,35 +241,63 @@ let successful_roundtrip =
     ~tags:["sapling"]
   @@ fun protocol ->
   let open Helpers in
-  let* c = init protocol contract in
+  let* c = init protocol (sapling_contract_path protocol) in
   let alice_tz1 = Constant.bootstrap2 in
   let* alice_address = gen_user c "alice" in
   let* bob_address = gen_user c "bob" in
-  let* () = assert_balance c "alice" 0 in
-  let* () = assert_balance c "bob" 0 in
+  let* () = check_balance ~__LOC__ c "alice" Tez.zero in
+  let* () = check_balance ~__LOC__ c "bob" Tez.zero in
+  let shield_amount = Tez.of_int 10 in
   let* balance_alice_tz1_before = balance_tz1 c alice_tz1.public_key_hash in
-  let* amount, fees = shield c alice_tz1 alice_address 10 in
+  let* amount, fees = shield c alice_tz1 alice_address shield_amount in
   let* balance_alice_tz1_after = balance_tz1 c alice_tz1.public_key_hash in
-  assert (amount = 10_000_000) ;
-  assert (balance_alice_tz1_after = balance_alice_tz1_before - 10_000_000 - fees) ;
+  Check.(
+    (amount = shield_amount) Tez.typ ~__LOC__ ~error_msg:"Expected %R, got %L") ;
+  Check.(
+    (balance_alice_tz1_after
+    = Tez.(balance_alice_tz1_before - shield_amount - fees))
+      Tez.typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
   let* balance_contract = balance_tz1 c (snd c) in
-  assert (balance_contract = 10_000_000) ;
-  let* () = assert_balance c "alice" 10 in
-  let* () = assert_balance c "bob" 0 in
-  let* () = transfer c "alice" bob_address 10 in
+  Check.(
+    (balance_contract = shield_amount)
+      Tez.typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  let* () = check_balance ~__LOC__ c "alice" shield_amount in
+  let* () = check_balance ~__LOC__ c "bob" Tez.zero in
+  let* () = transfer c "alice" bob_address shield_amount in
   let* balance_contract = balance_tz1 c (snd c) in
-  assert (balance_contract = 10_000_000) ;
-  let* () = assert_balance c "alice" 0 in
-  let* () = assert_balance c "bob" 10 in
+  Check.(
+    (balance_contract = shield_amount)
+      Tez.typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  let* () = check_balance ~__LOC__ c "alice" Tez.zero in
+  let* () = check_balance ~__LOC__ c "bob" shield_amount in
   let* balance_alice_tz1_before = balance_tz1 c alice_tz1.public_key_hash in
-  let* amount, fees = unshield c "bob" alice_tz1 10 in
+  let* amount, fees = unshield c "bob" alice_tz1 shield_amount in
   let* balance_alice_tz1_after = balance_tz1 c alice_tz1.public_key_hash in
-  assert (amount = -10_000_000) ;
-  assert (balance_alice_tz1_after = balance_alice_tz1_before + 10_000_000 - fees) ;
+  Check.(
+    (amount = Tez.(to_mutez shield_amount * -1 |> Tez.of_mutez_int))
+      Tez.typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  Check.(
+    (balance_alice_tz1_after
+    = Tez.(balance_alice_tz1_before + shield_amount - fees))
+      Tez.typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
   let* balance_contract = balance_tz1 c (snd c) in
-  assert (balance_contract = 0) ;
-  let* () = assert_balance c "alice" 0 in
-  let* () = assert_balance c "bob" 0 in
+  Check.(
+    (balance_contract = Tez.zero)
+      Tez.typ
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  let* () = check_balance ~__LOC__ c "alice" Tez.zero in
+  let* () = check_balance ~__LOC__ c "bob" Tez.zero in
   unit
 
 let register ~protocols =
