@@ -29,11 +29,15 @@ module Test = struct
     let number_of_shards = 2048 / 16 in
     let slot_size = 1048576 / 16 in
     let page_size = 4096 / 16 in
-    let msg_size = slot_size in
+    let msg_size = slot_size / 16 in
+    (* [msg] is initialized with random bytes. *)
     let msg = Bytes.create msg_size in
-    for i = 0 to (msg_size / 8) - 1 do
-      Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
-    done ;
+    let slot = Bytes.create slot_size in
+
+    (* We include [msg] in a slot, with additional zero padding *)
+    Bytes.blit msg 0 slot 0 msg_size ;
+    Bytes.fill slot msg_size (slot_size - msg_size) '0' ;
+
     let parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
         ~slot_size
@@ -45,14 +49,13 @@ module Test = struct
           Cryptobox.make
             {redundancy_factor; slot_size; page_size; number_of_shards}
         in
-        let* p = Cryptobox.polynomial_from_slot t msg in
+        let* p = Cryptobox.polynomial_from_slot t slot in
         let cm = Cryptobox.commit t p in
         let* pi = Cryptobox.prove_page t p 1 in
         let page = Bytes.sub msg page_size page_size in
         let* check =
           Cryptobox.verify_page t cm {index = 1; content = page} pi
         in
-
         assert check ;
         let enc_shards = Cryptobox.shards_from_polynomial t p in
         let c_indices =
@@ -64,15 +67,11 @@ module Test = struct
         let c =
           Cryptobox.IntMap.filter (fun i _ -> Array.mem i c_indices) enc_shards
         in
-        let* dec = Cryptobox.polynomial_from_shards t c in
-        assert (
-          Bytes.compare
-            msg
-            (Bytes.sub
-               (Cryptobox.polynomial_to_bytes t dec)
-               0
-               (min slot_size msg_size))
-          = 0) ;
+        let* decoded_slot = Cryptobox.polynomial_from_shards t c in
+        let decoded_msg =
+          Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
+        in
+        assert (Bytes.equal msg decoded_msg) ;
         let comm = Cryptobox.commit t p in
         let shard_proofs = Cryptobox.prove_shards t p in
         match Cryptobox.IntMap.find 0 enc_shards with
