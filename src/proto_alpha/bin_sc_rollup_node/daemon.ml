@@ -422,7 +422,9 @@ let run ~data_dir (configuration : Configuration.t)
       configuration.sc_rollup_node_operators
   in
   let*! store =
-    Store.load Configuration.(default_storage_dir configuration.data_dir)
+    Store.load
+      Read_write
+      Configuration.(default_storage_dir configuration.data_dir)
   in
   let*! context = Context.load configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in

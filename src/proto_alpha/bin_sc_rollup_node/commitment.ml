@@ -47,7 +47,7 @@ open Alpha_context
 module type Mutable_level_store =
   Store_sigs.Mutable_value
     with type value = Raw_level.t
-     and type store = Store.t
+     and type 'a store = 'a Store.store
 
 (* We persist the number of ticks to be included in the
    next commitment on disk, in a map that is indexed by
@@ -56,8 +56,8 @@ module type Mutable_level_store =
    node, as only finalized heads are processed to build commitments.
 *)
 module Number_of_ticks :
-  Store_sigs.Map
-    with type store = Store.t
+  Store_sigs.Append_only_map
+    with type 'a store = 'a Store.store
      and type key = Raw_level.t
      and type value = Z.t =
   Store.Make_append_only_map

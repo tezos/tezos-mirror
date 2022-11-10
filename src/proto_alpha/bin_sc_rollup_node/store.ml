@@ -36,6 +36,10 @@ end)
 
 include Store_utils.Make (IStore)
 
+type 'a store = 'a IStore.t
+
+type t = rw store
+
 let close = IStore.close
 
 let load = IStore.load
