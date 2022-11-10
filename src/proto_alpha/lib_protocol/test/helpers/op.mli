@@ -75,12 +75,6 @@ val preendorsement :
   unit ->
   Kind.preendorsement Operation.t tzresult Lwt.t
 
-val miss_signed_endorsement :
-  ?level:Raw_level.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  Kind.endorsement Operation.t tzresult Lwt.t
-
 type gas_limit =
   | Max  (** Max corresponds to the [max_gas_limit_per_operation] constant. *)
   | High

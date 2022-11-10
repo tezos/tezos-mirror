@@ -417,13 +417,6 @@ let register_global_constant ?force_reveal ?counter ?public_key ?fee ?gas_limit
     operation
   >|=? fun sop -> sign account.sk ctxt sop
 
-let miss_signed_endorsement ?level ~endorsed_block ctxt =
-  (match level with None -> Context.get_level ctxt | Some level -> ok level)
-  >>?= fun level ->
-  Context.get_endorser ctxt >>=? fun (real_delegate_pkh, slots) ->
-  let delegate = Account.find_alternate real_delegate_pkh in
-  endorsement ~delegate:(delegate.pkh, slots) ~level ~endorsed_block ctxt ()
-
 let unsafe_transaction ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?(parameters = Script.unit_parameter) ?(entrypoint = Entrypoint.default)
     ctxt (src : Contract.t) (destination : Contract.t) (amount : Tez.t) =
