@@ -352,8 +352,8 @@ let test_update_consensus_key =
     in
     let delayed_op_kind =
       JSON.(
-        json |-> "branch_delayed" |> geti 0 |> geti 1 |-> "contents" |> geti 0
-        |-> "kind" |> encode)
+        json |-> "branch_delayed" |> geti 0 |-> "contents" |> geti 0 |-> "kind"
+        |> encode)
     in
     Check.((delayed_op_kind = "\"transaction\"") string)
       ~error_msg:

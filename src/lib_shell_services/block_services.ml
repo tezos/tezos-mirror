@@ -1139,10 +1139,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                          next_operation_encoding)))))
 
       (* This encoding should be always the one by default. *)
-      let encoding = version_0_encoding
+      let encoding = version_1_encoding
 
       (* If you change this value, also change [encoding]. *)
-      let default_pending_operations_version = 0
+      let default_pending_operations_version = 1
 
       let pending_query =
         let open Tezos_rpc.Query in
