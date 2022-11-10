@@ -55,6 +55,7 @@ SNOOP_RESULT_DIR="snoop_results/_snoop_${TODAY}_${HEADCOMMIT}"
 # Create the result directory and register its name for tools that depend on it.
 cd ..
 echo "$SNOOP_RESULT_DIR" > current_run_dir
+mkdir -p snoop_results
 mkdir "$SNOOP_RESULT_DIR"
 
 # Build dependencies.
