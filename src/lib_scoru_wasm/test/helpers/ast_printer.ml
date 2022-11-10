@@ -621,13 +621,11 @@ let pp_step_kont out = function
   | SK_Trapped msg -> Format.fprintf out "@[<v 2>SK_Trapped %s@]" msg.it
 
 let pp_input_buffer out input =
-  let open Input_buffer in
   Format.fprintf
     out
-    "@[<v 2>{content = %a;@;num_elements = %s;@;}@]"
+    "@[<v 2>%a@]"
     (pp_vector_z Input_buffer.pp_message)
-    (Lazy_vector.Mutable.ZVector.snapshot input.content)
-    (Z.to_string input.num_elements)
+    (Lazy_vector.Mutable.ZVector.snapshot input)
 
 let pp_index_vector out index_vector =
   Format.fprintf

@@ -9,10 +9,7 @@ type message = {raw_level : int32; message_counter : Z.t; payload : bytes}
     there is no cleanup operation so an input_buffer content will likely have
     more than [num_elements] messages (see #3340). *)
 
-type t = {
-  content : message Lazy_vector.Mutable.ZVector.t;
-  mutable num_elements : Z.t;
-}
+type t = message Lazy_vector.Mutable.ZVector.t
 
 exception Bounds
 

@@ -248,9 +248,7 @@ let show_inbox tree =
   let* input_buffer = Wasm.Internal_for_tests.get_input_buffer tree in
   let* messages =
     Tezos_lazy_containers.Lazy_vector.(
-      Mutable.ZVector.snapshot
-        input_buffer.Tezos_webassembly_interpreter.Input_buffer.content
-      |> ZVector.to_list)
+      Mutable.ZVector.snapshot input_buffer |> ZVector.to_list)
   in
   let messages_sorted =
     List.sort Messages.compare_input_buffer_messages messages
@@ -278,7 +276,7 @@ let show_inbox tree =
   in
 
   let size =
-    input_buffer.Tezos_webassembly_interpreter.Input_buffer.num_elements
+    Tezos_lazy_containers.Lazy_vector.Mutable.ZVector.num_elements input_buffer
   in
   Lwt_io.printf
     "Inbox has %s messages:\n%s\n%!"

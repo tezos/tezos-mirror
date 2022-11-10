@@ -885,23 +885,9 @@ let input_buffer_message_encoding =
 
 let input_buffer_encoding =
   conv
-    (fun (content, num_elements) ->
-      {
-        Input_buffer.content = Lazy_vector.Mutable.ZVector.of_immutable content;
-        num_elements;
-      })
-    (fun buffer ->
-      Input_buffer.
-        ( Lazy_vector.Mutable.ZVector.snapshot buffer.content,
-          buffer.num_elements ))
-    (tup2
-       ~flatten:true
-       (scope
-          ["messages"]
-          (z_lazy_vector
-             (value [] Data_encoding.z)
-             input_buffer_message_encoding))
-       (value ["num-messages"] Data_encoding.z))
+    (fun index -> Lazy_vector.Mutable.ZVector.of_immutable index)
+    (fun buffer -> Lazy_vector.Mutable.ZVector.snapshot buffer)
+    (z_lazy_vector (value [] Data_encoding.z) input_buffer_message_encoding)
 
 let label_encoding =
   conv

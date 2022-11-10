@@ -634,12 +634,8 @@ let input_buffer_gen =
     let+ payload = map Bytes.of_string (small_string ~gen:char) in
     Input_buffer.{raw_level; message_counter; payload}
   in
-  let* messages = vector_z_gen gen_message in
-  let+ num_elements = small_nat in
-  {
-    Input_buffer.content = Lazy_vector.Mutable.ZVector.of_immutable messages;
-    num_elements = Z.of_int num_elements;
-  }
+  let+ messages = vector_z_gen gen_message in
+  Lazy_vector.Mutable.ZVector.of_immutable messages
 
 let output_info_gen =
   let* level = small_int in
@@ -868,7 +864,7 @@ let buffers_gen =
   let* input = input_buffer_gen in
   let _input_list =
     Lwt_main.run @@ Lazy_vector.ZVector.to_list
-    @@ Lazy_vector.Mutable.ZVector.snapshot input.content
+    @@ Lazy_vector.Mutable.ZVector.snapshot input
   in
   let+ output = output_buffer_gen in
   Eval.{input; output}
