@@ -5,8 +5,6 @@
 
 # Ignoring package octez-dal-node, it only contains tests or private targets
 
-# Ignoring package octez-proxy-server, it only contains tests or private targets
-
 # Ignoring package octez-snoop, it only contains tests or private targets
 
 # Ignoring package tezos-benchmark-tests, it only contains tests or private targets
@@ -327,6 +325,13 @@ opam:octez-protocol-compiler:
     - .rules_template__trigger_opam_batch_5
   variables:
     package: octez-protocol-compiler
+
+opam:octez-proxy-server:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-proxy-server
 
 opam:octez-sc-rollup-client-alpha:
   extends:
@@ -807,7 +812,7 @@ opam:tezos-embedded-protocol-006-PsCARTHA:
 opam:tezos-embedded-protocol-007-PsDELPH1:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-007-PsDELPH1
 
@@ -933,7 +938,7 @@ opam:tezos-expect-helper:
 opam:tezos-hacl:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-hacl
 
@@ -1199,7 +1204,7 @@ opam:tezos-protocol-demo-noops:
 opam:tezos-protocol-environment:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-environment
 
@@ -1276,7 +1281,7 @@ opam:tezos-protocol-plugin-011-PtHangz2:
 opam:tezos-protocol-plugin-011-PtHangz2-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-protocol-plugin-011-PtHangz2-registerer
 
@@ -1444,7 +1449,7 @@ opam:tezos-shell:
 opam:tezos-shell-benchmarks:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-shell-benchmarks
 
