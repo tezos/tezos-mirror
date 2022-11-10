@@ -64,8 +64,8 @@ let extract_prequorum preendorsements =
         }
   | _ -> None
 
-let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
-    current_protocol next_protocol live_blocks =
+let raw_info cctxt ~chain ~block_hash shell resulting_context_hash payload_hash
+    payload_round current_protocol next_protocol live_blocks =
   Events.(emit raw_info (block_hash, shell.Tezos_base.Block_header.level))
   >>= fun () ->
   let open Protocol_client_context in
@@ -105,6 +105,7 @@ let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
     {
       Baking_state.hash = block_hash;
       shell;
+      resulting_context_hash;
       payload_hash;
       payload_round;
       round;
@@ -123,6 +124,8 @@ let info cctxt ~chain ~block () =
   (* Fails if the block's protocol is not the current one *)
   Shell_services.Blocks.protocols cctxt ~chain ~block ()
   >>=? fun {current_protocol; next_protocol} ->
+  Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
+  >>=? fun resulting_context_hash ->
   (if Tezos_crypto.Protocol_hash.(current_protocol <> Protocol.hash) then
    Block_services.Header.shell_header cctxt ~chain ~block () >>=? fun shell ->
    Chain_services.Blocks.Header.raw_protocol_data cctxt ~chain ~block ()
@@ -144,16 +147,17 @@ let info cctxt ~chain ~block () =
          (payload_hash, payload_round)
      | None -> (dummy_payload_hash, Round.zero)
    in
-   return (hash, shell, payload_hash, payload_round)
+   return (hash, shell, resulting_context_hash, payload_hash, payload_round)
   else
     Alpha_block_services.header cctxt ~chain ~block ()
     >>=? fun {hash; shell; protocol_data; _} ->
     return
       ( hash,
         shell,
+        resulting_context_hash,
         protocol_data.contents.payload_hash,
         protocol_data.contents.payload_round ))
-  >>=? fun (hash, shell, payload_hash, payload_round) ->
+  >>=? fun (hash, shell, resulting_context_hash, payload_hash, payload_round) ->
   (Chain_services.Blocks.live_blocks cctxt ~chain ~block () >>= function
    | Error _ ->
        (* The RPC might fail when a block's metadata is not available *)
@@ -165,6 +169,7 @@ let info cctxt ~chain ~block () =
     ~chain
     ~block_hash:hash
     shell
+    resulting_context_hash
     payload_hash
     payload_round
     current_protocol

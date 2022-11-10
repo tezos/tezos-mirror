@@ -112,6 +112,7 @@ type prequorum = {
 type block_info = {
   hash : Tezos_crypto.Block_hash.t;
   shell : Block_header.shell_header;
+  resulting_context_hash : Tezos_crypto.Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
@@ -175,6 +176,7 @@ let block_info_encoding =
     (fun {
            hash;
            shell;
+           resulting_context_hash;
            payload_hash;
            payload_round;
            round;
@@ -187,29 +189,30 @@ let block_info_encoding =
          } ->
       ( ( hash,
           shell,
+          resulting_context_hash,
           payload_hash,
           payload_round,
           round,
           protocol,
           next_protocol,
           prequorum,
-          List.map Operation.pack quorum,
-          payload ),
-        live_blocks ))
+          List.map Operation.pack quorum ),
+        (payload, live_blocks) ))
     (fun ( ( hash,
              shell,
+             resulting_context_hash,
              payload_hash,
              payload_round,
              round,
              protocol,
              next_protocol,
              prequorum,
-             quorum,
-             payload ),
-           live_blocks ) ->
+             quorum ),
+           (payload, live_blocks) ) ->
       {
         hash;
         shell;
+        resulting_context_hash;
         payload_hash;
         payload_round;
         round;
@@ -224,15 +227,17 @@ let block_info_encoding =
        (obj10
           (req "hash" Tezos_crypto.Block_hash.encoding)
           (req "shell" Block_header.shell_header_encoding)
+          (req "resulting_context_hash" Tezos_crypto.Context_hash.encoding)
           (req "payload_hash" Block_payload_hash.encoding)
           (req "payload_round" Round.encoding)
           (req "round" Round.encoding)
           (req "protocol" Tezos_crypto.Protocol_hash.encoding)
           (req "next_protocol" Tezos_crypto.Protocol_hash.encoding)
           (req "prequorum" (option prequorum_encoding))
-          (req "quorum" (list (dynamic_size Operation.encoding)))
-          (req "payload" Operation_pool.payload_encoding))
-       (obj1 (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
+          (req "quorum" (list (dynamic_size Operation.encoding))))
+       (obj2
+          (req "payload" Operation_pool.payload_encoding)
+          (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult

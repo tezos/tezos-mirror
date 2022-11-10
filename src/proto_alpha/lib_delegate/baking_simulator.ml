@@ -79,10 +79,15 @@ let check_context_consistency (abstract_index : Abstract_context_index.t)
 let begin_construction ~timestamp ~protocol_data
     (abstract_index : Abstract_context_index.t) predecessor chain_id =
   protect (fun () ->
-      let {Baking_state.shell = pred_shell; hash = pred_hash; _} =
+      let {
+        Baking_state.shell = pred_shell;
+        hash = pred_hash;
+        resulting_context_hash;
+        _;
+      } =
         predecessor
       in
-      abstract_index.checkout_fun pred_shell.context >>= function
+      abstract_index.checkout_fun resulting_context_hash >>= function
       | None -> fail Failed_to_checkout_context
       | Some context ->
           let header : Tezos_base.Block_header.shell_header =
