@@ -33,7 +33,10 @@ let resolve_plugin cctxt =
        (Dal_plugin.get protocols.current_protocol)
        (Dal_plugin.get protocols.next_protocol)
 
-type error += Cryptobox_initialisation_failed of string
+type error +=
+  | Cryptobox_initialisation_failed of string
+  | Reveal_data_path_not_a_directory of string
+  | Cannot_create_reveal_data_dir of string
 
 let () =
   register_error_kind
@@ -48,7 +51,33 @@ let () =
         msg)
     Data_encoding.(obj1 (req "error" string))
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
-    (fun str -> Cryptobox_initialisation_failed str)
+    (fun str -> Cryptobox_initialisation_failed str) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.dac.reveal_data_path_not_a_dir"
+    ~title:"Reveal data path is not a directory"
+    ~description:"Reveal data path is not a directory"
+    ~pp:(fun ppf reveal_data_path ->
+      Format.fprintf
+        ppf
+        "Reveal data path %s is not a directory"
+        reveal_data_path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Reveal_data_path_not_a_directory path -> Some path | _ -> None)
+    (fun path -> Reveal_data_path_not_a_directory path) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.dac.cannot_create_directory"
+    ~title:"Cannot create directory to store reveal data"
+    ~description:"Cannot create directory to store reveal data"
+    ~pp:(fun ppf reveal_data_path ->
+      Format.fprintf
+        ppf
+        "Reveal data path %s is not a directory"
+        reveal_data_path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Cannot_create_reveal_data_dir path -> Some path | _ -> None)
+    (fun path -> Cannot_create_reveal_data_dir path)
 
 let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
   let open Cryptobox in
@@ -252,6 +281,19 @@ let get_dac_keys cctxt {Configuration.dac = {addresses; threshold; _}; _} =
   in
   return keys
 
+let ensure_reveal_data_dir_exists reveal_data_dir =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let*! () = Lwt_utils_unix.create_dir ~perm:0o744 reveal_data_dir in
+      return ())
+    (function
+      | Failure s ->
+          if String.equal s "Not a directory" then
+            tzfail @@ Reveal_data_path_not_a_directory reveal_data_dir
+          else tzfail @@ Cannot_create_reveal_data_dir reveal_data_dir
+      | _ -> tzfail @@ Cannot_create_reveal_data_dir reveal_data_dir)
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
 
    Improve general architecture, handle L1 disconnection etc
@@ -261,6 +303,7 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
+  let* () = ensure_reveal_data_dir_exists config.dac.reveal_data_dir in
   let* _dac_list = get_dac_keys cctxt config in
   let*! store = Store.init config in
   let ctxt = Node_context.init config store in
