@@ -30,6 +30,11 @@ type dac = {
   threshold : int;
       (** The number of signature needed on root page hashes for the
           corresponding reveal preimages to be available. *)
+  reveal_data_dir : string;
+      (** The directory where the dal node saves pages computed
+          from reveal preimages. If the dal node saves the data
+          directly into the rollup node, this should be
+          {ROLLUP_NODE_DATA_DIR}/{PVM_NAME}. *)
 }
 
 type t = {
@@ -52,6 +57,8 @@ val filename : t -> string
 val data_dir_path : t -> string -> string
 
 val default_data_dir : string
+
+val default_reveal_data_dir : string
 
 val default_rpc_addr : string
 

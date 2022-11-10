@@ -28,6 +28,7 @@ type neighbor = {addr : string; port : int}
 type dac = {
   addresses : Aggregate_signature.public_key_hash list;
   threshold : int;
+  reveal_data_dir : string;
 }
 
 type t = {
@@ -57,8 +58,17 @@ let default_dac_threshold = 0
 
 let default_dac_addresses = []
 
+let default_reveal_data_dir =
+  Filename.concat
+    (Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-node")
+    "wasm_2_0_0"
+
 let default_dac =
-  {addresses = default_dac_addresses; threshold = default_dac_threshold}
+  {
+    addresses = default_dac_addresses;
+    threshold = default_dac_threshold;
+    reveal_data_dir = default_reveal_data_dir;
+  }
 
 let default_use_unsafe_srs = false
 
@@ -72,11 +82,14 @@ let neighbor_encoding : neighbor Data_encoding.t =
 let dac_encoding : dac Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {addresses; threshold} -> (addresses, threshold))
-    (fun (addresses, threshold) -> {addresses; threshold})
-    (obj2
+    (fun {addresses; threshold; reveal_data_dir} ->
+      (addresses, threshold, reveal_data_dir))
+    (fun (addresses, threshold, reveal_data_dir) ->
+      {addresses; threshold; reveal_data_dir})
+    (obj3
        (req "addresses" (list Aggregate_signature.Public_key_hash.encoding))
-       (req "threshold" uint8))
+       (req "threshold" uint8)
+       (req "reveal-data-dir" string))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
