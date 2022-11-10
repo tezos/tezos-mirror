@@ -12,6 +12,7 @@
   tezos-rpc-http
   tezos-rpc-http-server
   tezos-context
+  tezos-store
   tezos-validation)
  (flags
   (:standard)
@@ -22,4 +23,5 @@
   -open Tezos_rpc_http
   -open Tezos_rpc_http_server
   -open Tezos_context
+  -open Tezos_store
   -open Tezos_validation))

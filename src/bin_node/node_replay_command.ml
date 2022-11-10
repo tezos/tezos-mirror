@@ -230,7 +230,7 @@ let replay_one_block strict main_chain_store validator_process block =
     let* protocol = Store.Block.protocol_hash main_chain_store block in
     let* (module Proto) = Registered_protocol.get_result protocol in
     let* expected_context_hash =
-      if Proto.expected_context_hash = `Current then
+      if Proto.expected_context_hash = Resulting_context then
         return (Store.Block.context_hash block)
       else Store.Block.resulting_context_hash main_chain_store block
     in
@@ -440,7 +440,11 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
 
 let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
-  let* () = Data_version.ensure_data_dir config.data_dir in
+  let* () =
+    Data_version.ensure_data_dir
+      config.blockchain_network.genesis
+      config.data_dir
+  in
   Lwt_lock_file.try_with_lock
     ~when_locked:(fun () ->
       failwith "Data directory is locked by another process")

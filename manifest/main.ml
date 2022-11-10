@@ -3281,6 +3281,7 @@ let octez_node_config =
         octez_rpc_http |> open_;
         octez_rpc_http_server |> open_;
         octez_context |> open_;
+        octez_store |> open_;
         octez_validation |> open_;
       ]
 
