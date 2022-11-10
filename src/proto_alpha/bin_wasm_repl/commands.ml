@@ -27,11 +27,12 @@ open Wasm_utils
 open Repl_helpers
 
 (* Possible commands for the REPL. *)
-type commands = Load_inputs | Unknown of string | Stop
+type commands = Show_inbox | Load_inputs | Unknown of string | Stop
 
 let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
   match command with
+  | ["show"; "inbox"] -> Show_inbox
   | ["load"; "inputs"] -> Load_inputs
   | ["stop"] -> Stop
   | _ -> Unknown s
@@ -86,6 +87,50 @@ let load_inputs inboxes level tree =
       Format.printf "%s\n%!" msg ;
       return (tree, inboxes, level)
 
+(* [show_inbox tree] prints the current input buffer and the number of messages
+   it contains. *)
+let show_inbox tree =
+  let open Lwt_syntax in
+  let* input_buffer = Wasm.Internal_for_tests.get_input_buffer tree in
+  let* messages =
+    Tezos_lazy_containers.Lazy_vector.(
+      Mutable.ZVector.snapshot
+        input_buffer.Tezos_webassembly_interpreter.Input_buffer.content
+      |> ZVector.to_list)
+  in
+  let messages_sorted =
+    List.sort Messages.compare_input_buffer_messages messages
+  in
+  let pp_message ppf
+      Tezos_webassembly_interpreter.Input_buffer.
+        {raw_level; message_counter; payload} =
+    Format.fprintf
+      ppf
+      {|{ raw_level: %ld;
+  counter: %s
+  payload: %a }|}
+      raw_level
+      (Z.to_string message_counter)
+      Messages.pp_input
+      payload
+  in
+  let pp_messages () =
+    Format.asprintf
+      "%a"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+         pp_message)
+      messages_sorted
+  in
+
+  let size =
+    input_buffer.Tezos_webassembly_interpreter.Input_buffer.num_elements
+  in
+  Lwt_io.printf
+    "Inbox has %s messages:\n%s\n%!"
+    (Z.to_string size)
+    (pp_messages ())
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c tree inboxes level =
@@ -94,6 +139,9 @@ let handle_command c tree inboxes level =
   let return ?(tree = tree) () = return (tree, inboxes, level) in
   match command with
   | Load_inputs -> load_inputs inboxes level tree
+  | Show_inbox ->
+      let*! () = show_inbox tree in
+      return ()
   | Unknown s ->
       let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
       return ()

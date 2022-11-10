@@ -109,3 +109,34 @@ let parse_inboxes inputs Config.{sender; source; destination} =
             inputs)
         full_inputs
   | Error e -> Error_monad.failwith "%s" e
+
+(* [pp_input ppf bytes] is a pretty printer for Sc_rollup.Inbox messages that
+   also handles deserialization from raw bytes. If the message cannot be
+   decoded, it prints its hexadecimal representation. *)
+let pp_input ppf bytes =
+  let pp ppf = function
+    | Sc_rollup.Inbox_message.(Internal (Transfer _) as msg) ->
+        let json =
+          Data_encoding.Json.construct Sc_rollup.Inbox_message.encoding msg
+        in
+        Data_encoding.Json.pp ppf json
+    | Internal Start_of_level -> Format.fprintf ppf "Start_of_level"
+    | Internal End_of_level -> Format.fprintf ppf "End_of_level"
+    | External msg -> Format.fprintf ppf "%a" Hex.pp (Hex.of_string msg)
+  in
+  match
+    Sc_rollup.Inbox_message.(
+      deserialize (unsafe_of_string (Bytes.to_string bytes)))
+  with
+  | Error _ ->
+      Format.fprintf ppf "Unknown encoding: %a" Hex.pp (Hex.of_bytes bytes)
+  | Ok msg -> pp ppf msg
+
+let compare_input_buffer_messages i1 i2 =
+  let cmp_lvl =
+    Int32.compare
+      i1.Tezos_webassembly_interpreter.Input_buffer.raw_level
+      i2.Tezos_webassembly_interpreter.Input_buffer.raw_level
+  in
+  if cmp_lvl = 0 then Z.compare i1.message_counter i2.message_counter
+  else cmp_lvl
