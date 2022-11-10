@@ -45,10 +45,10 @@ dated_log "Starting benchmarks processes"
 # commit.
 cd /data/tezos-benchmarks/tezos
 rm -rf _opam
-echo "Pulling repository."
+dated_log "Pulling repository."
 git pull
 HEADCOMMIT=$(git describe --always --dirty --long)
-echo "HEAD is $HEADCOMMIT"
+dated_log "HEAD is $HEADCOMMIT"
 
 SNOOP_RESULT_DIR="snoop_results/_snoop_${TODAY}_${HEADCOMMIT}"
 
@@ -66,7 +66,7 @@ cd tezos
 dated_log "Compiling dependencies"
 . "/home/mclaren/.cargo/env"
 make BLST_PORTABLE=y build-dev-deps || true
-if [ -d _opam/share/zcash-params ]; then echo "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
+if [ -d _opam/share/zcash-params ]; then dated_log "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
 eval "$(opam env)"
 
 # Build Tezos
