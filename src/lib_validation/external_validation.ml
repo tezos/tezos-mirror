@@ -43,6 +43,7 @@ type request =
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
       max_operations_ttl : int;
       should_precheck : bool;
@@ -60,12 +61,14 @@ type request =
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
     }
   | Precheck of {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
+      predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
       operations : Operation.t list list;
       hash : Block_hash.t;
@@ -178,12 +181,13 @@ let case_validate tag =
   case
     tag
     ~title:"validate"
-    (obj9
+    (obj10
        (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "pred_header" (dynamic_size Block_header.encoding))
        (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
        (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
+       (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "max_operations_ttl" int31)
        (req "operations" (list (list (dynamic_size Operation.encoding))))
        (req "should_precheck" bool)
@@ -196,6 +200,7 @@ let case_validate tag =
             predecessor_block_header;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
+            predecessor_resulting_context_hash;
             max_operations_ttl;
             operations;
             should_precheck;
@@ -207,6 +212,7 @@ let case_validate tag =
               predecessor_block_header,
               predecessor_block_metadata_hash,
               predecessor_ops_metadata_hash,
+              predecessor_resulting_context_hash,
               max_operations_ttl,
               operations,
               should_precheck,
@@ -217,6 +223,7 @@ let case_validate tag =
            predecessor_block_header,
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
+           predecessor_resulting_context_hash,
            max_operations_ttl,
            operations,
            should_precheck,
@@ -228,6 +235,7 @@ let case_validate tag =
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           max_operations_ttl;
           operations;
           should_precheck;
@@ -253,7 +261,9 @@ let case_preapply tag =
           (opt
              "predecessor_ops_metadata_hash"
              Operation_metadata_list_list_hash.encoding))
-       (obj1 (req "operations" (list (list (dynamic_size Operation.encoding))))))
+       (obj2
+          (req "predecessor_resulting_context_hash" Context_hash.encoding)
+          (req "operations" (list (list (dynamic_size Operation.encoding))))))
     (function
       | Preapply
           {
@@ -267,6 +277,7 @@ let case_preapply tag =
             predecessor_max_operations_ttl;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
+            predecessor_resulting_context_hash;
             operations;
           } ->
           Some
@@ -280,7 +291,7 @@ let case_preapply tag =
                 predecessor_max_operations_ttl,
                 predecessor_block_metadata_hash,
                 predecessor_ops_metadata_hash ),
-              operations )
+              (predecessor_resulting_context_hash, operations) )
       | _ -> None)
     (fun ( ( chain_id,
              timestamp,
@@ -292,7 +303,7 @@ let case_preapply tag =
              predecessor_max_operations_ttl,
              predecessor_block_metadata_hash,
              predecessor_ops_metadata_hash ),
-           operations ) ->
+           (predecessor_resulting_context_hash, operations) ) ->
       Preapply
         {
           chain_id;
@@ -305,6 +316,7 @@ let case_preapply tag =
           predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
         })
 
@@ -313,10 +325,11 @@ let case_precheck tag =
   case
     tag
     ~title:"precheck"
-    (obj6
+    (obj7
        (req "chain_id" Chain_id.encoding)
        (req "predecessor_block_header" (dynamic_size Block_header.encoding))
        (req "predecessor_block_hash" Block_hash.encoding)
+       (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "header" (dynamic_size Block_header.encoding))
        (req "hash" Block_hash.encoding)
        (req "operations" (list (list (dynamic_size Operation.encoding)))))
@@ -326,6 +339,7 @@ let case_precheck tag =
             chain_id;
             predecessor_block_header;
             predecessor_block_hash;
+            predecessor_resulting_context_hash;
             header;
             operations;
             hash;
@@ -334,6 +348,7 @@ let case_precheck tag =
             ( chain_id,
               predecessor_block_header,
               predecessor_block_hash,
+              predecessor_resulting_context_hash,
               header,
               hash,
               operations )
@@ -341,6 +356,7 @@ let case_precheck tag =
     (fun ( chain_id,
            predecessor_block_header,
            predecessor_block_hash,
+           predecessor_resulting_context_hash,
            header,
            hash,
            operations ) ->
@@ -349,6 +365,7 @@ let case_precheck tag =
           chain_id;
           predecessor_block_header;
           predecessor_block_hash;
+          predecessor_resulting_context_hash;
           header;
           operations;
           hash;

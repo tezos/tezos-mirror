@@ -43,6 +43,7 @@ type request =
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
       max_operations_ttl : int;
       should_precheck : bool;
@@ -60,12 +61,14 @@ type request =
       predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
         Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
     }
   | Precheck of {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
+      predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
       operations : Operation.t list list;
       hash : Block_hash.t;

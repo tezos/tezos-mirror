@@ -257,6 +257,7 @@ let run ~readonly input output =
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
           max_operations_ttl;
           should_precheck;
@@ -266,16 +267,17 @@ let run ~readonly input output =
         let*! block_application_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
-                let pred_context_hash =
-                  predecessor_block_header.shell.context
+                let*! o =
+                  Context.checkout
+                    context_index
+                    predecessor_resulting_context_hash
                 in
-                let*! o = Context.checkout context_index pred_context_hash in
                 match o with
                 | Some c -> return (Shell_context.wrap_disk_context c)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
-                         pred_context_hash))
+                         predecessor_resulting_context_hash))
           in
           let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
@@ -290,13 +292,14 @@ let run ~readonly input output =
               predecessor_block_metadata_hash;
               predecessor_ops_metadata_hash;
               predecessor_context;
+              predecessor_resulting_context_hash;
             }
           in
-          let predecessor_context = predecessor_block_header.shell.context in
           let cache =
             match cache with
             | None -> `Load
-            | Some cache -> `Inherited (cache, predecessor_context)
+            | Some cache ->
+                `Inherited (cache, predecessor_resulting_context_hash)
           in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.apply
@@ -320,7 +323,11 @@ let run ~readonly input output =
           | Error _ as err -> (err, cache)
           | Ok {result; cache} ->
               ( Ok result,
-                Some {context_hash = block_header.shell.context; cache} )
+                Some
+                  {
+                    context_hash = result.validation_store.resulting_context_hash;
+                    cache;
+                  } )
         in
         let*! () =
           External_validation.send
@@ -341,14 +348,16 @@ let run ~readonly input output =
           predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
         } ->
         let*! block_preapplication_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
-                let pred_context_hash = predecessor_shell_header.context in
                 let*! context =
-                  Context.checkout context_index pred_context_hash
+                  Context.checkout
+                    context_index
+                    predecessor_resulting_context_hash
                 in
                 match context with
                 | Some context ->
@@ -356,7 +365,7 @@ let run ~readonly input output =
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
-                         pred_context_hash))
+                         predecessor_resulting_context_hash))
           in
           let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
@@ -376,6 +385,7 @@ let run ~readonly input output =
                 ~predecessor_max_operations_ttl
                 ~predecessor_block_metadata_hash
                 ~predecessor_ops_metadata_hash
+                ~predecessor_resulting_context_hash
                 operations)
         in
         let*! cachable_result =
@@ -405,6 +415,7 @@ let run ~readonly input output =
           chain_id;
           predecessor_block_header;
           predecessor_block_hash;
+          predecessor_resulting_context_hash;
           header;
           operations;
           hash;
@@ -416,7 +427,7 @@ let run ~readonly input output =
                 let*! o =
                   Context.checkout
                     context_index
-                    predecessor_block_header.shell.context
+                    predecessor_resulting_context_hash
                 in
                 match o with
                 | Some context ->
@@ -424,19 +435,20 @@ let run ~readonly input output =
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
-                         predecessor_block_header.shell.context))
+                         predecessor_resulting_context_hash))
           in
           let cache =
             match cache with
             | None -> `Lazy
             | Some cache ->
-                `Inherited (cache, predecessor_block_header.shell.context)
+                `Inherited (cache, predecessor_resulting_context_hash)
           in
           Block_validation.precheck
             ~chain_id
             ~predecessor_block_header
             ~predecessor_block_hash
             ~predecessor_context
+            ~predecessor_resulting_context_hash
             ~cache
             header
             operations
