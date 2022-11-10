@@ -141,7 +141,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let dal_attestation_lag =
       node_ctxt.protocol_constants.parametric.dal.attestation_lag
     in
-    let* state, num_messages, inbox_level, _fuel =
+    let* eval_result =
       Free_pvm.eval_block_inbox
         ~metadata
         ~dal_attestation_lag
@@ -150,7 +150,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         hash
         predecessor_state
     in
-
+    let*! state, num_messages, inbox_level, _fuel =
+      Delayed_write_monad.apply node_ctxt eval_result
+    in
     (* Write final state to store. *)
     let*! ctxt = PVM.State.set ctxt state in
     let*! context_hash = Context.commit ctxt in
@@ -229,6 +231,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       evaluation of the inbox at block [hash] for at most [tick_distance]. *)
   let run_for_ticks node_ctxt predecessor_hash hash level tick_distance =
     let open Lwt_result_syntax in
+    let open Delayed_write_monad.Lwt_result_syntax in
     let pred_level = Raw_level.to_int32 level |> Int32.pred in
     let* ctxt = Node_context.checkout_context node_ctxt predecessor_hash in
     let* _ctxt, state =
@@ -241,7 +244,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let dal_attestation_lag =
       node_ctxt.protocol_constants.parametric.dal.attestation_lag
     in
-    let* state, _counter, _level, _fuel =
+    let>* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox
         ~metadata
         ~dal_attestation_lag
@@ -285,6 +288,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
               event.level
               tick_distance
           in
+          let state = Delayed_write_monad.ignore state in
           let*! hash = PVM.state_hash state in
           return (Some (state, hash))
 end

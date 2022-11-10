@@ -108,3 +108,6 @@ val checkout_context :
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)
 val readonly : _ t -> ro
+
+(** Monad for values with delayed write effects in the node context. *)
+type 'a delayed_write = ('a, rw) Delayed_write_monad.t

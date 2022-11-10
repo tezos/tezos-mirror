@@ -129,6 +129,7 @@ module Make (Interpreter : Interpreter.S) :
         let* pages =
           Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
         in
+        let*! pages = Delayed_write_monad.apply node_ctxt pages in
         match pages with
         | None -> return_none (* The slot is not confirmed. *)
         | Some pages -> (

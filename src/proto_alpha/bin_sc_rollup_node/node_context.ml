@@ -112,3 +112,5 @@ let readonly (node_ctxt : _ t) =
     store = Store.readonly node_ctxt.store;
     context = Context.readonly node_ctxt.context;
   }
+
+type 'a delayed_write = ('a, rw) Delayed_write_monad.t
