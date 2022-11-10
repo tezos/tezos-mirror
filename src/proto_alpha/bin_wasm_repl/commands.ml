@@ -27,22 +27,132 @@ open Wasm_utils
 open Repl_helpers
 open Tezos_scoru_wasm
 
+(* Possible step kinds. *)
+type eval_step =
+  | Tick  (** Tick per tick *)
+  | Result  (** Up to Eval (Result (SK_Result _ | SK_Trap _)) *)
+  | Kernel_next  (** Up to the end of the current `kernal_next` *)
+  | Inbox  (** Until input requested *)
+
 (* Possible commands for the REPL. *)
 type commands =
   | Show_inbox
   | Show_status
+  | Step of eval_step
   | Load_inputs
   | Unknown of string
   | Stop
+
+let parse_eval_step = function
+  | "tick" -> Some Tick
+  | "result" -> Some Result
+  | "kernel_next" -> Some Kernel_next
+  | "inbox" -> Some Inbox
+  | _ -> None
 
 let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
   match command with
   | ["show"; "inbox"] -> Show_inbox
   | ["show"; "status"] -> Show_status
+  | ["step"; step] -> (
+      match parse_eval_step step with Some s -> Step s | None -> Unknown s)
   | ["load"; "inputs"] -> Load_inputs
   | ["stop"] -> Stop
   | _ -> Unknown s
+
+(* [compute_step tree] is a wrapper around [Wasm_pvm.compute_step] that also
+   returns the number of ticks elapsed (whi is always 1). *)
+let compute_step tree =
+  let open Lwt_syntax in
+  trap_exn (fun () ->
+      let+ tree = Wasm.compute_step tree in
+      (tree, 1L))
+
+(** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
+    or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
+    property that the memory hasn't been flushed yet and can be inspected. *)
+let eval_to_result tree =
+  let open Lwt_syntax in
+  let open Wasm_pvm_state in
+  let should_compute pvm_state =
+    let+ input_request_val = Wasm_vm.get_info pvm_state in
+    match (input_request_val.input_request, pvm_state.tick_state) with
+    | Reveal_required _, _ | Input_required, _ -> false
+    | ( No_input_required,
+        Eval
+          {
+            config =
+              {
+                step_kont =
+                  Tezos_webassembly_interpreter.Eval.(
+                    SK_Result _ | SK_Trapped _);
+                _;
+              };
+            _;
+          } ) ->
+        false
+    | No_input_required, _ -> true
+  in
+  (* Since `compute_step_many_until` is not exported by the PVM but only the VM,
+     we decode and re-encode by hand. *)
+  trap_exn (fun () ->
+      let* pvm_state =
+        Test_encodings_util.Tree_encoding_runner.decode
+          Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+          tree
+      in
+      let* pvm_state, ticks =
+        Tezos_scoru_wasm.Wasm_vm.compute_step_many_until
+          ~max_steps:Int64.max_int
+          should_compute
+          pvm_state
+      in
+      let+ tree =
+        Test_encodings_util.Tree_encoding_runner.encode
+          Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+          pvm_state
+          tree
+      in
+      (tree, ticks))
+
+(* [eval_kernel_next tree] evals up to the end of the current `kernel_next` (or
+   starts a new one if already at snapshot point). *)
+let eval_kernel_next tree =
+  let open Lwt_syntax in
+  trap_exn (fun () ->
+      let* info_before = Wasm.get_info tree in
+      let* tree = eval_to_snapshot ~max_steps:Int64.max_int tree in
+      (* If the reboot key is set, the next phase will be an evaluation, we can
+         safely stop here. Otherwise, the next phase will be a input phase, but
+         the next step (Snapshot) is not an input tick: we simply go to the next
+         input tick. Otherwise, the user needs to step to it themself. *)
+      let* reboot =
+        Repl_helpers.find_key_in_durable tree Constants.reboot_flag_key
+      in
+      let* tree =
+        if reboot = None then eval_until_input_requested tree else return tree
+      in
+      let+ info_after = Wasm.get_info tree in
+      ( tree,
+        Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
+
+(* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
+let eval_until_input_requested tree =
+  let open Lwt_syntax in
+  trap_exn (fun () ->
+      let* info_before = Wasm.get_info tree in
+      let* tree = eval_until_input_requested ~max_steps:Int64.max_int tree in
+      let+ info_after = Wasm.get_info tree in
+      ( tree,
+        Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
+
+(* Eval dispatcher. *)
+let eval = function
+  | Tick -> compute_step
+  | Result -> eval_to_result
+  | Kernel_next -> eval_kernel_next
+  | Inbox -> eval_until_input_requested
 
 let set_raw_message_input_step level counter encoded_message tree =
   Wasm.set_input_step (input_info level counter) encoded_message tree
@@ -118,6 +228,15 @@ let show_status tree =
        pp_state
        state)
 
+(* [step kind tree] evals according to the step kind and prints the number of
+   ticks elapsed and the new status. *)
+let step kind tree =
+  let open Lwt_result_syntax in
+  let* tree, ticks = eval kind tree in
+  let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
+  let*! () = show_status tree in
+  return tree
+
 (* [show_inbox tree] prints the current input buffer and the number of messages
    it contains. *)
 let show_inbox tree =
@@ -173,6 +292,9 @@ let handle_command c tree inboxes level =
   | Show_status ->
       let*! () = show_status tree in
       return ()
+  | Step kind ->
+      let* tree = step kind tree in
+      return ~tree ()
   | Show_inbox ->
       let*! () = show_inbox tree in
       return ()
