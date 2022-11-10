@@ -25,14 +25,21 @@
 
 open Wasm_utils
 open Repl_helpers
+open Tezos_scoru_wasm
 
 (* Possible commands for the REPL. *)
-type commands = Show_inbox | Load_inputs | Unknown of string | Stop
+type commands =
+  | Show_inbox
+  | Show_status
+  | Load_inputs
+  | Unknown of string
+  | Stop
 
 let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
   match command with
   | ["show"; "inbox"] -> Show_inbox
+  | ["show"; "status"] -> Show_status
   | ["load"; "inputs"] -> Load_inputs
   | ["stop"] -> Stop
   | _ -> Unknown s
@@ -87,6 +94,30 @@ let load_inputs inboxes level tree =
       Format.printf "%s\n%!" msg ;
       return (tree, inboxes, level)
 
+let pp_input_request ppf = function
+  | Wasm_pvm_state.No_input_required -> Format.fprintf ppf "Evaluating"
+  | Input_required -> Format.fprintf ppf "Waiting for input"
+  | Reveal_required Reveal_metadata -> Format.fprintf ppf "Waiting for metadata"
+  | Reveal_required (Reveal_raw_data hash) ->
+      Format.fprintf
+        ppf
+        "Waiting for reveal: %s"
+        (Tezos_webassembly_interpreter.Reveal.reveal_hash_to_string hash)
+
+(* [show_status tree] show the state of the PVM. *)
+let show_status tree =
+  let open Lwt_syntax in
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  let* info = Wasm.get_info tree in
+  Lwt_io.printf
+    "%s\n%!"
+    (Format.asprintf
+       "Status: %a\nInternal_status: %a"
+       pp_input_request
+       info.Wasm_pvm_state.input_request
+       pp_state
+       state)
+
 (* [show_inbox tree] prints the current input buffer and the number of messages
    it contains. *)
 let show_inbox tree =
@@ -139,6 +170,9 @@ let handle_command c tree inboxes level =
   let return ?(tree = tree) () = return (tree, inboxes, level) in
   match command with
   | Load_inputs -> load_inputs inboxes level tree
+  | Show_status ->
+      let*! () = show_status tree in
+      return ()
   | Show_inbox ->
       let*! () = show_inbox tree in
       return ()
