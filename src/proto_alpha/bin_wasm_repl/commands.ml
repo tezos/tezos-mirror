@@ -40,6 +40,7 @@ type commands =
   | Show_outbox of int32
   | Show_status
   | Show_durable_storage
+  | Show_key of string
   | Step of eval_step
   | Load_inputs
   | Unknown of string
@@ -62,6 +63,7 @@ let parse_commands s =
       | None -> Unknown s)
   | ["show"; "status"] -> Show_status
   | ["show"; "durable"; "storage"] -> Show_durable_storage
+  | ["show"; "key"; key] -> Show_key key
   | ["step"; step] -> (
       match parse_eval_step step with Some s -> Step s | None -> Unknown s)
   | ["load"; "inputs"] -> Load_inputs
@@ -326,6 +328,34 @@ let show_outbox tree level =
 (* [show_durable] prints the durable storage from the tree. *)
 let show_durable tree = Repl_helpers.print_durable ~depth:10 tree
 
+(* [show_key_gen tree key] looks for the given [key] in the durable storage and
+   print its value in hexadecimal format. *)
+let show_key_gen tree key =
+  let open Lwt_syntax in
+  let* value = Repl_helpers.find_key_in_durable tree key in
+  match value with
+  | None ->
+      Format.printf "Key not found\n%!" ;
+      return_unit
+  | Some v ->
+      let+ str_value = Tezos_lazy_containers.Chunked_byte_vector.to_string v in
+      Format.printf "%a\n%!" Hex.pp (Hex.of_string str_value)
+
+(* [show_key tree key] looks for the given [key] in the durable storage and
+   print its value in hexadecimal format. Prints errors in case the key is
+   invalid or not existing. *)
+let show_key tree key =
+  Lwt.catch
+    (fun () ->
+      let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+      show_key_gen tree key)
+    (function
+      | Tezos_scoru_wasm.Durable.Invalid_key _ ->
+          Lwt_io.printf "Invalid key\n%!"
+      | Tezos_scoru_wasm.Durable.Not_found -> Lwt_io.printf "Key not found\n%!"
+      | exn ->
+          Lwt_io.printf "Unknown exception: %s\n%!" (Printexc.to_string exn))
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c tree inboxes level =
@@ -348,6 +378,9 @@ let handle_command c tree inboxes level =
       return ()
   | Show_durable_storage ->
       let*! () = show_durable tree in
+      return ()
+  | Show_key key ->
+      let*! () = show_key tree key in
       return ()
   | Unknown s ->
       let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
