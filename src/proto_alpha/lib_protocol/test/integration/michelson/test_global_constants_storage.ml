@@ -55,7 +55,7 @@ let expr_to_hash expr =
    that values written to the global table of constants persist across
    blocks. *)
 let get_happy_path () =
-  Context.init2 () >>=? fun (b, (alice, bob)) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (alice, bob)) ->
   Incremental.begin_construction b >>=? fun b ->
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in
@@ -80,8 +80,8 @@ let get_happy_path () =
     n_transactions 10 b alice bob (Tez.of_mutez_exn 1000L) >>=? fun b ->
     Incremental.finalize_block b >>=? fun b -> assert_unchanged b
   in
-  do_many_transfers b >>=? do_many_transfers >>=? do_many_transfers >>= fun _ ->
-  Lwt.return_ok ()
+  do_many_transfers b >>=? do_many_transfers >>=? do_many_transfers
+  >>=? fun (_ : Block.t) -> Lwt.return_ok ()
 
 (* Blocks that include a registration of a bad expression should
    fail. *)
