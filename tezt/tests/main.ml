@@ -93,6 +93,7 @@ let register_older_protocol_migration_tests () =
    Then we could remove the [~protocols] argument from all register functions. *)
 let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
+  Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
   Baking.register ~protocols ;
