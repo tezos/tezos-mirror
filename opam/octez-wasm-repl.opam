@@ -1,0 +1,33 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.0" }
+  "ppx_import"
+  "ppx_deriving"
+  "tezos-base"
+  "tezos-clic"
+  "tezos-tree-encoding"
+  "tezos-context"
+  "tezos-base-test-helpers"
+  "tezos-client-base"
+  "tezos-client-alpha"
+  "tezos-scoru-wasm"
+  "tezos-scoru-wasm-test-helpers"
+  "tezos-webassembly-interpreter"
+  "tezos-webassembly-interpreter-extra"
+  "tezos-protocol-alpha"
+  "tezos-protocol-plugin-alpha"
+]
+build: [
+  ["rm" "-r" "vendors"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: REPL for the scoru-wasm functionality"
