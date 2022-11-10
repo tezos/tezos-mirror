@@ -41,6 +41,7 @@ type commands =
   | Show_status
   | Show_durable_storage
   | Show_key of string
+  | Show_memory of int32 * int
   | Step of eval_step
   | Load_inputs
   | Unknown of string
@@ -64,6 +65,10 @@ let parse_commands s =
   | ["show"; "status"] -> Show_status
   | ["show"; "durable"; "storage"] -> Show_durable_storage
   | ["show"; "key"; key] -> Show_key key
+  | ["show"; "memory"; "at"; address; "for"; length; "bytes"] -> (
+      match (Int32.of_string_opt address, int_of_string_opt length) with
+      | Some address, Some length -> Show_memory (address, length)
+      | _, _ -> Unknown s)
   | ["step"; step] -> (
       match parse_eval_step step with Some s -> Step s | None -> Unknown s)
   | ["load"; "inputs"] -> Load_inputs
@@ -356,6 +361,42 @@ let show_key tree key =
       | exn ->
           Lwt_io.printf "Unknown exception: %s\n%!" (Printexc.to_string exn))
 
+exception Cannot_inspect_memory of string
+
+(* [load_memory tree] finds the memory module 0 from the tree, only and only if
+   the PVM is in an Init or Eval state. *)
+let load_memory tree =
+  let open Lwt_syntax in
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  let* module_inst =
+    match state with
+    | Eval _ | Init _ -> Wasm.Internal_for_tests.get_module_instance_exn tree
+    | _ -> raise (Cannot_inspect_memory (Format.asprintf "%a" pp_state state))
+  in
+  Lwt.catch
+    (fun () ->
+      Tezos_lazy_containers.Lazy_vector.Int32Vector.get 0l module_inst.memories)
+    (fun _ -> raise Tezos_webassembly_interpreter.Eval.Missing_memory_0_export)
+
+(* [show_memory tree address length] loads the [length] bytes at address
+   [address] in the memory, and prints it in its hexadecimal representation. *)
+let show_memory tree address length =
+  let open Lwt_syntax in
+  Lwt.catch
+    (fun () ->
+      let* memory = load_memory tree in
+      let* value =
+        Tezos_webassembly_interpreter.Memory.load_bytes memory address length
+      in
+      Lwt_io.printf "%s\n%!"
+      @@ Format.asprintf "%a" Hex.pp (Hex.of_string value))
+    (function
+      | Cannot_inspect_memory state ->
+          Lwt_io.printf
+            "Error: Cannot inspect memory during internal state %s\n%!"
+            state
+      | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c tree inboxes level =
@@ -381,6 +422,9 @@ let handle_command c tree inboxes level =
       return ()
   | Show_key key ->
       let*! () = show_key tree key in
+      return ()
+  | Show_memory (address, length) ->
+      let*! () = show_memory tree address length in
       return ()
   | Unknown s ->
       let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
