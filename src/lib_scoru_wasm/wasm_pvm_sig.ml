@@ -48,6 +48,8 @@ module type Internal_for_tests = sig
 
   val get_output_buffer :
     tree -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
+
+  include Wasm_vm_sig.Internal_for_tests with type state := tree
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)

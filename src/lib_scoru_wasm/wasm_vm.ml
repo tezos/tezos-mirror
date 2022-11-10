@@ -78,6 +78,20 @@ let initial_boot_state () =
     (Tezos_webassembly_interpreter.Decode.initial_decode_kont
        ~name:Constants.wasm_main_module_name)
 
+let save_fallback_kernel durable =
+  let open Lwt.Syntax in
+  let* kernel_hash = Durable.hash durable Constants.kernel_key in
+  let* kernel_fallback_hash =
+    Durable.hash durable Constants.kernel_fallback_key
+  in
+  if kernel_hash <> kernel_fallback_hash then
+    Durable.copy_tree_exn
+      durable
+      ~edit_readonly:true
+      Constants.kernel_key
+      Constants.kernel_fallback_key
+  else Lwt.return durable
+
 let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
   let open Lwt_syntax in
   let return ?(status = Running) ?(durable = durable) state =
@@ -188,19 +202,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           in
           (* Set kernel - now known to be valid - as fallback kernel,
              if it is not already *)
-          let* kernel_hash = Durable.hash durable Constants.kernel_key in
-          let* kernel_fallback_hash =
-            Durable.hash durable Constants.kernel_fallback_key
-          in
-          let* durable =
-            if kernel_hash <> kernel_fallback_hash then
-              Durable.copy_tree_exn
-                durable
-                ~edit_readonly:true
-                Constants.kernel_key
-                Constants.kernel_fallback_key
-            else Lwt.return durable
-          in
+          let* durable = save_fallback_kernel durable in
           return ~durable ~status:Starting (Eval {config; module_reg})
       | _ ->
           (* We require a function with the name [main] to be exported
@@ -455,3 +457,7 @@ let get_info ({current_tick; last_input_info; _} as pvm_state) =
   let+ input_request = input_request pvm_state in
   Wasm_pvm_state.
     {current_tick; last_input_read = last_input_info; input_request}
+
+module Internal_for_tests = struct
+  let compute_step_many_with_hooks ?after_fast_exec:_ = compute_step_many
+end

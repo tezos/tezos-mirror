@@ -902,7 +902,7 @@ opam:tezos-error-monad:
 opam:tezos-event-logging:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-event-logging
 
@@ -1423,6 +1423,13 @@ opam:tezos-scoru-wasm:
     - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-scoru-wasm
+
+opam:tezos-scoru-wasm-fast:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: tezos-scoru-wasm-fast
 
 opam:tezos-shell:
   extends:
