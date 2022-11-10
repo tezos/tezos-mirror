@@ -65,6 +65,29 @@ let store_entry_from_published_level ~dal_attestation_lag ~published_level store
   @@ Int32.(
        add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
 
+(* The cache allows to not fetch pages on the DAL node more than necessary. *)
+module Pages_cache =
+  Ringo_lwt.Functors.Make
+    ((val Ringo.(
+            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+       (struct
+         include Cryptobox.Commitment
+
+         let hash commitment =
+           Data_encoding.Binary.to_string_exn
+             Cryptobox.Commitment.encoding
+             commitment
+           |> Hashtbl.hash
+       end))
+
+let get_slot_pages =
+  let pages_cache = Pages_cache.create 16 (* 130MB *) in
+  fun dal_cctxt commitment ->
+    Pages_cache.find_or_replace
+      pages_cache
+      commitment
+      (Dal_node_client.get_slot_pages dal_cctxt)
+
 let check_confirmation_status_and_download
     ({Node_context.store; dal_cctxt; _} as node_ctxt) ~confirmed_in_block_hash
     ~published_in_block_hash index =
@@ -85,7 +108,7 @@ let check_confirmation_status_and_download
         ~primary_key:published_in_block_hash
         ~secondary_key:index
     in
-    let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
+    let* pages = get_slot_pages dal_cctxt commitment in
     let save_pages node_ctxt =
       Dal_slots_tracker.save_confirmed_slot
         node_ctxt
