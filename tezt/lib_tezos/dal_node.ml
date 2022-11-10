@@ -97,19 +97,24 @@ let init_config ?use_unsafe_srs dal_node =
   | Some filename -> return filename
 
 module Dac = struct
-  let spawn_set_parameters ?threshold dal_node =
+  let spawn_set_parameters ?threshold ?reveal_data_dir dal_node =
     let threshold_arg =
       match threshold with
       | None -> []
       | Some threshold -> ["--threshold"; Int.to_string threshold]
     in
+    let reveal_data_dir_arg =
+      match reveal_data_dir with
+      | None -> []
+      | Some reveal_data_dir -> ["--reveal-data-dir"; reveal_data_dir]
+    in
     let data_dir_arg = ["--data-dir"; data_dir dal_node] in
     spawn_command dal_node
     @@ ["set"; "dac"; "parameters"]
-    @ threshold_arg @ data_dir_arg
+    @ threshold_arg @ reveal_data_dir_arg @ data_dir_arg
 
-  let set_parameters ?threshold dal_node =
-    spawn_set_parameters ?threshold dal_node |> Process.check
+  let set_parameters ?threshold ?reveal_data_dir dal_node =
+    spawn_set_parameters ?threshold ?reveal_data_dir dal_node |> Process.check
 
   let spawn_add_committee_member ~address dal_node =
     let base_dir_argument =
