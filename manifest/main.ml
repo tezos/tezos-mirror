@@ -4686,6 +4686,22 @@ module Protocol = Protocol
     let _baker = daemon "baker" in
     let _accuser = daemon "accuser" in
     let _endorser = only_if N.(number <= 011) @@ fun () -> daemon "endorser" in
+    let layer2_utils =
+      only_if N.(number >= 016) @@ fun () ->
+      public_lib
+        (sf "tezos-layer2-utils-%s" name_dash)
+        ~path:(path // "lib_layer2_utils")
+        ~synopsis:"Tezos/Protocol: protocol specific library for Layer 2 utils"
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives";
+            main |> open_;
+            client |> if_some |> open_;
+            octez_rpc |> open_;
+          ]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
     let injector =
       only_if N.(number >= 013) @@ fun () ->
       public_lib
@@ -4706,22 +4722,7 @@ module Protocol = Protocol
             octez_client_base |> open_;
             octez_workers |> open_;
             octez_shell;
-          ]
-        ~inline_tests:ppx_expect
-        ~linkall:true
-    in
-    let layer2_utils =
-      only_if N.(number >= 016) @@ fun () ->
-      public_lib
-        (sf "tezos-layer2-utils-%s" name_dash)
-        ~path:(path // "lib_layer2_utils")
-        ~synopsis:"Tezos/Protocol: protocol specific library for Layer 2 utils"
-        ~deps:
-          [
-            octez_base |> open_ ~m:"TzPervasives";
-            main |> open_;
-            client |> if_some |> open_;
-            octez_rpc |> open_;
+            layer2_utils |> if_some |> open_;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true

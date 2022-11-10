@@ -15,7 +15,8 @@
   tezos-client-alpha
   tezos-client-base
   tezos-workers
-  tezos-shell)
+  tezos-shell
+  tezos-layer2-utils-alpha)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -30,4 +31,5 @@
   -open Tezos_micheline
   -open Tezos_client_alpha
   -open Tezos_client_base
-  -open Tezos_workers))
+  -open Tezos_workers
+  -open Tezos_layer2_utils_alpha))

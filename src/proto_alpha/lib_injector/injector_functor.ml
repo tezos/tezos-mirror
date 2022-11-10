@@ -309,9 +309,11 @@ module Make (Rollup : PARAMETERS) = struct
 
   (** Add an operation to the pending queue corresponding to the signer for this
     operation.  *)
-  let add_pending_operation state op =
+  let add_pending_operation ?(retry = false) state op =
     let open Lwt_result_syntax in
-    let*! () = Event.(emit1 add_pending) state op in
+    let*! () =
+      Event.(emit1 (if retry then retry_operation else add_pending)) state op
+    in
     Op_queue.replace state.queue op.L1_operation.hash op
 
   (** Mark operations as injected (in [oph]). *)
@@ -365,21 +367,24 @@ module Make (Rollup : PARAMETERS) = struct
         return []
     | Some mophs ->
         let* () = Injected_ophs.remove state.injected.injected_ophs oph in
-        List.fold_left_es
-          (fun removed moph ->
-            match
-              Injected_operations.find state.injected.injected_operations moph
-            with
-            | None -> return removed
-            | Some info ->
-                let+ () =
-                  Injected_operations.remove
-                    state.injected.injected_operations
-                    moph
-                in
-                info :: removed)
-          []
-          mophs
+        let+ removed =
+          List.fold_left_es
+            (fun removed moph ->
+              match
+                Injected_operations.find state.injected.injected_operations moph
+              with
+              | None -> return removed
+              | Some info ->
+                  let+ () =
+                    Injected_operations.remove
+                      state.injected.injected_operations
+                      moph
+                  in
+                  info :: removed)
+            []
+            mophs
+        in
+        List.rev removed
 
   (** [remove state block] removes the included operations that correspond to all
     the L1 batches included in [block]. This function is used when [block] is on
@@ -690,21 +695,25 @@ module Make (Rollup : PARAMETERS) = struct
     in
     List.rev rev_ops
 
-  (* Ignore the failures of finalize and remove commitment operations. These
-     operations fail when there are either no commitment to finalize or to remove
-     (which can happen when there are no inbox for instance). *)
-  let ignore_ignorable_failing_operations operations = function
-    | Ok res -> Ok (`Injected res)
-    | Error _ as res ->
-        let open Result_syntax in
+  (* Ignore operations that are allowed to fail. *)
+  let ignore_ignorable_failing_operations state operations = function
+    | Ok res -> return (`Injected res)
+    | Error err ->
+        let open Lwt_result_syntax in
         let+ operations_to_drop =
-          List.fold_left_e
+          List.fold_left_es
             (fun to_drop op ->
               let (Manager operation) = op.L1_operation.manager_operation in
-              match Rollup.ignore_failing_operation operation with
-              | `Don't_ignore -> res
-              | `Ignore_keep -> Ok to_drop
-              | `Ignore_drop -> Ok (op :: to_drop))
+              let*! retry =
+                Rollup.retry_unsuccessful_operation
+                  state.rollup_node_state
+                  operation
+                  (Failed err)
+              in
+              match retry with
+              | Abort err -> fail err
+              | Retry -> return to_drop
+              | Forget -> return (op :: to_drop))
             []
             operations
         in
@@ -736,8 +745,8 @@ module Make (Rollup : PARAMETERS) = struct
         let*! res =
           inject_operations ~must_succeed state operations_to_inject
         in
-        let*? res =
-          ignore_ignorable_failing_operations operations_to_inject res
+        let* res =
+          ignore_ignorable_failing_operations state operations_to_inject res
         in
         match res with
         | `Injected (oph, injected_operations) ->
@@ -757,20 +766,78 @@ module Make (Rollup : PARAMETERS) = struct
             in
             return_unit)
 
-  (** [register_included_operation state block level oph] marks the manager
-    operations contained in the L1 batch [oph] as being included in the [block]
-    of level [level], by moving them from the "injected" state to the "included"
-    state. *)
-  let register_included_operation state block level oph =
+  (** [register_included_operation state block level op] marks the manager
+      operations contained in the L1 batch [op] as being included in the [block]
+      of level [level], by moving the successful ones from the "injected" state
+      to the "included" state, and re-queuing the operations that should be
+      retried.  *)
+  let register_included_operation state block level
+      (operation : Alpha_block_services.operation) =
     let open Lwt_result_syntax in
-    let* rmed = remove_injected_operation state oph in
-    match rmed with
-    | [] -> return_unit
-    | injected_infos ->
-        let included_mops =
-          List.map (fun (i : injected_info) -> i.op) injected_infos
+    let* injected_infos = remove_injected_operation state operation.hash in
+    match injected_infos with
+    | [] ->
+        (* No operations injected by us *)
+        return_unit
+    | _ ->
+        let apply (type kind) acc ~source:_ (op : kind manager_operation)
+            (result : kind Apply_results.manager_operation_result) =
+          match op with
+          | Reveal _ ->
+              (* Ignore public key revelations because, when present, they are
+                 added by the injection function automatically. If we don't
+                 ignore them, we may have more operations than we think we
+                 injected (and end up in the assert false below). *)
+              acc
+          | _ -> (
+              let* (injected : injected_info list), included, to_retry = acc in
+              let info, injected =
+                match injected with
+                | [] -> assert false
+                (* We should have the same number of injected operations and
+                   included operations. *)
+                | i :: rest -> (i, rest)
+              in
+              match result with
+              | Applied _ -> return (injected, info.op :: included, to_retry)
+              | _ -> (
+                  let status =
+                    match result with
+                    | Applied _ -> assert false
+                    | Backtracked (_, _) -> Backtracked
+                    | Skipped _ -> Skipped
+                    | Failed (_, err) -> Failed (Environment.wrap_tztrace err)
+                  in
+                  let*! retry =
+                    Rollup.retry_unsuccessful_operation
+                      state.rollup_node_state
+                      op
+                      status
+                  in
+                  match retry with
+                  | Retry -> return (injected, included, info.op :: to_retry)
+                  | Forget -> return (injected, included, to_retry)
+                  | Abort err -> fail err))
         in
-        add_included_operations state oph block level included_mops
+        let apply_internal acc ~source:_ _op _result = acc in
+        let* unhandled_injected, included, to_retry =
+          Layer1_services.process_manager_operations
+            (return (injected_infos, [], []))
+            [[operation]]
+            {apply; apply_internal}
+        in
+        assert (unhandled_injected = []) ;
+        let* () =
+          add_included_operations
+            state
+            operation.hash
+            block
+            level
+            (List.rev included)
+        in
+        List.iter_es
+          (add_pending_operation ~retry:true state)
+          (List.rev to_retry)
 
   (** [register_included_operations state block level oph] marks the known (by
     this injector) manager operations contained in [block] as being included. *)
@@ -782,9 +849,7 @@ module Make (Rollup : PARAMETERS) = struct
              state
              block.hash
              block.header.shell.level
-             op.hash
-           (* TODO/TORU: Handle operations for rollup_id here with
-              callback *)))
+             op))
       block.Alpha_block_services.operations
 
   (** [revert_included_operations state block] marks the known (by this injector)
@@ -805,9 +870,14 @@ module Make (Rollup : PARAMETERS) = struct
       (fun {op; _} ->
         let {L1_operation.manager_operation = Manager mop; _} = op in
         let*! requeue =
-          Rollup.requeue_reverted_operation state.rollup_node_state mop
+          Rollup.retry_unsuccessful_operation
+            state.rollup_node_state
+            mop
+            Other_branch
         in
-        if requeue then add_pending_operation state op else return_unit)
+        match requeue with
+        | Retry -> add_pending_operation ~retry:true state op
+        | _ -> return_unit)
       included_infos
 
   (** [register_confirmed_level state confirmed_level] is called when the level

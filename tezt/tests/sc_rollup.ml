@@ -1865,6 +1865,89 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
   in
   unit
 
+let test_reinject_failed_commitment ~kind =
+  let commitment_period = 3 in
+  test_full_scenario
+    ~kind
+    ~commitment_period
+    {
+      tags = ["injector"; "reinject"; "failed"];
+      variant = None;
+      description = "Republish commitments that are included as failed";
+    }
+  @@ fun sc_rollup_node1 _sc_rollup_client1 sc_rollup node client ->
+  let sc_rollup_node2 =
+    Sc_rollup_node.create
+      Operator
+      node
+      client
+      ~default_operator:Constant.bootstrap5.public_key_hash
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup
+  in
+  Log.info "Run two honest rollup nodes." ;
+  let* () = Sc_rollup_node.run sc_rollup_node1
+  and* () = Sc_rollup_node.run sc_rollup_node2 in
+  Log.info "Add messages and advance L1 to trigger commitment." ;
+  (* We bake one extra block to allow for the injection of the commitment and
+     another block to allow for reinjection of the commitment that has the out
+     of gas error. *)
+  let retried = ref false in
+  let _ =
+    let* () =
+      Sc_rollup_node.wait_for sc_rollup_node1 "retry_operation.v0" (fun _ ->
+          Some ())
+    in
+    retried := true ;
+    unit
+  in
+  let _ =
+    let* () =
+      Sc_rollup_node.wait_for sc_rollup_node2 "retry_operation.v0" (fun _ ->
+          Some ())
+    in
+    retried := true ;
+    unit
+  in
+  let* () = bake_levels (commitment_period + block_finality_time + 2) client in
+  let* _ =
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node1
+      (Node.get_level node)
+  and* _ =
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Rollup nodes both at %d." (Node.get_level node) ;
+  (* NOTE: if the gas consumed by publishing commitments is fixed, remove the
+     following check. One of the commitments is supposed to be included as
+     failed in a block because when two identical commitments are in the same
+     block, the second one consumes more gas than the first, and consumes more
+     gas than what was simulated. *)
+  if not !retried then
+    Test.fail "Rollup nodes did not retry to republish commitment" ;
+  let* {stake_amount; _} = get_sc_rollup_constants client in
+  let check_committed id =
+    let* deposit_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_frozen_bonds ~id ()
+    in
+    Check.(
+      (deposit_json = stake_amount)
+        Tez.typ
+        ~error_msg:
+          "A node has not committed, expecting deposit for participant = %R, \
+           got %L") ;
+    unit
+  in
+  let* () = check_committed Constant.bootstrap1.public_key_hash
+  and* () = check_committed Constant.bootstrap5.public_key_hash in
+  unit
+
 (* Check that the SC rollup is correctly originated with a boot sector.
    -------------------------------------------------------
 
@@ -3129,6 +3212,7 @@ let register ~kind ~protocols =
     test_consecutive_commitments
     protocols
     ~kind ;
+  test_reinject_failed_commitment protocols ~kind ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4020
      When looking at the logs of these tests, it appears that they do
      not come with enough inspection of the state of the rollup to

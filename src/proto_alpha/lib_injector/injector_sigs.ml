@@ -42,6 +42,27 @@ type injection_strategy =
         kind of operations to include in a block. *)
   ]
 
+(** Explanation for unsuccessful operations (that are included in a block). *)
+type unsuccessful_status =
+  | Other_branch
+      (** The operation is included in a block that is not on the main chain
+          anymore, because of a reorganization. *)
+  | Backtracked
+      (** The operation is backtracked because of a further failing operation in
+          the same batch. *)
+  | Skipped
+      (** The operation is skipped because of a previous failing operation in
+          the same batch. *)
+  | Failed of error trace  (** The operation failed with the provided error. *)
+
+(** Action to be taken for unsuccessful operation. *)
+type retry_action =
+  | Retry  (** The operation is retried by being re-queued for injection. *)
+  | Forget  (** The operation is forgotten without error. *)
+  | Abort of error trace
+      (** The error for the failing operation should be propagated at a higher
+          level. *)
+
 (** Signature for tags used in injector  *)
 module type TAG = sig
   include Stdlib.Set.OrderedType
@@ -68,11 +89,13 @@ module type PARAMETERS = sig
       inject for each block. *)
   val table_estimated_size : Tag.t -> int
 
-  (** [requeue_reverted_operation state op] should return [true] if an included
-      operation should be re-queued for injection when the block in which it is
-      included is reverted (due to a reorganization). *)
-  val requeue_reverted_operation :
-    rollup_node_state -> 'a manager_operation -> bool Lwt.t
+  (** Action (see {!retry_action}) to be taken on unsuccessful operation (see
+      {!unsuccessful_status}). *)
+  val retry_unsuccessful_operation :
+    rollup_node_state ->
+    'a manager_operation ->
+    unsuccessful_status ->
+    retry_action Lwt.t
 
   (** [ignore_failing_operation op] specifies if the injector should
       ignore this operation when its simulation fails when trying to inject.
@@ -84,8 +107,6 @@ module type PARAMETERS = sig
       - [`Don't_ignore] if the failing operation should not be ignored and the
         failure reported.
   *)
-  val ignore_failing_operation :
-    'a manager_operation -> [`Ignore_keep | `Ignore_drop | `Don't_ignore]
 
   (** The tag of a manager operation. This is used to send operations to the
       correct queue automatically (when signer is not provided) and to recover
