@@ -237,8 +237,9 @@ module V2_0_0 = struct
       | Input_required -> Waiting_for_input_message
       | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
           match
-            Reveal_hash.of_bytes_opt
-              (Bytes.of_string (Wasm_2_0_0.reveal_hash_to_string hash))
+            Data_encoding.Binary.of_string_opt
+              Reveal_hash.encoding
+              (Wasm_2_0_0.reveal_hash_to_string hash)
           with
           | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
           | None ->
