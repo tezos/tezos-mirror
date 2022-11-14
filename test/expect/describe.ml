@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mu = Cons of (int * bu) | Stop
+type mu =
+  | Cons of (int * bu)
+  | Snoc of (mu * int)
+  | Snocc of (mu * int * int)
+  | Stop
 
 and bu = Consb of (int * mu) | Consbb of (int * bu)
 
@@ -546,6 +550,18 @@ let%expect_test _ =
                 (fun (((), ()), a, m) -> Cons (a, m));
               case
                 ~title:"s"
+                (Tag 127)
+                (tup2 e uint8)
+                (function Snoc (m, a) -> Some (m, a) | _ -> None)
+                (fun (m, a) -> Snoc (m, a));
+              case
+                ~title:"t"
+                (Tag 126)
+                (tup3 e uint8 uint16)
+                (function Snocc (m, a, b) -> Some (m, a, b) | _ -> None)
+                (fun (m, a, b) -> Snocc (m, a, b));
+              case
+                ~title:"s"
                 (Tag 255)
                 null
                 (function Stop -> Some () | _ -> None)
@@ -593,6 +609,36 @@ let%expect_test _ =
 
     weird-list (Determined from data, 8-bit tag)
     ********************************************
+
+    t (tag 126)
+    ===========
+
+    +-----------------+----------------------+-------------------------+
+    | Name            | Size                 | Contents                |
+    +=================+======================+=========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 0 | Determined from data | $weird-list             |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 2 | 2 bytes              | unsigned 16-bit integer |
+    +-----------------+----------------------+-------------------------+
+
+
+    s (tag 127)
+    ===========
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weird-list            |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+
 
     c (tag 128)
     ===========
@@ -655,7 +701,34 @@ let%expect_test _ =
              "encoding":
                { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
                  "cases":
-                   [ { "tag": 128,
+                   [ { "tag": 126,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weird-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "size": "Uint16", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 2, "kind": "Fixed" } } ],
+                       "name": "t" },
+                     { "tag": 127,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weird-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
+                       "name": "s" },
+                     { "tag": 128,
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
@@ -722,20 +795,20 @@ let%expect_test _ =
                      (function Cons (3, m) -> Some m | _ -> None)
                      (fun m -> Cons (3, m));
                    case
-                     ~title:"c4"
-                     (payload (bu e))
-                     (function Cons (4, m) -> Some m | _ -> None)
-                     (fun m -> Cons (4, m));
-                   case
-                     ~title:"c5"
-                     (payload (bu e))
-                     (function Cons (5, m) -> Some m | _ -> None)
-                     (fun m -> Cons (5, m));
-                   case
                      ~title:"c"
                      (tup2 (payload uint8) (payload (bu e)))
                      (function Cons (x, m) -> Some (x, m) | _ -> None)
                      (fun (x, m) -> Cons (x, m));
+                   case
+                     ~title:"s"
+                     (tup2 (payload e) (payload uint8))
+                     (function Snoc (m, a) -> Some (m, a) | _ -> None)
+                     (fun (m, a) -> Snoc (m, a));
+                   case
+                     ~title:"t"
+                     (tup3 (payload e) (payload uint8) (payload uint16))
+                     (function Snocc (m, a, b) -> Some (m, a, b) | _ -> None)
+                     (fun (m, a, b) -> Snocc (m, a, b));
                    case
                      ~title:"s"
                      null
@@ -841,7 +914,9 @@ let%expect_test _ =
     +=================+======================+========================+
     | Tag             | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
-    | Unnamed field 0 | Determined from data | $weirb-list            |
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
     +-----------------+----------------------+------------------------+
 
 
@@ -853,22 +928,26 @@ let%expect_test _ =
     +=================+======================+========================+
     | Tag             | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
-    | Unnamed field 0 | Determined from data | $weirb-list            |
+    | Unnamed field 0 | Determined from data | $weirder-list          |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
 
 
     case 48 (tag 48)
     ================
 
-    +-----------------+----------------------+------------------------+
-    | Name            | Size                 | Contents               |
-    +=================+======================+========================+
-    | Tag             | 1 byte               | unsigned 8-bit integer |
-    +-----------------+----------------------+------------------------+
-    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
-    +-----------------+----------------------+------------------------+
-    | Unnamed field 1 | Determined from data | $weirb-list            |
-    +-----------------+----------------------+------------------------+
+    +-----------------+----------------------+-------------------------+
+    | Name            | Size                 | Contents                |
+    +=================+======================+=========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 0 | Determined from data | $weirder-list           |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 2 | 2 bytes              | unsigned 16-bit integer |
+    +-----------------+----------------------+-------------------------+
 
 
     case 56 (tag 56)
@@ -960,6 +1039,9 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
                        "name": "case 32" },
@@ -969,8 +1051,11 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
-                           { "layout": { "name": "weirb-list", "kind": "Ref" },
-                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
                        "name": "case 40" },
                      { "tag": 48,
                        "fields":
@@ -978,11 +1063,14 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 1, "kind": "Fixed" } },
-                           { "layout": { "name": "weirb-list", "kind": "Ref" },
-                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                           { "layout": { "size": "Uint16", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 2, "kind": "Fixed" } } ],
                        "name": "case 48" },
                      { "tag": 56,
                        "fields":
@@ -1044,20 +1132,21 @@ let%expect_test _ =
                        (function Cons (3, m) -> Some m | _ -> None)
                        (fun m -> Cons (3, m));
                      case
-                       ~title:"c4"
-                       (payload (bu e))
-                       (function Cons (4, m) -> Some m | _ -> None)
-                       (fun m -> Cons (4, m));
-                     case
-                       ~title:"c5"
-                       (payload (bu e))
-                       (function Cons (5, m) -> Some m | _ -> None)
-                       (fun m -> Cons (5, m));
-                     case
                        ~title:"c"
                        (tup2 (payload uint8) (payload (bu e)))
                        (function Cons (x, m) -> Some (x, m) | _ -> None)
                        (fun (x, m) -> Cons (x, m));
+                     case
+                       ~title:"s"
+                       (tup2 (payload e) (payload uint8))
+                       (function Snoc (m, a) -> Some (m, a) | _ -> None)
+                       (fun (m, a) -> Snoc (m, a));
+                     case
+                       ~title:"t"
+                       (tup3 (payload e) (payload uint8) (payload uint16))
+                       (function
+                         | Snocc (m, a, b) -> Some (m, a, b) | _ -> None)
+                       (fun (m, a, b) -> Snocc (m, a, b));
                      case
                        ~title:"s"
                        null
@@ -1071,7 +1160,7 @@ let%expect_test _ =
     +-----------------+----------------------+----------+
     | Name            | Size                 | Contents |
     +=================+======================+==========+
-    | Unnamed field 0 | Determined from data | $X_63    |
+    | Unnamed field 0 | Determined from data | $X_49    |
     +-----------------+----------------------+----------+
 
 
@@ -1165,7 +1254,9 @@ let%expect_test _ =
     +=================+======================+========================+
     | Tag             | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
-    | Unnamed field 0 | Determined from data | $weirb-list            |
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
     +-----------------+----------------------+------------------------+
 
 
@@ -1177,22 +1268,26 @@ let%expect_test _ =
     +=================+======================+========================+
     | Tag             | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
-    | Unnamed field 0 | Determined from data | $weirb-list            |
+    | Unnamed field 0 | Determined from data | $weirder-list          |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
 
 
     case 48 (tag 48)
     ================
 
-    +-----------------+----------------------+------------------------+
-    | Name            | Size                 | Contents               |
-    +=================+======================+========================+
-    | Tag             | 1 byte               | unsigned 8-bit integer |
-    +-----------------+----------------------+------------------------+
-    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
-    +-----------------+----------------------+------------------------+
-    | Unnamed field 1 | Determined from data | $weirb-list            |
-    +-----------------+----------------------+------------------------+
+    +-----------------+----------------------+-------------------------+
+    | Name            | Size                 | Contents                |
+    +=================+======================+=========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 0 | Determined from data | $weirder-list           |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 2 | 2 bytes              | unsigned 16-bit integer |
+    +-----------------+----------------------+-------------------------+
 
 
     case 56 (tag 56)
@@ -1205,7 +1300,7 @@ let%expect_test _ =
     +------+--------+------------------------+
 
 
-    X_63 (Determined from data, 8-bit tag)
+    X_49 (Determined from data, 8-bit tag)
     **************************************
 
     case 0 (tag 0)
@@ -1306,7 +1401,7 @@ let%expect_test _ =
 
     { "toplevel":
          { "fields":
-             [ { "layout": { "name": "X_63", "kind": "Ref" }, "kind": "anon",
+             [ { "layout": { "name": "X_49", "kind": "Ref" }, "kind": "anon",
                  "data_kind": { "kind": "Dynamic" } } ] },
        "fields":
          [ { "description": { "title": "weirb-list" },
@@ -1383,6 +1478,9 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
                        "name": "case 32" },
@@ -1392,8 +1490,11 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
-                           { "layout": { "name": "weirb-list", "kind": "Ref" },
-                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
                        "name": "case 40" },
                      { "tag": 48,
                        "fields":
@@ -1401,11 +1502,14 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 1, "kind": "Fixed" } },
-                           { "layout": { "name": "weirb-list", "kind": "Ref" },
-                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                           { "layout": { "size": "Uint16", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 2, "kind": "Fixed" } } ],
                        "name": "case 48" },
                      { "tag": 56,
                        "fields":
@@ -1413,7 +1517,7 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" } ], "name": "case 56" } ] } },
-           { "description": { "title": "X_63" },
+           { "description": { "title": "X_49" },
              "encoding":
                { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
                  "cases":
