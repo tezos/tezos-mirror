@@ -260,9 +260,8 @@ let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
 
 let rpc_services = Services.rpc_services
 
-(* Fake mempool *)
 module Mempool = struct
-  type t = unit
+  type t = State.t
 
   type validation_info = unit
 
@@ -290,16 +289,34 @@ module Mempool = struct
     | Incompatible_mempool
     | Merge_conflict of operation_conflict
 
-  let init _ _ ~head_hash:_ ~head:_  = Lwt.return_ok ((), ())
+  let init ctxt _chain_id ~head_hash:_ ~(head : Block_header.shell_header) =
+    let open Lwt_result_syntax in
+    Logging.log
+      Notice
+      "Mempool.init: head fitness = %a%!"
+      Fitness.pp
+      head.fitness ;
+    let*! state = State.get_state ctxt in
+    return ((), state)
 
-  let encoding = Data_encoding.unit
+  let encoding = State.encoding
 
-  let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-    Lwt.return_ok ((), Unchanged)
+  let add_operation ?check_signature:_ ?conflict_handler:_
+      (_info : validation_info) state ((_oph : Operation_hash.t), op) =
+    match Apply.apply state op.protocol_data with
+    | None ->
+        Lwt.return_error
+          (Validation_error (trace_of_error Error.Invalid_operation))
+    | Some state -> return (state, Added)
 
-  let remove_operation () _ = ()
+  (* This mempool does not currently support removing an operation. *)
+  let remove_operation _ _ = assert false
 
-  let merge ?conflict_handler:_ () () = Ok ()
+  (* This mempool does not currently support merging. *)
+  let merge ?conflict_handler:_ _ _ = assert false
 
-  let operations () = Operation_hash.Map.empty
+  (* This function is not currently used in the context of
+     [proto_demo_counter]. If it is needed in the future, the type [t]
+     will need to be extended to remember all added operations. *)
+  let operations _ = assert false
 end
