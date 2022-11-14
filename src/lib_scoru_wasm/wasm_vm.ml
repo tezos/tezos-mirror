@@ -408,6 +408,12 @@ let set_input_step input_info message pvm_state =
   let open Wasm_pvm_state in
   let {inbox_level; message_counter} = input_info in
   let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
+  let return_stuck state_name =
+    Lwt.return
+      (Stuck
+         (Wasm_pvm_errors.invalid_state
+         @@ Format.sprintf "No input required during %s" state_name))
+  in
   let+ tick_state =
     match pvm_state.tick_state with
     | Collect -> (
@@ -420,28 +426,13 @@ let set_input_step input_info message pvm_state =
         match Pvm_input_kind.from_raw_input message with
         | Internal End_of_level -> Padding
         | _ -> Collect)
-    | Snapshot ->
-        Lwt.return
-          (Stuck
-             (Wasm_pvm_errors.invalid_state "No input required during start"))
-    | Decode _ ->
-        Lwt.return
-          (Stuck
-             (Wasm_pvm_errors.invalid_state "No input required during decoding"))
-    | Link _ ->
-        Lwt.return
-          (Stuck (Wasm_pvm_errors.invalid_state "No input required during link"))
-    | Init _ ->
-        Lwt.return
-          (Stuck
-             (Wasm_pvm_errors.invalid_state
-                "No input required during initialization"))
-    | Eval _ ->
-        Lwt.return
-          (Stuck
-             (Wasm_pvm_errors.invalid_state
-                "No input required during evaluation"))
-    | Stuck _ | Padding -> Lwt.return pvm_state.tick_state
+    | Stuck _ -> Lwt.return pvm_state.tick_state
+    | Snapshot -> return_stuck "start"
+    | Decode _ -> return_stuck "decoding"
+    | Link _ -> return_stuck "link"
+    | Init _ -> return_stuck "initialization"
+    | Eval _ -> return_stuck "evaluation"
+    | Padding -> return_stuck "padding"
   in
   (* Increase the current tick counter and mark that no input is required. *)
   {pvm_state with tick_state; current_tick = Z.succ pvm_state.current_tick}
