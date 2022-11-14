@@ -84,6 +84,13 @@ cd ..
 mv tezos/_snoop/*_results "$SNOOP_RESULT_DIR"/
 chmod +rx "$SNOOP_RESULT_DIR"/*_results
 
+# Save results in the cloud.
+dated_log "Uploading results"
+aws s3 cp "$SNOOP_RESULT_DIR"/ s3://snoop-playground/mclaren/complete_results/"$SNOOP_RESULT_DIR"/ --recursive
+dated_log "Uploading CSVs"
+aws s3 cp "$SNOOP_RESULT_DIR"/inference_results/ s3://snoop-playground/mclaren/inference_csvs/"$SNOOP_RESULT_DIR"/ --recursive --exclude "*" --include "*.csv"
+dated_log "Results and CSVs uploaded"
+
 # Change the file containing the name of the result directory.
 # This allows to use current_run_dir and last_run_dir as markers of the
 # benchmarks being run (current_run_dir) or finished (last_run_dir).
