@@ -253,7 +253,7 @@ let save :
     with
     | Error err ->
         Format.eprintf
-          "Measure.save: encoding failed (%a); exiting"
+          "Measure.save: encoding failed (%a); exiting@."
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
@@ -268,7 +268,7 @@ let save :
     with
     | Error err ->
         Format.eprintf
-          "Measure.save: encoding failed (%a); exiting"
+          "Measure.save: encoding failed (%a); exiting@."
           Data_encoding.Binary.pp_write_error
           err ;
         exit 1
@@ -283,7 +283,7 @@ let load : filename:string -> packed_measurement =
  fun ~filename ->
   let cant_load err =
     Format.eprintf
-      "Measure.load: can't load file (%a); exiting"
+      "Measure.load: can't load file (%a); exiting@."
       Data_encoding.Binary.pp_read_error
       err ;
     exit 1
