@@ -770,6 +770,24 @@ module type TEZOS_CONTEXT = sig
      strategy mode "always", which is not suitable for GC.*)
   val is_gc_allowed : index -> bool
 
+  (** [split index] creates a new suffix file, also called "chunk",
+      into the irmin's file hierarchy.
+
+      To be optimal, the split function is expected to be called
+      directly after committing, to the context, a commit (of hash
+      [context_hash]) that will be a future candidate of a GC
+      target. Thus, the commit [commit_hash] is the last commit stored
+      on a given chunk. The GC called on that [commit_hash] will be
+      able to extract that [commit_hash] into a new prefix file, and
+      then, drop the whole chunk.
+
+      If the last commit of a chunk appears not to be the candidate of
+      a future GC, it may result in keeping chunks containing
+      partially needed data. This is not an issue, but it should be
+      avoided to prevent storing unnecessary data and thus, to
+      minimize the disk footprint. *)
+  val split : index -> unit
+
   val set_head :
     index ->
     Tezos_crypto.Chain_id.t ->

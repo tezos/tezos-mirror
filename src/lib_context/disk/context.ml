@@ -408,6 +408,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let is_gc_allowed index = Store.Gc.is_allowed index.repo
 
+  let split index = Store.split index.repo
+
   (*-- Generic Store Primitives ------------------------------------------------*)
 
   let data_key = Tezos_context_sigs.Context.data_key
