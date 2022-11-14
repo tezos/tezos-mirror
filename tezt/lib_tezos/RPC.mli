@@ -227,8 +227,15 @@ val get_network_versions : JSON.t t
 
 (** RPC: [POST /private/injection/operations]
 
-    Returns the hashes of the operations that were injected. *)
+    Returns the hashes of the operations that were injected.
+
+    [use_tmp_file] defaults to [false]. Set [use_tmp_file] to inject large
+    operations or many operations. Otherwise, the injection may fail as a
+    command line argument can only handle a limited number of characters.
+    [force] default to [false]
+    [async] default to [false] *)
 val post_private_injection_operations :
+  ?use_tmp_file:bool ->
   ?force:bool ->
   ?async:bool ->
   ops:Hex.t list ->

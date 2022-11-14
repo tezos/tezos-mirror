@@ -137,17 +137,20 @@ val inject :
   Client.t ->
   [`OpHash of string] Lwt.t
 
-(** [inject_operations] is similar as [inject] for a list of
-   operations. This function calls the RPC
-   {!val:RPC.post_private_injection_operations} which is faster than
-   calling the RPC used by {!val:inject} several times. Note that this
-   function should be used mainly when the time for injecting
-   operations matters. *)
+(** [inject_operations ?protocol ?request ?force ?error ?use_tmp_file ops
+    client] is similar as [inject] for a list of operations. This function calls
+    the RPC {!val:RPC.post_private_injection_operations} which is faster than
+    calling the RPC used by {!val:inject} several times. Note that this function
+    should be used mainly when the time for injecting operations matters.
+
+    @param use_tmp_file see {!val:RPC.post_private_injection_operations} for
+    more information. *)
 val inject_operations :
   ?protocol:Protocol.t ->
   ?request:[`Inject | `Notify] ->
   ?force:bool ->
   ?error:rex ->
+  ?use_tmp_file:bool ->
   t list ->
   Client.t ->
   [`OpHash of string] list Lwt.t

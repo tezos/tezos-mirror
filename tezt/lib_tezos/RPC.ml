@@ -59,13 +59,26 @@ let get_network_connection peer_id =
   let id_point = JSON.(json |-> "id_point") in
   (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))
 
-let post_private_injection_operations ?(force = false) ?(async = false) ~ops ()
-    =
+let post_private_injection_operations ?(use_tmp_file = false) ?(force = false)
+    ?(async = false) ~ops () =
   let query_string =
     [("async", string_of_bool async); ("force", string_of_bool force)]
   in
   let data : RPC_core.data =
-    Data (`A (List.map (fun (`Hex op) -> `String op) ops))
+    if use_tmp_file then (
+      let filename = Temp.file "injection_operations.json" in
+      with_open_out filename (fun out ->
+          let open Format in
+          let fmt = formatter_of_out_channel out in
+          fprintf
+            fmt
+            "[%a]"
+            (pp_print_list
+               ~pp_sep:(fun fmt () -> fprintf fmt ",")
+               (fun fmt (`Hex op) -> fprintf fmt {|"%s"|} op))
+            ops) ;
+      File filename)
+    else Data (`A (List.map (fun (`Hex op) -> `String op) ops))
   in
   make ~data ~query_string POST ["private"; "injection"; "operations"]
   @@ fun json ->

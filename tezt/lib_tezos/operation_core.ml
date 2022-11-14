@@ -140,8 +140,8 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
       let* () = Process.check_error ~msg process in
       hash t client
 
-let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error t
-    client : [`OpHash of string] list Lwt.t =
+let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
+    ?use_tmp_file t client : [`OpHash of string] list Lwt.t =
   let forge op =
     let* signature = sign ?protocol op client in
     hex ?protocol ~signature op client
@@ -156,7 +156,9 @@ let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error t
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let rpc = RPC.post_private_injection_operations ~force ~ops () in
+  let rpc =
+    RPC.post_private_injection_operations ?use_tmp_file ~force ~ops ()
+  in
   match error with
   | None ->
       let* ophs = RPC.Client.call client rpc in
