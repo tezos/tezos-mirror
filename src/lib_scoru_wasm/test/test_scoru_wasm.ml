@@ -48,5 +48,6 @@ let () =
       ("Max nb of ticks", Test_fixed_nb_ticks.tests);
       ("Hash correspondence", Test_hash_consistency.tests);
       ("Reveal", Test_reveal.tests);
+      ("Fast Execution", Test_fast.tests);
     ]
   |> Lwt_main.run
