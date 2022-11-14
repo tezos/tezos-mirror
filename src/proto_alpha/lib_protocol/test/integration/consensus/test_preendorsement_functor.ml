@@ -59,21 +59,21 @@ end = struct
       ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
     Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
-    Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun endo ->
-    let endo = Operation.pack endo in
+    Op.endorsement b1 >>=? fun endo ->
     bake b1 ~operations:[endo] >>=? fun b2 ->
-    let ctxt = Context.B (preend_branch genesis b1 b2) in
+    let pred_branch =
+      Some (Context.branch (Context.B (preend_branch genesis b1 b2)))
+    in
     let endorsed_block = preendorsed_block genesis b1 b2 in
     get_delegate_and_slot genesis b1 b2 >>=? fun (delegate, slot) ->
     Op.preendorsement
       ?delegate
       ?slot
+      ?pred_branch
       ~round:preend_round
-      ~endorsed_block
-      ctxt
-      ()
+      endorsed_block
     >>=? fun p ->
-    let operations = endo :: (mk_ops @@ Operation.pack p) in
+    let operations = endo :: (mk_ops @@ p) in
     bake
       ~payload_round
       ~locked_round
@@ -182,8 +182,7 @@ end = struct
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
         Context.get_endorsers (B curr) >>=? function
-        | {V.delegate; slots = s :: _ as slots; _} :: _ ->
-            return (Some (delegate, slots), Some s)
+        | {V.delegate; slots = s :: _; _} :: _ -> return (Some delegate, Some s)
         | _ -> assert false
         (* there is at least one endorser with a slot *))
       ~loc:__LOC__
@@ -195,9 +194,8 @@ end = struct
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
         Context.get_endorsers (B curr) >>=? function
-        | {V.delegate; V.slots = _ :: non_canonical_slot :: _ as slots; _} :: _
-          ->
-            return (Some (delegate, slots), Some non_canonical_slot)
+        | {V.delegate; V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
+            return (Some delegate, Some non_canonical_slot)
         | _ -> assert false
         (* there is at least one endorser with a slot *))
       ~loc:__LOC__
@@ -217,9 +215,9 @@ end = struct
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
         Context.get_endorsers (B curr) >>=? function
-        | {V.delegate; _} :: {V.slots = s :: _ as slots; _} :: _ ->
+        | {V.delegate; _} :: {V.slots = s :: _; _} :: _ ->
             (* the canonical slot s is not owned by the delegate "delegate" !*)
-            return (Some (delegate, slots), Some s)
+            return (Some delegate, Some s)
         | _ -> assert false
         (* there is at least one endorser with a slot *))
       ~loc:__LOC__

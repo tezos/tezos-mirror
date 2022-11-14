@@ -52,74 +52,122 @@ let mk_block_payload_hash predecessor_hash payload_round (b : Block.t) =
   let hashes = List.map Operation.hash_packed non_consensus_operations in
   Block_payload.hash ~predecessor_hash ~payload_round hashes
 
-(* ctxt is used for getting the branch in sign *)
-let endorsement ?delegate ?slot ?level ?round ?block_payload_hash
-    ~endorsed_block ctxt ?(pred_branch = Context.branch ctxt) () =
-  let pred_hash = match ctxt with Context.B b -> b.hash | _ -> assert false in
-  (match delegate with
-  | None -> Context.get_endorser (B endorsed_block)
-  | Some v -> return v)
-  >>=? fun (delegate_pkh, slots) ->
+let mk_consensus_content_signer_and_pred_branch ?delegate ?slot ?level ?round
+    ?block_payload_hash ?pred_branch endorsed_block =
+  let open Lwt_result_syntax in
+  let pred_branch =
+    match pred_branch with
+    | None -> endorsed_block.Block.header.shell.predecessor
+    | Some branch -> branch
+  in
+  let* delegate_pkh, slots =
+    match delegate with
+    | None -> Context.get_endorser (B endorsed_block)
+    | Some del -> (
+        let* slots = Context.get_endorser_slot (B endorsed_block) del in
+        match slots with
+        | None -> return (del, [])
+        | Some slots -> return (del, slots))
+  in
   let slot =
     match slot with None -> Stdlib.List.hd slots | Some slot -> slot
   in
-  (match level with
-  | None -> Context.get_level (B endorsed_block)
-  | Some level -> ok level)
-  >>?= fun level ->
-  (match round with
-  | None -> Block.get_round endorsed_block
-  | Some round -> ok round)
-  >>?= fun round ->
+  let* level =
+    match level with
+    | None ->
+        let*? level = Context.get_level (B endorsed_block) in
+        return level
+    | Some level -> return level
+  in
+  let* round =
+    match round with
+    | None ->
+        let*? round = Block.get_round endorsed_block in
+        return round
+    | Some round -> return round
+  in
   let block_payload_hash =
     match block_payload_hash with
-    | None -> mk_block_payload_hash pred_hash round endorsed_block
+    | None -> mk_block_payload_hash pred_branch round endorsed_block
     | Some block_payload_hash -> block_payload_hash
   in
   let consensus_content = {slot; level; round; block_payload_hash} in
+  let* signer = Account.find delegate_pkh in
+  return (consensus_content, signer.sk, pred_branch)
+
+let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash
+    ?pred_branch endorsed_block =
+  let open Lwt_result_syntax in
+  let* consensus_content, signer, pred_branch =
+    mk_consensus_content_signer_and_pred_branch
+      ?delegate
+      ?slot
+      ?level
+      ?round
+      ?block_payload_hash
+      ?pred_branch
+      endorsed_block
+  in
   let op = Single (Endorsement consensus_content) in
-  Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
        ~watermark:
          Operation.(to_watermark (Endorsement Tezos_crypto.Chain_id.zero))
-       delegate.sk
+       signer
        pred_branch
        op)
 
-let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
-    ~endorsed_block ctxt ?(pred_branch = Context.branch ctxt) () =
-  let pred_hash = match ctxt with Context.B b -> b.hash | _ -> assert false in
-  (match delegate with
-  | None -> Context.get_endorser (B endorsed_block)
-  | Some v -> return v)
-  >>=? fun (delegate_pkh, slots) ->
-  let slot =
-    match slot with None -> Stdlib.List.hd slots | Some slot -> slot
+let endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?pred_branch
+    endorsed_block =
+  let open Lwt_result_syntax in
+  let* op =
+    raw_endorsement
+      ?delegate
+      ?slot
+      ?level
+      ?round
+      ?block_payload_hash
+      ?pred_branch
+      endorsed_block
   in
-  (match level with
-  | None -> Context.get_level (B endorsed_block)
-  | Some level -> ok level)
-  >>?= fun level ->
-  (match round with
-  | None -> Block.get_round endorsed_block
-  | Some round -> ok round)
-  >>?= fun round ->
-  let block_payload_hash =
-    match block_payload_hash with
-    | None -> mk_block_payload_hash pred_hash round endorsed_block
-    | Some block_payload_hash -> block_payload_hash
+  return (Operation.pack op)
+
+let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
+    ?pred_branch endorsed_block =
+  let open Lwt_result_syntax in
+  let* consensus_content, signer, pred_branch =
+    mk_consensus_content_signer_and_pred_branch
+      ?delegate
+      ?slot
+      ?level
+      ?round
+      ?block_payload_hash
+      ?pred_branch
+      endorsed_block
   in
-  let consensus_content = {slot; level; round; block_payload_hash} in
   let op = Single (Preendorsement consensus_content) in
-  Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
        ~watermark:
          Operation.(to_watermark (Preendorsement Tezos_crypto.Chain_id.zero))
-       delegate.sk
+       signer
        pred_branch
        op)
+
+let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
+    ?pred_branch endorsed_block =
+  let open Lwt_result_syntax in
+  let* op =
+    raw_preendorsement
+      ?delegate
+      ?slot
+      ?level
+      ?round
+      ?block_payload_hash
+      ?pred_branch
+      endorsed_block
+  in
+  return (Operation.pack op)
 
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)

@@ -48,7 +48,7 @@ let init_genesis ?policy () =
 
 (** Consensus operation for future level : apply a preendorsement with a level in the future *)
 let test_consensus_operation_preendorsement_for_future_level () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -61,13 +61,12 @@ let test_consensus_operation_preendorsement_for_future_level () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for old level : apply a preendorsement with a level in the past *)
 let test_consensus_operation_preendorsement_for_old_level () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -80,13 +79,12 @@ let test_consensus_operation_preendorsement_for_old_level () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for future round : apply a preendorsement with a round in the future *)
 let test_consensus_operation_preendorsement_for_future_round () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -98,13 +96,12 @@ let test_consensus_operation_preendorsement_for_future_round () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for old round : apply a preendorsement with a round in the past *)
 let test_consensus_operation_preendorsement_for_old_round () =
-  init_genesis ~policy:(By_round 10) () >>=? fun (genesis, pred) ->
+  init_genesis ~policy:(By_round 10) () >>=? fun (_genesis, pred) ->
   Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -116,13 +113,12 @@ let test_consensus_operation_preendorsement_for_old_round () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation on competing proposal : apply a preendorsement on a competing proposal *)
 let test_consensus_operation_preendorsement_on_competing_proposal () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~is_preendorsement:true
@@ -134,13 +130,12 @@ let test_consensus_operation_preendorsement_on_competing_proposal () =
         when kind = Validate_errors.Consensus.Preendorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Unexpected preendorsements in block : apply a preendorsement with an incorrect round *)
 let test_unexpected_preendorsements_in_blocks () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~is_preendorsement:true
@@ -148,12 +143,11 @@ let test_unexpected_preendorsements_in_blocks () =
     ~error:(function
       | Validate_errors.Consensus.Unexpected_preendorsement_in_block -> true
       | _ -> false)
-    ~context:(Context.B genesis)
     ()
 
 (** Round too high : apply a preendorsement with a too high round *)
 let test_too_high_round () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 2) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Environment.wrap_tzresult (Round.of_int 1) >>?= fun round ->
@@ -166,7 +160,6 @@ let test_too_high_round () =
     ~error:(function
       | Validate_errors.Consensus.Preendorsement_round_too_high _ -> true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, Some pred.header.protocol_data)
     ()
 
@@ -175,11 +168,9 @@ let test_duplicate_preendorsement () =
   init_genesis () >>=? fun (genesis, _) ->
   Block.bake genesis >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun inc ->
-  Op.preendorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
-  let operation = Operation.pack operation in
+  Op.preendorsement b >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
-  Op.preendorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
-  let operation = Operation.pack operation in
+  Op.preendorsement b >>=? fun operation ->
   Incremental.add_operation inc operation >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__

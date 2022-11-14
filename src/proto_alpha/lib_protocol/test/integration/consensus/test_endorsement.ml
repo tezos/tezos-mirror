@@ -44,9 +44,9 @@ let init_genesis ?policy () =
 (** inject an endorsement and return the block with the endorsement and its
    parent. *)
 let inject_the_first_endorsement () =
-  init_genesis () >>=? fun (genesis, b) ->
-  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun op ->
-  Block.bake ~operations:[Operation.pack op] b >>=? fun b' -> return (b', b)
+  init_genesis () >>=? fun (_genesis, b) ->
+  Op.endorsement b >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b' -> return (b', b)
 
 (****************************************************************)
 (*                      Tests                                   *)
@@ -68,11 +68,10 @@ let test_negative_slot () =
   Lwt.catch
     (fun () ->
       Op.endorsement
-        ~delegate:(delegate, [Slot.of_int_do_not_use_except_for_parameters (-1)])
-        ~endorsed_block:b
-        (B genesis)
-        ()
-      >>=? fun (_ : _ operation) ->
+        ~delegate
+        ~slot:(Slot.of_int_do_not_use_except_for_parameters (-1))
+        b
+      >>=? fun (_ : packed_operation) ->
       failwith "negative slot should not be accepted by the binary format")
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
@@ -109,14 +108,12 @@ let test_non_normalized_slot () =
         (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd slots)
         (WithExceptions.Option.get ~loc:__LOC__ @@ Slot.Set.min_elt set_slots)
       >>=? fun () ->
-      Op.endorsement
-        ~delegate:(delegate, List.rev slots)
-        ~endorsed_block:b
-        (B genesis)
-        ()
-      >>=? fun op ->
+      let slot =
+        match List.hd (List.rev slots) with None -> assert false | Some s -> s
+      in
+      Op.endorsement ~delegate ~slot b >>=? fun operation ->
       let policy = Block.Excluding [delegate] in
-      Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
+      Block.bake ~policy ~operation b >>= fun res ->
       Assert.proto_error ~loc:__LOC__ res (function
           | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
               {kind}
@@ -127,14 +124,8 @@ let test_non_normalized_slot () =
 (** Wrong endorsement predecessor : apply an endorsement with an
     incorrect block predecessor. *)
 let test_wrong_endorsement_predecessor () =
-  init_genesis () >>=? fun (genesis, b) ->
-  Op.endorsement
-    ~endorsed_block:b
-    (B genesis)
-    ~pred_branch:(Context.branch (B b))
-    ()
-  >>=? fun operation ->
-  let operation = Operation.pack operation in
+  init_genesis () >>=? fun (_genesis, b) ->
+  Op.endorsement ~pred_branch:(Context.branch (B b)) b >>=? fun operation ->
   Block.bake ~operation b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Consensus.Wrong_consensus_operation_branch {kind; _}
@@ -147,9 +138,8 @@ let test_wrong_endorsement_predecessor () =
 let test_invalid_endorsement_level () =
   init_genesis () >>=? fun (genesis, b) ->
   Context.get_level (B genesis) >>?= fun genesis_level ->
-  Op.endorsement ~level:genesis_level ~endorsed_block:b (B genesis) ()
-  >>=? fun op ->
-  Block.bake ~operations:[Operation.pack op] b >>= fun res ->
+  Op.endorsement ~level:genesis_level b >>=? fun operation ->
+  Block.bake ~operation b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
         when kind = Validate_errors.Consensus.Endorsement ->
@@ -158,13 +148,11 @@ let test_invalid_endorsement_level () =
 
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
-  init_genesis () >>=? fun (genesis, b) ->
+  init_genesis () >>=? fun (_genesis, b) ->
   Incremental.begin_construction b >>=? fun inc ->
-  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
-  let operation = Operation.pack operation in
+  Op.endorsement b >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
-  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
-  let operation = Operation.pack operation in
+  Op.endorsement b >>=? fun operation ->
   Incremental.add_operation inc operation >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
@@ -174,7 +162,7 @@ let test_duplicate_endorsement () =
 
 (** Consensus operation for future level : apply an endorsement with a level in the future *)
 let test_consensus_operation_endorsement_for_future_level () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -187,13 +175,12 @@ let test_consensus_operation_endorsement_for_future_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for old level : apply an endorsement one level in the past *)
 let test_consensus_operation_endorsement_for_predecessor_level () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -206,14 +193,13 @@ let test_consensus_operation_endorsement_for_predecessor_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for old level : apply an endorsement with more than one level in the past *)
 let test_consensus_operation_endorsement_for_old_level () =
   init_genesis () >>=? fun (genesis, pred) ->
-  Block.bake genesis >>=? fun next_block ->
+  Block.bake genesis >>=? fun _next_block ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -226,13 +212,12 @@ let test_consensus_operation_endorsement_for_old_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B next_block)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for future round : apply an endorsement with a round in the future *)
 let test_consensus_operation_endorsement_for_future_round () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -244,13 +229,12 @@ let test_consensus_operation_endorsement_for_future_round () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation for old round : apply an endorsement with a round in the past *)
 let test_consensus_operation_endorsement_for_old_round () =
-  init_genesis ~policy:(By_round 10) () >>=? fun (genesis, pred) ->
+  init_genesis ~policy:(By_round 10) () >>=? fun (_genesis, pred) ->
   Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -262,13 +246,12 @@ let test_consensus_operation_endorsement_for_old_round () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Consensus operation on competing proposal : apply an endorsement on a competing proposal *)
 let test_consensus_operation_endorsement_on_competing_proposal () =
-  init_genesis () >>=? fun (genesis, pred) ->
+  init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~is_preendorsement:false
@@ -280,13 +263,12 @@ let test_consensus_operation_endorsement_on_competing_proposal () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
 
 (** Wrong round : apply an endorsement with an incorrect round *)
 let test_wrong_round () =
-  init_genesis () >>=? fun (genesis, b) ->
+  init_genesis () >>=? fun (_genesis, b) ->
   Environment.wrap_tzresult (Round.of_int 2) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -298,13 +280,12 @@ let test_wrong_round () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ()
 
 (** Wrong level : apply an endorsement with an incorrect level *)
 let test_wrong_level () =
-  init_genesis () >>=? fun (genesis, b) ->
-  let context = Context.B genesis in
+  init_genesis () >>=? fun (_genesis, b) ->
+  (* let context = Context.B genesis in*)
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
@@ -317,12 +298,11 @@ let test_wrong_level () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context
     ()
 
 (** Wrong payload hash : apply an endorsement with an incorrect payload hash *)
 let test_wrong_payload_hash () =
-  init_genesis () >>=? fun (genesis, b) ->
+  init_genesis () >>=? fun (_genesis, b) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
     ~is_preendorsement:false
@@ -334,11 +314,10 @@ let test_wrong_payload_hash () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ()
 
 let test_wrong_slot_used () =
-  init_genesis () >>=? fun (genesis, b) ->
+  init_genesis () >>=? fun (_genesis, b) ->
   Context.get_endorser (B b) >>=? fun (_, slots) ->
   (match slots with
   | _x :: y :: _ -> return y
@@ -355,7 +334,6 @@ let test_wrong_slot_used () =
         when kind = Validate_errors.Consensus.Endorsement ->
           true
       | _ -> false)
-    ~context:(Context.B genesis)
     ()
 
 (** Check that:
@@ -380,13 +358,8 @@ let test_endorsement_threshold ~sufficient_threshold () =
         (sufficient_threshold && counter < consensus_threshold)
         || ((not sufficient_threshold) && new_counter < consensus_threshold)
       then
-        Op.endorsement
-          ~round
-          ~delegate:(delegate, slots)
-          ~endorsed_block:b
-          (B genesis)
-          ()
-        >>=? fun endo -> return (new_counter, Operation.pack endo :: endos)
+        Op.endorsement ~round ~delegate b >>=? fun endo ->
+        return (new_counter, endo :: endos)
       else return (counter, endos))
     (0, [])
     endorsers_list
@@ -421,11 +394,9 @@ let test_preendorsement_endorsement_same_level () =
   Block.bake genesis >>=? fun b1 ->
   Incremental.begin_construction ~mempool_mode:true ~policy:(By_round 2) b1
   >>=? fun i ->
-  Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun op_endo ->
-  let op_endo = Alpha_context.Operation.pack op_endo in
+  Op.endorsement b1 >>=? fun op_endo ->
   Incremental.add_operation i op_endo >>=? fun (_i : Incremental.t) ->
-  Op.preendorsement ~endorsed_block:b1 (B genesis) () >>=? fun op_preendo ->
-  let op_preendo = Alpha_context.Operation.pack op_preendo in
+  Op.preendorsement b1 >>=? fun op_preendo ->
   Incremental.add_operation i op_preendo >>=? fun (_i : Incremental.t) ->
   return_unit
 
@@ -441,8 +412,7 @@ let test_wrong_endorsement_slot_in_mempool_mode () =
        return (Some non_canonical_slot)
    | _ -> assert false)
   >>=? fun slot ->
-  Op.endorsement ~endorsed_block:b1 (B genesis) ?slot () >>=? fun endo ->
-  let endo = Operation.pack endo in
+  Op.endorsement ?slot b1 >>=? fun endo ->
   Incremental.begin_construction ~mempool_mode:true b1 >>=? fun i ->
   Incremental.add_operation i endo >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -474,11 +444,9 @@ let test_endorsement_grandparent () =
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
   (* Endorsement on grandparent *)
-  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
+  Op.endorsement b_gp >>=? fun op1 ->
   (* Endorsement on parent *)
-  Op.endorsement ~endorsed_block:b (B b_gp) () >>=? fun op2 ->
-  let op1 = Alpha_context.Operation.pack op1 in
-  let op2 = Alpha_context.Operation.pack op2 in
+  Op.endorsement b >>=? fun op2 ->
   (* Both should be accepted by the mempool *)
   Incremental.add_operation i op1 >>=? fun i ->
   Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
@@ -490,11 +458,9 @@ let test_double_endorsement_grandparent () =
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
   (* Endorsement on grandparent *)
-  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
+  Op.endorsement b_gp >>=? fun op1 ->
   (* Endorsement on parent *)
-  Op.endorsement ~endorsed_block:b (B b_gp) () >>=? fun op2 ->
-  let op1 = Alpha_context.Operation.pack op1 in
-  let op2 = Alpha_context.Operation.pack op2 in
+  Op.endorsement b >>=? fun op2 ->
   (* The first grand parent endorsement should be accepted by the
      mempool but the second rejected. *)
   Incremental.add_operation i op1 >>=? fun i ->
@@ -514,12 +480,10 @@ let test_endorsement_grandparent_same_slot () =
   Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
   (* Endorsement on parent *)
   Consensus_helpers.delegate_of_first_slot (B b) >>=? fun (delegate, slot) ->
-  Op.endorsement ~endorsed_block:b ~delegate (B b_gp) () >>=? fun op2 ->
+  Op.endorsement ~delegate b >>=? fun op2 ->
   (* Endorsement on grandparent *)
   Consensus_helpers.delegate_of_slot slot (B b_gp) >>=? fun delegate ->
-  Op.endorsement ~endorsed_block:b_gp ~delegate (B genesis) () >>=? fun op1 ->
-  let op1 = Alpha_context.Operation.pack op1 in
-  let op2 = Alpha_context.Operation.pack op2 in
+  Op.endorsement ~delegate b_gp >>=? fun op1 ->
   (* Both should be accepted by the mempool *)
   Incremental.add_operation i op1 >>=? fun i ->
   Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
@@ -529,8 +493,8 @@ let test_endorsement_grandparent_application () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b_gp ->
   Block.bake b_gp >>=? fun b ->
-  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op ->
-  Block.bake ~operations:[Operation.pack op] b >>= fun res ->
+  Op.endorsement b_gp >>=? fun operation ->
+  Block.bake ~operation b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
         when kind = Validate_errors.Consensus.Endorsement ->
@@ -544,8 +508,7 @@ let test_endorsement_grandparent_full_construction () =
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->
   (* Endorsement on grandparent *)
-  Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
-  let op1 = Alpha_context.Operation.pack op1 in
+  Op.endorsement b_gp >>=? fun op1 ->
   Incremental.add_operation i op1 >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}

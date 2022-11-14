@@ -188,21 +188,15 @@ let test_endorsement_with_consensus_key () =
   update_consensus_key blk' delegate consensus_pk >>=? fun b_pre ->
   Block.bake b_pre >>=? fun b ->
   let slot = Slot.of_int_do_not_use_except_for_parameters 0 in
-  Op.endorsement ~delegate:(account1_pkh, [slot]) ~endorsed_block:b (B b_pre) ()
-  >>=? fun endorsement ->
-  Block.bake ~operation:(Operation.pack endorsement) b >>= fun res ->
+  Op.endorsement ~delegate:account1_pkh ~slot b >>=? fun endorsement ->
+  Block.bake ~operation:endorsement b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Operation.Invalid_signature -> true
       | _ -> false)
   >>=? fun () ->
-  Op.endorsement
-    ~delegate:(consensus_pkh, [slot])
-    ~endorsed_block:b
-    (B b_pre)
-    ()
-  >>=? fun endorsement ->
-  Block.bake ~operation:(Operation.pack endorsement) b
-  >>=? fun (_good_block : Block.t) -> return_unit
+  Op.endorsement ~delegate:consensus_pkh ~slot b >>=? fun endorsement ->
+  Block.bake ~operation:endorsement b >>=? fun (_good_block : Block.t) ->
+  return_unit
 
 let tests =
   Tztest.

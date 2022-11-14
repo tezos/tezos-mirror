@@ -362,20 +362,8 @@ let dbl_endorsement_prelude state =
   | None -> return ([], state)
   | Some (b1, b2) ->
       let* delegate1, delegate2 = pick_two_endorsers (B b1) in
-      let* op1 =
-        Op.preendorsement
-          ~delegate:delegate1
-          ~endorsed_block:b1
-          (B state.block)
-          ()
-      in
-      let* op2 =
-        Op.preendorsement
-          ~delegate:delegate1
-          ~endorsed_block:b2
-          (B state.block)
-          ()
-      in
+      let* op1 = Op.raw_preendorsement ~delegate:delegate1 b1 in
+      let* op2 = Op.raw_preendorsement ~delegate:delegate1 b2 in
       let op1, op2 =
         let comp =
           Tezos_crypto.Operation_hash.compare
@@ -388,12 +376,8 @@ let dbl_endorsement_prelude state =
       let slashable_preend =
         (op1, op2) :: state.dbl_endorsement.slashable_preend
       in
-      let* op3 =
-        Op.endorsement ~delegate:delegate2 ~endorsed_block:b1 (B state.block) ()
-      in
-      let* op4 =
-        Op.endorsement ~delegate:delegate2 ~endorsed_block:b2 (B state.block) ()
-      in
+      let* op3 = Op.raw_endorsement ~delegate:delegate2 b1 in
+      let* op4 = Op.raw_endorsement ~delegate:delegate2 b2 in
       let op3, op4 =
         let comp =
           Tezos_crypto.Operation_hash.compare
@@ -607,18 +591,14 @@ let preendorsement_descriptor =
         let gen (delegate, ck_opt) =
           let* slots_opt = Context.get_endorser_slot (B state.block) delegate in
           let delegate = Option.value ~default:delegate ck_opt in
-          match (state.pred, slots_opt) with
-          | None, _ -> assert false
-          | Some _pred, None -> return_none
-          | Some pred, Some slots ->
-              let* op =
-                Op.preendorsement
-                  ~delegate:(delegate, slots)
-                  ~endorsed_block:state.block
-                  (B pred)
-                  ()
-              in
-              return_some (Alpha_context.Operation.pack op)
+          match slots_opt with
+          | None -> return_none
+          | Some slots -> (
+              match slots with
+              | [] -> return_none
+              | _ :: _ ->
+                  let* op = Op.preendorsement ~delegate state.block in
+                  return_some op)
         in
         List.filter_map_es gen state.delegates);
   }
@@ -636,18 +616,14 @@ let endorsement_descriptor =
         let gen (delegate, ck_opt) =
           let* slots_opt = Context.get_endorser_slot (B state.block) delegate in
           let delegate = Option.value ~default:delegate ck_opt in
-          match (state.pred, slots_opt) with
-          | None, _ -> assert false
-          | Some _pred, None -> return_none
-          | Some pred, Some slots ->
-              let* op =
-                Op.endorsement
-                  ~delegate:(delegate, slots)
-                  ~endorsed_block:state.block
-                  (B pred)
-                  ()
-              in
-              return_some (Alpha_context.Operation.pack op)
+          match slots_opt with
+          | None -> return_none
+          | Some slots -> (
+              match slots with
+              | [] -> return_none
+              | _ :: _ ->
+                  let* op = Op.endorsement ~delegate state.block in
+                  return_some op)
         in
         List.filter_map_es gen state.delegates);
   }

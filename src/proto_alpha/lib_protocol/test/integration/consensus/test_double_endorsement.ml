@@ -83,8 +83,8 @@ let test_valid_double_endorsement_evidence () =
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
   Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
-  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
-  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  Op.raw_endorsement blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Context.get_bakers (B blk_a) >>=? fun bakers ->
   let baker = Context.get_first_different_baker delegate bakers in
@@ -134,8 +134,8 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
   Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
-  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
-  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  Op.raw_endorsement blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Context.get_bakers (B blk_a) >>=? fun bakers ->
   let baker = Context.get_first_different_baker delegate bakers in
@@ -146,8 +146,8 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
   block_fork blk_with_evidence1 >>=? fun (blk_30, blk_40) ->
   Block.bake blk_30 >>=? fun blk_3 ->
   Block.bake blk_40 >>=? fun blk_4 ->
-  Op.endorsement ~endorsed_block:blk_3 (B blk_30) () >>=? fun endorsement_3 ->
-  Op.endorsement ~endorsed_block:blk_4 (B blk_40) () >>=? fun endorsement_4 ->
+  Op.raw_endorsement blk_3 >>=? fun endorsement_3 ->
+  Op.raw_endorsement blk_4 >>=? fun endorsement_4 ->
   let operation =
     double_endorsement (B blk_with_evidence1) endorsement_3 endorsement_4
   in
@@ -170,7 +170,7 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
 let test_invalid_double_endorsement () =
   Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
-  Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun endorsement ->
+  Op.raw_endorsement b >>=? fun endorsement ->
   Block.bake ~operation:(Operation.pack endorsement) b >>=? fun b ->
   Op.double_endorsement (B b) endorsement endorsement |> fun operation ->
   Block.bake ~operation b >>= fun res ->
@@ -188,8 +188,8 @@ let test_invalid_double_endorsement_variant () =
   block_fork b >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
-  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  Op.raw_endorsement blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   double_endorsement
     (B genesis)
     ~correct_order:false
@@ -210,8 +210,8 @@ let test_too_early_double_endorsement_evidence () =
   block_fork b >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
-  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  Op.raw_endorsement blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   double_endorsement (B genesis) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -230,8 +230,8 @@ let test_too_late_double_endorsement_evidence () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
-  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  Op.raw_endorsement blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   Block.bake_n ((max_slashing_period * Int32.to_int blocks_per_cycle) + 1) blk_a
   >>=? fun blk ->
   double_endorsement (B blk) endorsement_a endorsement_b |> fun operation ->
@@ -250,29 +250,19 @@ let test_different_delegates () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (endorser_a, a_slots) ->
+  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
   Context.get_first_different_endorsers (B blk_b)
   >>=? fun (endorser_b1c, endorser_b2c) ->
-  let endorser_b, b_slots =
+  let endorser_b =
     if
       Tezos_crypto.Signature.Public_key_hash.( = )
         endorser_a
         endorser_b1c.delegate
-    then (endorser_b2c.delegate, endorser_b2c.slots)
-    else (endorser_b1c.delegate, endorser_b1c.slots)
+    then endorser_b2c.delegate
+    else endorser_b1c.delegate
   in
-  Op.endorsement
-    ~delegate:(endorser_a, a_slots)
-    ~endorsed_block:blk_a
-    (B blk_1)
-    ()
-  >>=? fun e_a ->
-  Op.endorsement
-    ~delegate:(endorser_b, b_slots)
-    ~endorsed_block:blk_b
-    (B blk_2)
-    ()
-  >>=? fun e_b ->
+  Op.raw_endorsement ~delegate:endorser_a blk_a >>=? fun e_a ->
+  Op.raw_endorsement ~delegate:endorser_b blk_b >>=? fun e_b ->
   Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun (_ : Block.t) ->
   double_endorsement (B blk_b) e_a e_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
@@ -289,26 +279,16 @@ let test_wrong_delegate () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (endorser_a, a_slots) ->
-  Op.endorsement
-    ~delegate:(endorser_a, a_slots)
-    ~endorsed_block:blk_a
-    (B blk_1)
-    ()
-  >>=? fun endorsement_a ->
-  Context.get_endorser_n (B blk_b) 0 >>=? fun (endorser0, slots0) ->
-  Context.get_endorser_n (B blk_b) 1 >>=? fun (endorser1, slots1) ->
-  let endorser_b, b_slots =
+  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
+  Op.raw_endorsement ~delegate:endorser_a blk_a >>=? fun endorsement_a ->
+  Context.get_endorser_n (B blk_b) 0 >>=? fun (endorser0, _slots0) ->
+  Context.get_endorser_n (B blk_b) 1 >>=? fun (endorser1, _slots1) ->
+  let endorser_b =
     if Tezos_crypto.Signature.Public_key_hash.equal endorser_a endorser0 then
-      (endorser1, slots1)
-    else (endorser0, slots0)
+      endorser1
+    else endorser0
   in
-  Op.endorsement
-    ~delegate:(endorser_b, b_slots)
-    ~endorsed_block:blk_b
-    (B blk_2)
-    ()
-  >>=? fun endorsement_b ->
+  Op.raw_endorsement ~delegate:endorser_b blk_b >>=? fun endorsement_b ->
   double_endorsement (B blk_b) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -340,19 +320,15 @@ let test_freeze_more_with_low_balance =
     Block.bake ~policy:(Block.By_account account1) blk_d1 >>=? fun blk_a ->
     Block.bake ~policy:(Block.By_account account1) blk_d2 >>=? fun blk_b ->
     get_endorsing_slots_for_account (B blk_a) account1 >>=? fun slots_a ->
-    Op.endorsement
-      ~delegate:(account1, slots_a)
-      ~endorsed_block:blk_a
-      (B blk_d1)
-      ()
-    >>=? fun end_a ->
+    let slot =
+      match List.hd slots_a with None -> assert false | Some s -> s
+    in
+    Op.raw_endorsement ~delegate:account1 ~slot blk_a >>=? fun end_a ->
     get_endorsing_slots_for_account (B blk_b) account1 >>=? fun slots_b ->
-    Op.endorsement
-      ~delegate:(account1, slots_b)
-      ~endorsed_block:blk_b
-      (B blk_d2)
-      ()
-    >>=? fun end_b ->
+    let slot =
+      match List.hd slots_b with None -> assert false | Some s -> s
+    in
+    Op.raw_endorsement ~delegate:account1 ~slot blk_b >>=? fun end_b ->
     let denunciation = double_endorsement (B b2) end_a end_b in
     Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
   in
@@ -469,8 +445,8 @@ let test_two_double_endorsement_evidences_leads_to_duplicate_denunciation () =
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
   Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
-  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
-  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  Op.raw_endorsement blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   let operation2 = double_endorsement (B genesis) endorsement_b endorsement_a in
   Context.get_bakers (B blk_a) >>=? fun bakers ->
