@@ -2074,9 +2074,7 @@ let test_rollup_arith_uses_reveals ~kind =
     close_out cout ;
     filename
   in
-  let* hash =
-    Sc_rollup_node.import sc_rollup_node ~pvm_name:"arith" ~filename
-  in
+  let* hash = Sc_rollup_node.import sc_rollup_node ~pvm_name:kind ~filename in
   let* genesis_info =
     RPC.Client.call ~hooks client
     @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
@@ -2110,6 +2108,46 @@ let test_rollup_arith_uses_reveals ~kind =
   Check.(
     (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
   unit
+
+let test_reveals_fails_on_wrong_hash ~kind =
+  test_full_scenario
+    ~timeout:120
+    ~kind
+    {
+      tags = ["reveals"];
+      variant = None;
+      description = "reveal data fails with wrong hash";
+    }
+  @@ fun sc_rollup_node _sc_rollup_client sc_rollup _node client ->
+  (* This value has been obtained from the logs of the test
+     scrrh1kXE3tnCVTJ21aDNVeaV86e8rS6jtiMEDpjZJtDnLXRThQdmy. *)
+  let hash = "scrrh1kXE3tnCVTJ21aDNVeaV86e8rS6jtiMEDpjZJtDnLXRThQdmy" in
+  let pvm_dir =
+    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "arith"
+  in
+  let filename = Filename.concat pvm_dir hash in
+  let () = Sys.mkdir pvm_dir 0o700 in
+  let cout = open_out filename in
+  let () = output_string cout "Some data that is not related to the hash" in
+  let () = close_out cout in
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  (* Prepare the handler to wait for the rollup node to fail before
+     sending the L1 message that will trigger the failure. This
+     ensures that the failure handler can access the status code
+     of the rollup node even after it has terminated. *)
+  let expect_failure = Sc_rollup_node.wait_for_failure_handler sc_rollup_node in
+  let* _level =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  in
+
+  let* () = send_text_messages client ["hash:" ^ hash] in
+  expect_failure ()
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4147
 
@@ -3283,6 +3321,7 @@ let register ~protocols =
     ~internal:false ;
   (* DAC tests, not supported yet by the Wasm PVM *)
   test_rollup_arith_uses_reveals protocols ~kind:"arith" ;
+  test_reveals_fails_on_wrong_hash protocols ~kind:"arith" ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
