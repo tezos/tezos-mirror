@@ -233,7 +233,15 @@ module Types = struct
           {op_code; price; l1_dst; rollup_id})
         (obj4_encoding
            (op_code_encoding ~safety)
-           (ticket_balance_encoding ~safety)
+           (* We use an Unsafe Bounded scalar encoding here to be able to
+              detect that an out-of-range value has been passed.
+              This encoding is unsafe in the sense that such value will cause
+              a failure in proving, instead of a circuit that can prove that
+              the argument is out-of-range.
+              This is enough for Protocol testing purposes, while keeping
+              the dummy circuit small.
+           *)
+           (ticket_balance_encoding ~safety:Unsafe)
            tezos_pkh_encoding
            tezos_pkh_encoding)
 
@@ -370,7 +378,7 @@ end = struct
 
   let srs =
     let open Bls12_381_polynomial.Polynomial in
-    (Srs.generate_insecure 8 1, Srs.generate_insecure 1 1)
+    (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1)
 
   let dummy_l1_dst =
     Hex.to_bytes_exn (`Hex "0002298c03ed7d454a101eb7022bc95f7e5f41ac78")
