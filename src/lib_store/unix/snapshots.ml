@@ -591,11 +591,13 @@ module Version = struct
    * - 1: snapshot exported with storage 0.0.1 to 0.0.4
    * - 2: snapshot exported with storage 0.0.4 to 0.0.6
    * - 3: snapshot exported with storage 0.0.7
-   * - 4: snapshot exported with storage 0.0.8 to current *)
-  let current_version = 4
+   * - 4: snapshot exported with storage 0.0.8 to current
+   * - 5: snapshot exported with new protocol tables *)
+  let current_version = 5
 
   (* List of versions that are supported *)
-  let supported_versions = [(2, `Legacy); (3, `Legacy); (4, `Current)]
+  let supported_versions =
+    [(2, `Legacy); (3, `Legacy); (4, `Current); (5, `Current)]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
