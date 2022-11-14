@@ -32,7 +32,7 @@
 # then moves the log files to the result directory returned by the latter
 # (through the last_run_dir file).
 
-cd /data/tezos-benchmarks
+cd /data/tezos-benchmarks || (echo "Unknown benchmarks directory"; exit)
 ./run_all_benchmarks_on_latest_master.sh > cron_res 2> cron_res_errors
 SNOOP_RESULT_DIR="$(cat last_run_dir)"
 mv cron_res cron_res_errors "$SNOOP_RESULT_DIR"/

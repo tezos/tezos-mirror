@@ -18,3 +18,4 @@ src/bin_client/octez-init-sandboxed-client.sh
 src/bin_node/octez-sandboxed-node.sh
 src/lib_store/unix/test/generate_locator_plot.sh
 src/lib_webassembly/bin/test/meta/noderun.sh
+devtools/benchmarks-tools/run_all_benchmarks_on_latest_master.sh

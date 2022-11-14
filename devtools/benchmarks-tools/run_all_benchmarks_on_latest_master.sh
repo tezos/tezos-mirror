@@ -47,7 +47,7 @@ rm -rf _opam
 echo "Pulling repository."
 git pull
 HEADCOMMIT=$(git describe --always --dirty --long)
-echo -n "HEAD is $HEADCOMMIT"
+echo "HEAD is $HEADCOMMIT"
 
 SNOOP_RESULT_DIR="snoop_results/_snoop_${TODAY}_${HEADCOMMIT}"
 
@@ -66,7 +66,7 @@ dated_log "Compiling dependencies"
 . "/home/mclaren/.cargo/env"
 make BLST_PORTABLE=y build-dev-deps || true
 if [ -d _opam/share/zcash-params ]; then echo "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
-eval $(opam env)
+eval "$(opam env)"
 
 # Build Tezos
 dated_log "Make"
