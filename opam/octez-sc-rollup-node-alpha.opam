@@ -37,6 +37,7 @@ depends: [
   "tezos-injector-alpha"
   "tezos-scoru-wasm-fast"
   "tezos-crypto-dal"
+  "prometheus-app" { >= "1.2" }
 ]
 build: [
   ["rm" "-r" "vendors"]
