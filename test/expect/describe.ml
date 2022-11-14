@@ -23,7 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mu = Cons of (int * mu) | Stop
+type mu =
+  | Cons of (int * bu)
+  | Snoc of (mu * int)
+  | Snocc of (mu * int * int)
+  | Stop
+
+and bu = Consb of (int * mu) | Consbb of (int * bu)
 
 let dump encoding =
   let open Data_encoding in
@@ -514,15 +520,46 @@ let%expect_test _ =
                        "name": "r" } ] } } ] } |}] ;
   dump
     Data_encoding.(
+      let bu mue =
+        mu "weirb-list" (fun e ->
+            union
+              [
+                case
+                  ~title:"b"
+                  (Tag 64)
+                  (tup3 obj2_zero_width uint8 mue)
+                  (function
+                    | Consb (a, m) -> Some (((), ()), a, m) | Consbb _ -> None)
+                  (fun (((), ()), a, m) -> Consb (a, m));
+                case
+                  ~title:"bb"
+                  (Tag 32)
+                  (tup2 uint8 e)
+                  (function Consbb (a, m) -> Some (a, m) | Consb _ -> None)
+                  (fun (a, m) -> Consbb (a, m));
+              ])
+      in
       mu "weird-list" (fun e ->
           union
             [
               case
                 ~title:"c"
                 (Tag 128)
-                (tup3 obj2_zero_width uint8 e)
+                (tup3 obj2_zero_width uint8 (bu e))
                 (function Cons (a, m) -> Some (((), ()), a, m) | _ -> None)
                 (fun (((), ()), a, m) -> Cons (a, m));
+              case
+                ~title:"s"
+                (Tag 127)
+                (tup2 e uint8)
+                (function Snoc (m, a) -> Some (m, a) | _ -> None)
+                (fun (m, a) -> Snoc (m, a));
+              case
+                ~title:"t"
+                (Tag 126)
+                (tup3 e uint8 uint16)
+                (function Snocc (m, a, b) -> Some (m, a, b) | _ -> None)
+                (fun (m, a, b) -> Snocc (m, a, b));
               case
                 ~title:"s"
                 (Tag 255)
@@ -539,8 +576,69 @@ let%expect_test _ =
     +-----------------+----------------------+-------------+
 
 
+    weirb-list (Determined from data, 8-bit tag)
+    ********************************************
+
+    bb (tag 32)
+    ===========
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    b (tag 64)
+    ==========
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weird-list            |
+    +-----------------+----------------------+------------------------+
+
+
     weird-list (Determined from data, 8-bit tag)
     ********************************************
+
+    t (tag 126)
+    ===========
+
+    +-----------------+----------------------+-------------------------+
+    | Name            | Size                 | Contents                |
+    +=================+======================+=========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 0 | Determined from data | $weird-list             |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 2 | 2 bytes              | unsigned 16-bit integer |
+    +-----------------+----------------------+-------------------------+
+
+
+    s (tag 127)
+    ===========
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weird-list            |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+
 
     c (tag 128)
     ===========
@@ -552,7 +650,7 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
     | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
     +-----------------+----------------------+------------------------+
-    | Unnamed field 1 | Determined from data | $weird-list            |
+    | Unnamed field 1 | Determined from data | $weirb-list            |
     +-----------------+----------------------+------------------------+
 
 
@@ -571,11 +669,23 @@ let%expect_test _ =
              [ { "layout": { "name": "weird-list", "kind": "Ref" },
                  "kind": "anon", "data_kind": { "kind": "Dynamic" } } ] },
        "fields":
-         [ { "description": { "title": "weird-list" },
+         [ { "description": { "title": "weirb-list" },
              "encoding":
                { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
                  "cases":
-                   [ { "tag": 128,
+                   [ { "tag": 32,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "bb" },
+                     { "tag": 64,
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
@@ -586,6 +696,49 @@ let%expect_test _ =
                              "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weird-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "b" } ] } },
+           { "description": { "title": "weird-list" },
+             "encoding":
+               { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
+                 "cases":
+                   [ { "tag": 126,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weird-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "size": "Uint16", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 2, "kind": "Fixed" } } ],
+                       "name": "t" },
+                     { "tag": 127,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weird-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
+                       "name": "s" },
+                     { "tag": 128,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
                        "name": "c" },
                      { "tag": 255,
                        "fields":
@@ -593,6 +746,890 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" } ], "name": "s" } ] } } ] } |}] ;
+  dump
+    Data_encoding.(
+      let bu mue =
+        mu "weirb-list" (fun e ->
+            union
+              [
+                case
+                  ~title:"b"
+                  (Tag 64)
+                  (tup3 obj2_zero_width uint8 mue)
+                  (function
+                    | Consb (a, m) -> Some (((), ()), a, m) | Consbb _ -> None)
+                  (fun (((), ()), a, m) -> Consb (a, m));
+                case
+                  ~title:"bb"
+                  (Tag 32)
+                  (tup2 uint8 e)
+                  (function Consbb (a, m) -> Some (a, m) | Consb _ -> None)
+                  (fun (a, m) -> Consbb (a, m));
+              ])
+      in
+      mu "weirder-list" (fun e ->
+          Compact.(
+            make
+              ~tag_size:`Uint8
+              (union
+                 ~cases_tag_bits:3
+                 [
+                   case
+                     ~title:"c0"
+                     (payload Data_encoding.(tup2 obj2_zero_width (bu e)))
+                     (function Cons (0, m) -> Some (((), ()), m) | _ -> None)
+                     (fun (((), ()), m) -> Cons (0, m));
+                   case
+                     ~title:"c1"
+                     (payload (bu e))
+                     (function Cons (1, m) -> Some m | _ -> None)
+                     (fun m -> Cons (1, m));
+                   case
+                     ~title:"c2"
+                     (payload (bu e))
+                     (function Cons (2, m) -> Some m | _ -> None)
+                     (fun m -> Cons (2, m));
+                   case
+                     ~title:"c3"
+                     (payload (bu e))
+                     (function Cons (3, m) -> Some m | _ -> None)
+                     (fun m -> Cons (3, m));
+                   case
+                     ~title:"c"
+                     (tup2 (payload uint8) (payload (bu e)))
+                     (function Cons (x, m) -> Some (x, m) | _ -> None)
+                     (fun (x, m) -> Cons (x, m));
+                   case
+                     ~title:"s"
+                     (tup2 (payload e) (payload uint8))
+                     (function Snoc (m, a) -> Some (m, a) | _ -> None)
+                     (fun (m, a) -> Snoc (m, a));
+                   case
+                     ~title:"t"
+                     (tup3 (payload e) (payload uint8) (payload uint16))
+                     (function Snocc (m, a, b) -> Some (m, a, b) | _ -> None)
+                     (fun (m, a, b) -> Snocc (m, a, b));
+                   case
+                     ~title:"s"
+                     null
+                     (function Stop -> Some () | _ -> None)
+                     (fun () -> Stop);
+                 ])))) ;
+  [%expect
+    {|
+    +-----------------+----------------------+---------------+
+    | Name            | Size                 | Contents      |
+    +=================+======================+===============+
+    | Unnamed field 0 | Determined from data | $weirder-list |
+    +-----------------+----------------------+---------------+
+
+
+    weirb-list (Determined from data, 8-bit tag)
+    ********************************************
+
+    bb (tag 32)
+    ===========
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    b (tag 64)
+    ==========
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirder-list          |
+    +-----------------+----------------------+------------------------+
+
+
+    weirder-list (Determined from data, 8-bit tag)
+    **********************************************
+
+    case 0 (tag 0)
+    ==============
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 8 (tag 8)
+    ==============
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 16 (tag 16)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 24 (tag 24)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 32 (tag 32)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 40 (tag 40)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirder-list          |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+
+
+    case 48 (tag 48)
+    ================
+
+    +-----------------+----------------------+-------------------------+
+    | Name            | Size                 | Contents                |
+    +=================+======================+=========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 0 | Determined from data | $weirder-list           |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 2 | 2 bytes              | unsigned 16-bit integer |
+    +-----------------+----------------------+-------------------------+
+
+
+    case 56 (tag 56)
+    ================
+
+    +------+--------+------------------------+
+    | Name | Size   | Contents               |
+    +======+========+========================+
+    | Tag  | 1 byte | unsigned 8-bit integer |
+    +------+--------+------------------------+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "name": "weirder-list", "kind": "Ref" },
+                 "kind": "anon", "data_kind": { "kind": "Dynamic" } } ] },
+       "fields":
+         [ { "description": { "title": "weirb-list" },
+             "encoding":
+               { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
+                 "cases":
+                   [ { "tag": 32,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "bb" },
+                     { "tag": 64,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "b" } ] } },
+           { "description": { "title": "weirder-list" },
+             "encoding":
+               { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
+                 "cases":
+                   [ { "tag": 0,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 0" },
+                     { "tag": 8,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 8" },
+                     { "tag": 16,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 16" },
+                     { "tag": 24,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 24" },
+                     { "tag": 32,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 32" },
+                     { "tag": 40,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
+                       "name": "case 40" },
+                     { "tag": 48,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "size": "Uint16", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 2, "kind": "Fixed" } } ],
+                       "name": "case 48" },
+                     { "tag": 56,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" } ], "name": "case 56" } ] } } ] } |}] ;
+  dump
+    Data_encoding.(
+      let bu mue =
+        mu "weirb-list" (fun e ->
+            Compact.(
+              make
+                ~tag_size:`Uint8
+                (union
+                   ~cases_tag_bits:1
+                   [
+                     case
+                       ~title:"b"
+                       (tup2 (payload uint8) (payload mue))
+                       (function
+                         | Consb (a, m) -> Some (a, m) | Consbb _ -> None)
+                       (function a, m -> Consb (a, m));
+                     case
+                       ~title:"bb"
+                       (tup2 (payload uint8) (payload e))
+                       (function
+                         | Consbb (a, m) -> Some (a, m) | Consb _ -> None)
+                       (fun (a, m) -> Consbb (a, m));
+                   ])))
+      in
+      let mu =
+        mu "weirder-list" (fun e ->
+            Compact.(
+              make
+                ~tag_size:`Uint8
+                (union
+                   ~cases_tag_bits:3
+                   [
+                     case
+                       ~title:"c0"
+                       (payload Data_encoding.(tup2 obj2_zero_width (bu e)))
+                       (function
+                         | Cons (0, m) -> Some (((), ()), m) | _ -> None)
+                       (fun (((), ()), m) -> Cons (0, m));
+                     case
+                       ~title:"c1"
+                       (payload (bu e))
+                       (function Cons (1, m) -> Some m | _ -> None)
+                       (fun m -> Cons (1, m));
+                     case
+                       ~title:"c2"
+                       (payload (bu e))
+                       (function Cons (2, m) -> Some m | _ -> None)
+                       (fun m -> Cons (2, m));
+                     case
+                       ~title:"c3"
+                       (payload (bu e))
+                       (function Cons (3, m) -> Some m | _ -> None)
+                       (fun m -> Cons (3, m));
+                     case
+                       ~title:"c"
+                       (tup2 (payload uint8) (payload (bu e)))
+                       (function Cons (x, m) -> Some (x, m) | _ -> None)
+                       (fun (x, m) -> Cons (x, m));
+                     case
+                       ~title:"s"
+                       (tup2 (payload e) (payload uint8))
+                       (function Snoc (m, a) -> Some (m, a) | _ -> None)
+                       (fun (m, a) -> Snoc (m, a));
+                     case
+                       ~title:"t"
+                       (tup3 (payload e) (payload uint8) (payload uint16))
+                       (function
+                         | Snocc (m, a, b) -> Some (m, a, b) | _ -> None)
+                       (fun (m, a, b) -> Snocc (m, a, b));
+                     case
+                       ~title:"s"
+                       null
+                       (function Stop -> Some () | _ -> None)
+                       (fun () -> Stop);
+                   ])))
+      in
+      Compact.(make ~tag_size:`Uint8 (list ~bits:3 mu))) ;
+  [%expect
+    {|
+    +-----------------+----------------------+----------+
+    | Name            | Size                 | Contents |
+    +=================+======================+==========+
+    | Unnamed field 0 | Determined from data | $X_49    |
+    +-----------------+----------------------+----------+
+
+
+    weirb-list (Determined from data, 8-bit tag)
+    ********************************************
+
+    case 0 (tag 0)
+    ==============
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirder-list          |
+    +-----------------+----------------------+------------------------+
+
+
+    case 2 (tag 2)
+    ==============
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    weirder-list (Determined from data, 8-bit tag)
+    **********************************************
+
+    case 0 (tag 0)
+    ==============
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 8 (tag 8)
+    ==============
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 16 (tag 16)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 24 (tag 24)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 32 (tag 32)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | Determined from data | $weirb-list            |
+    +-----------------+----------------------+------------------------+
+
+
+    case 40 (tag 40)
+    ================
+
+    +-----------------+----------------------+------------------------+
+    | Name            | Size                 | Contents               |
+    +=================+======================+========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 0 | Determined from data | $weirder-list          |
+    +-----------------+----------------------+------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer |
+    +-----------------+----------------------+------------------------+
+
+
+    case 48 (tag 48)
+    ================
+
+    +-----------------+----------------------+-------------------------+
+    | Name            | Size                 | Contents                |
+    +=================+======================+=========================+
+    | Tag             | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 0 | Determined from data | $weirder-list           |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 1 | 1 byte               | unsigned 8-bit integer  |
+    +-----------------+----------------------+-------------------------+
+    | Unnamed field 2 | 2 bytes              | unsigned 16-bit integer |
+    +-----------------+----------------------+-------------------------+
+
+
+    case 56 (tag 56)
+    ================
+
+    +------+--------+------------------------+
+    | Name | Size   | Contents               |
+    +======+========+========================+
+    | Tag  | 1 byte | unsigned 8-bit integer |
+    +------+--------+------------------------+
+
+
+    X_49 (Determined from data, 8-bit tag)
+    **************************************
+
+    case 0 (tag 0)
+    ==============
+
+    +------+--------+------------------------+
+    | Name | Size   | Contents               |
+    +======+========+========================+
+    | Tag  | 1 byte | unsigned 8-bit integer |
+    +------+--------+------------------------+
+
+
+    case 1 (tag 1)
+    ==============
+
+    +-----------------+----------+-------------------------------------+
+    | Name            | Size     | Contents                            |
+    +=================+==========+=====================================+
+    | Tag             | 1 byte   | unsigned 8-bit integer              |
+    +-----------------+----------+-------------------------------------+
+    | Unnamed field 0 | Variable | sequence of exactly 1 $weirder-list |
+    +-----------------+----------+-------------------------------------+
+
+
+    case 2 (tag 2)
+    ==============
+
+    +-----------------+----------+-------------------------------------+
+    | Name            | Size     | Contents                            |
+    +=================+==========+=====================================+
+    | Tag             | 1 byte   | unsigned 8-bit integer              |
+    +-----------------+----------+-------------------------------------+
+    | Unnamed field 0 | Variable | sequence of exactly 2 $weirder-list |
+    +-----------------+----------+-------------------------------------+
+
+
+    case 3 (tag 3)
+    ==============
+
+    +-----------------+----------+-------------------------------------+
+    | Name            | Size     | Contents                            |
+    +=================+==========+=====================================+
+    | Tag             | 1 byte   | unsigned 8-bit integer              |
+    +-----------------+----------+-------------------------------------+
+    | Unnamed field 0 | Variable | sequence of exactly 3 $weirder-list |
+    +-----------------+----------+-------------------------------------+
+
+
+    case 4 (tag 4)
+    ==============
+
+    +-----------------+----------+-------------------------------------+
+    | Name            | Size     | Contents                            |
+    +=================+==========+=====================================+
+    | Tag             | 1 byte   | unsigned 8-bit integer              |
+    +-----------------+----------+-------------------------------------+
+    | Unnamed field 0 | Variable | sequence of exactly 4 $weirder-list |
+    +-----------------+----------+-------------------------------------+
+
+
+    case 5 (tag 5)
+    ==============
+
+    +-----------------+----------+-------------------------------------+
+    | Name            | Size     | Contents                            |
+    +=================+==========+=====================================+
+    | Tag             | 1 byte   | unsigned 8-bit integer              |
+    +-----------------+----------+-------------------------------------+
+    | Unnamed field 0 | Variable | sequence of exactly 5 $weirder-list |
+    +-----------------+----------+-------------------------------------+
+
+
+    case 6 (tag 6)
+    ==============
+
+    +-----------------+----------+-------------------------------------+
+    | Name            | Size     | Contents                            |
+    +=================+==========+=====================================+
+    | Tag             | 1 byte   | unsigned 8-bit integer              |
+    +-----------------+----------+-------------------------------------+
+    | Unnamed field 0 | Variable | sequence of exactly 6 $weirder-list |
+    +-----------------+----------+-------------------------------------+
+
+
+    case 7 (tag 7)
+    ==============
+
+    +-----------------------+----------+---------------------------+
+    | Name                  | Size     | Contents                  |
+    +=======================+==========+===========================+
+    | Tag                   | 1 byte   | unsigned 8-bit integer    |
+    +-----------------------+----------+---------------------------+
+    | # bytes in next field | 4 bytes  | unsigned 30-bit integer   |
+    +-----------------------+----------+---------------------------+
+    | Unnamed field 0       | Variable | sequence of $weirder-list |
+    +-----------------------+----------+---------------------------+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "name": "X_49", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } } ] },
+       "fields":
+         [ { "description": { "title": "weirb-list" },
+             "encoding":
+               { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
+                 "cases":
+                   [ { "tag": 0,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 0" },
+                     { "tag": 2,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 2" } ] } },
+           { "description": { "title": "weirder-list" },
+             "encoding":
+               { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
+                 "cases":
+                   [ { "tag": 0,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 0" },
+                     { "tag": 8,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 8" },
+                     { "tag": 16,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 16" },
+                     { "tag": 24,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 24" },
+                     { "tag": 32,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "name": "weirb-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
+                       "name": "case 32" },
+                     { "tag": 40,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
+                       "name": "case 40" },
+                     { "tag": 48,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout": { "name": "weirder-list", "kind": "Ref" },
+                             "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                           { "layout": { "size": "Uint8", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
+                           { "layout": { "size": "Uint16", "kind": "Int" },
+                             "kind": "anon",
+                             "data_kind": { "size": 2, "kind": "Fixed" } } ],
+                       "name": "case 48" },
+                     { "tag": 56,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" } ], "name": "case 56" } ] } },
+           { "description": { "title": "X_49" },
+             "encoding":
+               { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
+                 "cases":
+                   [ { "tag": 0,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" } ], "name": "case 0" },
+                     { "tag": 1,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq",
+                                 "length_limit":
+                                   { "kind": "exactly", "exactly": 1 } },
+                             "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 1" },
+                     { "tag": 2,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq",
+                                 "length_limit":
+                                   { "kind": "exactly", "exactly": 2 } },
+                             "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 2" },
+                     { "tag": 3,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq",
+                                 "length_limit":
+                                   { "kind": "exactly", "exactly": 3 } },
+                             "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 3" },
+                     { "tag": 4,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq",
+                                 "length_limit":
+                                   { "kind": "exactly", "exactly": 4 } },
+                             "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 4" },
+                     { "tag": 5,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq",
+                                 "length_limit":
+                                   { "kind": "exactly", "exactly": 5 } },
+                             "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 5" },
+                     { "tag": 6,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq",
+                                 "length_limit":
+                                   { "kind": "exactly", "exactly": 6 } },
+                             "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 6" },
+                     { "tag": 7,
+                       "fields":
+                         [ { "name": "Tag",
+                             "layout": { "size": "Uint8", "kind": "Int" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
+                             "kind": "named" },
+                           { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
+                           { "layout":
+                               { "layout":
+                                   { "name": "weirder-list", "kind": "Ref" },
+                                 "kind": "Seq" }, "kind": "anon",
+                             "data_kind": { "kind": "Variable" } } ],
+                       "name": "case 7" } ] } } ] } |}] ;
   let obj2_opt_zero =
     Data_encoding.(
       obj2 (opt "l" (constant "left")) (opt "r" (constant "right")))
@@ -600,27 +1637,203 @@ let%expect_test _ =
   dump obj2_opt_zero ;
   [%expect
     {|
-      +-------------------------+---------+-------------------------------------+
-      | Name                    | Size    | Contents                            |
-      +=========================+=========+=====================================+
-      | ? presence of field "l" | 1 byte  | boolean (0 for false, 255 for true) |
-      +-------------------------+---------+-------------------------------------+
-      | l                       | 0 bytes |                                     |
-      +-------------------------+---------+-------------------------------------+
-      | ? presence of field "r" | 1 byte  | boolean (0 for false, 255 for true) |
-      +-------------------------+---------+-------------------------------------+
-      | r                       | 0 bytes |                                     |
-      +-------------------------+---------+-------------------------------------+
+    +-------------------------+---------+-------------------------------------+
+    | Name                    | Size    | Contents                            |
+    +=========================+=========+=====================================+
+    | ? presence of field "l" | 1 byte  | boolean (0 for false, 255 for true) |
+    +-------------------------+---------+-------------------------------------+
+    | l                       | 0 bytes |                                     |
+    +-------------------------+---------+-------------------------------------+
+    | ? presence of field "r" | 1 byte  | boolean (0 for false, 255 for true) |
+    +-------------------------+---------+-------------------------------------+
+    | r                       | 0 bytes |                                     |
+    +-------------------------+---------+-------------------------------------+
 
 
 
-      { "toplevel":
-           { "fields":
-               [ { "kind": "option_indicator", "name": "l" },
-                 { "name": "l", "layout": { "kind": "Zero_width" },
-                   "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" },
-                 { "kind": "option_indicator", "name": "r" },
-                 { "name": "r", "layout": { "kind": "Zero_width" },
-                   "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" } ] },
-         "fields": [] } |}] ;
+    { "toplevel":
+         { "fields":
+             [ { "kind": "option_indicator", "name": "l" },
+               { "name": "l", "layout": { "kind": "Zero_width" },
+                 "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" },
+               { "kind": "option_indicator", "name": "r" },
+               { "name": "r", "layout": { "kind": "Zero_width" },
+                 "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" } ] },
+       "fields": [] } |}] ;
+  let list_with_length_16 = Data_encoding.(list_with_length `Uint16 uint8) in
+  dump list_with_length_16 ;
+  [%expect
+    {|
+    +-----------------+----------+--------------------------------------------------+
+    | Name            | Size     | Contents                                         |
+    +=================+==========+==================================================+
+    | Unnamed field 0 | 2 bytes  | unsigned 16-bit integer                          |
+    +-----------------+----------+--------------------------------------------------+
+    | Unnamed field 1 | Variable | sequence of at most 65535 unsigned 8-bit integer |
+    +-----------------+----------+--------------------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "size": "Uint16", "kind": "Int" }, "kind": "anon",
+                 "data_kind": { "size": 2, "kind": "Fixed" } },
+               { "layout":
+                   { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "Seq",
+                     "length_limit": { "kind": "at-most", "at_most": 65535 } },
+                 "kind": "anon", "data_kind": { "kind": "Variable" } } ] },
+       "fields": [] } |}] ;
+  let list_with_length_n = Data_encoding.(list_with_length `N uint8) in
+  dump list_with_length_n ;
+  [%expect
+    {|
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Name            | Size                 | Contents                                              |
+    +=================+======================+=======================================================+
+    | Unnamed field 0 | Determined from data | $N.t                                                  |
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Unnamed field 1 | Variable             | sequence of at most 1073741823 unsigned 8-bit integer |
+    +-----------------+----------------------+-------------------------------------------------------+
+
+
+    N.t
+    ***
+
+    A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order.
+
+    +------+----------------------+----------+
+    | Name | Size                 | Contents |
+    +======+======================+==========+
+    | N.t  | Determined from data | bytes    |
+    +------+----------------------+----------+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "name": "N.t", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } },
+               { "layout":
+                   { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "Seq",
+                     "length_limit": { "kind": "at-most", "at_most": 1073741823 } },
+                 "kind": "anon", "data_kind": { "kind": "Variable" } } ] },
+       "fields":
+         [ { "description":
+               { "title": "N.t",
+                 "description":
+                   "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order." },
+             "encoding":
+               { "fields":
+                   [ { "name": "N.t", "layout": { "kind": "Bytes" },
+                       "data_kind": { "kind": "Dynamic" }, "kind": "named" } ] } } ] } |}] ;
+  let list_with_length_n_2 =
+    Data_encoding.(tup2 (list_with_length `N uint8) (list_with_length `N int64))
+  in
+  dump list_with_length_n_2 ;
+  [%expect
+    {|
+    +-----------------+----------------------+----------+
+    | Name            | Size                 | Contents |
+    +=================+======================+==========+
+    | Unnamed field 0 | Determined from data | $X_0     |
+    +-----------------+----------------------+----------+
+    | Unnamed field 1 | Determined from data | $X_1     |
+    +-----------------+----------------------+----------+
+
+
+    N.t
+    ***
+
+    A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order.
+
+    +------+----------------------+----------+
+    | Name | Size                 | Contents |
+    +======+======================+==========+
+    | N.t  | Determined from data | bytes    |
+    +------+----------------------+----------+
+
+
+    X_0
+    ***
+
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Name            | Size                 | Contents                                              |
+    +=================+======================+=======================================================+
+    | Unnamed field 0 | Determined from data | $N.t                                                  |
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Unnamed field 1 | Variable             | sequence of at most 1073741823 unsigned 8-bit integer |
+    +-----------------+----------------------+-------------------------------------------------------+
+
+
+    X_1
+    ***
+
+    +-----------------+----------------------+------------------------------------------------------+
+    | Name            | Size                 | Contents                                             |
+    +=================+======================+======================================================+
+    | Unnamed field 0 | Determined from data | $N.t                                                 |
+    +-----------------+----------------------+------------------------------------------------------+
+    | Unnamed field 1 | Variable             | sequence of at most 1073741823 signed 64-bit integer |
+    +-----------------+----------------------+------------------------------------------------------+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "name": "X_0", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } },
+               { "layout": { "name": "X_1", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } } ] },
+       "fields":
+         [ { "description":
+               { "title": "N.t",
+                 "description":
+                   "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order." },
+             "encoding":
+               { "fields":
+                   [ { "name": "N.t", "layout": { "kind": "Bytes" },
+                       "data_kind": { "kind": "Dynamic" }, "kind": "named" } ] } },
+           { "description": { "title": "X_0" },
+             "encoding":
+               { "fields":
+                   [ { "layout": { "name": "N.t", "kind": "Ref" },
+                       "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                     { "layout":
+                         { "layout": { "size": "Uint8", "kind": "Int" },
+                           "kind": "Seq",
+                           "length_limit":
+                             { "kind": "at-most", "at_most": 1073741823 } },
+                       "kind": "anon", "data_kind": { "kind": "Variable" } } ] } },
+           { "description": { "title": "X_1" },
+             "encoding":
+               { "fields":
+                   [ { "layout": { "name": "N.t", "kind": "Ref" },
+                       "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                     { "layout":
+                         { "layout": { "size": "Int64", "kind": "Int" },
+                           "kind": "Seq",
+                           "length_limit":
+                             { "kind": "at-most", "at_most": 1073741823 } },
+                       "kind": "anon", "data_kind": { "kind": "Variable" } } ] } } ] } |}] ;
+  let dynamic_size_n =
+    Data_encoding.(dynamic_size ~kind:`N (Variable.list uint8))
+  in
+  dump dynamic_size_n ;
+  [%expect
+    {|
+    +-----------------------+----------------------+------------------------------------+
+    | Name                  | Size                 | Contents                           |
+    +=======================+======================+====================================+
+    | # bytes in next field | Determined from data | $N.t                               |
+    +-----------------------+----------------------+------------------------------------+
+    | Unnamed field 0       | Variable             | sequence of unsigned 8-bit integer |
+    +-----------------------+----------------------+------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "kind": "dyn", "num_fields": 1, "size": "N" },
+               { "layout":
+                   { "layout": { "size": "Uint8", "kind": "Int" },
+                     "kind": "Seq" }, "kind": "anon",
+                 "data_kind": { "kind": "Variable" } } ] }, "fields": [] } |}] ;
   ()

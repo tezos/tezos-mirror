@@ -49,3 +49,7 @@ v0.6:
 - OCaml 4.14 support (including CI tests)
 - new tutorial
 - fix pathological performance issues when generating some binary descriptions for `mu`+`union` encodings
+
+dev:  
+- Fixed binary-schema reference duplication issue
+
