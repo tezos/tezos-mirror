@@ -618,6 +618,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ~output:raw_protocol_encoding
         Tezos_rpc.Path.(path / "protocols")
 
+    let resulting_context_hash =
+      Tezos_rpc.Service.get_service
+        ~description:"Context hash resulting of the block application."
+        ~query:Tezos_rpc.Query.empty
+        ~output:Tezos_crypto.Context_hash.encoding
+        Tezos_rpc.Path.(path / "resulting_context_hash")
+
     module Header = struct
       let path = Tezos_rpc.Path.(path / "header")
 
@@ -1437,6 +1444,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
   let protocols ctxt =
     let f = make_call0 S.protocols ctxt in
+    fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+
+  let resulting_context_hash ctxt =
+    let f = make_call0 S.resulting_context_hash ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
 
   module Header = struct

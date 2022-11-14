@@ -102,6 +102,10 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
            header.protocol_data)) ;
   register0 S.Header.raw_protocol_data (fun (_, _, header) () () ->
       return header.protocol_data) ;
+  register0 S.resulting_context_hash (fun (chain_store, hash, _) () () ->
+      let*! block_opt = Store.Block.read_block_opt chain_store hash in
+      let block = WithExceptions.Option.to_exn ~none:Not_found block_opt in
+      Store.Block.resulting_context_hash chain_store block) ;
   (* helpers *)
   register0 S.Helpers.Forge.block_header (fun _block () header ->
       return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)) ;
@@ -292,11 +296,14 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     in
     let predecessor_header = Store.Block.header predecessor_block in
     let* context = Store.Block.context chain_store predecessor_block in
+    let* predecessor_resulting_context =
+      Store.Block.resulting_context_hash chain_store predecessor_block
+    in
     let* predecessor_context =
       let*! ctxt =
         Context_ops.checkout
           (Context_ops.index context)
-          (Store.Block.context_hash predecessor_block)
+          predecessor_resulting_context
       in
       match ctxt with Some c -> return c | None -> fail_with_exn Not_found
     in
