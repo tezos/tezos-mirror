@@ -23,39 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module SMap : Map.S with type key = string
+(**
+  Abstraction layer for the public inputs to the ZKRU aPlonk circuits.
 
-(** Representation of a ZK Rollup account. *)
+  As explained in the documentation, circuits in ZKRUs will be grouped into
+  three categories: pending (public) operations, private batches and
+  fee circuit. Each of these expects a different set of public inputs.
+*)
 
-(** Static part of a ZKRU account. These are set at origination,
-    after which they cannot be modified. *)
-type static = {
-  public_parameters : Plonk.public_parameters;
-      (** Input to the Plonk verifier that are fixed once the circuits
-          are decided. *)
-  state_length : int;  (** Number of scalars in the state. *)
-  circuits_info : [`Public | `Private | `Fee] SMap.t;
-      (** Circuit names, alongside a tag indicating its kind. *)
-  nb_ops : int;  (** Valid op codes of L2 operations must be in \[0, nb_ops) *)
+(** Public inputs expected by circuits that handle single public
+    L2 operations. *)
+type pending_op_public_inputs = {
+  old_state : Zk_rollup_state_repr.t;
+  new_state : Zk_rollup_state_repr.t;
+  fee : Zk_rollup_scalar.t;
+  exit_validity : bool;
+  zk_rollup : Zk_rollup_repr.t;
+  l2_op : Zk_rollup_operation_repr.t;
 }
 
-(**  Dynamic part of a ZKRU account. *)
-type dynamic = {
-  state : Zk_rollup_state_repr.t;
-      (** Array of scalars representing the state of the rollup
-          at a given level. *)
-  paid_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that have
-          been already paid for. *)
-  used_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that are
-          being used. *)
+(** Public inputs expected by circuits that handle a batch of private
+    L2 operations. *)
+type private_batch_public_inputs = {
+  old_state : Zk_rollup_state_repr.t;
+  new_state : Zk_rollup_state_repr.t;
+  fees : Zk_rollup_scalar.t;
+  zk_rollup : Zk_rollup_repr.t;
 }
 
-type t = {static : static; dynamic : dynamic}
+(** Public inputs expected by the circuit that handles the L2 fees. *)
+type fee_public_inputs = {
+  old_state : Zk_rollup_state_repr.t;
+  new_state : Zk_rollup_state_repr.t;
+  fees : Zk_rollup_scalar.t;
+}
 
-val encoding : t Data_encoding.t
+type t =
+  | Pending_op of pending_op_public_inputs
+  | Private_batch of private_batch_public_inputs
+  | Fee of fee_public_inputs
 
-(* Encoding for the [circuits_info] field.
-   Checks that keys are not duplicated in serialized representation. *)
-val circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t
+(** Conversion to the type the aPlonk verifier expects. *)
+val to_scalar_array : t -> Zk_rollup_scalar.t array

@@ -2387,7 +2387,7 @@ module Zk_rollup : sig
     type static = {
       public_parameters : Plonk.public_parameters;
       state_length : int;
-      circuits_info : bool SMap.t;
+      circuits_info : [`Public | `Private | `Fee] SMap.t;
       nb_ops : int;
     }
 
@@ -2425,6 +2425,54 @@ module Zk_rollup : sig
     val encoding : t Data_encoding.t
   end
 
+  module Circuit_public_inputs : sig
+    type pending_op_public_inputs = {
+      old_state : State.t;
+      new_state : State.t;
+      fee : scalar;
+      exit_validity : bool;
+      zk_rollup : t;
+      l2_op : Operation.t;
+    }
+
+    type private_batch_public_inputs = {
+      old_state : State.t;
+      new_state : State.t;
+      fees : scalar;
+      zk_rollup : t;
+    }
+
+    type fee_public_inputs = {
+      old_state : State.t;
+      new_state : State.t;
+      fees : scalar;
+    }
+
+    type t =
+      | Pending_op of pending_op_public_inputs
+      | Private_batch of private_batch_public_inputs
+      | Fee of fee_public_inputs
+
+    val to_scalar_array : t -> scalar array
+  end
+
+  module Update : sig
+    type op_pi = {new_state : State.t; fee : scalar; exit_validity : bool}
+
+    type private_inner_pi = {new_state : State.t; fees : scalar}
+
+    type fee_pi = {new_state : State.t}
+
+    type t = {
+      pending_pis : (string * op_pi) list;
+      private_pis : (string * private_inner_pi) list;
+      fee_pi : fee_pi;
+      proof : Plonk.proof;
+    }
+
+    val encoding : t Data_encoding.t
+  end
+
   type pending_list =
     | Empty of {next_index : int64}
     | Pending of {next_index : int64; length : int}
@@ -2445,6 +2493,32 @@ module Zk_rollup : sig
     (Operation.t * Ticket_hash.t option) list ->
     (context * Z.t) tzresult Lwt.t
 
+  val get_pending_length :
+    context -> Address.t -> (context * int) tzresult Lwt.t
+
+  val get_prefix :
+    context ->
+    Address.t ->
+    int ->
+    (context * (Operation.t * Ticket_hash.t option) list) tzresult Lwt.t
+
+  val update :
+    context ->
+    Address.t ->
+    pending_to_drop:int ->
+    new_account:Account.t ->
+    context tzresult Lwt.t
+
+  val account : context -> t -> (context * Account.t) tzresult Lwt.t
+
+  val pending_list : context -> t -> (context * pending_list) tzresult Lwt.t
+
+  val pending_op :
+    context ->
+    t ->
+    Int64.t ->
+    (context * (Operation.t * Ticket_hash.t option)) tzresult Lwt.t
+
   val assert_exist : context -> t -> context tzresult Lwt.t
 
   val exists : context -> t -> (context * bool) tzresult Lwt.t
@@ -2459,6 +2533,10 @@ module Zk_rollup : sig
           payload_size : Saturation_repr.may_saturate Saturation_repr.t;
           limit : int;
         }
+      | Invalid_verification
+      | Invalid_circuit
+      | Inconsistent_state_update
+      | Pending_bound
   end
 
   module Internal_for_tests : sig
@@ -4263,6 +4341,8 @@ module Kind : sig
 
   type zk_rollup_publish = Zk_rollup_publish_kind
 
+  type zk_rollup_update = Zk_rollup_update_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -4297,6 +4377,7 @@ module Kind : sig
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
+    | Zk_rollup_update_manager_kind : zk_rollup_update manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -4537,7 +4618,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
-      circuits_info : bool Zk_rollup.Account.SMap.t;
+      circuits_info : [`Public | `Private | `Fee] Zk_rollup.Account.SMap.t;
       init_state : Zk_rollup.State.t;
       nb_ops : int;
     }
@@ -4547,6 +4628,11 @@ and _ manager_operation =
       ops : (Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list;
     }
       -> Kind.zk_rollup_publish manager_operation
+  | Zk_rollup_update : {
+      zk_rollup : Zk_rollup.t;
+      update : Zk_rollup.Update.t;
+    }
+      -> Kind.zk_rollup_update manager_operation
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -4744,6 +4830,8 @@ module Operation : sig
 
     val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
 
+    val zk_rollup_update_case : Kind.zk_rollup_update Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4816,6 +4904,8 @@ module Operation : sig
       val zk_rollup_origination_case : Kind.zk_rollup_origination case
 
       val zk_rollup_publish_case : Kind.zk_rollup_publish case
+
+      val zk_rollup_update_case : Kind.zk_rollup_update case
     end
   end
 

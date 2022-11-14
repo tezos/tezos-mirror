@@ -743,7 +743,7 @@ val zk_rollup_origination :
   public_parameters:
     Plonk.Main_protocol.verifier_public_parameters
     * Plonk.Main_protocol.transcript ->
-  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  circuits_info:[`Public | `Private | `Fee] Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
   (Operation.packed * Zk_rollup.t) tzresult Lwt.t
@@ -778,4 +778,18 @@ val zk_rollup_publish :
   Contract.t ->
   zk_rollup:Zk_rollup.t ->
   ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  Operation.packed tzresult Lwt.t
+
+(** [zk_rollup_update ctxt source ~zk_rollup ~update] tries to apply an update
+    to a ZK Rollup. *)
+val zk_rollup_update :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  zk_rollup:Zk_rollup.t ->
+  update:Zk_rollup.Update.t ->
   Operation.packed tzresult Lwt.t

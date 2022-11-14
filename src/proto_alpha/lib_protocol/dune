@@ -116,6 +116,8 @@
   Zk_rollup_account_repr
   Zk_rollup_ticket_repr
   Zk_rollup_operation_repr
+  Zk_rollup_update_repr
+  Zk_rollup_circuit_public_inputs_repr
   Bond_id_repr
   Vote_repr
   Liquidity_baking_repr
@@ -386,6 +388,9 @@
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
   zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
+  zk_rollup_update_repr.ml zk_rollup_update_repr.mli
+  zk_rollup_circuit_public_inputs_repr.ml
+  zk_rollup_circuit_public_inputs_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -637,6 +642,9 @@
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
   zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
+  zk_rollup_update_repr.ml zk_rollup_update_repr.mli
+  zk_rollup_circuit_public_inputs_repr.ml
+  zk_rollup_circuit_public_inputs_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -893,6 +901,9 @@
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
   zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
+  zk_rollup_update_repr.ml zk_rollup_update_repr.mli
+  zk_rollup_circuit_public_inputs_repr.ml
+  zk_rollup_circuit_public_inputs_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli

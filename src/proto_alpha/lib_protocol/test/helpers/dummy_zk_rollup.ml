@@ -330,14 +330,25 @@ end) : sig
   (** Initial state of the rollup  *)
   val init_state : Zk_rollup.State.t
 
-  (** Map associating every circuit identifier to a boolean representing
-      whether the circuit can be part of a private batch *)
-  val circuits : bool Plonk.Main_protocol.SMap.t
+  (** Map associating every circuit identifier to its kind *)
+  val circuits : [`Public | `Private | `Fee] Plonk.Main_protocol.SMap.t
 
   (** Commitment to the circuits  *)
   val public_parameters :
     Plonk.Main_protocol.verifier_public_parameters
     * Plonk.Main_protocol.transcript
+
+  (** [craft_update state ~zk_rollup ?private_ops public_ops] will apply
+     first the [public_ops], then the [private_ops]. While doing so,
+      the public inputs for every circuit will be collected. A Plonk proof
+      of correctness of the application these operations is created. *)
+  val craft_update :
+    Zk_rollup.State.t ->
+    zk_rollup:Zk_rollup.t ->
+    ?private_ops:Zk_rollup.Operation.t list list ->
+    ?exit_validities:bool list ->
+    Zk_rollup.Operation.t list ->
+    Zk_rollup.State.t * Zk_rollup.Update.t
 
   module Internal_for_tests : sig
     val true_op : Zk_rollup.Operation.t
@@ -347,6 +358,8 @@ end) : sig
     val pending : Zk_rollup.Operation.t list
 
     val private_ops : Zk_rollup.Operation.t list list
+
+    val update_data : Zk_rollup.Update.t
   end
 end = struct
   open Protocol.Alpha_context
@@ -368,7 +381,7 @@ end = struct
 
   let dummy_ticket_hash = Bytes.make 32 '0'
 
-  let _of_proto_state : Zk_rollup.State.t -> Types.P.state =
+  let of_proto_state : Zk_rollup.State.t -> Types.P.state =
    fun s -> Bls12_381.Fr.is_one s.(0)
 
   let to_proto_state : Types.P.state -> Zk_rollup.State.t =
@@ -415,9 +428,9 @@ end = struct
          ]
 
   let circuits =
-    SMap.(add "op" false @@ add batch_name true @@ add "fee" false empty)
+    SMap.(add "op" `Public @@ add batch_name `Private @@ add "fee" `Fee empty)
 
-  let public_parameters, _prover_pp =
+  let public_parameters, prover_pp =
     let (ppp, vpp), t =
       Plonk.Main_protocol.setup_multi_circuits
         ~zero_knowledge:false
@@ -426,10 +439,146 @@ end = struct
     in
     ((vpp, t), ppp)
 
-  let _insert s x m =
+  let insert s x m =
     match SMap.find_opt s m with
     | None -> SMap.add s [x] m
     | Some l -> SMap.add s (x :: l) m
+
+  let craft_update :
+      Zk_rollup.State.t ->
+      zk_rollup:Zk_rollup.t ->
+      ?private_ops:Zk_rollup.Operation.t list list ->
+      ?exit_validities:bool list ->
+      Zk_rollup.Operation.t list ->
+      Zk_rollup.State.t * Zk_rollup.Update.t =
+   fun s ~zk_rollup ?(private_ops = []) ?exit_validities pending ->
+    let s = of_proto_state s in
+    let rev_inputs = SMap.empty in
+    let exit_validities =
+      match exit_validities with
+      | None -> List.map (Fun.const true) pending
+      | Some l ->
+          assert (List.length l = List.length pending) ;
+          l
+    in
+    let _circ, _pi_size, op_solver = SMap.find "op" circuit_map in
+    (* Process the public operations *)
+    let s, rev_inputs, rev_pending_pis =
+      Stdlib.List.fold_left2
+        (fun (s, rev_inputs, rev_pending_pis) op exit_validity ->
+          let new_state =
+            if s = of_proto_state Zk_rollup.Operation.(op.payload) then not s
+            else s
+          in
+          let fee = Bls12_381.Fr.zero in
+          let pi_to_send =
+            Zk_rollup.Update.
+              {new_state = to_proto_state new_state; fee; exit_validity}
+          in
+          let exit_validity_s =
+            if exit_validity then Bls12_381.Fr.one else Bls12_381.Fr.zero
+          in
+          let public_inputs =
+            Array.concat
+              [
+                to_proto_state s;
+                to_proto_state new_state;
+                [|fee; exit_validity_s; Zk_rollup.to_scalar zk_rollup|];
+                Zk_rollup.Operation.to_scalar_array op;
+              ]
+          in
+          let private_inputs = Solver.solve op_solver public_inputs in
+          ( new_state,
+            insert
+              "op"
+              Plonk.Main_protocol.
+                {public = public_inputs; witness = private_inputs}
+              rev_inputs,
+            ("op", pi_to_send) :: rev_pending_pis ))
+        (s, rev_inputs, [])
+        pending
+        exit_validities
+    in
+    let pending_pis = List.rev rev_pending_pis in
+
+    let _circ, _pi_size, batch_solver = SMap.find batch_name circuit_map in
+    (* Process the private operation batches *)
+    let s, rev_inputs, rev_private_pis =
+      if private_ops = [] then (s, rev_inputs, [])
+      else
+        List.fold_left
+          (fun (s, rev_inputs, rev_private_pis) batch ->
+            let new_state =
+              List.fold_left
+                (fun s op ->
+                  if s = of_proto_state Zk_rollup.Operation.(op.payload) then
+                    not s
+                  else s)
+                s
+                batch
+            in
+            let fees = Bls12_381.Fr.zero in
+            let pi_to_send : Zk_rollup.Update.private_inner_pi =
+              Zk_rollup.Update.{new_state = to_proto_state new_state; fees}
+            in
+            let public_inputs =
+              Array.concat
+                [
+                  to_proto_state s;
+                  to_proto_state new_state;
+                  [|fees; Zk_rollup.to_scalar zk_rollup|];
+                ]
+            in
+            let initial =
+              Array.concat
+                ([public_inputs]
+                @ List.map Zk_rollup.Operation.to_scalar_array batch)
+            in
+            let private_inputs = Solver.solve batch_solver initial in
+            ( new_state,
+              insert
+                batch_name
+                Plonk.Main_protocol.
+                  {public = public_inputs; witness = private_inputs}
+                rev_inputs,
+              (batch_name, pi_to_send) :: rev_private_pis ))
+          (s, rev_inputs, [])
+          private_ops
+    in
+    let private_pis = List.rev rev_private_pis in
+    (* Dummy fee circuit *)
+    let _circ, _pi_size, fee_solver = SMap.find "fee" circuit_map in
+    let rev_inputs, fee_pi =
+      let fee_pi = Zk_rollup.Update.{new_state = to_proto_state s} in
+      let fees = Bls12_381.Fr.zero in
+
+      let public_inputs =
+        Array.concat [to_proto_state s; to_proto_state s; [|fees|]]
+      in
+      let private_inputs = Solver.solve fee_solver public_inputs in
+      ( insert
+          "fee"
+          Plonk.Main_protocol.{public = public_inputs; witness = private_inputs}
+          rev_inputs,
+        fee_pi )
+    in
+    let (_, t), pp = (public_parameters, prover_pp) in
+    let inputs = SMap.map List.rev rev_inputs in
+
+    let proof, _ = Plonk.Main_protocol.prove_multi_circuits (pp, t) ~inputs in
+    let public_inputs =
+      Plonk.Main_protocol.SMap.map
+        (List.map (fun Plonk.Main_protocol.{public; witness = _} -> public))
+        inputs
+    in
+    assert (
+      fst
+      @@ Plonk.Main_protocol.verify_multi_circuits
+           public_parameters
+           ~public_inputs
+           proof) ;
+    ( to_proto_state s,
+      Zk_rollup.Update.{pending_pis; private_pis; fee_pi; proof} )
 
   let init_state = to_proto_state false
 
@@ -466,5 +615,16 @@ end = struct
       Stdlib.List.init n_batches @@ Fun.const
       @@ Stdlib.List.init Params.batch_size (fun i ->
              if i mod 2 = 0 then false_op else true_op)
+
+    let update_data =
+      snd
+      @@ craft_update
+           init_state
+           ~zk_rollup:
+             (Data_encoding.Binary.of_bytes_exn
+                Zk_rollup.Address.encoding
+                dummy_rollup_id)
+           ~private_ops
+           pending
   end
 end

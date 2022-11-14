@@ -122,7 +122,7 @@ val originate :
   ctxt_before_op:t ->
   ctxt:t ->
   public_parameters:Plonk.public_parameters ->
-  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  circuits_info:[`Public | `Private | `Fee] Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
   (t
@@ -230,6 +230,63 @@ val transaction_to_zk_rollup :
   since:t ->
   (t
   * Kind.transaction Apply_internal_results.successful_internal_operation_result
+  * Script_typed_ir.packed_internal_operation list)
+  tzresult
+  Lwt.t
+
+(** [update ~ctxt_before_op ~ctxt ~zk_rollup ~update ~source_contract]
+    applies an [update] to [zk_rollup].
+
+    A ZKRU update will verify three sorts of ZK circuits:
+    {ul
+      {li Public operation circuits, that handle a single L2 operation
+        from the pending list.}
+      {li Private batch circuits, that handle a batch of private L2
+        operations.}
+      {li Fee circuit, which credits the ZKRU operator with all the aggregated
+        fees from the update.}
+    }
+
+    The [update] provides some inputs required to perform this verification,
+    alongside the proof. See {!Zk_rollup_update_repr}.
+
+    If the verification is successful, the [zk_rollup]'s state is updated,
+    a prefix of its pending list is dropped and the exits from the ZKRU are
+    performed.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_feature_disabled] if the ZKRU feature flag is not
+        activated.
+      }
+      {li [Zk_rollup.Errors.Pending_bound] if the [update] processes fewer
+        public operation than allowed.
+      }
+      {li [Zk_rollup.Errors.Inconsistent_state_update] if the [update] declares
+        a new state of incorrect length.
+      }
+      {li [Zk_rollup.Errors.Invalid_circuit] if a public operation circuit is
+        ran as private.
+      }
+      {li [Zk_rollup.Errors.Invalid_verification] if the PlonK verification
+        fails.
+      }
+      {li [Zk_rollup.Errors.Invalid_deposit_amount] if an L2 operation without
+        a corresponding ticket in the pending list has a non-zero price.
+      }
+      {li [Zk_rollup_storage.Zk_rollup_pending_list_too_short]
+        if the [update] tries to process more public operations than those in
+        the pending list.
+      }
+    }
+*)
+val update :
+  ctxt_before_op:t ->
+  ctxt:t ->
+  zk_rollup:Zk_rollup.t ->
+  update:Zk_rollup.Update.t ->
+  (t
+  * Kind.zk_rollup_update Apply_results.successful_manager_operation_result
   * Script_typed_ir.packed_internal_operation list)
   tzresult
   Lwt.t

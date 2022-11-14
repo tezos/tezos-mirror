@@ -136,6 +136,8 @@ module Zk_rollup = struct
   module Operation = Zk_rollup_operation_repr
   module Ticket = Zk_rollup_ticket_repr
   module Errors = Zk_rollup_errors
+  module Circuit_public_inputs = Zk_rollup_circuit_public_inputs_repr
+  module Update = Zk_rollup_update_repr
   include Zk_rollup_storage
 end
 

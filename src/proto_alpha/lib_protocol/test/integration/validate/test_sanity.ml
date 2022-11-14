@@ -86,7 +86,8 @@ let ensure_kind infos kind =
       | Sc_rollup_recover_bond _, K_Sc_rollup_recover_bond
       | Dal_publish_slot_header _, K_Dal_publish_slot_header
       | Zk_rollup_origination _, K_Zk_rollup_origination
-      | Zk_rollup_publish _, K_Zk_rollup_publish ->
+      | Zk_rollup_publish _, K_Zk_rollup_publish
+      | Zk_rollup_update _, K_Zk_rollup_update ->
           return_unit
       | ( ( Transaction _ | Origination _ | Register_global_constant _
           | Delegation _ | Set_deposits_limit _ | Update_consensus_key _
@@ -99,7 +100,7 @@ let ensure_kind infos kind =
           | Sc_rollup_refute _ | Sc_rollup_timeout _
           | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
           | Dal_publish_slot_header _ | Zk_rollup_origination _
-          | Zk_rollup_publish _ ),
+          | Zk_rollup_publish _ | Zk_rollup_update _ ),
           _ ) ->
           assert false)
   | Single _ -> assert false

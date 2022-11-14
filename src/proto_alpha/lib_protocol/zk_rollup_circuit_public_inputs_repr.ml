@@ -23,39 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module SMap : Map.S with type key = string
-
-(** Representation of a ZK Rollup account. *)
-
-(** Static part of a ZKRU account. These are set at origination,
-    after which they cannot be modified. *)
-type static = {
-  public_parameters : Plonk.public_parameters;
-      (** Input to the Plonk verifier that are fixed once the circuits
-          are decided. *)
-  state_length : int;  (** Number of scalars in the state. *)
-  circuits_info : [`Public | `Private | `Fee] SMap.t;
-      (** Circuit names, alongside a tag indicating its kind. *)
-  nb_ops : int;  (** Valid op codes of L2 operations must be in \[0, nb_ops) *)
+type pending_op_public_inputs = {
+  old_state : Zk_rollup_state_repr.t;
+  new_state : Zk_rollup_state_repr.t;
+  fee : Zk_rollup_scalar.t;
+  exit_validity : bool;
+  zk_rollup : Zk_rollup_repr.t;
+  l2_op : Zk_rollup_operation_repr.t;
 }
 
-(**  Dynamic part of a ZKRU account. *)
-type dynamic = {
-  state : Zk_rollup_state_repr.t;
-      (** Array of scalars representing the state of the rollup
-          at a given level. *)
-  paid_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that have
-          been already paid for. *)
-  used_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that are
-          being used. *)
+type private_batch_public_inputs = {
+  old_state : Zk_rollup_state_repr.t;
+  new_state : Zk_rollup_state_repr.t;
+  fees : Zk_rollup_scalar.t;
+  zk_rollup : Zk_rollup_repr.t;
 }
 
-type t = {static : static; dynamic : dynamic}
+type fee_public_inputs = {
+  old_state : Zk_rollup_state_repr.t;
+  new_state : Zk_rollup_state_repr.t;
+  fees : Zk_rollup_scalar.t;
+}
 
-val encoding : t Data_encoding.t
+type t =
+  | Pending_op of pending_op_public_inputs
+  | Private_batch of private_batch_public_inputs
+  | Fee of fee_public_inputs
 
-(* Encoding for the [circuits_info] field.
-   Checks that keys are not duplicated in serialized representation. *)
-val circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t
+let bool_to_scalar b =
+  if b then Zk_rollup_scalar.of_z Z.one else Zk_rollup_scalar.of_z Z.zero
+
+let to_scalar_array = function
+  | Pending_op {old_state; new_state; fee; exit_validity; zk_rollup; l2_op} ->
+      Array.concat
+        [
+          old_state;
+          new_state;
+          [|
+            fee;
+            bool_to_scalar exit_validity;
+            Zk_rollup_repr.to_scalar zk_rollup;
+          |];
+          Zk_rollup_operation_repr.to_scalar_array l2_op;
+        ]
+  | Private_batch {old_state; new_state; fees; zk_rollup} ->
+      Array.concat
+        [old_state; new_state; [|fees; Zk_rollup_repr.to_scalar zk_rollup|]]
+  | Fee {old_state; new_state; fees} ->
+      Array.concat [old_state; new_state; [|fees|]]

@@ -23,39 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module SMap : Map.S with type key = string
+(** Payload of a ZK Rollup update operation.
+    The operator only needs to send a subset of the public inputs
+    defined in {!Zk_rollup_circuit_public_inputs_repr}, the rest
+    is provided by the protocol.
+*)
 
-(** Representation of a ZK Rollup account. *)
-
-(** Static part of a ZKRU account. These are set at origination,
-    after which they cannot be modified. *)
-type static = {
-  public_parameters : Plonk.public_parameters;
-      (** Input to the Plonk verifier that are fixed once the circuits
-          are decided. *)
-  state_length : int;  (** Number of scalars in the state. *)
-  circuits_info : [`Public | `Private | `Fee] SMap.t;
-      (** Circuit names, alongside a tag indicating its kind. *)
-  nb_ops : int;  (** Valid op codes of L2 operations must be in \[0, nb_ops) *)
+(** Minimal subset of public inputs for the public L2 operations' circuits. *)
+type op_pi = {
+  new_state : Zk_rollup_state_repr.t;
+  fee : Zk_rollup_scalar.t;
+  exit_validity : bool;
 }
 
-(**  Dynamic part of a ZKRU account. *)
-type dynamic = {
-  state : Zk_rollup_state_repr.t;
-      (** Array of scalars representing the state of the rollup
-          at a given level. *)
-  paid_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that have
-          been already paid for. *)
-  used_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that are
-          being used. *)
+(** Minimal subset of public inputs for the circuits for batches of
+    private L2 operations *)
+type private_inner_pi = {
+  new_state : Zk_rollup_state_repr.t;
+  fees : Zk_rollup_scalar.t;
 }
 
-type t = {static : static; dynamic : dynamic}
+(** Minimal subset of public inputs for the "fee" circuit. *)
+type fee_pi = {new_state : Zk_rollup_state_repr.t}
+
+(** Payload of an update operation.
+    Includes the proof and the public inputs that are needed to verify it.
+    Each set of public inputs also carries the string that identifies the
+    circuit which they are for. *)
+type t = {
+  pending_pis : (string * op_pi) list;
+  private_pis : (string * private_inner_pi) list;
+  fee_pi : fee_pi;
+  proof : Plonk.proof;
+}
 
 val encoding : t Data_encoding.t
-
-(* Encoding for the [circuits_info] field.
-   Checks that keys are not duplicated in serialized representation. *)
-val circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t

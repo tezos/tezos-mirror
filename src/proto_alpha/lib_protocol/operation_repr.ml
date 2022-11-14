@@ -125,6 +125,8 @@ module Kind = struct
 
   type zk_rollup_publish = Zk_rollup_publish_kind
 
+  type zk_rollup_update = Zk_rollup_update_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -159,6 +161,7 @@ module Kind = struct
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
+    | Zk_rollup_update_manager_kind : zk_rollup_update manager
 end
 
 type 'a consensus_operation_type =
@@ -469,7 +472,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
-      circuits_info : bool Zk_rollup_account_repr.SMap.t;
+      circuits_info : [`Public | `Private | `Fee] Zk_rollup_account_repr.SMap.t;
       init_state : Zk_rollup_state_repr.t;
       nb_ops : int;
     }
@@ -479,6 +482,11 @@ and _ manager_operation =
       ops : (Zk_rollup_operation_repr.t * Zk_rollup_ticket_repr.t option) list;
     }
       -> Kind.zk_rollup_publish manager_operation
+  | Zk_rollup_update : {
+      zk_rollup : Zk_rollup_repr.t;
+      update : Zk_rollup_update_repr.t;
+    }
+      -> Kind.zk_rollup_update manager_operation
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function
@@ -513,6 +521,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
   | Zk_rollup_origination _ -> Kind.Zk_rollup_origination_manager_kind
   | Zk_rollup_publish _ -> Kind.Zk_rollup_publish_manager_kind
+  | Zk_rollup_update _ -> Kind.Zk_rollup_update_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -613,6 +622,8 @@ let zk_rollup_operation_tag_offset = 250
 let zk_rollup_operation_create_tag = zk_rollup_operation_tag_offset + 0
 
 let zk_rollup_operation_publish_tag = zk_rollup_operation_tag_offset + 1
+
+let zk_rollup_operation_update_tag = zk_rollup_operation_tag_offset + 2
 
 module Encoding = struct
   open Data_encoding
@@ -1094,6 +1105,25 @@ module Encoding = struct
           proj =
             (function Zk_rollup_publish {zk_rollup; ops} -> (zk_rollup, ops));
           inj = (fun (zk_rollup, ops) -> Zk_rollup_publish {zk_rollup; ops});
+        }
+
+    let zk_rollup_update_case =
+      MCase
+        {
+          tag = zk_rollup_operation_update_tag;
+          name = "zk_rollup_update";
+          encoding =
+            obj2
+              (req "zk_rollup" Zk_rollup_repr.Address.encoding)
+              (req "update" Zk_rollup_update_repr.encoding);
+          select =
+            (function
+            | Manager (Zk_rollup_update _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Zk_rollup_update {zk_rollup; update} -> (zk_rollup, update));
+          inj =
+            (fun (zk_rollup, update) -> Zk_rollup_update {zk_rollup; update});
         }
 
     let string_to_bytes_encoding =
@@ -1728,6 +1758,11 @@ module Encoding = struct
       zk_rollup_operation_publish_tag
       Manager_operations.zk_rollup_publish_case
 
+  let zk_rollup_update_case =
+    make_manager_case
+      zk_rollup_operation_update_tag
+      Manager_operations.zk_rollup_update_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -1781,6 +1816,7 @@ module Encoding = struct
            make sc_rollup_recover_bond_case;
            make zk_rollup_origination_case;
            make zk_rollup_publish_case;
+           make zk_rollup_update_case;
          ]
 
   let contents_list_encoding =
@@ -2042,6 +2078,8 @@ let equal_manager_operation_kind :
   | Zk_rollup_origination _, _ -> None
   | Zk_rollup_publish _, Zk_rollup_publish _ -> Some Eq
   | Zk_rollup_publish _, _ -> None
+  | Zk_rollup_update _, Zk_rollup_update _ -> Some Eq
+  | Zk_rollup_update _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

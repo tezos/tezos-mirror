@@ -339,7 +339,8 @@ let estimated_gas_single (type kind)
         | Sc_rollup_recover_bond_result {consumed_gas; _} ->
             Ok consumed_gas
         | Zk_rollup_origination_result {consumed_gas; _} -> Ok consumed_gas
-        | Zk_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas)
+        | Zk_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas
+        | Zk_rollup_update_result {consumed_gas; _} -> Ok consumed_gas)
     | Skipped _ ->
         error_with "Cannot estimate gas of skipped operation"
         (* There must be another error for this to happen, and it should not
@@ -396,6 +397,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}
         | Transfer_ticket_result {paid_storage_size_diff; _}
         | Zk_rollup_publish_result {paid_storage_size_diff; _}
+        | Zk_rollup_update_result {paid_storage_size_diff; _}
         | Transaction_result
             (Transaction_to_zk_rollup_result {paid_storage_size_diff; _}) ->
             Ok paid_storage_size_diff
@@ -514,7 +516,7 @@ let originated_contracts_single (type kind)
         | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
         | Sc_rollup_timeout_result _ | Sc_rollup_execute_outbox_message_result _
         | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
-        | Zk_rollup_publish_result _ ->
+        | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
             Ok [])
     | Skipped _ ->
         error_with "Cannot know originated contracts of skipped operation"

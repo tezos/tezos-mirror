@@ -157,7 +157,7 @@ module Parameters :
           | Transfer_ticket _ | Dal_publish_slot_header _
           | Sc_rollup_originate _ | Sc_rollup_execute_outbox_message _
           | Sc_rollup_recover_bond _ | Zk_rollup_origination _
-          | Zk_rollup_publish _ ->
+          | Zk_rollup_publish _ | Zk_rollup_update _ ->
               (* These operations should never be handled by this injector *)
               assert false)
 

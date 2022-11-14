@@ -104,6 +104,7 @@ type manager_operation_kind =
   | K_Dal_publish_slot_header
   | K_Zk_rollup_origination
   | K_Zk_rollup_publish
+  | K_Zk_rollup_update
 
 (** The requirements for a tested manager operation. *)
 type operation_req = {
@@ -206,6 +207,7 @@ let kind_to_string = function
   | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
   | K_Zk_rollup_origination -> "Zk_rollup_origination"
   | K_Zk_rollup_publish -> "Zk_rollup_publish"
+  | K_Zk_rollup_update -> "Zk_rollup_update"
 
 (** {2 Pretty-printers} *)
 let pp_opt pp v =
@@ -1181,6 +1183,23 @@ let mk_zk_rollup_publish (oinfos : operation_req) (infos : infos) =
   in
   return op
 
+let mk_zk_rollup_update (oinfos : operation_req) (infos : infos) =
+  let open Lwt_result_syntax in
+  let* zk_rollup = zk_rollup_of infos.ctxt.zk_rollup in
+  let* op =
+    Op.zk_rollup_update
+      ?fee:oinfos.fee
+      ?gas_limit:oinfos.gas_limit
+      ?counter:oinfos.counter
+      ?storage_limit:oinfos.storage_limit
+      ?force_reveal:oinfos.force_reveal
+      (B infos.ctxt.block)
+      (contract_of (get_source infos))
+      ~zk_rollup
+      ~update:ZKOperator.Internal_for_tests.update_data
+  in
+  return op
+
 (** {2 Helpers for generation of generic check tests by manager operation} *)
 
 (** Generic forge for any kind of manager operation according to
@@ -1218,6 +1237,7 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Dal_publish_slot_header -> mk_dal_publish_slot_header
     | K_Zk_rollup_origination -> mk_zk_rollup_origination
     | K_Zk_rollup_publish -> mk_zk_rollup_publish
+    | K_Zk_rollup_update -> mk_zk_rollup_update
   in
   mk_op op_req infos
 
@@ -1574,6 +1594,8 @@ let subjects =
     K_Sc_rollup_recover_bond;
     K_Dal_publish_slot_header;
     K_Zk_rollup_origination;
+    K_Zk_rollup_publish;
+    K_Zk_rollup_update;
   ]
 
 let is_consumer = function
@@ -1585,7 +1607,7 @@ let is_consumer = function
   | K_Sc_rollup_refute | K_Sc_rollup_timeout | K_Sc_rollup_cement
   | K_Sc_rollup_publish | K_Sc_rollup_execute_outbox_message
   | K_Sc_rollup_recover_bond | K_Dal_publish_slot_header
-  | K_Zk_rollup_origination | K_Zk_rollup_publish ->
+  | K_Zk_rollup_origination | K_Zk_rollup_publish | K_Zk_rollup_update ->
       false
   | K_Transaction | K_Origination | K_Register_global_constant
   | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
@@ -1612,4 +1634,5 @@ let is_disabled flags = function
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->
       flags.scoru = false
   | K_Dal_publish_slot_header -> flags.dal = false
-  | K_Zk_rollup_origination | K_Zk_rollup_publish -> flags.zkru = false
+  | K_Zk_rollup_origination | K_Zk_rollup_publish | K_Zk_rollup_update ->
+      flags.zkru = false

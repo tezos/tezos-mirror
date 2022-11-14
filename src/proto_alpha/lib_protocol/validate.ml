@@ -2441,7 +2441,7 @@ module Manager = struct
           assert_sc_rollup_feature_enabled vi
       | Dal_publish_slot_header {slot_header} ->
           Dal_apply.validate_publish_slot_header vi.ctxt slot_header
-      | Zk_rollup_origination _ | Zk_rollup_publish _ ->
+      | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
           assert_zk_rollup_feature_enabled vi
     in
     (* Gas should no longer be consumed below this point, because it

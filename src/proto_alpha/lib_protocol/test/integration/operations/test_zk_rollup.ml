@@ -740,6 +740,474 @@ let test_invalid_deposit () =
   in
   return_unit
 
+(* Test for a valid update:
+   - 1 private batch of 10 "true" operations
+   - 1 public "false" operation
+   On a ZKRU with the initial state and a pending list with
+   1 operation ("false").
+*)
+let test_update () =
+  let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let n_batches = 2 in
+  let _, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup
+        ~private_ops:
+          (Stdlib.List.init n_batches (fun batch ->
+               Stdlib.List.init batch_size
+               @@ Fun.const
+               @@ (if batch mod 2 = 0 then true_op else false_op) pkh zk_rollup))
+        [false_op pkh zk_rollup])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i = Incremental.add_operation i operation in
+  return_unit
+
+(* Test for an invalid update:
+   - 1 public "true" operation
+   On a ZKRU with the initial state and a pending list with
+   1 operation ("false").
+   The public operation proved is different from the one in the pending list.
+*)
+let test_update_false_proof () =
+  let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  (* Testing with proof on incorrect statement *)
+  let _, update =
+    Operator.(craft_update init_state ~zk_rollup [true_op pkh zk_rollup])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      i
+      ~expect_apply_failure:
+        (check_proto_error Zk_rollup.Errors.Invalid_verification)
+      operation
+  in
+  (* Testing with proof with incorrect private inputs *)
+  let update =
+    let _, Zk_rollup.Update.{pending_pis; private_pis; fee_pi; proof} =
+      Operator.(craft_update init_state ~zk_rollup [true_op pkh zk_rollup])
+    in
+    let private_pis = List.rev private_pis in
+    Zk_rollup.Update.{pending_pis; private_pis; fee_pi; proof}
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      i
+      ~expect_apply_failure:
+        (check_proto_error Zk_rollup.Errors.Invalid_verification)
+      operation
+  in
+  return_unit
+
+(* Test for an invalid update:
+   A set of inputs for a public circuit is included in the list of
+   inputs for private batches.
+*)
+let test_update_public_in_private () =
+  let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(craft_update init_state ~zk_rollup [true_op pkh zk_rollup])
+  in
+  let update =
+    (* Circuit ID and inputs for a public circuit, which will be added to the
+       [private_pis] list *)
+    let name, op_pi = Stdlib.List.hd update.pending_pis in
+    {
+      update with
+      private_pis =
+        (name, {new_state = op_pi.new_state; fees = op_pi.fee})
+        :: update.private_pis;
+    }
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      i
+      ~expect_apply_failure:(check_proto_error Zk_rollup.Errors.Invalid_circuit)
+      operation
+  in
+  return_unit
+
+(* Test for an invalid update:
+   Two ZKRUs are originated: [zk_rollup1] and [zk_rollup2].
+   An L2 [op] for [zk_rollup2] is appended to [zk_rollup1]'s pending list.
+   This operation must be discarded, but a malicious validator tries to process
+   it by making a proof for an update in which [op]'s [rollup_id] is changed
+   from [zk_rollup2] to [zk_rollup1]. The verification must fail, because
+   the Protocol uses the actual [op] from the pending list as input.
+*)
+let test_update_for_another_rollup () =
+  let* b, contracts, zk_rollup1, pkh = init_with_pending 3 in
+  let contract0 = Stdlib.List.hd contracts in
+  let contract1 = Stdlib.List.nth contracts 1 in
+  let contract2 = Stdlib.List.nth contracts 2 in
+  let* i = Incremental.begin_construction b in
+  (* Originate [zk_rollup2] *)
+  let* operation, zk_rollup2 =
+    Op.zk_rollup_origination
+      (I i)
+      contract0
+      ~public_parameters:Operator.public_parameters
+      ~circuits_info:(of_plonk_smap Operator.circuits)
+      ~init_state:Operator.init_state
+      ~nb_ops:1
+  in
+  let* i = Incremental.add_operation i operation in
+  (* Append to [zk_rollup1] an op for [zk_rollup2] *)
+  let* operation =
+    Op.zk_rollup_publish
+      (I i)
+      contract1
+      ~zk_rollup:zk_rollup1
+      ~ops:[no_ticket @@ true_op pkh zk_rollup2]
+  in
+  let* i = Incremental.add_operation i operation in
+  (* Craft the update, changing the "true" op to have zk_rollup1 as
+     [rollup_id] *)
+  let _, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup:zk_rollup1
+        [false_op pkh zk_rollup1; true_op pkh zk_rollup1])
+  in
+  let* operation =
+    Op.zk_rollup_update (I i) contract2 ~zk_rollup:zk_rollup1 ~update
+  in
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:
+        (check_proto_error Zk_rollup.Errors.Invalid_verification)
+      i
+      operation
+  in
+  return_unit
+
+(* Test for an invalid update:
+   The update sent by the prover processes more public operations than
+   those in the pending list.
+*)
+let test_update_more_public_than_pending () =
+  (* test with number of pending operations < min_pending_to_process. *)
+  let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup
+        [false_op pkh zk_rollup; true_op pkh zk_rollup])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:
+        (check_proto_error Zk_rollup_storage.Zk_rollup_pending_list_too_short)
+      i
+      operation
+  in
+  (* test with number of pending operations >= min_pending_to_process. *)
+  let* constants = Context.get_constants (I i) in
+  let min_pending_to_process =
+    constants.parametric.zk_rollup.min_pending_to_process
+  in
+  let* b, contracts, zk_rollup, pkh =
+    init_with_pending ~n_pending:min_pending_to_process 1
+  in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup
+        (Stdlib.List.init (min_pending_to_process + 1) (fun i ->
+             if i mod 2 = 0 then false_op pkh zk_rollup
+             else true_op pkh zk_rollup)))
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:
+        (check_proto_error Zk_rollup_storage.Zk_rollup_pending_list_too_short)
+      i
+      operation
+  in
+  return_unit
+
+(* Test for an invalid update:
+   The update sent by the prover contains a set of circuit inputs in which
+   the [new_state] is larger than the ZKRU's [state_length].
+*)
+let test_update_inconsistent_state () =
+  let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(craft_update init_state ~zk_rollup [false_op pkh zk_rollup])
+  in
+  let open Zk_rollup.Update in
+  let update =
+    {
+      update with
+      pending_pis =
+        List.map
+          (fun (s, (op_pi : op_pi)) ->
+            ( s,
+              {
+                op_pi with
+                new_state = Array.append op_pi.new_state op_pi.new_state;
+              } ))
+          update.pending_pis;
+    }
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:
+        (check_proto_error Zk_rollup.Errors.Inconsistent_state_update)
+      i
+      operation
+  in
+  return_unit
+
+(* Test for an invalid update:
+   The update sent by the prover processes fewer pending operations (p.o.) than
+   allowed (the exact number of p.o. or at least min_pending_to_process).
+   The pending list has a length of 2, while only 1 is processed.
+*)
+let test_update_not_enough_pending () =
+  let* b, contracts, zk_rollup, pkh = init_with_pending ~n_pending:2 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(craft_update init_state ~zk_rollup [false_op pkh zk_rollup])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:(check_proto_error Zk_rollup.Errors.Pending_bound)
+      i
+      operation
+  in
+  return_unit
+
+(* Test for a valid update:
+   The update sent by the prover processes a prefix of the pending list,
+   of the minimum length allowed.
+*)
+let test_update_valid_prefix () =
+  (* Checking when pending list has more than min_pending_to_process *)
+  let min_pending_to_process =
+    Context.default_test_constants.zk_rollup.min_pending_to_process
+  in
+  let* b, contracts, zk_rollup, pkh =
+    init_with_pending ~n_pending:(min_pending_to_process + 1) 1
+  in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup
+        (Stdlib.List.init min_pending_to_process (fun i ->
+             if i mod 2 = 0 then false_op pkh zk_rollup
+             else true_op pkh zk_rollup)))
+  in
+  (* Checking when pending list has less than min_pending_to_process *)
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i = Incremental.add_operation i operation in
+  let* b, contracts, zk_rollup, pkh = init_with_pending ~n_pending:2 1 in
+  let contract = Stdlib.List.hd contracts in
+  let* i = Incremental.begin_construction b in
+  let _, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup
+        [false_op pkh zk_rollup; true_op pkh zk_rollup])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract ~zk_rollup ~update in
+  let* _i = Incremental.add_operation i operation in
+  return_unit
+
+let test_valid_deposit_and_withdrawal () =
+  (* Create 2 accounts and one zk rollups *)
+  let* block, contracts, zk_rollup = init_and_originate 2 in
+  let contract0 = Stdlib.List.nth contracts 0 in
+  let contract1 = Stdlib.List.nth contracts 1 in
+  (* Create and originate the deposit contract *)
+  let module Nat_ticket = Nat_ticket (struct
+    let contents = 1
+  end) in
+  let* deposit_contract, _script, block =
+    Nat_ticket.init_deposit_contract (Z.of_int 10) block contract0
+  in
+  let token = Nat_ticket.ex_token ~ticketer:deposit_contract in
+  (* Generate ticket created by deposit contract and owned by rollup *)
+  let* ticket_hash =
+    Nat_ticket.ticket_hash (B block) ~ticketer:deposit_contract ~zk_rollup
+  in
+  let pkh = match contract0 with Implicit pkh -> pkh | _ -> assert false in
+  (* Create append/deposit operation with ticket *)
+  let zk_op =
+    {
+      (false_op pkh zk_rollup) with
+      price = {id = ticket_hash; amount = Z.of_int 10};
+    }
+  in
+  let* operation =
+    Nat_ticket.deposit_op
+      ~block
+      ~zk_rollup
+      ~zk_op
+      ~account:contract0
+      ~deposit_contract
+  in
+  (* ----- Start generating block *)
+  let* i = Incremental.begin_construction block in
+  (* check rollup exists with none of these particular tokens *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) None
+  in
+  (* ----- Add deposit operation to block*)
+  let* i = Incremental.add_operation i operation in
+  (* check *rollup* has 10 of these particular tokens (deposit has been processed) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) (Some 10)
+  in
+  (* check *contract* has no tokens (deposit has been processed) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Contract contract0) None
+  in
+  (* Create update operation to process the zk operation (which is a
+     "deposit-withdrawal" for dummy rollup) *)
+  let _, update =
+    Operator.(craft_update init_state ~zk_rollup ~private_ops:[] [zk_op])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract1 ~zk_rollup ~update in
+  (* ----- Add update operation to block) *)
+  let* i = Incremental.add_operation i operation in
+  (* check *rollup* has no tokens (deposit was withdrawn) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) None
+  in
+  (* check *contract* has 10 of these particular tokens (deposit was withdrawn) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Contract contract0) (Some 10)
+  in
+  return_unit
+
+let test_valid_deposit_and_external_withdrawal () =
+  (* Create 2 accounts and one zk rollups *)
+  let* block, contracts, zk_rollup = init_and_originate 4 in
+  let contract0 = Stdlib.List.nth contracts 0 in
+  let contract1 = Stdlib.List.nth contracts 1 in
+  let contract2 = Stdlib.List.nth contracts 2 in
+  let contract3 = Stdlib.List.nth contracts 3 in
+  (* Create and originate the deposit contract *)
+  let module Nat_ticket = Nat_ticket (struct
+    let contents = 1
+  end) in
+  let* deposit_contract, _script, block =
+    Nat_ticket.init_deposit_contract (Z.of_int 10) block contract0
+  in
+  let token = Nat_ticket.ex_token ~ticketer:deposit_contract in
+  (* Generate ticket created by deposit contract and owned by rollup *)
+  let* ticket_hash =
+    Nat_ticket.ticket_hash (B block) ~ticketer:deposit_contract ~zk_rollup
+  in
+  let pkh = match contract0 with Implicit pkh -> pkh | _ -> assert false in
+  (* Create append/deposit operation with ticket *)
+  let zk_op =
+    {
+      (false_op pkh zk_rollup) with
+      price = {id = ticket_hash; amount = Z.of_int 10};
+    }
+  in
+  let* operation =
+    Nat_ticket.deposit_op
+      ~block
+      ~zk_rollup
+      ~zk_op
+      ~account:contract0
+      ~deposit_contract
+  in
+  (* ----- Start generating block *)
+  let* i = Incremental.begin_construction block in
+  (* check rollup exists with none of these particular tokens *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) None
+  in
+  (* ----- Add deposit operation to block*)
+  let* i = Incremental.add_operation i operation in
+  (* check *rollup* has 10 of these particular tokens (deposit has been processed) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) (Some 10)
+  in
+  (* check *contract* has no tokens (deposit has been processed) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Contract contract0) None
+  in
+  (* Create update operation to process the zk operation (which is a
+     "deposit" for dummy rollup) *)
+  let s, update =
+    Operator.(
+      craft_update
+        init_state
+        ~zk_rollup
+        ~private_ops:[]
+        ~exit_validities:[false]
+        [zk_op])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract1 ~zk_rollup ~update in
+  (* ----- Add update operation to block) *)
+  let* i = Incremental.add_operation i operation in
+  (* check *rollup* has 10 of these particular tokens (deposit has been processed) *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) (Some 10)
+  in
+  (* Create withdrawal operation with ticket *)
+  let zk_op =
+    {
+      (false_op pkh zk_rollup) with
+      price = {id = ticket_hash; amount = Z.of_int (-10)};
+    }
+  in
+  let ticket = Nat_ticket.zkru_ticket ~ticketer:deposit_contract in
+  let* operation =
+    Op.zk_rollup_publish (I i) contract2 ~zk_rollup ~ops:[(zk_op, Some ticket)]
+  in
+  let* i = Incremental.add_operation i operation in
+  (* Create update to process the withdrawal *)
+  let _, update =
+    Operator.(
+      craft_update s ~zk_rollup ~private_ops:[] ~exit_validities:[true] [zk_op])
+  in
+  let* operation = Op.zk_rollup_update (I i) contract3 ~zk_rollup ~update in
+  let* i = Incremental.add_operation i operation in
+  (* check *rollup* has no tokens *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Zk_rollup zk_rollup) None
+  in
+  (* check *contract* has 10 of these particular tokens *)
+  let* () =
+    assert_ticket_balance ~loc:__LOC__ i token (Contract contract0) (Some 10)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -759,4 +1227,32 @@ let tests =
     Tztest.tztest "append external deposit" `Quick test_append_external_deposit;
     Tztest.tztest "append check errors" `Quick test_append_errors;
     Tztest.tztest "invalid deposit" `Quick test_invalid_deposit;
+    Tztest.tztest "update" `Quick test_update;
+    Tztest.tztest "update with false proof" `Quick test_update_false_proof;
+    Tztest.tztest
+      "update with invalid circuit"
+      `Quick
+      test_update_public_in_private;
+    Tztest.tztest
+      "update with op for another rollup"
+      `Quick
+      test_update_for_another_rollup;
+    Tztest.tztest
+      "update with more public operations than pending"
+      `Quick
+      test_update_more_public_than_pending;
+    Tztest.tztest
+      "update with inconsistent state"
+      `Quick
+      test_update_inconsistent_state;
+    Tztest.tztest
+      "update with not enough pending"
+      `Quick
+      test_update_not_enough_pending;
+    Tztest.tztest "update with valid prefix" `Quick test_update_valid_prefix;
+    Tztest.tztest "valid deposit" `Quick test_valid_deposit_and_withdrawal;
+    Tztest.tztest
+      "valid deposit and external withdrawal"
+      `Quick
+      test_valid_deposit_and_external_withdrawal;
   ]

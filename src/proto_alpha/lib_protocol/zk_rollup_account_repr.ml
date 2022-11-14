@@ -28,7 +28,7 @@ module SMap = Map.Make (String)
 type static = {
   public_parameters : Plonk.public_parameters;
   state_length : int;
-  circuits_info : bool SMap.t;
+  circuits_info : [`Public | `Private | `Fee] SMap.t;
   nb_ops : int;
 }
 
@@ -40,8 +40,39 @@ type dynamic = {
 
 type t = {static : static; dynamic : dynamic}
 
-let circuits_info_encoding : bool SMap.t Data_encoding.t =
+let circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t
+    =
   let open Data_encoding in
+  let variant_encoding =
+    let public_tag, public_encoding = (0, obj1 @@ req "public" unit) in
+    let private_tag, private_encoding = (1, obj1 @@ req "private" unit) in
+    let fee_tag, fee_encoding = (2, obj1 @@ req "fee" unit) in
+    matching
+      (function
+        | `Public -> matched public_tag public_encoding ()
+        | `Private -> matched private_tag private_encoding ()
+        | `Fee -> matched fee_tag fee_encoding ())
+      [
+        case
+          ~title:"Public"
+          (Tag public_tag)
+          public_encoding
+          (function `Public -> Some () | _ -> None)
+          (fun () -> `Public);
+        case
+          ~title:"Private"
+          (Tag private_tag)
+          private_encoding
+          (function `Private -> Some () | _ -> None)
+          (fun () -> `Private);
+        case
+          ~title:"Fee"
+          (Tag fee_tag)
+          fee_encoding
+          (function `Fee -> Some () | _ -> None)
+          (fun () -> `Fee);
+      ]
+  in
   conv_with_guard
     (fun m -> List.of_seq @@ SMap.to_seq m)
     (fun l ->
@@ -51,17 +82,11 @@ let circuits_info_encoding : bool SMap.t Data_encoding.t =
         Compare.List_length_with.(l <> SMap.cardinal m)
       then Error "Zk_rollup_origination: circuits_info has duplicated keys"
       else Ok m)
-    (list (tup2 string bool))
+    (list (tup2 string variant_encoding))
 
 let encoding =
   let open Data_encoding in
   let static_encoding =
-    let circuits_info_encoding =
-      conv
-        SMap.bindings
-        (fun l -> SMap.of_seq @@ List.to_seq l)
-        (list (tup2 string bool))
-    in
     conv
       (fun {public_parameters; state_length; circuits_info; nb_ops} ->
         (public_parameters, state_length, circuits_info, nb_ops))

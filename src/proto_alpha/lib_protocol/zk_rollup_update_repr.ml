@@ -23,39 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module SMap : Map.S with type key = string
-
-(** Representation of a ZK Rollup account. *)
-
-(** Static part of a ZKRU account. These are set at origination,
-    after which they cannot be modified. *)
-type static = {
-  public_parameters : Plonk.public_parameters;
-      (** Input to the Plonk verifier that are fixed once the circuits
-          are decided. *)
-  state_length : int;  (** Number of scalars in the state. *)
-  circuits_info : [`Public | `Private | `Fee] SMap.t;
-      (** Circuit names, alongside a tag indicating its kind. *)
-  nb_ops : int;  (** Valid op codes of L2 operations must be in \[0, nb_ops) *)
+type op_pi = {
+  new_state : Zk_rollup_state_repr.t;
+  fee : Zk_rollup_scalar.t;
+  exit_validity : bool;
 }
 
-(**  Dynamic part of a ZKRU account. *)
-type dynamic = {
-  state : Zk_rollup_state_repr.t;
-      (** Array of scalars representing the state of the rollup
-          at a given level. *)
-  paid_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that have
-          been already paid for. *)
-  used_l2_operations_storage_space : Z.t;
-      (** Number of bytes for storage of L2 operations that are
-          being used. *)
+type private_inner_pi = {
+  new_state : Zk_rollup_state_repr.t;
+  fees : Zk_rollup_scalar.t;
 }
 
-type t = {static : static; dynamic : dynamic}
+type fee_pi = {new_state : Zk_rollup_state_repr.t}
 
-val encoding : t Data_encoding.t
+(* Data sent to an update operation *)
+type t = {
+  pending_pis : (string * op_pi) list;
+  private_pis : (string * private_inner_pi) list;
+  fee_pi : fee_pi;
+  proof : Plonk.proof;
+}
 
-(* Encoding for the [circuits_info] field.
-   Checks that keys are not duplicated in serialized representation. *)
-val circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t
+let op_pi_encoding : op_pi Data_encoding.t =
+  Data_encoding.(
+    conv
+      (fun {new_state; fee; exit_validity} -> (new_state, fee, exit_validity))
+      (fun (new_state, fee, exit_validity) -> {new_state; fee; exit_validity})
+      (obj3
+         (req "new_state" Zk_rollup_state_repr.encoding)
+         (req "fee" Plonk.scalar_encoding)
+         (req "exit_validity" bool)))
+
+let private_inner_pi_encoding : private_inner_pi Data_encoding.t =
+  Data_encoding.(
+    conv
+      (fun ({new_state; fees} : private_inner_pi) -> (new_state, fees))
+      (fun (new_state, fees) -> {new_state; fees})
+      (obj2
+         (req "new_state" Zk_rollup_state_repr.encoding)
+         (req "fee" Plonk.scalar_encoding)))
+
+let fee_pi_encoding : fee_pi Data_encoding.t =
+  Data_encoding.(
+    conv
+      (fun {new_state} -> new_state)
+      (fun new_state -> {new_state})
+      (obj1 (req "new_state" Zk_rollup_state_repr.encoding)))
+
+let encoding : t Data_encoding.t =
+  Data_encoding.(
+    conv
+      (fun {pending_pis; private_pis; fee_pi; proof} ->
+        (pending_pis, private_pis, fee_pi, proof))
+      (fun (pending_pis, private_pis, fee_pi, proof) ->
+        {pending_pis; private_pis; fee_pi; proof})
+      (obj4
+         (req "pending_pis" (list @@ tup2 string op_pi_encoding))
+         (req "private_pis" (list @@ tup2 string private_inner_pi_encoding))
+         (req "fee_pi" fee_pi_encoding)
+         (req "proof" Plonk.proof_encoding)))
