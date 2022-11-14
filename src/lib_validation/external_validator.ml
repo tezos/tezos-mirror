@@ -107,6 +107,14 @@ module Events = struct
       ~pp1:Context_hash.pp
       ("context_hash", Context_hash.encoding)
 
+  let context_split_request =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"context_split_request"
+      ~msg:"spliting context"
+      ()
+
   let termination_request =
     declare_0
       ~section
@@ -516,6 +524,16 @@ let run ~readonly input output =
             (fun () -> Lwt_unix.close lockfile)
         in
         let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
+        let*! () =
+          External_validation.send
+            output
+            (Error_monad.result_encoding Data_encoding.empty)
+            (Ok ())
+        in
+        loop cache None
+    | External_validation.Context_split ->
+        let*! () = Events.(emit context_split_request) () in
+        let () = Context.split context_index in
         let*! () =
           External_validation.send
             output

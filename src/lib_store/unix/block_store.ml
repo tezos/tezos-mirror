@@ -45,6 +45,7 @@ type block_store = {
   status_data : status Stored_data.t;
   block_cache : Block_repr.t Block_lru_cache.t;
   mutable gc_callback : (Block_hash.t -> unit tzresult Lwt.t) option;
+  mutable split_callback : (unit -> unit tzresult Lwt.t) option;
   merge_mutex : Lwt_mutex.t;
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
@@ -1299,6 +1300,12 @@ let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
         let*! () = Store_events.(emit start_context_gc new_savepoint) in
         gc savepoint_hash
 
+let split_context block_store =
+  let open Lwt_result_syntax in
+  match block_store.split_callback with
+  | None -> return_unit
+  | Some split -> split ()
+
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
     ~finalizer ~history_mode ~new_head ~new_head_metadata
     ~cementing_highwatermark =
@@ -1571,6 +1578,7 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
       status_data;
       block_cache;
       gc_callback = None;
+      split_callback = None;
       merge_mutex;
       merge_scheduler;
       merging_thread = None;
@@ -1598,6 +1606,9 @@ let create ?block_cache_limit chain_dir ~genesis_block =
 
 let register_gc_callback block_store gc_callback =
   block_store.gc_callback <- Some gc_callback
+
+let register_split_callback block_store split_callback =
+  block_store.split_callback <- Some split_callback
 
 let pp_merge_status fmt status =
   match status with

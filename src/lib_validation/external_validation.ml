@@ -84,6 +84,7 @@ type request =
       context_hash : Context_hash.t;
       gc_lockfile_path : string;
     }
+  | Context_split
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t
@@ -127,6 +128,7 @@ let request_pp ppf = function
         "garbage collecting context below %a"
         Context_hash.pp
         context_hash
+  | Context_split -> Format.fprintf ppf "splitting context"
   | Reconfigure_event_logging _ ->
       Format.fprintf ppf "reconfigure event logging"
 
@@ -395,6 +397,15 @@ let case_context_gc tag =
     (fun (context_hash, gc_lockfile_path) ->
       Context_garbage_collection {context_hash; gc_lockfile_path})
 
+let case_context_split tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"context_split"
+    unit
+    (function Context_split -> Some () | _ -> None)
+    (fun () -> Context_split)
+
 let request_encoding =
   let open Data_encoding in
   union
@@ -441,6 +452,7 @@ let request_encoding =
       case_preapply (Tag 7);
       case_precheck (Tag 8);
       case_context_gc (Tag 9);
+      case_context_split (Tag 10);
     ]
 
 let send pin encoding data =

@@ -1364,6 +1364,38 @@ module Chain = struct
       (Int32.to_float (snd new_checkpoint)) ;
     return_unit
 
+  (* Calls a context split when reaching the dawn of a cycle. See
+     {!Lib_context.Context.split} for details.
+
+     In the context of full and rolling nodes, the split function is
+     expected to be called just after committing the first block of a
+     cycle, i.e, a future savepoint. Thus, that commit will end a
+     chunk and will be an optimal candidate for a GC call.
+
+     The call of split is triggered when the last allowed fork level
+     of the new head changes. This is not ensuring that the created
+     chunk will be ended by a commit that will be the target of a
+     future gc call as reorganization may occur above the last allowed
+     fork level. Most of the time, and as reorganization are often
+     short, this will lead to the optimal behaviour. *)
+  let may_split_context chain_store new_head_lafl previous_head =
+    let open Lwt_result_syntax in
+    match history_mode chain_store with
+    | Archive -> return_unit
+    | Full _ | Rolling _ ->
+        let* previous_head_metadata =
+          Block.get_block_metadata chain_store previous_head
+        in
+        if
+          not
+            (Int32.equal
+               new_head_lafl
+               (Block.last_allowed_fork_level previous_head_metadata))
+        then
+          let block_store = chain_store.block_store in
+          Block_store.split_context block_store
+        else return_unit
+
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
@@ -1412,6 +1444,7 @@ module Chain = struct
         in
         let*! target = Stored_data.get chain_state.target_data in
         let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
+        let* () = may_split_context chain_store new_head_lafl previous_head in
         let*! cementing_highwatermark =
           locked_determine_cementing_highwatermark
             chain_store
@@ -2311,6 +2344,9 @@ module Chain = struct
 
   let register_gc_callback chain_store callback =
     Block_store.register_gc_callback chain_store.block_store callback
+
+  let register_split_callback chain_store callback =
+    Block_store.register_split_callback chain_store.block_store callback
 end
 
 module Protocol = struct

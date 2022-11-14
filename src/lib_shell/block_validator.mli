@@ -142,7 +142,7 @@ val fetch_and_compile_protocol :
   Tezos_crypto.Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
-(** [context_garbage_collection bv chain_store context_hash
+(** [context_garbage_collection bv index chain_store context_hash
     ~gc_lockfile_path] moves the contexts below the give
     [context_hash] from the upper layer to the lower layer. For full
     and rolling nodes, this is considered as a garbage
@@ -155,6 +155,12 @@ val context_garbage_collection :
   Tezos_crypto.Context_hash.t ->
   gc_lockfile_path:string ->
   unit tzresult Lwt.t
+
+(** [context_split bv index] finishes and then starts a new chunk in
+    the context storage layout. This aims to be called at the dawn of
+    each cycle, to improve the disk footprint when running a garbage
+    collection. *)
+val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

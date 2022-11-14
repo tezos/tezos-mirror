@@ -84,6 +84,7 @@ type request =
       context_hash : Context_hash.t;
       gc_lockfile_path : string;
     }
+  | Context_split
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t

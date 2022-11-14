@@ -560,6 +560,10 @@ let context_garbage_collection w index context_hash ~gc_lockfile_path =
     context_hash
     ~gc_lockfile_path
 
+let context_split w index =
+  let bv = Worker.state w in
+  Block_validator_process.context_split bv.validation_process index
+
 let fetch_and_compile_protocol w =
   let bv = Worker.state w in
   Protocol_validator.fetch_and_compile_protocol bv.protocol_validator

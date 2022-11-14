@@ -115,14 +115,19 @@ val precheck_block :
   Operation.t trace trace ->
   unit tzresult Lwt.t
 
-(** [context_garbage_collection context_index context_hash] removes
-    contexts that are below [context_hash] in the context tree. *)
+(** [context_garbage_collection bvp context_index context_hash]
+    removes contexts that are below [context_hash] in the context
+    tree. *)
 val context_garbage_collection :
   t ->
   Context_ops.index ->
   Tezos_crypto.Context_hash.t ->
   gc_lockfile_path:string ->
   unit tzresult Lwt.t
+
+(** [context_split bvp context_index] splits the context storage
+    layout into a new chunk. *)
+val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
 val commit_genesis :
   t ->
