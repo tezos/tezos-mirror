@@ -620,8 +620,8 @@ module Dal = struct
 
   module Commitment = struct
     let pad n message =
-      let prefix = String.make n '\000' in
-      prefix ^ message
+      let padding = String.make n '\000' in
+      message ^ padding
 
     let dummy_commitment
         ?(on_error =
@@ -637,5 +637,7 @@ module Dal = struct
       match Cryptobox.polynomial_from_slot t slot with
       | Ok r -> Cryptobox.commit t r
       | Error (`Slot_wrong_size str) -> on_error str
+
+    let to_string commitment = Cryptobox.Commitment.to_b58check commitment
   end
 end

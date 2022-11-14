@@ -270,5 +270,7 @@ module Dal : sig
       Cryptobox.t ->
       string ->
       Cryptobox.commitment
+
+    val to_string : Cryptobox.commitment -> string
   end
 end

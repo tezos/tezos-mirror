@@ -823,15 +823,27 @@ let test_dal_node_test_slots_propagation =
   let* () = Dal_node.run dal_node2 in
   let* () = Dal_node.run dal_node3 in
   let* () = Dal_node.run dal_node4 in
+  let* dal = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make dal.cryptobox in
+  let commitment1 =
+    Rollup.Dal.Commitment.dummy_commitment dal.cryptobox cryptobox "content1"
+  in
+  let slot_header1_exp = Rollup.Dal.Commitment.to_string commitment1 in
+  let commitment2 =
+    Rollup.Dal.Commitment.dummy_commitment dal.cryptobox cryptobox "content2"
+  in
+  let slot_header2_exp = Rollup.Dal.Commitment.to_string commitment2 in
+  let p1 = wait_for_stored_slot dal_node3 slot_header1_exp in
+  let p2 = wait_for_stored_slot dal_node3 slot_header2_exp in
+  let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
+  let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
   let* slot_header1 = split_slot dal_node1 "content1" in
   let* slot_header2 = split_slot dal_node2 "content2" in
-  Lwt.join
-    [
-      wait_for_stored_slot dal_node3 slot_header1;
-      wait_for_stored_slot dal_node3 slot_header2;
-      wait_for_stored_slot dal_node4 slot_header1;
-      wait_for_stored_slot dal_node4 slot_header2;
-    ]
+  Check.(
+    (slot_header1_exp = slot_header1) string ~error_msg:"Expected:%L. Got: %R") ;
+  Check.(
+    (slot_header2_exp = slot_header2) string ~error_msg:"Expected:%L. Got: %R") ;
+  Lwt.join [p1; p2; p3; p4]
 
 let test_dal_node_startup =
   Protocol.register_test
