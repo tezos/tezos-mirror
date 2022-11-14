@@ -110,6 +110,14 @@ let rpc_addr_arg =
          default)
     Client_proto_args.string_parameter
 
+let metrics_addr_arg =
+  Tezos_clic.arg
+    ~long:"metrics-addr"
+    ~placeholder:
+      "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9932)"
+    ~doc:"The address of the smart-contract rollup node metrics server."
+    Client_proto_args.string_parameter
+
 let dal_node_addr_arg =
   let default = Configuration.default_dal_node_addr in
   Tezos_clic.arg
@@ -245,10 +253,11 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
-    (args8
+    (args9
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
+       metrics_addr_arg
        loser_mode
        reconnection_delay_arg
        dal_node_addr_arg
@@ -262,6 +271,7 @@ let config_init_command =
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
+           metrics_addr,
            loser_mode,
            reconnection_delay,
            dal_node_addr,
@@ -302,6 +312,7 @@ let config_init_command =
             Option.value ~default:default_dal_node_addr dal_node_addr;
           dal_node_port =
             Option.value ~default:default_dal_node_port dal_node_port;
+          metrics_addr;
           fee_parameters = Operator_purpose_map.empty;
           mode;
           loser_mode;
@@ -324,20 +335,22 @@ let run_command =
   command
     ~group
     ~desc:"Run the rollup daemon."
-    (args6
+    (args7
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
        dal_node_addr_arg
        dal_node_port_arg
-       reconnection_delay_arg)
+       reconnection_delay_arg
+       metrics_addr_arg)
     (prefixes ["run"] @@ stop)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
            dal_node_addr,
            dal_node_port,
-           reconnection_delay )
+           reconnection_delay,
+           metrics_addr )
          cctxt ->
       let* configuration = Configuration.load ~data_dir in
       let configuration =
@@ -354,6 +367,7 @@ let run_command =
               Option.value
                 ~default:configuration.reconnection_delay
                 reconnection_delay;
+            metrics_addr = Option.either metrics_addr configuration.metrics_addr;
           }
       in
       Daemon.run ~data_dir configuration cctxt)

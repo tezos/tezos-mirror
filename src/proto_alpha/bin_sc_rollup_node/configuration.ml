@@ -55,6 +55,7 @@ type t = {
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
+  metrics_addr : string option;
   reconnection_delay : float;
   fee_parameters : fee_parameters;
   mode : mode;
@@ -81,6 +82,8 @@ let config_filename ~data_dir = Filename.concat data_dir "config.json"
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8932
+
+let default_metrics_port = 9934
 
 let default_reconnection_delay = 2.0 (* seconds *)
 
@@ -479,6 +482,7 @@ let encoding : t Data_encoding.t =
            sc_rollup_node_operators;
            rpc_addr;
            rpc_port;
+           metrics_addr;
            reconnection_delay;
            fee_parameters;
            mode;
@@ -492,6 +496,7 @@ let encoding : t Data_encoding.t =
           sc_rollup_node_operators,
           rpc_addr,
           rpc_port,
+          metrics_addr,
           reconnection_delay,
           fee_parameters,
           mode,
@@ -501,6 +506,7 @@ let encoding : t Data_encoding.t =
              sc_rollup_node_operators,
              rpc_addr,
              rpc_port,
+             metrics_addr,
              reconnection_delay,
              fee_parameters,
              mode,
@@ -516,6 +522,7 @@ let encoding : t Data_encoding.t =
         sc_rollup_node_operators;
         rpc_addr;
         rpc_port;
+        metrics_addr;
         reconnection_delay;
         fee_parameters;
         mode;
@@ -526,7 +533,7 @@ let encoding : t Data_encoding.t =
         injector_retention_period;
       })
     (merge_objs
-       (obj8
+       (obj9
           (req
              "sc-rollup-address"
              ~description:"Smart contract rollup address"
@@ -539,6 +546,7 @@ let encoding : t Data_encoding.t =
              operators_encoding)
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+          (opt "metrics-addr" ~description:"Metrics address" string)
           (dft
              "reconnection_delay"
              ~description:

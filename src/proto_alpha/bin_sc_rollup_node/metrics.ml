@@ -23,44 +23,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines functions that emit the events used when the smart
-    contract rollup node is running (see {!Daemon}). *)
+open Prometheus
 
-open Protocol.Alpha_context
+let sc_rollup_node_registry = CollectorRegistry.create ()
 
-val starting_node : unit -> unit Lwt.t
+module Cohttp (Server : Cohttp_lwt.S.Server) = struct
+  let callback _conn req _body =
+    let open Cohttp in
+    let open Lwt_syntax in
+    let uri = Request.uri req in
+    match (Request.meth req, Uri.path uri) with
+    | `GET, "/metrics" ->
+        let* data = CollectorRegistry.(collect sc_rollup_node_registry) in
+        let body =
+          Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data
+        in
+        let headers =
+          Header.init_with "Content-Type" "text/plain; version=0.0.4"
+        in
+        Server.respond_string ~status:`OK ~headers ~body ()
+    | _ -> Server.respond_error ~status:`Bad_request ~body:"Bad request" ()
+end
 
-val node_is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
+module Metrics_server = Cohttp (Cohttp_lwt_unix.Server)
 
-(** [rollup_exists addr kind] emits the event that the smart contract rollup
-    node is interacting with the rollup at address [addr] and of the given
-    [kind]. *)
-val rollup_exists : addr:Sc_rollup.t -> kind:Sc_rollup.Kind.t -> unit Lwt.t
-
-(** [shutdown_node exit_status] emits the event that the smart contract rollup
-    node is stopping with exit status [exit_status]. *)
-val shutdown_node : int -> unit Lwt.t
-
-(** Emits the event that the connection to the Tezos node has been lost. *)
-val connection_lost : unit -> unit Lwt.t
-
-(** [cannot_connect ~count error] emits the event that the rollup node cannot
-    connect to the Tezos node because of [error] for the [count]'s time. *)
-val cannot_connect : count:int -> tztrace -> unit Lwt.t
-
-(** [wait_reconnect delay] emits the event that the rollup will wait [delay]
-    seconds before attempting to reconnect to the Tezos node . *)
-val wait_reconnect : float -> unit Lwt.t
-
-(** [starting_metrics_server ~metrics_addr ~metrics_port] emits the event
-    that the metrics server for the rollup node is starting. *)
-val starting_metrics_server : host:string -> port:int -> unit Lwt.t
-
-(** [metrics_ended error] emits the event that the metrics server
-    has ended with a failure. *)
-val metrics_ended : string -> unit Lwt.t
-
-(** [metrics_ended error] emits the event that the metrics server
-    has ended with a failure.
-    (Doesn't wait for event to be emited. *)
-val metrics_ended_dont_wait : string -> unit
+let metrics_serve metrics_addr =
+  let open Lwt_result_syntax in
+  match metrics_addr with
+  | Some metrics_addr ->
+      let* addrs =
+        Octez_node_config.Config_file.resolve_metrics_addrs
+          ~default_metrics_port:Configuration.default_metrics_port
+          metrics_addr
+      in
+      let*! () =
+        List.iter_p
+          (fun (addr, port) ->
+            let host = Ipaddr.V6.to_string addr in
+            let*! () = Event.starting_metrics_server ~host ~port in
+            let*! ctx = Conduit_lwt_unix.init ~src:host () in
+            let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+            let mode = `TCP (`Port port) in
+            let callback = Metrics_server.callback in
+            Cohttp_lwt_unix.Server.create
+              ~ctx
+              ~mode
+              (Cohttp_lwt_unix.Server.make ~callback ()))
+          addrs
+      in
+      return_unit
+  | None -> return_unit

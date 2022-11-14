@@ -89,6 +89,23 @@ module Simple = struct
       ~msg:"Retrying to connect in {delay}s"
       ~level:Warning
       ("delay", Data_encoding.float)
+
+  let starting_metrics_server =
+    declare_2
+      ~section
+      ~name:"starting_metrics_server"
+      ~msg:"starting metrics server on {host}:{port}"
+      ~level:Notice
+      ("host", Data_encoding.string)
+      ("port", Data_encoding.uint16)
+
+  let metrics_ended =
+    declare_1
+      ~section
+      ~name:"metrics_ended"
+      ~level:Error
+      ~msg:"metrics server ended with error {stacktrace}"
+      ("stacktrace", Data_encoding.string)
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -107,3 +124,11 @@ let connection_lost () = Simple.(emit connection_lost) ()
 let cannot_connect ~count error = Simple.(emit cannot_connect) (count, error)
 
 let wait_reconnect delay = Simple.(emit wait_reconnect) delay
+
+let starting_metrics_server ~host ~port =
+  Simple.(emit starting_metrics_server) (host, port)
+
+let metrics_ended error = Simple.(emit metrics_ended) error
+
+let metrics_ended_dont_wait error =
+  Simple.(emit__dont_wait__use_with_care metrics_ended) error
