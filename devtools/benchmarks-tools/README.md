@@ -27,6 +27,8 @@ On the reference machine, the benchmarks directory should look like this:
           - inference_results/
           - cron_res
           - cron_res_errors
+          - STARTED
+          - SUCCESS
   - tezos/
       - _snoop/
           - michelson_data/
@@ -41,17 +43,20 @@ On the reference machine, the benchmarks directory should look like this:
   - anomalies
 ```
 
-- `cronjob.sh` is the main script run by Cron. Its sources are in this repository and needs to be copied to the reference machine whenever it is updated.
-- `run_all_benchmarks_on_latest_master.sh` is the script actually launching the benchmarks and called by `cronjob.sh`. Its sources are in this repository and needs to be copied to the reference machine whenever it is updated.
+- `cronjob.sh` is the main script run by Cron. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
+- `run_all_benchmarks_on_latest_master.sh` is the script actually launching the benchmarks and called by `cronjob.sh`. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
 - `rustup-init.sh` and `zcash_params` handle some external dependencies. How to maintain these files is under discussion.
-- `snoop_results` contains the result of the benchmarks, with one sub-directory per benchmarks run.
+- `snoop_results` contains the result of the benchmarks, with one sub-directory per benchmark run.
+  - `STARTED` and `SUCCESS` are marker files that can be used by human beings to have a quick look at the benchmarks process status (they contain the PID).
+  - Other files are created by being moved from other locations, as described below.
 - `tezos` is a clone of https://gitlab.com/tezos/tezos. It is updated automatically in `run_all_benchmarks_on_latest_master.sh`, but it needs to be created prior to the very first Cron job.
-  - `michelson_data` and `sapling_data` contain data that are very long to generate but rarely change between two benchmarks runs. For now, we decided not to regenerate them, and keep the same data from one run to the other. When to update them is under discussion.
+  - `michelson_data` and `sapling_data` contain data that are very long to generate but rarely change between two benchmark runs. For now, we decided not to regenerate them, and keep the same data from one run to the other. When to update them is under discussion.
   - Also note that in this directory, `benchmark_results` and `inference_results` only exist during a run of the benchmarks. They are moved to `snoop_results` at the end.
-- `cron_res` and `cron_res_errors` are the log files of a benchmarks run. They are only present during a run, and moved to `snoop_results` at the end.
+- `cron_res` and `cron_res_errors` are the log files of a benchmark run. They are only present during a run, and moved to `snoop_results` at the end.
 - `current_run_dir` and `last_run_dir` are marker files each containing the name of a benchmarks results directory:
   - `current_run_dir` is present as long as benchmarks are running, or when they failed for some reason;
-  - `last_run_dir` records the last benchmarks process that completed successfully.
-- `anomalies` logs the cases where the benchmarks could not be run at all. For instance if the processes are triggered while the previous haven't completed yet.
+  - `last_run_dir` records the last benchmark process that was completed successfully;
+  - their intent is close to that of the status files (`STARTED` and `SUCCESS`), but they are used for scripting and the status files are more convenient for human beings.
+- `anomalies` logs some events that prevent the benchmarks from being run correctly. For instance if the processes are triggered while the previous haven't completed yet.
 
-`cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but only know their final destination after fetching the most recent `master` commit.
+`cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but we only know their final destination after fetching the most recent `master` commit.

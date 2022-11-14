@@ -53,10 +53,12 @@ dated_log "HEAD is $HEADCOMMIT"
 SNOOP_RESULT_DIR="snoop_results/_snoop_${TODAY}_${HEADCOMMIT}"
 
 # Create the result directory and register its name for tools that depend on it.
+# Also create a status file for a quick check from human beings.
 cd ..
 echo "$SNOOP_RESULT_DIR" > current_run_dir
 mkdir -p snoop_results
 mkdir "$SNOOP_RESULT_DIR"
+echo $$ > "$SNOOP_RESULT_DIR"/STARTED
 
 # Build dependencies.
 # opam's solver can timeout sometimes, which does not mean that the remaining
@@ -91,10 +93,10 @@ dated_log "Uploading CSVs"
 aws s3 cp "$SNOOP_RESULT_DIR"/inference_results/ s3://snoop-playground/mclaren/inference_csvs/"$SNOOP_RESULT_DIR"/ --recursive --exclude "*" --include "*.csv"
 dated_log "Results and CSVs uploaded"
 
-# Change the file containing the name of the result directory.
-# This allows to use current_run_dir and last_run_dir as markers of the
-# benchmarks being run (current_run_dir) or finished (last_run_dir).
+# Update the directory of the last successful run, and its status.
 mv current_run_dir last_run_dir
+echo $$ > "$SNOOP_RESULT_DIR"/SUCCESS
+aws s3 cp "$SNOOP_RESULT_DIR"/SUCCESS s3://snoop-playground/mclaren/complete_results/"$SNOOP_RESULT_DIR"/
 
 dated_log "End of benchmarks processes"
 exit 0
