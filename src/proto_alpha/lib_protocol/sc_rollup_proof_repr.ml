@@ -353,7 +353,7 @@ module type PVM_with_context_and_state = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option
+  val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option Lwt.t
 
   module Inbox_with_history : sig
     include
@@ -423,7 +423,8 @@ let produce ~metadata pvm_and_state commit_level =
         in
         return (Some inbox_proof, input)
     | Needs_reveal (Reveal_raw_data h) -> (
-        match reveal h with
+        let*! res = reveal h in
+        match res with
         | None -> proof_error "No reveal"
         | Some data ->
             return

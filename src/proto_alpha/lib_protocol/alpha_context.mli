@@ -3746,7 +3746,7 @@ module Sc_rollup : sig
 
       val proof_encoding : proof Data_encoding.t
 
-      val reveal : Reveal_hash.t -> string option
+      val reveal : Reveal_hash.t -> string option Lwt.t
 
       module Inbox_with_history : sig
         include Inbox.Merkelized_operations with type inbox_context = context

@@ -216,7 +216,8 @@ module Make (Interpreter : Interpreter.S) :
       let state = start_state
 
       let reveal hash =
-        Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_name:PVM.name ~hash
+        Lwt.return
+        @@ Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_name:PVM.name ~hash
 
       module Inbox_with_history = struct
         include Context.Inbox
