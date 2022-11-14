@@ -131,7 +131,7 @@ type error +=
   | Target_block_validation_failed of Block_hash.t * string
   | Directory_already_exists of string
   | Empty_floating_store
-  | Cannot_create_tmp_export_directory of string
+  | Cannot_remove_tmp_export_directory of string
   | Inconsistent_chain_import of {
       expected : Distributed_db_version.Name.t;
       got : Distributed_db_version.Name.t;

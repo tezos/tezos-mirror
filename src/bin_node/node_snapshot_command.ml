@@ -202,14 +202,19 @@ module Term = struct
       let* snapshot_path = check_snapshot_path snapshot_path in
       let dir_cleaner () =
         let*! () = Event.(emit cleaning_up_after_failure) data_dir in
-        if existing_data_dir then
-          (* Remove only context and store if the import directory
-                 was previously existing. *)
-          let*! () =
-            Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
-          in
-          Lwt_utils_unix.remove_dir (Node_data_version.context_dir data_dir)
-        else Lwt_utils_unix.remove_dir data_dir
+        let*! () =
+          if existing_data_dir then
+            (* Remove only context and store if the import directory
+                   was previously existing. *)
+            let*! () =
+              Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
+            in
+            Lwt_utils_unix.remove_dir (Node_data_version.context_dir data_dir)
+          else Lwt_utils_unix.remove_dir data_dir
+        in
+        let lock_file = Node_data_version.lock_file data_dir in
+        let*! lock_file_exists = Lwt_unix.file_exists lock_file in
+        if lock_file_exists then Lwt_unix.unlink lock_file else Lwt.return_unit
       in
       let* () = Node_data_version.ensure_data_dir ~mode:Is_bare data_dir in
       (* Lock only on snapshot import *)
