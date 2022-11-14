@@ -290,7 +290,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.post_chain_block_context_contract_big_map_get
            ~id:contract_id
-           ~data:big_map_key
+           ~data:(Data big_map_key)
            ()
     in
     let* _ =
@@ -344,7 +344,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.post_chain_block_context_contract_big_map_get
          ~id:originated_contract_advanced
-         ~data:unique_big_map_key
+         ~data:(Data unique_big_map_key)
          ()
   in
   let duplicate_big_map_key =
@@ -355,7 +355,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.post_chain_block_context_contract_big_map_get
          ~id:originated_contract_advanced
-         ~data:duplicate_big_map_key
+         ~data:(Data duplicate_big_map_key)
          ()
   in
   unit
@@ -890,7 +890,9 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let post_and_get_filter config_str =
     let* _ =
       RPC.Client.call ?endpoint ~hooks:mempool_hooks client
-      @@ RPC.post_chain_mempool_filter ~data:(Ezjsonm.from_string config_str) ()
+      @@ RPC.post_chain_mempool_filter
+           ~data:(Data (Ezjsonm.from_string config_str))
+           ()
     in
     get_filter_variations ()
   in

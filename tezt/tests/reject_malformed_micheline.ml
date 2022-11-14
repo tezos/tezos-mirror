@@ -82,7 +82,7 @@ let reject_malformed_micheline =
   let send_operation data =
     (* The [run_operation] RPC is used because it doesn't require
        valid signatures. *)
-    let json = Ezjsonm.from_string data in
+    let json : RPC_core.data = Data (Ezjsonm.from_string data) in
     let* response =
       RPC.(call_raw node (post_chain_block_helpers_scripts_run_operation json))
     in

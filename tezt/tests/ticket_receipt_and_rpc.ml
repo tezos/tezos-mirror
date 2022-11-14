@@ -34,13 +34,14 @@ let hooks = Tezos_regression.hooks
 
 let rpc_check_ticket_balance client ~contract ~ticketer ~content_type ~content
     ~expected =
-  let post_body =
-    Ezjsonm.value_from_string
-    @@ sf
-         {|{"ticketer": "%s", "content_type": {"prim": "%s"}, "content": {"string": "%s"}}|}
-         ticketer
-         content_type
-         content
+  let post_body : RPC_core.data =
+    Data
+      (Ezjsonm.value_from_string
+      @@ sf
+           {|{"ticketer": "%s", "content_type": {"prim": "%s"}, "content": {"string": "%s"}}|}
+           ticketer
+           content_type
+           content)
   in
   let* actual =
     RPC.Client.call client

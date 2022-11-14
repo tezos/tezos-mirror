@@ -761,7 +761,7 @@ module Dal = struct
              | _ -> failwith "invalid case")
 
     let patch_profile profile =
-      let data = json_of_profile profile in
+      let data = Client.Data (json_of_profile profile) in
       make ~data PATCH ["profiles"] as_empty_object_or_fail
 
     let get_profiles () = make GET ["profiles"] profiles_of_json

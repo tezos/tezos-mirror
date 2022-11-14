@@ -102,7 +102,9 @@ module Revamped = struct
   let set_filter ?(log = false) config_str client =
     let* res =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_filter ~data:(Ezjsonm.from_string config_str) ()
+      @@ RPC.post_chain_mempool_filter
+           ~data:(Data (Ezjsonm.from_string config_str))
+           ()
     in
     if log then Log.info "Updated filter config with: %s." config_str ;
     return res
@@ -486,7 +488,7 @@ module Revamped = struct
     log_step 6 "Ban the operation %s." oph1 ;
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step 7 "Check that the node's mempool contains %s as applied." oph2 ;
@@ -945,7 +947,7 @@ module Revamped = struct
     log_step 6 "Ban the operation %s." oph1 ;
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step
@@ -958,7 +960,7 @@ module Revamped = struct
     log_step 8 "Ban the operation %s." oph2 ;
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
 
     log_step
@@ -1031,7 +1033,7 @@ module Revamped = struct
     in
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step
@@ -1113,7 +1115,7 @@ module Revamped = struct
     log_step 5 "Ban the operation %s." oph1 ;
     let* _ =
       RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     log_step
@@ -1433,7 +1435,7 @@ module Revamped = struct
     log_step 3 "Ban %s on node 2." oph1 ;
     let* _ =
       RPC.Client.call client2
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~applied:[oph2] client2 in
 
@@ -1511,11 +1513,11 @@ module Revamped = struct
     (* We ban twice to check banning an operation is idempotent. *)
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~applied:[oph2] client1 in
 
@@ -1526,11 +1528,11 @@ module Revamped = struct
     log_step 5 "Ban op2 and op1 again." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* () = check_mempool ~applied:[oph3] client1 in
 
@@ -1545,7 +1547,7 @@ module Revamped = struct
     log_step 7 "Unban op1, successfully reinject op1." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ = inject_op ~wait:true `A in
     let* () = check_mempool ~applied:[oph3; oph1] client1 in
@@ -1560,7 +1562,7 @@ module Revamped = struct
     log_step 9 "Unban op2, successfully reinject op2." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
 
     let* _ = inject_op ~wait:true `B in
@@ -1569,7 +1571,7 @@ module Revamped = struct
     log_step 10 "Ban op1 again, check that reinjecting it fails." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
     let wait_reinject_op1_banned_again =
@@ -1582,11 +1584,11 @@ module Revamped = struct
     log_step 11 "Try unban op3 and op2 check that nothing changes." ;
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph3) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph3)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
     check_mempool ~applied:[oph3; oph2] client1
 
@@ -1645,15 +1647,15 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
     in
     let* _ =
       RPC.Client.call client1
-      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph3) ()
+      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph3)) ()
     in
     let* () = check_mempool ~applied:[oph4] client1 in
 
@@ -2267,14 +2269,15 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
   let* op_hex =
     RPC.Client.call client
     @@ RPC.post_chain_block_helpers_forge_operations
-         ~data:(Ezjsonm.from_string op_json_branch)
+         ~data:(Data (Ezjsonm.from_string op_json_branch))
          ()
   in
   return (`Hex (JSON.as_string op_hex))
 
 let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  RPC.Client.call client @@ RPC.post_injection_operation (`String signed_op)
+  RPC.Client.call client
+  @@ RPC.post_injection_operation (Data (`String signed_op))
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client =
@@ -2507,14 +2510,14 @@ let propagation_future_endorsement =
   Log.info "%s" step5_msg ;
   let* _ =
     RPC.Client.call client_1
-    @@ RPC.post_chain_mempool_ban_operation ~data:(`String hash) ()
+    @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String hash)) ()
   in
   Log.info "%s" step6_msg ;
   let (`Hex bytes) = Hex.of_bytes bytes in
   let injection_waiter = wait_for_injection node_2 in
   let* _ =
     RPC.Client.call client_2
-    @@ RPC.post_private_injection_operation (`String bytes)
+    @@ RPC.post_private_injection_operation (Data (`String bytes))
   in
   let* () = injection_waiter in
   Log.info "%s" step7_msg ;
@@ -2950,7 +2953,7 @@ let ban_operation_and_check_applied =
   Log.info "Operation to ban: %s" oph_to_ban ;
   let* _ =
     RPC.Client.call client_1
-    @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph_to_ban) ()
+    @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph_to_ban)) ()
   in
   Log.info "Operation %s is now banned." oph_to_ban ;
   Log.info "Step 4: Check that applied operations in node_1 are still applied." ;
@@ -3400,7 +3403,8 @@ let force_operation_injection =
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
   let*? p =
-    RPC.Client.spawn client1 @@ RPC.post_injection_operation (`String signed_op)
+    RPC.Client.spawn client1
+    @@ RPC.post_injection_operation (Data (`String signed_op))
   in
   let injection_error_rex =
     rex
@@ -3411,7 +3415,7 @@ let force_operation_injection =
   Log.info "%s" step6_msg ;
   let*? p =
     RPC.Client.spawn client1
-    @@ RPC.post_private_injection_operation (`String signed_op)
+    @@ RPC.post_private_injection_operation (Data (`String signed_op))
   in
   let access_error_rex =
     rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
@@ -3419,13 +3423,14 @@ let force_operation_injection =
   let* () = Process.check_error ~msg:access_error_rex p in
   Log.info "%s" step7_msg ;
   let*? p =
-    RPC.Client.spawn client2 @@ RPC.post_injection_operation (`String signed_op)
+    RPC.Client.spawn client2
+    @@ RPC.post_injection_operation (Data (`String signed_op))
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step8_msg ;
   let* _ =
     RPC.Client.call client2
-    @@ RPC.post_private_injection_operation (`String signed_op)
+    @@ RPC.post_private_injection_operation (Data (`String signed_op))
   in
   unit
 
@@ -3491,7 +3496,7 @@ let injecting_old_operation_fails =
   log_step 5 step5 ;
   let*? process =
     RPC.Client.spawn client
-    @@ RPC.post_injection_operation (`String (op_str_hex ^ signature))
+    @@ RPC.post_injection_operation (Data (`String (op_str_hex ^ signature)))
   in
   let injection_error_rex =
     rex

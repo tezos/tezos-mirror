@@ -227,12 +227,13 @@ let propagate_precheckable_bad_block =
   let signed_bad_block_header_hex =
     String.concat "" [unsigned_block_header_hex; signature]
   in
-  let injection_json =
-    `O
-      [
-        ("data", `String signed_bad_block_header_hex);
-        ("operations", `A (List.init 4 (fun _ -> `A [])));
-      ]
+  let injection_json : RPC_core.data =
+    Data
+      (`O
+        [
+          ("data", `String signed_bad_block_header_hex);
+          ("operations", `A (List.init 4 (fun _ -> `A [])));
+        ])
   in
   let wait_precheck_but_validation_fail node =
     let got_prechecked = ref false in
@@ -361,12 +362,13 @@ let propagate_precheckable_bad_block_payload =
   let signed_bad_block_header_hex =
     String.concat "" [unsigned_bad_block_header_hex; signature]
   in
-  let injection_json =
-    `O
-      [
-        ("data", `String signed_bad_block_header_hex);
-        ("operations", `A (List.init 4 (fun _ -> `A [])));
-      ]
+  let injection_json : RPC_core.data =
+    Data
+      (`O
+        [
+          ("data", `String signed_bad_block_header_hex);
+          ("operations", `A (List.init 4 (fun _ -> `A [])));
+        ])
   in
   let wait_precheck_but_validation_fail node =
     let got_prechecked = ref false in
