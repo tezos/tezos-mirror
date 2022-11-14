@@ -175,11 +175,12 @@ val resolve_discovery_addrs : string -> (Ipaddr.V4.t * int) list tzresult Lwt.t
    [default_rpc_port]. Fails if the address could not be parsed. *)
 val resolve_rpc_listening_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
 
-(** [resolve_metrics_addrs metrics_addr] parses [metrics_addr] and returns a list of
+(** [resolve_metrics_addrs ?default_metrics_port metrics_addr] parses [metrics_addr] and
     returns a list of [points]).
     The default host is "localhost" and the default port is [default_metrics_port].
     Fails if the address could not be parsed.*)
-val resolve_metrics_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
+val resolve_metrics_addrs :
+  ?default_metrics_port:int -> string -> P2p_point.Id.t list tzresult Lwt.t
 
 (** [resolve_boostrap_addrs bs_addrs] parses [bs_addrs] and returns
    for each [addr] a list of [points]. The default port is
