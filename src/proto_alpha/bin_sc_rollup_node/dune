@@ -38,7 +38,8 @@
   tezos-injector-alpha
   tezos-scoru-wasm-fast
   tezos-crypto-dal
-  prometheus-app)
+  prometheus-app
+  octez-node-config)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))

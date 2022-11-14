@@ -4857,6 +4857,7 @@ module Protocol = Protocol
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             prometheus_app |> if_ N.(number >= 016);
+            octez_node_config |> if_ N.(number >= 016);
           ]
     in
     let _octez_scoru_wasm_repl =
