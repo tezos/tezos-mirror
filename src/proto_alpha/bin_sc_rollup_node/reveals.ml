@@ -23,11 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let string_of_file filename =
-  let cin = open_in filename in
-  let s = really_input_string cin (in_channel_length cin) in
-  close_in cin ;
-  s
+module Reveal_hash = Protocol.Alpha_context.Sc_rollup.Reveal_hash
+
+type error +=
+  | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
+  | Could_not_open_preimage_file of String.t
+
+let () =
+  register_error_kind
+    ~id:"sc_rollup.node.wrong_hash_of_reveal_preimage"
+    ~title:"Hash of reveal preimage is not correct"
+    ~description:"Hash of reveal preimage is not correct."
+    ~pp:(fun ppf (found, expected) ->
+      Format.fprintf
+        ppf
+        "The hash of reveal preimage is %a while a value of %a is expected"
+        Reveal_hash.pp
+        found
+        Reveal_hash.pp
+        expected)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "found" Reveal_hash.encoding)
+        (req "expected" Reveal_hash.encoding))
+    (function
+      | Wrong_hash {found; expected} -> Some (found, expected) | _ -> None)
+    (fun (found, expected) -> Wrong_hash {found; expected}) ;
+  register_error_kind
+    ~id:"sc_rollup.node.could_not_open_reveal_preimage_file"
+    ~title:"Could not open reveal preimage file"
+    ~description:"Could not open reveal preimage file."
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "Could not open file containing preimage of reveal hash %s"
+        hash)
+    `Permanent
+    Data_encoding.(obj1 (req "hash" string))
+    (function
+      | Could_not_open_preimage_file filename -> Some filename | _ -> None)
+    (fun filename -> Could_not_open_preimage_file filename)
+
+let file_contents filename =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let*! contents = Lwt_utils_unix.read_file filename in
+      return contents)
+    (fun _ -> tzfail @@ Could_not_open_preimage_file filename)
 
 let save_string filename s =
   let cout = open_out filename in
@@ -35,9 +79,7 @@ let save_string filename s =
   close_out cout
 
 let path data_dir pvm_name hash =
-  let hash =
-    Format.asprintf "%a" Protocol.Alpha_context.Sc_rollup.Reveal_hash.pp hash
-  in
+  let hash = Format.asprintf "%a" Reveal_hash.pp hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
 let ensure_dir_exists data_dir pvm_name =
@@ -48,7 +90,16 @@ let ensure_dir_exists data_dir pvm_name =
   else Sys.mkdir path 0o700
 
 let get ~data_dir ~pvm_name ~hash =
-  try Some (string_of_file (path data_dir pvm_name hash)) with _ -> None
+  let open Lwt_result_syntax in
+  let filename = path data_dir pvm_name hash in
+  let* contents = file_contents filename in
+  let*? () =
+    let contents_hash = Reveal_hash.hash_string [contents] in
+    error_unless
+      (Reveal_hash.equal contents_hash hash)
+      (Wrong_hash {found = contents_hash; expected = hash})
+  in
+  return contents
 
 module Arith = struct
   let pvm_name =
@@ -115,7 +166,6 @@ module Arith = struct
     let rec aux successor_hash linked_chunks = function
       | [] -> linked_chunks
       | chunk :: rev_chunks ->
-          let open Protocol.Alpha_context.Sc_rollup in
           let cell =
             match successor_hash with
             | None -> chunk

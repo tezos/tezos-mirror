@@ -216,8 +216,11 @@ module Make (Interpreter : Interpreter.S) :
       let state = start_state
 
       let reveal hash =
-        Lwt.return
-        @@ Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_name:PVM.name ~hash
+        let open Lwt_syntax in
+        let* res =
+          Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_name:PVM.name ~hash
+        in
+        match res with Ok data -> return @@ Some data | Error _ -> return None
 
       module Inbox_with_history = struct
         include Context.Inbox

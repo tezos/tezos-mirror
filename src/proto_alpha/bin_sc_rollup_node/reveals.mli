@@ -50,14 +50,21 @@
 
 open Protocol.Alpha_context
 
-(** [get ~data_dir ~pvm_name ~hash] returns [Some data] such that
-    [Input_hash.hash_string [data] = hash]. If such [data] is known
-    to the rollup node. Otherwise, returns [None]. *)
+(** [get ~data_dir ~pvm_name ~hash] retrieves the data associated with
+    the reveal hash [hash] from disk. May fail with:
+    {ul
+      {li [Wrong_hash {found; expected}] where [expected = hash], and
+        [found <> hash], if the data is retrieved and hashes to the wrong
+        hash [found],}
+     {li [Could_not_open_preimage_file filename] if the function tries to
+        retrieve the data from [filename], but it cannot read the contents
+        of the file.}
+   } *)
 val get :
   data_dir:string ->
   pvm_name:string ->
   hash:Sc_rollup.Reveal_hash.t ->
-  string option
+  string tzresult Lwt.t
 
 (** [import ~data_dir ~pvm_name ~filename] turns the content of ~filename
     into a chunk of pages of (at most) 4KB, returning the hash of the first

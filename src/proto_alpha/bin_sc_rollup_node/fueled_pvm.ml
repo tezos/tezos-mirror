@@ -106,16 +106,12 @@ module Make
               failing_ticks
               next_state
         | Needs_reveal (Reveal_raw_data hash) -> (
-            match Reveals.get ~data_dir ~pvm_name:PVM.name ~hash with
-            | None -> tzfail (Sc_rollup_node_errors.Cannot_retrieve_reveal hash)
-            | Some data -> (
-                let*! next_state =
-                  PVM.set_input (Reveal (Raw_data data)) state
-                in
-                match F.consume F.one_tick_consumption fuel with
-                | None -> return (state, fuel, current_tick, failing_ticks)
-                | Some fuel ->
-                    go fuel (Int64.succ current_tick) failing_ticks next_state))
+            let* data = Reveals.get ~data_dir ~pvm_name:PVM.name ~hash in
+            let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
+            match F.consume F.one_tick_consumption fuel with
+            | None -> return (state, fuel, current_tick, failing_ticks)
+            | Some fuel ->
+                go fuel (Int64.succ current_tick) failing_ticks next_state)
         | Needs_reveal Reveal_metadata -> (
             let*! next_state =
               PVM.set_input (Reveal (Metadata metadata)) state
