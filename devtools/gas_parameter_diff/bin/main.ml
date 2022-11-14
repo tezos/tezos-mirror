@@ -38,26 +38,61 @@ let parse_input_csv file : csv_input_table =
   List.combine first_line second_line
 
 (* Returns names1 @ List.map fst table2 but without the duplicates *)
-let merge_params names1 table2 =
+let merge_params names1 (table2, _file_name) =
   names1
   @ List.filter_map
       (fun (name, _value) -> if List.mem name names1 then None else Some name)
       table2
 
+let read_num s = try Some (float_of_string s) with _ -> None
+
+let lift f a b =
+  match (a, b) with
+  | Some a, Some b -> Some (f a b)
+  | Some a, None -> Some a
+  | None, Some b -> Some b
+  | None, None -> None
+
 let () =
   let len = Array.length Sys.argv - 1 in
-  let tables = Array.init len (fun i -> parse_input_csv Sys.argv.(i + 1)) in
+  let tables =
+    Array.init len (fun i ->
+        let file = Sys.argv.(i + 1) in
+        (parse_input_csv file, file))
+  in
   let all_param_names = Array.fold_left merge_params [] tables in
+
+  (* Output the title line *)
+  Printf.printf "," ;
+  Array.iter (fun (_table, file_name) -> Printf.printf "%s," file_name) tables ;
+  Printf.printf ",MIN,MAX,DIFF,CHANGE (%%)\n" ;
+
+  (* Output the content lines *)
   List.iter
     (fun name ->
       Printf.printf "%s," name ;
+      let current_min = ref None in
+      let current_max = ref None in
       Array.iter
-        (fun table ->
+        (fun (table, _file_name) ->
           let value = List.assoc_opt name table in
           (match value with
           | None -> ()
-          | Some value -> Printf.printf "%s" value) ;
+          | Some value ->
+              let v = read_num value in
+              Printf.printf "%s" value ;
+              current_min := lift min !current_min v ;
+              current_max := lift max !current_max v) ;
           Printf.printf ",")
         tables ;
-      Printf.printf "\n")
+      match (!current_min, !current_max) with
+      | Some final_min, Some final_max ->
+          let diff = final_max -. final_min in
+          let change =
+            let divisor = max (abs_float final_min) (abs_float final_max) in
+            if divisor = 0. then (* in that case all values are null *) 0.
+            else 100. *. diff /. divisor
+          in
+          Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change
+      | _, _ -> Printf.printf ",,,,\n")
     all_param_names
