@@ -410,7 +410,7 @@ module Make (PVM : Pvm.S) = struct
         Injector.init
           node_ctxt.cctxt
           (Node_context.readonly node_ctxt)
-          ~data_dir:configuration.data_dir
+          ~data_dir:node_ctxt.data_dir
           ~signers
           ~retention_period:configuration.injector_retention_period
       in
@@ -454,11 +454,9 @@ let run ~data_dir (configuration : Configuration.t)
       configuration.sc_rollup_node_operators
   in
   let*! store =
-    Store.load
-      Read_write
-      Configuration.(default_storage_dir configuration.data_dir)
+    Store.load Read_write Configuration.(default_storage_dir data_dir)
   in
-  let*! context = Context.load Read_write configuration in
+  let*! context = Context.load Read_write data_dir in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init

@@ -292,7 +292,6 @@ let config_init_command =
       in
       let config =
         {
-          data_dir;
           sc_rollup_address;
           sc_rollup_node_operators;
           rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
@@ -311,11 +310,11 @@ let config_init_command =
         }
       in
       let*? config = check_mode config in
-      let* () = save config in
+      let* () = save ~data_dir config in
       let*! () =
         cctxt#message
           "Smart-contract rollup node configuration written in %s"
-          (filename config)
+          (config_filename ~data_dir)
       in
       return_unit)
 

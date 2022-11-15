@@ -51,7 +51,6 @@ type batcher = {
 }
 
 type t = {
-  data_dir : string;
   sc_rollup_address : Sc_rollup.t;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
@@ -77,9 +76,7 @@ let default_storage_dir data_dir = Filename.concat data_dir storage_dir
 
 let default_context_dir data_dir = Filename.concat data_dir context_dir
 
-let relative_filename data_dir = Filename.concat data_dir "config.json"
-
-let filename config = relative_filename config.data_dir
+let config_filename ~data_dir = Filename.concat data_dir "config.json"
 
 let default_rpc_addr = "127.0.0.1"
 
@@ -478,7 +475,6 @@ let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {
-           data_dir;
            sc_rollup_address;
            sc_rollup_node_operators;
            rpc_addr;
@@ -492,8 +488,7 @@ let encoding : t Data_encoding.t =
            batcher;
            injector_retention_period;
          } ->
-      ( ( data_dir,
-          sc_rollup_address,
+      ( ( sc_rollup_address,
           sc_rollup_node_operators,
           rpc_addr,
           rpc_port,
@@ -502,8 +497,7 @@ let encoding : t Data_encoding.t =
           mode,
           loser_mode ),
         (dal_node_addr, dal_node_port, batcher, injector_retention_period) ))
-    (fun ( ( data_dir,
-             sc_rollup_address,
+    (fun ( ( sc_rollup_address,
              sc_rollup_node_operators,
              rpc_addr,
              rpc_port,
@@ -518,7 +512,6 @@ let encoding : t Data_encoding.t =
           "injector_retention_period should be smaller than %d"
           max_injector_retention_period ;
       {
-        data_dir;
         sc_rollup_address;
         sc_rollup_node_operators;
         rpc_addr;
@@ -533,12 +526,7 @@ let encoding : t Data_encoding.t =
         injector_retention_period;
       })
     (merge_objs
-       (obj9
-          (dft
-             "data-dir"
-             ~description:"Location of the data dir"
-             string
-             default_data_dir)
+       (obj8
           (req
              "sc-rollup-address"
              ~description:"Smart contract rollup address"
@@ -626,16 +614,16 @@ This should be used for test only!
 ************ WARNING *************
 |}
 
-let save config =
+let save ~data_dir config =
   loser_warning_message config ;
   let open Lwt_syntax in
   let json = Data_encoding.Json.construct encoding config in
-  let* () = Lwt_utils_unix.create_dir config.data_dir in
-  Lwt_utils_unix.Json.write_file (filename config) json
+  let* () = Lwt_utils_unix.create_dir data_dir in
+  Lwt_utils_unix.Json.write_file (config_filename ~data_dir) json
 
 let load ~data_dir =
   let open Lwt_result_syntax in
-  let+ json = Lwt_utils_unix.Json.read_file (relative_filename data_dir) in
+  let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
   let config = Data_encoding.Json.destruct encoding json in
   loser_warning_message config ;
   config

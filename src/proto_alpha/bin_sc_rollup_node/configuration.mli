@@ -65,7 +65,6 @@ type batcher = {
 }
 
 type t = {
-  data_dir : string;
   sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
   sc_rollup_node_operators : operators;
   rpc_addr : string;
@@ -156,15 +155,16 @@ val mode_of_string : string -> mode tzresult
 (** [description_of_mode m] returns a textual description of the mode [m]. *)
 val description_of_mode : mode -> string
 
-(** [filename configuration] returns the [configuration] filename. *)
-val filename : t -> string
+(** [config_filename data_dir] returns
+    the configration filename from the [data_dir] *)
+val config_filename : data_dir:string -> string
 
 (** [check_mode config] ensures the operators correspond to the chosen mode and
     removes the extra ones. *)
 val check_mode : t -> t tzresult
 
-(** [save configuration] overwrites [configuration] file. *)
-val save : t -> unit tzresult Lwt.t
+(** [save configuration] overwrites [configuration] file from [data_dir]. *)
+val save : data_dir:string -> t -> unit tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t

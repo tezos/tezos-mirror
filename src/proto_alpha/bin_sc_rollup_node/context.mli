@@ -64,9 +64,8 @@ val hash_to_raw_string : hash -> string
     [fmt]. *)
 val pp_hash : Format.formatter -> hash -> unit
 
-(** [load config] initializes from disk a context using the [data_dir]
-    information contained in the configuration [config]. *)
-val load : 'a mode -> Configuration.t -> 'a index Lwt.t
+(** [load data_dir] initializes from disk a context using the [data_dir]. *)
+val load : 'a mode -> string -> 'a index Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index

@@ -73,11 +73,11 @@ let pp_hash fmt h =
   IStore.Hash.to_raw_string h
   |> Hex.of_string |> Hex.show |> Format.pp_print_string fmt
 
-let load : type a. a mode -> Configuration.t -> a raw_index Lwt.t =
- fun mode configuration ->
+let load : type a. a mode -> string -> a raw_index Lwt.t =
+ fun mode data_dir ->
   let open Lwt_syntax in
   let open Configuration in
-  let path = default_context_dir configuration.data_dir in
+  let path = default_context_dir data_dir in
   let readonly = match mode with Read_only -> true | Read_write -> false in
   let+ repo = IStore.Repo.v (Irmin_pack.config ~readonly path) in
   {path; repo}
