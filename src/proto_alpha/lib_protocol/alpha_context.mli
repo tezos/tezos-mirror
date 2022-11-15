@@ -3661,7 +3661,7 @@ module Sc_rollup : sig
 
       val get_status : state -> status Lwt.t
 
-      val get_outbox : state -> output list Lwt.t
+      val get_outbox : Raw_level.t -> state -> output list Lwt.t
     end
 
     val reference_initial_state_hash : State_hash.t
@@ -3716,7 +3716,7 @@ module Sc_rollup : sig
 
       val get_status : state -> status Lwt.t
 
-      val get_outbox : state -> output list Lwt.t
+      val get_outbox : Raw_level.t -> state -> output list Lwt.t
 
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t

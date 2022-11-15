@@ -475,10 +475,25 @@ module Global = struct
         ~output:Data_encoding.string
         (path / "status")
 
+    let outbox_level_query =
+      let open Tezos_rpc.Query in
+      query (fun outbox_level ->
+          let req name f = function
+            | None ->
+                raise
+                  (Invalid
+                     (Format.sprintf "Query parameter %s is required" name))
+            | Some arg -> f arg
+          in
+          req "outbox_level" Raw_level.of_int32_exn outbox_level)
+      |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun o ->
+             Some (Raw_level.to_int32 o))
+      |> seal
+
     let outbox =
       Tezos_rpc.Service.get_service
-        ~description:"Outbox at block"
-        ~query:Tezos_rpc.Query.empty
+        ~description:"Outbox at block for a given outbox level"
+        ~query:outbox_level_query
         ~output:Data_encoding.(list Sc_rollup.output_encoding)
         (path / "outbox")
 

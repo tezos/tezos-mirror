@@ -103,11 +103,11 @@ val state_value :
 val status :
   ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
 
-(** [outbox ?block client] gets the rollup outbox for the [block] (default
-    ["cemented"] which is the block corresponding to the last cemented
-    level). *)
+(** [outbox ?block outbox_level client] gets the rollup outbox of
+   [outbox_level] as known to the [block] (default ["cemented"] which
+   is the block corresponding to the last cemented level). *)
 val outbox :
-  ?hooks:Process.hooks -> ?block:string -> t -> JSON.t Runnable.process
+  ?hooks:Process.hooks -> ?block:string -> outbox_level:int -> t -> JSON.t Lwt.t
 
 type outbox_proof = {commitment_hash : string; proof : string}
 

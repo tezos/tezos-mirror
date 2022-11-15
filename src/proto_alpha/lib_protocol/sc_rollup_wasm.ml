@@ -142,7 +142,8 @@ module V2_0_0 = struct
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
 
-    val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
+    val get_outbox :
+      Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
   (* [Make (Make_backend) (Context)] creates a PVM.
@@ -317,9 +318,8 @@ module V2_0_0 = struct
 
     let get_status : state -> status Lwt.t = result_of get_status
 
-    let get_outbox _state =
+    let get_outbox outbox_level state =
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790 *)
-      let open Lwt_syntax in
       return []
 
     let set_input_state input =

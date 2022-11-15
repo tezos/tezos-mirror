@@ -49,9 +49,9 @@ module type S = sig
   (** [string_of_status status] returns a string representation of [status]. *)
   val string_of_status : status -> string
 
-  (** [get_outbox state] returns a list of outputs available in the
-      outbox of [state]. *)
-  val get_outbox : state -> Sc_rollup.output list Lwt.t
+  (** [get_outbox outbox_level state] returns a list of outputs
+     available in the outbox of [state] at a given [outbox_level]. *)
+  val get_outbox : Raw_level.t -> state -> Sc_rollup.output list Lwt.t
 
   (** [eval_many ~max_steps s0] returns a state [s1] resulting from the
       execution of up to [~max_steps] steps of the rollup at state [s0]. *)

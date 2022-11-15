@@ -223,8 +223,13 @@ let status ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "status"]
   |> Runnable.map JSON.as_string
 
-let outbox ?hooks ?(block = "cemented") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "outbox"]
+let outbox ?hooks ?(block = "cemented") ~outbox_level sc_client =
+  let open Lwt.Syntax in
+  rpc_get_rich
+    ?hooks
+    sc_client
+    ["global"; "block"; block; "outbox"]
+    [("outbox_level", string_of_int outbox_level)]
 
 let last_stored_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]

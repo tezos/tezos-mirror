@@ -136,7 +136,8 @@ module type S = sig
 
   val get_status : state -> status Lwt.t
 
-  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
+  val get_outbox :
+    Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   type instruction =
     | IPush : int -> instruction
@@ -914,9 +915,14 @@ module Make (Context : P) :
 
   let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
 
-  let get_outbox state =
+  let get_outbox outbox_level state =
     let open Lwt_syntax in
     let+ entries = result_of ~default:[] Output.entries state in
+    let entries =
+      List.filter
+        (fun (_, msg) -> Raw_level_repr.(msg.PS.outbox_level = outbox_level))
+        entries
+    in
     List.map snd entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
