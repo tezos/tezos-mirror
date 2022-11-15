@@ -25,6 +25,11 @@ chmod 700 "$HOME/.ssh"
 log "Done setting up credentials."
 
 # call opam-release.sh with the correct arguments
+echo "$script_dir/opam-release.sh" \
+  "$opam_release_tag" \
+  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_package_name.tar.gz" \
+  "$opam_dir"
+
 "$script_dir/opam-release.sh" \
   "$opam_release_tag" \
   "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_package_name.tar.gz" \
