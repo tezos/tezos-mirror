@@ -315,6 +315,23 @@ module Result_syntax : sig
   val all : ('a, 'e) result list -> ('a list, 'e list) result
 
   val both : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e list) result
+
+  val tzfail : 'error -> ('a, 'error trace) result
+
+  val ( and* ) :
+    ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result
+
+  val ( and+ ) :
+    ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result
+
+  val tzjoin : (unit, 'error trace) result list -> (unit, 'error trace) result
+
+  val tzall : ('a, 'error trace) result list -> ('a list, 'error trace) result
+
+  val tzboth :
+    ('a, 'error trace) result ->
+    ('b, 'error trace) result ->
+    ('a * 'b, 'error trace) result
 end
 
 module Lwt_result_syntax : sig
@@ -357,6 +374,29 @@ module Lwt_result_syntax : sig
     ('a, 'e) result Lwt.t ->
     ('b, 'e) result Lwt.t ->
     ('a * 'b, 'e list) result Lwt.t
+
+  val tzfail : 'error -> ('a, 'error trace) result Lwt.t
+
+  val ( and* ) :
+    ('a, 'e trace) result Lwt.t ->
+    ('b, 'e trace) result Lwt.t ->
+    ('a * 'b, 'e trace) result Lwt.t
+
+  val ( and+ ) :
+    ('a, 'e trace) result Lwt.t ->
+    ('b, 'e trace) result Lwt.t ->
+    ('a * 'b, 'e trace) result Lwt.t
+
+  val tzjoin :
+    (unit, 'error trace) result Lwt.t list -> (unit, 'error trace) result Lwt.t
+
+  val tzall :
+    ('a, 'error trace) result Lwt.t list -> ('a list, 'error trace) result Lwt.t
+
+  val tzboth :
+    ('a, 'error trace) result Lwt.t ->
+    ('b, 'error trace) result Lwt.t ->
+    ('a * 'b, 'error trace) result Lwt.t
 end
 
 module Lwt_option_syntax : sig
@@ -385,92 +425,4 @@ module Lwt_option_syntax : sig
   val ( let*? ) : 'a option -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
 
   val both : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
-end
-
-module Tzresult_syntax : sig
-  val return : 'a -> ('a, 'error) result
-
-  val return_unit : (unit, 'error) result
-
-  val return_none : ('a option, 'error) result
-
-  val return_some : 'a -> ('a option, 'error) result
-
-  val return_nil : ('a list, 'error) result
-
-  val return_true : (bool, 'error) result
-
-  val return_false : (bool, 'error) result
-
-  val fail : 'error -> ('a, 'error trace) result
-
-  val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-
-  val ( and* ) :
-    ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result
-
-  val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
-
-  val ( and+ ) :
-    ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result
-
-  val join : (unit, 'error trace) result list -> (unit, 'error trace) result
-
-  val all : ('a, 'error trace) result list -> ('a list, 'error trace) result
-
-  val both :
-    ('a, 'error trace) result ->
-    ('b, 'error trace) result ->
-    ('a * 'b, 'error trace) result
-end
-
-module Lwt_tzresult_syntax : sig
-  val return : 'a -> ('a, 'error) result Lwt.t
-
-  val return_unit : (unit, 'error) result Lwt.t
-
-  val return_none : ('a option, 'error) result Lwt.t
-
-  val return_some : 'a -> ('a option, 'error) result Lwt.t
-
-  val return_nil : ('a list, 'error) result Lwt.t
-
-  val return_true : (bool, 'error) result Lwt.t
-
-  val return_false : (bool, 'error) result Lwt.t
-
-  val fail : 'error -> ('a, 'error trace) result Lwt.t
-
-  val ( let* ) :
-    ('a, 'e) result Lwt.t ->
-    ('a -> ('b, 'e) result Lwt.t) ->
-    ('b, 'e) result Lwt.t
-
-  val ( and* ) :
-    ('a, 'e trace) result Lwt.t ->
-    ('b, 'e trace) result Lwt.t ->
-    ('a * 'b, 'e trace) result Lwt.t
-
-  val ( let+ ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
-
-  val ( and+ ) :
-    ('a, 'e trace) result Lwt.t ->
-    ('b, 'e trace) result Lwt.t ->
-    ('a * 'b, 'e trace) result Lwt.t
-
-  val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-  val ( let*? ) :
-    ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
-
-  val join :
-    (unit, 'error trace) result Lwt.t list -> (unit, 'error trace) result Lwt.t
-
-  val all :
-    ('a, 'error trace) result Lwt.t list -> ('a list, 'error trace) result Lwt.t
-
-  val both :
-    ('a, 'error trace) result Lwt.t ->
-    ('b, 'error trace) result Lwt.t ->
-    ('a * 'b, 'error trace) result Lwt.t
 end
