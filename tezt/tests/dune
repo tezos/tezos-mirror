@@ -9,7 +9,6 @@
   bls12-381
   tezt-tezos
   data-encoding
-  tezos-crypto-dal
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix

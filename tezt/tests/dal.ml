@@ -32,6 +32,8 @@
 
 let hooks = Tezos_regression.hooks
 
+module Cryptobox = Rollup.Dal.Cryptobox
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -294,9 +296,7 @@ let publish_dummy_slot ~source ?level ?error ?fee ~index ~message cryptobox =
 
 let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
   let level = 1 + Node.get_level node in
-  let commitment =
-    Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt commitment
-  in
+  let commitment = Cryptobox.Commitment.of_b58check_opt commitment in
   match commitment with
   | None -> assert false
   | Some commitment ->
@@ -695,7 +695,7 @@ let test_dal_node_slot_management =
 let publish_and_store_slot node client dal_node source index content =
   let* slot_header = split_slot dal_node content in
   let commitment =
-    Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
+    Cryptobox.Commitment.of_b58check_opt slot_header
     |> mandatory "The b58check-encoded slot header is not valid"
   in
   let* _ = publish_slot ~source ~fee:1_200 ~index ~commitment node client in
@@ -742,7 +742,6 @@ let test_dal_node_rebuild_from_shards =
     ~title:"dal node shard fetching and slot reconstruction"
     ~tags:["dal"; "dal_node"]
   @@ fun protocol ->
-  let open Tezos_crypto_dal in
   let* node, client, dal_node = init_dal_node protocol in
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let crypto_params = parameters.cryptobox in

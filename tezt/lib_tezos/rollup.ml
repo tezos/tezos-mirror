@@ -526,7 +526,7 @@ module Dal = struct
       return
         {
           cryptobox =
-            Tezos_crypto_dal.Cryptobox.Verifier.
+            Cryptobox.Verifier.
               {number_of_shards; redundancy_factor; slot_size; page_size};
           number_of_slots;
           endorsement_lag;
