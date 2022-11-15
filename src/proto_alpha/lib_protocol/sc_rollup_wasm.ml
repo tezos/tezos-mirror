@@ -319,8 +319,34 @@ module V2_0_0 = struct
     let get_status : state -> status Lwt.t = result_of get_status
 
     let get_outbox outbox_level state =
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790 *)
-      return []
+      let outbox_level_int32 =
+        Raw_level_repr.to_int32_non_negative outbox_level
+      in
+      let open Lwt_syntax in
+      let rec aux outbox message_index =
+        let output =
+          Wasm_2_0_0.{outbox_level = outbox_level_int32; message_index}
+        in
+        let* res = WASM_machine.get_output output state in
+        match res with
+        | None -> return (List.rev outbox)
+        | Some msg -> (
+            let serialized =
+              Sc_rollup_outbox_message_repr.unsafe_of_string msg
+            in
+            match Sc_rollup_outbox_message_repr.deserialize serialized with
+            | Error _ ->
+                (* The [write_output] host function does not guarantee that the contents
+                   of the returned output is a valid encoding of an outbox message.
+                   We choose to ignore such messages. An alternative choice would be to
+                   craft an output with a payload witnessing the illformedness of the
+                   output produced by the kernel. *)
+                aux outbox (Z.succ message_index)
+            | Ok message ->
+                let output = PS.{outbox_level; message_index; message} in
+                aux (output :: outbox) (Z.succ message_index))
+      in
+      aux [] Z.zero
 
     let set_input_state input =
       let open Monad.Syntax in
