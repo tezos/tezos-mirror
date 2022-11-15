@@ -525,104 +525,19 @@ A detailed description of the following instructions can be found in the `intera
 Stack operations
 ~~~~~~~~~~~~~~~~
 
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
 -  ``DROP``: Drop the top element of the stack.
-
-::
-
-    :: _ : 'A   ->   'A
-
-    > DROP / _ : S  =>  S
-
-- ``DROP n``: Drop the `n` topmost elements of the stack. In
-  particular, ``DROP 0`` is a noop and ``DROP 1`` is equivalent to
-  ``DROP``.
-
-::
-
-   :: 'a{1} : ... : 'a{n} : 'A   ->   'A
-
-   > DROP n / x{1} : ... : x{n} : S  =>  S
-
+- ``DROP n``: Drop the `n` topmost elements of the stack.
 -  ``DUP``: Duplicate the top element of the stack.
-
-::
-
-    :: 'a : 'A   ->   'a : 'a : 'A
-
-    > DUP / x : S  =>  x : x : S
-
--  ``DUP n``: Duplicate the N-th element of the stack. `DUP 1` is equivalent to `DUP`. `DUP 0` is rejected.
-
-::
-
-    DUP 1 :: 'a : 'A   ->   'a : 'a : 'A
-
-    DUP (n+1) :: 'a : 'A   ->   'b : 'a : 'A
-        iff DUP n :: 'A   ->    'b : 'A
-
-    > DUP 1 / x : S  =>  x : x : S
-
-    > DUP (n+1) / x : S  =>  y : x : S
-      iff DUP n / S  =>  y : S
-
-
+-  ``DUP n``: Duplicate the N-th element of the stack.
 -  ``SWAP``: Exchange the top two elements of the stack.
-
-::
-
-    :: 'a : 'b : 'A   ->   'b : 'a : 'A
-
-    > SWAP / x : y : S  =>  y : x : S
-
 - ``DIG n``: Take the element at depth ``n`` of the stack and move it
-  on top. The element on top of the stack is at depth ``0`` so that
-  ``DIG 0`` is a no-op and ``DIG 1`` is equivalent to ``SWAP``.
-
-::
-
-    :: 'a{1} : ... : 'a{n} : 'b : 'A   ->   'b : 'a{1} : ... : 'a{n} : 'A
-
-    > DIG n / x{1} : ... : x{n} : y : S  =>  y : x{1} : ... : x{n} : S
-
-- ``DUG n``: Place the element on top of the stack at depth ``n``. The
-  element on top of the stack is at depth ``0`` so that ``DUG 0`` is a
-  no-op and ``DUG 1`` is equivalent to ``SWAP``.
-
-::
-
-    :: 'b : 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'b : 'A
-
-    > DUG n / y : x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : y : S
-
+  on top.
+- ``DUG n``: Place the element on top of the stack at depth ``n``.
 -  ``PUSH 'a x``: Push a constant value of a given type onto the stack.
-
-::
-
-    :: 'A   ->   'a : 'A
-       iff   x :: 'a
-
-    > PUSH 'a x / S  =>  x : S
-
--  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return
-   type `'b` onto the stack.
-
-::
-
-    :: 'A ->  (lambda 'a 'b) : 'A
-
-    > LAMBDA _ _ code / S  =>  code : S
-
-- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the
-   code, recursively, with the given parameter type `'a` and return
-   a value of type `'b` onto the stack (if it terminates before gas
-   exhaustion).
-
-::
-
-    :: 'A ->  (lambda 'a 'b) : 'A
-       iff code::'a: (lambda 'a 'b):[] -> 'b:[]
-
-    > LAMBDA_REC 'a 'b code / S  => {LAMBDA_REC 'a 'b code; code} : S
+-  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type `'a` and return type `'b` onto the stack.
+- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the code, recursively, with the given parameter type `'a` and return a value of type `'b` onto the stack (if it terminates before gas exhaustion).
 
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
