@@ -123,16 +123,7 @@ let test_get_info () =
     let last_input_read =
       Some (make_inbox_info ~inbox_level ~message_counter)
     in
-    {
-      current_tick = Z.zero;
-      last_input_read;
-      input_request =
-        Input_required
-        (* While it shouldn't be Input_required after an input, `add_input_info`
-           doesn't use the PVM interface but encodes it directly into the tree.
-           The tree is in `Input_required` state since it is in snapshot state,
-           waiting for the next_input. *);
-    }
+    {current_tick = Z.zero; last_input_read; input_request = No_input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info.last_input_read = None) ;
@@ -149,7 +140,7 @@ let encode_tick_state tree =
   let* tree =
     Tree_encoding_runner.encode
       (Tezos_tree_encoding.value ["wasm"; "tag"] Data_encoding.string)
-      "snapshot"
+      "collect"
       tree
   in
   (* Encode the value. *)
@@ -171,7 +162,7 @@ let test_set_input () =
   let* tree =
     Wasm.set_input_step
       {inbox_level = zero; message_counter = Z.of_int 1}
-      "hello"
+      "\000\000hello"
       tree
   in
   let* buffers =
@@ -189,12 +180,12 @@ let test_set_input () =
     let last_input_read =
       Some (make_inbox_info ~inbox_level:5 ~message_counter:10)
     in
-    {current_tick = Z.one; last_input_read; input_request = No_input_required}
+    {current_tick = Z.one; last_input_read; input_request = Input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info = expected_info) ;
   assert (current_tick = Z.one) ;
-  assert (Bytes.to_string result_message.payload = "hello") ;
+  assert (Bytes.to_string result_message.payload = "\000\000hello") ;
   Lwt_result_syntax.return_unit
 
 (** Given a [config] whose output has a given payload at position (0,0), if we

@@ -101,11 +101,13 @@ val count_subtrees : t -> key -> int Lwt.t
     under [key]. *)
 val subtree_name_at : t -> key -> int -> string Lwt.t
 
-(** [delete durable key] deletes the value at and/or subtrees of [key].
+(** [delete ?edit_readonly durable key] deletes the value at and/or
+    subtrees of [key].
 
-    @raise Readonly_value
+    @raise Readonly_value when [edit_readonly] is not set while trying
+    to edit the readonly section.
 *)
-val delete : t -> key -> t Lwt.t
+val delete : ?edit_readonly:bool -> t -> key -> t Lwt.t
 
 (** [hash durable key] retrieves the tree hash of the value at the given [key].
     This is not the same as the hash of the value.
@@ -119,15 +121,16 @@ val hash : t -> key -> Context_hash.t option Lwt.t
 *)
 val hash_exn : t -> key -> Context_hash.t Lwt.t
 
-(** [write_value durable key offset bytes] writes [bytes] to [key],
-    starting at the given [offset].
+(** [write_value ?edit_readonly durable key offset bytes] writes
+    [bytes] to [key], starting at the given [offset].
 
     If no value at [key] exists, it is created.
 
     [~edit_readonly:true] allows a value to be written into a readonly location.
 
     @raise Out_of_bounds
-    @raise Readonly_value
+    @raise Readonly_value iff [edit_readonly] is not set to [true]
+    when attempting to write in the [readonly] section.
 *)
 val write_value_exn :
   t -> ?edit_readonly:bool -> key -> int64 -> string -> t Lwt.t

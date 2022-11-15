@@ -35,10 +35,10 @@ let tick_state_encoding =
     (value [] Data_encoding.string)
     [
       case
-        "start"
+        "snapshot"
         (return ())
-        (function Start -> Some () | _ -> None)
-        (fun () -> Start);
+        (function Snapshot -> Some () | _ -> None)
+        (fun () -> Snapshot);
       case
         "decode"
         Parsing.Decode.encoding
@@ -95,10 +95,10 @@ let tick_state_encoding =
         (function Stuck err -> Some err | _ -> None)
         (fun err -> Stuck err);
       case
-        "snapshot"
+        "collect"
         (value [] Data_encoding.unit)
-        (function Snapshot -> Some () | _ -> None)
-        (fun () -> Snapshot);
+        (function Collect -> Some () | _ -> None)
+        (fun () -> Collect);
       case
         "padding"
         (value [] Data_encoding.unit)
@@ -125,7 +125,10 @@ let pvm_state_encoding =
         last_input_info;
         current_tick;
         reboot_counter =
-          Option.value ~default:maximum_reboots_per_input reboot_counter;
+          Option.value
+            ~default:(Z.succ maximum_reboots_per_input)
+            (* One is used to read the inbox *)
+            reboot_counter;
         durable;
         buffers =
           (*`Gather_floppies` uses `get_info`, that decodes the state of the
@@ -212,11 +215,11 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       bs
       tree
 
-  let compute_step_many ~max_steps tree =
+  let compute_step_many ?stop_at_snapshot ~max_steps tree =
     let open Lwt.Syntax in
     let* pvm_state = decode tree in
     let* pvm_state, executed_ticks =
-      Wasm_vm.compute_step_many ~max_steps pvm_state
+      Wasm_vm.compute_step_many ?stop_at_snapshot ~max_steps pvm_state
     in
     let+ tree = encode pvm_state tree in
     (tree, executed_ticks)
@@ -295,6 +298,14 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let pvm_state = {pvm_state with maximum_reboots_per_input = n} in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
+    let decr_reboot_counter tree =
+      let open Lwt_syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let pvm_state =
+        {pvm_state with reboot_counter = Z.pred pvm_state.reboot_counter}
+      in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
     let reset_reboot_counter tree =
       let open Lwt_syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
@@ -313,12 +324,14 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
       pvm.buffers.input
 
-    let compute_step_many_with_hooks ?after_fast_exec ~max_steps tree =
+    let compute_step_many_with_hooks ?after_fast_exec ?stop_at_snapshot
+        ~max_steps tree =
       let open Lwt.Syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* pvm_state, ticks =
         Wasm_vm.Internal_for_tests.compute_step_many_with_hooks
           ?after_fast_exec
+          ?stop_at_snapshot
           ~max_steps
           pvm_state
       in

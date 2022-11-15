@@ -33,7 +33,7 @@ let eval_has_finished = function
   | Eval {config = {step_kont = Wasm.Eval.(SK_Result _); _}; _} -> true
   | Padding -> true
   (* explicit pattern matching to avoid new states introducing silent bugs *)
-  | Start | Decode _ | Link _ | Init _ | Eval _ | Snapshot | Stuck _ -> false
+  | Snapshot | Decode _ | Link _ | Init _ | Eval _ | Collect | Stuck _ -> false
 
 let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
   let open Z in
@@ -58,12 +58,12 @@ let has_stuck_flag durable =
   let+ stuck = Durable.(find_value durable Constants.stuck_flag_key) in
   Option.is_some stuck
 
-let mark_for_reboot reboot_counter durable =
+let mark_for_reboot {reboot_counter; durable; _} =
   let open Lwt_syntax in
-  if Z.Compare.(reboot_counter <= Z.zero) then return Failing
-  else
-    let+ has_reboot_flag = has_reboot_flag durable in
-    if has_reboot_flag then Reboot else Restarting
+  let+ has_reboot_flag = has_reboot_flag durable in
+  if has_reboot_flag then
+    if Z.Compare.(reboot_counter <= Z.zero) then `Forcing_restart else `Reboot
+  else `Restarting
 
 (* Returns true is a fallback kernel is available, and it's different to
    the currently running kernel. *)
@@ -117,29 +117,20 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
         return ~durable Padding
       else return ~status:Failing (Stuck (No_fallback_kernel cause))
   | Stuck e -> return ~status:Failing (Stuck e)
-  | Snapshot ->
-      let* has_reboot_flag = has_reboot_flag durable in
-      if has_reboot_flag then
-        let* durable = Durable.(delete durable Constants.reboot_flag_key) in
-        return ~durable Start
-      else
-        return
-          ~status:Failing
-          (Stuck
-             (Wasm_pvm_errors.invalid_state "snapshot is an input tick state"))
-  | Padding when is_time_for_snapshot pvm_state ->
-      (* The state is Padding which means that either the calculation finished
-         or it was trapped. Since we are at snapshot time we will either return
-         a stuck because too many reboots happened if the flag has been set or
-          snapshot. *)
-      let* status = mark_for_reboot pvm_state.reboot_counter durable in
-      (* Execution took too many reboot *)
-      if status = Failing then return ~status (Stuck Too_many_reboots)
-      else return ~status Snapshot
+  | Snapshot -> (
+      let* reboot_status = mark_for_reboot pvm_state in
+      match reboot_status with
+      | `Reboot -> return ~status:Reboot ~durable (initial_boot_state ())
+      | `Forcing_restart -> return ~status:Forcing_restart ~durable Collect
+      | `Restarting -> return ~status:Restarting ~durable Collect)
+  | Collect ->
+      return
+        ~status:Failing
+        (Stuck (Wasm_pvm_errors.invalid_state "Collect is a input tick"))
+  | Padding when is_time_for_snapshot pvm_state -> return ~durable Snapshot
   | _ when is_time_for_snapshot pvm_state ->
       (* Execution took too many ticks *)
       return ~status:Failing (Stuck Too_many_ticks)
-  | Start -> return (initial_boot_state ())
   | Decode {module_kont = MKStop ast_module; _} ->
       return
         (Link
@@ -203,7 +194,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           (* Set kernel - now known to be valid - as fallback kernel,
              if it is not already *)
           let* durable = save_fallback_kernel durable in
-          return ~durable ~status:Starting (Eval {config; module_reg})
+          return ~durable (Eval {config; module_reg})
       | _ ->
           (* We require a function with the name [main] to be exported
              rather than any other structure. *)
@@ -225,6 +216,17 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           init_kont
       in
       return (Init {self; ast_module; init_kont; module_reg})
+  | Padding -> return Padding
+  | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped _msg); _}; _} ->
+      let* durable =
+        Durable.write_value_exn
+          ~edit_readonly:true
+          durable
+          Constants.stuck_flag_key
+          0L
+          ""
+      in
+      return ~durable Padding
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
       let* has_stuck_flag = has_stuck_flag durable in
@@ -232,17 +234,6 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
         let* durable = Durable.(delete durable Constants.stuck_flag_key) in
         return ~durable Padding
       else return Padding
-  | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped _msg); _}; _} ->
-      let* durable =
-        Durable.write_value_exn
-          durable
-          ~edit_readonly:true
-          Constants.stuck_flag_key
-          0L
-          ""
-      in
-      return ~durable Padding
-  | Padding -> return Padding
   | Eval {config; module_reg} ->
       (* Continue execution. *)
       let store = Durable.to_storage durable in
@@ -263,7 +254,7 @@ let next_tick_state pvm_state =
           | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
           | Init _ -> Init_error error
           | Eval _ -> Eval_error error
-          | Start | Stuck _ | Snapshot | Padding ->
+          | Snapshot | Stuck _ | Collect | Padding ->
               Unknown_error error.raw_exception)
       | `Unknown raw_exception -> Unknown_error raw_exception
     in
@@ -272,14 +263,49 @@ let next_tick_state pvm_state =
   Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
 let next_last_top_level_call {current_tick; last_top_level_call; _} = function
-  | Restarting | Reboot -> Z.succ current_tick
-  | Starting | Failing | Running -> last_top_level_call
+  | Forcing_restart | Restarting | Reboot -> current_tick
+  | Failing | Running -> last_top_level_call
 
 let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _} status =
   match status with
   | Reboot -> Z.pred reboot_counter
-  | Restarting | Failing -> maximum_reboots_per_input
-  | Starting | Running -> reboot_counter
+  | Forcing_restart | Restarting | Failing ->
+      Z.succ maximum_reboots_per_input (* one is used to read the inbox *)
+  | Running -> reboot_counter
+
+(** When successfully restarting the VM, we can remove the
+    [Too_many_reboot] flag if it exists. On the contrary, we create it
+    in case we are failing. *)
+let patch_too_many_reboot_flag durable =
+  let open Lwt_syntax in
+  function
+  | Restarting ->
+      Durable.delete
+        ~edit_readonly:true
+        durable
+        Constants.too_many_reboot_flag_key
+  | Forcing_restart ->
+      Durable.(
+        write_value_exn
+          ~edit_readonly:true
+          durable
+          Constants.too_many_reboot_flag_key
+          0L
+          "")
+  | _ -> return durable
+
+(** When rebooting, we can remove the [Reboot] flag (because it has
+    achieved its purpose). On the contrary, when [Restarting] or
+    [Forcing_restart], we set the flag, because we will want to reboot
+    once the inbox is loaded. *)
+let patch_reboot_flag durable =
+  let open Lwt_syntax in
+  function
+  | Reboot ->
+      Durable.delete ~edit_readonly:true durable Constants.reboot_flag_key
+  | Forcing_restart | Restarting ->
+      Durable.(write_value_exn durable Constants.reboot_flag_key 0L "")
+  | _ -> return durable
 
 (** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.
@@ -291,6 +317,8 @@ let compute_step pvm_state =
   let current_tick = Z.succ pvm_state.current_tick in
   let last_top_level_call = next_last_top_level_call pvm_state status in
   let reboot_counter = next_reboot_counter pvm_state status in
+  let* durable = patch_too_many_reboot_flag durable status in
+  let* durable = patch_reboot_flag durable status in
   let pvm_state =
     {
       pvm_state with
@@ -304,18 +332,15 @@ let compute_step pvm_state =
   return pvm_state
 
 let input_request pvm_state =
-  let open Lwt_syntax in
   match pvm_state.tick_state with
-  | Stuck _ -> return Wasm_pvm_state.Input_required
-  | Snapshot ->
-      let+ has_reboot_flag = has_reboot_flag pvm_state.durable in
-      if has_reboot_flag then Wasm_pvm_state.No_input_required
-      else Wasm_pvm_state.Input_required
+  | Stuck _ -> Wasm_pvm_state.Input_required
+  | Snapshot -> Wasm_pvm_state.No_input_required
+  | Collect -> Wasm_pvm_state.Input_required
   | Eval {config; _} -> (
       match Tezos_webassembly_interpreter.Eval.is_reveal_tick config with
-      | Some reveal -> return (Wasm_pvm_state.Reveal_required reveal)
-      | None -> return Wasm_pvm_state.No_input_required)
-  | _ -> return Wasm_pvm_state.No_input_required
+      | Some reveal -> Wasm_pvm_state.Reveal_required reveal
+      | None -> Wasm_pvm_state.No_input_required)
+  | _ -> Wasm_pvm_state.No_input_required
 
 let is_top_level_padding pvm_state =
   eval_has_finished pvm_state.tick_state && not (is_time_for_snapshot pvm_state)
@@ -363,14 +388,20 @@ let compute_step_many_until ?(max_steps = 1L) should_continue =
   measure_executed_ticks one_or_more_steps
 
 let should_compute pvm_state =
-  let open Lwt.Syntax in
-  let+ input_request_val = input_request pvm_state in
+  let input_request_val = input_request pvm_state in
   match input_request_val with
   | Reveal_required _ | Input_required -> false
   | No_input_required -> true
 
-let compute_step_many ~max_steps pvm_state =
-  compute_step_many_until ~max_steps should_compute pvm_state
+let compute_step_many ?(stop_at_snapshot = false) ~max_steps pvm_state =
+  compute_step_many_until
+    ~max_steps
+    (fun pvm_state ->
+      Lwt.return
+        (* should_compute && (stop_at_snapshot -> tick_state <> snapshot) *)
+        (should_compute pvm_state
+        && ((not stop_at_snapshot) || pvm_state.tick_state <> Snapshot)))
+    pvm_state
 
 let set_input_step input_info message pvm_state =
   let open Lwt_syntax in
@@ -379,18 +410,17 @@ let set_input_step input_info message pvm_state =
   let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
   let+ tick_state =
     match pvm_state.tick_state with
-    | Snapshot ->
+    | Collect -> (
         let+ () =
           Wasm.Input_buffer.(
             enqueue
               pvm_state.buffers.input
               {raw_level; message_counter; payload = String.to_bytes message})
         in
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
-           The goal is to read a complete inbox. *)
-        (* Go back to decoding *)
-        Start
-    | Start ->
+        match Pvm_input_kind.from_raw_input message with
+        | Internal End_of_level -> Padding
+        | _ -> Collect)
+    | Snapshot ->
         Lwt.return
           (Stuck
              (Wasm_pvm_errors.invalid_state "No input required during start"))
@@ -427,7 +457,7 @@ let reveal_step payload pvm_state =
   | Eval {config; module_reg} ->
       let* config = Eval.reveal_step module_reg payload config in
       return (Eval {config; module_reg})
-  | Start ->
+  | Snapshot ->
       return
         (Stuck (Wasm_pvm_errors.invalid_state "No reveal expected during start"))
   | Decode _ ->
@@ -442,11 +472,11 @@ let reveal_step payload pvm_state =
         (Stuck
            (Wasm_pvm_errors.invalid_state
               "No reveal expected during initialization"))
-  | Snapshot ->
+  | Collect ->
       return
         (Stuck
            (Wasm_pvm_errors.invalid_state
-              "No reveal expected during snapshotting"))
+              "No reveal expected during collecting"))
   | Stuck _ | Padding -> return pvm_state.tick_state
 
 let get_output output_info output =
@@ -459,9 +489,10 @@ let get_output output_info output =
 
 let get_info ({current_tick; last_input_info; _} as pvm_state) =
   let open Lwt_syntax in
-  let+ input_request = input_request pvm_state in
-  Wasm_pvm_state.
-    {current_tick; last_input_read = last_input_info; input_request}
+  let input_request = input_request pvm_state in
+  return
+  @@ Wasm_pvm_state.
+       {current_tick; last_input_read = last_input_info; input_request}
 
 module Internal_for_tests = struct
   let compute_step_many_with_hooks ?after_fast_exec:_ = compute_step_many

@@ -57,7 +57,8 @@ module Impl : Pvm.S = struct
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
 
-  let eval_many ~max_steps initial_state =
+  let eval_many ?stop_at_snapshot ~max_steps initial_state =
+    ignore stop_at_snapshot ;
     let rec go state step =
       let open Lwt.Syntax in
       let* is_input_required = is_input_state state in

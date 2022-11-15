@@ -129,8 +129,8 @@ let copy_tree_exn tree ?(edit_readonly = false) from_key to_key =
 
 let count_subtrees tree key = T.length tree @@ key_contents key
 
-let delete tree key =
-  assert_key_writeable key ;
+let delete ?(edit_readonly = false) tree key =
+  if not edit_readonly then assert_key_writeable key ;
   T.remove tree @@ key_contents key
 
 let subtree_name_at tree key index =

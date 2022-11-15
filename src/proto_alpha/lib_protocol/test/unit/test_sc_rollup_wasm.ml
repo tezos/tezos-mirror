@@ -160,14 +160,16 @@ let make_transactions () =
   in
   List.map (fun (contract, i, s) -> make_transaction i s contract) l
 
-(* This is simple "echo kernel"  it spits out whatever it receive. It uses the
-   [write_output] host function and so it is used to test this function. *)
+(* This is simple "echo kernel" it spits out the first three inputs (SOL, input,
+   EOL) it receives. It uses the [write_output] host function and so it is used
+   to test this function. *)
 let test_output () =
   let open Lwt_result_syntax in
   let level_offset = 20 in
   let id_offset = 40 in
   let dst = 60 in
   let max_bytes = 3600 in
+  let dst_without_header = dst + 2 in
   let modul =
     Format.sprintf
       {|
@@ -179,13 +181,27 @@ let test_output () =
           (import "rollup_safe_core" "write_output" (func $write_output (type $t0)))
           (func (export "kernel_next")
             (local $size i32)
-           (local.set $size (call $read_input
-                              (i32.const %d)
-                              (i32.const %d)
-                              (i32.const %d)
-                              (i32.const %d)))
+            (local.set $size (call $read_input
+                             (i32.const %d)
+                             (i32.const %d)
+                             (i32.const %d)
+                             (i32.const %d)))
             (call $write_output (i32.const %d)
-                               (local.get $size))
+                                (i32.sub (local.get $size) (i32.const 2)))
+            (local.set $size (call $read_input
+                             (i32.const %d)
+                             (i32.const %d)
+                             (i32.const %d)
+                             (i32.const %d)))
+            (call $write_output (i32.const %d)
+                                (i32.sub (local.get $size) (i32.const 2)))
+            (local.set $size (call $read_input
+                             (i32.const %d)
+                             (i32.const %d)
+                             (i32.const %d)
+                             (i32.const %d)))
+            (call $write_output (i32.const %d)
+                                (local.get $size))
             drop)
           (memory (;0;) 17)
           (export "memory" (memory 0))
@@ -196,8 +212,19 @@ let test_output () =
       id_offset
       dst
       max_bytes
+      dst_without_header
+      level_offset
+      id_offset
       dst
+      max_bytes
+      dst_without_header
+      level_offset
+      id_offset
+      dst
+      max_bytes
+      dst_without_header
   in
+
   let*! dummy = Context.init "/tmp" in
   let dummy_context = Context.empty dummy in
   let*! (empty_tree : Wasm.tree) = Test_encodings_util.empty_tree () in
@@ -219,12 +246,17 @@ let test_output () =
       Sc_rollup_outbox_message_repr.encoding
       out
   in
-  let*! tree = set_input_step string_input_message 0 tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! tree = set_full_input_step [string_input_message] 0l tree in
   let*! final_tree = eval_until_input_requested tree in
   let*! output = Wasm.Internal_for_tests.get_output_buffer final_tree in
-  let*! level, message_index =
+  let*! level, end_of_level_message_index =
     Tezos_webassembly_interpreter.Output_buffer.get_id output
   in
+  (* The last message in the outbox corresponds to EOL, due to the nature of the
+     kernel. As such we must take the one preceding it. *)
+  let message_index = Z.pred end_of_level_message_index in
+
   let*! bytes_output_message =
     Tezos_webassembly_interpreter.Output_buffer.get output level message_index
   in

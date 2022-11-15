@@ -61,3 +61,6 @@ let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
 let kernel_fallback_key = Durable.key_of_string_exn "/readonly/kernel/boot.wasm"
 
 let stuck_flag_key = Durable.key_of_string_exn "/readonly/kernel/env/stuck"
+
+let too_many_reboot_flag_key =
+  Durable.key_of_string_exn "/readonly/kernel/toomanyreboot"

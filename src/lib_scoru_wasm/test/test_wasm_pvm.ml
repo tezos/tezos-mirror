@@ -44,7 +44,7 @@ let should_boot_unreachable_kernel ~max_steps kernel =
      “Input_requested” mode. *)
   let* tree = eval_until_input_requested ~max_steps tree in
   (* Feeding it with one input *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested ~max_steps tree in
   let* info_after_first_message = Wasm.get_info tree in
@@ -54,7 +54,7 @@ let should_boot_unreachable_kernel ~max_steps kernel =
   let* stuck_flag = has_stuck_flag tree in
   assert stuck_flag ;
   (* Feeding it with one input *)
-  let* tree = set_input_step "test" 1 tree in
+  let* tree = set_empty_inbox_step 1l tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
   let* info_after_second_message = Wasm.get_info tree in
@@ -99,7 +99,7 @@ let should_run_debug_kernel () =
      “Input_requested” mode. *)
   let* tree = eval_until_input_requested tree in
   (* Feeding it with one input *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
   let* stuck_flag = has_stuck_flag tree in
@@ -181,13 +181,13 @@ let should_run_store_has_kernel () =
   let* stuck_flag = has_stuck_flag tree in
   assert (not stuck_flag) ;
   (* We first evaluate the kernel normally, and it shouldn't fail. *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   (* The kernel is not expected to fail, the PVM should not have stuck state on.
       *)
   let* stuck_flag = has_stuck_flag tree in
   assert (not stuck_flag) ;
-  let* tree = set_input_step "test" 1 tree in
+  let* tree = set_empty_inbox_step 1l tree in
   (* We now delete the path ["hello"; "universe"] - this will cause gthe kernel
      assertion on this path to fail, and the PVM should become stuck on the
      third assert in the kernel. *)
@@ -239,7 +239,7 @@ let should_run_store_list_size_kernel () =
      “Input_requested” mode. *)
   let* tree = eval_until_input_requested tree in
   (* Feeding it with one input *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
@@ -249,7 +249,7 @@ let should_run_store_list_size_kernel () =
   assert (not @@ is_stuck state_after_first_message) ;
   (* We now add another value - this will cause the kernel
      assertion on this path to fail, as there are now four subtrees. *)
-  let* tree = set_input_step "test" 1 tree in
+  let* tree = set_empty_inbox_step 1l tree in
   let* tree = add_value tree ["one"; "four"] in
   let* tree = eval_until_input_requested tree in
   (* The kernel is now expected to fail, the PVM should have the stuck tag. *)
@@ -311,7 +311,7 @@ let should_run_store_delete_kernel () =
   (* Eval until input requested: the initial step will be "Snapshot", which is
      an input step. It needs an input to be forced to initialize. *)
   let* tree = eval_until_input_requested tree in
-  let* tree = set_input_step "moving forward" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   (* The kernel is not expected to fail, the PVM should not have stuck flag. *)
   let* stuck_flag = has_stuck_flag tree in
@@ -381,7 +381,7 @@ let should_run_store_move_kernel () =
   in
   assert (not @@ is_stuck state_before_first_message) ;
   (* consume a message and run kernel_next until we need next message *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -444,7 +444,7 @@ let should_run_store_copy_kernel () =
   in
   assert (not @@ is_stuck state_before_first_message) ;
   (* consume a message and run kernel_next until we need next message *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -538,7 +538,7 @@ let test_modify_read_only_storage_kernel () =
   let* stuck_flag = has_stuck_flag tree in
   assert (not stuck_flag) ;
   (* We first evaluate the kernel normally, and it shouldn't fail. *)
-  let* tree = set_input_step "test" 0 tree in
+  let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   (* The kernel is not expected to fail, the PVM should not have stuck state on.
       *)
@@ -562,7 +562,7 @@ let build_snapshot_wasm_state_from_set_input
         [
           case
             "snapshot"
-            (value [] Data_encoding.unit)
+            (return ())
             (function Snapshot -> Some () | _ -> None)
             (fun () -> Snapshot);
         ])
@@ -574,15 +574,16 @@ let build_snapshot_wasm_state_from_set_input
       Snapshot
       tree
   in
-  (* Since we start directly after at an input_step, we need to offset the tick
-     at the next max tick + the snapshot tick. *)
-  let* current_tick =
+  (* Since we start directly after reading an inbox. *)
+  let* previous_top_level_call =
     Test_encodings_util.Tree_encoding_runner.decode
       (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
       tree
   in
 
-  let snapshot_tick = Z.(max_tick + current_tick) in
+  let new_last_top_level_call = Z.(max_tick + previous_top_level_call) in
+
+  let snapshot_tick = Z.(max_tick + new_last_top_level_call) in
 
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
@@ -590,11 +591,11 @@ let build_snapshot_wasm_state_from_set_input
       snapshot_tick
       tree
   in
-  let* tree = Wasm.Internal_for_tests.reset_reboot_counter tree in
+  let* tree = Wasm.Internal_for_tests.decr_reboot_counter tree in
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
-      snapshot_tick
+      new_last_top_level_call
       tree
   in
   (* The kernel will have been set as the fallback kernel. *)
@@ -610,6 +611,9 @@ let build_snapshot_wasm_state_from_set_input
       Constants.kernel_key
       Constants.kernel_fallback_key
   in
+  (* And the PVM will have cleared the request for a reboot set by the
+     collect phase *)
+  let* durable = Durable.delete durable Constants.reboot_flag_key in
   Test_encodings_util.Tree_encoding_runner.encode
     (Tezos_tree_encoding.scope ["durable"] Durable.encoding)
     durable
@@ -634,7 +638,7 @@ let test_snapshotable_state () =
   let*! state = Wasm.Internal_for_tests.get_tick_state tree in
   let* () =
     match state with
-    | Snapshot -> return_unit
+    | Collect -> return_unit
     | _ ->
         failwith
           "Unexpected state at input requested: %a"
@@ -651,13 +655,13 @@ let test_snapshotable_state () =
   in
   assert (not (wasm_tree_exists || wasm_value_exists)) ;
   (* Set a new input should go back to decoding *)
-  let*! tree = set_input_step "test" 1 tree in
+  let*! tree = set_empty_inbox_step 1l tree in
   let*! state = Wasm.Internal_for_tests.get_tick_state tree in
   match state with
-  | Start -> return_unit
+  | Snapshot -> return_unit
   | _ ->
       failwith
-        "Unexpected state after set_input_step: %a"
+        "Unexpected state after set_empty_inbox_step: %a"
         Wasm_utils.pp_state
         state
 
@@ -676,9 +680,9 @@ let test_rebuild_snapshotable_state () =
   in
   let*! tree = initial_tree ~from_binary:false module_ in
   let*! tree = eval_until_input_requested tree in
-  let*! tree = set_input_step "test" 0 tree in
+  let*! tree = set_empty_inbox_step 0l tree in
   (* First evaluate until the snapshotable state. *)
-  let*! tree_after_eval = eval_until_input_requested tree in
+  let*! tree_after_eval = eval_to_snapshot tree in
   (* From out initial tree, let's rebuild the expected snapshotable state as the
      Fast Node would do. This works because the kernel doesn't change anything. *)
   let*! rebuilded_tree = build_snapshot_wasm_state_from_set_input tree in
@@ -705,8 +709,12 @@ let test_rebuild_snapshotable_state () =
 
   (* To be sure, let's try to evaluate a new input from these two, either by the
      regular tree or the snapshoted one. *)
-  let*! input_step_from_eval = set_input_step "test" 1 tree_after_eval in
-  let*! input_step_from_snapshot = set_input_step "test" 1 rebuilded_tree in
+  (* First, we reach the collect state *)
+  let*! tree_after_eval = Wasm.compute_step tree_after_eval in
+  let*! rebuilded_tree = Wasm.compute_step rebuilded_tree in
+  (* Then we eval *)
+  let*! input_step_from_eval = set_empty_inbox_step 1l tree_after_eval in
+  let*! input_step_from_snapshot = set_empty_inbox_step 1l rebuilded_tree in
 
   (* Their hash should still be the same, but the first test should have caught
      that. *)
@@ -748,9 +756,7 @@ let test_unkown_host_function_truncated () =
   let*! tree = initial_tree ~from_binary:false module_ in
   (* The tree should be in snapshot state by default, hence in input step. *)
   let*! tree_snapshotted = eval_until_input_requested tree in
-  let*! tree_with_dummy_input =
-    set_input_step "dummy_input" 0 tree_snapshotted
-  in
+  let*! tree_with_dummy_input = set_empty_inbox_step 0l tree_snapshotted in
   let*! tree_stuck = eval_until_input_requested tree_with_dummy_input in
   let*! state = Wasm.Internal_for_tests.get_tick_state tree_stuck in
   (* The message as originally outputed before being
@@ -781,7 +787,8 @@ let test_bulk_noops () =
     |}
   in
   let* base_tree = initial_tree ~max_tick:500L module_ in
-  let* base_tree = set_input_step "dummy_input" 0 base_tree in
+  let* base_tree = eval_until_input_requested base_tree in
+  let* base_tree = set_empty_inbox_step 0l base_tree in
 
   let rec goto_snapshot ticks tree_slow =
     let* tree_fast, _ = Wasm.compute_step_many ~max_steps:ticks base_tree in
@@ -797,19 +804,9 @@ let test_bulk_noops () =
     else goto_snapshot (Int64.succ ticks) tree_slow
   in
 
-  let* ticks, snapshot = goto_snapshot 1L base_tree in
+  let* _ticks, snapshot = goto_snapshot 1L base_tree in
   let* snapshot_info = Wasm_utils.Wasm.get_info snapshot in
-  assert (snapshot_info.input_request = Input_required) ;
-
-  (* Try to advance past the snapshot point. *)
-  let* tree_fast, _ =
-    Wasm.compute_step_many ~max_steps:(Int64.mul ticks 2L) base_tree
-  in
-
-  (* Because the Snapshot state is an input state, the [compute_step_many]
-     invocation must not be able to zoom past it! *)
-  assert (
-    Context_hash.(Test_encodings_util.Tree.(hash tree_fast = hash snapshot))) ;
+  assert (snapshot_info.input_request = No_input_required) ;
 
   Lwt_result_syntax.return_unit
 
@@ -884,7 +881,7 @@ let test_durable_store_io () =
   assert (Option.is_none value) ;
 
   (* Set input and eval again. *)
-  let*! tree = set_input_step "dummy_input" 0 tree in
+  let*! tree = set_empty_inbox_step 0l tree in
   let*! tree = eval_until_input_requested tree in
   let*! stuck_flag = has_stuck_flag tree in
   assert (not stuck_flag) ;
@@ -992,7 +989,7 @@ let test_reveal_upgrade_kernel_ok () =
   let*! () = assert_kernel tree @@ Some modul in
   let*! () = assert_fallback_kernel tree None in
   (* Run the kernel, it should request a preimage reveal *)
-  let*! tree = set_input_step "test" 0 tree in
+  let*! tree = set_empty_inbox_step 0l tree in
   let*! tree = eval_until_input_requested tree in
   (* At this point, the kernel should be installed, including as fallback *)
   let*! () = assert_kernel tree @@ Some modul in
@@ -1045,7 +1042,7 @@ let test_reveal_upgrade_kernel_ok () =
   let*! () = assert_kernel tree @@ Some preimage in
   let*! () = assert_fallback_kernel tree @@ Some modul in
   (* run with new input, this should be the new kernel *)
-  let*! tree = set_input_step "test" 2 tree in
+  let*! tree = set_empty_inbox_step 2l tree in
   let*! tree = eval_until_input_requested tree in
   let*! state_after_second_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -1071,7 +1068,7 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error invalid_kernel
   let*! () = assert_kernel tree @@ Some modul in
   let*! () = assert_fallback_kernel tree None in
   (* Run the kernel, it should request a preimage reveal *)
-  let*! tree = set_input_step "test" 0 tree in
+  let*! tree = set_empty_inbox_step 0l tree in
   let*! tree = eval_until_input_requested tree in
   (* At this point, the kernel should be installed, including as fallback *)
   let*! () = assert_kernel tree @@ Some modul in
@@ -1115,7 +1112,7 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error invalid_kernel
   let*! () = assert_kernel tree @@ Some preimage in
   let*! () = assert_fallback_kernel tree @@ Some modul in
   (* run with new input, this should be the new kernel *)
-  let*! tree = set_input_step "test" 2 tree in
+  let*! tree = set_empty_inbox_step 2l tree in
   let*! tree = eval_until_input_requested tree in
   let*! state_after_second_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -1289,19 +1286,21 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
       reboot_module
   in
   let*! tree = eval_until_input_requested tree in
-  let*! tree = set_input_step "dummy_input" 0 tree in
+  let*! tree = set_empty_inbox_step 0l tree in
   let*! tree = eval_until_input_requested tree in
-  let*! state = Wasm.Internal_for_tests.get_tick_state tree in
-
+  let*! durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let*! too_many_reboot =
+    Durable.find_value durable Constants.too_many_reboot_flag_key
+  in
+  let too_many_reboot = Option.is_some too_many_reboot in
   (* If the expected number of reboots from the PVM is lower than the maximum
      asked by the kernel itself, this should lead to a stuck state with
      `Too_many_reboots`. *)
   let*! stuck_flag = has_stuck_flag tree in
   if reboots <= pvm_max_reboots then assert (not stuck_flag)
-  else assert (is_stuck ~step:`Too_many_reboots state) ;
+  else assert too_many_reboot ;
 
-  let*! durable = wrap_as_durable_storage tree in
-  let durable = Durable.of_storage_exn durable in
   let*! value =
     Durable.find_value durable (Durable.key_of_string_exn "/reboot/counter")
   in

@@ -98,9 +98,7 @@ let test_reveal_preimage_gen preimage max_bytes =
   let modl = reveal_preimage_module hash_addr preimage_addr max_bytes in
   let*! state = initial_tree modl in
   let*! state_snapshotted = eval_until_input_requested state in
-  let*! state_with_dummy_input =
-    set_input_step "dummy_input" 0 state_snapshotted
-  in
+  let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
   let*! state = eval_until_input_requested state_with_dummy_input in
   let*! info = Wasm.get_info state in
@@ -171,9 +169,7 @@ let test_reveal_metadata () =
   let modl = reveal_metadata_module metadata_addr in
   let*! state = initial_tree modl in
   let*! state_snapshotted = eval_until_input_requested state in
-  let*! state_with_dummy_input =
-    set_input_step "dummy_input" 0 state_snapshotted
-  in
+  let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
   (* Let’s go *)
   let*! state = eval_until_input_requested state_with_dummy_input in
   let*! info = Wasm.get_info state in
