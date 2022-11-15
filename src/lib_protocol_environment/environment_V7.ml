@@ -1407,8 +1407,10 @@ struct
   module Dal = struct
     include Tezos_crypto_dal.Cryptobox.Verifier
 
+    type page = {index : int; content : bytes}
+
     let verify_page t sh page proof =
-      match verify_page t sh page proof with
+      match verify_page t sh ~page_index:page.index page.content proof with
       | Error `Page_length_mismatch -> Ok false
       | Error `Segment_index_out_of_range -> Error `Segment_index_out_of_range
       | Ok r -> Ok r

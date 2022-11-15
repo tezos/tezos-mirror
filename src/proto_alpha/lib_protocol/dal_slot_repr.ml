@@ -693,18 +693,18 @@ module History = struct
 
     let proof_error reason = error @@ dal_proof_error reason
 
-    let check_page_proof dal_params proof data pid commitment =
+    let check_page_proof dal_params proof data ({Page.page_index; _} as pid)
+        commitment =
       let open Result_syntax in
       let* dal =
         match Dal.make dal_params with
         | Ok dal -> return dal
         | Error (`Fail s) -> proof_error s
       in
-      let page = {Dal.content = data; index = pid.Page.page_index} in
       let fail_with_error_msg what =
         Format.kasprintf proof_error "%s (page id=%a)." what Page.pp pid
       in
-      match Dal.verify_page dal commitment page proof with
+      match Dal.verify_page dal commitment ~page_index data proof with
       | Ok true -> return ()
       | Ok false ->
           fail_with_error_msg

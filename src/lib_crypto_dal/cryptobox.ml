@@ -137,7 +137,7 @@ module Inner = struct
 
   type page_proof = Bls12_381.G1.t
 
-  type page = {index : int; content : bytes}
+  type page = bytes
 
   type share = Scalar.t array
 
@@ -854,12 +854,12 @@ module Inner = struct
 
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
-  let verify_page t cm {index = slot_page_index; content = slot_page} proof =
-    if slot_page_index < 0 || slot_page_index >= t.pages_per_slot then
+  let verify_page t cm ~page_index page proof =
+    if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
       let expected_page_length = t.page_size in
-      let got_page_length = Bytes.length slot_page in
+      let got_page_length = Bytes.length page in
       if expected_page_length <> got_page_length then
         Error `Page_length_mismatch
       else
@@ -871,7 +871,7 @@ module Inner = struct
               | i when i < t.page_length - 1 ->
                   let dst = Bytes.create scalar_bytes_amount in
                   Bytes.blit
-                    slot_page
+                    page
                     (i * scalar_bytes_amount)
                     dst
                     0
@@ -880,7 +880,7 @@ module Inner = struct
               | i when i = t.page_length - 1 ->
                   let dst = Bytes.create t.remaining_bytes in
                   Bytes.blit
-                    slot_page
+                    page
                     (i * scalar_bytes_amount)
                     dst
                     0
@@ -894,7 +894,7 @@ module Inner = struct
              cm
              t.srs.kate_amortized_srs_g2_pages
              domain
-             (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
+             (Domains.get t.domain_k page_index, slot_page_evaluations)
              proof)
 end
 

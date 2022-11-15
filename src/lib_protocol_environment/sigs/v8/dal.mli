@@ -81,10 +81,10 @@ val commitment_proof_encoding : commitment_proof Data_encoding.t
      exceed [C.slot_size]. The verification time is constant. *)
 val verify_commitment : t -> commitment -> commitment_proof -> bool
 
-(** The original slot can be split into a list of pages of size
-     [page_size]. A page is consequently encoded as a pair of an
-     [index] and the content of this page. *)
-type page = {index : int; content : bytes}
+(** The original slot can be split into a list of pages of fixed
+     size. This size is given by the parameter [page_size] given to the
+     function {!val:make}. *)
+type page = bytes
 
 (** A proof that the evaluation of points of a polynomial is part of
      a commitment. *)
@@ -107,6 +107,7 @@ val pages_per_slot : parameters -> int
 val verify_page :
   t ->
   commitment ->
+  page_index:int ->
   page ->
   page_proof ->
   (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
