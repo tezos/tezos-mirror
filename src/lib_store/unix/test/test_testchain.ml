@@ -39,8 +39,11 @@ let fork_testchain chain_store (blocks, forked_block) =
   let context_index = Store.context_index global_store in
   (* Call [Context.fork_test_chain] then commit so we are able to gather
      commit info *)
+  let* resulting_context_hash =
+    Store.Block.resulting_context_hash chain_store forked_block
+  in
   let*! context =
-    Context_ops.checkout_exn context_index head_header.shell.context
+    Context_ops.checkout_exn context_index resulting_context_hash
   in
   let*! context =
     Context_ops.fork_test_chain context ~protocol:test_protocol ~expiration
@@ -72,7 +75,6 @@ let fork_testchain chain_store (blocks, forked_block) =
   let* test_blocks, head =
     append_blocks
       ~min_lafl:genesis_header.shell.level
-      ~should_commit:true
       ~should_set_head:true
       testchain_store
       ~kind:`Full
@@ -87,12 +89,7 @@ let test_simple store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let* blocks, head =
-    append_blocks
-      ~should_commit:true
-      ~should_set_head:true
-      chain_store
-      ~kind:`Full
-      10
+    append_blocks ~should_set_head:true chain_store ~kind:`Full 10
   in
   let* _ = fork_testchain chain_store (blocks, head) in
   return_unit
@@ -101,12 +98,7 @@ let test_inner store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let* blocks, head =
-    append_blocks
-      ~should_commit:true
-      ~should_set_head:true
-      chain_store
-      ~kind:`Full
-      10
+    append_blocks ~should_set_head:true chain_store ~kind:`Full 10
   in
   let* testchain, blocks, head = fork_testchain chain_store (blocks, head) in
   let testchain_store = Store.Chain.testchain_store testchain in
@@ -117,12 +109,7 @@ let test_shutdown store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let* blocks, head =
-    append_blocks
-      ~should_commit:true
-      ~should_set_head:true
-      chain_store
-      ~kind:`Full
-      10
+    append_blocks ~should_set_head:true chain_store ~kind:`Full 10
   in
   let* testchain, blocks, _head = fork_testchain chain_store (blocks, head) in
   let testchain_store = Store.Chain.testchain_store testchain in

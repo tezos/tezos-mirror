@@ -22,6 +22,7 @@
   tezos-shell-services
   tezos-stdlib-unix
   tezos-validation
+  tezos-protocol-updater
   tezos-embedded-protocol-demo-noops
   tezos-embedded-protocol-genesis
   tezos-embedded-protocol-alpha
@@ -42,6 +43,7 @@
   -open Tezos_shell_services
   -open Tezos_stdlib_unix
   -open Tezos_validation
+  -open Tezos_protocol_updater
   -open Tezos_protocol_alpha_parameters
   -open Tezos_protocol_plugin_alpha))
 

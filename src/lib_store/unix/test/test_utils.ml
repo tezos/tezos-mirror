@@ -440,7 +440,7 @@ let pp_raw_block fmt b =
   let h, lvl = raw_descriptor b in
   Format.fprintf fmt "%a (%ld)" Block_hash.pp h lvl
 
-let store_raw_block chain_store (raw_block : Block_repr.t) =
+let store_raw_block chain_store ?resulting_context (raw_block : Block_repr.t) =
   let open Lwt_syntax in
   let metadata =
     WithExceptions.Option.get ~loc:__LOC__ (Block_repr.metadata raw_block)
@@ -463,7 +463,10 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
     {
       Tezos_validation.Block_validation.validation_store =
         {
-          context_hash = Block_repr.context raw_block;
+          context_hash =
+            Option.value
+              ~default:(Block_repr.context raw_block)
+              resulting_context;
           timestamp = Block_repr.timestamp raw_block;
           message = Block_repr.message metadata;
           max_operations_ttl = Block_repr.max_operations_ttl metadata;
@@ -543,8 +546,7 @@ let incr_fitness b =
   | _ -> assert false
 
 let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
-    ?(should_set_head = false) ?(should_commit = false) ?protocol_level
-    ?set_protocol chain_store n =
+    ?(should_set_head = false) ?protocol_level ?set_protocol chain_store n =
   let open Lwt_result_syntax in
   let*! root =
     match root with
@@ -554,10 +556,13 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
         Lwt.return (Store.Block.descriptor block)
   in
   let* root_b = Store.Block.read_block chain_store (fst root) in
-  let*! ctxt_opt =
-    Context_ops.checkout
+  let* resulting_context_hash =
+    Store.Block.resulting_context_hash chain_store root_b
+  in
+  let*! ctxt =
+    Context_ops.checkout_exn
       (Store.context_index (Store.Chain.global_store chain_store))
-      (Store.Block.context_hash root_b)
+      resulting_context_hash
   in
   let*! blocks, _last =
     make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ~kind root n
@@ -569,68 +574,76 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
   in
   let* _, _, blocks =
     List.fold_left_es
-      (fun (ctxt_opt, last_opt, blocks) b ->
-        let* ctxt, last_opt, b =
-          if should_commit then
-            let ctxt = WithExceptions.Option.get ~loc:__LOC__ ctxt_opt in
-            let*! ctxt =
-              Context_ops.add
-                ctxt
-                ["level"]
-                (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
-            in
-            let*! ctxt =
-              match set_protocol with
-              | None -> Lwt.return ctxt
-              | Some proto -> Context_ops.add_protocol ctxt proto
-            in
-            let*! ctxt_hash =
-              Context_ops.commit ~time:Time.Protocol.epoch ctxt
-            in
-            let predecessor =
-              match List.hd blocks with None -> root_b | Some pred -> pred
-            in
-            let shell =
+      (fun (ctxt, pred, blocks) b ->
+        let* ctxt, resulting_context, b =
+          let*! ctxt =
+            Context_ops.add
+              ctxt
+              ["level"]
+              (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
+          in
+          let*! ctxt =
+            match set_protocol with
+            | None -> Lwt.return ctxt
+            | Some proto -> Context_ops.add_protocol ctxt proto
+          in
+          let* pred_resulting_context =
+            Store.Block.resulting_context_hash chain_store pred
+          in
+          let shell =
+            {
+              b.contents.header.Block_header.shell with
+              fitness = incr_fitness (Store.Block.fitness pred);
+              proto_level;
+              context = pred_resulting_context;
+              predecessor = Store.Block.hash pred;
+            }
+          in
+          let header =
+            {
+              Block_header.shell;
+              protocol_data = b.contents.header.protocol_data;
+            }
+          in
+          let hash = Block_header.hash header in
+          let*! resulting_context =
+            Context_ops.commit ~time:Time.Protocol.epoch ctxt
+          in
+          return
+            ( ctxt,
+              resulting_context,
               {
-                b.contents.header.Block_header.shell with
-                fitness = incr_fitness (Store.Block.fitness predecessor);
-                proto_level;
-                context = ctxt_hash;
-                predecessor = Store.Block.hash predecessor;
-              }
-            in
-            let header =
-              {
-                Block_header.shell;
-                protocol_data = b.contents.header.protocol_data;
-              }
-            in
-            let hash = Block_header.hash header in
-            return
-              ( Some ctxt,
-                Some hash,
-                {
-                  Block_repr.hash;
-                  contents =
-                    {
-                      header;
-                      operations = b.contents.operations;
-                      block_metadata_hash = None;
-                      operations_metadata_hashes = None;
-                    };
-                  metadata = b.metadata;
-                } )
-          else return (ctxt_opt, last_opt, b)
+                Block_repr.hash;
+                contents =
+                  {
+                    header;
+                    operations = b.contents.operations;
+                    block_metadata_hash = None;
+                    operations_metadata_hashes = None;
+                  };
+                metadata = b.metadata;
+              } )
         in
-        let* b = store_raw_block chain_store b in
+        let* b = store_raw_block chain_store ~resulting_context b in
+        let* () =
+          match set_protocol with
+          | None -> return_unit
+          | Some proto ->
+              Store.Chain.may_update_protocol_level
+                chain_store
+                ~pred
+                ~protocol_level:(Store.Block.proto_level b)
+                ~expect_predecessor_context:true
+                (b, proto)
+        in
         let* () =
           if should_set_head then
             let* _ = Store.Chain.set_head chain_store b in
             return_unit
           else return_unit
         in
-        return (ctxt, last_opt, b :: blocks))
-      (ctxt_opt, None, [])
+        return (ctxt, b, b :: blocks))
+      (ctxt, root_b, [])
       blocks
   in
   let head = List.hd blocks |> WithExceptions.Option.get ~loc:__LOC__ in

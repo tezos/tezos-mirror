@@ -109,7 +109,6 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
     | None -> `Alias (`Checkpoint, 0)
     | Some hash -> `Hash (hash, 0)
   in
-  (*FIXME test over Raw formats as well *)
   let* () =
     Snapshots.export
       ~snapshot_path

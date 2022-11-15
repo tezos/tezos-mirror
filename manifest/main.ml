@@ -5330,6 +5330,7 @@ let _octez_store_tests =
         octez_shell_services |> open_;
         octez_stdlib_unix |> open_;
         octez_validation |> open_;
+        octez_protocol_updater |> open_;
         Protocol.(embedded demo_noops);
         Protocol.(embedded genesis);
         Protocol.(embedded alpha);

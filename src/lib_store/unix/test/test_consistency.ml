@@ -27,31 +27,50 @@ open Test_utils
 
 let nb_protocols = 5
 
-let init_protocols store history_mode =
-  let open Lwt_result_syntax in
-  let chain_store = Store.main_chain_store store in
-  assert (History_mode.equal (Store.Chain.history_mode chain_store) history_mode) ;
+let register_protocol ~hash ~sources =
+  let module M = struct
+    include
+      Registered_protocol.Register_embedded_V8
+        (Tezos_protocol_environment_demo_noops)
+        (Tezos_protocol_demo_noops.Protocol)
+        (struct
+          let hash = Some hash
+
+          let sources = sources
+        end)
+  end in
+  ()
+
+let test_protocols =
   let mk i =
     let s = string_of_int i in
     let proto =
       {
-        Protocol.expected_env = V0;
+        Protocol.expected_env = V8;
         components = [{name = s; interface = None; implementation = s}];
       }
     in
-    (Protocol.hash proto, proto)
+    let proto_hash = Protocol.hash proto in
+    register_protocol ~hash:proto_hash ~sources:proto ;
+    (proto_hash, proto)
   in
-  let protos = Stdlib.List.init nb_protocols mk in
+  Stdlib.List.init nb_protocols mk
+
+let init_protocols store history_mode =
+  let open Lwt_result_syntax in
+  let chain_store = Store.main_chain_store store in
+  assert (History_mode.equal (Store.Chain.history_mode chain_store) history_mode) ;
   let*! () =
     List.iter_s
       (fun (h, p) ->
         let*! r = Store.Protocol.store store h p in
         assert (r <> None) ;
+        (* register protocol *)
         Lwt.return_unit)
-      protos
+      test_protocols
   in
-  assert (List.for_all (Store.Protocol.mem store) (List.map fst protos)) ;
-  let blocks_proto = List.mapi (fun i p -> (succ i, fst p)) protos in
+  assert (List.for_all (Store.Protocol.mem store) (List.map fst test_protocols)) ;
+  let blocks_proto = List.mapi (fun i p -> (succ i, fst p)) test_protocols in
   (* 10 blocks per cycle *)
   let nb_blocks_per_cycle = 10 in
   let constants =
@@ -64,27 +83,16 @@ let init_protocols store history_mode =
   let* () =
     List.iter_es
       (fun (protocol_level, proto_hash) ->
-        let*! pred = Store.Chain.current_head chain_store in
-        let* bl, _ =
+        let* _ =
           append_blocks
             ~constants
             ~max_operations_ttl:8
             ~kind:`Full
             ~should_set_head:true
-            ~should_commit:true
             ~protocol_level
             ~set_protocol:proto_hash
             chain_store
             nb_blocks_per_cycle
-        in
-        let first_block_of_cycle = Stdlib.List.hd bl in
-        let* () =
-          Store.Chain.may_update_protocol_level
-            chain_store
-            ~pred
-            ~protocol_level
-            ~expect_predecessor_context:true
-            (first_block_of_cycle, proto_hash)
         in
         let*! () =
           Block_store.await_merging (Store.Unsafe.get_block_store chain_store)
@@ -173,9 +181,14 @@ let test_protocol_level_consistency_drop_one history_mode nth
                 "unexpected missing proto level %d in the protocol levels"
                 (Store.Block.proto_level b)
         in
-        let*! ctxt = Store.Block.context_exn chain_store b in
+        let* ctxt = Store.Block.context chain_store b in
         let*! proto_block = Context_ops.get_protocol ctxt in
-        assert (Protocol_hash.(proto = proto_block)) ;
+        Assert.equal
+          ~eq:Protocol_hash.equal
+          ~pp:Protocol_hash.pp
+          ~loc:__LOC__
+          proto
+          proto_block ;
         return_unit)
       (Int32.to_int savepoint_level
       -- Int32.to_int (Store.Block.level current_head))
@@ -286,7 +299,6 @@ let make_tests =
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
-       ~argv:[|""|]
        "tezos-store"
        [
          ( "consistency",
