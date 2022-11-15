@@ -1154,7 +1154,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let pending_query =
         let open Tezos_rpc.Query in
         query
-          (fun version applied refused outdated branch_refused branch_delayed ->
+          (fun
+            version
+            applied
+            refused
+            outdated
+            branch_refused
+            branch_delayed
+            validation_passes
+          ->
             object
               method version = version
 
@@ -1167,6 +1175,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               method branch_refused = branch_refused
 
               method branch_delayed = branch_delayed
+
+              method validation_passes = validation_passes
             end)
         |+ field
              "version"
@@ -1203,6 +1213,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              Tezos_rpc.Arg.bool
              true
              (fun t -> t#branch_delayed)
+        |+ multi_field
+             ~descr:
+               "Include operations filtered by validation pass (all by default)"
+             "validation_pass"
+             Tezos_rpc.Arg.int
+             (fun t -> t#validation_passes)
         |> seal
 
       (* If you update this datatype, please update also [supported_version]. *)
@@ -1283,7 +1299,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let mempool_query =
         let open Tezos_rpc.Query in
-        query (fun applied refused outdated branch_refused branch_delayed ->
+        query
+          (fun
+            applied
+            refused
+            outdated
+            branch_refused
+            branch_delayed
+            validation_passes
+          ->
             object
               method applied = applied
 
@@ -1294,6 +1318,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               method branch_refused = branch_refused
 
               method branch_delayed = branch_delayed
+
+              method validation_passes = validation_passes
             end)
         |+ field
              ~descr:"Include applied operations (set by default)"
@@ -1325,6 +1351,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              Tezos_rpc.Arg.bool
              true
              (fun t -> t#branch_delayed)
+        |+ multi_field
+             ~descr:
+               "Include operations filtered by validation pass (all by default)"
+             "validation_pass"
+             Tezos_rpc.Arg.int
+             (fun t -> t#validation_passes)
         |> seal
 
       (* We extend the object so that the fields of 'next_operation'
@@ -1657,7 +1689,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let pending_operations ctxt ?(chain = `Main)
         ?(version = S.Mempool.default_pending_operations_version)
         ?(applied = true) ?(branch_delayed = true) ?(branch_refused = true)
-        ?(refused = true) ?(outdated = true) () =
+        ?(refused = true) ?(outdated = true) ?(validation_passes = []) () =
       let open Lwt_result_syntax in
       let* v =
         Tezos_rpc.Context.make_call1
@@ -1676,6 +1708,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              method branch_refused = branch_refused
 
              method branch_delayed = branch_delayed
+
+             method validation_passes = validation_passes
           end)
           ()
       in
@@ -1697,7 +1731,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
         ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false)
-        ?(outdated = false) () =
+        ?(outdated = false) ?(validation_passes = []) () =
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
       Tezos_rpc.Context.make_streamed_call
         s
@@ -1713,6 +1747,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
            method branch_refused = branch_refused
 
            method branch_delayed = branch_delayed
+
+           method validation_passes = validation_passes
         end)
         ()
 

@@ -1098,6 +1098,16 @@ module Make
       Filter.Mempool.config_encoding
       pv.filter_config
 
+  let filter_validation_passes allowed_validation_passes
+      (op : protocol_operation) =
+    match allowed_validation_passes with
+    | [] -> true
+    | validation_passes -> (
+        match Filter.Proto.acceptable_pass op with
+        | None -> false
+        | Some validation_pass ->
+            List.mem ~equal:Compare.Int.equal validation_pass validation_passes)
+
   let build_rpc_directory w =
     lazy
       (let open Lwt_result_syntax in
@@ -1178,58 +1188,6 @@ module Make
           !dir
           (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
-            let map_op_error oph (op, error) acc =
-              op.Prevalidation.protocol |> fun res ->
-              Tezos_crypto.Operation_hash.Map.add oph (res, error) acc
-            in
-            let applied =
-              if params#applied then
-                List.rev_map
-                  (fun op -> (op.Prevalidation.hash, op.Prevalidation.protocol))
-                  pv.shell.classification.applied_rev
-              else []
-            in
-            let filter f map =
-              Tezos_crypto.Operation_hash.Map.fold
-                f
-                map
-                Tezos_crypto.Operation_hash.Map.empty
-            in
-            let refused =
-              if params#refused then
-                filter
-                  map_op_error
-                  (Classification.map pv.shell.classification.refused)
-              else Tezos_crypto.Operation_hash.Map.empty
-            in
-            let outdated =
-              if params#outdated then
-                filter
-                  map_op_error
-                  (Classification.map pv.shell.classification.outdated)
-              else Tezos_crypto.Operation_hash.Map.empty
-            in
-            let branch_refused =
-              if params#branch_refused then
-                filter
-                  map_op_error
-                  (Classification.map pv.shell.classification.branch_refused)
-              else Tezos_crypto.Operation_hash.Map.empty
-            in
-            let branch_delayed =
-              if params#branch_delayed then
-                filter
-                  map_op_error
-                  (Classification.map pv.shell.classification.branch_delayed)
-              else Tezos_crypto.Operation_hash.Map.empty
-            in
-            let unprocessed =
-              Pending_ops.fold
-                (fun _prio oph op acc ->
-                  Tezos_crypto.Operation_hash.Map.add oph op.protocol acc)
-                pv.shell.pending
-                Tezos_crypto.Operation_hash.Map.empty
-            in
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
                We merge prechecked operation with applied operation
@@ -1239,11 +1197,66 @@ module Make
                reflect that. *)
             let prechecked_with_applied =
               if params#applied then
-                Classification.Sized_map.fold
-                  (fun oph op acc -> (oph, op.Prevalidation.protocol) :: acc)
+                let applied_seq =
+                  pv.shell.classification.applied_rev |> List.to_seq
+                  |> Seq.map (fun (Prevalidation.{hash; _} as op) -> (hash, op))
+                in
+                Classification.Sized_map.to_map
                   pv.shell.classification.prechecked
-                  applied
-              else applied
+                |> Tezos_crypto.Operation_hash.Map.to_seq
+                |> Seq.append applied_seq
+                |> Seq.filter_map (fun (oph, op) ->
+                       if
+                         filter_validation_passes
+                           params#validation_passes
+                           op.Prevalidation.protocol
+                       then Some (oph, op.protocol)
+                       else None)
+                |> List.of_seq
+              else []
+            in
+            let process_map map =
+              let open Tezos_crypto.Operation_hash in
+              Map.filter_map
+                (fun _oph (op, error) ->
+                  if
+                    filter_validation_passes
+                      params#validation_passes
+                      op.Prevalidation.protocol
+                  then Some (op.protocol, error)
+                  else None)
+                map
+            in
+            let refused =
+              if params#refused then
+                process_map (Classification.map pv.shell.classification.refused)
+              else Tezos_crypto.Operation_hash.Map.empty
+            in
+            let outdated =
+              if params#outdated then
+                process_map
+                  (Classification.map pv.shell.classification.outdated)
+              else Tezos_crypto.Operation_hash.Map.empty
+            in
+            let branch_refused =
+              if params#branch_refused then
+                process_map
+                  (Classification.map pv.shell.classification.branch_refused)
+              else Tezos_crypto.Operation_hash.Map.empty
+            in
+            let branch_delayed =
+              if params#branch_delayed then
+                process_map
+                  (Classification.map pv.shell.classification.branch_delayed)
+              else Tezos_crypto.Operation_hash.Map.empty
+            in
+            let unprocessed =
+              Tezos_crypto.Operation_hash.Map.filter_map
+                (fun _ Prevalidation.{protocol; _} ->
+                  if filter_validation_passes params#validation_passes protocol
+                  then Some protocol
+                  else None)
+                (Pending_ops.operations pv.shell.pending)
             in
             let pending_operations =
               {
@@ -1274,76 +1287,65 @@ module Make
             let op_stream, stopper =
               Lwt_watcher.create_stream pv.operation_stream
             in
-            (* Convert ops *)
-            let fold_op hash (Prevalidation.{protocol; _}, error) acc =
-              (hash, protocol, error) :: acc
-            in
             (* First call : retrieve the current set of op from the mempool *)
-            let applied =
+            let applied_seq =
               if params#applied then
-                List.map
-                  (fun op -> (op.Prevalidation.hash, op.protocol, []))
-                  pv.shell.classification.applied_rev
-              else []
+                pv.shell.classification.applied_rev |> List.to_seq
+                |> Seq.map (fun Prevalidation.{hash; protocol; _} ->
+                       ((hash, protocol), None))
+              else Seq.empty
             in
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
                For the moment, applied and prechecked operations are
                handled the same way for the user point of view. *)
-            let prechecked =
+            let prechecked_seq =
               if params#applied then
-                Classification.Sized_map.fold
-                  (fun hash op acc ->
-                    (hash, op.Prevalidation.protocol, []) :: acc)
+                Classification.Sized_map.to_map
                   pv.shell.classification.prechecked
-                  []
-              else []
+                |> Tezos_crypto.Operation_hash.Map.to_seq
+                |> Seq.map (fun (hash, Prevalidation.{protocol; _}) ->
+                       ((hash, protocol), None))
+              else Seq.empty
             in
-            let refused =
+            let process_error_map map =
+              let open Tezos_crypto.Operation_hash in
+              map |> Map.to_seq
+              |> Seq.map (fun (hash, (op, error)) ->
+                     ((hash, op.Prevalidation.protocol), Some error))
+            in
+            let refused_seq =
               if params#refused then
-                Tezos_crypto.Operation_hash.Map.fold
-                  fold_op
+                process_error_map
                   (Classification.map pv.shell.classification.refused)
-                  []
-              else []
+              else Seq.empty
             in
-            let branch_refused =
+            let branch_refused_seq =
               if params#branch_refused then
-                Tezos_crypto.Operation_hash.Map.fold
-                  fold_op
+                process_error_map
                   (Classification.map pv.shell.classification.branch_refused)
-                  []
-              else []
+              else Seq.empty
             in
-            let branch_delayed =
+            let branch_delayed_seq =
               if params#branch_delayed then
-                Tezos_crypto.Operation_hash.Map.fold
-                  fold_op
+                process_error_map
                   (Classification.map pv.shell.classification.branch_delayed)
-                  []
-              else []
+              else Seq.empty
             in
-            let outdated =
+            let outdated_seq =
               if params#outdated then
-                Tezos_crypto.Operation_hash.Map.fold
-                  fold_op
+                process_error_map
                   (Classification.map pv.shell.classification.outdated)
-                  []
-              else []
+              else Seq.empty
+            in
+            let filter ((_, op), _) =
+              filter_validation_passes params#validation_passes op
             in
             let current_mempool =
-              List.concat_map
-                (List.map (function
-                    | hash, op, [] -> ((hash, op), None)
-                    | hash, op, errors -> ((hash, op), Some errors)))
-                [
-                  applied;
-                  prechecked;
-                  refused;
-                  branch_refused;
-                  branch_delayed;
-                  outdated;
-                ]
+              Seq.append outdated_seq branch_delayed_seq
+              |> Seq.append branch_refused_seq
+              |> Seq.append refused_seq |> Seq.append prechecked_seq
+              |> Seq.append applied_seq |> Seq.filter filter |> List.of_seq
             in
             let current_mempool = ref (Some current_mempool) in
             let filter_result = function
