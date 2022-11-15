@@ -182,6 +182,21 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
     ~outbox_level
     [{destination; entrypoint; parameters}]
 
+let encode_batch ?hooks ?expected_error sc_client batch =
+  let process =
+    spawn_command
+      ?hooks
+      sc_client
+      ["encode"; "outbox"; "message"; string_of_batch batch]
+  in
+  match expected_error with
+  | None ->
+      let* answer = Process.check_and_read_stdout process in
+      return (Some (String.trim answer))
+  | Some msg ->
+      let* () = Process.check_error ~msg process in
+      return None
+
 let rpc_get ?hooks sc_client path =
   spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
   |> Runnable.map @@ fun output ->

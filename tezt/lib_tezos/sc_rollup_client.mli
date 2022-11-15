@@ -143,6 +143,15 @@ val outbox_proof_batch :
   transaction list ->
   outbox_proof option Lwt.t
 
+(** [encode_batch batch] returns the encoding of a [batch] of output
+   transactions. *)
+val encode_batch :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  t ->
+  transaction list ->
+  string option Lwt.t
+
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
 
