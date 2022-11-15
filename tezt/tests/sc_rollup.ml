@@ -684,8 +684,14 @@ let to_text_messages_arg msgs =
   let json = Ezjsonm.list Ezjsonm.string msgs in
   "text:" ^ Ezjsonm.to_string ~minify:true json
 
-let send_text_messages ?src client msgs =
-  send_message ?src client (to_text_messages_arg msgs)
+let to_hex_messages_arg msgs =
+  let json = Ezjsonm.list Ezjsonm.string msgs in
+  "hex:" ^ Ezjsonm.to_string ~minify:true json
+
+let send_text_messages ?(format = `Raw) ?src client msgs =
+  match format with
+  | `Raw -> send_message ?src client (to_text_messages_arg msgs)
+  | `Hex -> send_message ?src client (to_hex_messages_arg msgs)
 
 let parse_inbox json =
   let go () =
@@ -3380,7 +3386,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
     let* payload = input_message sc_client target_address in
     let* () =
       match payload with
-      | `External payload -> send_text_messages client [payload]
+      | `External payload -> send_text_messages ~format:`Hex client [payload]
       | `Internal payload ->
           let payload = "0x" ^ payload in
           Client.transfer
