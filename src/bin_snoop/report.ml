@@ -30,7 +30,6 @@ module Hashtbl = Stdlib.Hashtbl
 
 type context =
   | Add
-  | Sub
   | Mul
   | Div
   | Lam_body
@@ -69,12 +68,8 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
     unprotect_in_context [Add; Lam_body] (fun fmtr () ->
         Format.fprintf fmtr "%a +@, %a" x Add y Add)
 
-  let ( - ) x y =
-    unprotect_in_context [Lam_body] (fun fmtr () ->
-        Format.fprintf fmtr "%a - %a" x Sub y Sub)
-
   let sat_sub x y =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "sat_sub %a %a" x Arg_app y Arg_app)
 
   let ( * ) x y =
@@ -86,27 +81,27 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
         Format.fprintf fmtr "%a / %a" x Div y Div)
 
   let max x y =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "max %a %a" x Arg_app y Arg_app)
 
   let min x y =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "min %a %a" x Arg_app y Arg_app)
 
   let shift_left x i =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "%a lsl %d" x Arg_app i)
 
   let shift_right x i =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "%a lsr %d" x Arg_app i)
 
   let log2 x =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "log2 @[<h>%a@]" x Arg_app)
 
   let sqrt x =
-    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+    unprotect_in_context [Lam_body; Add; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "sqrt @[<h>%a@]" x Arg_app)
 
   let free ~name fmtr _c =
