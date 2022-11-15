@@ -61,7 +61,6 @@ type error +=
   | (* `Temporary *) Sc_rollup_invalid_outbox_message_index
   | (* `Temporary *) Sc_rollup_outbox_level_expired
   | (* `Temporary *) Sc_rollup_outbox_message_already_applied
-  | (* `Temporary *) Sc_rollup_state_change_on_zero_tick_commitment
   | (* `Temporary *)
       Sc_rollup_staker_funds_too_low of {
       staker : Signature.public_key_hash;
@@ -71,6 +70,7 @@ type error +=
     }
   | (* `Temporary *) Sc_rollup_bad_commitment_serialization
   | (* `Permanent *) Sc_rollup_address_generation
+  | (* `Permanent *) Sc_rollup_zero_tick_commitment
 
 let () =
   register_error_kind
@@ -403,17 +403,6 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_outbox_message_already_applied -> Some () | _ -> None)
     (fun () -> Sc_rollup_outbox_message_already_applied) ;
-  let description = "Attempt to commit zero ticks with state change" in
-  register_error_kind
-    `Temporary
-    ~id:"Sc_rollup_state_change_on_zero_tick_commitment"
-    ~title:description
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.empty
-    (function
-      | Sc_rollup_state_change_on_zero_tick_commitment -> Some () | _ -> None)
-    (fun () -> Sc_rollup_state_change_on_zero_tick_commitment) ;
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_staker_funds_too_low"
@@ -468,4 +457,14 @@ let () =
     ~description
     Data_encoding.empty
     (function Sc_rollup_address_generation -> Some () | _ -> None)
-    (fun () -> Sc_rollup_address_generation)
+    (fun () -> Sc_rollup_address_generation) ;
+  let description = "Tried to publish a 0 tick commitment" in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_zero_tick_commitment"
+    ~title:description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    ~description
+    Data_encoding.empty
+    (function Sc_rollup_zero_tick_commitment -> Some () | _ -> None)
+    (fun () -> Sc_rollup_zero_tick_commitment)

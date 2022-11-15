@@ -2047,6 +2047,30 @@ let test_sol_and_eol () =
 
   return_unit
 
+(** With [Start_of_level] and [End_of_level] inbox messages in each inbox level,
+    it's impossible to give a valid commitment with 0 ticks. *)
+let test_zero_tick_commitment_fails () =
+  let* ctxt, contract, rollup = init_and_originate Context.T1 "unit" in
+  let* incr = Incremental.begin_construction ctxt in
+  let* commitment = dummy_commitment (I incr) rollup in
+  let commitment = {commitment with number_of_ticks = number_of_ticks_exn 0L} in
+  let* publish_commitment =
+    Op.sc_rollup_publish (B ctxt) contract rollup commitment
+  in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_errors.Sc_rollup_zero_tick_commitment as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ ->
+        failwith "It should have failed with [Sc_rollup_zero_tick_commitment]"
+  in
+  let* _incr =
+    Incremental.add_operation ~expect_apply_failure incr publish_commitment
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -2160,4 +2184,8 @@ let tests =
       "Test that SOL/EOL are added in the inbox"
       `Quick
       test_sol_and_eol;
+    Tztest.tztest
+      "0-tick commitments are forbidden"
+      `Quick
+      test_zero_tick_commitment_fails;
   ]
