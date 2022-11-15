@@ -67,6 +67,15 @@ val rpc_get :
 val rpc_post :
   ?hooks:Process.hooks -> t -> Client.path -> JSON.t -> JSON.t Runnable.process
 
+(** [rpc_get_rich client path parameters] issues a GET request for [path]
+    passing [parameters]. *)
+val rpc_get_rich :
+  ?hooks:Process.hooks ->
+  t ->
+  Client.path ->
+  (string * string) list ->
+  JSON.t Lwt.t
+
 (** [total_ticks ?block client] gets the total number of ticks for the PVM. *)
 val total_ticks :
   ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process

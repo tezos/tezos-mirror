@@ -195,6 +195,18 @@ let rpc_post ?hooks sc_client path data =
   |> Runnable.map @@ fun output ->
      JSON.parse ~origin:(Client.string_of_path path ^ " response") output
 
+let rpc_get_rich ?hooks sc_client path parameters =
+  let parameters =
+    if parameters = [] then ""
+    else
+      "?" ^ String.concat "&"
+      @@ List.map (fun (k, v) -> Format.asprintf "%s=%s" k v) parameters
+  in
+  let uri = Client.string_of_path path ^ parameters in
+  let process = spawn_command ?hooks sc_client ["rpc"; "get"; uri] in
+  let* output = Process.check_and_read_stdout process in
+  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
+
 let ticks ?hooks ?(block = "head") sc_client =
   let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
   Runnable.map JSON.as_int res
