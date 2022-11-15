@@ -40,7 +40,7 @@ type t = private {
   blocks_cache : blocks_cache;
   heads : head Lwt_stream.t;
   cctxt : Protocol_client_context.full;
-  stopper : RPC_context.stopper;
+  stopper : Tezos_rpc.Context.stopper;
   genesis_info : Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info;
 }
 

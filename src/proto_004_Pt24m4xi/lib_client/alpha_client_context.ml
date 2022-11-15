@@ -29,14 +29,14 @@ module Alpha_block_services = Block_services.Make (Protocol) (Protocol)
 
 class type rpc_context =
   object
-    inherit RPC_context.generic
+    inherit Tezos_rpc.Context.generic
 
     inherit
       [Shell_services.chain * Shell_services.block] Environment.RPC_context
                                                     .simple
   end
 
-class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
+class wrap_rpc_context (t : Tezos_rpc.Context.generic) : rpc_context =
   object
     method base : Uri.t = t#base
 
@@ -44,7 +44,7 @@ class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           'p ->
           'q ->
           'i ->
@@ -53,7 +53,7 @@ class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           on_chunk:('o -> unit) ->
           on_close:(unit -> unit) ->
           'p ->
@@ -64,7 +64,7 @@ class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
 
     inherit
       [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
-        (t :> RPC_context.t)
+        (t :> Tezos_rpc.Context.t)
         Shell_services.Blocks.path
   end
 
@@ -86,7 +86,7 @@ class wrap_full (t : Client_context.full) : full =
 
     inherit
       [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
-        (t :> RPC_context.t)
+        (t :> Tezos_rpc.Context.t)
         Shell_services.Blocks.path
   end
 

@@ -42,7 +42,7 @@ type mode =
     RPC calls of the form [/chains/<chain>/blocks/<block>] where the <...>
     received the value of the corresponding field of this record. *)
 type proxy_getter_input = {
-  rpc_context : RPC_context.simple;  (** How to perform RPC calls *)
+  rpc_context : Tezos_rpc.Context.simple;  (** How to perform RPC calls *)
   mode : mode;  (** Whether [octez-client] or [tezos-proxy-server] is running *)
   chain : Tezos_shell_services.Block_services.chain;
       (** The chain involved in the RPC call *)

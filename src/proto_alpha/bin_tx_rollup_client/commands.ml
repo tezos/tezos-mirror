@@ -834,7 +834,7 @@ let sign_transaction () =
         return_unit)
 
 let display_answer (cctxt : #Configuration.tx_client_context) :
-    RPC_context.generic_call_result -> unit Lwt.t = function
+    Tezos_rpc.Context.generic_call_result -> unit Lwt.t = function
   | `Json (`Ok json) -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
   | `Binary (`Ok binary) -> cctxt#answer "%a" Hex.pp (Hex.of_string binary)
   | `Json (`Error (Some error)) ->

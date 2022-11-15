@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_context
+open Tezos_rpc.Context
 
 val self : #simple -> P2p_peer.Id.t tzresult Lwt.t
 
@@ -43,19 +43,25 @@ val connect :
   #simple -> timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
 
 module S : sig
-  val self : ([`GET], unit, unit, unit, unit, P2p_peer.Id.t) RPC_service.t
+  val self : ([`GET], unit, unit, unit, unit, P2p_peer.Id.t) Tezos_rpc.Service.t
 
-  val stat : ([`GET], unit, unit, unit, unit, P2p_stat.t) RPC_service.t
+  val stat : ([`GET], unit, unit, unit, unit, P2p_stat.t) Tezos_rpc.Service.t
 
   val version :
-    ([`GET], unit, unit, unit, unit, Network_version.t) RPC_service.t
+    ([`GET], unit, unit, unit, unit, Network_version.t) Tezos_rpc.Service.t
 
   (* DEPRECATED: use [version] instead. *)
   val versions :
-    ([`GET], unit, unit, unit, unit, Network_version.t list) RPC_service.t
+    ([`GET], unit, unit, unit, unit, Network_version.t list) Tezos_rpc.Service.t
 
   val events :
-    ([`GET], unit, unit, unit, unit, P2p_connection.P2p_event.t) RPC_service.t
+    ( [`GET],
+      unit,
+      unit,
+      unit,
+      unit,
+      P2p_connection.P2p_event.t )
+    Tezos_rpc.Service.t
 
   val connect :
     ( [`PUT],
@@ -64,11 +70,11 @@ module S : sig
       < timeout : Ptime.Span.t >,
       unit,
       unit )
-    RPC_service.t
+    Tezos_rpc.Service.t
 end
 
 module Connections : sig
-  open RPC_context
+  open Tezos_rpc.Context
 
   type connection_info = Connection_metadata.t P2p_connection.Info.t
 
@@ -80,7 +86,7 @@ module Connections : sig
 
   module S : sig
     val list :
-      ([`GET], unit, unit, unit, unit, connection_info list) RPC_service.t
+      ([`GET], unit, unit, unit, unit, connection_info list) Tezos_rpc.Service.t
 
     val info :
       ( [`GET],
@@ -89,7 +95,7 @@ module Connections : sig
         unit,
         unit,
         connection_info )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val kick :
       ( [`DELETE],
@@ -98,7 +104,7 @@ module Connections : sig
         < wait : bool >,
         unit,
         unit )
-      RPC_service.t
+      Tezos_rpc.Service.t
   end
 end
 
@@ -131,7 +137,7 @@ module Points : sig
         < filters : P2p_point.Filter.t list >,
         unit,
         (P2p_point.Id.t * P2p_point.Info.t) list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val info :
       ( [`GET],
@@ -140,7 +146,7 @@ module Points : sig
         unit,
         unit,
         P2p_point.Info.t )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val patch_input_encoding :
       ([`Ban | `Open | `Trust] option * P2p_peer.Id.t option) Data_encoding.t
@@ -152,7 +158,7 @@ module Points : sig
         unit,
         [`Ban | `Open | `Trust] option * P2p_peer.Id.t option,
         P2p_point.Info.t )
-      RPC_service.service
+      Tezos_rpc.Service.service
 
     val events :
       ( [`GET],
@@ -161,26 +167,56 @@ module Points : sig
         < monitor : bool >,
         unit,
         P2p_point.Pool_event.t list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     (* DEPRECATED *)
     val ban :
-      ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
+      ( [`GET],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        unit,
+        unit )
+      Tezos_rpc.Service.t
 
     (* DEPRECATED *)
     val unban :
-      ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
+      ( [`GET],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        unit,
+        unit )
+      Tezos_rpc.Service.t
 
     (* DEPRECATED *)
     val trust :
-      ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
+      ( [`GET],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        unit,
+        unit )
+      Tezos_rpc.Service.t
 
     (* DEPRECATED *)
     val untrust :
-      ([`GET], unit, unit * P2p_point.Id.t, unit, unit, unit) RPC_service.t
+      ( [`GET],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        unit,
+        unit )
+      Tezos_rpc.Service.t
 
     val banned :
-      ([`GET], unit, unit * P2p_point.Id.t, unit, unit, bool) RPC_service.t
+      ( [`GET],
+        unit,
+        unit * P2p_point.Id.t,
+        unit,
+        unit,
+        bool )
+      Tezos_rpc.Service.t
   end
 end
 
@@ -221,7 +257,7 @@ module Peers : sig
         (P2p_peer.Id.t
         * (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t)
         list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val info :
       ( [`GET],
@@ -230,7 +266,7 @@ module Peers : sig
         unit,
         unit,
         (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val events :
       ( [`GET],
@@ -239,7 +275,7 @@ module Peers : sig
         < monitor : bool >,
         unit,
         P2p_peer.Pool_event.t list )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val patch_input_encoding : [`Ban | `Open | `Trust] option Data_encoding.t
 
@@ -250,22 +286,22 @@ module Peers : sig
         unit,
         [`Ban | `Open | `Trust] option,
         (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
-      RPC_service.service
+      Tezos_rpc.Service.service
 
     val ban :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) RPC_service.t
+      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
 
     val unban :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) RPC_service.t
+      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
 
     val trust :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) RPC_service.t
+      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
 
     val untrust :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) RPC_service.t
+      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
 
     val banned :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, bool) RPC_service.t
+      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, bool) Tezos_rpc.Service.t
   end
 end
 
@@ -288,14 +324,15 @@ module ACL : sig
   val get_greylisted_ips : #simple -> ip_list tzresult Lwt.t
 
   module S : sig
-    val clear : ([`GET], unit, unit, unit, unit, unit) RPC_service.t
+    val clear : ([`GET], unit, unit, unit, unit, unit) Tezos_rpc.Service.t
 
-    val clear_delete : ([`DELETE], unit, unit, unit, unit, unit) RPC_service.t
+    val clear_delete :
+      ([`DELETE], unit, unit, unit, unit, unit) Tezos_rpc.Service.t
 
     val get_greylisted_peers :
-      ([`GET], unit, unit, unit, unit, P2p_peer.Id.t list) RPC_service.t
+      ([`GET], unit, unit, unit, unit, P2p_peer.Id.t list) Tezos_rpc.Service.t
 
     val get_greylisted_ips :
-      ([`GET], unit, unit, unit, unit, ip_list) RPC_service.t
+      ([`GET], unit, unit, unit, unit, ip_list) Tezos_rpc.Service.t
   end
 end

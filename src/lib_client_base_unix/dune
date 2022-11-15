@@ -9,6 +9,7 @@
   tezos-base
   tezos-base.unix
   tezos-clic
+  tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-client-unix
   tezos-shell-services

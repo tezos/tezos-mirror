@@ -3,15 +3,15 @@ index c7d73dca78..b4af18ab90 100644
 --- a/src/lib_protocol_environment/environment_V3.ml
 +++ b/src/lib_protocol_environment/environment_V3.ml
 @@ -756,4 +756,9 @@ struct
-   module RPC_arg = RPC_arg
-   module RPC_path = RPC_path
-   module RPC_query = RPC_query
+   module RPC_arg = Tezos_rpc.Arg
+   module RPC_path = Tezos_rpc.Path
+   module RPC_query = Tezos_rpc.Query
 +
 +  module Hack = struct
 +    let printf = Format.printf
 +  end
 +
-   module RPC_service = RPC_service
+   module RPC_service = Tezos_rpc.Service
 
    module RPC_answer = struct
 diff --git a/src/lib_protocol_environment/sigs/v3.in.ml b/src/lib_protocol_environment/sigs/v3.in.ml

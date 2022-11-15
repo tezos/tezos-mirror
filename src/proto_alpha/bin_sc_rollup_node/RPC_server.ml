@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 open Protocol
@@ -127,21 +126,23 @@ end
 module Make_directory (S : PARAM) = struct
   open S
 
-  let directory : context tzresult RPC_directory.t ref = ref RPC_directory.empty
+  let directory : context tzresult Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
 
   let register service f =
-    directory := RPC_directory.register !directory service f
+    directory := Tezos_rpc.Directory.register !directory service f
 
   let register0 service f =
     let open Lwt_result_syntax in
-    register (RPC_service.subst0 service) @@ fun ctxt query input ->
+    register (Tezos_rpc.Service.subst0 service) @@ fun ctxt query input ->
     let*? ctxt = ctxt in
     f ctxt query input
 
   let build_directory node_ctxt =
     !directory
-    |> RPC_directory.map (fun prefix -> context_of_prefix node_ctxt prefix)
-    |> RPC_directory.prefix prefix
+    |> Tezos_rpc.Directory.map (fun prefix ->
+           context_of_prefix node_ctxt prefix)
+    |> Tezos_rpc.Directory.prefix prefix
 end
 
 module Global_directory = Make_directory (struct
@@ -333,8 +334,8 @@ module Make (PVM : Pvm.S) = struct
 
   let register node_ctxt =
     List.fold_left
-      (fun dir f -> RPC_directory.merge dir (f node_ctxt))
-      RPC_directory.empty
+      (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
+      Tezos_rpc.Directory.empty
       [
         Global_directory.build_directory;
         Local_directory.build_directory;

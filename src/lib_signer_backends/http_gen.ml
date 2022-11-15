@@ -221,7 +221,7 @@ struct
       in
       match r with
       | Ok ans -> return ans
-      | Error (RPC_context.Not_found _ :: _) -> return_false
+      | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_false
       | Error _ as res -> Lwt.return res
   end
 

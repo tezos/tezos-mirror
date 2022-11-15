@@ -131,7 +131,7 @@ module type T = sig
     Block_header.shell_header option ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
-  val rpc_services : rpc_context RPC_directory.t
+  val rpc_services : rpc_context Tezos_rpc.Directory.t
 
   val init :
     Chain_id.t ->

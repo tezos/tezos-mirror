@@ -34,7 +34,6 @@
   -open Tezos_client_base
   -open Tezos_client_015_PtLimaPt
   -open Tezos_client_commands
-  -open Tezos_rpc
   -open Tezos_client_base_unix
   -open Tezos_protocol_plugin_015_PtLimaPt)
  (modules (:standard \ alpha_commands_registration)))
@@ -69,6 +68,5 @@
   -open Tezos_client_commands
   -open Tezos_client_015_PtLimaPt_commands
   -open Tezos_client_sapling_015_PtLimaPt
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_015_PtLimaPt)
  (modules alpha_commands_registration))

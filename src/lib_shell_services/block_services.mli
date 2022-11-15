@@ -30,13 +30,13 @@ type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 type chain_prefix = unit * chain
 
-val chain_path : (unit, chain_prefix) RPC_path.t
+val chain_path : (unit, chain_prefix) Tezos_rpc.Path.t
 
 val parse_chain : string -> (chain, string) result
 
 val chain_to_string : chain -> string
 
-val chain_arg : chain RPC_arg.t
+val chain_arg : chain Tezos_rpc.Arg.t
 
 (** A representation of a block's position relatively to a known
     block of a chain. *)
@@ -73,13 +73,13 @@ val to_string : block -> string
 
 type prefix = (unit * chain) * block
 
-val dir_path : (chain_prefix, chain_prefix) RPC_path.t
+val dir_path : (chain_prefix, chain_prefix) Tezos_rpc.Path.t
 
-val path : (chain_prefix, chain_prefix * block) RPC_path.t
+val path : (chain_prefix, chain_prefix * block) Tezos_rpc.Path.t
 
-val mempool_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
+val mempool_path : ('a, 'b) Tezos_rpc.Path.t -> ('a, 'b) Tezos_rpc.Path.t
 
-val live_blocks_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
+val live_blocks_path : ('a, 'b) Tezos_rpc.Path.t -> ('a, 'b) Tezos_rpc.Path.t
 
 type operation_list_quota = {max_size : int; max_op : int option}
 
@@ -124,14 +124,14 @@ type protocols = {
 }
 
 val protocols :
-  #RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   ?chain:chain ->
   ?block:block ->
   unit ->
   protocols tzresult Lwt.t
 
 module Make (Proto : PROTO) (Next_proto : PROTO) : sig
-  val path : (unit, chain_prefix * block) RPC_path.t
+  val path : (unit, chain_prefix * block) Tezos_rpc.Path.t
 
   type raw_block_header = {
     shell : Block_header.shell_header;
@@ -177,7 +177,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
   val block_info_encoding : block_info Data_encoding.t
 
-  open RPC_context
+  open Tezos_rpc.Context
 
   val info :
     #simple ->
@@ -344,7 +344,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   module Helpers : sig
     module Forge : sig
       val block_header :
-        #RPC_context.simple ->
+        #Tezos_rpc.Context.simple ->
         ?chain:chain ->
         ?block:block ->
         Block_header.t ->
@@ -393,7 +393,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     type t_with_version
 
     val pending_operations_version_dispatcher :
-      version:int -> t -> t_with_version RPC_answer.t Lwt.t
+      version:int -> t -> t_with_version Tezos_rpc.Answer.t Lwt.t
 
     (** Call RPC GET /chains/[chain]/mempool/pending_operations
 
@@ -469,7 +469,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     Block_hash.Set.t tzresult Lwt.t
 
   module S : sig
-    val hash : ([`GET], prefix, prefix, unit, unit, Block_hash.t) RPC_service.t
+    val hash :
+      ([`GET], prefix, prefix, unit, unit, Block_hash.t) Tezos_rpc.Service.t
 
     val info :
       ( [`GET],
@@ -478,21 +479,28 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         < force_metadata : bool ; metadata : [`Always | `Never] option >,
         unit,
         block_info )
-      RPC_service.t
+      Tezos_rpc.Service.t
 
     val header :
-      ([`GET], prefix, prefix, unit, unit, block_header) RPC_service.t
+      ([`GET], prefix, prefix, unit, unit, block_header) Tezos_rpc.Service.t
 
-    val raw_header : ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
+    val raw_header :
+      ([`GET], prefix, prefix, unit, unit, Bytes.t) Tezos_rpc.Service.t
 
     val metadata :
-      ([`GET], prefix, prefix, unit, unit, block_metadata) RPC_service.t
+      ([`GET], prefix, prefix, unit, unit, block_metadata) Tezos_rpc.Service.t
 
     val metadata_hash :
-      ([`GET], prefix, prefix, unit, unit, Block_metadata_hash.t) RPC_service.t
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Block_metadata_hash.t )
+      Tezos_rpc.Service.t
 
     val protocols :
-      ([`GET], prefix, prefix, unit, unit, protocols) RPC_service.t
+      ([`GET], prefix, prefix, unit, unit, protocols) Tezos_rpc.Service.t
 
     module Header : sig
       val shell_header :
@@ -502,7 +510,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Block_header.shell_header )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val protocol_data :
         ( [`GET],
@@ -511,10 +519,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Proto.block_header_data )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val raw_protocol_data :
-        ([`GET], prefix, prefix, unit, unit, Bytes.t) RPC_service.t
+        ([`GET], prefix, prefix, unit, unit, Bytes.t) Tezos_rpc.Service.t
     end
 
     module Operations : sig
@@ -525,7 +533,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < force_metadata : bool ; metadata : [`Always | `Never] option >,
           unit,
           operation list list )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operations_in_pass :
         ( [`GET],
@@ -534,7 +542,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < force_metadata : bool ; metadata : [`Always | `Never] option >,
           unit,
           operation list )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operation :
         ( [`GET],
@@ -543,7 +551,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < force_metadata : bool ; metadata : [`Always | `Never] option >,
           unit,
           operation )
-        RPC_service.t
+        Tezos_rpc.Service.t
     end
 
     module Operation_hashes : sig
@@ -554,7 +562,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_hash.t list list )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operation_hashes_in_pass :
         ( [`GET],
@@ -563,7 +571,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_hash.t list )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operation_hash :
         ( [`GET],
@@ -572,7 +580,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_hash.t )
-        RPC_service.t
+        Tezos_rpc.Service.t
     end
 
     module Operation_metadata_hashes : sig
@@ -583,7 +591,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Operation_metadata_list_list_hash.t )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operation_metadata_hashes :
         ( [`GET],
@@ -592,7 +600,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_metadata_hash.t list list )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operation_metadata_hashes_in_pass :
         ( [`GET],
@@ -601,7 +609,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_metadata_hash.t list )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val operation_metadata_hash :
         ( [`GET],
@@ -610,7 +618,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           unit,
           Tezos_crypto.Operation_metadata_hash.t )
-        RPC_service.t
+        Tezos_rpc.Service.t
     end
 
     module Context : sig
@@ -621,7 +629,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < depth : int option >,
           unit,
           Proof.raw_context )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val merkle_tree :
         ( [`GET],
@@ -630,7 +638,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < holey : bool option >,
           unit,
           Proof.merkle_tree option )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       val merkle_tree_v2 :
         ( [`GET],
@@ -639,7 +647,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < holey : bool option >,
           unit,
           Proof.tree Proof.t option )
-        RPC_service.t
+        Tezos_rpc.Service.t
     end
 
     module Helpers : sig
@@ -651,7 +659,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
             unit,
             Block_header.t,
             Bytes.t )
-          RPC_service.service
+          Tezos_rpc.Service.service
       end
 
       module Preapply : sig
@@ -667,7 +675,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
             < sort_operations : bool ; timestamp : Time.Protocol.t option >,
             block_param,
             Block_header.shell_header * error Preapply_result.t list )
-          RPC_service.t
+          Tezos_rpc.Service.t
 
         val operations :
           ( [`POST],
@@ -676,11 +684,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
             unit,
             Next_proto.operation list,
             (Next_proto.operation_data * Next_proto.operation_receipt) list )
-          RPC_service.t
+          Tezos_rpc.Service.t
       end
 
       val complete :
-        ([`GET], prefix, prefix * string, unit, unit, string list) RPC_service.t
+        ( [`GET],
+          prefix,
+          prefix * string,
+          unit,
+          unit,
+          string list )
+        Tezos_rpc.Service.t
     end
 
     module Mempool : sig
@@ -688,7 +702,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
       (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
-        ('a, 'b) RPC_path.t ->
+        ('a, 'b) Tezos_rpc.Path.t ->
         ( [`GET],
           'a,
           'b,
@@ -700,25 +714,26 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; outdated : bool >,
           unit,
           Mempool.t_with_version )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
       val ban_operation :
-        ('a, 'b) RPC_path.t ->
-        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/unban_operation *)
       val unban_operation :
-        ('a, 'b) RPC_path.t ->
-        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) RPC_service.t
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/unban_all_operations *)
       val unban_all_operations :
-        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+        ('a, 'b) Tezos_rpc.Path.t ->
+        ([`POST], 'a, 'b, unit, unit, unit) Tezos_rpc.Service.t
 
       (** Define RPC GET /chains/[chain]/mempool/monitor_operations *)
       val monitor_operations :
-        ('a, 'b) RPC_path.t ->
+        ('a, 'b) Tezos_rpc.Path.t ->
         ( [`GET],
           'a,
           'b,
@@ -730,44 +745,44 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           unit,
           ((Operation_hash.t * Next_proto.operation) * error trace option) list
         )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       (** Define RPC GET /chains/[chain]/mempool/filter *)
       val get_filter :
-        ('a, 'b) RPC_path.t ->
+        ('a, 'b) Tezos_rpc.Path.t ->
         ( [`GET],
           'a,
           'b,
           < include_default : bool >,
           unit,
           Data_encoding.json )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/filter *)
       val set_filter :
-        ('a, 'b) RPC_path.t ->
+        ('a, 'b) Tezos_rpc.Path.t ->
         ( [`POST],
           'a,
           'b,
           unit,
           Data_encoding.json,
           Data_encoding.json )
-        RPC_service.t
+        Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/request_operations *)
       val request_operations :
-        ('a, 'b) RPC_path.t ->
+        ('a, 'b) Tezos_rpc.Path.t ->
         ( [`POST],
           'a,
           'b,
           < peer_id : P2p_peer_id.t option >,
           unit,
           unit )
-        RPC_service.t
+        Tezos_rpc.Service.t
     end
 
     val live_blocks :
-      ([`GET], prefix, prefix, unit, unit, Block_hash.Set.t) RPC_service.t
+      ([`GET], prefix, prefix, unit, unit, Block_hash.Set.t) Tezos_rpc.Service.t
   end
 end
 

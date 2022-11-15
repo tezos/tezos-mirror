@@ -44,13 +44,13 @@ let rpc_ctxt =
   object
     method call_proto_service0
         : 'm 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             Environment.RPC_context.t,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'q ->
           'i ->
@@ -62,13 +62,13 @@ let rpc_ctxt =
 
     method call_proto_service1
         : 'm 'a 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             Environment.RPC_context.t * 'a,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'a ->
           'q ->
@@ -81,13 +81,13 @@ let rpc_ctxt =
 
     method call_proto_service2
         : 'm 'a 'b 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             (Environment.RPC_context.t * 'a) * 'b,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'a ->
           'b ->
@@ -101,13 +101,13 @@ let rpc_ctxt =
 
     method call_proto_service3
         : 'm 'a 'b 'c 'q 'i 'o.
-          ( ([< RPC_service.meth] as 'm),
+          ( ([< Tezos_rpc.Service.meth] as 'm),
             Environment.RPC_context.t,
             ((Environment.RPC_context.t * 'a) * 'b) * 'c,
             'q,
             'i,
             'o )
-          RPC_service.t ->
+          Tezos_rpc.Service.t ->
           t ->
           'a ->
           'b ->

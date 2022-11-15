@@ -6,6 +6,7 @@
  (libraries
   tezos-base
   tezos-base-test-helpers
+  tezos-rpc
   tezos-mockup
   tezos-mockup-registration
   tezos-client-base

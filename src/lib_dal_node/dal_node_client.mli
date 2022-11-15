@@ -29,7 +29,7 @@ open Tezos_crypto_dal
     RPCs. Can be used for keys and RPCs related commands. *)
 class type cctxt =
   object
-    inherit RPC_context.generic
+    inherit Tezos_rpc.Context.generic
   end
 
 (** Instance of [cctxt] for linux systems. Relies on

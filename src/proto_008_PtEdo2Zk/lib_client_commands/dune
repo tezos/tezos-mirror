@@ -28,7 +28,6 @@
   -open Tezos_client_base
   -open Tezos_client_008_PtEdo2Zk
   -open Tezos_client_commands
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_008_PtEdo2Zk)
  (modules (:standard \ alpha_commands_registration)))
 
@@ -59,6 +58,5 @@
   -open Tezos_client_008_PtEdo2Zk
   -open Tezos_client_commands
   -open Tezos_client_008_PtEdo2Zk_commands
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_008_PtEdo2Zk)
  (modules alpha_commands_registration))

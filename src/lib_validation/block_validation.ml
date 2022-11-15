@@ -221,7 +221,7 @@ let preapply_result_encoding :
     (req "shell_header" Block_header.shell_header_encoding)
     (req
        "preapplied_operations_result"
-       (list (Preapply_result.encoding RPC_error.encoding)))
+       (list (Preapply_result.encoding Tezos_rpc.Error.encoding)))
 
 let may_force_protocol_upgrade ~user_activated_upgrades ~level
     (validation_result : Tezos_protocol_environment.validation_result) =

@@ -44,7 +44,7 @@ type 'a state = {
   cctxt : Protocol_client_context.full;
   constants : Constants.t;
   mutable block_stream : (block_info, 'a) result Lwt_stream.t;
-  mutable stream_stopper : RPC_context.stopper option;
+  mutable stream_stopper : Tezos_rpc.Context.stopper option;
   mutable cycle : Cycle.t option;
   mutable computation_status : status;
   mutable vdf_setup : vdf_setup option;

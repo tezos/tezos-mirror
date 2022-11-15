@@ -62,13 +62,16 @@ let read_partial_context =
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
   let open Lwt_result_syntax in
   let dir :
-      (Store.chain_store * Block_hash.t * Block_header.t) RPC_directory.t ref =
-    ref RPC_directory.empty
+      (Store.chain_store * Block_hash.t * Block_header.t) Tezos_rpc.Directory.t
+      ref =
+    ref Tezos_rpc.Directory.empty
   in
   let register0 s f =
     dir :=
-      RPC_directory.register !dir (RPC_service.subst0 s) (fun block p q ->
-          f block p q)
+      Tezos_rpc.Directory.register
+        !dir
+        (Tezos_rpc.Service.subst0 s)
+        (fun block p q -> f block p q)
   in
   let module Block_services = Block_services.Make (Proto) (Proto) in
   let module S = Block_services.S in
@@ -153,25 +156,29 @@ let with_metadata ~force_metadata ~metadata =
 let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
   let open Lwt_result_syntax in
-  let dir : (Store.chain_store * Store.Block.block) RPC_directory.t ref =
-    ref RPC_directory.empty
+  let dir : (Store.chain_store * Store.Block.block) Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
   in
-  let merge d = dir := RPC_directory.merge d !dir in
+  let merge d = dir := Tezos_rpc.Directory.merge d !dir in
   let register0 s f =
     dir :=
-      RPC_directory.register !dir (RPC_service.subst0 s) (fun block p q ->
-          f block p q)
+      Tezos_rpc.Directory.register
+        !dir
+        (Tezos_rpc.Service.subst0 s)
+        (fun block p q -> f block p q)
   in
   let register1 s f =
     dir :=
-      RPC_directory.register !dir (RPC_service.subst1 s) (fun (block, a) p q ->
-          f block a p q)
+      Tezos_rpc.Directory.register
+        !dir
+        (Tezos_rpc.Service.subst1 s)
+        (fun (block, a) p q -> f block a p q)
   in
   let register2 s f =
     dir :=
-      RPC_directory.register
+      Tezos_rpc.Directory.register
         !dir
-        (RPC_service.subst2 s)
+        (Tezos_rpc.Service.subst2 s)
         (fun ((block, a), b) p q -> f block a b p q)
   in
   let module Block_services = Block_services.Make (Proto) (Next_proto) in
@@ -726,7 +733,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       return (l1 @ l2)) ;
   (* merge protocol rpcs... *)
   merge
-    (RPC_directory.map
+    (Tezos_rpc.Directory.map
        (fun (chain_store, block) ->
          let hash = Store.Block.hash block in
          let header = Store.Block.header block in
@@ -738,7 +745,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     | None -> Next_proto.rpc_services
   in
   merge
-    (RPC_directory.map
+    (Tezos_rpc.Directory.map
        (fun (chain_store, block) ->
          let*! r =
            let*! context = Store.Block.context_exn chain_store block in
@@ -863,4 +870,5 @@ let build_rpc_directory chain_store block =
   | None -> Lwt.fail Not_found
   | Some b ->
       let* dir = get_directory chain_store b in
-      Lwt.return (RPC_directory.map (fun _ -> Lwt.return (chain_store, b)) dir)
+      Lwt.return
+        (Tezos_rpc.Directory.map (fun _ -> Lwt.return (chain_store, b)) dir)

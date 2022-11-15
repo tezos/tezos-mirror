@@ -28,9 +28,12 @@ module Events = Signer_events.Http_daemon
 let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     ~check_high_watermark ~require_auth mode =
   let open Lwt_result_syntax in
-  let dir = RPC_directory.empty in
+  let dir = Tezos_rpc.Directory.empty in
   let dir =
-    RPC_directory.register1 dir Signer_services.sign (fun pkh signature data ->
+    Tezos_rpc.Directory.register1
+      dir
+      Signer_services.sign
+      (fun pkh signature data ->
         Handler.sign
           ?magic_bytes
           ~check_high_watermark
@@ -39,11 +42,16 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
           {pkh; data; signature})
   in
   let dir =
-    RPC_directory.register1 dir Signer_services.public_key (fun pkh () () ->
-        Handler.public_key cctxt pkh)
+    Tezos_rpc.Directory.register1
+      dir
+      Signer_services.public_key
+      (fun pkh () () -> Handler.public_key cctxt pkh)
   in
   let dir =
-    RPC_directory.register0 dir Signer_services.authorized_keys (fun () () ->
+    Tezos_rpc.Directory.register0
+      dir
+      Signer_services.authorized_keys
+      (fun () () ->
         if require_auth then
           let* keys = Handler.Authorized_key.load cctxt in
           let hashes =

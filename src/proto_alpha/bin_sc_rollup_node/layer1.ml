@@ -100,7 +100,7 @@ type t = {
   blocks_cache : blocks_cache;
   heads : head Lwt_stream.t;
   cctxt : Protocol_client_context.full;
-  stopper : RPC_context.stopper;
+  stopper : Tezos_rpc.Context.stopper;
   genesis_info : Sc_rollup.Commitment.genesis_info;
 }
 

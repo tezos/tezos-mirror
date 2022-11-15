@@ -33,7 +33,6 @@
   -open Tezos_client_base
   -open Tezos_client_011_PtHangz2
   -open Tezos_client_commands
-  -open Tezos_rpc
   -open Tezos_client_base_unix
   -open Tezos_protocol_plugin_011_PtHangz2)
  (modules (:standard \ alpha_commands_registration)))
@@ -67,6 +66,5 @@
   -open Tezos_client_commands
   -open Tezos_client_011_PtHangz2_commands
   -open Tezos_client_sapling_011_PtHangz2
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_011_PtHangz2)
  (modules alpha_commands_registration))

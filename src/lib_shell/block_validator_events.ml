@@ -109,7 +109,7 @@ let validation_failure_after_precheck =
     ~pp3:pp_print_top_error_of_trace
     ("block", Block_hash.encoding)
     ("worker_status", Worker_types.request_status_encoding)
-    ("errors", RPC_error.encoding)
+    ("errors", Tezos_rpc.Error.encoding)
 
 let precheck_failure =
   declare_3
@@ -122,7 +122,7 @@ let precheck_failure =
     ~pp3:pp_print_top_error_of_trace
     ("block", Block_hash.encoding)
     ("worker_status", Worker_types.request_status_encoding)
-    ("errors", RPC_error.encoding)
+    ("errors", Tezos_rpc.Error.encoding)
 
 let prechecked_block =
   declare_1

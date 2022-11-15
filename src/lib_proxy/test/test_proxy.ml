@@ -79,11 +79,11 @@ let mock_proto_rpc () =
       Lwt_result_syntax.return @@ mock_raw_context k
   end : MOCKED_PROTO_RPC)
 
-class mock_rpc_context : RPC_context.simple =
+class mock_rpc_context : Tezos_rpc.Context.simple =
   object
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           'p ->
           'q ->
           'i ->

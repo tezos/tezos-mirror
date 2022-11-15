@@ -8,6 +8,7 @@
  (instrumentation (backend tezos-time-measurement))
  (libraries
   tezos-base
+  tezos-rpc
   tezos-context
   tezos-context-ops
   tezos-shell-services

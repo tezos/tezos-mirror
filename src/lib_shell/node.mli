@@ -63,4 +63,4 @@ val create :
 
 val shutdown : t -> unit Lwt.t
 
-val build_rpc_directory : t -> unit RPC_directory.t
+val build_rpc_directory : t -> unit Tezos_rpc.Directory.t

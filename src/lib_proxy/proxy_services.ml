@@ -25,9 +25,9 @@
 
 exception Rpc_dir_creation_failure of tztrace
 
-module Directory = Resto_directory.Make (RPC_encoding)
+module Directory = Resto_directory.Make (Tezos_rpc.Encoding)
 
-let hash_of_block ?cache (rpc_context : #RPC_context.simple)
+let hash_of_block ?cache (rpc_context : #Tezos_rpc.Context.simple)
     (chain : Tezos_shell_services.Shell_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
   let open Lwt_result_syntax in
@@ -116,8 +116,8 @@ module Env_cache =
 module Env_cache_lwt = Ringo_lwt.Functors.Make_result (Env_cache)
 
 let build_directory (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.generic) (mode : mode) expected_protocol :
-    unit RPC_directory.t =
+    (rpc_context : Tezos_rpc.Context.generic) (mode : mode) expected_protocol :
+    unit Tezos_rpc.Directory.t =
   let block_hash_cache =
     (* We consider that the duration of a run of a client command is
        below the time between blocks so that aliases (`head`, levels,
@@ -200,7 +200,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         Proxy_environment.initial_context ctx block_header.context
       in
       let mapped_directory =
-        RPC_directory.map
+        Tezos_rpc.Directory.map
           (fun (_chain, _block) ->
             Lwt.return
               Tezos_protocol_environment.
@@ -208,7 +208,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           Proxy_environment.directory
       in
       return
-        (RPC_directory.register
+        (Tezos_rpc.Directory.register
            mapped_directory
            Tezos_shell_services.Block_services.Empty.S.protocols
            (fun _ctxt () () -> return protocols))
@@ -253,9 +253,9 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   in
   let proto_directory =
     (* register protocol-specific RPCs *)
-    RPC_directory.register_dynamic_directory
-      RPC_directory.empty
-      (Tezos_rpc.RPC_path.prefix
+    Tezos_rpc.Directory.register_dynamic_directory
+      Tezos_rpc.Directory.empty
+      (Tezos_rpc.Path.prefix
          Tezos_shell_services.Chain_services.path
          Tezos_shell_services.Block_services.path)
       (fun ((_, chain), block) ->
@@ -266,6 +266,6 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
            values. *)
         get_env_rpc_context' chain block)
   in
-  RPC_directory.register_describe_directory_service
+  Tezos_rpc.Directory.register_describe_directory_service
     proto_directory
-    RPC_service.description_service
+    Tezos_rpc.Service.description_service

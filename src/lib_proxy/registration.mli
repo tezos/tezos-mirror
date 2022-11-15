@@ -32,12 +32,12 @@ module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
 
   (** RPCs provided by the protocol *)
-  val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
+  val directory : Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.t
 
   (** How to build the context to execute RPCs on. Arguments are:
 
       - A printer (for logging)
-      - An instance of [RPC_context.generic], to perform RPCs
+      - An instance of [Tezos_rpc.Context.generic], to perform RPCs
       - Whether [octez-client] or [tezos-proxy-server] is running
       - The chain for which the context is required
       - The block for which the context is required
@@ -49,7 +49,7 @@ module type Proxy_sig = sig
 
   (** The [time_between_blocks] constant for the given block, if any. *)
   val time_between_blocks :
-    RPC_context.generic ->
+    Tezos_rpc.Context.generic ->
     Block_services.chain ->
     Block_services.block ->
     int64 option tzresult Lwt.t

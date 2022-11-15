@@ -142,7 +142,7 @@ module type RPC = sig
   module Proto : Registered_protocol.T
 
   val rpc_services :
-    Tezos_protocol_environment.rpc_context RPC_directory.directory
+    Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
 end
 
 (** Dummy filter that does nothing *)

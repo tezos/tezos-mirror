@@ -140,7 +140,7 @@ struct
   let of_b58check = H.of_b58check
 
   let rpc_arg =
-    RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:H.name
       ~descr:(Format.asprintf "%s (Base58Check-encoded)" H.name)
       ~destruct:(fun s ->

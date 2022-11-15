@@ -122,11 +122,11 @@ end
 module Description = struct
   module Query = struct
     let pp_arg fmt =
-      let open RPC_arg in
+      let open Tezos_rpc.Arg in
       function {name; _} -> Format.fprintf fmt "<%s>" name
 
     let pp_title_item ppf =
-      let open RPC_description in
+      let open Tezos_rpc.Description in
       function
       | {name; kind; _} -> (
           match kind with
@@ -146,11 +146,11 @@ module Description = struct
         query
 
     let pp_html_arg fmt =
-      let open RPC_arg in
+      let open Tezos_rpc.Arg in
       function {name; _} -> Format.fprintf fmt "&lt;%s&gt;" name
 
     let pp_item ppf =
-      let open RPC_description in
+      let open Tezos_rpc.Description in
       function
       | {name; description; kind} -> (
           (match kind with
@@ -214,8 +214,8 @@ module Description = struct
         (fun ppf ->
           Format.fprintf ppf "<%s>@ %a</%s>" tag pp_content content tag)
 
-    let pp_description ppf (service : _ RPC_description.service) =
-      let open RPC_description in
+    let pp_description ppf (service : _ Tezos_rpc.Description.service) =
+      let open Tezos_rpc.Description in
       (* TODO collect and display arg description (in path and in query) *)
       Format.fprintf
         ppf
@@ -226,7 +226,7 @@ module Description = struct
         service.query
 
     let pp ppf prefix service =
-      let open RPC_description in
+      let open Tezos_rpc.Description in
       let target_ref = ref_of_service (prefix, service.meth) in
       Rst.pp_html ppf (fun ppf ->
           pp_tab_div ppf (fun ppf ->
@@ -398,7 +398,7 @@ let make_index node required_version =
           "Protocol " ^ name,
           intro,
           [".."; "<block_id>"],
-          RPC_directory.map (fun () -> assert false)
+          Tezos_rpc.Directory.map (fun () -> assert false)
           @@ Block_directory.build_raw_rpc_directory
                (module Proto)
                (module Proto) ))
@@ -415,7 +415,7 @@ let make_index node required_version =
            version = required_version)
          dirs
   in
-  let* dir = RPC_directory.describe_directory ~recurse:true ~arg:() dir in
+  let* dir = Tezos_rpc.Directory.describe_directory ~recurse:true ~arg:() dir in
   let ppf = Format.std_formatter in
   pp_document ppf [(name, intro, path, dir)] required_version ;
   return_ok ()

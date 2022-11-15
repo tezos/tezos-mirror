@@ -2,6 +2,7 @@
  (names rpc_doc
         p2p_doc)
  (libraries tezos-base
+            tezos-rpc
             tezos-stdlib-unix
             tezos-shell
             tezos-rpc-http-server

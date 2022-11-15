@@ -804,7 +804,7 @@ let octez_crypto =
         octez_hacl;
         secp256k1_internal;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        octez_rpc |> open_;
+        octez_rpc;
         ringo;
         zarith;
         zarith_stubs_js;
@@ -1043,7 +1043,7 @@ let octez_base =
         octez_crypto |> open_;
         data_encoding |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        octez_rpc |> open_;
+        octez_rpc;
         octez_micheline |> open_;
         octez_event_logging |> open_;
         ptime;
@@ -1295,7 +1295,7 @@ let octez_p2p_services =
     "tezos-p2p-services"
     ~path:"src/lib_p2p_services"
     ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-p2p`"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc]
     ~linkall:true
     ~js_compatible:true
 
@@ -1357,6 +1357,7 @@ let octez_shell_services =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_rpc;
         octez_p2p_services |> open_;
         octez_version |> open_;
         octez_context_sigs;
@@ -2198,6 +2199,7 @@ let octez_validation =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_rpc;
         octez_context |> open_;
         octez_context_ops |> open_;
         octez_shell_services |> open_;
@@ -2313,6 +2315,7 @@ tezos-store is a virtual library that provides two implementations:
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_rpc;
         lwt_watcher;
         octez_shell_services |> open_;
         octez_validation |> open_;
@@ -2392,6 +2395,7 @@ let octez_shell =
         prometheus;
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix |> open_;
+        octez_rpc;
         octez_context |> open_;
         octez_store |> open_;
         octez_store_shared |> open_;
@@ -2415,7 +2419,7 @@ let octez_rpc_http =
     "tezos-rpc-http"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Tezos: library of auto-documented RPCs (http server and client)"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; resto_cohttp; uri]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc; resto_cohttp; uri]
     ~modules:["RPC_client_errors"; "media_type"]
 
 let octez_rpc_http_client =
@@ -2427,6 +2431,7 @@ let octez_rpc_http_client =
       [
         octez_base |> open_ ~m:"TzPervasives";
         resto_cohttp_client;
+        octez_rpc;
         octez_rpc_http |> open_;
       ]
     ~modules:["RPC_client"]
@@ -2442,6 +2447,7 @@ let octez_rpc_http_client_unix =
         octez_base |> open_ ~m:"TzPervasives";
         cohttp_lwt_unix;
         resto_cohttp_client;
+        octez_rpc;
         octez_rpc_http_client |> open_;
       ]
     ~modules:["RPC_client_unix"]
@@ -2457,7 +2463,7 @@ let octez_rpc_http_server =
         octez_stdlib_unix |> open_;
         resto_cohttp_server;
         resto_acl;
-        octez_rpc |> open_;
+        octez_rpc;
         octez_rpc_http |> open_;
       ]
     ~modules:["RPC_server"; "RPC_middleware"]
@@ -2527,7 +2533,7 @@ let octez_client_base =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_clic;
-        octez_rpc |> open_;
+        octez_rpc;
         octez_shell_services |> open_;
         octez_sapling;
         uri;
@@ -2572,7 +2578,7 @@ let octez_signer_services =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
-        octez_rpc |> open_;
+        octez_rpc;
         octez_client_base |> open_;
       ]
     ~linkall:true
@@ -2664,7 +2670,7 @@ let octez_client_commands =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
-        octez_rpc |> open_;
+        octez_rpc;
         octez_clic;
         octez_clic_unix |> open_;
         octez_client_base |> open_;
@@ -2766,6 +2772,7 @@ let _octez_mockup_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_test_helpers |> open_;
+        octez_rpc;
         octez_mockup;
         octez_mockup_registration;
         octez_client_base;
@@ -2896,6 +2903,7 @@ let octez_client_base_unix =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_clic;
+        octez_rpc;
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix |> open_;
         octez_shell_services |> open_;
@@ -3198,7 +3206,7 @@ let octez_dal_node_services =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
-        octez_rpc |> open_;
+        octez_rpc;
         octez_crypto_dal;
       ]
     ~linkall:true
@@ -4303,7 +4311,7 @@ module Protocol = Protocol
             octez_signer_backends |> if_ N.(number >= 001);
             plugin |> if_some |> open_if N.(number >= 008);
             parameters |> if_some |> if_ N.(number >= 011) |> open_;
-            octez_rpc |> if_ N.(number >= 001) |> open_;
+            octez_rpc;
             octez_client_commands |> if_ N.(number == 000) |> open_;
             octez_stdlib_unix |> if_ N.(number == 000);
             uri |> if_ N.(number >= 001);
@@ -4417,7 +4425,7 @@ module Protocol = Protocol
             octez_client_base |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
             octez_client_base_unix |> if_ N.(number >= 009) |> open_;
             plugin |> if_some |> if_ N.(number >= 008) |> open_;
             (* uri used by the stresstest command introduced in 011 *)
@@ -4472,7 +4480,7 @@ module Protocol = Protocol
             octez_client_commands |> open_;
             client_commands |> if_some |> open_;
             client_sapling |> if_some |> if_ N.(number >= 011) |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
             plugin |> if_some |> if_ N.(number >= 008) |> open_;
           ]
         ~bisect_ppx:N.(number >= 008)
@@ -4508,7 +4516,7 @@ module Protocol = Protocol
             octez_context_memory |> if_ N.(number >= 012);
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
             octez_context_ops |> if_ N.(number >= 011) |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
             octez_rpc_http |> open_;
             lwt_canceler;
             lwt_exit;
@@ -4627,7 +4635,7 @@ module Protocol = Protocol
             client |> if_some |> open_;
             octez_client_commands |> open_;
             baking |> if_some |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
             uri;
           ]
         ~linkall:true
@@ -4653,7 +4661,7 @@ module Protocol = Protocol
             octez_client_commands |> open_;
             baking |> if_some |> open_;
             baking_commands |> if_some |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
           ]
         ~linkall:true
         ~modules:
@@ -4697,7 +4705,6 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives";
             main |> open_;
             client |> if_some |> open_;
-            octez_rpc |> open_;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
@@ -4740,7 +4747,7 @@ module Protocol = Protocol
             main |> open_;
             plugin |> if_some |> open_;
             parameters |> if_some |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
@@ -4793,7 +4800,7 @@ module Protocol = Protocol
             main |> open_;
             plugin |> if_some |> open_;
             parameters |> if_some |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
             octez_rpc_http;
             octez_rpc_http_server;
             octez_dal_node_services;
@@ -4833,7 +4840,7 @@ module Protocol = Protocol
             octez_context_encoding;
             baking_commands |> if_some |> open_;
             octez_stdlib_unix |> open_;
-            octez_rpc |> open_;
+            octez_rpc;
             octez_rpc_http |> open_;
             octez_rpc_http_client_unix |> open_;
             octez_rpc_http_server |> open_;
@@ -5694,6 +5701,7 @@ let _octez_proxy_server =
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix;
          octez_stdlib_unix |> open_;
+         octez_rpc;
          cmdliner;
          lwt_exit;
          lwt_unix;

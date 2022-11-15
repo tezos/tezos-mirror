@@ -249,7 +249,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
         pop_until_ok ()
       in
       let shutdown () = () in
-      RPC_answer.{next; shutdown}
+      Tezos_rpc.Answer.{next; shutdown}
 
     let monitor_bootstrapped () =
       let first_run = ref true in
@@ -263,7 +263,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
         else Lwt.return_none
       in
       let shutdown () = () in
-      RPC_answer.{next; shutdown}
+      Tezos_rpc.Answer.{next; shutdown}
 
     let protocols (block : Tezos_shell_services.Block_services.block) =
       locate_block state block >>=? fun x ->
@@ -421,7 +421,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
         pop_until_ok ()
       in
       let shutdown () = () in
-      RPC_answer.{next; shutdown}
+      Tezos_rpc.Answer.{next; shutdown}
 
     let rpc_context_callback block =
       locate_block state block >>=? fun x -> return x.rpc_context

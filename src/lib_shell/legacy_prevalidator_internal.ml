@@ -199,7 +199,7 @@ module type S = sig
       (Classification.classification
       * protocol_operation Prevalidation.operation)
       Lwt_watcher.input;
-    mutable rpc_directory : types_state RPC_directory.t lazy_t;
+    mutable rpc_directory : types_state Tezos_rpc.Directory.t lazy_t;
     mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
@@ -292,7 +292,7 @@ module Make_s
       (Classification.classification
       * protocol_operation Prevalidation.operation)
       Lwt_watcher.input;
-    mutable rpc_directory : types_state RPC_directory.t lazy_t;
+    mutable rpc_directory : types_state Tezos_rpc.Directory.t lazy_t;
     mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
@@ -1098,23 +1098,25 @@ module Make
   let build_rpc_directory w =
     lazy
       (let open Lwt_result_syntax in
-      let dir : state RPC_directory.t ref = ref RPC_directory.empty in
+      let dir : state Tezos_rpc.Directory.t ref =
+        ref Tezos_rpc.Directory.empty
+      in
       let module Proto_services =
         Block_services.Make (Filter.Proto) (Filter.Proto)
       in
       dir :=
-        RPC_directory.register
+        Tezos_rpc.Directory.register
           !dir
-          (Proto_services.S.Mempool.get_filter RPC_path.open_root)
+          (Proto_services.S.Mempool.get_filter Tezos_rpc.Path.open_root)
           (fun pv params () ->
             return
               (get_filter_config_json
                  ~include_default:params#include_default
                  pv)) ;
       dir :=
-        RPC_directory.register
+        Tezos_rpc.Directory.register
           !dir
-          (Proto_services.S.Mempool.set_filter RPC_path.open_root)
+          (Proto_services.S.Mempool.set_filter Tezos_rpc.Path.open_root)
           (fun pv () obj ->
             let open Lwt_syntax in
             let* () =
@@ -1135,9 +1137,9 @@ module Make
          it's necessary to restart it manually to flush the operation
          from it. *)
       dir :=
-        RPC_directory.register
+        Tezos_rpc.Directory.register
           !dir
-          (Proto_services.S.Mempool.ban_operation RPC_path.open_root)
+          (Proto_services.S.Mempool.ban_operation Tezos_rpc.Path.open_root)
           (fun _pv () oph ->
             let open Lwt_result_syntax in
             let*! r = Worker.Queue.push_request_and_wait w (Request.Ban oph) in
@@ -1150,25 +1152,26 @@ module Make
       (* Unban an operation (from its given hash): remove it from the
          set pv.banned_operations (nothing happens if it was not banned). *)
       dir :=
-        RPC_directory.register
+        Tezos_rpc.Directory.register
           !dir
-          (Proto_services.S.Mempool.unban_operation RPC_path.open_root)
+          (Proto_services.S.Mempool.unban_operation Tezos_rpc.Path.open_root)
           (fun pv () oph ->
             pv.shell.banned_operations <-
               Operation_hash.Set.remove oph pv.shell.banned_operations ;
             return_unit) ;
       (* Unban all operations: clear the set pv.banned_operations. *)
       dir :=
-        RPC_directory.register
+        Tezos_rpc.Directory.register
           !dir
-          (Proto_services.S.Mempool.unban_all_operations RPC_path.open_root)
+          (Proto_services.S.Mempool.unban_all_operations
+             Tezos_rpc.Path.open_root)
           (fun pv () () ->
             pv.shell.banned_operations <- Operation_hash.Set.empty ;
             return_unit) ;
       dir :=
-        RPC_directory.gen_register
+        Tezos_rpc.Directory.gen_register
           !dir
-          (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
+          (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
             let map_op_error oph (op, error) acc =
               op.Prevalidation.protocol |> fun res ->
@@ -1248,16 +1251,16 @@ module Make
               ~version:params#version
               pending_operations) ;
       dir :=
-        RPC_directory.register
+        Tezos_rpc.Directory.register
           !dir
-          (Proto_services.S.Mempool.request_operations RPC_path.open_root)
+          (Proto_services.S.Mempool.request_operations Tezos_rpc.Path.open_root)
           (fun pv t () ->
             pv.shell.parameters.tools.send_get_current_head ?peer:t#peer_id () ;
             return_unit) ;
       dir :=
-        RPC_directory.gen_register
+        Tezos_rpc.Directory.gen_register
           !dir
-          (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
+          (Proto_services.S.Mempool.monitor_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
             Lwt_mutex.with_lock pv.lock @@ fun () ->
             let op_stream, stopper =
@@ -1367,7 +1370,7 @@ module Make
                   | None -> Lwt.return_none)
             in
             let shutdown () = Lwt_watcher.shutdown stopper in
-            RPC_answer.return_stream {next; shutdown}) ;
+            Tezos_rpc.Answer.return_stream {next; shutdown}) ;
       !dir)
 
   (** Module implementing the events at the {!Worker} level. Contrary

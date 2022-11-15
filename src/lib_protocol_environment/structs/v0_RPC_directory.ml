@@ -24,38 +24,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_rpc.RPC_directory
+include Tezos_rpc.Directory
 
 type conflict =
-  | CService of Tezos_rpc.RPC_service.meth
+  | CService of Tezos_rpc.Service.meth
   | CDir
   | CBuilder
   | CTail
-  | CTypes of Tezos_rpc.RPC_arg.descr * Tezos_rpc.RPC_arg.descr
-  | CType of Tezos_rpc.RPC_arg.descr * string list
+  | CTypes of Tezos_rpc.Arg.descr * Tezos_rpc.Arg.descr
+  | CType of Tezos_rpc.Arg.descr * string list
 
 exception Conflict of step list * conflict
 
 let merge d1 d2 =
   try merge ~strategy:`Raise d1 d2 with
-  | Tezos_rpc.RPC_directory.Conflict (sl, Tezos_rpc.RPC_directory.CService m) ->
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CService m) ->
       raise (Conflict (sl, CService m))
-  | Tezos_rpc.RPC_directory.Conflict (sl, Tezos_rpc.RPC_directory.CDir) ->
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CDir) ->
       raise (Conflict (sl, CDir))
-  | Tezos_rpc.RPC_directory.Conflict (sl, Tezos_rpc.RPC_directory.CBuilder) ->
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CBuilder) ->
       raise (Conflict (sl, CBuilder))
   (* Here we reproduce the old behavior before
      https://gitlab.com/tezos/tezos/-/merge_requests/6085#note_1075865206.
      This conflit is raised when merging dynamic directories.
      As dynamic directories were not mergeable, [CBuilder] was raised.*)
-  | Tezos_rpc.RPC_directory.Conflict
-      (sl, Tezos_rpc.RPC_directory.CDynDescr (_, _)) ->
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CDynDescr (_, _)) ->
       raise (Conflict (sl, CBuilder))
-  | Tezos_rpc.RPC_directory.Conflict (sl, Tezos_rpc.RPC_directory.CTail) ->
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CTail) ->
       raise (Conflict (sl, CTail))
-  | Tezos_rpc.RPC_directory.Conflict
-      (sl, Tezos_rpc.RPC_directory.CTypes (arg1, arg2)) ->
-      raise (Conflict (sl, CTypes (arg1, arg2)))
-  | Tezos_rpc.RPC_directory.Conflict (sl, Tezos_rpc.RPC_directory.CType (d, l))
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CTypes (arg1, arg2))
     ->
+      raise (Conflict (sl, CTypes (arg1, arg2)))
+  | Tezos_rpc.Directory.Conflict (sl, Tezos_rpc.Directory.CType (d, l)) ->
       raise (Conflict (sl, CType (d, l)))

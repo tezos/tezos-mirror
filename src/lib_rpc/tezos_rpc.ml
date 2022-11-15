@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,56 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val sign :
-  ( [`POST],
-    unit,
-    unit * Signature.Public_key_hash.t,
-    Signature.t option,
-    Bytes.t,
-    Signature.t )
-  Tezos_rpc.Service.t
-
-val deterministic_nonce :
-  ( [`POST],
-    unit,
-    unit * Signature.Public_key_hash.t,
-    Signature.t option,
-    Bytes.t,
-    Bytes.t )
-  Tezos_rpc.Service.t
-
-val deterministic_nonce_hash :
-  ( [`POST],
-    unit,
-    unit * Signature.Public_key_hash.t,
-    Signature.t option,
-    Bytes.t,
-    Bytes.t )
-  Tezos_rpc.Service.t
-
-val supports_deterministic_nonces :
-  ( [`GET],
-    unit,
-    unit * Signature.Public_key_hash.t,
-    unit,
-    unit,
-    bool )
-  Tezos_rpc.Service.t
-
-val public_key :
-  ( [`GET],
-    unit,
-    unit * Signature.Public_key_hash.t,
-    unit,
-    unit,
-    Signature.Public_key.t )
-  Tezos_rpc.Service.t
-
-val authorized_keys :
-  ( [`GET],
-    unit,
-    unit,
-    unit,
-    unit,
-    Signature.Public_key_hash.t list option )
-  Tezos_rpc.Service.t
+module Answer = RPC_answer
+module Arg = RPC_arg
+module Context = RPC_context
+module Description = RPC_description
+module Directory = RPC_directory
+module Encoding = RPC_encoding
+module Error = RPC_error
+module Path = RPC_path
+module Query = RPC_query
+module Service = RPC_service

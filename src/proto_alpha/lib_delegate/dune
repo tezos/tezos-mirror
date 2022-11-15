@@ -44,7 +44,6 @@
   -open Tezos_shell_context
   -open Tezos_context
   -open Tezos_context_ops
-  -open Tezos_rpc
   -open Tezos_rpc_http)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
@@ -75,8 +74,7 @@
   -open Tezos_client_base
   -open Tezos_client_alpha
   -open Tezos_client_commands
-  -open Tezos_baking_alpha
-  -open Tezos_rpc)
+  -open Tezos_baking_alpha)
  (modules Baking_commands))
 
 (library
@@ -104,6 +102,5 @@
   -open Tezos_client_alpha
   -open Tezos_client_commands
   -open Tezos_baking_alpha
-  -open Tezos_baking_alpha_commands
-  -open Tezos_rpc)
+  -open Tezos_baking_alpha_commands)
  (modules Baking_commands_registration))

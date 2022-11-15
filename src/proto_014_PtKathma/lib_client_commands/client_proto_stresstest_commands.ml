@@ -358,7 +358,7 @@ let generate_fresh_source state =
    stream. *)
 let heads_iter (cctxt : Protocol_client_context.full)
     (f : Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t) :
-    (unit tzresult Lwt.t * RPC_context.stopper) tzresult Lwt.t =
+    (unit tzresult Lwt.t * Tezos_rpc.Context.stopper) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* heads_stream, stopper = Shell_services.Monitor.heads cctxt `Main in
   let rec loop () : unit tzresult Lwt.t =

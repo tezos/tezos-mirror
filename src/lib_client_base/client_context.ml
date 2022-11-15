@@ -118,7 +118,7 @@ class type io_rpcs =
 
     inherit prompter
 
-    inherit RPC_context.generic
+    inherit Tezos_rpc.Context.generic
   end
 
 class type ui =
@@ -143,7 +143,7 @@ class type full =
 
     inherit wallet
 
-    inherit RPC_context.generic
+    inherit Tezos_rpc.Context.generic
 
     inherit chain
 
@@ -172,7 +172,7 @@ class proxy_context (obj : full) =
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           'p ->
           'q ->
           'i ->
@@ -181,7 +181,7 @@ class proxy_context (obj : full) =
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           on_chunk:('o -> unit) ->
           on_close:(unit -> unit) ->
           'p ->

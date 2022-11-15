@@ -26,19 +26,19 @@
 
 let build_rpc_directory block_validator store =
   let open Lwt_result_syntax in
-  let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
+  let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let gen_register0 s f =
-    dir := RPC_directory.gen_register !dir s (fun () p q -> f p q)
+    dir := Tezos_rpc.Directory.gen_register !dir s (fun () p q -> f p q)
   in
   let register1 s f =
-    dir := RPC_directory.register !dir s (fun ((), a) p q -> f a p q)
+    dir := Tezos_rpc.Directory.register !dir s (fun ((), a) p q -> f a p q)
   in
   gen_register0 Protocol_services.S.list (fun () () ->
       let set = Store.Protocol.all store in
       let protocols =
         Protocol_hash.Set.add_seq (Registered_protocol.seq_embedded ()) set
       in
-      RPC_answer.return (Protocol_hash.Set.elements protocols)) ;
+      Tezos_rpc.Answer.return (Protocol_hash.Set.elements protocols)) ;
   register1 Protocol_services.S.contents (fun hash () () ->
       match Registered_protocol.get_embedded_sources hash with
       | Some p -> return p

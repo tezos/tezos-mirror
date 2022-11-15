@@ -90,7 +90,7 @@ class type sc_client_context =
   object
     inherit Base.Client_context.io_wallet
 
-    inherit RPC_context.generic
+    inherit Tezos_rpc.Context.generic
   end
 
 class unix_sc_client_context ~base_dir ~password_filename ~rpc_config :
