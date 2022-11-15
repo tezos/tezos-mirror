@@ -1045,22 +1045,6 @@ class TestChainId:
 
 @pytest.mark.incremental
 @pytest.mark.contract
-class TestBigMapToSelf:
-    def test_big_map_to_self_origination(self, client: Client, session: dict):
-        path = os.path.join(CONTRACT_PATH, 'opcodes', 'big_map_to_self.tz')
-        originate(client, session, path, '{}', 0)
-        utils.bake(client, bake_for='bootstrap5')
-
-    def test_big_map_to_self_transfer(self, client: Client):
-        client.call('bootstrap2', "big_map_to_self", [])
-        utils.bake(client, bake_for='bootstrap5')
-
-        client.transfer(0, 'bootstrap2', "big_map_to_self", [])
-        utils.bake(client, bake_for='bootstrap5')
-
-
-@pytest.mark.incremental
-@pytest.mark.contract
 class TestNonRegression:
     """Test contract-related non-regressions"""
 
