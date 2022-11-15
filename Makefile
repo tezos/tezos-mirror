@@ -33,8 +33,8 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-OCTEZ_BIN=octez-node octez-validator octez-client octez-admin-client \
-    octez-signer octez-codec octez-protocol-compiler octez-snoop octez-proxy-server \
+OCTEZ_BIN=octez-node octez-client octez-admin-client octez-signer octez-codec \
+	octez-protocol-compiler octez-snoop octez-proxy-server \
     $(foreach p, $(active_protocol_versions_without_number), octez-baker-$(p)) \
     $(foreach p, $(active_protocol_versions_without_number), octez-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions_without_number), octez-tx-rollup-node-$(p)) \
@@ -122,6 +122,9 @@ clean-old-names:
 	@rm -f tezos-sc-rollup-client-alpha
 	@rm -f tezos-snoop
 	@rm -f tezos-dal-node
+# octez-validator should stay in this list for Octez 16.0 because we
+# removed the executable
+	@rm -f octez-validator
 	@rm -f octez-baker-012-Psithaca
 	@rm -f octez-accuser-012-Psithaca
 	@rm -f octez-baker-013-PtJakart
@@ -149,7 +152,6 @@ endif
 		@copy-parameters
 	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
 	@ln -s octez-node tezos-node
-	@ln -s octez-validator tezos-validator
 	@ln -s octez-client tezos-client
 	@ln -s octez-admin-client tezos-admin-client
 	@ln -s octez-signer tezos-signer

@@ -22,7 +22,6 @@ BINARIES = [
     "octez-protocol-compiler",
     "octez-node",
     "octez-snoop",
-    "octez-validator",
 ] + PROTO_BINARIES
 
 
