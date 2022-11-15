@@ -80,8 +80,8 @@ There are two channels of communication to interact with smart rollups:
    information to all the rollups. This unique inbox contains two
    kinds of messages: *external* messages are pushed through a layer-1
    manager operation while *internal* messages are pushed by layer-1
-   smart-contract or the protocol itself. More information about these
-   two kinds of messages can be found below.
+   smart-contracts or the protocol itself. More information about
+   these two kinds of messages can be found below.
 
 #. a **reveal data channel** allows the rollup to retrieve data
    coming from data sources external to the layer-1. More information
@@ -529,6 +529,683 @@ actual payloads.
 
 Developing WASM Kernels
 -----------------------
+
+A rollup is primarily characterized by the semantics it gives to the
+input messages it processes. This semantics is provided at origination
+time as a WASM program (in the case of the ``wasm_2_0_0`` kind) called
+a *kernel*. More precisely, a *kernel* is a WASM module encoded in the
+binary format defined by the WASM standard.
+
+Though compliance with the WASM standard was a key requirement for
+smart rollups, there is a caveat to this claim. This is due to the
+particular constraints web3 developers are very familiar with, namely
+programs must be fully deterministic. As a consequence,
+
+#. Instructions and types related to floating-point arithmetic are not
+   supported. This is because IEEE floats are not deterministic, as
+   the standard includes undefined behaviors operations.
+#. The call stack of the WASM kernel is restricted to 300.
+
+A valid kernel is a WASM module that satisfies the following
+constraints:
+
+#. It exports a function ``kernel_next`` that takes no argument and
+   returns nothing.
+#. It declares and exports exactly one memory.
+#. It only imports the host functions, exported by the (virtual)
+   module ``rollup_safe_core``.
+
+.. warning::
+
+   We expect ``rollup_safe_core`` to be renamed ``rollup_core`` before
+   smart rollups land on Tezos mainnet.
+
+For instance, the mandatory example of a ``hello, world!`` kernel is
+the following WASM program in text format.
+
+.. code::
+
+    (module
+      (import "rollup_safe_core" "write_debug"
+         (func $write_debug (param i32 i32) (result i32)))
+      (memory 1)
+      (export "mem" (memory 0))
+      (data (i32.const 100) "hello, world!")
+      (func (export "kernel_next")
+        (local $hello_address i32)
+        (local $hello_length i32)
+        (local.set $hello_address (i32.const 100))
+        (local.set $hello_length (i32.const 13))
+        (drop (call $write_debug (local.get $hello_address)
+                                 (local.get $hello_length)))))
+
+This program can be compiled to the WASM binary format with
+general-purpose tool like [WABT](https://github.com/WebAssembly/wabt).
+
+::
+
+   wat2wasm hello.wat -o hello.wasm
+
+The contents of the resulting ``hello.wasm`` file is a valid WASM
+kernel, though its relevance as a decentralized application is
+debatable.
+
+One of the benefit of choosing WASM as the programming language for
+smart rollups is that WASM has gradually become a ubiquitous
+compilation target over the years. To the point where mainstream,
+industrial languages like Go or Rust now natively compile to
+WASM. Thus, ``cargo`` —the official Rust package manager— provides an
+official target to compile Rust to ``.wasm`` binary files that are
+valid WASM kernels. This means that, for this particular example, one
+can build a WASM kernel while enjoying the strengths and convenience
+of the Rust language and the Rust ecosystem.
+
+The rest of the section proceeds as follows.
+
+#. First, we explain the execution environment of a WASM kernel: when
+   it is parsed, executed, etc.
+#. Then, we explain in more details the API at the disposal of WASM
+   kernel developers.
+#. Finally, we demonstrate how Rust in particular can be used to
+   implement a WASM kernel.
+
+Though Rust has become the primary language whose WASM backend has
+been tested in the context of smart rollups, the WASM VM has not been
+modified in anyway to favor this language. We fully expect that other
+mainstream languages like Go for instance are also good candidate to
+implement WASM kernels.
+
+Execution Environment
+^^^^^^^^^^^^^^^^^^^^^
+In a nutshell, the life cycle of a smart rollup is a never-ending
+interleaving of fetching inputs from the layer-1, and executing the
+``kernel_next`` function exposed by the WASM kernel.
+
+State
+"""""
+
+The smart rollup carries two states:
+
+#. A transient state, that is reset after each call to the
+   ``kernel_next`` function and is akin to RAM.
+#. A persistent state, that is preserved across ``kernel_next`` calls.
+   The persistent state consists in an *inbox* that is regularly
+   populated with the inputs coming from the layer-1, the *outbox*
+   which the kernel can populate with contract calls targeting smart
+   contracts in the layer-1, and a durable storage which is akin to a
+   file system.
+
+The durable storage is a persistent tree, whose contents is addressed
+by path-like keys. The WASM kernel can write and read raw bytes stored
+under a given path (files), but can also interact (delete, copy, move,
+etc.) with subtrees (directories). The value and subtrees at key
+``/readonly`` are not writable by a kernel, but can be used by the PVM
+to give information to the kernel.
+
+Control Flow
+""""""""""""
+
+When a new block is published on Tezos, the inbox exposed to the smart
+rollup is populated with all the inputs published on Tezos in this
+block. It is important to keep in mind that all the smart rollups
+which are originated on Tezos share the same inbox. As a consequence,
+a WASM kernel has to filter the inputs that are relevant for its
+purpose from the ones it does not need to process.
+
+Once the inbox has been populated with the inputs of the Tezos block,
+the ``kernel_next`` function is called, from a clean “transient”
+state. More precisely, the WASM kernel is parsed, linked, initialized,
+then ``kernel_next`` is called.
+
+By default, ``kernel_next`` is called only once, then the smart rollup
+waits for a new Tezos block to populate the inbox and restart the
+cycle. However, when the kernel needs more computation time than what
+one ``kernel_next`` call allows, it can request a so-called reboot by
+writing arbitrary data under the path ``/kernel/env/reboot`` in its
+durable storage. In such a case, ``kernel_next`` is called again,
+without the inbox populated with the contents of the inbox of the next
+Tezos level. This file is removed between each call of
+``kernel_next``, and the ``kernel_next`` function can require at most
+1,000 reboots for each Tezos level.
+
+A call to ``kernel_next`` cannot take an arbitrary amount of time to
+complete, because diverging computations are not compatible with the
+optimistic rollup infrastructure of Tezos. To dodge the halting
+problem, the reference interpreter of WASM used during the rejection
+enforces a bound on the number of ticks used in a call to
+``kernel_next``. Once the maximum number of ticks is reached, the
+execution of ``kernel_next`` is trapped (*i.e.*, interrupted with an
+error).
+
+The current bound is set to 11,000,000,000 ticks. ``octez-wasm-repl``
+is probably the best tool available to verify the ``kernel_next``
+function does not take more ticks than authorized.
+
+The direct consequence of this setup is that it might be necessary for
+a WASM kernel to span a long computation across several calls to
+``kernel_next``, and therefore to serialize any data it needs in the
+durable storage to avoid loosing them.
+
+Finally, the kernel can verify if the previous ``kernel_next``
+invocation was trapped by verifying if some data are stored under the
+path ``/kernel/env/stuck``.
+
+Host Functions
+^^^^^^^^^^^^^^
+
+At its core, the WASM machine defined in the WASM standard is just a
+very evolved arithmetic machine. It needs to be enriched with
+so-called host functions in order to be used for greater purposes. The
+host functions provides an API to the WASM program to interact with an
+“outer world.”  In a browser, this API typically allows the WASM
+program to interact with the `DOM
+<https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model>`_
+of the webpage.
+
+As for smart rollups, the host functions exposed to a WASM kernel
+allows it to interact with the components of persistent state.
+
+``read_input``
+  Loads the oldest input still present in the inbox of the smart
+  rollup in the transient memory of the WASM kernel. This means that
+  the input is lost at the next invocation of ``kernel_next`` if it is
+  not written in the durable storage.
+
+``write_output``
+  Writes an in-memory buffer to the outbox of the smart rollup. If the
+  content of the buffer follows the expected encoding, it can be
+  interpreted in the layer-1 as a smart contract call, once a
+  commitment acknowledging the call to this host function is cemented.
+
+``write_debug``
+  Is considered as a no-op, but can be used by the WASM kernel to log
+  events which can potentially be interpreted by an instrumented
+  rollup node.
+
+``store_has``
+  Reports the kind of data stored under a given path in the durable
+  storage: a directory, a file, neither or both.
+
+``store_delete``
+  Cuts the subtree under a given path out of the durable storage.
+
+``store_copy``
+  Copies the subtree under a given path to another key.
+
+``store_move``
+  Behaves as ``store_copy``, but also cuts the original subtree out of
+  the tree.
+
+``store_read``
+  Loads at most 4,096 bytes from a file of the durable storage to a buffer
+  in the memory of the WASM kernel.
+
+``store_write``
+  Writes at most 4,096 bytes from a buffer in the memory of the WASM
+  kernel to a file of the durable storage, increasing its size if
+  necessary. Note that files in the durable storage cannot exceed
+  2,147,483,647 bytes (:math:`2^31 - 1`, around 2GB).
+
+``store_value_size``
+  Returns the size (in bytes) of a file under a given key in the
+  durable storage.
+
+``store_list_size``
+  Returns the number of child objects (either directories or files)
+  under a given key.
+
+``store_get_nth_key``
+  Loads in memory at a given location the durable storage key to
+  access the nth child under a given key. Note that the result is not
+  stable w.r.t. key additions and removals. Returns the number of
+  bytes loaded in memory. If :math:`0` is loaded, it means there
+  exists a value under the key given as argument (which can be
+  manipulated with ``store_read`` and ``store_write``).
+
+``reveal_preimage``
+  Loads in memory the preimage of a 32-byte Blake2B hash.
+
+``reveal_metadata``
+  Loads in memory the address of the smart rollup (20 bytes), and the
+  Tezos level of its origination (4 bytes).
+
+These host functions use a "C-like" API. In particular, most of them
+return a signed 32bit integer, where negative values are reserved for
+conveying errors.
+
+======= =======================================================================================================
+ Code    Description
+------- -------------------------------------------------------------------------------------------------------
+  -1     Input is too large to be a valid key of the durable storage
+  -2     Input cannot be parsed as a valid key of the durable storage
+  -3     There is no file under the requested key
+  -4     The host functions tried to read or write an invalid section (determined by an offset and a length) of the value stored under a given key
+  -5     Cannot write a value beyond the 2GB size limit
+  -6     Invalid memory access (segmentation fault)
+  -7     Tried to read from the inbox or write to the outbox more than 4,096 bytes
+  -8     Unknown error due to an invalid access
+  -9     Attempt to modify a readonly value
+======= =======================================================================================================
+
+Implementing a WASM Kernel in Rust
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Though WASM is a good fit for writing computation intensive, arbitrary
+programs, it remains a low-level, stack-based, memory unsafe language.
+Fortunately, it was designed to be a compilation target, not a
+language whose program would be written directly by developers.
+
+Rust has several advantages that makes it a good candidate to write
+the kernel of a smart rollup. Not only does the Rust compiler treat
+WASM as a first class citizen when it comes to compilation targets,
+but its approach to memory safety eliminates large classes of bugs and
+vulnerabilities that arbitrary WASM programs may suffer from.
+
+Setting-up Rust
+"""""""""""""""
+
+```rustup`` <https://rustup.rs>`_ is the standard to get Rust. Once
+``rustup`` is installed, enabling WASM as a compilation target is as
+simple as running the following command.
+
+::
+   rustup target add wasm32-unknown-unknown
+
+Rust also proposes the ``wasm64-unknown-unknown`` compilation
+target. This target is **not** compatible with Tezos smart rollups,
+which only provides a 32bit address space.
+
+.. note::
+
+   This document is not a tutorial about Rust, and familiarity with
+   the language and its ecosystem (*e.g.*, how Rust crates are
+   structured in particular) is assumed.
+
+The simplest kernel one can implement in Rust (the one that returns
+directly after being called, without doing anything particular) is the
+following.
+
+.. code:: rust
+
+   #[no_mangle]
+   pub extern "C" fn kernel_next() {
+   }
+
+This code can be easily computed with ``cargo`` with the following
+``Cargo.toml``.
+
+::
+
+   [package]
+   name = 'noop'
+   version = '0.1.0'
+   edition = '2021'
+
+   [lib]
+   crate-type = ["cdylib"]
+
+The key line to spot is the ``crate-type`` definition to
+``cdylib``. As a side note, when writing a library that will
+eventually be consumed by a Kernel WASM crate, this line must be
+modified to
+
+.. code:: toml
+
+   crate-type = ["cdylib", "rlib"]
+
+Compiling our ``noop`` kernel is done by calling ``cargo`` with the
+correct argument.
+
+::
+
+   cargo build --target wasm32-unknown-unknown
+
+To make the use of the ``target`` optional, it is possible to create
+a ``.cargo/config.toml`` file, containing the following line.
+
+::
+
+   [build]
+   target = "wasm32-unknown-unknown"
+
+   [rust]
+   lld = true%
+
+Host Functions in Rust
+""""""""""""""""""""""
+
+Exposing host functions exported by the WASM runtime to a Rust program
+is actually really straightforward. The ``link`` pragma is used to specify the
+module that exports them (in our case, ``rollup_safe_core``).
+
+.. code:: rust
+
+   #[link(wasm_import_module = "rollup_safe_core")]
+   extern "C" {
+       /// Returns the number of bytes written to `dst`, or an error code.
+       pub fn read_input(
+           level: *mut i32,
+           id: *mut i32,
+           dst: *mut u8,
+           max_bytes: usize,
+       ) -> i32;
+
+       /// Returns 0 in case of success, or an error code.
+       pub fn write_output(src: *const u8, num_bytes: usize) -> i32;
+
+       /// Does nothing. Does not check the correctness of its argument.
+       pub fn write_debug(src: *const u8, num_bytes: usize);
+
+       /// Returns
+       /// - 0 the key is missing
+       /// - 1 only a file is stored under the path
+       /// - 2 only directories under the path
+       /// - 3 both a file and directories
+       pub fn store_has(path: *const u8, path_len: usize) -> i32;
+
+       /// Returns 0 in case of success, or an error code
+       pub fn store_delete(path: *const u8, path_len: usize) -> i32;
+
+       /// Returns the number of children (file and directories) under a
+       /// given key.
+       pub fn store_list_size(path: *const u8, path_len: usize) -> i64;
+
+       /// Returns the size of the key loaded in memory at `dst`, or an
+       /// error code.
+       pub fn store_get_nth_key(
+           path: *const u8,
+           path_len: usize,
+           index: i64,
+           dst: *mut u8,
+           max_size: usize,
+       ) -> i32;
+
+       /// Returns 0 in case of success, or an error code.
+       pub fn store_copy(
+           src_path: *const u8,
+           scr_path_len: usize,
+           dst_path: *const u8,
+           dst_path_len: usize,
+       ) -> i32;
+
+       /// Returns 0 in case of success, or an error code.
+       pub fn store_move(
+           src_path: *const u8,
+           scr_path_len: usize,
+           dst_path: *const u8,
+           dst_path_len: usize,
+       ) -> i32;
+
+       /// Returns the number of bytes written to the durable storage
+       /// (should be equal to `num_bytes`, or an error code.
+       pub fn store_read(
+           path: *const u8,
+           path_len: usize,
+           offset: usize,
+           dst: *mut u8,
+           num_bytes: usize,
+       ) -> i32;
+
+       /// Returns 0 in case of success, or an error code.
+       pub fn store_write(
+           path: *const u8,
+           path_len: usize,
+           offset: usize,
+           src: *const u8,
+           num_bytes: usize,
+       ) -> i32;
+
+       /// Returns the number of bytes written at `dst`, or an error
+       /// code.
+       pub fn reveal_preimage(
+           hash_addr: *const u8,
+           dst: *mut u8,
+           max_bytes: usize,
+       ) -> i32;
+   }
+
+These functions are marked as ``unsafe`` for Rust. It is possible to
+provide safe API on top of them. For instance, the ``read_input`` host
+function can be used to declare a safe function which allocates a
+fresh Rust Vector to receive the input.
+
+.. code:: rust
+
+   // Assuming the host functions are defined in a module `host`.
+
+   pub const MAX_MESSAGE_SIZE: u32 = 4096u32;
+
+   pub struct Input {
+       pub level: u32,
+       pub id: u32,
+       pub payload: Vec<u8>,
+   }
+
+   pub fn next_input() -> Option<Input> {
+       let mut payload = Vec::with_capacity(MAX_MESSAGE_SIZE as usize);
+
+       // Placeholder values
+       let mut level = 0i32;
+       let mut id = 0i32;
+
+       let size = unsafe {
+            host::read_input(
+               &mut level,
+               &mut id,
+               payload.as_mut_ptr(),
+               MAX_MESSAGE_SIZE,
+           )
+       };
+
+       if 0 < payload.len() {
+           unsafe { payload.set_len(size as usize) };
+           Some(Input {
+               level: level as u32,
+               id: id as u32,
+               payload,
+           })
+       } else {
+           None
+       }
+   }
+
+Coupling ``Vec::with_capacity`` along with the ``set_len`` unsafe
+function is a good approach to avoid initializing the 4,096 bytes of
+memory every time you want to load data of arbitrary size into the
+WASM memory.
+
+Testing your Kernel
+"""""""""""""""""""
+
+.. warning::
+
+   The ``octez-wasm-repl`` tool that is described in this section is
+   still under active development. A preliminary version can be found
+   in `the Octez repository <https://gitlab.com/tezos/tezos>`_.
+
+   To get ``octez-wasm-repl``, the easiest way is to build Octez from
+   source. In addition to the `usual instructions
+   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_,
+   the command ``make build-unreleased`` has to be used.
+
+   For now, ``octez-wasm-repl`` is **not** part of Octez, and is only
+   provided for developers interested in testing Tezos smart rollup
+   infrastructure before its release on mainnet.
+
+Testing kernels can be useful during its development, without relying
+on starting a rollup on a test network. We provide a
+*read-eval-print-loop* (REPL) as a mean to evaluate the WASM PVM
+without relying on any node and network: ``octez-wasm-repl``.
+
+.. code:: sh
+
+  octez-wasm-repl ${WASM_FILE} --inputs ${JSON_INPUTS} --rollup ${ROLLUP_ADDRESS}
+
+``octez-wasm-repl`` can take either a `.wasm` file (the binary
+representation of WebAssembly modules) or a `.wast` file (its textual
+representation), and actually parses and typechecks the kernel before
+giving it to the PVM. It can take a file containing inboxes and a
+rollup address. The expected contents of the inboxes is a JSON value,
+with the following schema:
+
+.. code:: javascript
+
+  [
+    [ { "payload" : <Michelson data>,
+        "sender" : <Contract hash of the originated contract for the rollup, optional>,
+        "source" : <Implicit account sending the message, optional>
+        "destination" : <Smart rollup address> }
+      ..
+      // or
+      { "external" : <hexadecimal payload> }
+      ..
+    ]
+  ]
+
+The contents of the input file is a JSON array of array of inputs,
+which encodes a sequence of inboxes, where an inbox is a set of
+messages. These inboxes are read in the same order as they appear in
+the JSON file. For example, here is a valid input file that defines
+two inboxes: the first array encodes an inbox containing only an
+external message, while the second array encodes an inbox containing
+two messages:
+
+.. code:: javascript
+
+  [
+    [
+      {
+        "external":
+        "0000000023030b01d1a37c088a1221b636bb5fccb35e05181038ba7c000000000764656661756c74"
+      }
+    ],
+    [
+      {
+        "payload" : "0",
+        "sender" : "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq",
+        "source" : "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w",
+        "destination" : "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+      },
+      { "payload" : "Pair Unit False" }
+    ]
+  ]
+
+Note that the `sender`, `source` and `destination` fields are optional
+and will be given default values by the REPL (which are the *zero*
+adresses). If no input file is given it will be assumed empty. If no
+rollup address is given, it will use a default address which is the
+*zero* address: ``scr1AFyXAWFS3c6S2D617o8NGRvazoMJPEw6s``.
+
+``octez-wasm-repl`` is a REPL, as such it waits for user inputs to
+continue its execution. Its initial state is exactly the same as right
+after its origination. Its current state can be inspected with the
+command ``show status``:
+
+.. code::
+
+  > show status
+  Status: Waiting for inputs
+  Internal state: Snapshot
+
+At start, internally the kernel is in snapshot mode. It means it is
+not executing any WASM code, and initially it is waiting for inputs to
+proceed. It needs some inputs to continue its execution. The command
+``load inputs`` will load the first inbox from the file given with the
+option `--input`, putting `Start_of_level` (and `End_of_level`) before
+(resp. after) these inputs.
+
+.. code::
+
+  > load inputs
+  Loaded 3 inputs at level 0
+
+  > show status
+  Status: Evaluating
+  Internal state: Decode
+
+At this point, the internal input buffer can be inspected with the
+command ``show inbox``.
+
+.. code::
+
+  > show inbox
+  Inbox has 3 messages:
+  { raw_level: 0;
+    counter: 0
+    payload: Start_of_level }
+  { raw_level: 0;
+    counter: 1
+    payload: 0000000023030b01d1a37c088a1221b636bb5fccb35e05181038ba7c000000000764656661756c74 }
+  { raw_level: 0;
+    counter: 2
+    payload: End_of_level }
+
+The first input of an inbox at the beginning of a level is
+`Start_of_level`, and is represented by the message ``\000\001`` on
+the kernel side. We can now start a `kernel_next` evaluation:
+
+.. code::
+
+  > step kernel_next
+  Evaluation took 10000 ticks so far
+  Status: Evaluating
+  Internal state: Snapshot
+
+
+The memory of the interpreter is flushed between two `kernel_next`
+call (at the `Snapshot` internal state), however the ``durable
+storage`` can be used as a persistent memory. Let's assume this kernel
+wrote data at key `/store/key`:
+
+.. code::
+
+  > show key /store/key
+  `<hexadecimal value of the key>`
+
+Since the representation of values is decided by the kernel, the REPL can only
+return its raw value. It is possible however to inspect the memory by stopping
+the PVM before its snapshot internal state, with ``step result``, and
+inspect the memory at pointer `n` and length `l`, and finaly evaluate until the
+next `kernel_next`:
+
+.. code::
+
+  > step result
+  Evaluation took 2500 ticks so far
+  Status: Evaluating
+  Internal state: Eval (Result)
+
+  > show memory at p for l bytes
+  `<hexadecimal value>`
+
+  > step kernel_next
+  Evaluation took 7500 ticks so far
+  Status: Evaluating
+  Internal state: Snapshot
+
+Once again, note that values from the memory are outputted as is,
+since the representation is internal to WASM.
+
+Finally, it is possible to evaluate the whole inbox with ``step inbox``:
+
+.. code::
+
+  > step inbox
+  Evaluation took 30000 ticks
+  Status: Waiting for inputs
+  Internal state: Snapshot
+
+It is also possible to show the outbox for any given level (``show outbox at level 0``)
+
+.. code::
+
+  > show outbox
+  Outbox has N messages:
+  { unparsed_parameters: ..;
+    destination: ..;
+    entrypoint: ..; }
+  ..
+
 
 Glossary
 --------
