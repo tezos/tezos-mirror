@@ -215,16 +215,11 @@ module Tx_rollup : sig
 end
 
 module Dal : sig
-  module Parameters : sig
-    type cryptobox = Tezos_crypto_dal.Cryptobox.Verifier.parameters = {
-      redundancy_factor : int;
-      page_size : int;
-      slot_size : int;
-      number_of_shards : int;
-    }
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
 
+  module Parameters : sig
     type t = {
-      cryptobox : cryptobox;
+      cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       endorsement_lag : int;
     }
@@ -258,15 +253,12 @@ module Dal : sig
     val dac_store_preimage : string -> (Dal_node.t, string) RPC_core.t
   end
 
-  module Cryptobox = Tezos_crypto_dal.Cryptobox
-
   val make :
-    ?on_error:(string -> Cryptobox.t) -> Parameters.cryptobox -> Cryptobox.t
+    ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
   module Commitment : sig
     val dummy_commitment :
       ?on_error:(string -> Cryptobox.commitment) ->
-      Parameters.cryptobox ->
       Cryptobox.t ->
       string ->
       Cryptobox.commitment

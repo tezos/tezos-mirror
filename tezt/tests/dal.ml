@@ -32,6 +32,8 @@
 
 let hooks = Tezos_regression.hooks
 
+module Cryptobox = Rollup.Dal.Cryptobox
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -232,9 +234,7 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let cryptobox_params = parameters.cryptobox in
   let cryptobox = Rollup.Dal.make cryptobox_params in
-  let commitment =
-    Rollup.Dal.Commitment.dummy_commitment cryptobox_params cryptobox "coucou"
-  in
+  let commitment = Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou" in
   Check.(
     (feature_flag = false)
       bool
@@ -290,22 +290,13 @@ let publish_slot ~source ?level ?fee ?error ~index ~commitment node client =
       [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~commitment]
       client)
 
-let publish_dummy_slot ~source ?level ?error ?fee ~index ~message parameters
-    cryptobox =
-  let commitment =
-    Rollup.Dal.(
-      Commitment.dummy_commitment
-        parameters.Parameters.cryptobox
-        cryptobox
-        message)
-  in
+let publish_dummy_slot ~source ?level ?error ?fee ~index ~message cryptobox =
+  let commitment = Rollup.Dal.(Commitment.dummy_commitment cryptobox message) in
   publish_slot ~source ?level ?fee ?error ~index ~commitment
 
 let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
   let level = 1 + Node.get_level node in
-  let commitment =
-    Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt commitment
-  in
+  let commitment = Cryptobox.Commitment.of_b58check_opt commitment in
   match commitment with
   | None -> assert false
   | Some commitment ->
@@ -413,7 +404,6 @@ let test_slot_management_logic =
       ~index:2
       ~message:"a"
       ~error
-      parameters
       cryptobox
       node
       client
@@ -429,7 +419,6 @@ let test_slot_management_logic =
       ~index:2
       ~message:"a"
       ~error
-      parameters
       cryptobox
       node
       client
@@ -440,7 +429,6 @@ let test_slot_management_logic =
       ~fee:1_000
       ~index:0
       ~message:"a"
-      parameters
       cryptobox
       node
       client
@@ -451,7 +439,6 @@ let test_slot_management_logic =
       ~fee:1_500
       ~index:1
       ~message:"b"
-      parameters
       cryptobox
       node
       client
@@ -462,7 +449,6 @@ let test_slot_management_logic =
       ~fee:2_000
       ~index:0
       ~message:"c"
-      parameters
       cryptobox
       node
       client
@@ -473,7 +459,6 @@ let test_slot_management_logic =
       ~fee:1_200
       ~index:1
       ~message:"d"
-      parameters
       cryptobox
       node
       client
@@ -633,7 +618,6 @@ let test_slots_attestation_operation_behavior =
       ~fee:1_200
       ~index:10
       ~message:" TEST!!! "
-      parameters
       cryptobox
       node
       client
@@ -711,7 +695,7 @@ let test_dal_node_slot_management =
 let publish_and_store_slot node client dal_node source index content =
   let* slot_header = split_slot dal_node content in
   let commitment =
-    Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
+    Cryptobox.Commitment.of_b58check_opt slot_header
     |> mandatory "The b58check-encoded slot header is not valid"
   in
   let* _ = publish_slot ~source ~fee:1_200 ~index ~commitment node client in
@@ -758,7 +742,6 @@ let test_dal_node_rebuild_from_shards =
     ~title:"dal node shard fetching and slot reconstruction"
     ~tags:["dal"; "dal_node"]
   @@ fun protocol ->
-  let open Tezos_crypto_dal in
   let* node, client, dal_node = init_dal_node protocol in
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let crypto_params = parameters.cryptobox in
@@ -826,11 +809,11 @@ let test_dal_node_test_slots_propagation =
   let* dal = Rollup.Dal.Parameters.from_client client in
   let cryptobox = Rollup.Dal.make dal.cryptobox in
   let commitment1 =
-    Rollup.Dal.Commitment.dummy_commitment dal.cryptobox cryptobox "content1"
+    Rollup.Dal.Commitment.dummy_commitment cryptobox "content1"
   in
   let slot_header1_exp = Rollup.Dal.Commitment.to_string commitment1 in
   let commitment2 =
-    Rollup.Dal.Commitment.dummy_commitment dal.cryptobox cryptobox "content2"
+    Rollup.Dal.Commitment.dummy_commitment cryptobox "content2"
   in
   let slot_header2_exp = Rollup.Dal.Commitment.to_string commitment2 in
   let p1 = wait_for_stored_slot dal_node3 slot_header1_exp in
