@@ -62,8 +62,8 @@ let mark_for_reboot {reboot_counter; durable; _} =
   let open Lwt_syntax in
   let+ has_reboot_flag = has_reboot_flag durable in
   if has_reboot_flag then
-    if Z.Compare.(reboot_counter <= Z.zero) then `Forcing_restart else `Reboot
-  else `Restarting
+    if Z.Compare.(reboot_counter <= Z.zero) then `Forcing_yield else `Reboot
+  else `Yielding
 
 (* Returns true is a fallback kernel is available, and it's different to
    the currently running kernel. *)
@@ -121,8 +121,8 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       let* reboot_status = mark_for_reboot pvm_state in
       match reboot_status with
       | `Reboot -> return ~status:Reboot ~durable (initial_boot_state ())
-      | `Forcing_restart -> return ~status:Forcing_restart ~durable Collect
-      | `Restarting -> return ~status:Restarting ~durable Collect)
+      | `Forcing_yield -> return ~status:Forcing_yield ~durable Collect
+      | `Yielding -> return ~status:Yielding ~durable Collect)
   | Collect ->
       return
         ~status:Failing
@@ -263,13 +263,13 @@ let next_tick_state pvm_state =
   Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
 let next_last_top_level_call {current_tick; last_top_level_call; _} = function
-  | Forcing_restart | Restarting | Reboot -> current_tick
+  | Forcing_yield | Yielding | Reboot -> current_tick
   | Failing | Running -> last_top_level_call
 
 let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _} status =
   match status with
   | Reboot -> Z.pred reboot_counter
-  | Forcing_restart | Restarting | Failing ->
+  | Forcing_yield | Yielding | Failing ->
       Z.succ maximum_reboots_per_input (* one is used to read the inbox *)
   | Running -> reboot_counter
 
@@ -279,12 +279,12 @@ let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _} status =
 let patch_too_many_reboot_flag durable =
   let open Lwt_syntax in
   function
-  | Restarting ->
+  | Yielding ->
       Durable.delete
         ~edit_readonly:true
         durable
         Constants.too_many_reboot_flag_key
-  | Forcing_restart ->
+  | Forcing_yield ->
       Durable.(
         write_value_exn
           ~edit_readonly:true
@@ -295,15 +295,15 @@ let patch_too_many_reboot_flag durable =
   | _ -> return durable
 
 (** When rebooting, we can remove the [Reboot] flag (because it has
-    achieved its purpose). On the contrary, when [Restarting] or
-    [Forcing_restart], we set the flag, because we will want to reboot
+    achieved its purpose). On the contrary, when [Yielding] or
+    [Forcing_yield], we set the flag, because we will want to reboot
     once the inbox is loaded. *)
 let patch_reboot_flag durable =
   let open Lwt_syntax in
   function
   | Reboot ->
       Durable.delete ~edit_readonly:true durable Constants.reboot_flag_key
-  | Forcing_restart | Restarting ->
+  | Forcing_yield | Yielding ->
       Durable.(write_value_exn durable Constants.reboot_flag_key 0L "")
   | _ -> return durable
 
