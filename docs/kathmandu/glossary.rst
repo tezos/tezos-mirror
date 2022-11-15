@@ -123,6 +123,24 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
+_`Layer 1`
+    The primary blockchain i.e. the Tezos chain. Within any blockchain ecosystem, Layer 1 (L1) refers to the main chain to
+    which side chains, rollups, or other protocols connect and settle to. The Layer 1 chain is deemed to be most
+    secure, since it has the most value (or stake) tied to it, and be most decentralized and censorship resistant.
+    However, transaction space is limited leading to low throughput and possibly high transaction costs.
+    See `Layer 2`_.
+
+_`Layer 2`
+    Layer 2 (L2) includes sidechains, rollups, payment channels, etc. that batch their transactions and
+    write to the `layer 1`_ chain. By processing transactions on layer 2 networks,
+    greater scalability in speed and throughput can be achieved by the ecosystem overall, since the number of transactions
+    the layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
+    the security of the L1 chain backs those operations. In Tezos there are a number of layer 2 solutions,
+    including :doc:`TORUs (Transaction Optimistic Rollups) <transaction_rollups>`,
+    `Smart Optimistic Rollups`_,
+    validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
+    zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
+
 .. _glossary_michelson:
 .. _glossary_michelson_kathmandu:
 
@@ -163,6 +181,11 @@ _`Smart contract`
     created with an explicit origination_ operation and are therefore
     sometimes called originated accounts. The address of a smart
     contract always starts with the letters ``KT1``.
+
+_`Smart Optimistic Rollups`
+    Smart optimistic rollups constitute a `layer 2`_ solution that can be used to deploy either a general-purpose polyvalent layer 2 blockchain
+    (e.g., an EVM-compatible one), or an application-specific DApp.
+    See :doc:`../alpha/smart_rollups`.
 
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
