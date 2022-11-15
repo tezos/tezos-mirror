@@ -30,7 +30,7 @@ let split_query =
   |+ flag "fill" (fun fill_x00 -> fill_x00)
   |> seal
 
-let split_slot () =
+let split_slot =
   Tezos_rpc.Service.post_service
     ~description:"Split and store a slot"
     ~query:split_query
@@ -45,7 +45,7 @@ let slot_query =
   |+ flag "trim" (fun trim_x00 -> trim_x00)
   |> seal
 
-let slot () =
+let slot =
   Tezos_rpc.Service.get_service
     ~description:"Show content of a slot"
     ~query:slot_query
@@ -53,7 +53,7 @@ let slot () =
     Tezos_rpc.Path.(
       open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
 
-let slot_pages () =
+let slot_pages =
   Tezos_rpc.Service.get_service
     ~description:"Fetch slot as list of pages"
     ~query:Tezos_rpc.Query.empty
@@ -61,7 +61,7 @@ let slot_pages () =
     Tezos_rpc.Path.(
       open_root / "slot" / "pages" /: Cryptobox.Commitment.rpc_arg)
 
-let stored_slot_headers () =
+let stored_slot_headers =
   Tezos_rpc.Service.get_service
     ~description:"List slot headers for a given block hash"
     ~query:Tezos_rpc.Query.empty
@@ -74,7 +74,7 @@ let stored_slot_headers () =
     Tezos_rpc.Path.(
       open_root / "stored_slot_headers" /: Tezos_crypto.Block_hash.rpc_arg)
 
-let shard () =
+let shard =
   let shard_arg = Tezos_rpc.Arg.int in
   Tezos_rpc.Service.get_service
     ~description:"Fetch shard as bytes"
@@ -83,7 +83,7 @@ let shard () =
     Tezos_rpc.Path.(
       open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
-let shards () =
+let shards =
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4111
      Bound size of the input *)
   Tezos_rpc.Service.post_service
@@ -93,7 +93,7 @@ let shards () =
     ~input:Data_encoding.(list int31)
     Tezos_rpc.Path.(open_root / "shards" /: Cryptobox.Commitment.rpc_arg)
 
-let monitor_slot_headers () =
+let monitor_slot_headers =
   Tezos_rpc.Service.get_service
     ~description:"Monitor stored slot headers"
     ~query:Tezos_rpc.Query.empty
