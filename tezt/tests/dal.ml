@@ -109,13 +109,14 @@ let setup ?(endorsement_lag = 1) ?commitment_period ?challenge_window
 
 type test = {variant : string; tags : string list; description : string}
 
-let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
+let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
+    bootstrap1_key =
   let* rollup_address =
     Client.Sc_rollup.originate
       ~hooks
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
-      ~kind:"arith"
+      ~kind:pvm_name
       ~boot_sector:""
       ~parameters_ty:"unit"
       tezos_client
@@ -131,6 +132,15 @@ let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
+  let* () =
+    match dal_node with
+    | None -> return ()
+    | Some dal_node ->
+        let reveal_data_dir =
+          Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name
+        in
+        Dal_node.Dac.set_parameters ~reveal_data_dir dal_node
+  in
   let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
@@ -140,7 +150,7 @@ let with_dal_node tezos_node tezos_client f key =
   f key dal_node
 
 let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
-    ?dal_enable {variant; tags; description} scenario =
+    ?dal_enable {variant; tags; description} ?(pvm_name = "arith") scenario =
   let tags = tags @ [variant] in
   regression_test
     ~__FILE__
@@ -150,10 +160,16 @@ let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
       setup ?commitment_period ?challenge_window ~protocol ?dal_enable
       @@ fun _parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
-      ( with_fresh_rollup ~dal_node
+      ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node _filename ->
-        scenario protocol dal_node sc_rollup_node sc_rollup_address node client
-      )
+        scenario
+          protocol
+          dal_node
+          sc_rollup_node
+          sc_rollup_address
+          node
+          client
+          pvm_name )
         node
         client
         key)
@@ -173,11 +189,13 @@ let test_scenario ?commitment_period ?challenge_window ?dal_enable
         node
         client)
 
-let test_dal_rollup_scenario ?dal_enable variant =
+let test_dal_rollup_scenario ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
+    ?dal_enable variant =
   test_scenario_rollup_dal_node
     ?dal_enable
+    ~pvm_name
     {
-      tags = ["dal"; "dal_node"];
+      tags;
       variant;
       description = "Testing rollup and Data availability layer node";
     }
@@ -878,7 +896,7 @@ let send_messages ?(src = Constant.bootstrap2.alias) client msgs =
   Client.bake_for_and_wait client
 
 let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
-    sc_rollup_address node client =
+    sc_rollup_address node client _pvm_name =
   (* Check that the rollup node stores the slots published in a block, along with slot headers:
      0. Run dal node
      1. Send three slots to dal node and obtain corresponding headers
@@ -1143,14 +1161,10 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
       return ()
 
 (* DAC tests *)
-let test_dal_node_handles_dac_store_preimage =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal node handles dac store preimage"
-    ~tags:["dac"; "dal_node"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
-  @@ fun protocol ->
-  let* _node, _client, dal_node = init_dal_node protocol in
+
+let test_dal_node_handles_dac_store_preimage _protocol dal_node sc_rollup_node
+    _sc_rollup_address _node _client pvm_name =
+  let* () = Dal_node.run dal_node in
   let preimage = "test" in
   let* actual_rh =
     RPC.call dal_node (Rollup.Dal.RPC.dac_store_preimage preimage)
@@ -1163,6 +1177,23 @@ let test_dal_node_handles_dac_store_preimage =
     (actual_rh = expected_rh)
       string
       ~error_msg:"Invalid root hash returned (Current:%L <> Expected: %R)") ;
+  let filename =
+    Filename.concat
+      (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
+      actual_rh
+  in
+  let cin = open_in filename in
+  let recovered_payload = really_input_string cin (in_channel_length cin) in
+  let () = close_in cin in
+  (* Discard first five preamble bytes *)
+  let recovered_preimage =
+    String.sub recovered_payload 5 (String.length recovered_payload - 5)
+  in
+  Check.(
+    (recovered_preimage = preimage)
+      string
+      ~error_msg:
+        "Preimage does not match expected value (Current:%L <> Expected: %R)") ;
   return ()
 
 let test_dal_node_imports_dac_member =
@@ -1229,6 +1260,11 @@ let register ~protocols =
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   test_slots_attestation_operation_behavior protocols ;
-  test_dal_node_handles_dac_store_preimage protocols ;
+  test_dal_rollup_scenario
+    ~tags:["dac"; "dal_node"]
+    ~dal_enable:true
+    "dac_handles_reveal_data"
+    test_dal_node_handles_dac_store_preimage
+    protocols ;
   test_dal_node_imports_dac_member protocols ;
   test_dal_node_dac_threshold_not_reached protocols

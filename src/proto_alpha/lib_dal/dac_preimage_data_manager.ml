@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,51 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+open Protocol
 
-type dac = {
-  addresses : Aggregate_signature.public_key_hash list;
-  threshold : int;
-      (** The number of signature needed on root page hashes for the
-          corresponding reveal preimages to be available. *)
-  reveal_data_dir : string;
-      (** The directory where the dal node saves pages computed
-          from reveal preimages. If the dal node saves the data
-          directly into the rollup node, this should be
-          {ROLLUP_NODE_DATA_DIR}/{PVM_NAME}. *)
-}
+type error += Cannot_write_dac_page_to_disk of string
 
-type t = {
-  use_unsafe_srs : bool;
-      (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : string;  (** The address the DAL node listens to *)
-  rpc_port : int;  (** The port the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
-  dac : dac;
-      (** The aggregate account aliases that constitute the Data availability
-          Committee. *)
-}
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"cannot_write_dac_page_to_disk"
+    ~title:"Cannot write Dac page to disk"
+    ~description:"Cannot write Dac page to disk"
+    ~pp:(fun ppf b58_hash ->
+      Format.fprintf ppf "Could not write dac page for hash %s" b58_hash)
+    Data_encoding.(obj1 (req "hash" string))
+    (function
+      | Cannot_write_dac_page_to_disk b58_hash -> Some b58_hash | _ -> None)
+    (fun b58_hash -> Cannot_write_dac_page_to_disk b58_hash)
 
-(** [filename config] gets the path to config file *)
-val filename : t -> string
+module Make (Hash : Dac_pages_encoding.HASH) = struct
+  let path data_dir hash = Filename.(concat data_dir @@ Hash.to_b58check hash)
 
-(** [data_dir_path config subpath] builds a subpath relatively to the
-    [config] *)
-val data_dir_path : t -> string -> string
+  let save_bytes data_dir hash page_contents =
+    let open Lwt_result_syntax in
+    let path = path data_dir hash in
+    let*! result =
+      Lwt_utils_unix.with_atomic_open_out path @@ fun chan ->
+      Lwt_utils_unix.write_bytes chan page_contents
+    in
+    match result with
+    | Ok () -> return ()
+    | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_b58check hash)
+end
 
-val default_data_dir : string
-
-val default_reveal_data_dir : string
-
-val default_rpc_addr : string
-
-val default_rpc_port : int
-
-(** Default configuration for the data availability committee. *)
-val default_dac : dac
-
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
-
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+module Reveal_hash = Make (Sc_rollup_PVM_sig.Reveal_hash)

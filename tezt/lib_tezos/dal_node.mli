@@ -103,10 +103,13 @@ module Dac : sig
     [octez-dal-node set dac parameters --data-dir data_dir], where
     [data_dit = dal_node.persistent_stated.data_dir]. If the optional integer
     parameter [~threshold] is passed, then the dal node configuration file is
-    updated with the dac threshold indicated. If no optional arguments are
+    updated with the dac threshold indicated. If the [~reveal_data_dir]
+    optional argument is passed, then the dal node configuration file is
+    updated with the corresponding reveal_data_dir. If no optional arguments are
     passed, the configuration file of the dal node is left unchanged.
 *)
-  val set_parameters : ?threshold:int -> t -> unit Lwt.t
+  val set_parameters :
+    ?threshold:int -> ?reveal_data_dir:string -> t -> unit Lwt.t
 
   (** [add_committee_member dal_node] runs
     [octez-dal-node add data availability committee member alias --data-dir data-dir],

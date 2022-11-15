@@ -12,6 +12,7 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "octez-protocol-compiler"
+  "tezos-stdlib-unix"
   "tezos-dal-node-lib"
   "tezos-client-alpha"
   "tezos-embedded-protocol-alpha"

@@ -33,7 +33,10 @@ let resolve_plugin cctxt =
        (Dal_plugin.get protocols.current_protocol)
        (Dal_plugin.get protocols.next_protocol)
 
-type error += Cryptobox_initialisation_failed of string
+type error +=
+  | Cryptobox_initialisation_failed of string
+  | Reveal_data_path_not_a_directory of string
+  | Cannot_create_reveal_data_dir of string
 
 let () =
   register_error_kind
@@ -113,9 +116,12 @@ module Handler = struct
                 init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
               in
               let dir = RPC_server.register ctxt in
+              let reveal_data_dir = config.Configuration.dac.reveal_data_dir in
               let plugin_prefix = Tezos_rpc.Path.(open_root / "plugin") in
               let plugin_dir =
-                Tezos_rpc.Directory.prefix plugin_prefix Plugin.RPC.rpc_services
+                Tezos_rpc.Directory.prefix
+                  plugin_prefix
+                  (Plugin.RPC.rpc_services ~reveal_data_dir)
               in
               let dir_with_plugin = RPC_server.merge dir plugin_dir in
               let* rpc_server = RPC_server.(start config dir_with_plugin) in
@@ -210,45 +216,6 @@ let daemonize handlers =
      return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
-let get_dac_address_keys cctxt address =
-  let open Lwt_result_syntax in
-  let open Tezos_client_base.Client_keys in
-  let* alias = Aggregate_alias.Public_key_hash.rev_find cctxt address in
-  match alias with
-  | None -> return_none
-  | Some alias -> (
-      let* keys_opt = alias_aggregate_keys cctxt alias in
-      match keys_opt with
-      | None ->
-          (* DAC/TODO: https://gitlab.com/tezos/tezos/-/issues/4193
-             Revisit this once the Dac committee will be spread across
-             multiple dal nodes.*)
-          let*! () = Event.(emit dac_account_not_available address) in
-          return_none
-      | Some (pkh, pk, sk_uri_opt) -> (
-          match sk_uri_opt with
-          | None ->
-              let*! () = Event.(emit dac_account_cannot_sign address) in
-              return_none
-          | Some sk_uri -> return_some (pkh, pk, sk_uri)))
-
-let get_dac_keys cctxt {Configuration.dac = {addresses; threshold; _}; _} =
-  let open Lwt_result_syntax in
-  let* keys = List.map_es (get_dac_address_keys cctxt) addresses in
-  let recovered_keys = List.length @@ List.filter Option.is_some keys in
-  let*! () =
-    (* We emit a warning if the threshold of dac accounts needed to sign a
-       root page hash is not reached. We also emit a warning for each DAC
-       account whose secret key URI was not recovered.
-       We do not stop the dal node at this stage, as it can still serve
-       any request that is related to DAL.
-    *)
-    if recovered_keys < threshold then
-      Event.(emit dac_threshold_not_reached (recovered_keys, threshold))
-    else Event.(emit dac_is_ready) ()
-  in
-  return keys
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
 
    Improve general architecture, handle L1 disconnection etc
@@ -258,7 +225,10 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
-  let* _dac_list = get_dac_keys cctxt config in
+  let* () =
+    Dac_manager.Storage.ensure_reveal_data_dir_exists config.dac.reveal_data_dir
+  in
+  let* _dac_list = Dac_manager.Keys.get_keys cctxt config in
   let*! store = Store.init config in
   let ctxt = Node_context.init config store in
   daemonize (Handler.new_head config ctxt cctxt :: Handler.new_slot_header ctxt)

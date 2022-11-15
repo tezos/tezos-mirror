@@ -109,6 +109,13 @@ let config_init_command =
 (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4125
    Move the following commands to a dac node once we have one. *)
 module Dac_client = struct
+  let reveal_data_dir_arg =
+    Tezos_clic.arg
+      ~long:"reveal-data-dir"
+      ~placeholder:"reveal-data-dir"
+      ~doc:"The directory where reveal preimage pages are saved."
+      (Client_config.string_parameter ())
+
   let threshold_arg =
     Tezos_clic.arg
       ~long:"threshold"
@@ -178,13 +185,16 @@ module Dac_client = struct
     command
       ~group
       ~desc:"Configure DAC parameters."
-      (args2 data_dir_arg threshold_arg)
+      (args3 data_dir_arg threshold_arg reveal_data_dir_arg)
       (prefixes ["set"; "dac"; "parameters"] stop)
-      (fun (data_dir, threshold) cctxt ->
+      (fun (data_dir, threshold, reveal_data_dir) cctxt ->
         let open Configuration in
         let* config = load ~data_dir in
         let threshold = Option.value threshold ~default:config.dac.threshold in
-        let dac = {config.dac with threshold} in
+        let reveal_data_dir =
+          Option.value reveal_data_dir ~default:config.dac.reveal_data_dir
+        in
+        let dac = {config.dac with threshold; reveal_data_dir} in
         let config = {config with dac} in
         let* () = save config in
         let*! _ =
