@@ -1293,12 +1293,12 @@ let estimate_transaction_costs : Protocol_client_context.full Tezos_clic.command
       Format.printf "%a" Data_encoding.Json.pp json ;
       return_unit)
 
+let commands =
+  [
+    generate_random_transactions;
+    estimate_transaction_costs;
+    Smart_contracts.originate_command;
+  ]
+
 let commands network () =
-  match network with
-  | Some `Mainnet -> []
-  | Some `Testnet | None ->
-      [
-        generate_random_transactions;
-        estimate_transaction_costs;
-        Smart_contracts.originate_command;
-      ]
+  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands

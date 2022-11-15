@@ -1972,13 +1972,13 @@ let fund_accounts_from_source : Protocol_client_context.full Tezos_clic.command
       let*! () = log Notice (fun () -> cctxt#message "Done.@.") in
       return_unit)
 
+let commands =
+  [
+    generate_random_transactions;
+    estimate_transaction_costs;
+    Smart_contracts.originate_command;
+    fund_accounts_from_source;
+  ]
+
 let commands network () =
-  match network with
-  | Some `Mainnet -> []
-  | Some `Testnet | None ->
-      [
-        generate_random_transactions;
-        estimate_transaction_costs;
-        Smart_contracts.originate_command;
-        fund_accounts_from_source;
-      ]
+  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands
