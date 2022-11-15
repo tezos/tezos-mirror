@@ -51,12 +51,12 @@ module Ticket_token_map = struct
   include Ticket_token_map
 
   let balance_diff ctxt token map =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let+ amnt_opt, ctxt = Ticket_token_map.find ctxt token map in
     (Option.value ~default:Z.zero amnt_opt, ctxt)
 
   let merge_overlap ctxt b1 b2 =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let+ ctxt = Gas.consume ctxt (Ticket_costs.add_z_cost b1 b2) in
     (Z.add b1 b2, ctxt)
 
@@ -66,7 +66,7 @@ module Ticket_token_map = struct
   let add ctxt = Ticket_token_map.merge ctxt ~merge_overlap
 
   let sub ctxt m1 m2 =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let* m2, ctxt =
       map_e
         ctxt
@@ -79,12 +79,12 @@ module Ticket_token_map = struct
 end
 
 let ticket_balances_of_value ctxt ~include_lazy ty value =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* tickets, ctxt =
     Ticket_scanner.tickets_of_value ~include_lazy ctxt ty value
   in
   let accum_ticket_balances (acc, ctxt) ticket =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let token, amount =
       Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
     in
@@ -100,7 +100,7 @@ let ticket_balances_of_value ctxt ~include_lazy ty value =
   Ticket_token_map.of_list ctxt token_amounts
 
 let update_ticket_balances ctxt ~total_storage_diff token destinations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (tot_storage_diff, ctxt) (owner, delta) ->
       let* key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
@@ -123,7 +123,7 @@ let invalid_ticket_transfer_error
   Invalid_ticket_transfer {ticketer = Contract.to_b58check ticketer; amount}
 
 let update_ticket_balances_for_self_contract ctxt ~self_contract ticket_diffs =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (total_storage_diff, ctxt) (ticket_token, amount) ->
       (* Diff is valid iff either:
@@ -148,7 +148,7 @@ let update_ticket_balances_for_self_contract ctxt ~self_contract ticket_diffs =
 
 let ticket_diffs_of_lazy_storage_diff ctxt ~storage_type_has_tickets
     lazy_storage_diff =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Only scan lazy-diffs for tickets in case the storage contains tickets. *)
   if Ticket_scanner.has_tickets storage_type_has_tickets then
     let* diffs, ctxt =
@@ -190,7 +190,7 @@ let ticket_diffs_of_lazy_storage_diff ctxt ~storage_type_has_tickets
 let ticket_diffs ctxt ~self_contract ~arg_type_has_tickets
     ~storage_type_has_tickets ~arg ~old_storage ~new_storage ~lazy_storage_diff
     =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Collect ticket-token balances of the incoming parameters. *)
   let* arg_tickets, ctxt =
     ticket_balances_of_value ctxt ~include_lazy:true arg_type_has_tickets arg
@@ -231,7 +231,7 @@ let ticket_diffs ctxt ~self_contract ~arg_type_has_tickets
   return (diff, ticket_receipt, ctxt)
 
 let update_ticket_balances ctxt ~self_contract ~ticket_diffs operations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let validate_spending_budget ctxt
       (Ticket_token.Ex_token {ticketer; _} as ticket_token) amount =
     if Contract.equal ticketer self_contract then
@@ -283,7 +283,7 @@ let update_ticket_balances ctxt ~self_contract ~ticket_diffs operations =
         List.fold_left_e
           (fun (acc, ctxt) (token, (amount : Script_typed_ir.ticket_amount)) ->
             (* Consume some gas for traversing the list. *)
-            let open Tzresult_syntax in
+            let open Result_syntax in
             let+ ctxt =
               Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
             in

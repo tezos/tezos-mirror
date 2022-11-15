@@ -205,7 +205,7 @@ module Make (Name : NAME) (Key : KEY) (Value : VALUE) :
         Key_bound_to_different_value {key; existing_value; given_value})
 
   let remember key value t =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     if Compare.Int64.(t.capacity <= 0L) then return t
     else
       match Map.find key t.events with

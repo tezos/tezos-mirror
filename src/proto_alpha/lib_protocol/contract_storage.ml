@@ -572,12 +572,12 @@ let get_balance_carbonated c contract =
   get_balance c contract >>=? fun balance -> return (c, balance)
 
 let check_allocated_and_get_balance c pkh =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* balance_opt =
     Storage.Contract.Spendable_balance.find c (Contract_repr.Implicit pkh)
   in
   match balance_opt with
-  | None -> fail (Empty_implicit_contract pkh)
+  | None -> tzfail (Empty_implicit_contract pkh)
   | Some balance -> return balance
 
 let update_script_storage c contract_hash storage lazy_storage_diff =
@@ -598,7 +598,7 @@ let spend_from_balance contract balance amount =
     Tez_repr.(balance -? amount)
 
 let check_emptiable c contract =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match contract with
   | Contract_repr.Originated _ -> return_unit
   | Implicit pkh -> (
@@ -612,7 +612,7 @@ let check_emptiable c contract =
       | None -> return_unit)
 
 let spend_only_call_from_token c contract amount =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* balance = Storage.Contract.Spendable_balance.find c contract in
   let balance = Option.value balance ~default:Tez_repr.zero in
   let*? new_balance = spend_from_balance contract balance amount in
@@ -741,7 +741,7 @@ let fold_on_bond_ids ctxt contract =
 (** Indicate whether the given implicit contract should avoid deletion
     when it is emptied. *)
 let should_keep_empty_implicit_contract ctxt contract =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* has_frozen_bonds = has_frozen_bonds ctxt contract in
   if has_frozen_bonds then return_true
   else
@@ -759,7 +759,7 @@ let should_keep_empty_implicit_contract ctxt contract =
         return_false
 
 let ensure_deallocated_if_empty ctxt contract =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match contract with
   | Contract_repr.Originated _ ->
       return ctxt (* Never delete originated contracts *)
@@ -780,7 +780,7 @@ let ensure_deallocated_if_empty ctxt contract =
             if keep_contract then return ctxt else delete ctxt contract)
 
 let simulate_spending ctxt ~balance ~amount source =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit source in
   let*? new_balance = spend_from_balance contract balance amount in
   let* still_allocated =

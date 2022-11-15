@@ -93,7 +93,7 @@ module Contract = struct
       (fun c -> Empty_delegate_account c)
 
   let set_self_delegate c delegate =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! is_registered = registered c delegate in
     if is_registered then
       let* () =
@@ -159,7 +159,7 @@ module Contract = struct
       (fun () -> Current_delegate)
 
   let set_delegate c contract delegate =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       match contract with
       | Contract_repr.Originated _ -> return_unit
@@ -176,7 +176,7 @@ module Contract = struct
           return_unit
       | Some delegate, Some current_delegate
         when Signature.Public_key_hash.equal delegate current_delegate ->
-          fail Current_delegate
+          tzfail Current_delegate
       | _ -> return_unit
     in
     let* balance_and_frozen_bonds =
@@ -249,7 +249,7 @@ let delegated_balance ctxt delegate =
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
 
 let drain ctxt ~delegate ~destination =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let destination_contract = Contract_repr.Implicit destination in
   let*! is_destination_allocated =
     Contract_storage.allocated ctxt destination_contract

@@ -154,7 +154,7 @@ let test_check_path () =
       let* b = check_path path pos elements_array.(pos) (ML.root t) in
       assert b ;
       return_unit)
-  |> Environment.Error_monad.Tzresult_syntax.join
+  |> Environment.Error_monad.Result_syntax.tzjoin
 
 (* Check that a path is only valid for the position for which it
    was computed *)
@@ -171,7 +171,7 @@ let test_check_path_wrong_pos () =
       let* b = check_path path pos elements_array.(pos) (ML.root t) in
       assert (not b) ;
       return_unit)
-  |> Environment.Error_monad.Tzresult_syntax.join
+  |> Environment.Error_monad.Result_syntax.tzjoin
 
 (* Check that a computed path is invalidated by a tree update  *)
 let test_check_invalidated_path () =

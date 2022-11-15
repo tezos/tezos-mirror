@@ -1847,7 +1847,7 @@ let rec mark_skipped :
    the operation is solvable, i.e. its fees can be taken, i.e.
    [take_fees] cannot return an error. *)
 let take_fees ctxt contents_list =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec take_fees_rec :
       type kind.
       context ->
@@ -2012,7 +2012,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
 
 let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preendorsement contents_result_list) tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let ctxt =
     match mode with
     | Full_construction _ -> (
@@ -2052,7 +2052,7 @@ let is_grandparent_endorsement mode content =
 
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let mk_endorsement_result {Consensus_key.delegate; consensus_pkh}
       endorsement_power =
     Single_result
@@ -2075,7 +2075,7 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     match Slot.Map.find content.slot (Consensus.allowed_endorsements ctxt) with
     | None ->
         (* This should not happen: operation validation should have failed. *)
-        fail Faulty_validation_wrong_slot
+        tzfail Faulty_validation_wrong_slot
     | Some (consensus_key, power) ->
         let*? ctxt =
           Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
@@ -2098,7 +2098,7 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
 
 let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     contents_list =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
   let*! ctxt, contents_result_list =
@@ -2278,7 +2278,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         contents_list
 
 let apply_operation application_state operation_hash operation =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let apply_operation application_state packed_operation ~payload_producer =
     let {shell; protocol_data = Operation_data unpacked_protocol_data} =
       packed_operation
@@ -2507,7 +2507,7 @@ let record_endorsing_participation ctxt =
 let begin_application ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~(predecessor_fitness : Fitness.raw)
     (block_header : Block_header.t) : application_state tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? fitness = Fitness.from_raw block_header.shell.fitness in
   let level = block_header.shell.level in
   let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
@@ -2561,7 +2561,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_timestamp ~predecessor_level
     ~predecessor_round ~predecessor_hash ~timestamp
     (block_data_contents : Block_header.contents) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let round_durations = Constants.round_durations ctxt in
   let*? round =
     Round.round_of_timestamp
@@ -2616,7 +2616,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
 let begin_partial_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_level
     ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let toggle_vote = Liquidity_baking.LB_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
@@ -2641,7 +2641,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~liquidity_baking_toggle_ema ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let level = Level.current ctxt in
   let endorsing_power = Consensus.current_endorsement_power ctxt in
   let* required_endorsements =
@@ -2777,7 +2777,7 @@ let finalize_with_commit_message ctxt ~cache_nonce fitness round op_count =
   return validation_result
 
 let finalize_block (application_state : application_state) shell_header_opt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let {
     ctxt;
     liquidity_baking_toggle_ema;

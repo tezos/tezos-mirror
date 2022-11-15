@@ -57,7 +57,7 @@ let initial_timeout ctxt =
     (current_level - last_turn_level)] where [nb_of_block_left] is her current
     timeout. *)
 let update_timeout ctxt rollup (game : Sc_rollup_game_repr.t) idx =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) idx in
   let current_level = (Raw_context.current_level ctxt).level in
   let sub_block_left nb_of_block_left =
@@ -77,14 +77,14 @@ let update_timeout ctxt rollup (game : Sc_rollup_game_repr.t) idx =
   return ctxt
 
 let get_ongoing_game ctxt rollup staker1 staker2 =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make staker1 staker2 in
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
   let answer = Option.map (fun game -> (game, stakers)) game in
   return (answer, ctxt)
 
 let get_ongoing_game_for_staker ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, opponent = Store.Opponent.find (ctxt, rollup) staker in
   match opponent with
   | Some opponent -> get_ongoing_game ctxt rollup staker opponent
@@ -93,7 +93,7 @@ let get_ongoing_game_for_staker ctxt rollup staker =
 (** [goto_inbox_level ctxt rollup inbox_level commit] Follows the predecessors of [commit] until it
     arrives at the exact [inbox_level]. The result is the commit hash at the given inbox level. *)
 let goto_inbox_level ctxt rollup inbox_level commit =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec go ctxt commit =
     let* info, ctxt =
       Commitment_storage.get_commitment_unsafe ctxt rollup commit
@@ -108,7 +108,7 @@ let goto_inbox_level ctxt rollup inbox_level commit =
   go ctxt commit
 
 let get_conflict_point ctxt rollup staker1 staker2 =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Ensure the LCC is set. *)
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   (* Find out on which commitments the competitors are staked. *)
@@ -190,9 +190,11 @@ let get_conflict_point ctxt rollup staker1 staker2 =
   traverse_in_parallel ctxt commit1 commit2
 
 let get_game ctxt rollup stakers =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
-  match game with Some g -> return (g, ctxt) | None -> fail Sc_rollup_no_game
+  match game with
+  | Some g -> return (g, ctxt)
+  | None -> tzfail Sc_rollup_no_game
 
 (** [start_game ctxt rollup refuter defender] initialises the game or
     if it already exists fails with `Sc_rollup_game_already_started`.
@@ -227,7 +229,7 @@ let get_game ctxt rollup stakers =
          is already playing a game}
     } *)
 let start_game ctxt rollup ~player:refuter ~opponent:defender =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make refuter defender in
   let* ctxt, game_exists = Store.Game.mem (ctxt, rollup) stakers in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
@@ -237,11 +239,11 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
     match (opp_1, opp_2) with
     | None, None -> return ()
     | Some _refuter_opponent, None ->
-        fail (Sc_rollup_staker_in_game (`Refuter refuter))
+        tzfail (Sc_rollup_staker_in_game (`Refuter refuter))
     | None, Some _defender_opponent ->
-        fail (Sc_rollup_staker_in_game (`Defender defender))
+        tzfail (Sc_rollup_staker_in_game (`Defender defender))
     | Some _refuter_opponent, Some _defender_opponent ->
-        fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
+        tzfail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
   in
   let* ( ( {hash = _refuter_commit; commitment = _info},
            {hash = _defender_commit; commitment = child_info} ),
@@ -281,7 +283,7 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   return ctxt
 
 let game_move ctxt rollup ~player ~opponent refutation =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make player opponent in
   let* game, ctxt = get_game ctxt rollup stakers in
   let* () =
@@ -310,16 +312,16 @@ let game_move ctxt rollup ~player ~opponent refutation =
       return (None, ctxt)
 
 let get_timeout ctxt rollup stakers =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, timeout_opt =
     Storage.Sc_rollup.Game_timeout.find (ctxt, rollup) stakers
   in
   match timeout_opt with
   | Some timeout -> return (timeout, ctxt)
-  | None -> fail Sc_rollup_no_game
+  | None -> tzfail Sc_rollup_no_game
 
 let timeout ctxt rollup stakers =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let level = (Raw_context.current_level ctxt).level in
   let* game, ctxt = get_game ctxt rollup stakers in
   let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) stakers in
@@ -352,7 +354,7 @@ let timeout ctxt rollup stakers =
   return (game_result, ctxt)
 
 let reward ctxt winner =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let winner_contract = Contract_repr.Implicit winner in
   let stake = Constants_storage.sc_rollup_stake_amount ctxt in
   let*? reward = Tez_repr.(stake /? 2L) in
@@ -364,7 +366,7 @@ let reward ctxt winner =
 
 let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
     (game_result : Sc_rollup_game_repr.game_result) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let status = Sc_rollup_game_repr.Ended game_result in
   let* ctxt, balances_updates =
     match game_result with
@@ -420,7 +422,7 @@ let conflict_encoding =
          (req "parent_commitment" Sc_rollup_commitment_repr.Hash.encoding)))
 
 let conflicting_stakers_uncarbonated ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let make_conflict ctxt rollup other (our_point, their_point) =
     let our_hash = our_point.hash and their_hash = their_point.hash in
     let get = Sc_rollup_commitment_storage.get_commitment_unsafe ctxt rollup in

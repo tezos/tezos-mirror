@@ -31,7 +31,7 @@ let level_index ctxt level =
   Int32.rem (Raw_level_repr.to_int32 level) max_active_levels
 
 let record_applied_message ctxt rollup level ~message_index =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Check that the 0 <= message index < maximum number of outbox messages per
      level. *)
   let*? () =
@@ -48,7 +48,7 @@ let record_applied_message ctxt rollup level ~message_index =
     Storage.Sc_rollup.Applied_outbox_messages.find (ctxt, rollup) level_index
   in
   let*? bitset, ctxt =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let* bitset, ctxt =
       match level_and_bitset_opt with
       | Some (existing_level, bitset)
@@ -64,7 +64,7 @@ let record_applied_message ctxt rollup level ~message_index =
           return (bitset, ctxt)
       | Some (existing_level, _bitset)
         when Raw_level_repr.(level < existing_level) ->
-          fail Sc_rollup_errors.Sc_rollup_outbox_level_expired
+          tzfail Sc_rollup_errors.Sc_rollup_outbox_level_expired
       | Some _ | None ->
           (* The old level is outdated or there is no previous bitset at
              this index. *)

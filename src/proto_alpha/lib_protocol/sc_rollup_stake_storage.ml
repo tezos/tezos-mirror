@@ -31,20 +31,20 @@ module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
 let find_staker_unsafe ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
-  | None -> fail Sc_rollup_not_staked
+  | None -> tzfail Sc_rollup_not_staked
   | Some branch -> return (branch, ctxt)
 
 let find_staker ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, res = Store.Last_cemented_commitment.mem ctxt rollup in
-  if not res then fail (Sc_rollup_does_not_exist rollup)
+  if not res then tzfail (Sc_rollup_does_not_exist rollup)
   else find_staker_unsafe ctxt rollup staker
 
 let modify_staker_count ctxt rollup f =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, maybe_count = Store.Staker_count.find ctxt rollup in
   let count = Option.value ~default:0l maybe_count in
   let* ctxt, size_diff, _was_bound =
@@ -61,7 +61,7 @@ let get_contract_and_stake ctxt staker =
 (** Warning: must be called only if [rollup] exists and [staker] is not to be
     found in {!Store.Stakers.} *)
 let deposit_stake ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let staker_contract, stake = get_contract_and_stake ctxt staker in
   let* ctxt, staker_balance = Token.balance ctxt (`Contract staker_contract) in
@@ -89,11 +89,11 @@ let deposit_stake ctxt rollup staker =
   return (ctxt, balance_updates, lcc)
 
 let withdraw_stake ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
-  | None -> fail Sc_rollup_not_staked
+  | None -> tzfail Sc_rollup_not_staked
   | Some staked_on_commitment ->
       let* () =
         fail_unless
@@ -116,7 +116,7 @@ let withdraw_stake ctxt rollup staker =
       (ctxt, balance_updates)
 
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.get_commitment_unsafe ctxt rollup lcc in
   let min_level = Commitment.(lcc.inbox_level) in
   let max_level = Commitment.(commitment.inbox_level) in
@@ -135,7 +135,7 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
     This property is used in several places - not obeying it causes severe breakage.
 *)
 let assert_commitment_period ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let pred_hash = Commitment.(commitment.predecessor) in
   let* pred, ctxt =
     Commitment_storage.get_commitment_unsafe ctxt rollup pred_hash
@@ -177,20 +177,20 @@ let assert_commitment_period ctxt rollup commitment =
     of their deposit.
  *)
 let assert_refine_conditions_met ctxt rollup lcc commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
   return ctxt
 
 let get_commitment_stake_count ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, maybe_staked_on_commitment =
     Store.Commitment_stake_count.find (ctxt, rollup) node
   in
   return (Option.value ~default:0l maybe_staked_on_commitment, ctxt)
 
 let modify_commitment_stake_count ctxt rollup node f =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* count, ctxt = get_commitment_stake_count ctxt rollup node in
   let new_count = f count in
   let* ctxt, size_diff, _was_bound =
@@ -199,7 +199,7 @@ let modify_commitment_stake_count ctxt rollup node f =
   return (new_count, size_diff, ctxt)
 
 let deallocate_commitment ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if Commitment_hash.(node = zero) then return ctxt
   else
     let* ctxt, _size_freed =
@@ -208,7 +208,7 @@ let deallocate_commitment ctxt rollup node =
     return ctxt
 
 let deallocate_commitment_metadata ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if Commitment_hash.(node = zero) then return ctxt
   else
     let* ctxt, _size_freed =
@@ -220,7 +220,7 @@ let deallocate_commitment_metadata ctxt rollup node =
     return ctxt
 
 let deallocate ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt = deallocate_commitment_metadata ctxt rollup node in
   deallocate_commitment ctxt rollup node
 
@@ -243,7 +243,7 @@ let find_commitment_to_deallocate ctxt rollup commitment_hash
   aux ctxt commitment_hash num_commitments_to_keep
 
 let decrease_commitment_stake_count ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* new_count, _size_diff, ctxt =
     modify_commitment_stake_count ctxt rollup node Int32.pred
   in
@@ -251,7 +251,7 @@ let decrease_commitment_stake_count ctxt rollup node =
   else return ctxt
 
 let increase_commitment_stake_count ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* _new_count, size_diff, ctxt =
     modify_commitment_stake_count ctxt rollup node Int32.succ
   in
@@ -264,7 +264,7 @@ let increase_commitment_stake_count ctxt rollup node =
 let commitment_storage_size_in_bytes = 85
 
 let refine_stake ctxt rollup staker staked_on commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let*? ctxt, new_hash = Sc_rollup_commitment_storage.hash ctxt commitment in
@@ -320,7 +320,7 @@ let refine_stake ctxt rollup staker staked_on commitment =
   go Commitment.(commitment.predecessor) ctxt
 
 let publish_commitment ctxt rollup staker commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () =
     fail_when
       Sc_rollup_repr.Number_of_ticks.(
@@ -339,7 +339,7 @@ let publish_commitment ctxt rollup staker commitment =
   (commitment_hash, ctxt, level, balance_updates)
 
 let cement_commitment ctxt rollup new_lcc =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let refutation_deadline_blocks =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
@@ -414,11 +414,11 @@ let cement_commitment ctxt rollup new_lcc =
       (ctxt, new_lcc_commitment)
 
 let remove_staker ctxt rollup staker =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
   match res with
-  | None -> fail Sc_rollup_not_staked
+  | None -> tzfail Sc_rollup_not_staked
   | Some staked_on ->
       let* () =
         fail_when Commitment_hash.(staked_on = lcc) Sc_rollup_remove_lcc
@@ -452,7 +452,7 @@ module Internal_for_tests = struct
   let deposit_stake = deposit_stake
 
   let refine_stake ctxt rollup staker ?staked_on commitment =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match staked_on with
     | Some staked_on -> refine_stake ctxt rollup staker staked_on commitment
     | None ->

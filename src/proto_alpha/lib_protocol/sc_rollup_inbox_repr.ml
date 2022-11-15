@@ -490,7 +490,7 @@ struct
     set_number_of_messages tree Z.zero
 
   let add_message inbox payload level_tree =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let message_index = inbox.message_counter in
     let message_counter = Z.succ message_index in
     let*! level_tree =
@@ -544,7 +544,7 @@ struct
     P.commit_tree ctxt key tree
 
   let form_history_proof ctxt history inbox level_tree =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! () =
       let*! tree =
         match level_tree with
@@ -598,7 +598,7 @@ struct
       return (history, inbox, tree)
 
   let add_messages ctxt history inbox level payloads level_tree =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       fail_when
         (match payloads with [] -> true | _ -> false)
@@ -626,7 +626,7 @@ struct
     return (level_tree, history, {inbox with current_level_proof})
 
   let add_messages_no_history ctxt inbox level payloads level_tree =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let+ level_tree, _, inbox =
       add_messages ctxt no_history inbox level payloads level_tree
     in
@@ -659,7 +659,7 @@ struct
     aux [] ptr_path
 
   let verify_inclusion_proof inclusion_proof snapshot_history_proof =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let rec aux (hash_map, ptr_list) = function
       | [] -> error (Inbox_proof_error "inclusion proof is empty")
       | [target] ->
@@ -763,8 +763,8 @@ struct
   let to_serialized_proof = Data_encoding.Binary.to_bytes_exn proof_encoding
 
   let proof_error reason =
-    let open Lwt_tzresult_syntax in
-    fail (Inbox_proof_error reason)
+    let open Lwt_result_syntax in
+    tzfail (Inbox_proof_error reason)
 
   let check p reason = unless p (fun () -> proof_error reason)
 
@@ -791,7 +791,7 @@ struct
       [P.verify_proof], but also checks the proof has the correct
       [P.proof_before] hash. *)
   let check_message_proof message_proof level_hash n label =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       check
         (Hash.equal level_hash (P.proof_before message_proof))
@@ -804,7 +804,7 @@ struct
 
   let verify_proof (l, n) snapshot proof =
     assert (Z.(geq n zero)) ;
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match proof with
     | Single_level {inc; message_proof} -> (
         let*? history_proof = verify_inclusion_proof inc snapshot in
@@ -844,14 +844,14 @@ struct
         | Some _ -> proof_error "more messages to read in current level")
 
   (** Utility function; we convert all our calls to be consistent with
-      [Lwt_tzresult_syntax]. *)
+      [Lwt_result_syntax]. *)
   let option_to_result e lwt_opt =
     let open Lwt_syntax in
     let* opt = lwt_opt in
     match opt with None -> proof_error e | Some x -> return (ok x)
 
   let produce_proof ctxt history inbox (l, n) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let deref ptr = History.find ptr history in
     let compare {hash = _; level} = Raw_level_repr.compare level l in
     let result = Skip_list.search ~deref ~compare ~cell:inbox in
@@ -926,7 +926,7 @@ struct
     let eq_tree = Tree.equal
 
     let produce_inclusion_proof history a b =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let cell_ptr = hash_history_proof b in
       let target_index = Skip_list.index a in
       let* history = History.remember cell_ptr b history in

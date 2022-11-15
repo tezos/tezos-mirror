@@ -344,22 +344,22 @@ module V2_0_0 = struct
     type error += WASM_proof_verification_failed
 
     let verify_proof input_given proof =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! result = Context.verify_proof proof (step_transition input_given) in
       match result with
-      | None -> fail WASM_proof_verification_failed
+      | None -> tzfail WASM_proof_verification_failed
       | Some (_state, request) -> return request
 
     type error += WASM_proof_production_failed
 
     let produce_proof context input_given state =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! result =
         Context.produce_proof context state (step_transition input_given)
       in
       match result with
       | Some (tree_proof, _requested) -> return tree_proof
-      | None -> fail WASM_proof_production_failed
+      | None -> tzfail WASM_proof_production_failed
 
     let verify_origination_proof proof boot_sector =
       let open Lwt_syntax in
@@ -374,7 +374,7 @@ module V2_0_0 = struct
         match result with None -> return false | Some (_, ()) -> return true
 
     let produce_origination_proof context boot_sector =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! state = initial_state context in
       let*! result =
         Context.produce_proof context state (fun state ->
@@ -384,7 +384,7 @@ module V2_0_0 = struct
       in
       match result with
       | Some (tree_proof, ()) -> return tree_proof
-      | None -> fail WASM_proof_production_failed
+      | None -> tzfail WASM_proof_production_failed
 
     type output_proof = {
       output_proof : Context.proof;

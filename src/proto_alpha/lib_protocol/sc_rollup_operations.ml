@@ -87,7 +87,7 @@ type origination_result = {
 }
 
 let origination_proof_of_string origination_proof kind =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match kind with
   | Sc_rollup.Kind.Example_arith ->
       let* proof =
@@ -98,7 +98,7 @@ let origination_proof_of_string origination_proof kind =
         with
         | Some x -> return x
         | None ->
-            fail
+            tzfail
               (Sc_rollup_proof_repr.Sc_rollup_proof_check
                  "invalid encoding for Arith origination proof")
       in
@@ -122,7 +122,7 @@ let origination_proof_of_string origination_proof kind =
         with
         | Some x -> return x
         | None ->
-            fail
+            tzfail
               (Sc_rollup_proof_repr.Sc_rollup_proof_check
                  "invalid encoding for Wasm_2_0_0 origination proof")
       in
@@ -198,7 +198,7 @@ and validate_two_tys :
       (validate_ty [@ocaml.tailcall]) ty2 k)
 
 let validate_parameters_ty ctxt parameters_ty =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* ctxt =
     Gas.consume
       ctxt
@@ -209,7 +209,7 @@ let validate_parameters_ty ctxt parameters_ty =
   ctxt
 
 let validate_untyped_parameters_ty ctxt parameters_ty =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   (* Parse the type and check that the entrypoints are well-formed. Using
      [parse_parameter_ty_and_entrypoints] restricts to [passable] types
      (everything but operations), which is OK since [validate_ty] constraints
@@ -224,7 +224,7 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
   validate_parameters_ty ctxt arg_type
 
 let check_origination_proof kind boot_sector origination_proof =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
   let kind' = Sc_rollup.wrapped_proof_kind_exn origination_proof in
   let* () =
@@ -242,9 +242,9 @@ let check_origination_proof kind boot_sector origination_proof =
   return PVM.(proof_stop_state proof)
 
 let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? ctxt =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let* parameters_ty, ctxt =
       Script.force_decode_in_context
         ~consume_deserialization_gas:When_needed
@@ -277,7 +277,7 @@ let to_transaction_operation ctxt ~source
     (Sc_rollup_management_protocol.Transaction
       {destination; entrypoint; parameters_ty; parameters; unparsed_parameters})
     =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* ctxt, nonce = fresh_internal_nonce ctxt in
   (* Validate the type of the parameters. Only types that can be transferred
      from Layer 1 to Layer 2 are permitted.
@@ -309,7 +309,7 @@ let to_transaction_operation ctxt ~source
    amount. *)
 let transfer_ticket_token ctxt ~source_destination ~target_destination ~amount
     ticket_token =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* source_key_hash, ctxt =
     Ticket_balance_key.of_ex_token ctxt ~owner:source_destination ticket_token
   in
@@ -332,7 +332,7 @@ let transfer_ticket_token ctxt ~source_destination ~target_destination ~amount
 
 let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
     {Ticket_operations_diff.ticket_token; total_amount = _; destinations} =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (acc_storage_diff, ctxt)
          (target_destination, (amount : Script_typed_ir.ticket_amount)) ->
@@ -350,7 +350,7 @@ let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
 
 let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     ~output_proof =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Lookup the PVM of the rollup. *)
   let* ctxt, (module PVM : Sc_rollup.PVM.S) =
     let+ ctxt, kind = Sc_rollup.kind ctxt rollup in
@@ -412,7 +412,7 @@ let validate_outbox_level ctxt ~outbox_level ~lcc_level =
 
 let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     ~cemented_commitment ~source ~output_proof =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* TODO: #3211
      Allow older cemented commits as well.
      This has the benefits of eliminating any race condition where new commits
@@ -448,7 +448,7 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
   let*? ctxt, operations =
     List.fold_left_map_e
       (fun ctxt transaction ->
-        let open Tzresult_syntax in
+        let open Result_syntax in
         let+ op, ctxt = to_transaction_operation ctxt ~source transaction in
         (ctxt, op))
       ctxt

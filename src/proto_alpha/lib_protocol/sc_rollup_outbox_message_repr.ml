@@ -117,16 +117,16 @@ let pp fmt (Atomic_transaction_batch {transactions}) =
 type serialized = string
 
 let deserialize data =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Data_encoding.Binary.of_string_opt encoding data with
   | Some x -> return x
-  | None -> fail Error_decode_outbox_message
+  | None -> tzfail Error_decode_outbox_message
 
 let serialize outbox_message =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Data_encoding.Binary.to_string_opt encoding outbox_message with
   | Some str -> return str
-  | None -> fail Error_encode_outbox_message
+  | None -> tzfail Error_encode_outbox_message
 
 let unsafe_of_string s = s
 

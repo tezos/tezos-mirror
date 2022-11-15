@@ -38,7 +38,7 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
   | Some slashed -> return slashed.for_double_baking
 
 let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* slashed =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
   in
@@ -81,7 +81,7 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   return (ctxt, amount_to_burn, balance_updates)
 
 let punish_double_baking ctxt delegate (level : Level_repr.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* slashed =
     Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
   in

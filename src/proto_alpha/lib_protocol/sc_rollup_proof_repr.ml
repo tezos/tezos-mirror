@@ -182,11 +182,11 @@ let cut_at_level ~origination_level ~commit_level
   | Reveal _data -> Some input
 
 let proof_error reason =
-  let open Lwt_tzresult_syntax in
-  fail (Sc_rollup_proof_check reason)
+  let open Lwt_result_syntax in
+  tzfail (Sc_rollup_proof_check reason)
 
 let check p reason =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if p then return () else proof_error reason
 
 let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
@@ -226,7 +226,7 @@ module Dal_proofs = struct
 
   let verify ~metadata ~dal_endorsement_lag ~commit_level dal_parameters page_id
       dal_snapshot proof =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
@@ -246,7 +246,7 @@ module Dal_proofs = struct
 
   let produce ~metadata ~dal_endorsement_lag ~commit_level dal_parameters
       page_id ~page_info confirmed_slots_history history_cache =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
@@ -270,7 +270,7 @@ end
 
 let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
     ~dal_endorsement_lag ~pvm_name proof =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -380,7 +380,7 @@ module type PVM_with_context_and_state = sig
 end
 
 let produce ~metadata pvm_and_state commit_level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let open P in
   let*! (request : Sc_rollup_PVM_sig.input_request) =
