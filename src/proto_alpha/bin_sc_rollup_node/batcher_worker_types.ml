@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,68 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module RPC_server = RPC_server.Make (Simulation)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
+module Request = struct
+  type ('a, 'b) t =
+    | Register : string list -> (L2_message.hash list, error trace) t
+    | New_head : Layer1.head -> (unit, error trace) t
+    | Batch : (unit, error trace) t
+
+  type view = View : _ t -> view
+
+  let view req = View req
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Register"
+          (obj2
+             (req "request" (constant "register"))
+             (req "messages" (list L2_message.content_encoding)))
+          (function
+            | View (Register messages) -> Some ((), messages) | _ -> None)
+          (fun ((), messages) -> View (Register messages));
+        case
+          (Tag 1)
+          ~title:"New_head"
+          (obj2
+             (req "request" (constant "new_head"))
+             (req "block" Layer1.head_encoding))
+          (function View (New_head b) -> Some ((), b) | _ -> None)
+          (fun ((), b) -> View (New_head b));
+        case
+          (Tag 2)
+          ~title:"Batch"
+          (obj1 (req "request" (constant "batch")))
+          (function View Batch -> Some () | _ -> None)
+          (fun () -> View Batch);
+      ]
+
+  let pp ppf (View r) =
+    match r with
+    | Register messages ->
+        Format.fprintf ppf "register %d new L2 message" (List.length messages)
+    | New_head {Layer1.hash; level} ->
+        Format.fprintf
+          ppf
+          "switching to new L1 head %a at level %ld"
+          Tezos_crypto.Block_hash.pp
+          hash
+          level
+    | Batch -> Format.pp_print_string ppf "batch"
 end
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+module Name = struct
+  (* We only have a single batcher right now *)
+  type t = unit
+
+  let encoding = Data_encoding.unit
+
+  let base = ["sc_rollup_batcher"]
+
+  let pp _ _ = ()
+
+  let equal () () = true
+end

@@ -40,6 +40,7 @@ type error +=
     }
   | Missing_PVM_state of Tezos_crypto.Block_hash.t * Int32.t
   | Cannot_checkout_context of Tezos_crypto.Block_hash.t * string option
+  | No_batcher
 
 type error +=
   | Lost_game of
@@ -234,4 +235,15 @@ let () =
     (function
       | Lost_game (loser, reason, slashed) -> Some (loser, reason, slashed)
       | _ -> None)
-    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed))
+    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed)) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.no_batcher"
+    ~title:"No batcher for this node"
+    ~description:"This node does not have a batcher"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This rollup node does not have batcher.")
+    `Permanent
+    Data_encoding.unit
+    (function No_batcher -> Some () | _ -> None)
+    (fun () -> No_batcher)

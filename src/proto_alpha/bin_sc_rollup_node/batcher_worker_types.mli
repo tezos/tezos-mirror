@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module RPC_server = RPC_server.Make (Simulation)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
+(** This module contains the parameters for the worker (see {!Worker}) used by
+    the batcher. *)
+
+module Request : sig
+  (** Type of requests accepted by the batcher worker. *)
+  type ('a, 'b) t =
+    | Register : string list -> (L2_message.hash list, error trace) t
+        (** Request to register new L2 messages in the queue. *)
+    | New_head : Layer1.head -> (unit, error trace) t
+        (** Request to handle a new L1 head. *)
+    | Batch : (unit, error trace) t  (** Request to produce batches. *)
+
+  type view = View : _ t -> view
+
+  include
+    Worker_intf.REQUEST
+      with type ('a, 'request_error) t := ('a, 'request_error) t
+       and type view := view
 end
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+module Name : Worker_intf.NAME with type t = unit
