@@ -100,7 +100,7 @@ let rec compute_step_many accum_ticks ?(after_fast_exec = fun () -> ())
         let* reboot_mark = Wasm_vm.mark_for_reboot pvm_state in
         match reboot_mark with
         | `Reboot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
-        | `Restarting | `Forcing_restart ->
+        | `Yielding | `Forcing_yield ->
             (* Go to next [Collect] state *)
             backup pvm_state)
     | _ -> goto_snapshot_and_retry ()

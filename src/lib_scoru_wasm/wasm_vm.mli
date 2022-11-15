@@ -58,8 +58,7 @@ val has_reboot_flag : Durable.t -> bool Lwt.t
 
 (** [mark_for_reboot reboot_counter durable] figures out the computational
     status with respect to what the PVM shall do next. E.g. schedule a reboot. *)
-val mark_for_reboot :
-  pvm_state -> [`Forcing_restart | `Reboot | `Restarting] Lwt.t
+val mark_for_reboot : pvm_state -> [`Forcing_yield | `Reboot | `Yielding] Lwt.t
 
 (** [next_reboot_counter pvm_state status] computes the next reboot counter. *)
 val next_reboot_counter : pvm_state -> computation_status -> Z.t

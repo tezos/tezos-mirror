@@ -657,16 +657,16 @@ the ``kernel_next`` function is called, from a clean “transient”
 state. More precisely, the WASM kernel is parsed, linked, initialized,
 then ``kernel_next`` is called.
 
-By default, ``kernel_next`` is called only once, then the smart rollup
-waits for a new Tezos block to populate the inbox and restart the
-cycle. However, when the kernel needs more computation time than what
-one ``kernel_next`` call allows, it can request a so-called reboot by
-writing arbitrary data under the path ``/kernel/env/reboot`` in its
-durable storage. In such a case, ``kernel_next`` is called again,
-without the inbox populated with the contents of the inbox of the next
-Tezos level. This file is removed between each call of
-``kernel_next``, and the ``kernel_next`` function can require at most
-1,000 reboots for each Tezos level.
+By default, the WASM kernel yields when ``kernel_next`` returns. In
+this case, the WASM kernel execution is put on hold while the input of
+the next inbox are being loaded. The inputs that were not consumed by
+``kernel_next`` are dropped. ``kernel_next`` can prevent the WASM
+kernel from yielding by writing arbitrary data under the path
+``/kernel/env/reboot`` in its durable storage. In such a case (known
+as reboot), ``kernel_next`` is called again, without dropping unread
+inputs. This value is removed between each call of ``kernel_next``,
+and the ``kernel_next`` function can postpone yielding at most 1,000
+reboots for each Tezos level.
 
 A call to ``kernel_next`` cannot take an arbitrary amount of time to
 complete, because diverging computations are not compatible with the

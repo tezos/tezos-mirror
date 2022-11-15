@@ -125,8 +125,8 @@ module Internal_state = struct
   }
 
   type computation_status =
-    | Restarting
-    | Forcing_restart
+    | Yielding
+    | Forcing_yield
     | Running
     | Failing
     | Reboot
