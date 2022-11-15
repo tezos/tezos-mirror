@@ -70,7 +70,12 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let ( + ) x y = call ["+"] [x; y]
 
-  let ( - ) x y = call ["-"] [x; y]
+  let ( - ) _ _ =
+    Stdlib.failwith
+      "Code generation of models using subtraction is forbidden, please use \
+       saturated subtraction (sat_sub) instead."
+
+  let sat_sub x y = call (saturated "sub") [x; y]
 
   let ( * ) x y = call ["*"] [x; y]
 

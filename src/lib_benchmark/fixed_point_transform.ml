@@ -392,6 +392,8 @@ end = struct
 
   let ( - ) = lift_binop X.( - )
 
+  let sat_sub = lift_binop X.sat_sub
+
   let ( * ) x y =
     match (x, y) with
     | Term x, Term y -> Term X.(x * y)

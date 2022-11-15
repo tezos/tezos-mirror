@@ -40,6 +40,8 @@ module type S = sig
 
   val ( - ) : size repr -> size repr -> size repr
 
+  val sat_sub : size repr -> size repr -> size repr
+
   val ( * ) : size repr -> size repr -> size repr
 
   val ( / ) : size repr -> size repr -> size repr
@@ -90,6 +92,8 @@ module Pp : S with type 'a repr = string and type size = string = struct
   let ( + ) x y = Format.asprintf "(%s + %s)" x y
 
   let ( - ) x y = Format.asprintf "(%s - %s)" x y
+
+  let sat_sub x y = Format.asprintf "(sat_sub %s %s)" x y
 
   let ( * ) x y = Format.asprintf "(%s * %s)" x y
 
@@ -144,6 +148,8 @@ module Free_variables :
 
   let ( - ) = lift_binop
 
+  let sat_sub = lift_binop
+
   let ( * ) = lift_binop
 
   let ( / ) = lift_binop
@@ -180,6 +186,10 @@ module Free_variables :
   let if_ cond ift iff = Set.union cond (Set.union ift iff)
 end
 
+let sat_sub_float x y = max 0. (x -. y)
+
+let sat_sub_int x y = max 0 (x - y)
+
 module Eval : S with type 'a repr = 'a and type size = float = struct
   exception Term_contains_free_variable of Free_variable.t
 
@@ -200,6 +210,8 @@ module Eval : S with type 'a repr = 'a and type size = float = struct
   let ( + ) = lift_binop ( +. )
 
   let ( - ) = lift_binop ( -. )
+
+  let sat_sub = lift_binop sat_sub_float
 
   let ( * ) = lift_binop ( *. )
 
@@ -311,6 +323,17 @@ struct
     let (Affine a1) = x1 subst in
     let (Affine a2) = x2 subst in
     Affine Affine_ops.(a1 - a2)
+
+  let sat_sub (x1 : size repr) (x2 : size repr) subst =
+    let (Affine a1) = x1 subst in
+    let (Affine a2) = x2 subst in
+    if Affine_ops.is_const a1 && Affine_ops.is_const a2 then
+      Affine
+        {
+          linear_comb = Free_variable.Sparse_vec.zero;
+          const = sat_sub_float a1.const a2.const;
+        }
+    else raise (Eval_linear_combination "sat_sub")
 
   let ( * ) (x1 : size repr) (x2 : size repr) subst =
     let (Affine a1) = x1 subst in
@@ -474,6 +497,7 @@ functor
       | Float_tag of {f : float} (* not a tag, actual data! *)
       | Add_tag of int * int
       | Sub_tag of int * int
+      | Sat_sub_tag of int * int
       | Mul_tag of int * int
       | Div_tag of int * int
       | Max_tag of int * int
@@ -534,6 +558,11 @@ functor
       insert_if_not_present
         X.(fun () -> x.repr - y.repr)
         (Sub_tag (x.tag, y.tag))
+
+    let sat_sub x y =
+      insert_if_not_present
+        X.(fun () -> sat_sub x.repr y.repr)
+        (Sat_sub_tag (x.tag, y.tag))
 
     let ( * ) x y =
       insert_if_not_present
@@ -642,6 +671,8 @@ functor
 
     let ( - ) x y = lift2 X.( - ) x y
 
+    let sat_sub x y = lift2 X.sat_sub x y
+
     let ( * ) x y = lift2 X.( * ) x y
 
     let ( / ) x y = lift2 X.( / ) x y
@@ -716,6 +747,8 @@ functor
     let ( + ) = lift_binop X.( + )
 
     let ( - ) = lift_binop X.( - )
+
+    let sat_sub = lift_binop X.sat_sub
 
     let ( * ) = lift_binop X.( * )
 
@@ -815,6 +848,11 @@ module Fold_constants (X : S) = struct
     | Int 0, _ | Float 0.0, _ | _, Int 0 | _, Float 0.0 -> Int 0
     | Int 1, term | Float 1.0, term | term, Int 1 | term, Float 1.0 -> term
     | _ -> arith_op ( * ) ( *. ) X.( * ) x y
+
+  let sat_sub x y =
+    match (x, y) with
+    | term, Int 0 | term, Float 0.0 -> term
+    | _ -> arith_op sat_sub_int sat_sub_float X.sat_sub x y
 
   let ( - ) x y =
     match (x, y) with

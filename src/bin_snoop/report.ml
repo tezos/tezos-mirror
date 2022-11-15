@@ -73,6 +73,10 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
     unprotect_in_context [Lam_body] (fun fmtr () ->
         Format.fprintf fmtr "%a - %a" x Sub y Sub)
 
+  let sat_sub x y =
+    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+        Format.fprintf fmtr "sat_sub %a %a" x Arg_app y Arg_app)
+
   let ( * ) x y =
     unprotect_in_context [Mul; Lam_body] (fun fmtr () ->
         Format.fprintf fmtr "%a * %a" x Mul y Mul)
