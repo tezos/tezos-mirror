@@ -394,7 +394,7 @@ let test_rollup_node_running ~kind =
     }
     ~kind
   @@ fun rollup_node rollup_client sc_rollup _tezos_node _tezos_client ->
-  let* () = Sc_rollup_node.run rollup_node in
+  let* () = Sc_rollup_node.run rollup_node [] in
   let* sc_rollup_from_rpc =
     sc_rollup_node_rpc rollup_node "global/sc_rollup_address"
   in
@@ -596,7 +596,7 @@ let basic_scenario sc_rollup_node _rollup_client _sc_rollup _node client =
        must end up at level 4. *)
     4
   in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = send_messages num_messages client in
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
@@ -618,11 +618,11 @@ let _sc_rollup_node_stops_scenario sc_rollup_node _node client =
        must end up at level 6. *)
     6
   in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = send_messages num_messages client in
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   let* () = send_messages num_messages client in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
   in
@@ -633,7 +633,7 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node _rollup_client _sc_rollup
   let num_messages = 2 in
   let level = Node.get_level node in
   Log.info "we are at level %d" level ;
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = send_messages num_messages client in
   let* level =
     Sc_rollup_node.wait_for_level sc_rollup_node (level + num_messages)
@@ -662,7 +662,7 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
 
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = send_messages num_messages client in
   (* Since we start at level 2, sending 1 message (which also bakes a block) must cause the nodes to
      observe level 3. *)
@@ -755,7 +755,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -797,7 +797,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1053,7 +1053,7 @@ let commitment_stored sc_rollup_node sc_rollup_client sc_rollup _node client =
   let store_commitment_level =
     init_level + levels_to_commitment + block_finality_time
   in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1110,7 +1110,7 @@ let mode_publish mode publishes sc_rollup_node sc_rollup_client sc_rollup node
   let* () = Client.Admin.trust_address client ~peer:node'
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let level = Node.get_level node in
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
@@ -1140,7 +1140,7 @@ let mode_publish mode publishes sc_rollup_node sc_rollup_client sc_rollup node
   let* _configuration_filename =
     Sc_rollup_node.config_init sc_rollup_other_node sc_rollup
   in
-  let* () = Sc_rollup_node.run sc_rollup_other_node in
+  let* () = Sc_rollup_node.run sc_rollup_other_node [] in
   let* _level = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Other rollup node synchronized." ;
   let* () = send_messages levels_to_commitment client in
@@ -1195,7 +1195,7 @@ let commitment_not_stored_if_non_final sc_rollup_node sc_rollup_client sc_rollup
   in
   let levels_to_finalize = block_finality_time - 1 in
   let store_commitment_level = init_level + levels_to_commitment in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1257,7 +1257,7 @@ let commitments_messages_reset sc_rollup_node sc_rollup_client sc_rollup _node
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1333,8 +1333,8 @@ let commitment_stored_robust_to_failures sc_rollup_node sc_rollup_client
     Sc_rollup_node.config_init sc_rollup_node' sc_rollup
   in
   let sc_rollup_client' = Sc_rollup_client.create sc_rollup_node' in
-  let* () = Sc_rollup_node.run sc_rollup_node in
-  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = Sc_rollup_node.run sc_rollup_node' [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1364,11 +1364,11 @@ let commitment_stored_robust_to_failures sc_rollup_node sc_rollup_client
       level_before_storing_commitment
   in
   let* () = Sc_rollup_node.terminate sc_rollup_node' in
-  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node' [] in
   let* () = Client.bake_for_and_wait client in
   let* () = Sc_rollup_node.terminate sc_rollup_node' in
   let* () = Client.bake_for_and_wait client in
-  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node' [] in
   let* level_commitment_is_stored =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
@@ -1423,7 +1423,7 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
 
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   (* We bake `sc_rollup_commitment_period_in_blocks - 1` levels, which
      should cause both nodes to observe level
      `sc_rollup_commitment_period_in_blocks + init_level - 1 . *)
@@ -1604,7 +1604,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1696,7 +1696,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
   let* _configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node' sc_rollup
   in
-  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node' [] in
 
   let* rollup_node2_catchup_level =
     Sc_rollup_node.wait_for_level
@@ -1782,7 +1782,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
   in
@@ -1842,7 +1842,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
   let* _configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node' sc_rollup
   in
-  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node' [] in
 
   let* rollup_node2_catchup_level =
     Sc_rollup_node.wait_for_level
@@ -1895,8 +1895,8 @@ let test_reinject_failed_commitment ~kind =
     Sc_rollup_node.config_init sc_rollup_node2 sc_rollup
   in
   Log.info "Run two honest rollup nodes." ;
-  let* () = Sc_rollup_node.run sc_rollup_node1
-  and* () = Sc_rollup_node.run sc_rollup_node2 in
+  let* () = Sc_rollup_node.run sc_rollup_node1 []
+  and* () = Sc_rollup_node.run sc_rollup_node2 [] in
   Log.info "Add messages and advance L1 to trigger commitment." ;
   (* We bake one extra block to allow for the injection of the commitment and
      another block to allow for reinjection of the commitment that has the out
@@ -1992,7 +1992,7 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
          ()
   in
   let init_hash = JSON.(init_commitment |-> "compressed_state" |> as_string) in
-  let* () = Sc_rollup_node.run rollup_node in
+  let* () = Sc_rollup_node.run rollup_node [] in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. rollup_node init_level in
   let* node_state_hash = Sc_rollup_client.state_hash ~hooks rollup_client in
   Check.(
@@ -2090,7 +2090,7 @@ let test_rollup_arith_uses_reveals ~kind =
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
@@ -2281,8 +2281,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   let* _configuration_filename =
     Sc_rollup_node.config_init ~loser_mode sc_rollup_node2 sc_rollup_address
   in
-  let* () = Sc_rollup_node.run sc_rollup_node
-  and* () = Sc_rollup_node.run sc_rollup_node2 in
+  let* () = Sc_rollup_node.run sc_rollup_node []
+  and* () = Sc_rollup_node.run sc_rollup_node2 [] in
 
   let start_level = Node.get_level node in
 
@@ -2708,7 +2708,7 @@ let test_late_rollup_node =
     }
   @@ fun sc_rollup_node _rollup_client _sc_rollup_address _node client ->
   let* () = bake_levels 65 client in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = bake_levels 30 client in
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
   unit
@@ -2730,10 +2730,10 @@ let test_interrupt_rollup_node =
       (fun _ -> Some ())
   in
   let* () = bake_levels 15 client in
-  let* () = Sc_rollup_node.run sc_rollup_node and* () = processing_promise in
+  let* () = Sc_rollup_node.run sc_rollup_node [] and* () = processing_promise in
   let* () = Sc_rollup_node.kill sc_rollup_node in
   let* () = bake_levels 1 client in
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
 
@@ -2897,7 +2897,7 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
       description = "an outbox message should be executable";
     }
   @@ fun rollup_node sc_client sc_rollup _node client ->
-  let* () = Sc_rollup_node.run rollup_node in
+  let* () = Sc_rollup_node.run rollup_node [] in
   let src = Constant.bootstrap1.public_key_hash in
   let originate_target_contract () =
     let prg =
@@ -3031,7 +3031,7 @@ let test_rpcs ~kind =
       description = "RPC API should work and be stable";
     }
   @@ fun sc_rollup_node sc_client sc_rollup node client ->
-  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* sc_rollup_address =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "sc_rollup_address"]
   in

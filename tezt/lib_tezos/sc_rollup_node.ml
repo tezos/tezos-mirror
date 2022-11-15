@@ -313,10 +313,12 @@ let do_runlike_command node arguments =
   let arguments = make_arguments node @ arguments in
   run node {ready = false; level = Unknown} arguments ~on_terminate
 
-let run node =
-  do_runlike_command node ["run"; "--data-dir"; node.persistent_state.data_dir]
+let run node arguments =
+  do_runlike_command
+    node
+    (["run"; "--data-dir"; node.persistent_state.data_dir] @ arguments)
 
-let run node =
-  let* () = run node in
+let run node arguments =
+  let* () = run node arguments in
   let* () = wait_for_ready node in
   return ()
