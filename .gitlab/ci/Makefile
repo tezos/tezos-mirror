@@ -170,7 +170,7 @@ doc-linkcheck:
 
 .PHONY: opam-release
 opam-release:
-	cd ${CI_PROJECT_DIR} ; \
+	cd ${CI_PROJECT_DIR} && \
 		./scripts/ci/opam-release.sh
 
 .PHONY: gitlab-release

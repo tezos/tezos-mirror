@@ -24,11 +24,13 @@ opam_dir="${3:-opam-repository}"
 
 if [ -z "$version" ] ; then
     echo "$usage"
+    echo "Missing argument: <VERSION_NUMBER>"
     exit 1
 fi
 
 if [ -z "$url" ] ; then
     echo "$usage"
+    echo "Missing argument: <TARBALL_URL>"
     exit 1
 fi
 

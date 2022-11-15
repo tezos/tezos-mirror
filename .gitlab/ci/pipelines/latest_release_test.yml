@@ -1,30 +1,3 @@
 include:
-  # Stage: sanity
-  - .gitlab/ci/jobs/sanity/sanity_ci.yml
-
-  # Stage: build
-  - .gitlab/ci/jobs/build/static_x86_64_linux_binaries.yml
-  - .gitlab/ci/jobs/build/arm64.yml
-  - .gitlab/ci/jobs/build/x86_64.yml
-  - .gitlab/ci/jobs/build/get_contracts.yml
-  - .gitlab/ci/jobs/doc/build_all.yml
-
-
-  # Stage: test
-  - .gitlab/ci/jobs/test/check_precommit_hook.yml
-  - .gitlab/ci/jobs/test/misc_checks.yml
-  - .gitlab/ci/jobs/test/misc_opam_checks.yml
-  - .gitlab/ci/jobs/test/semgrep.yml
-  - .gitlab/ci/jobs/test/unit.yml
-  - .gitlab/ci/jobs/test/integration_compiler_rejections.yml
-  - .gitlab/ci/jobs/test/check_scripts.yml
-  - .gitlab/ci/jobs/test/python_integration_tests.yml
-  - .gitlab/ci/jobs/test/integration_pytest_old_protocols.yml
-  - .gitlab/ci/jobs/test/liquidity_baking_scripts-integrity.yml
-  - .gitlab/ci/jobs/test/tezt.yml
-  - .gitlab/ci/jobs/test/tezt_build_long.yml
-  - .gitlab/ci/jobs/test/tezt_self_tests.yml
-
-  # Stage: doc
-  - .gitlab/ci/jobs/doc/linkcheck.yml
-  - .gitlab/ci/jobs/doc/tests.yml
+  # Stage: publish_release
+  - .gitlab/ci/jobs/publish/docker_promote_to_latest_test.yml

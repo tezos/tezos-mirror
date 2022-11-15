@@ -1,4 +1,5 @@
-# This template is used by the opam test jobs defined in opam-ci.yml
+# This template is used by the opam test jobs defined in
+# .gitlab/ci/jobs/packaging/opam_package.yml
 .opam_template:
   extends:
     - .default_settings_template
