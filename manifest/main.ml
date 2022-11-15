@@ -4820,6 +4820,35 @@ module Protocol = Protocol
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in
+    let _octez_scoru_wasm_repl =
+      only_if (active && N.(number >= 016)) @@ fun () ->
+      public_exe
+        (sf "octez-wasm-repl-%s" short_hash)
+        ~internal_name:(sf "main_wasm_repl_%s" name_underscore)
+        ~path:(path // "bin_wasm_repl")
+        ~opam:"octez-wasm-repl"
+        ~synopsis:"Tezos/Protocol: REPL for the scoru-wasm functionality"
+        ~release:false
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives";
+            octez_clic;
+            tree_encoding;
+            octez_base_unix;
+            octez_context_disk;
+            octez_base_test_helpers |> open_;
+            octez_client_base;
+            client |> if_some |> open_;
+            octez_scoru_wasm;
+            octez_scoru_wasm_tests_helpers |> open_;
+            octez_webassembly_interpreter |> open_;
+            octez_webassembly_interpreter_extra |> open_;
+            main |> open_;
+            plugin |> if_some |> open_;
+            parameters |> if_some |> open_;
+          ]
+        ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+    in
     let tx_rollup =
       only_if active @@ fun () ->
       public_lib

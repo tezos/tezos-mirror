@@ -9,6 +9,8 @@
 
 # Ignoring package octez-snoop, it only contains tests or private targets
 
+# Ignoring package octez-wasm-repl, it only contains tests or private targets
+
 # Ignoring package tezos-benchmark-tests, it only contains tests or private targets
 
 # Ignoring package tezos-dal-node-lib, it only contains tests or private targets

@@ -273,10 +273,8 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let open Lwt_syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       match pvm_state.tick_state with
-      | Eval config ->
-          Wasm.Instance.ModuleMap.get
-            Constants.wasm_main_module_name
-            config.module_reg
+      | Eval {module_reg; _} | Init {module_reg; _} ->
+          Wasm.Instance.ModuleMap.get Constants.wasm_main_module_name module_reg
       | _ -> raise (Invalid_argument "get_module_instance")
 
     let is_stuck tree =

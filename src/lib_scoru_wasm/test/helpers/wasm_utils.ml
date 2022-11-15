@@ -137,7 +137,7 @@ let set_eol_input level counter tree =
   in
   Wasm.set_input_step (input_info level counter) sol_input tree
 
-let set_inputs_step messages level tree =
+let set_inputs_step set_internal_message messages level tree =
   let open Lwt_syntax in
   let next_message_counter = new_message_counter () in
   let (_ : Z.t) = next_message_counter () in
@@ -151,10 +151,12 @@ let set_inputs_step messages level tree =
   in
   set_eol_input level (next_message_counter ()) tree
 
-let set_full_input_step messages level tree =
+let set_full_input_step_gen set_internal_message messages level tree =
   let open Lwt_syntax in
-  let* tree = set_inputs_step messages level tree in
+  let* tree = set_inputs_step set_internal_message messages level tree in
   eval_to_snapshot ~max_steps:Int64.max_int tree
+
+let set_full_input_step = set_full_input_step_gen set_internal_message
 
 let set_empty_inbox_step level tree = set_full_input_step [] level tree
 

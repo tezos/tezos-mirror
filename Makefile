@@ -42,7 +42,7 @@ OCTEZ_BIN=octez-node octez-validator octez-client octez-admin-client \
     $(foreach p, $(sc_rollup_protocol_versions_without_number), octez-sc-rollup-node-$(p)) \
     $(foreach p, $(sc_rollup_protocol_versions_without_number), octez-sc-rollup-client-$(p))
 
-UNRELEASED_OCTEZ_BIN=octez-dal-node
+UNRELEASED_OCTEZ_BIN=octez-dal-node octez-wasm-repl-alpha
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
