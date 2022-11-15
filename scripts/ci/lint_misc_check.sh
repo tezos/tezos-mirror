@@ -24,3 +24,6 @@ git apply devtools/protocol-print/add-hack-module.patch
 
 # check that yes-wallet builds correctly
 dune build devtools/yes_wallet/yes_wallet.exe
+
+# check that the patch-yes_node.sh applies correctly
+scripts/patch-yes_node.sh --dry-run
