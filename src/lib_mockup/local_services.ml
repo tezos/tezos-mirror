@@ -905,6 +905,18 @@ module Make (E : MENV) = struct
                    in
                    Tezos_rpc.Answer.return block_header)))
 
+  let resulting_context_hash () =
+    Directory.prefix
+      (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
+      (Directory.register
+         Directory.empty
+         E.Block_services.S.resulting_context_hash
+         (fun (((), chain), _block) () () ->
+           with_chain ~caller_name:"resulting_context_hash" chain (fun () ->
+               (* This is not sufficient but this library doesn't have
+                  what's necessary to determine the correct value. *)
+               Tezos_rpc.Answer.return E.rpc_context.block_header.context)))
+
   let protocol_data_raw () =
     Directory.prefix
       (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
@@ -965,6 +977,7 @@ module Make (E : MENV) = struct
     |> merge (monitor_heads ())
     |> merge (header ())
     |> merge (operations ())
+    |> merge (resulting_context_hash ())
     |> merge (protocol_data_raw ())
     |> merge (monitor_operations ())
 end

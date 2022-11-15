@@ -21,6 +21,10 @@ module type Mocked_services_hooks = sig
   val header :
     Block_services.block -> Mockup.M.Block_services.block_header tzresult Lwt.t
 
+  (** [resulting_context_hash] returns the context resulting hash of the given block. *)
+  val resulting_context_hash :
+    Block_services.block -> Tezos_crypto.Context_hash.t tzresult Lwt.t
+
   (** [operations] returns all operations included in the block. *)
   val operations :
     Block_services.block ->
@@ -145,6 +149,14 @@ module Make (Hooks : Mocked_services_hooks) = struct
          Directory.empty
          Mockup.M.Block_services.S.header
          (fun (((), _chain), block) _ _ -> Hooks.header block)
+
+  let resulting_context_hash =
+    Directory.prefix
+      (Tezos_rpc.Path.prefix Chain_services.path Block_services.path)
+    @@ Directory.register
+         Directory.empty
+         Mockup.M.Block_services.S.resulting_context_hash
+         (fun (((), _chain), block) _ _ -> Hooks.resulting_context_hash block)
 
   let operations =
     Directory.prefix
@@ -277,6 +289,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
     let merge = Directory.merge in
     Directory.empty |> merge monitor_heads |> merge protocols |> merge header
     |> merge operations |> merge hash |> merge shell_header
+    |> merge resulting_context_hash
     |> merge (chain chain_id)
     |> merge inject_block |> merge inject_operation |> merge monitor_operations
     |> merge list_blocks |> merge live_blocks |> merge raw_protocol_data
