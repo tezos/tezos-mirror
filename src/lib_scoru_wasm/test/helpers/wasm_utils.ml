@@ -66,6 +66,26 @@ let eval_until_stuck ?(max_steps = 20000L) tree =
   in
   go max_steps tree
 
+(* This function relies on the invariant that `compute_step_many` will always
+   stop at a Snapshot or an input request, and never start another
+   `kernel_next`. *)
+let rec eval_to_snapshot ?(max_steps = Int64.max_int) tree =
+  let open Lwt_syntax in
+  let eval tree =
+    let* tree, _ =
+      Wasm.compute_step_many ~stop_at_snapshot:true ~max_steps tree
+    in
+    let* state = Wasm.Internal_for_tests.get_tick_state tree in
+    match state with
+    | Snapshot -> return tree
+    | _ -> eval_to_snapshot ~max_steps tree
+  in
+  let* info = Wasm.get_info tree in
+  match info.input_request with
+  | No_input_required -> eval tree
+  | Input_required | Reveal_required _ ->
+      Stdlib.failwith "Cannot reach snapshot point"
+
 let rec eval_until_input_requested ?after_fast_exec ?(fast_exec = false)
     ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
@@ -78,10 +98,65 @@ let rec eval_until_input_requested ?after_fast_exec ?(fast_exec = false)
   match info.input_request with
   | No_input_required ->
       let* tree, _ = run ~max_steps tree in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4175
-         We don't pass [~max_steps] here because some tests are buggy. *)
-      eval_until_input_requested ?after_fast_exec ~fast_exec tree
+      eval_until_input_requested ~max_steps tree
   | Input_required | Reveal_required _ -> return tree
+
+let input_info level message_counter =
+  Wasm_pvm_state.
+    {
+      inbox_level =
+        Option.value_f ~default:(fun () -> assert false)
+        @@ Tezos_base.Bounded.Non_negative_int32.of_value level;
+      message_counter;
+    }
+
+let new_message_counter () =
+  let c = ref Z.zero in
+  fun () ->
+    c := Z.succ !c ;
+    Z.pred !c
+
+let set_sol_input level tree =
+  let sol_input =
+    Pvm_input_kind.(
+      Internal_for_tests.to_binary_input (Internal Start_of_level) None)
+  in
+  Wasm.set_input_step (input_info level Z.zero) sol_input tree
+
+let set_internal_message level counter message tree =
+  let encoded_message =
+    Pvm_input_kind.(
+      Internal_for_tests.to_binary_input (Internal Deposit) (Some message))
+  in
+  Wasm.set_input_step (input_info level counter) encoded_message tree
+
+let set_eol_input level counter tree =
+  let sol_input =
+    Pvm_input_kind.(
+      Internal_for_tests.to_binary_input (Internal End_of_level) None)
+  in
+  Wasm.set_input_step (input_info level counter) sol_input tree
+
+let set_inputs_step messages level tree =
+  let open Lwt_syntax in
+  let next_message_counter = new_message_counter () in
+  let (_ : Z.t) = next_message_counter () in
+  let* tree = set_sol_input level tree in
+  let* tree =
+    List.fold_left_s
+      (fun tree message ->
+        set_internal_message level (next_message_counter ()) message tree)
+      tree
+      messages
+  in
+  set_eol_input level (next_message_counter ()) tree
+
+let set_full_input_step messages level tree =
+  let open Lwt_syntax in
+  let* tree = set_inputs_step messages level tree in
+  eval_to_snapshot ~max_steps:Int64.max_int tree
+
+let set_empty_inbox_step level tree = set_full_input_step [] level tree
 
 let rec eval_until_init tree =
   let open Lwt_syntax in
@@ -109,13 +184,13 @@ let set_input_step message message_counter tree =
 let pp_state fmt state =
   let pp_s s = Format.fprintf fmt "%s" s in
   match state with
-  | Wasm_pvm_state.Internal_state.Start -> pp_s "Start"
+  | Wasm_pvm_state.Internal_state.Snapshot -> pp_s "Start"
   | Decode _ -> pp_s "Decode"
   | Eval _ -> pp_s "Eval"
   | Stuck e ->
       Format.fprintf fmt "Stuck (%a)" Test_wasm_pvm_encodings.pp_error_state e
   | Init _ -> pp_s "Init"
-  | Snapshot -> pp_s "Snapshot"
+  | Collect -> pp_s "Collect"
   | Link _ -> pp_s "Link"
   | Padding -> pp_s "Padding"
 

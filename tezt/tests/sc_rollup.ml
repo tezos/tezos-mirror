@@ -772,7 +772,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
   let expected_status =
     match kind with
     | "arith" -> "Halted"
-    | "wasm_2_0_0" -> "Waiting for input message"
+    | "wasm_2_0_0" -> "Computing"
     | _ -> raise (Invalid_argument kind)
   in
   Check.(status = expected_status)
@@ -1501,15 +1501,23 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   let () = Log.info "init_level: %d" init_level in
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
-   let additional_ticks =
+   let expected_number_of_ticks =
      match kind with
-     | "arith" -> 1 (* boot sector *) + 1 (* metadata *)
-     | "wasm_2_0_0" -> 1 (* boot_sector *) + 1 (* moving through start state *)
+     | "arith" ->
+         1 (* boot sector *) + 1 (* metadata *) + (2 * levels_to_commitment)
+         (* input ticks *)
+     | "wasm_2_0_0" ->
+         11_000_000_000
+         (* ticks to load first inbox commitments:
+            snapshot --> collect --> padding --> snapshot
+            see Lib_scoru_wasm.Constants.wasm_max_tick *)
+         + 1 (* snapshot --> decode *)
+         + 1 (* decode -> stuck *)
+         + (2 * (levels_to_commitment - 1))
+         (* input ticks for the rest of the inboxes  *)
      | _ -> assert false
    in
-   Check.(
-     stored_number_of_ticks
-     = Some ((2 * levels_to_commitment) + additional_ticks))
+   Check.(stored_number_of_ticks = Some expected_number_of_ticks)
      (Check.option Check.int)
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \

@@ -72,19 +72,21 @@ module Internal_state = struct
 
     {[
       stateDiagram
-      Snapshot --> Restarting the machine
-      Start --> Decode
-      Decode --> Link
-      Link --> Init
-      Init --> Eval
-
-      Eval --> Padding : Evaluation succeeded
-      Padding --> Snapshot : End of top-level cycle
-      Eval --> Stuck : Evaluation failed
+      Snapshot --> Collect : reboot_flag is not set
+      Snapshot --> Evaluation : reboot_flag is set
+      state Evaluation {
+        Decode --> Link
+        Link --> Init
+        Init --> Eval
+      }
+      Evaluation --> Padding : evaluation succeeded
+      Collect --> Padding
+      Padding --> Snapshot
+      Evaluation --> Stuck : something went wrong
     ]}
   *)
   type tick_state =
-    | Start
+    | Snapshot
     | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
     | Link of {
         ast_module : Tezos_webassembly_interpreter.Ast.module_;
@@ -103,9 +105,9 @@ module Internal_state = struct
         config : Tezos_webassembly_interpreter.Eval.config;
         module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
       }
+    | Collect
     | Stuck of Wasm_pvm_errors.t
     | Padding
-    | Snapshot
 
   type pvm_state = {
     last_input_info : input_info option;  (** Info about last read input. *)
@@ -122,5 +124,10 @@ module Internal_state = struct
         (** Number of reboots between two inputs. *)
   }
 
-  type computation_status = Starting | Restarting | Running | Failing | Reboot
+  type computation_status =
+    | Restarting
+    | Forcing_restart
+    | Running
+    | Failing
+    | Reboot
 end

@@ -69,7 +69,7 @@ let run kernel k =
   in
   return res
 
-let set_input_step = Wasm_utils.set_input_step
+let set_full_input_step s = Wasm_utils.set_full_input_step [s]
 
 let read_message name =
   let open Tezt.Base in

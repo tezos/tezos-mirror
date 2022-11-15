@@ -47,7 +47,7 @@ val execute_on_state :
 (** [run path k] execute [k] on the content of the file at [path] *)
 val run : Lwt_io.file_name -> (string -> 'a Lwt.t) -> 'a Lwt.t
 
-val set_input_step : string -> int -> Wasm.tree -> Wasm.tree Lwt.t
+val set_full_input_step : string -> int32 -> Wasm.tree -> Wasm.tree Lwt.t
 
 (** [read_message "my_file.out"] returns the content of the file,
       searched in the input repository for messages*)

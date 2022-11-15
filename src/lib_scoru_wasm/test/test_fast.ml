@@ -27,18 +27,18 @@ open Tztest
 
 let apply_fast counter tree =
   let open Lwt.Syntax in
-  let run_counter = ref 0 in
+  let run_counter = ref 0l in
   let+ tree =
     Wasm_utils.eval_until_input_requested
-      ~after_fast_exec:(fun () -> run_counter := succ !run_counter)
+      ~after_fast_exec:(fun () -> run_counter := Int32.succ !run_counter)
       ~fast_exec:true
       ~max_steps:Int64.max_int
       tree
   in
-  if counter > 0 then
+  if counter > 0l then
     (* Assert that the FE actual ran. We must consider that before the first
        message is inserted, FE is unlikely to run. *)
-    if !run_counter <> 1 then
+    if !run_counter <> 1l then
       Stdlib.failwith "Fast Execution was expected to run!" ;
   tree
 
@@ -59,10 +59,10 @@ let test_against_both ~from_binary ~kernel ~messages =
     let* info = Wasm_utils.Wasm.get_info tree in
     assert (info.input_request = Input_required) ;
 
-    let+ tree = Wasm_utils.set_input_step message counter tree in
+    let+ tree = Wasm_utils.set_full_input_step [message] counter tree in
     let hash2 = Tezos_context_memory.Context_binary.Tree.hash tree in
 
-    (tree, succ counter, hash1 :: hash2 :: hashes)
+    (tree, Int32.succ counter, hash1 :: hash2 :: hashes)
   in
 
   let* initial_tree =
@@ -71,7 +71,7 @@ let test_against_both ~from_binary ~kernel ~messages =
 
   let run_with apply =
     let* tree, counter, hashes =
-      List.fold_left_s (make_folder apply) (initial_tree, 0, []) messages
+      List.fold_left_s (make_folder apply) (initial_tree, 0l, []) messages
     in
 
     let+ tree = apply counter tree in

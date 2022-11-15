@@ -150,7 +150,9 @@ let exec_on_message message run_state =
   let open Lwt_syntax in
   let* run_state =
     lift_action
-      (Exec.set_input_step message run_state.message_counter)
+      (Exec.set_full_input_step
+         message
+         (Int32.of_int run_state.message_counter))
       run_state
   in
   exec_loop {run_state with message_counter = run_state.message_counter + 1}

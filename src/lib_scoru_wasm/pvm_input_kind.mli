@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,57 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** [internal_message_kind] represent an internal message in a inbox. *)
+type internal_message_kind =
+  | Deposit (* Generic internal message. *)
+  | Start_of_level
+      (** Internal message put at the beginning of each inbox's level. *)
+  | End_of_level  (** Internal message put at the end of each inbox's level. *)
 
-(** This module manifests the proof format used by the Arith PVM as defined by
-    the Layer 1 implementation for it.
+(** A type representing messages from Layer 1 to Layer 2. Internal ones are
+    originated from Layer 1 smart-contracts and external ones are messages from
+    an external manager operation. Other messages shouldn't happen and treated
+    as errors by the PVM, it represents unexpected tags. *)
+type t = Internal of internal_message_kind | External | Other
 
-    It is imperative that this is aligned with the protocol's implementation.
+(** [from_raw_input input] takes a message produced by the L1 protocol and
+    returns its kind. *)
+val from_raw_input : string -> t
+
+module Internal_for_tests : sig
+  (** [to_binary_input kind input] returns the serialized representation of an
+      [input] according to its [kind]. Internal message payloads and external
+      message payloads are prefixed by their tag, and `Other` messages result in
+      an exception. These messages are meant to be used in tests only, and does
+      not give any guarantee on their validity according to the protocol's
+      representation.
+
+      @raise Failure on `Other` messages, and mismatches between kind and
+        presence or absence of the input.
 *)
-module Arith_proof_format =
-  Context.Proof
-    (struct
-      include Sc_rollup.State_hash
-
-      let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
-    end)
-    (struct
-      let proof_encoding =
-        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
-        .tree_proof_encoding
-    end)
-
-module Impl : Pvm.S = struct
-  include Sc_rollup.ArithPVM.Make (Arith_proof_format)
-  module State = Context.PVMState
-
-  let string_of_status status =
-    match status with
-    | Halted -> "Halted"
-    | Waiting_for_input_message -> "Waiting for input message"
-    | Waiting_for_reveal -> "Waiting for reveal"
-    | Waiting_for_metadata -> "Waiting for metadata"
-    | Parsing -> "Parsing"
-    | Evaluating -> "Evaluating"
-
-  let eval_many ?stop_at_snapshot ~max_steps initial_state =
-    ignore stop_at_snapshot ;
-    let rec go state step =
-      let open Lwt.Syntax in
-      let* is_input_required = is_input_state state in
-
-      if is_input_required = No_input_required && step <= max_steps then
-        let open Lwt.Syntax in
-        (* Note: This is not an efficient implementation because the state is
-           decoded/encoded to/from the tree at each step but for Arith PVM
-           it doesn't matter
-        *)
-        let* next_state = eval state in
-        go next_state (Int64.succ step)
-      else Lwt.return (state, step)
-    in
-    go initial_state 0L
+  val to_binary_input : t -> string option -> string
 end
-
-include Impl

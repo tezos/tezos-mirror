@@ -17,7 +17,8 @@ let test_padding_state () =
     |}
   in
   let*! tree = initial_tree ~from_binary:false module_ in
-  let*! tree = set_input_step "test" 0 tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! tree = set_empty_inbox_step 0l tree in
   let*! pvm_state =
     Test_encodings_util.Tree_encoding_runner.decode
       Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding

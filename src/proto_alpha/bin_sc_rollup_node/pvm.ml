@@ -52,7 +52,8 @@ module type S = sig
 
   (** [eval_many ~max_steps s0] returns a state [s1] resulting from the
       execution of up to [~max_steps] steps of the rollup at state [s0]. *)
-  val eval_many : max_steps:int64 -> state -> (state * int64) Lwt.t
+  val eval_many :
+    ?stop_at_snapshot:bool -> max_steps:int64 -> state -> (state * int64) Lwt.t
 
   (** State storage for this PVM. *)
   module State : sig
