@@ -65,7 +65,8 @@ type page_proof
 
 module Verifier :
   VERIFIER
-    with type parameters = parameters
+    with type t = t
+     and type parameters = parameters
      and type commitment = commitment
      and type page_proof = page_proof
 

@@ -232,9 +232,7 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let cryptobox_params = parameters.cryptobox in
   let cryptobox = Rollup.Dal.make cryptobox_params in
-  let commitment =
-    Rollup.Dal.Commitment.dummy_commitment cryptobox_params cryptobox "coucou"
-  in
+  let commitment = Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou" in
   Check.(
     (feature_flag = false)
       bool
@@ -290,15 +288,8 @@ let publish_slot ~source ?level ?fee ?error ~index ~commitment node client =
       [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~commitment]
       client)
 
-let publish_dummy_slot ~source ?level ?error ?fee ~index ~message parameters
-    cryptobox =
-  let commitment =
-    Rollup.Dal.(
-      Commitment.dummy_commitment
-        parameters.Parameters.cryptobox
-        cryptobox
-        message)
-  in
+let publish_dummy_slot ~source ?level ?error ?fee ~index ~message cryptobox =
+  let commitment = Rollup.Dal.(Commitment.dummy_commitment cryptobox message) in
   publish_slot ~source ?level ?fee ?error ~index ~commitment
 
 let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
@@ -413,7 +404,6 @@ let test_slot_management_logic =
       ~index:2
       ~message:"a"
       ~error
-      parameters
       cryptobox
       node
       client
@@ -429,7 +419,6 @@ let test_slot_management_logic =
       ~index:2
       ~message:"a"
       ~error
-      parameters
       cryptobox
       node
       client
@@ -440,7 +429,6 @@ let test_slot_management_logic =
       ~fee:1_000
       ~index:0
       ~message:"a"
-      parameters
       cryptobox
       node
       client
@@ -451,7 +439,6 @@ let test_slot_management_logic =
       ~fee:1_500
       ~index:1
       ~message:"b"
-      parameters
       cryptobox
       node
       client
@@ -462,7 +449,6 @@ let test_slot_management_logic =
       ~fee:2_000
       ~index:0
       ~message:"c"
-      parameters
       cryptobox
       node
       client
@@ -473,7 +459,6 @@ let test_slot_management_logic =
       ~fee:1_200
       ~index:1
       ~message:"d"
-      parameters
       cryptobox
       node
       client
@@ -633,7 +618,6 @@ let test_slots_attestation_operation_behavior =
       ~fee:1_200
       ~index:10
       ~message:" TEST!!! "
-      parameters
       cryptobox
       node
       client
@@ -826,11 +810,11 @@ let test_dal_node_test_slots_propagation =
   let* dal = Rollup.Dal.Parameters.from_client client in
   let cryptobox = Rollup.Dal.make dal.cryptobox in
   let commitment1 =
-    Rollup.Dal.Commitment.dummy_commitment dal.cryptobox cryptobox "content1"
+    Rollup.Dal.Commitment.dummy_commitment cryptobox "content1"
   in
   let slot_header1_exp = Rollup.Dal.Commitment.to_string commitment1 in
   let commitment2 =
-    Rollup.Dal.Commitment.dummy_commitment dal.cryptobox cryptobox "content2"
+    Rollup.Dal.Commitment.dummy_commitment cryptobox "content2"
   in
   let slot_header2_exp = Rollup.Dal.Commitment.to_string commitment2 in
   let p1 = wait_for_stored_slot dal_node3 slot_header1_exp in

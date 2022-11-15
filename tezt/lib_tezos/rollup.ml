@@ -499,16 +499,11 @@ module Tx_rollup = struct
 end
 
 module Dal = struct
-  module Parameters = struct
-    type cryptobox = Tezos_crypto_dal.Cryptobox.Verifier.parameters = {
-      redundancy_factor : int;
-      page_size : int;
-      slot_size : int;
-      number_of_shards : int;
-    }
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
 
+  module Parameters = struct
     type t = {
-      cryptobox : cryptobox;
+      cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       endorsement_lag : int;
     }
@@ -603,18 +598,16 @@ module Dal = struct
       make ~data PUT ["plugin"; "dac"; "store_preimage"] JSON.as_string
   end
 
-  module Cryptobox = Tezos_crypto_dal.Cryptobox
-
   let make
       ?(on_error =
         fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
-      cryptobox_params =
+      parameters =
     let initialisation_parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-        ~slot_size:cryptobox_params.Parameters.slot_size
+        ~slot_size:parameters.Cryptobox.slot_size
     in
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
-    match Cryptobox.make cryptobox_params with
+    match Cryptobox.make parameters with
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg
 
@@ -626,16 +619,15 @@ module Dal = struct
     let dummy_commitment
         ?(on_error =
           fun str -> Test.fail "Rollup.Dal.dummy_commitment failed: %s" str)
-        cryptobox_params t message =
-      let padding_length =
-        cryptobox_params.Parameters.slot_size - String.length message
-      in
+        cryptobox message =
+      let parameters = Cryptobox.Verifier.parameters cryptobox in
+      let padding_length = parameters.slot_size - String.length message in
       let padded_message =
         if padding_length > 0 then pad padding_length message else message
       in
       let slot = String.to_bytes padded_message in
-      match Cryptobox.polynomial_from_slot t slot with
-      | Ok r -> Cryptobox.commit t r
+      match Cryptobox.polynomial_from_slot cryptobox slot with
+      | Ok r -> Cryptobox.commit cryptobox r
       | Error (`Slot_wrong_size str) -> on_error str
 
     let to_string commitment = Cryptobox.Commitment.to_b58check commitment
