@@ -350,10 +350,26 @@ let run_command =
       in
       Daemon.run ~data_dir configuration cctxt)
 
+(** Command to dump the rollup node metrics. *)
+let dump_metrics =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~group
+    ~desc:"dump the rollup node available metrics in CSV format."
+    no_options
+    (prefixes ["dump-metrics"] @@ stop)
+    (fun () (cctxt : Protocol_client_context.full) ->
+      let*! metrics =
+        Prometheus.CollectorRegistry.collect Metrics.sc_rollup_node_registry
+      in
+      let*! () = cctxt#message "%a@." Metrics.print_csv_metrics metrics in
+      return_unit)
+
 let sc_rollup_commands () =
   List.map
     (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
-    [config_init_command; run_command]
+    [config_init_command; run_command; dump_metrics]
 
 let select_commands _ _ =
   return (sc_rollup_commands () @ Client_helpers_commands.commands ())
