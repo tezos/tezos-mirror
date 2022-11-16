@@ -40,7 +40,6 @@ type error +=
     }
   | Missing_PVM_state of Tezos_crypto.Block_hash.t * Int32.t
   | Cannot_checkout_context of Tezos_crypto.Block_hash.t * string option
-  | Cannot_retrieve_reveal of Sc_rollup.Reveal_hash.t
 
 type error +=
   | Lost_game of
@@ -235,19 +234,4 @@ let () =
     (function
       | Lost_game (loser, reason, slashed) -> Some (loser, reason, slashed)
       | _ -> None)
-    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed)) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"internal.cannot_retrieve_reveal"
-    ~title:"Internal error: Cannot retrieve reveal of hash"
-    ~description:"The rollup node cannot retrieve a reveal asked by the rollup."
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "The node cannot retrieve a reveal for hash %a"
-        Sc_rollup.Reveal_hash.pp
-        hash)
-    Data_encoding.(obj1 (req "hash" Sc_rollup.Reveal_hash.encoding))
-    (function Cannot_retrieve_reveal hash -> Some hash | _ -> None)
-    (fun hash -> Cannot_retrieve_reveal hash)
+    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed))
