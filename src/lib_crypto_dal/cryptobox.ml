@@ -316,6 +316,8 @@ module Inner = struct
          multiplicative group of Fr, because the FFTs operate on such groups. *)
       fail (`Fail "Wrong computed size for n")
     else if t.k > srs_size then
+      (* the committed polynomials have degree t.k - 1 at most,
+         so t.k coefficients. *)
       fail
         (`Fail
           (Format.asprintf
