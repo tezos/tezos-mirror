@@ -4,12 +4,6 @@ octez-codec
 octez-client
 octez-admin-client
 octez-node
-octez-tx-rollup-node-alpha
-octez-tx-rollup-client-alpha
-octez-sc-rollup-node-alpha
-octez-sc-rollup-client-alpha
-octez-accuser-alpha
-octez-baker-alpha
 octez-tx-rollup-node-PtLimaPt
 octez-tx-rollup-client-PtLimaPt
 octez-accuser-PtLimaPt
