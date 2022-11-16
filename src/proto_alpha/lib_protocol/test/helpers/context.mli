@@ -50,11 +50,13 @@ val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 val get_first_different_endorsers :
   t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
 
-(** Return the first element of the list returns by [get_endorsers]. *)
+(** Return the first element [delegate,slot] of the list returns by
+    [get_endorsers], where [delegate] is the [consensus key] when
+    is set. *)
 val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
-(** Given a delegate public key hash [del], and a context [ctxt],
-    if [del] is in [get_endorsers ctxt] returns the [slots] of [del] otherwise
+(** Given a [delegate], and a context [ctxt], if [delegate] is in
+    [get_endorsers ctxt] returns the [slots] of [delegate] otherwise
     return [None]. *)
 val get_endorser_slot :
   t -> public_key_hash -> Slot.t list option tzresult Lwt.t

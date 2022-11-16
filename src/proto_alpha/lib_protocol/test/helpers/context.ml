@@ -133,14 +133,14 @@ let get_first_different_endorsers ctxt =
 let get_endorser ctxt =
   get_endorsers ctxt >|=? fun endorsers ->
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
-  (endorser.delegate, endorser.slots)
+  (endorser.consensus_key, endorser.slots)
 
 let get_endorser_slot ctxt pkh =
   get_endorsers ctxt >|=? fun endorsers ->
   List.find_map
     (function
-      | {Plugin.RPC.Validators.delegate; slots; _} ->
-          if Tezos_crypto.Signature.Public_key_hash.(delegate = pkh) then
+      | {Plugin.RPC.Validators.consensus_key; slots; _} ->
+          if Tezos_crypto.Signature.Public_key_hash.(consensus_key = pkh) then
             Some slots
           else None)
     endorsers
@@ -150,7 +150,7 @@ let get_endorser_n ctxt n =
   let endorser =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth endorsers n
   in
-  (endorser.delegate, endorser.slots)
+  (endorser.consensus_key, endorser.slots)
 
 let get_endorsing_power_for_delegate ctxt ?levels pkh =
   Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun endorsers ->
