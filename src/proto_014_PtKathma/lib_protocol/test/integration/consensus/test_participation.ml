@@ -42,7 +42,7 @@ let bake_and_endorse_once (b_pred, b_cur) baker endorser =
   List.find_map
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} ->
-          if Signature.Public_key_hash.equal delegate endorser then
+          if Tezos_crypto.Signature.Public_key_hash.equal delegate endorser then
             Some (delegate, slots)
           else None)
     endorsers_list

@@ -28,16 +28,16 @@ open Alpha_context
 open Protocol_client_context
 
 type block_info = {
-  hash : Block_hash.t;
-  chain_id : Chain_id.t;
-  predecessor : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
+  chain_id : Tezos_crypto.Chain_id.t;
+  predecessor : Tezos_crypto.Block_hash.t;
   fitness : Bytes.t list;
   timestamp : Time.Protocol.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
+  protocol : Tezos_crypto.Protocol_hash.t;
+  next_protocol : Tezos_crypto.Protocol_hash.t;
   proto_level : int;
   level : Raw_level.t;
-  context : Context_hash.t;
+  context : Tezos_crypto.Context_hash.t;
 }
 
 let raw_info cctxt ?(chain = `Main) hash shell_header =
@@ -80,9 +80,9 @@ let info cctxt ?(chain = `Main) block =
 
 module Block_seen_event = struct
   type t = {
-    hash : Block_hash.t;
+    hash : Tezos_crypto.Block_hash.t;
     header : Tezos_base.Block_header.t;
-    occurrence : [`Valid_blocks of Chain_id.t | `Heads];
+    occurrence : [`Valid_blocks of Tezos_crypto.Chain_id.t | `Heads];
   }
 
   let make hash header occurrence = {hash; header; occurrence}
@@ -101,7 +101,7 @@ module Block_seen_event = struct
           (function {hash; header; occurrence} -> (hash, occurrence, header))
           (fun (hash, occurrence, header) -> make hash header occurrence)
           (obj3
-             (req "hash" Block_hash.encoding)
+             (req "hash" Tezos_crypto.Block_hash.encoding)
              (* Occurrence has to come before header, because:
                 (Invalid_argument
                    "Cannot merge two objects when the left element is of
@@ -123,7 +123,7 @@ module Block_seen_event = struct
                        (Tag 1)
                        (obj2
                           (req "occurrence-kind" (constant "valid-blocks"))
-                          (req "chain-id" Chain_id.encoding))
+                          (req "chain-id" Tezos_crypto.Chain_id.encoding))
                        (function
                          | `Valid_blocks ch -> Some ((), ch) | _ -> None)
                        (fun ((), ch) -> `Valid_blocks ch);
@@ -133,7 +133,7 @@ module Block_seen_event = struct
       With_version.(encoding ~name (first_version v0_encoding))
 
     let pp ~short:_ ppf {hash; _} =
-      Format.fprintf ppf "Saw block %a" Block_hash.pp_short hash
+      Format.fprintf ppf "Saw block %a" Tezos_crypto.Block_hash.pp_short hash
 
     let doc = "Block observed while monitoring a blockchain."
 
@@ -173,7 +173,7 @@ let monitor_heads cctxt ~next_protocols chain =
 type error +=
   | Unexpected_empty_block_list of {
       chain : string;
-      block_hash : Block_hash.t;
+      block_hash : Tezos_crypto.Block_hash.t;
       length : int;
     }
 
@@ -190,13 +190,13 @@ let () =
         "Unexpected empty block list retrieved from chain %s at block %a, \
          length %d"
         chain
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block_hash
         length)
     Data_encoding.(
       obj3
         (req "chain" string)
-        (req "block_hash" Block_hash.encoding)
+        (req "block_hash" Tezos_crypto.Block_hash.encoding)
         (req "length" int31))
     (function
       | Unexpected_empty_block_list {chain; block_hash; length} ->

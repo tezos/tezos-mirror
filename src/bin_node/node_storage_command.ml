@@ -122,7 +122,7 @@ module Term = struct
       Context.Checks.Pack.Reconstruct_index.run ~root ~output ~index_log_size () ;
       return_unit)
 
-  let to_context_hash chain_store (hash : Block_hash.t) =
+  let to_context_hash chain_store (hash : Tezos_crypto.Block_hash.t) =
     let open Lwt_result_syntax in
     let* block = Store.Block.read_block chain_store hash in
     return (Store.Block.context_hash block)
@@ -140,19 +140,19 @@ module Term = struct
       Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
     in
     let genesis = cfg.blockchain_network.genesis in
-    let chain_id = Chain_id.of_block_hash genesis.block in
+    let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.block in
     let* chain_store = Store.get_chain_store store chain_id in
     let to_context_hash = to_context_hash chain_store in
     let* block_hash =
       match block with
-      | Some block -> Lwt.return (Block_hash.of_b58check block)
+      | Some block -> Lwt.return (Tezos_crypto.Block_hash.of_b58check block)
       | None ->
           let*! head = Store.Chain.current_head chain_store in
           return (Store.Block.hash head)
     in
     let* context_hash = to_context_hash block_hash in
     let*! () = Store.close_store store in
-    return (Context_hash.to_b58check context_hash)
+    return (Tezos_crypto.Context_hash.to_b58check context_hash)
 
   let integrity_check_inodes config_file data_dir block =
     Node_shared_arg.process_command

@@ -44,7 +44,7 @@ module Event = struct
       ~name:"predecessor_less_block"
       ~msg:"Observing that a parent of block {blk_h} has no predecessor"
       ~level:Warning
-      ("blk_h", Block_hash.encoding)
+      ("blk_h", Tezos_crypto.Block_hash.encoding)
 end
 
 type error_classification =
@@ -55,7 +55,7 @@ type error_classification =
 
 type classification = [`Applied | `Prechecked | error_classification]
 
-module Map = Operation_hash.Map
+module Map = Tezos_crypto.Operation_hash.Map
 module Sized_map = Tezos_base.Sized.MakeSizedMap (Map)
 
 (** This type wraps together:
@@ -66,7 +66,7 @@ module Sized_map = Tezos_base.Sized.MakeSizedMap (Map)
     All operations must maintain integrity between the 2!
 *)
 type 'protocol_data bounded_map = {
-  ring : Operation_hash.t Ringo.Ring.t;
+  ring : Tezos_crypto.Operation_hash.t Ringo.Ring.t;
   mutable map : ('protocol_data Prevalidation.operation * error list) Map.t;
 }
 
@@ -82,7 +82,7 @@ let mk_empty_bounded_map ring_size =
 
 type parameters = {
   map_size_limit : int;
-  on_discarded_operation : Operation_hash.t -> unit;
+  on_discarded_operation : Tezos_crypto.Operation_hash.t -> unit;
 }
 
 (** Note that [applied] and [in_mempool] are intentionally unbounded.
@@ -97,7 +97,7 @@ type 'protocol_data t = {
   branch_delayed : 'protocol_data bounded_map;
   mutable applied_rev : 'protocol_data Prevalidation.operation list;
   mutable prechecked : 'protocol_data Prevalidation.operation Sized_map.t;
-  mutable unparsable : Operation_hash.Set.t;
+  mutable unparsable : Tezos_crypto.Operation_hash.Set.t;
   mutable in_mempool :
     ('protocol_data Prevalidation.operation * classification) Map.t;
 }
@@ -110,7 +110,7 @@ let create parameters =
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
     prechecked = Sized_map.empty;
-    unparsable = Operation_hash.Set.empty;
+    unparsable = Tezos_crypto.Operation_hash.Set.empty;
     in_mempool = Map.empty;
     applied_rev = [];
   }
@@ -134,13 +134,13 @@ let is_empty
      [in_mempool] is the union of all other fields (see the MLI for
      detailed documentation of this invariant) except unparsable
      operations which are not classified yet. *)
-  Map.is_empty in_mempool && Operation_hash.Set.is_empty unparsable
+  Map.is_empty in_mempool && Tezos_crypto.Operation_hash.Set.is_empty unparsable
 
 let set_of_bounded_map bounded_map =
   Map.fold
-    (fun oph _ acc -> Operation_hash.Set.add oph acc)
+    (fun oph _ acc -> Tezos_crypto.Operation_hash.Set.add oph acc)
     bounded_map.map
-    Operation_hash.Set.empty
+    Tezos_crypto.Operation_hash.Set.empty
 
 let flush (classes : 'protocol_data t) ~handle_branch_refused =
   let remove_map_from_in_mempool map =
@@ -167,13 +167,13 @@ let flush (classes : 'protocol_data t) ~handle_branch_refused =
   remove_list_from_in_mempool classes.applied_rev ;
   classes.applied_rev <- [] ;
   remove_map_from_in_mempool (Sized_map.to_map classes.prechecked) ;
-  classes.unparsable <- Operation_hash.Set.empty ;
+  classes.unparsable <- Tezos_crypto.Operation_hash.Set.empty ;
   classes.prechecked <- Sized_map.empty
 
 let is_in_mempool oph classes = Map.find oph classes.in_mempool
 
 let is_known_unparsable oph classes =
-  Operation_hash.Set.mem oph classes.unparsable
+  Tezos_crypto.Operation_hash.Set.mem oph classes.unparsable
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
@@ -205,7 +205,8 @@ let remove oph classes =
        | `Applied ->
            classes.applied_rev <-
              List.filter
-               (fun op -> Operation_hash.(op.Prevalidation.hash <> oph))
+               (fun op ->
+                 Tezos_crypto.Operation_hash.(op.Prevalidation.hash <> oph))
                classes.applied_rev) ;
       Some (op, classification)
 
@@ -253,7 +254,8 @@ let handle_error oph op classification classes =
   classes.in_mempool <- Map.add oph (op, classification) classes.in_mempool
 
 let add_unparsable oph classes =
-  classes.unparsable <- Operation_hash.Set.add oph classes.unparsable ;
+  classes.unparsable <-
+    Tezos_crypto.Operation_hash.Set.add oph classes.unparsable ;
   classes.parameters.on_discarded_operation oph
 
 let add classification op classes =
@@ -297,14 +299,14 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
      +> if outdated then classes.outdated.map else Map.empty
 
 type 'block block_tools = {
-  hash : 'block -> Block_hash.t;
+  hash : 'block -> Tezos_crypto.Block_hash.t;
   operations : 'block -> Operation.t list list;
-  all_operation_hashes : 'block -> Operation_hash.t list list;
+  all_operation_hashes : 'block -> Tezos_crypto.Operation_hash.t list list;
 }
 
 type 'block chain_tools = {
-  clear_or_cancel : Operation_hash.t -> unit;
-  inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
+  clear_or_cancel : Tezos_crypto.Operation_hash.t -> unit;
+  inject_operation : Tezos_crypto.Operation_hash.t -> Operation.t -> unit Lwt.t;
   new_blocks :
     from_block:'block -> to_block:'block -> ('block * 'block list) Lwt.t;
   read_predecessor_opt : 'block -> 'block option Lwt.t;
@@ -313,15 +315,15 @@ type 'block chain_tools = {
 (* There's detailed documentation in the mli *)
 let handle_live_operations ~classes ~(block_store : 'block block_tools)
     ~(chain : 'block chain_tools) ~(from_branch : 'block) ~(to_branch : 'block)
-    ~(is_branch_alive : Block_hash.t -> bool)
+    ~(is_branch_alive : Tezos_crypto.Block_hash.t -> bool)
     ~(parse :
-       Operation_hash.t ->
+       Tezos_crypto.Operation_hash.t ->
        Operation.t ->
        'protocol_data Prevalidation.operation option) old_mempool =
   let open Lwt_syntax in
   let rec pop_block ancestor (block : 'block) mempool =
     let hash = block_store.hash block in
-    if Block_hash.equal hash ancestor then Lwt.return mempool
+    if Tezos_crypto.Block_hash.equal hash ancestor then Lwt.return mempool
     else
       let operations = block_store.operations block in
       let* mempool =
@@ -350,7 +352,8 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
                       unparsable and it is ok. *)
                    add_unparsable oph classes ;
                    mempool
-               | Some parsed_op -> Operation_hash.Map.add oph parsed_op mempool))
+               | Some parsed_op ->
+                   Tezos_crypto.Operation_hash.Map.add oph parsed_op mempool))
           mempool
           operations
       in
@@ -374,7 +377,8 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
     let operations = block_store.all_operation_hashes block in
     List.iter (List.iter chain.clear_or_cancel) operations ;
     List.fold_left
-      (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
+      (List.fold_left (fun mempool h ->
+           Tezos_crypto.Operation_hash.Map.remove h mempool))
       mempool
       operations
   in
@@ -405,7 +409,8 @@ let recycle_operations ~from_branch ~to_branch ~live_blocks ~classes ~parse
       ~chain
       ~from_branch
       ~to_branch
-      ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
+      ~is_branch_alive:(fun branch ->
+        Tezos_crypto.Block_hash.Set.mem branch live_blocks)
       ~parse
       (Map.union
          (fun _key v _ -> Some v)
@@ -429,7 +434,7 @@ module Internal_for_tests = struct
   (** [copy_bounded_map bm] returns a deep copy of [bm] *)
   let copy_bounded_map (bm : 'protocol_data bounded_map) :
       'protocol_data bounded_map =
-    let copy_ring (ring : Operation_hash.t Ringo.Ring.t) =
+    let copy_ring (ring : Tezos_crypto.Operation_hash.t Ringo.Ring.t) =
       let result = Ringo.Ring.capacity ring |> Ringo.Ring.create in
       List.iter (Ringo.Ring.add result) (Ringo.Ring.elements ring) ;
       result
@@ -455,7 +460,10 @@ module Internal_for_tests = struct
   let[@coverage off] bounded_map_pp ppf bounded_map =
     bounded_map.map |> Map.bindings
     |> List.map (fun (key, _value) -> key)
-    |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+    |> Format.fprintf
+         ppf
+         "%a"
+         (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
 
   let[@coverage off] pp ppf
       {
@@ -472,19 +480,31 @@ module Internal_for_tests = struct
     let applied_pp ppf applied =
       applied
       |> List.map (fun op -> op.Prevalidation.hash)
-      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+      |> Format.fprintf
+           ppf
+           "%a"
+           (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
     in
     let in_mempool_pp ppf in_mempool =
       in_mempool |> Map.bindings |> List.map fst
-      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+      |> Format.fprintf
+           ppf
+           "%a"
+           (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
     in
     let prechecked_pp ppf prechecked =
       prechecked |> Sized_map.bindings |> List.map fst
-      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+      |> Format.fprintf
+           ppf
+           "%a"
+           (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
     in
     let unparsable_pp ppf unparsable =
-      unparsable |> Operation_hash.Set.elements
-      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+      unparsable |> Tezos_crypto.Operation_hash.Set.elements
+      |> Format.fprintf
+           ppf
+           "%a"
+           (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
     in
     Format.fprintf
       ppf

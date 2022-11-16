@@ -128,7 +128,7 @@ let commands () =
   in
   let signature_parameter =
     parameter (fun _cctxt s ->
-        match Signature.of_b58check_opt s with
+        match Tezos_crypto.Signature.of_b58check_opt s with
         | Some s -> return s
         | None -> failwith "Not given a valid signature")
   in
@@ -442,8 +442,8 @@ let commands () =
                       Hex.pp
                       (Hex.of_bytes (Script_expr_hash.to_bytes hash)) );
                   ( "Ledger Blake2b hash",
-                    Base58.raw_encode Blake2B.(hash_bytes [bytes] |> to_string)
-                  );
+                    Tezos_crypto.Base58.raw_encode
+                      Tezos_crypto.Blake2B.(hash_bytes [bytes] |> to_string) );
                   ( "Raw Sha256 hash",
                     asprintf
                       "0x%a"
@@ -658,8 +658,8 @@ let commands () =
       @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
         Client_keys.sign cctxt sk bytes >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
-        return_unit);
+        cctxt#message "Signature: %a" Tezos_crypto.Signature.pp signature
+        >>= fun () -> return_unit);
     command
       ~group
       ~desc:

@@ -27,10 +27,10 @@
 module Request : sig
   type ('a, 'b) t =
     | Flush :
-        Block_hash.t
+        Tezos_crypto.Block_hash.t
         * Chain_validator_worker_state.update
-        * Block_hash.Set.t
-        * Operation_hash.Set.t
+        * Tezos_crypto.Block_hash.Set.t
+        * Tezos_crypto.Operation_hash.Set.t
         -> (unit, error trace) t
         (** The chain changed, the mempool is being notified of the new state. *)
     | Notify : P2p_peer.Id.t * Mempool.t -> (unit, Empty.t) t
@@ -39,11 +39,11 @@ module Request : sig
         (** Operations not yet processed should be processed. *)
     | Inject : {op : Operation.t; force : bool} -> (unit, error trace) t
         (** Operation has been locally injected (sent) to the node. *)
-    | Arrived : Operation_hash.t * Operation.t -> (unit, Empty.t) t
+    | Arrived : Tezos_crypto.Operation_hash.t * Operation.t -> (unit, Empty.t) t
         (** Operation was fetched by the node. *)
     | Advertise : (unit, Empty.t) t
         (** Current mempool should be advertised to all known peers. *)
-    | Ban : Operation_hash.t -> (unit, error trace) t
+    | Ban : Tezos_crypto.Operation_hash.t -> (unit, error trace) t
         (** User requested the node to ban operation with this hash. *)
 
   type view = View : _ t -> view
@@ -74,7 +74,7 @@ module Operation_encountered : sig
     | Notified of P2p_peer_id.t option
     | Other
 
-  type t = situation * Operation_hash.t
+  type t = situation * Tezos_crypto.Operation_hash.t
 
   val encoding : t Data_encoding.t
 

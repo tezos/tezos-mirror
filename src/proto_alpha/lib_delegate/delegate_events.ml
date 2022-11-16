@@ -50,8 +50,8 @@ module Denunciator = struct
       ~level
       ~name:"double_endorsement_detected"
       ~msg:"double endorsement detected"
-      ("existing_endorsement", Operation_hash.encoding)
-      ("new_endorsement", Operation_hash.encoding)
+      ("existing_endorsement", Tezos_crypto.Operation_hash.encoding)
+      ("new_endorsement", Tezos_crypto.Operation_hash.encoding)
 
   let double_endorsement_denounced =
     declare_2
@@ -59,7 +59,7 @@ module Denunciator = struct
       ~level
       ~name:"double_endorsement_denounced"
       ~msg:"double endorsement evidence injected: {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
@@ -69,8 +69,8 @@ module Denunciator = struct
       ~level
       ~name:"double_preendorsement_detected"
       ~msg:"double preendorsement detected"
-      ("existing_preendorsement", Operation_hash.encoding)
-      ("new_preendorsement", Operation_hash.encoding)
+      ("existing_preendorsement", Tezos_crypto.Operation_hash.encoding)
+      ("new_preendorsement", Tezos_crypto.Operation_hash.encoding)
 
   let double_preendorsement_denounced =
     declare_2
@@ -78,7 +78,7 @@ module Denunciator = struct
       ~level
       ~name:"double_preendorsement_denounced"
       ~msg:"double preendorsement evidence injected: {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
@@ -88,7 +88,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"inconsistent_endorsement"
       ~msg:"inconsistent endorsement found {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
 
   let unexpected_pruned_block =
     declare_1
@@ -96,7 +96,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"unexpected_pruned_block"
       ~msg:"unexpected pruned block: {hash}"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let double_baking_but_not =
     declare_0
@@ -120,7 +120,7 @@ module Denunciator = struct
       ~level
       ~name:"double_baking_denounced"
       ~msg:"double baking evidence injected {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
@@ -139,7 +139,7 @@ module Denunciator = struct
       ~name:"accuser_saw_block"
       ~msg:"block level: {level}"
       ("level", Alpha_context.Raw_level.encoding)
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let fetch_operations_error =
     declare_1
@@ -147,8 +147,8 @@ module Denunciator = struct
       ~level:Error
       ~name:"fetch_operations_error"
       ~msg:"error while fetching operations of block {hash}"
-      ("hash", Block_hash.encoding)
-      ~pp1:Block_hash.pp
+      ("hash", Tezos_crypto.Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
 
   let accuser_processed_block =
     declare_1
@@ -156,7 +156,7 @@ module Denunciator = struct
       ~level
       ~name:"accuser_processed_block"
       ~msg:"block {hash} registered"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let accuser_block_error =
     declare_2
@@ -165,7 +165,7 @@ module Denunciator = struct
       ~name:"accuser_block_error"
       ~msg:"error while processing block {hash} {errors}"
       ~pp2:pp_print_top_error_of_trace
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end
 

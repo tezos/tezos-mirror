@@ -35,11 +35,11 @@ open Filename.Infix
 (** Basic blocks *)
 
 let genesis_block_hash =
-  Block_hash.of_b58check_exn
+  Tezos_crypto.Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol_hash =
-  Protocol_hash.of_b58check_exn
+  Tezos_crypto.Protocol_hash.of_b58check_exn
     "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let genesis_time = Time.Protocol.of_seconds 0L
@@ -65,7 +65,7 @@ let genesis : Genesis.t =
     protocol = genesis_protocol_hash;
   }
 
-let chain_id = Chain_id.of_block_hash genesis_block_hash
+let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis_block_hash
 
 let patch_context ctxt =
   let open Lwt_syntax in

@@ -1040,7 +1040,7 @@ let octez_base =
     ~deps:
       [
         octez_stdlib |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         data_encoding |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_rpc;
@@ -1076,7 +1076,7 @@ let octez_base_unix =
     ~deps:
       [
         octez_error_monad |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_base |> open_;
         octez_hacl;
         octez_stdlib |> open_;
@@ -1795,7 +1795,7 @@ let octez_sapling =
         ctypes_stubs_js;
         data_encoding;
         octez_stdlib |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_rust_lib;
         octez_lwt_result_stdlib;
@@ -1849,7 +1849,7 @@ let _octez_sapling_tests =
     ~deps:
       [
         octez_sapling |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         str;
         octez_base;
         octez_base_unix;
@@ -2612,7 +2612,7 @@ let _octez_signer_backends_tests =
         octez_base_unix;
         octez_stdlib |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        octez_crypto |> open_;
+        octez_crypto;
         octez_client_base |> open_;
         octez_signer_backends |> open_;
         alcotest_lwt;
@@ -2656,7 +2656,7 @@ let _octez_signer_backends_unix_tests =
       [
         octez_error_monad |> open_;
         octez_stdlib |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_client_base |> open_;
         octez_signer_backends_unix |> open_;
         alcotest_lwt;
@@ -2949,6 +2949,7 @@ let octez_benchmark =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_crypto;
         octez_micheline;
         octez_clic;
         data_encoding;
@@ -3011,6 +3012,7 @@ let octez_micheline_rewriting =
         zarith;
         zarith_stubs_js;
         octez_stdlib |> open_;
+        octez_crypto;
         octez_error_monad |> open_;
         octez_micheline |> open_;
       ]
@@ -3026,7 +3028,7 @@ let octez_shell_benchmarks =
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_error_monad |> open_;
         octez_benchmark |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_context;
         octez_shell_context;
         octez_micheline;
@@ -4722,7 +4724,7 @@ module Protocol = Protocol
             |> open_;
             octez_base_unix;
             octez_stdlib_unix |> open_;
-            octez_crypto |> open_;
+            octez_crypto;
             main |> open_;
             octez_micheline |> open_;
             client |> if_some |> open_;
@@ -4862,7 +4864,7 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
             |> open_;
-            octez_crypto |> open_;
+            octez_crypto;
             main |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;
@@ -5021,7 +5023,7 @@ module Protocol = Protocol
             octez_benchmark |> open_;
             benchmark_type_inference |> if_some |> open_;
             main |> open_;
-            octez_crypto |> open_;
+            octez_crypto;
             parameters |> if_some;
             hashcons;
             test_helpers |> open_;
@@ -5093,7 +5095,7 @@ module Protocol = Protocol
             benchmark |> if_some |> open_;
             benchmark_type_inference |> if_some |> open_;
             main |> open_ |> open_ ~m:"Protocol";
-            octez_crypto |> open_;
+            octez_crypto;
             octez_shell_benchmarks;
             octez_micheline |> open_;
             test_helpers |> open_;
@@ -5503,7 +5505,7 @@ let _yes_wallet_test =
     ~deps:
       [
         octez_error_monad |> open_ ~m:"TzLwtreslib";
-        octez_crypto |> open_;
+        octez_crypto;
         zarith;
         zarith_stubs_js;
         data_encoding |> open_;

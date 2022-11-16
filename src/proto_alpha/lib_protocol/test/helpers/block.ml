@@ -31,7 +31,7 @@ open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
 type t = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
@@ -93,7 +93,11 @@ let get_next_baker_by_account pkh block =
   >>=? fun bakers ->
   (match List.hd bakers with
   | Some b -> return b
-  | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
+  | None ->
+      failwith
+        "No slots found for %a"
+        Tezos_crypto.Signature.Public_key_hash.pp
+        pkh)
   >>=? fun {
              Plugin.RPC.Baking_rights.delegate = pkh;
              consensus_key;
@@ -122,7 +126,7 @@ let get_next_baker_excluding excludes block =
          (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
            not
              (List.mem
-                ~equal:Signature.Public_key_hash.equal
+                ~equal:Tezos_crypto.Signature.Public_key_hash.equal
                 consensus_key
                 excludes))
          bakers
@@ -181,7 +185,7 @@ module Forge = struct
         (* We don't care of the following values, only the shell validates them. *)
         proto_level = 0;
         validation_passes = 0;
-        context = Context_hash.zero;
+        context = Tezos_crypto.Context_hash.zero;
       }
 
   let set_seed_nonce_hash seed_nonce_hash
@@ -199,8 +203,9 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Signature.sign
-        ~watermark:Block_header.(to_watermark (Block_header Chain_id.zero))
+      Tezos_crypto.Signature.sign
+        ~watermark:
+          Block_header.(to_watermark (Block_header Tezos_crypto.Chain_id.zero))
         signer_account.sk
         unsigned_bytes
     in
@@ -242,7 +247,8 @@ module Forge = struct
     >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
-      Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
+      Tezos_crypto.Operation_list_list_hash.compute
+        [Tezos_crypto.Operation_list_hash.compute hashes]
     in
     let shell =
       make_shell
@@ -391,13 +397,13 @@ let initial_alpha_context ?(commitments = []) constants
     ~typecheck
     ~level
     ~timestamp
-    Chain_id.zero
+    Tezos_crypto.Chain_id.zero
     ctxt
   >|= Environment.wrap_tzresult
 
 let genesis_with_parameters parameters =
   let hash =
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let fitness =
@@ -413,7 +419,7 @@ let genesis_with_parameters parameters =
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Operation_list_list_hash.zero
+      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
   in
   let contents =
     Forge.make_contents
@@ -432,12 +438,16 @@ let genesis_with_parameters parameters =
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  let chain_id = Chain_id.of_block_hash hash in
+  let chain_id = Tezos_crypto.Chain_id.of_block_hash hash in
   Main.init chain_id ctxt shell >|= Environment.wrap_tzresult
   >|=? fun {context; _} ->
   {
     hash;
-    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    header =
+      {
+        shell;
+        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      };
     operations = [];
     context;
   }
@@ -582,7 +592,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   in
   check_constants_consistency constants >>=? fun () ->
   let hash =
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let level = Option.value ~default:0l level in
@@ -599,7 +609,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Operation_list_list_hash.zero
+      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
   in
   return (constants, shell, hash)
 
@@ -642,7 +652,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   initial_context
     ?commitments
     ?bootstrap_contracts
-    (Chain_id.of_block_hash hash)
+    (Tezos_crypto.Chain_id.of_block_hash hash)
     constants
     shell
     bootstrap_accounts
@@ -656,7 +666,11 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   in
   {
     hash;
-    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    header =
+      {
+        shell;
+        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      };
     operations = [];
     context;
   }
@@ -683,7 +697,7 @@ let get_application_vstate (pred : t) (operations : Protocol.operation trace) =
   let open Environment.Error_monad in
   begin_validation_and_application
     pred.context
-    Chain_id.zero
+    Tezos_crypto.Chain_id.zero
     (Application header)
     ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
@@ -705,7 +719,7 @@ let get_construction_vstate ?(policy = By_round 0) ?timestamp
   in
   begin_validation_and_application
     pred.context
-    Chain_id.zero
+    Tezos_crypto.Chain_id.zero
     mode
     ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
@@ -767,7 +781,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     | Application ->
         begin_validation_and_application
           pred.context
-          Chain_id.zero
+          Tezos_crypto.Chain_id.zero
           (Application header)
           ~predecessor:pred.header.shell
         >|= Environment.wrap_tzresult

@@ -280,7 +280,7 @@ let l2_message_encoding =
                     (req "result" transaction_result_encoding))))
            (req "withdrawals" (list Tx_rollup_withdraw.encoding))
            (req "indexes" indexes_encoding)
-           (req "aggregated_signature" Bls.encoding))
+           (req "aggregated_signature" Tezos_crypto.Bls.encoding))
         (function
           | Ok_batch
               {
@@ -314,7 +314,7 @@ let l2_message_encoding =
               "transactions"
               (list Tx_rollup_l2_batch.V1.transaction_encoding))
            (req "errors" Error_monad.trace_encoding)
-           (req "aggregated_signature" Bls.encoding))
+           (req "aggregated_signature" Tezos_crypto.Bls.encoding))
         (function
           | Failing_batch {transactions; reasons; aggregated_signature} ->
               Some (transactions, reasons, aggregated_signature)

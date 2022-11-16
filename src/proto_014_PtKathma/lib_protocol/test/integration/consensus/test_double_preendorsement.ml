@@ -134,7 +134,7 @@ end = struct
     let denun_reward = Test_tez.(lost_deposit /! 2L) in
     (* if the baker is the endorser, he'll only loose half of the deposits *)
     let expected_endo_loss =
-      if Signature.Public_key_hash.equal baker d1 then
+      if Tezos_crypto.Signature.Public_key_hash.equal baker d1 then
         Test_tez.(lost_deposit -! denun_reward)
       else lost_deposit
     in
@@ -148,7 +148,8 @@ end = struct
        burnt deposit of d1, so it's higher
     *)
     let high, low =
-      if Signature.Public_key_hash.equal baker d1 then (bal_good, bal_bad)
+      if Tezos_crypto.Signature.Public_key_hash.equal baker d1 then
+        (bal_good, bal_bad)
       else (bal_bad, bal_good)
     in
     let diff_baker = Test_tez.(high -! low) in
@@ -160,7 +161,7 @@ end = struct
   let order_preendorsements ~correct_order op1 op2 =
     let oph1 = Operation.hash op1 in
     let oph2 = Operation.hash op2 in
-    let c = Operation_hash.compare oph1 oph2 in
+    let c = Tezos_crypto.Operation_hash.compare oph1 oph2 in
     if correct_order then if c < 0 then (op1, op2) else (op2, op1)
     else if c < 0 then (op2, op1)
     else (op1, op2)

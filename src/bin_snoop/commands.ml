@@ -84,7 +84,10 @@ module Benchmark_cmd = struct
       | Memory -> "Mem"
       | Disk {source; base_dir; header_json} ->
           let pp_src =
-            Format.asprintf "%a" Signature.Public_key_hash.pp source
+            Format.asprintf
+              "%a"
+              Tezos_crypto.Signature.Public_key_hash.pp
+              source
           in
           sprintf
             "Disk { source = %s ; base_dir = %s ; header_json = %s }"

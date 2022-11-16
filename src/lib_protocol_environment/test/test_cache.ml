@@ -676,7 +676,9 @@ let load_cache_correctly_restores_cache_in_memory builder mode
   in
   let*! ctxt0 = Context.Cache.sync ctxt ~cache_nonce:Bytes.empty in
   (* We want to avoid a cache hit in the cache of caches. *)
-  let block = Block_hash.hash_string [string_of_int (Random.bits ())] in
+  let block =
+    Tezos_crypto.Block_hash.hash_string [string_of_int (Random.bits ())]
+  in
   let ctxt0 = Context.Cache.clear ctxt0 in
   let* ctxt1 = Context.load_cache block ctxt0 mode (builder entries) in
   (* We force the execution of [value_of_key] even in Lazy mode by

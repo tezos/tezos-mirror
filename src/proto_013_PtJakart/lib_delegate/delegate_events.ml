@@ -41,7 +41,7 @@ module Revelation = struct
       ~level
       ~name:"no_nonce_reveal"
       ~msg:"nothing to reveal for block {block}"
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
 
   let reveal_nonce =
     declare_5
@@ -55,7 +55,7 @@ module Revelation = struct
       ("level", Alpha_context.Raw_level.encoding)
       ("chain", Data_encoding.string)
       ("block", Data_encoding.string)
-      ("operation", Operation_hash.encoding)
+      ("operation", Tezos_crypto.Operation_hash.encoding)
 end
 
 module Nonces = struct
@@ -99,7 +99,7 @@ module Nonces = struct
       ~level
       ~name:"found_nonce"
       ~msg:"found nonce to reveal for {hash} (level: {level})"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ("level", Alpha_context.Raw_level.encoding)
 
   let bad_nonce =
@@ -131,8 +131,8 @@ module Denunciator = struct
       ~level
       ~name:"double_endorsement_detected"
       ~msg:"double endorsement detected"
-      ("existing_endorsement", Operation_hash.encoding)
-      ("new_endorsement", Operation_hash.encoding)
+      ("existing_endorsement", Tezos_crypto.Operation_hash.encoding)
+      ("new_endorsement", Tezos_crypto.Operation_hash.encoding)
 
   let double_endorsement_denounced =
     declare_2
@@ -140,7 +140,7 @@ module Denunciator = struct
       ~level
       ~name:"double_endorsement_denounced"
       ~msg:"double endorsement evidence injected: {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
@@ -150,8 +150,8 @@ module Denunciator = struct
       ~level
       ~name:"double_preendorsement_detected"
       ~msg:"double preendorsement detected"
-      ("existing_preendorsement", Operation_hash.encoding)
-      ("new_preendorsement", Operation_hash.encoding)
+      ("existing_preendorsement", Tezos_crypto.Operation_hash.encoding)
+      ("new_preendorsement", Tezos_crypto.Operation_hash.encoding)
 
   let double_preendorsement_denounced =
     declare_2
@@ -159,7 +159,7 @@ module Denunciator = struct
       ~level
       ~name:"double_preendorsement_denounced"
       ~msg:"double preendorsement evidence injected: {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
@@ -169,7 +169,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"inconsistent_endorsement"
       ~msg:"inconsistent endorsement found {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
 
   let unexpected_pruned_block =
     declare_1
@@ -177,7 +177,7 @@ module Denunciator = struct
       ~level:Error
       ~name:"unexpected_pruned_block"
       ~msg:"unexpected pruned block: {hash}"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let double_baking_but_not =
     declare_0
@@ -201,7 +201,7 @@ module Denunciator = struct
       ~level
       ~name:"double_baking_denounced"
       ~msg:"double baking evidence injected {hash}"
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_ignore
       ("bytes", Data_encoding.bytes)
 
@@ -220,7 +220,7 @@ module Denunciator = struct
       ~name:"accuser_saw_block"
       ~msg:"block level: {level}"
       ("level", Alpha_context.Raw_level.encoding)
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let fetch_operations_error =
     declare_1
@@ -228,8 +228,8 @@ module Denunciator = struct
       ~level:Error
       ~name:"fetch_operations_error"
       ~msg:"error while fetching operations of block {hash}"
-      ("hash", Block_hash.encoding)
-      ~pp1:Block_hash.pp
+      ("hash", Tezos_crypto.Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
 
   let accuser_processed_block =
     declare_1
@@ -237,7 +237,7 @@ module Denunciator = struct
       ~level
       ~name:"accuser_processed_block"
       ~msg:"block {hash} registered"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let accuser_block_error =
     declare_2
@@ -246,7 +246,7 @@ module Denunciator = struct
       ~name:"accuser_block_error"
       ~msg:"error while processing block {hash} {errors}"
       ~pp2:pp_print_top_error_of_trace
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end
 
@@ -325,7 +325,7 @@ module Baking_forge = struct
       ~level:Info
       ~name:"inject_baked_block"
       ~msg:"Client_baking_forge.inject_block: inject {hash}"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ~pp2:pp_ignore
       ("header", Data_encoding.bytes)
       ~pp3:Format.(pp_print_list @@ pp_print_list @@ Operation.pp)
@@ -338,7 +338,7 @@ module Baking_forge = struct
       ~level:Debug
       ~name:"baking_local_validation_start"
       ~msg:"starting client-side validation after {hash}"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let context_fetch_error =
     declare_1
@@ -364,7 +364,7 @@ module Baking_forge = struct
       ~name:"baking_rejected_invalid_operation"
       ~msg:"client-side validation: filtered invalid operation {hash} {errors}"
       ~pp2:pp_print_top_error_of_trace
-      ("hash", Operation_hash.encoding)
+      ("hash", Tezos_crypto.Operation_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
   let shell_prevalidation_notice =
@@ -436,7 +436,7 @@ module Baking_forge = struct
       ~name:"try_baking"
       ~msg:
         "try baking after {hash} (slot {priority}) for {client} ({timestamp})"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ("priority", Data_encoding.int31)
       ("client", Data_encoding.string)
       ("timestamp", Time.System.encoding)
@@ -480,7 +480,7 @@ module Baking_forge = struct
       ~msg:
         "try forging locally the block header for {hash} (slot {priority}) for \
          {client} ({timestamp})"
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ("priority", Data_encoding.int31)
       ("client", Data_encoding.string)
       ("timestamp", Time.System.encoding)
@@ -497,7 +497,7 @@ module Baking_forge = struct
       ("priority", Data_encoding.int31)
       ("fitness", Fitness.encoding)
       ("client", Data_encoding.string)
-      ("predecessor", Block_hash.encoding)
+      ("predecessor", Tezos_crypto.Block_hash.encoding)
       ("baker", Client_keys.Public_key_hash.encoding)
 
   let injected_block =
@@ -511,9 +511,9 @@ module Baking_forge = struct
          {operations})"
       ~pp6:Fitness.pp
       ~pp7:Format.(pp_print_list Operation.pp)
-      ("block_hash", Block_hash.encoding)
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
       ("client", Data_encoding.string)
-      ("predecessor", Block_hash.encoding)
+      ("predecessor", Tezos_crypto.Block_hash.encoding)
       ("level", Alpha_context.Raw_level.encoding)
       ("priority", Data_encoding.int31)
       ("fitness", Fitness.encoding)
@@ -549,7 +549,7 @@ module Baking_forge = struct
       ("priority", Data_encoding.int31)
       ("timestamp", Time.System.encoding)
       ("client", Data_encoding.string)
-      ("predecessor", Block_hash.encoding)
+      ("predecessor", Tezos_crypto.Block_hash.encoding)
       ("baker", Client_keys.Public_key_hash.encoding)
 
   let read_nonce_fail =
@@ -689,10 +689,10 @@ module Endorsement = struct
       ~msg:
         "injected endorsement for block '{block_hash}' (level {level}, \
          contract {client}) '{op_hash}'"
-      ("block_hash", Block_hash.encoding)
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
       ("level", Alpha_context.Raw_level.encoding)
       ("client", Data_encoding.string)
-      ("op_hash", Operation_hash.encoding)
+      ("op_hash", Tezos_crypto.Operation_hash.encoding)
       ("baker", Client_keys.Public_key_hash.encoding)
 
   let endorsing =
@@ -701,7 +701,7 @@ module Endorsement = struct
       ~level:Debug
       ~name:"endorsing"
       ~msg:"endorsing {block} for {client} (level {level})!"
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
       ("client", Data_encoding.string)
       ("level", Alpha_context.Raw_level.encoding)
 
@@ -711,7 +711,7 @@ module Endorsement = struct
       ~level:Debug
       ~name:"check_endorsement_ok"
       ~msg:"checking if allowed to endorse block {block} for {client}"
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
       ("client", Data_encoding.string)
 
   let endorsement_no_slots_found =
@@ -720,7 +720,7 @@ module Endorsement = struct
       ~level:Debug
       ~name:"endorsement_no_slots_found"
       ~msg:"no slot found for {block}/{client}"
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
       ("client", Data_encoding.string)
 
   let endorsement_slots_found =
@@ -738,7 +738,7 @@ module Endorsement = struct
               (pp_print_list
                  ~pp_sep:(fun f () -> pp_print_string f "; ")
                  Format.pp_print_int))
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
       ("client", Data_encoding.string)
       ("slots", Data_encoding.list Data_encoding.int31)
 
@@ -756,7 +756,7 @@ module Endorsement = struct
       ~level:Info
       ~name:"endorsement_stale_block"
       ~msg:"ignore block {block}: forged too far the past"
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
 
   let endorsement_got_block =
     declare_1
@@ -764,7 +764,7 @@ module Endorsement = struct
       ~level:Info
       ~name:"endorsement_got_block"
       ~msg:"received new block {block}"
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
 
   let wait_before_injecting =
     declare_2

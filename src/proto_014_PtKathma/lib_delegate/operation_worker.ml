@@ -145,7 +145,7 @@ module Events = struct
 end
 
 type candidate = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
 }
@@ -158,7 +158,7 @@ let candidate_encoding =
     (fun (hash, round_watched, payload_hash_watched) ->
       {hash; round_watched; payload_hash_watched})
     (obj3
-       (req "hash" Block_hash.encoding)
+       (req "hash" Tezos_crypto.Block_hash.encoding)
        (req "round_watched" Round.encoding)
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
@@ -539,7 +539,8 @@ let retrieve_pending_operations cctxt state =
       state.operation_pool
       (List.rev_map
          (fun (_, (op, _)) -> op)
-         (Operation_hash.Map.bindings pending_mempool.branch_delayed)) ;
+         (Tezos_crypto.Operation_hash.Map.bindings
+            pending_mempool.branch_delayed)) ;
   return_unit
 
 let get_current_operations state = state.operation_pool

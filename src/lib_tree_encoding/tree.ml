@@ -47,7 +47,7 @@ module type S = sig
 
   val find_tree : tree -> key -> tree option Lwt.t
 
-  val hash : tree -> Context_hash.t
+  val hash : tree -> Tezos_crypto.Context_hash.t
 
   val length : tree -> key -> int Lwt.t
 
@@ -80,7 +80,7 @@ let find : type tree. tree backend -> tree -> key -> value option Lwt.t =
 let find_tree : type tree. tree backend -> tree -> key -> tree option Lwt.t =
  fun (module T) tree key -> T.find_tree tree key
 
-let hash : type tree. tree backend -> tree -> Context_hash.t =
+let hash : type tree. tree backend -> tree -> Tezos_crypto.Context_hash.t =
  fun (module T) tree -> T.hash tree
 
 let length : type tree. tree backend -> tree -> key -> int Lwt.t =

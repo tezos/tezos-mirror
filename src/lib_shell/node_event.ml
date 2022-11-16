@@ -47,7 +47,7 @@ let store_protocol_already_included =
     ~name:"store_protocol_already_included"
     ~msg:"protocol {protocol} is already in store: nothing to do"
     ~level:Debug
-    ("protocol", Protocol_hash.encoding)
+    ("protocol", Tezos_crypto.Protocol_hash.encoding)
 
 let store_protocol_missing_files =
   declare_1
@@ -55,7 +55,7 @@ let store_protocol_missing_files =
     ~name:"store_protocol_missing_files"
     ~msg:"protocol {protocol} won't be stored: missing source files"
     ~level:Warning
-    ("protocol", Protocol_hash.encoding)
+    ("protocol", Tezos_crypto.Protocol_hash.encoding)
 
 let store_protocol_incorrect_hash =
   declare_1
@@ -63,7 +63,7 @@ let store_protocol_incorrect_hash =
     ~name:"store_protocol_incorrect_hash"
     ~msg:"protocol {protocol} won't be stored: wrong hash"
     ~level:Warning
-    ("protocol", Protocol_hash.encoding)
+    ("protocol", Tezos_crypto.Protocol_hash.encoding)
 
 let store_protocol_success =
   declare_1
@@ -71,7 +71,7 @@ let store_protocol_success =
     ~name:"store_successful_store"
     ~msg:"protocol {protocol} successfully stored"
     ~level:Info
-    ("protocol", Protocol_hash.encoding)
+    ("protocol", Tezos_crypto.Protocol_hash.encoding)
 
 let section = section_root @ ["storage_consistency"]
 

@@ -60,5 +60,5 @@ val make_index : context_path:string -> Tezos_context.Context.index Lwt.t
     to obtain an [index], you need a full-fledged context on disk. *)
 val of_index :
   index:Tezos_context.Context.index ->
-  Context_hash.t ->
+  Tezos_crypto.Context_hash.t ->
   Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t

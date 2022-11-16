@@ -45,12 +45,16 @@ let compiler_name = "octez-protocol-compiler"
 let do_compile hash p =
   let open Lwt_syntax in
   let* datadir = get_datadir () in
-  let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
-  let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
+  let source_dir =
+    datadir // Tezos_crypto.Protocol_hash.to_short_b58check hash // "src"
+  in
+  let log_file =
+    datadir // Tezos_crypto.Protocol_hash.to_short_b58check hash // "LOG"
+  in
   let plugin_file =
     datadir
-    // Protocol_hash.to_short_b58check hash
-    // Format.asprintf "protocol_%a" Protocol_hash.pp hash
+    // Tezos_crypto.Protocol_hash.to_short_b58check hash
+    // Format.asprintf "protocol_%a" Tezos_crypto.Protocol_hash.pp hash
   in
   let* r = Tezos_base_unix.Protocol_files.write_dir source_dir ~hash p in
   match r with

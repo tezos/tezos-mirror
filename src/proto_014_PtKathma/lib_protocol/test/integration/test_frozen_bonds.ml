@@ -54,7 +54,7 @@ let very_small_random_amount () =
   | Some x -> x
 
 let nonce_zero =
-  Origination_nonce.Internal_for_tests.initial Operation_hash.zero
+  Origination_nonce.Internal_for_tests.initial Tezos_crypto.Operation_hash.zero
 
 let mk_tx_rollup ?(nonce = nonce_zero) () =
   ( Tx_rollup.Internal_for_tests.originated_tx_rollup nonce,
@@ -74,13 +74,13 @@ let create_context () =
     delegate's pkh. *)
 let init_test ~user_is_delegate =
   create_context () >>=? fun (ctxt, _) ->
-  let delegate, delegate_pk, _ = Signature.generate_key () in
+  let delegate, delegate_pk, _ = Tezos_crypto.Signature.generate_key () in
   let delegate_contract = Contract.Implicit delegate in
   let delegate_account = `Contract (Contract.Implicit delegate) in
   let user_contract =
     if user_is_delegate then delegate_contract
     else
-      let user, _, _ = Signature.generate_key () in
+      let user, _, _ = Tezos_crypto.Signature.generate_key () in
       Contract.Implicit user
   in
   let user_account = `Contract user_contract in
@@ -398,7 +398,7 @@ let test_rpcs () =
 let test_scenario scenario =
   init_test ~user_is_delegate:false
   >>=? fun (ctxt, user_contract, user_account, delegate1) ->
-  let delegate2, delegate_pk2, _ = Signature.generate_key () in
+  let delegate2, delegate_pk2, _ = Tezos_crypto.Signature.generate_key () in
   let delegate_contract2 = Contract.Implicit delegate2 in
   let delegate_account2 = `Contract delegate_contract2 in
   let delegate_balance2 = big_random_amount () in

@@ -52,7 +52,7 @@ let previously_validated_protocol =
     ~name:"previously_validated_protocol"
     ~msg:"protocol {hash} already validated, ignoring"
     ~level:Debug
-    ("hash", Protocol_hash.encoding)
+    ("hash", Tezos_crypto.Protocol_hash.encoding)
 
 let pushing_protocol_validation =
   declare_1
@@ -60,7 +60,7 @@ let pushing_protocol_validation =
     ~name:"pushing_protocol_validation"
     ~msg:"pushing validation request for protocol {hash}"
     ~level:Debug
-    ("hash", Protocol_hash.encoding)
+    ("hash", Tezos_crypto.Protocol_hash.encoding)
 
 let fetching_protocol =
   declare_2
@@ -68,5 +68,5 @@ let fetching_protocol =
     ~name:"fetching_protocol"
     ~msg:"fetching protocol {hash}"
     ~level:Notice
-    ("hash", Protocol_hash.encoding)
+    ("hash", Tezos_crypto.Protocol_hash.encoding)
     ("source", Data_encoding.option P2p_peer.Id.encoding)

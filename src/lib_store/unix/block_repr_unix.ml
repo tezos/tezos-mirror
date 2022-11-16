@@ -107,7 +107,7 @@ let pread_block fd ~file_offset =
 let raw_pruned_block_length bytes =
   (* Hypothesis: (Int32.to_int total_len + 4 <= Bytes.length bytes) *)
   let offset = 4 in
-  let offset = offset + Block_hash.size (* hash *) in
+  let offset = offset + Tezos_crypto.Block_hash.size (* hash *) in
   let header_length = Bytes.get_int32_be bytes offset in
   let offset = offset + 4 + Int32.to_int header_length in
   let operations_length = Bytes.get_int32_be bytes offset in
@@ -115,7 +115,7 @@ let raw_pruned_block_length bytes =
   let offset =
     (* block metadata hash *)
     if Bytes.get_uint8 bytes offset = 0xff then
-      offset + 1 + Block_metadata_hash.size
+      offset + 1 + Tezos_crypto.Block_metadata_hash.size
     else offset + 1
   in
   let offset =
@@ -137,21 +137,22 @@ let prune_raw_block_bytes bytes =
 
 let hash_offset = 4
 
-let header_length_offset = hash_offset + Block_hash.size
+let header_length_offset = hash_offset + Tezos_crypto.Block_hash.size
 
 let level_offset = header_length_offset + 4
 
 let predecessor_offset = level_offset + 4 (* level *) + 1 (* proto_level *)
 
 let raw_get_block_hash block_bytes =
-  Block_hash.of_bytes_exn (Bytes.sub block_bytes hash_offset Block_hash.size)
+  Tezos_crypto.Block_hash.of_bytes_exn
+    (Bytes.sub block_bytes hash_offset Tezos_crypto.Block_hash.size)
 
 let raw_get_block_level block_bytes =
   Bytes.get_int32_be block_bytes level_offset
 
 let raw_get_block_predecessor block_bytes =
-  Block_hash.of_bytes_exn
-    (Bytes.sub block_bytes predecessor_offset Block_hash.size)
+  Tezos_crypto.Block_hash.of_bytes_exn
+    (Bytes.sub block_bytes predecessor_offset Tezos_crypto.Block_hash.size)
 
 let raw_get_last_allowed_fork_level block_bytes total_block_length =
   let header_length = Bytes.get_int32_be block_bytes header_length_offset in
@@ -167,7 +168,7 @@ let raw_get_last_allowed_fork_level block_bytes total_block_length =
   let operation_metadata_hashes_offset =
     (* block metadata hash *)
     if Bytes.get_uint8 block_bytes block_metadata_hash_offset = 0xff then
-      block_metadata_hash_offset + 1 + Block_metadata_hash.size
+      block_metadata_hash_offset + 1 + Tezos_crypto.Block_metadata_hash.size
     else block_metadata_hash_offset + 1
   in
   let metadata_offset =

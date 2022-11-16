@@ -37,15 +37,15 @@ let prepare_genesis base_dir =
   let open Lwt_result_syntax in
   let*! index = Tezos_context.Context.init ~readonly:false base_dir in
   let genesis_block =
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
   in
   let* context_hash =
     Tezos_context.Context.commit_genesis
       index
-      ~chain_id:(Chain_id.of_block_hash genesis_block)
+      ~chain_id:(Tezos_crypto.Chain_id.of_block_hash genesis_block)
       ~time:(Time.Protocol.of_seconds 0L)
-      ~protocol:Protocol_hash.zero
+      ~protocol:Tezos_crypto.Protocol_hash.zero
   in
   let*! o = Tezos_context.Context.checkout index context_hash in
   match o with

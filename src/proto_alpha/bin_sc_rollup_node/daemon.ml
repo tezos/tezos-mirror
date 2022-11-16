@@ -370,13 +370,18 @@ module Make (PVM : Pvm.S) = struct
         |> List.fold_left
              (fun acc (purpose, operator) ->
                let purposes =
-                 match Signature.Public_key_hash.Map.find operator acc with
+                 match
+                   Tezos_crypto.Signature.Public_key_hash.Map.find operator acc
+                 with
                  | None -> [purpose]
                  | Some ps -> purpose :: ps
                in
-               Signature.Public_key_hash.Map.add operator purposes acc)
-             Signature.Public_key_hash.Map.empty
-        |> Signature.Public_key_hash.Map.bindings
+               Tezos_crypto.Signature.Public_key_hash.Map.add
+                 operator
+                 purposes
+                 acc)
+             Tezos_crypto.Signature.Public_key_hash.Map.empty
+        |> Tezos_crypto.Signature.Public_key_hash.Map.bindings
         |> List.map (fun (operator, purposes) ->
                (operator, `Each_block, purposes))
       in

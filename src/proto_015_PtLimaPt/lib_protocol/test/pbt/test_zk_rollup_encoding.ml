@@ -98,7 +98,7 @@ let gen_ticket_hash =
   Ticket_hash_repr.of_bytes_exn bytes
 
 let gen_pkh =
-  let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
+  let pkh, _, _ = Tezos_crypto.Signature.generate_key ~algo:Ed25519 () in
   Gen.return pkh
 
 let gen_z =

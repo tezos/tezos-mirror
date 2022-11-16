@@ -36,22 +36,24 @@ module type Param_S = sig
   val size : int
 
   (** Algorithm to use for triplet generation. *)
-  val algo : [`Algo of Signature.algo | `Default]
+  val algo : [`Algo of Tezos_crypto.Signature.algo | `Default]
 end
 
 module type Finite_key_pool_S = sig
   (** Sample a public key from the pool. *)
-  val pk : Signature.public_key Base_samplers.sampler
+  val pk : Tezos_crypto.Signature.public_key Base_samplers.sampler
 
   (** Sample a public key hash from the pool. *)
-  val pkh : Signature.public_key_hash Base_samplers.sampler
+  val pkh : Tezos_crypto.Signature.public_key_hash Base_samplers.sampler
 
   (** Sample a secret key from the pool. *)
-  val sk : Signature.secret_key Base_samplers.sampler
+  val sk : Tezos_crypto.Signature.secret_key Base_samplers.sampler
 
   (** Sample a (pkh, pk, sk) triplet from the pool. *)
   val all :
-    (Signature.public_key_hash * Signature.public_key * Signature.secret_key)
+    (Tezos_crypto.Signature.public_key_hash
+    * Tezos_crypto.Signature.public_key
+    * Tezos_crypto.Signature.secret_key)
     Base_samplers.sampler
 end
 

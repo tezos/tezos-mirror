@@ -32,9 +32,9 @@ module Make
       val default : Uri.t
 
       val authenticate :
-        Signature.Public_key_hash.t list ->
+        Tezos_crypto.Signature.Public_key_hash.t list ->
         Bytes.t ->
-        Signature.t tzresult Lwt.t
+        Tezos_crypto.Signature.t tzresult Lwt.t
 
       val logger : RPC_client.logger
     end) =
@@ -127,11 +127,17 @@ end
 
 let make_sk sk =
   Client_keys.make_sk_uri
-    (Uri.make ~scheme ~path:(Signature.Secret_key.to_b58check sk) ())
+    (Uri.make
+       ~scheme
+       ~path:(Tezos_crypto.Signature.Secret_key.to_b58check sk)
+       ())
 
 let make_pk pk =
   Client_keys.make_pk_uri
-    (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
+    (Uri.make
+       ~scheme
+       ~path:(Tezos_crypto.Signature.Public_key.to_b58check pk)
+       ())
 
 let read_base_uri_from_env () =
   let open Lwt_result_syntax in

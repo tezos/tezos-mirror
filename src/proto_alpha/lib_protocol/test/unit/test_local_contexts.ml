@@ -96,9 +96,9 @@ let eq_context ctxt1 ctxt2 =
   hash ctxt2 >>=? fun y ->
   Assert.equal
     ~loc:__LOC__
-    Context_hash.equal
+    Tezos_crypto.Context_hash.equal
     "check context"
-    Context_hash.pp
+    Tezos_crypto.Context_hash.pp
     x
     y
 

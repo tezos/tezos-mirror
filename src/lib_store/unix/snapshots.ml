@@ -32,7 +32,7 @@ type error +=
       stored : History_mode.t;
     }
   | Invalid_export_block of {
-      block : Block_hash.t option;
+      block : Tezos_crypto.Block_hash.t option;
       reason :
         [ `Pruned
         | `Pruned_pred
@@ -45,15 +45,15 @@ type error +=
   | Invalid_export_path of string
   | Snapshot_file_not_found of string
   | Inconsistent_protocol_hash of {
-      expected : Protocol_hash.t;
-      got : Protocol_hash.t;
+      expected : Tezos_crypto.Protocol_hash.t;
+      got : Tezos_crypto.Protocol_hash.t;
     }
   | Inconsistent_context_hash of {
-      expected : Context_hash.t;
-      got : Context_hash.t;
+      expected : Tezos_crypto.Context_hash.t;
+      got : Tezos_crypto.Context_hash.t;
     }
-  | Inconsistent_context of Context_hash.t
-  | Cannot_decode_protocol of Protocol_hash.t
+  | Inconsistent_context of Tezos_crypto.Context_hash.t
+  | Cannot_decode_protocol of Tezos_crypto.Protocol_hash.t
   | Cannot_write_metadata of string
   | Cannot_read of {
       kind :
@@ -74,7 +74,7 @@ type error +=
   | Missing_cemented_file of string
   | Corrupted_floating_store
   | Invalid_protocol_file of string
-  | Target_block_validation_failed of Block_hash.t * string
+  | Target_block_validation_failed of Tezos_crypto.Block_hash.t * string
   | Directory_already_exists of string
   | Empty_floating_store
   | Cannot_remove_tmp_export_directory of string
@@ -87,9 +87,10 @@ type error +=
       requested : History_mode.t;
       stored : History_mode.t;
     }
-  | Inconsistent_imported_block of Block_hash.t * Block_hash.t
+  | Inconsistent_imported_block of
+      Tezos_crypto.Block_hash.t * Tezos_crypto.Block_hash.t
   | Wrong_snapshot_file of {filename : string}
-  | Invalid_chain_store_export of Chain_id.t * string
+  | Invalid_chain_store_export of Tezos_crypto.Chain_id.t * string
 
 let () =
   let open Data_encoding in
@@ -127,7 +128,7 @@ let () =
         "The selected block %a is invalid: %s."
         (Format.pp_print_option
            ~none:(fun fmt () -> Format.fprintf fmt "(n/a)")
-           Block_hash.pp)
+           Tezos_crypto.Block_hash.pp)
         hash
         (match reason with
         | `Pruned -> "the block is too old and has been pruned"
@@ -138,7 +139,7 @@ let () =
         | `Caboose -> "the caboose block is not a valid export point"
         | `Not_enough_pred -> "not enough of the block's predecessors are known"))
     (obj2
-       (opt "block" Block_hash.encoding)
+       (opt "block" Tezos_crypto.Block_hash.encoding)
        (req
           "reason"
           (string_enum
@@ -186,13 +187,13 @@ let () =
       Format.fprintf
         ppf
         "Inconsistent protocol_hash. Expected: %a, got %a."
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         oph
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         oph')
     (obj2
-       (req "expected" Protocol_hash.encoding)
-       (req "got" Protocol_hash.encoding))
+       (req "expected" Tezos_crypto.Protocol_hash.encoding)
+       (req "got" Tezos_crypto.Protocol_hash.encoding))
     (function
       | Inconsistent_protocol_hash {expected; got} -> Some (expected, got)
       | _ -> None)
@@ -206,13 +207,13 @@ let () =
       Format.fprintf
         ppf
         "Inconsistent context_hash. Expected: %a, got %a."
-        Context_hash.pp
+        Tezos_crypto.Context_hash.pp
         oph
-        Context_hash.pp
+        Tezos_crypto.Context_hash.pp
         oph')
     (obj2
-       (req "expected" Context_hash.encoding)
-       (req "got" Context_hash.encoding))
+       (req "expected" Tezos_crypto.Context_hash.encoding)
+       (req "got" Tezos_crypto.Context_hash.encoding))
     (function
       | Inconsistent_context_hash {expected; got} -> Some (expected, got)
       | _ -> None)
@@ -226,9 +227,9 @@ let () =
       Format.fprintf
         ppf
         "Failed to checkout context %a after restoring it."
-        Context_hash.pp
+        Tezos_crypto.Context_hash.pp
         h)
-    (obj1 (req "context_hash" Context_hash.encoding))
+    (obj1 (req "context_hash" Tezos_crypto.Context_hash.encoding))
     (function Inconsistent_context h -> Some h | _ -> None)
     (fun h -> Inconsistent_context h) ;
   register_error_kind
@@ -240,9 +241,9 @@ let () =
       Format.fprintf
         ppf
         "Cannot decode the protocol in file: %a"
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         hash)
-    (obj1 (req "filename" Protocol_hash.encoding))
+    (obj1 (req "filename" Tezos_crypto.Protocol_hash.encoding))
     (function Cannot_decode_protocol hash -> Some hash | _ -> None)
     (fun hash -> Cannot_decode_protocol hash) ;
   register_error_kind
@@ -407,8 +408,13 @@ let () =
     ~title:"target block validation failed"
     ~description:"Failed to validate the target block."
     ~pp:(fun ppf (h, errs) ->
-      Format.fprintf ppf "Failed to validate block %a: %s" Block_hash.pp h errs)
-    (obj2 (req "block" Block_hash.encoding) (req "errors" string))
+      Format.fprintf
+        ppf
+        "Failed to validate block %a: %s"
+        Tezos_crypto.Block_hash.pp
+        h
+        errs)
+    (obj2 (req "block" Tezos_crypto.Block_hash.encoding) (req "errors" string))
     (function
       | Target_block_validation_failed (h, errs) -> Some (h, errs) | _ -> None)
     (fun (h, errs) -> Target_block_validation_failed (h, errs)) ;
@@ -532,13 +538,13 @@ let () =
       Format.fprintf
         ppf
         "The block contained in the file is %a instead of %a."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         got
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         exp)
     (obj2
-       (req "block_hash" Block_hash.encoding)
-       (req "block_hash_expected" Block_hash.encoding))
+       (req "block_hash" Tezos_crypto.Block_hash.encoding)
+       (req "block_hash_expected" Tezos_crypto.Block_hash.encoding))
     (function
       | Inconsistent_imported_block (got, exp) -> Some (got, exp) | _ -> None)
     (fun (got, exp) -> Inconsistent_imported_block (got, exp)) ;
@@ -566,11 +572,13 @@ let () =
         ppf
         "Failed to export snapshot. Cannot find chain %a from store located at \
          directory %s."
-        Chain_id.pp_short
+        Tezos_crypto.Chain_id.pp_short
         chain_id
         store_dir)
     Data_encoding.(
-      obj2 (req "chain_id" Chain_id.encoding) (req "store_dir" string))
+      obj2
+        (req "chain_id" Tezos_crypto.Chain_id.encoding)
+        (req "store_dir" string))
     (function
       | Invalid_chain_store_export (chain_id, store_dir) ->
           Some (chain_id, store_dir)
@@ -626,7 +634,7 @@ let default_index_log_size = 30_000_000
 type metadata = {
   chain_name : Distributed_db_version.Name.t;
   history_mode : History_mode.t;
-  block_hash : Block_hash.t;
+  block_hash : Tezos_crypto.Block_hash.t;
   level : Int32.t;
   timestamp : Time.Protocol.t;
   context_elements : int;
@@ -654,7 +662,7 @@ let metadata_encoding =
     (obj6
        (req "chain_name" Distributed_db_version.Name.encoding)
        (req "mode" History_mode.encoding)
-       (req "block_hash" Block_hash.encoding)
+       (req "block_hash" Tezos_crypto.Block_hash.encoding)
        (req "level" int32)
        (req "timestamp" Time.Protocol.encoding)
        (req "context_elements" int31))
@@ -676,7 +684,7 @@ let pp_snapshot_header ppf = function
          version %d)"
         Distributed_db_version.Name.pp
         chain_name
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block_hash
         level
         Time.Protocol.pp_hum
@@ -704,8 +712,9 @@ type block_data = {
   block_header : Block_header.t;
   operations : Operation.t list list;
   predecessor_header : Block_header.t;
-  predecessor_block_metadata_hash : Block_metadata_hash.t option;
-  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
+  predecessor_block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
+  predecessor_ops_metadata_hash :
+    Tezos_crypto.Operation_metadata_list_list_hash.t option;
 }
 
 let block_data_encoding =
@@ -739,10 +748,12 @@ let block_data_encoding =
        (req "operations" (list (list (dynamic_size Operation.encoding))))
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "predecessor_header" (dynamic_size Block_header.encoding))
-       (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+       (opt
+          "predecessor_block_metadata_hash"
+          Tezos_crypto.Block_metadata_hash.encoding)
        (opt
           "predecessor_ops_metadata_hash"
-          Operation_metadata_list_list_hash.encoding))
+          Tezos_crypto.Operation_metadata_list_list_hash.encoding))
 
 let default_snapshot_filename metadata =
   let {chain_name; block_hash; level; history_mode; _} = metadata in
@@ -753,7 +764,7 @@ let default_snapshot_filename metadata =
       "%a-%a-%ld.%a"
       Distributed_db_version.Name.pp
       chain_name
-      Block_hash.pp
+      Tezos_crypto.Block_hash.pp
       block_hash
       level
       History_mode.pp_short
@@ -1318,15 +1329,16 @@ module type EXPORTER = sig
   val write_block_data :
     t ->
     predecessor_header:Block_header.t ->
-    predecessor_block_metadata_hash:Block_metadata_hash.t option ->
-    predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+    predecessor_block_metadata_hash:Tezos_crypto.Block_metadata_hash.t option ->
+    predecessor_ops_metadata_hash:
+      Tezos_crypto.Operation_metadata_list_list_hash.t option ->
     export_block:Store.Block.t ->
     unit Lwt.t
 
   val dump_context :
     t ->
     Context.index ->
-    Context_hash.t ->
+    Tezos_crypto.Context_hash.t ->
     on_disk:bool ->
     Animation.progress_display_mode ->
     int tzresult Lwt.t
@@ -1349,7 +1361,8 @@ module type EXPORTER = sig
   val write_protocols_table :
     t -> f:(Lwt_unix.file_descr -> 'a Lwt.t) -> 'a Lwt.t
 
-  val copy_protocol : t -> src:string -> dst_ph:Protocol_hash.t -> unit Lwt.t
+  val copy_protocol :
+    t -> src:string -> dst_ph:Tezos_crypto.Protocol_hash.t -> unit Lwt.t
 
   val write_metadata : t -> metadata -> unit tzresult Lwt.t
 
@@ -1789,7 +1802,7 @@ module Tar_exporter : EXPORTER = struct
       Filename.(
         concat
           (Naming.dir_path t.snapshot_protocol_dir)
-          (Protocol_hash.to_b58check dst_ph))
+          (Tezos_crypto.Protocol_hash.to_b58check dst_ph))
     in
     Onthefly.add_file_and_finalize t.tar ~file:src ~filename:dst
 
@@ -1963,7 +1976,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (* FIXME: we also write potential branches, it will eventually
            be GCed *)
         if Compare.Int32.(Block_repr.level block >= limit_level) then
-          if Block_hash.equal limit_hash (Block_repr.hash block) then raise Done
+          if Tezos_crypto.Block_hash.equal limit_hash (Block_repr.hash block)
+          then raise Done
           else return_unit
         else
           let block = (* Prune everything  *) {block with metadata = None} in
@@ -2034,7 +2048,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                      || filename = Filename.parent_dir_name ->
                   copy_protocols ()
               | filename -> (
-                  match Protocol_hash.of_b58check_opt filename with
+                  match Tezos_crypto.Protocol_hash.of_b58check_opt filename with
                   | None -> return_ok_unit
                   | Some ph ->
                       let src_protocol_file =
@@ -2042,7 +2056,10 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                       in
                       let* () =
                         if
-                          List.mem ~equal:Protocol_hash.equal ph proto_to_export
+                          List.mem
+                            ~equal:Tezos_crypto.Protocol_hash.equal
+                            ph
+                            proto_to_export
                         then
                           let* () =
                             Exporter.copy_protocol
@@ -2496,7 +2513,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~context_dir
       ~chain_name ~on_disk ~progress_display_mode genesis =
     let open Lwt_result_syntax in
-    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.Genesis.block in
     let* () = ensure_valid_export_chain_dir store_dir chain_id in
     let* snapshot_exporter = init snapshot_path in
     (* Register a clean up callback to prevent export cancellation not
@@ -2740,7 +2757,7 @@ module type IMPORTER = sig
   val init :
     snapshot_path:string ->
     dst_store_dir:[`Store_dir] Naming.directory ->
-    Chain_id.t ->
+    Tezos_crypto.Chain_id.t ->
     t Lwt.t
 
   val load_snapshot_header : t -> header tzresult Lwt.t
@@ -2750,7 +2767,7 @@ module type IMPORTER = sig
   val restore_context :
     t ->
     Context.index ->
-    expected_context_hash:Context_hash.t ->
+    expected_context_hash:Tezos_crypto.Context_hash.t ->
     nb_context_elements:int ->
     legacy:bool ->
     in_memory:bool ->
@@ -2761,10 +2778,12 @@ module type IMPORTER = sig
     t -> Protocol_levels.activation_block Protocol_levels.t tzresult Lwt.t
 
   val load_and_validate_protocol_filenames :
-    t -> Protocol_hash.t list tzresult Lwt.t
+    t -> Tezos_crypto.Protocol_hash.t list tzresult Lwt.t
 
   val copy_and_validate_protocol :
-    t -> protocol_hash:Protocol_hash.t -> (unit, error trace) result Lwt.t
+    t ->
+    protocol_hash:Tezos_crypto.Protocol_hash.t ->
+    (unit, error trace) result Lwt.t
 
   val restore_cemented_indexes : t -> unit Lwt.t
 
@@ -2774,7 +2793,7 @@ module type IMPORTER = sig
 
   val restore_floating_blocks :
     t ->
-    Block_hash.t ->
+    Tezos_crypto.Block_hash.t ->
     (unit tzresult Lwt.t * Block_repr.block Lwt_stream.t) tzresult Lwt.t
 
   val close : t -> unit Lwt.t
@@ -2906,7 +2925,7 @@ module Raw_importer : IMPORTER = struct
     in
     List.map_es
       (fun file ->
-        match Protocol_hash.of_b58check_opt file with
+        match Tezos_crypto.Protocol_hash.of_b58check_opt file with
         | Some ph -> return ph
         | None -> tzfail (Invalid_protocol_file file))
       protocol_files
@@ -2916,12 +2935,12 @@ module Raw_importer : IMPORTER = struct
     let src =
       Filename.concat
         (Naming.dir_path t.snapshot_protocol_dir)
-        (Protocol_hash.to_b58check protocol_hash)
+        (Tezos_crypto.Protocol_hash.to_b58check protocol_hash)
     in
     let dst =
       Filename.concat
         (Naming.dir_path t.dst_protocol_dir)
-        (Protocol_hash.to_b58check protocol_hash)
+        (Tezos_crypto.Protocol_hash.to_b58check protocol_hash)
     in
     let*! () = Lwt_utils_unix.copy_file ~src ~dst in
     let*! protocol_sources = Lwt_utils_unix.read_file dst in
@@ -2930,7 +2949,7 @@ module Raw_importer : IMPORTER = struct
     | Some p ->
         let hash = Protocol.hash p in
         fail_unless
-          (Protocol_hash.equal protocol_hash hash)
+          (Tezos_crypto.Protocol_hash.equal protocol_hash hash)
           (Inconsistent_protocol_hash {expected = protocol_hash; got = hash})
 
   let restore_cemented_indexes t =
@@ -3166,7 +3185,7 @@ module Tar_importer : IMPORTER = struct
     in
     List.map_es
       (fun file ->
-        match Protocol_hash.of_b58check_opt file with
+        match Tezos_crypto.Protocol_hash.of_b58check_opt file with
         | Some ph -> return ph
         | None -> tzfail (Invalid_protocol_file file))
       protocol_files
@@ -3177,7 +3196,7 @@ module Tar_importer : IMPORTER = struct
       Filename.(
         concat
           Naming.(protocol_store_dir t.snapshot_tar |> dir_path)
-          (Protocol_hash.to_b58check protocol_hash))
+          (Tezos_crypto.Protocol_hash.to_b58check protocol_hash))
     in
     let* file =
       let*! o = Onthefly.get_file t.tar ~filename:src in
@@ -3189,7 +3208,7 @@ module Tar_importer : IMPORTER = struct
       Filename.(
         concat
           (Naming.dir_path t.dst_protocol_dir)
-          (Protocol_hash.to_b58check protocol_hash))
+          (Tezos_crypto.Protocol_hash.to_b58check protocol_hash))
     in
     let*! () = Onthefly.copy_to_file t.tar file ~dst in
     let*! protocol_sources = Lwt_utils_unix.read_file dst in
@@ -3198,7 +3217,7 @@ module Tar_importer : IMPORTER = struct
     | Some p ->
         let hash = Protocol.hash p in
         fail_unless
-          (Protocol_hash.equal protocol_hash hash)
+          (Tezos_crypto.Protocol_hash.equal protocol_hash hash)
           (Inconsistent_protocol_hash {expected = protocol_hash; got = hash})
 
   let restore_cemented_indexes t =
@@ -3337,7 +3356,7 @@ module type Snapshot_importer = sig
     ?patch_context:
       (Tezos_protocol_environment.Context.t ->
       Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
-    ?block:Block_hash.t ->
+    ?block:Tezos_crypto.Block_hash.t ->
     ?check_consistency:bool ->
     dst_store_dir:[`Store_dir] Naming.directory ->
     dst_context_dir:string ->
@@ -3485,7 +3504,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let check_context_hash_consistency validation_store block_header =
     fail_unless
-      (Context_hash.equal
+      (Tezos_crypto.Context_hash.equal
          validation_store.Tezos_validation.Block_validation.context_hash
          block_header.Block_header.shell.context)
       (Inconsistent_context_hash
@@ -3523,7 +3542,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       match user_expected_block with
       | Some bh ->
           fail_unless
-            (Block_hash.equal bh block_header_hash)
+            (Tezos_crypto.Block_hash.equal bh block_header_hash)
             (Inconsistent_imported_block (block_header_hash, bh))
       | None -> return_unit
     in
@@ -3531,7 +3550,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
        expected one *)
     let* () =
       fail_unless
-        (Block_hash.equal snapshot_metadata.block_hash block_header_hash)
+        (Tezos_crypto.Block_hash.equal
+           snapshot_metadata.block_hash
+           block_header_hash)
         (Inconsistent_imported_block
            (block_header_hash, snapshot_metadata.block_hash))
     in
@@ -3605,7 +3626,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
       ~in_memory ~progress_display_mode (genesis : Genesis.t) =
     let open Lwt_result_syntax in
-    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.Genesis.block in
     let*! snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
     let dst_store_dir = Naming.dir_path dst_store_dir in
     let* () =
@@ -3615,7 +3636,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let dst_store_dir = Naming.store_dir ~dir_path:dst_store_dir in
     let dst_protocol_dir = Naming.protocol_store_dir dst_store_dir in
-    let chain_id = Chain_id.of_block_hash genesis.block in
+    let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.block in
     let dst_chain_dir = Naming.chain_dir dst_store_dir chain_id in
     let dst_cemented_dir = Naming.cemented_blocks_dir dst_chain_dir in
     (* Create directories *)

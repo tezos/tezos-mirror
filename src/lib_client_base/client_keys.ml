@@ -67,11 +67,13 @@ let () =
 module Public_key_hash = struct
   include Client_aliases.Alias (struct
     (* includes t, Compare, encoding *)
-    include Signature.Public_key_hash
+    include Tezos_crypto.Signature.Public_key_hash
 
-    let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
+    let of_source s =
+      Lwt.return (Tezos_crypto.Signature.Public_key_hash.of_b58check s)
 
-    let to_source p = Lwt.return_ok (Signature.Public_key_hash.to_b58check p)
+    let to_source p =
+      Lwt.return_ok (Tezos_crypto.Signature.Public_key_hash.to_b58check p)
 
     let name = "public key hash"
   end)
@@ -235,14 +237,14 @@ end)
 module Public_key = Client_aliases.Alias (struct
   let name = "public_key"
 
-  type t = pk_uri * Signature.Public_key.t option
+  type t = pk_uri * Tezos_crypto.Signature.Public_key.t option
 
   include Compare.Make (struct
     type nonrec t = t
 
     let compare (apk, aso) (bpk, bso) =
       Compare.or_else (CompareUri.compare apk bpk) (fun () ->
-          Option.compare Signature.Public_key.compare aso bso)
+          Option.compare Tezos_crypto.Signature.Public_key.compare aso bso)
   end)
 
   let of_source s =
@@ -267,7 +269,7 @@ module Public_key = Client_aliases.Alias (struct
           ~title:"Locator_and_full_key"
           (obj2
              (req "locator" uri_encoding)
-             (req "key" Signature.Public_key.encoding))
+             (req "key" Tezos_crypto.Signature.Public_key.encoding))
           (function uri, Some key -> Some (uri, key) | _, None -> None)
           (fun (uri, key) -> (uri, Some key));
       ]
@@ -325,7 +327,7 @@ module Aggregate_alias = struct
   module Public_key_hash = struct
     include Client_aliases.Alias (struct
       (* includes t, Compare, encoding, of/to_b58check *)
-      include Aggregate_signature.Public_key_hash
+      include Tezos_crypto.Aggregate_signature.Public_key_hash
 
       let of_source s = Lwt.return (of_b58check s)
 
@@ -349,14 +351,17 @@ module Aggregate_alias = struct
   module Public_key = Client_aliases.Alias (struct
     let name = "Aggregate_public_key"
 
-    type t = pk_uri * Aggregate_signature.Public_key.t option
+    type t = pk_uri * Tezos_crypto.Aggregate_signature.Public_key.t option
 
     include Compare.Make (struct
       type nonrec t = t
 
       let compare (apk, aso) (bpk, bso) =
         Compare.or_else (CompareUri.compare apk bpk) (fun () ->
-            Option.compare Aggregate_signature.Public_key.compare aso bso)
+            Option.compare
+              Tezos_crypto.Aggregate_signature.Public_key.compare
+              aso
+              bso)
     end)
 
     let of_source s =
@@ -381,7 +386,7 @@ module Aggregate_alias = struct
             ~title:"Locator_and_full_key"
             (obj2
                (req "locator" uri_encoding)
-               (req "key" Aggregate_signature.Public_key.encoding))
+               (req "key" Tezos_crypto.Aggregate_signature.Public_key.encoding))
             (function uri, Some key -> Some (uri, key) | _, None -> None)
             (fun (uri, key) -> (uri, Some key));
         ]
@@ -412,7 +417,7 @@ module Aggregate_alias = struct
 end
 
 module Make_common_type (S : sig
-  include S.COMMON_SIGNATURE
+  include Tezos_crypto.S.COMMON_SIGNATURE
 
   type pk_uri
 
@@ -431,7 +436,7 @@ struct
 end
 
 module Signature_type = Make_common_type (struct
-  include Signature
+  include Tezos_crypto.Signature
 
   type nonrec pk_uri = pk_uri
 
@@ -439,7 +444,7 @@ module Signature_type = Make_common_type (struct
 end)
 
 module Aggregate_type = Make_common_type (struct
-  include Aggregate_signature
+  include Tezos_crypto.Aggregate_signature
 
   type pk_uri = aggregate_pk_uri
 
@@ -479,17 +484,17 @@ end
 module type SIGNER = sig
   include
     COMMON_SIGNER
-      with type public_key_hash = Signature.Public_key_hash.t
-       and type public_key = Signature.Public_key.t
-       and type secret_key = Signature.Secret_key.t
+      with type public_key_hash = Tezos_crypto.Signature.Public_key_hash.t
+       and type public_key = Tezos_crypto.Signature.Public_key.t
+       and type secret_key = Tezos_crypto.Signature.Secret_key.t
        and type pk_uri = pk_uri
        and type sk_uri = sk_uri
 
   val sign :
-    ?watermark:Signature.watermark ->
+    ?watermark:Tezos_crypto.Signature.watermark ->
     sk_uri ->
     Bytes.t ->
-    Signature.t tzresult Lwt.t
+    Tezos_crypto.Signature.t tzresult Lwt.t
 
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
@@ -501,13 +506,17 @@ end
 module type AGGREGATE_SIGNER = sig
   include
     COMMON_SIGNER
-      with type public_key_hash = Aggregate_signature.Public_key_hash.t
-       and type public_key = Aggregate_signature.Public_key.t
-       and type secret_key = Aggregate_signature.Secret_key.t
+      with type public_key_hash =
+        Tezos_crypto.Aggregate_signature.Public_key_hash.t
+       and type public_key = Tezos_crypto.Aggregate_signature.Public_key.t
+       and type secret_key = Tezos_crypto.Aggregate_signature.Secret_key.t
        and type pk_uri = aggregate_pk_uri
        and type sk_uri = aggregate_sk_uri
 
-  val sign : aggregate_sk_uri -> Bytes.t -> Aggregate_signature.t tzresult Lwt.t
+  val sign :
+    aggregate_sk_uri ->
+    Bytes.t ->
+    Tezos_crypto.Aggregate_signature.t tzresult Lwt.t
 end
 
 type signer =
@@ -628,7 +637,7 @@ let sign cctxt ?watermark sk_uri buf =
       in
       let* () =
         fail_unless
-          (Signature.check ?watermark pubkey signature buf)
+          (Tezos_crypto.Signature.check ?watermark pubkey signature buf)
           (Signature_mismatch sk_uri)
       in
       return signature)
@@ -636,12 +645,12 @@ let sign cctxt ?watermark sk_uri buf =
 let append cctxt ?watermark loc buf =
   let open Lwt_result_syntax in
   let+ signature = sign cctxt ?watermark loc buf in
-  Signature.concat buf signature
+  Tezos_crypto.Signature.concat buf signature
 
 let check ?watermark pk_uri signature buf =
   let open Lwt_result_syntax in
   let* pk = public_key pk_uri in
-  return (Signature.check ?watermark pk signature buf)
+  return (Tezos_crypto.Signature.check ?watermark pk signature buf)
 
 let deterministic_nonce sk_uri data =
   with_scheme_simple_signer sk_uri (fun (module Signer : SIGNER) ->
@@ -705,7 +714,8 @@ let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
   let rev_find_all list pkh =
     List.filter_map
       (fun (name, pkh') ->
-        if Signature.Public_key_hash.equal pkh pkh' then Some name else None)
+        if Tezos_crypto.Signature.Public_key_hash.equal pkh pkh' then Some name
+        else None)
       list
   in
   let*! r =
@@ -731,7 +741,7 @@ let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
     | None ->
         failwith
           "no keys for the source contract %a"
-          Signature.Public_key_hash.pp
+          Tezos_crypto.Signature.Public_key_hash.pp
           pkh
     | Some keys -> return keys
   in
@@ -741,7 +751,7 @@ let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
       let*! r =
         let*? signer = find_simple_signer_for_key ~scheme:"remote" in
         let module Signer = (val signer : SIGNER) in
-        let path = Signature.Public_key_hash.to_b58check pkh in
+        let path = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
         let uri = Uri.make ~scheme:Signer.scheme ~path () in
         let* pk = Signer.public_key uri in
         return (path, Some pk, Some uri)
@@ -764,9 +774,15 @@ let get_key cctxt pkh =
   match r with
   | pkh, Some pk, Some sk -> return (pkh, pk, sk)
   | _pkh, _pk, None ->
-      failwith "Unknown secret key for %a" Signature.Public_key_hash.pp pkh
+      failwith
+        "Unknown secret key for %a"
+        Tezos_crypto.Signature.Public_key_hash.pp
+        pkh
   | _pkh, None, _sk ->
-      failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
+      failwith
+        "Unknown public key for %a"
+        Tezos_crypto.Signature.Public_key_hash.pp
+        pkh
 
 let get_public_key cctxt pkh =
   let open Lwt_result_syntax in
@@ -774,7 +790,10 @@ let get_public_key cctxt pkh =
   match r with
   | pkh, Some pk, _sk -> return (pkh, pk)
   | _pkh, None, _sk ->
-      failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
+      failwith
+        "Unknown public key for %a"
+        Tezos_crypto.Signature.Public_key_hash.pp
+        pkh
 
 let get_keys (cctxt : #Client_context.wallet) =
   let open Lwt_result_syntax in
@@ -855,7 +874,8 @@ let raw_get_aggregate_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh
   let rev_find_all list pkh =
     List.filter_map
       (fun (name, pkh') ->
-        if Aggregate_signature.Public_key_hash.equal pkh pkh' then Some name
+        if Tezos_crypto.Aggregate_signature.Public_key_hash.equal pkh pkh' then
+          Some name
         else None)
       list
   in
@@ -883,7 +903,7 @@ let raw_get_aggregate_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh
   | None ->
       failwith
         "no keys for the source contract %a"
-        Aggregate_signature.Public_key_hash.pp
+        Tezos_crypto.Aggregate_signature.Public_key_hash.pp
         pkh
   | Some keys -> return keys
 
@@ -941,13 +961,13 @@ let aggregate_sign cctxt sk_uri buf =
       in
       let* () =
         fail_unless
-          (Aggregate_signature.check pubkey signature buf)
+          (Tezos_crypto.Aggregate_signature.check pubkey signature buf)
           (Signature_mismatch sk_uri)
       in
       return signature)
 
 module Mnemonic = struct
-  let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)
+  let new_random = Bip39.of_entropy (Tezos_crypto.Hacl.Rand.gen 32)
 
   let to_32_bytes mnemonic =
     let seed_64_to_seed_32 (seed_64 : bytes) : bytes =

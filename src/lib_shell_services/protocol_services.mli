@@ -25,20 +25,21 @@
 
 open Tezos_rpc.Context
 
-val contents : #simple -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
+val contents :
+  #simple -> Tezos_crypto.Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
 val environment :
-  #simple -> Protocol_hash.t -> Protocol.env_version tzresult Lwt.t
+  #simple -> Tezos_crypto.Protocol_hash.t -> Protocol.env_version tzresult Lwt.t
 
-val list : #simple -> Protocol_hash.t list tzresult Lwt.t
+val list : #simple -> Tezos_crypto.Protocol_hash.t list tzresult Lwt.t
 
-val fetch : #simple -> Protocol_hash.t -> unit tzresult Lwt.t
+val fetch : #simple -> Tezos_crypto.Protocol_hash.t -> unit tzresult Lwt.t
 
 module S : sig
   val contents :
     ( [`GET],
       unit,
-      unit * Protocol_hash.t,
+      unit * Tezos_crypto.Protocol_hash.t,
       unit,
       unit,
       Protocol.t )
@@ -47,15 +48,27 @@ module S : sig
   val environment :
     ( [`GET],
       unit,
-      unit * Protocol_hash.t,
+      unit * Tezos_crypto.Protocol_hash.t,
       unit,
       unit,
       Protocol.env_version )
     Tezos_rpc.Service.t
 
   val list :
-    ([`GET], unit, unit, unit, unit, Protocol_hash.t list) Tezos_rpc.Service.t
+    ( [`GET],
+      unit,
+      unit,
+      unit,
+      unit,
+      Tezos_crypto.Protocol_hash.t list )
+    Tezos_rpc.Service.t
 
   val fetch :
-    ([`GET], unit, unit * Protocol_hash.t, unit, unit, unit) Tezos_rpc.Service.t
+    ( [`GET],
+      unit,
+      unit * Tezos_crypto.Protocol_hash.t,
+      unit,
+      unit,
+      unit )
+    Tezos_rpc.Service.t
 end

@@ -68,7 +68,7 @@ let test_encodings balance =
 
 let test_encodings () =
   let open Receipt in
-  let pkh = Signature.Public_key_hash.zero in
+  let pkh = Tezos_crypto.Signature.Public_key_hash.zero in
   test_encodings (Contract (Contract.Implicit pkh)) >>=? fun () ->
   test_encodings Block_fees >>=? fun () ->
   test_encodings (Deposits pkh) >>=? fun () ->
@@ -89,7 +89,8 @@ let test_encodings () =
   test_encodings Initial_commitments >>=? fun () ->
   test_encodings Minted >>=? fun () ->
   let nonce =
-    Origination_nonce.Internal_for_tests.initial Operation_hash.zero
+    Origination_nonce.Internal_for_tests.initial
+      Tezos_crypto.Operation_hash.zero
   in
   let tx_rollup = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in

@@ -51,7 +51,10 @@ let input_encoding default_sender default_source default_destination =
         (obj4
            (req "payload" parsed_string_encoding)
            (dft "sender" Contract_hash.encoding default_sender)
-           (dft "source" Signature.Public_key_hash.encoding default_source)
+           (dft
+              "source"
+              Tezos_crypto.Signature.Public_key_hash.encoding
+              default_source)
            (dft
               "destination"
               Sc_rollup_repr.Address.encoding

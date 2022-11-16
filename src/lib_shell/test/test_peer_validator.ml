@@ -91,7 +91,7 @@ let wrap
           Shell_limits.default_peer_validator_limits
           block_validator
           chain_db
-          Crypto_box.Public_key_hash.zero
+          Tezos_crypto.Crypto_box.Public_key_hash.zero
       in
       f chain_db genesis_header pv)
 
@@ -137,7 +137,7 @@ let test_validate_new_head_on_lower_fitness () =
       Assert.assert_true
         (Format.asprintf
            "The ddb should contain two entries for %a"
-           Block_hash.pp
+           Tezos_crypto.Block_hash.pp
            block_hash)
         (known_0 && known_1) ;
 
@@ -160,7 +160,7 @@ let test_validate_new_head_on_lower_fitness () =
       Assert.assert_false
         (Format.asprintf
            "The ddb should not contain an entry for %a anymore"
-           Block_hash.pp
+           Tezos_crypto.Block_hash.pp
            block_hash)
         (known_0 || known_1) ;
       return_unit)

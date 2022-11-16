@@ -12,7 +12,7 @@ module type S = sig
 end
 
 (** Given a Hash/pseudorandom function, get the PBKDF *)
-module Make (H : Hacl.Hash.S) : S
+module Make (H : Tezos_crypto.Hacl.Hash.S) : S
 
 module SHA256 : S
 

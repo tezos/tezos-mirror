@@ -29,7 +29,9 @@ open Protocol
     one can provide a public key hash that would be the proposer. All non-
     specified level and rounds are not constrained. *)
 type delegate_selection =
-  (Raw_level_repr.t * (Round_repr.t * Signature.public_key_hash) list) list
+  (Raw_level_repr.t
+  * (Round_repr.t * Tezos_crypto.Signature.public_key_hash) list)
+  list
 
 (** Brute-force an initial seed nonce for the desired delegate selection.
     When found, the seed nonce is returned as a byte sequence of size 32. If

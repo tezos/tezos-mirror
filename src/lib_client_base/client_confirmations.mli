@@ -35,9 +35,9 @@ val wait_for_operation_inclusion :
   chain:Chain_services.chain ->
   ?predecessors:int ->
   ?confirmations:int ->
-  ?branch:Block_hash.t ->
-  Operation_hash.t ->
-  (Block_hash.t * int * int) tzresult Lwt.t
+  ?branch:Tezos_crypto.Block_hash.t ->
+  Tezos_crypto.Operation_hash.t ->
+  (Tezos_crypto.Block_hash.t * int * int) tzresult Lwt.t
 
 (** lookup an operation in [predecessors] previous blocks, starting
     from head *)
@@ -45,8 +45,8 @@ val lookup_operation_in_previous_blocks :
   #Client_context.full ->
   chain:Block_services.chain ->
   predecessors:int ->
-  Operation_list_hash.elt ->
-  (Block_hash.t * int * int) option tzresult Lwt.t
+  Tezos_crypto.Operation_list_hash.elt ->
+  (Tezos_crypto.Block_hash.t * int * int) option tzresult Lwt.t
 
 (** returns when the node consider itself as bootstrapped.
 
@@ -57,11 +57,13 @@ val lookup_operation_in_previous_blocks :
 val wait_for_bootstrapped :
   ?retry:
     (((#Client_context.full as 'a) ->
-     ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * Tezos_rpc.Context.stopper)
+     ((Tezos_crypto.Block_hash.t * Time.Protocol.t) Lwt_stream.t
+     * Tezos_rpc.Context.stopper)
      tzresult
      Lwt.t) ->
     'a ->
-    ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * Tezos_rpc.Context.stopper)
+    ((Tezos_crypto.Block_hash.t * Time.Protocol.t) Lwt_stream.t
+    * Tezos_rpc.Context.stopper)
     tzresult
     Lwt.t) ->
   'a ->

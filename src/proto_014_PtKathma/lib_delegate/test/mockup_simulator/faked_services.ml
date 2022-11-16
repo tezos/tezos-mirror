@@ -10,7 +10,7 @@ module type Mocked_services_hooks = sig
   (** The baker and endorser rely on this stream to be notified of new
      blocks. *)
   val monitor_heads :
-    unit -> (Block_hash.t * Block_header.t) Tezos_rpc.Answer.stream
+    unit -> (Tezos_crypto.Block_hash.t * Block_header.t) Tezos_rpc.Answer.stream
 
   (** Returns current and next protocol for a block. *)
   val protocols :
@@ -30,14 +30,15 @@ module type Mocked_services_hooks = sig
      [Tezos_shell_services.Injection_services.S.block], after checking that
      the block header can be deserialized. *)
   val inject_block :
-    Block_hash.t ->
+    Tezos_crypto.Block_hash.t ->
     Block_header.t ->
     Operation.t trace trace ->
     unit tzresult Lwt.t
 
   (** [inject_operation] is used by the endorser (or the client) to inject
       operations, including endorsements. *)
-  val inject_operation : Operation.t -> Operation_hash.t tzresult Lwt.t
+  val inject_operation :
+    Operation.t -> Tezos_crypto.Operation_hash.t tzresult Lwt.t
 
   (** [pending_operations] returns the current contents of the mempool. It
      is used by the baker to fetch operations to potentially include in the
@@ -54,7 +55,9 @@ module type Mocked_services_hooks = sig
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->
-    ((Operation_hash.t * Mockup.M.Protocol.operation) * error trace option) list
+    ((Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation)
+    * error trace option)
+    list
     Tezos_rpc.Answer.stream
 
   (** Lists block hashes from the chain, up to the last checkpoint, sorted
@@ -62,15 +65,16 @@ module type Mocked_services_hooks = sig
      chain. Optional arguments allow to return the list of predecessors of a
      given block or of a set of blocks. *)
   val list_blocks :
-    heads:Block_hash.t list ->
+    heads:Tezos_crypto.Block_hash.t list ->
     length:int option ->
     min_date:Time.Protocol.t option ->
-    Block_hash.t list list tzresult Lwt.t
+    Tezos_crypto.Block_hash.t list list tzresult Lwt.t
 
   (** List the ancestors of the given block which, if referred to as
       the branch in an operation header, are recent enough for that
       operation to be included in the current block. *)
-  val live_blocks : Block_services.block -> Block_hash.Set.t tzresult Lwt.t
+  val live_blocks :
+    Block_services.block -> Tezos_crypto.Block_hash.Set.t tzresult Lwt.t
 
   (** [rpc_context_callback] is used in the implementations of several
       RPCs (see local_services.ml). It should correspond to the
@@ -87,7 +91,7 @@ module type Mocked_services_hooks = sig
      to all nodes. *)
   val broadcast_block :
     ?dests:int list ->
-    Block_hash.t ->
+    Tezos_crypto.Block_hash.t ->
     Block_header.t ->
     Operation.t trace trace ->
     unit tzresult Lwt.t
@@ -102,7 +106,8 @@ module type Mocked_services_hooks = sig
       simulated node is already bootstrapped, returns the current head
       immediately. *)
   val monitor_bootstrapped :
-    unit -> (Block_hash.t * Time.Protocol.t) Tezos_rpc.Answer.stream
+    unit ->
+    (Tezos_crypto.Block_hash.t * Time.Protocol.t) Tezos_rpc.Answer.stream
 end
 
 type hooks = (module Mocked_services_hooks)
@@ -183,7 +188,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
         match Block_header.of_bytes bytes with
         | None -> failwith "faked_services.inject_block: can't deserialize"
         | Some block_header ->
-            let block_hash = Block_hash.hash_bytes [bytes] in
+            let block_hash = Tezos_crypto.Block_hash.hash_bytes [bytes] in
             Hooks.inject_block block_hash block_header operations >>=? fun () ->
             return block_hash)
 
@@ -202,7 +207,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
       Broadcast_services.S.block
       (fun () dests (block_header, operations) ->
         let bytes = Block_header.to_bytes block_header in
-        let block_hash = Block_hash.hash_bytes [bytes] in
+        let block_hash = Tezos_crypto.Block_hash.hash_bytes [bytes] in
         let dests = match dests#dests with [] -> None | dests -> Some dests in
         Hooks.broadcast_block ?dests block_hash block_header operations)
 

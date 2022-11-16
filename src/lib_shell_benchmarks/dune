@@ -21,5 +21,4 @@
   -open Tezos_base
   -open Tezos_base.TzPervasives
   -open Tezos_error_monad
-  -open Tezos_benchmark
-  -open Tezos_crypto))
+  -open Tezos_benchmark))

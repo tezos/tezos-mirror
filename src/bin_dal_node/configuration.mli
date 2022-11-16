@@ -26,7 +26,7 @@
 type neighbor = {addr : string; port : int}
 
 type dac = {
-  addresses : Aggregate_signature.public_key_hash list;
+  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
   threshold : int;
       (** The number of signature needed on root page hashes for the
           corresponding reveal preimages to be available. *)

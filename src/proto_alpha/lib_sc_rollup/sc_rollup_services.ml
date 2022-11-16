@@ -62,11 +62,15 @@ end
 
 module Arg = struct
   type block_id =
-    [`Head | `Hash of Block_hash.t | `Level of Int32.t | `Finalized | `Cemented]
+    [ `Head
+    | `Hash of Tezos_crypto.Block_hash.t
+    | `Level of Int32.t
+    | `Finalized
+    | `Cemented ]
 
   let construct_block_id = function
     | `Head -> "head"
-    | `Hash h -> Block_hash.to_b58check h
+    | `Hash h -> Tezos_crypto.Block_hash.to_b58check h
     | `Level l -> Int32.to_string l
     | `Finalized -> "finalized"
     | `Cemented -> "cemented"
@@ -80,7 +84,7 @@ module Arg = struct
         match Int32.of_string_opt h with
         | Some l -> Ok (`Level l)
         | None -> (
-            match Block_hash.of_b58check_opt h with
+            match Tezos_crypto.Block_hash.of_b58check_opt h with
             | Some b -> Ok (`Hash b)
             | None -> Error "Cannot parse block id"))
 
@@ -134,7 +138,7 @@ module Global = struct
     Tezos_rpc.Service.get_service
       ~description:"Tezos head known to the smart-contract rollup node"
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Block_hash.encoding)
+      ~output:(Data_encoding.option Tezos_crypto.Block_hash.encoding)
       (path / "tezos_head")
 
   let current_tezos_level =
@@ -215,7 +219,7 @@ module Global = struct
         ~description:
           "Tezos block hash of block known to the smart-contract rollup node"
         ~query:Tezos_rpc.Query.empty
-        ~output:Block_hash.encoding
+        ~output:Tezos_crypto.Block_hash.encoding
         (path / "hash")
 
     let level =

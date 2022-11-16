@@ -142,13 +142,13 @@ let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 
 let of_string_exn b = Data_encoding.Binary.of_string_exn encoding b
 
-let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
+let hash proto = Tezos_crypto.Protocol_hash.hash_bytes [to_bytes proto]
 
-let hash_raw proto = Protocol_hash.hash_bytes [proto]
+let hash_raw proto = Tezos_crypto.Protocol_hash.hash_bytes [proto]
 
 module Meta = struct
   type t = {
-    hash : Protocol_hash.t option;
+    hash : Tezos_crypto.Protocol_hash.t option;
     expected_env_version : env_version option;
     modules : string list;
   }
@@ -169,7 +169,7 @@ module Meta = struct
          (opt
             "hash"
             ~description:"Used to force the hash of the protocol"
-            Protocol_hash.encoding)
+            Tezos_crypto.Protocol_hash.encoding)
          (opt "expected_env_version" env_version_encoding)
          (req
             "modules"

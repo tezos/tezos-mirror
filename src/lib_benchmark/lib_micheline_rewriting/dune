@@ -9,6 +9,7 @@
   zarith
   zarith_stubs_js
   tezos-stdlib
+  tezos-crypto
   tezos-error-monad
   tezos-micheline)
  (flags

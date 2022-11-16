@@ -39,7 +39,7 @@ module type S = sig
     dal_endorsement_lag:int ->
     fuel:fuel ->
     Node_context.t ->
-    Block_hash.t ->
+    Tezos_crypto.Block_hash.t ->
     state ->
     (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t
 end

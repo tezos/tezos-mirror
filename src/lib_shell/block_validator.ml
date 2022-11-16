@@ -40,7 +40,7 @@ type validation_result =
 
 module Block_hash_ring =
   (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
-    (Block_hash)
+    (Tezos_crypto.Block_hash)
 
 module Name = struct
   type t = unit
@@ -78,7 +78,7 @@ module Request = struct
     notify_new_block : Store.Block.t -> unit;
     canceler : Lwt_canceler.t option;
     peer : P2p_peer.Id.t option;
-    hash : Block_hash.t;
+    hash : Tezos_crypto.Block_hash.t;
     header : Block_header.t;
     operations : Operation.t list list;
     precheck_and_notify : bool;
@@ -476,12 +476,12 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
         let open Lwt_result_syntax in
         let hashes = List.map (List.map Operation.hash) operations in
         let computed_hash =
-          Operation_list_list_hash.compute
-            (List.map Operation_list_hash.compute hashes)
+          Tezos_crypto.Operation_list_list_hash.compute
+            (List.map Tezos_crypto.Operation_list_hash.compute hashes)
         in
         let* () =
           fail_when
-            (Operation_list_list_hash.compare
+            (Tezos_crypto.Operation_list_list_hash.compare
                computed_hash
                header.shell.operations_hash
             <> 0)

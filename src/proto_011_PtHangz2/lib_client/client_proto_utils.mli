@@ -26,15 +26,15 @@
 val sign_message :
   #Protocol_client_context.full ->
   src_sk:Client_keys.sk_uri ->
-  block:Block_hash.t ->
+  block:Tezos_crypto.Block_hash.t ->
   message:string ->
-  Signature.t tzresult Lwt.t
+  Tezos_crypto.Signature.t tzresult Lwt.t
 
 val check_message :
   #Protocol_client_context.full ->
-  block:Block_hash.t ->
+  block:Tezos_crypto.Block_hash.t ->
   key_locator:Client_keys.pk_uri ->
   quiet:bool ->
   message:string ->
-  signature:Signature.t ->
+  signature:Tezos_crypto.Signature.t ->
   bool tzresult Lwt.t

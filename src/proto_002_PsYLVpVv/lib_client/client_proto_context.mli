@@ -74,5 +74,5 @@ val display_receipt_for_operation :
   #Alpha_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->
-  Operation_list_hash.elt ->
+  Tezos_crypto.Operation_list_hash.elt ->
   unit tzresult Lwt.t

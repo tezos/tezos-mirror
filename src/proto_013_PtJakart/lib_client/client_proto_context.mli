@@ -60,8 +60,8 @@ val register_global_constant :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->
@@ -105,7 +105,7 @@ val get_frozen_deposits_limit :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Signature.Public_key_hash.t ->
+  Tezos_crypto.Signature.Public_key_hash.t ->
   Tez.t option tzresult Lwt.t
 
 val build_delegate_operation :
@@ -284,7 +284,7 @@ val reveal :
   Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key = {
-  pkh : Ed25519.Public_key_hash.t;
+  pkh : Tezos_crypto.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -332,7 +332,7 @@ type period_info = {
   current_period_kind : Voting_period.kind;
   position : Int32.t;
   remaining : Int32.t;
-  current_proposal : Protocol_hash.t option;
+  current_proposal : Tezos_crypto.Protocol_hash.t option;
 }
 
 type ballots_info = {
@@ -370,7 +370,7 @@ val submit_proposals :
   ?confirmations:int ->
   src_sk:Client_keys.sk_uri ->
   public_key_hash ->
-  Protocol_hash.t list ->
+  Tezos_crypto.Protocol_hash.t list ->
   Kind.proposals Injection.result_list tzresult Lwt.t
 
 val submit_ballot :
@@ -382,7 +382,7 @@ val submit_ballot :
   ?confirmations:int ->
   src_sk:Client_keys.sk_uri ->
   public_key_hash ->
-  Protocol_hash.t ->
+  Tezos_crypto.Protocol_hash.t ->
   Vote.ballot ->
   Kind.ballot Injection.result_list tzresult Lwt.t
 
@@ -392,7 +392,7 @@ val display_receipt_for_operation :
   #Protocol_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->
-  Operation_list_hash.elt ->
+  Tezos_crypto.Operation_list_hash.elt ->
   unit tzresult Lwt.t
 
 val cached_contracts :
@@ -432,12 +432,12 @@ val originate_tx_rollup :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_origination Kind.manager contents
   * Kind.tx_rollup_origination Kind.manager Apply_results.contents_result)
   tzresult
@@ -456,14 +456,14 @@ val submit_tx_rollup_batch :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   content:string ->
   tx_rollup:Tx_rollup.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_submit_batch Kind.manager contents
   * Kind.tx_rollup_submit_batch Kind.manager Apply_results.contents_result)
   tzresult
@@ -481,8 +481,8 @@ val submit_tx_rollup_commitment :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
@@ -491,7 +491,7 @@ val submit_tx_rollup_commitment :
   predecessor:Tx_rollup_commitment_hash.t option ->
   tx_rollup:Tx_rollup.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_commit Kind.manager contents
   * Kind.tx_rollup_commit Kind.manager Apply_results.contents_result)
   tzresult
@@ -509,13 +509,13 @@ val submit_tx_rollup_finalize_commitment :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_finalize_commitment Kind.manager contents
   * Kind.tx_rollup_finalize_commitment Kind.manager
     Apply_results.contents_result)
@@ -534,13 +534,13 @@ val submit_tx_rollup_remove_commitment :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_remove_commitment Kind.manager contents
   * Kind.tx_rollup_remove_commitment Kind.manager Apply_results.contents_result)
   tzresult
@@ -558,8 +558,8 @@ val submit_tx_rollup_rejection :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
@@ -569,12 +569,12 @@ val submit_tx_rollup_rejection :
   message_path:Tx_rollup_inbox.Merkle.path ->
   message_result_hash:Tx_rollup_message_result_hash.t ->
   message_result_path:Tx_rollup_commitment.Merkle.path ->
-  previous_context_hash:Context_hash.t ->
+  previous_context_hash:Tezos_crypto.Context_hash.t ->
   previous_withdraw_list_hash:Tx_rollup_withdraw_list_hash.t ->
   previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
   proof:Tx_rollup_l2_proof.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_rejection Kind.manager contents
   * Kind.tx_rollup_rejection Kind.manager Apply_results.contents_result)
   tzresult
@@ -592,13 +592,13 @@ val submit_tx_rollup_return_bond :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_return_bond Kind.manager contents
   * Kind.tx_rollup_return_bond Kind.manager Apply_results.contents_result)
   tzresult
@@ -616,18 +616,18 @@ val tx_rollup_dispatch_tickets :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
-  context_hash:Context_hash.t ->
+  context_hash:Tezos_crypto.Context_hash.t ->
   message_position:int ->
   message_result_path:Tx_rollup_commitment.Merkle.path ->
   tickets_info:Tx_rollup_reveal.t list ->
   tx_rollup:Tx_rollup.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.tx_rollup_dispatch_tickets Kind.manager contents
   * Kind.tx_rollup_dispatch_tickets Kind.manager Apply_results.contents_result)
   tzresult
@@ -645,8 +645,8 @@ val transfer_ticket :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Signature.public_key_hash ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   contents:string ->
@@ -656,7 +656,7 @@ val transfer_ticket :
   destination:Contract.t ->
   entrypoint:Entrypoint.t ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.transfer_ticket Kind.manager contents
   * Kind.transfer_ticket Kind.manager Apply_results.contents_result)
   tzresult
@@ -681,7 +681,7 @@ val sc_rollup_originate :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  ( Operation_hash.t
+  ( Tezos_crypto.Operation_hash.t
     * Kind.sc_rollup_originate Kind.manager contents
     * Kind.sc_rollup_originate Kind.manager Apply_results.contents_result,
     tztrace )
@@ -707,7 +707,7 @@ val sc_rollup_add_messages :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.sc_rollup_add_messages Kind.manager contents
   * Kind.sc_rollup_add_messages Kind.manager Apply_results.contents_result)
   tzresult
@@ -732,7 +732,7 @@ val sc_rollup_cement :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.sc_rollup_cement Kind.manager contents
   * Kind.sc_rollup_cement Kind.manager Apply_results.contents_result)
   tzresult
@@ -757,7 +757,7 @@ val sc_rollup_publish :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Operation_hash.t
+  (Tezos_crypto.Operation_hash.t
   * Kind.sc_rollup_publish Kind.manager contents
   * Kind.sc_rollup_publish Kind.manager Apply_results.contents_result)
   tzresult

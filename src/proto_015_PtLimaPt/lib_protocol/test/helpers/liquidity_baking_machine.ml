@@ -390,13 +390,13 @@ let total_xtz = 32_000_000_000_000L
 let tzbtc_admin_account : Account.t =
   {
     pkh =
-      Signature.Public_key_hash.of_b58check_exn
+      Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
     pk =
-      Signature.Public_key.of_b58check_exn
+      Tezos_crypto.Signature.Public_key.of_b58check_exn
         "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
     sk =
-      Signature.Secret_key.of_b58check_exn
+      Tezos_crypto.Signature.Secret_key.of_b58check_exn
         "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
   }
 

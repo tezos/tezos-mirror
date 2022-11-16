@@ -39,9 +39,11 @@ open Tezos_rpc.Context
    [Injection_operation_error_case oph] followed by [err].  *)
 type Error_monad.error += Injection_operations_error
 
-type Error_monad.error += Injection_operation_succeed_case of Operation_hash.t
+type Error_monad.error +=
+  | Injection_operation_succeed_case of Tezos_crypto.Operation_hash.t
 
-type Error_monad.error += Injection_operation_error_case of Operation_hash.t
+type Error_monad.error +=
+  | Injection_operation_error_case of Tezos_crypto.Operation_hash.t
 
 (** [block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]
@@ -55,21 +57,21 @@ val block :
   ?chain:Chain_services.chain ->
   Bytes.t ->
   Operation.t list list ->
-  Block_hash.t tzresult Lwt.t
+  Tezos_crypto.Block_hash.t tzresult Lwt.t
 
 val operation :
   #simple ->
   ?async:bool ->
   ?chain:Chain_services.chain ->
   Bytes.t ->
-  Operation_hash.t tzresult Lwt.t
+  Tezos_crypto.Operation_hash.t tzresult Lwt.t
 
 val private_operation :
   #simple ->
   ?async:bool ->
   ?chain:Chain_services.chain ->
   Bytes.t ->
-  Operation_hash.t tzresult Lwt.t
+  Tezos_crypto.Operation_hash.t tzresult Lwt.t
 
 (** [private_operations] injects multiple operations. The [private_]
    prefix is because the service is bound to the /private/ path-prefix
@@ -81,10 +83,13 @@ val private_operations :
   ?force:bool ->
   ?chain:Chain_services.chain ->
   Bytes.t list ->
-  Operation_hash.t list tzresult Lwt.t
+  Tezos_crypto.Operation_hash.t list tzresult Lwt.t
 
 val protocol :
-  #simple -> ?async:bool -> Protocol.t -> Protocol_hash.t tzresult Lwt.t
+  #simple ->
+  ?async:bool ->
+  Protocol.t ->
+  Tezos_crypto.Protocol_hash.t tzresult Lwt.t
 
 module S : sig
   val block :
@@ -93,7 +98,7 @@ module S : sig
       unit,
       < async : bool ; force : bool ; chain : Chain_services.chain option >,
       Bytes.t * Operation.t list list,
-      Block_hash.t )
+      Tezos_crypto.Block_hash.t )
     Tezos_rpc.Service.t
 
   val operation :
@@ -102,7 +107,7 @@ module S : sig
       unit,
       < async : bool ; chain : Chain_services.chain option >,
       Bytes.t,
-      Operation_hash.t )
+      Tezos_crypto.Operation_hash.t )
     Tezos_rpc.Service.t
 
   val private_operation :
@@ -111,7 +116,7 @@ module S : sig
       unit,
       < async : bool ; chain : Chain_services.chain option >,
       Bytes.t,
-      Operation_hash.t )
+      Tezos_crypto.Operation_hash.t )
     Tezos_rpc.Service.t
 
   val private_operations :
@@ -120,7 +125,7 @@ module S : sig
       unit,
       < async : bool ; force : bool ; chain : Chain_services.chain option >,
       Bytes.t list,
-      Operation_hash.t list )
+      Tezos_crypto.Operation_hash.t list )
     Tezos_rpc.Service.t
 
   val protocol :
@@ -129,6 +134,6 @@ module S : sig
       unit,
       < async : bool >,
       Protocol.t,
-      Protocol_hash.t )
+      Tezos_crypto.Protocol_hash.t )
     Tezos_rpc.Service.t
 end

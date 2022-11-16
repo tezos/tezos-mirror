@@ -49,18 +49,18 @@ type priority = [`High | `Medium | `Low of Q.t list]
 type 'protocol_data t
 
 module Sized_set :
-  Tezos_base.Sized.SizedSet with type set := Operation_hash.Set.t
+  Tezos_base.Sized.SizedSet with type set := Tezos_crypto.Operation_hash.Set.t
 
 (** The empty structure of pending operations. *)
 val empty : 'protocol_data t
 
 (** [hashes p] returns the set of hashes contained in [p] *)
-val hashes : 'protocol_data t -> Operation_hash.Set.t
+val hashes : 'protocol_data t -> Tezos_crypto.Operation_hash.Set.t
 
 (** [operations p] returns the Map of bindings [oph -> op] contained in [p] *)
 val operations :
   'protocol_data t ->
-  'protocol_data Prevalidation.operation Operation_hash.Map.t
+  'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t
 
 (** [is_empty p] returns [true] if [p] has operations, [false] otherwise. *)
 val is_empty : 'protocol_data t -> bool
@@ -70,7 +70,7 @@ val is_empty : 'protocol_data t -> bool
     Complexity is O(log(n)), where n is the number of operations (hashes) in the
     structure.
 *)
-val mem : Operation_hash.t -> 'protocol_data t -> bool
+val mem : Tezos_crypto.Operation_hash.t -> 'protocol_data t -> bool
 
 (** [add oph op p prio] records the operation [op] whose hash is [oph] and whose
     priority is [prio] in [p].
@@ -93,7 +93,8 @@ val add :
     Complexity is O(log(n)), where n is the number of operations (hashes) in the
     structure.
 *)
-val remove : Operation_hash.t -> 'protocol_data t -> 'protocol_data t
+val remove :
+  Tezos_crypto.Operation_hash.t -> 'protocol_data t -> 'protocol_data t
 
 (** [cardinal p] returns the number of operations (hashes) in [p].
 
@@ -108,12 +109,12 @@ val cardinal : 'protocol_data t -> int
 
     We iterate on operations with `High priority first, then on those with `Low
     priority. For operations with the same priority, the iteration order is
-    defined [Operation_hash.compare] function (operations with small hashes are
+    defined [Tezos_crypto.Operation_hash.compare] function (operations with small hashes are
     processed first).
 *)
 val fold :
   (priority ->
-  Operation_hash.t ->
+  Tezos_crypto.Operation_hash.t ->
   'protocol_data Prevalidation.operation ->
   'a ->
   'a) ->
@@ -124,7 +125,7 @@ val fold :
 (** [iter f p] is similar to [fold] where [acc] is unit *)
 val iter :
   (priority ->
-  Operation_hash.t ->
+  Tezos_crypto.Operation_hash.t ->
   'protocol_data Prevalidation.operation ->
   unit) ->
   'protocol_data t ->
@@ -135,7 +136,7 @@ val iter :
     value [Error e] is returned by [f] *)
 val fold_es :
   (priority ->
-  Operation_hash.t ->
+  Tezos_crypto.Operation_hash.t ->
   'protocol_data Prevalidation.operation ->
   'a ->
   ('a, 'b) result Lwt.t) ->

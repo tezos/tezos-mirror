@@ -74,10 +74,10 @@ let expected_qr_num participation_ema =
        *. (of_int qr_max_num -. of_int qr_min_num)
        /. of_int den)
 
-(* Protocol_hash.zero is "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i" *)
+(* Tezos_crypto.Protocol_hash.zero is "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i" *)
 let protos =
   Array.map
-    (fun s -> Protocol_hash.of_b58check_exn s)
+    (fun s -> Tezos_crypto.Protocol_hash.of_b58check_exn s)
     [|
       "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
       "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";
@@ -230,9 +230,9 @@ let equal_delegate_info a b =
   Option.equal Int64.equal a.Vote.voting_power b.Vote.voting_power
   && Option.equal Vote.equal_ballot a.current_ballot b.current_ballot
   && List.equal
-       Protocol_hash.equal
-       (List.sort Protocol_hash.compare a.current_proposals)
-       (List.sort Protocol_hash.compare b.current_proposals)
+       Tezos_crypto.Protocol_hash.equal
+       (List.sort Tezos_crypto.Protocol_hash.compare a.current_proposals)
+       (List.sort Tezos_crypto.Protocol_hash.compare b.current_proposals)
   && Int.equal a.remaining_proposals b.remaining_proposals
 
 let assert_equal_info ~loc a b =
@@ -470,8 +470,9 @@ let test_successful_vote num_delegates () =
   let props =
     List.map (fun i -> protos.(i)) (2 -- Constants.max_proposals_per_delegate)
   in
-  Op.proposals (B b) del1 (Protocol_hash.zero :: props) >>=? fun ops1 ->
-  Op.proposals (B b) del2 [Protocol_hash.zero] >>=? fun ops2 ->
+  Op.proposals (B b) del1 (Tezos_crypto.Protocol_hash.zero :: props)
+  >>=? fun ops1 ->
+  Op.proposals (B b) del2 [Tezos_crypto.Protocol_hash.zero] >>=? fun ops2 ->
   Block.bake ~operations:[ops1; ops2] b >>=? fun b ->
   Context.Delegate.voting_info (B b) pkh1 >>=? fun info1 ->
   Context.Delegate.voting_info (B b) pkh2 >>=? fun info2 ->
@@ -481,7 +482,7 @@ let test_successful_vote num_delegates () =
     {
       voting_power = Some pow1;
       current_ballot = None;
-      current_proposals = Protocol_hash.zero :: props;
+      current_proposals = Tezos_crypto.Protocol_hash.zero :: props;
       remaining_proposals = 0;
     }
   >>=? fun () ->
@@ -491,7 +492,7 @@ let test_successful_vote num_delegates () =
     {
       voting_power = Some pow2;
       current_ballot = None;
-      current_proposals = [Protocol_hash.zero];
+      current_proposals = [Tezos_crypto.Protocol_hash.zero];
       remaining_proposals = Constants.max_proposals_per_delegate - 1;
     }
   >>=? fun () ->
@@ -513,7 +514,7 @@ let test_successful_vote num_delegates () =
   assert_validate_proposals_fails
     ~expected_error:too_many_proposals
     ~proposer:del1
-    ~proposals:(Protocol_hash.zero :: props)
+    ~proposals:(Tezos_crypto.Protocol_hash.zero :: props)
     b
     __LOC__
   >>=? fun () ->
@@ -544,13 +545,13 @@ let test_successful_vote num_delegates () =
   (* current proposal must be set during exploration period *)
   (Context.Vote.get_current_proposal (B b) >>=? function
    | Some v ->
-       if Protocol_hash.(equal zero v) then return_unit
+       if Tezos_crypto.Protocol_hash.(equal zero v) then return_unit
        else failwith "%s - Wrong proposal" __LOC__
    | None -> failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
   (* unanimous vote: all delegates --active when p2 started-- vote *)
   List.map_es
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del -> Op.ballot (B b) del Tezos_crypto.Protocol_hash.zero Vote.Yay)
     delegates_p2
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
@@ -571,7 +572,7 @@ let test_successful_vote num_delegates () =
   assert_validate_ballot_fails
     ~expected_error:already_submitted_a_ballot
     ~voter:del1
-    ~proposal:Protocol_hash.zero
+    ~proposal:Tezos_crypto.Protocol_hash.zero
     ~ballot:Vote.Nay
     b
     __LOC__
@@ -622,13 +623,13 @@ let test_successful_vote num_delegates () =
   (* current proposal must be set during promotion period *)
   (Context.Vote.get_current_proposal (B b) >>=? function
    | Some v ->
-       if Protocol_hash.(equal zero v) then return_unit
+       if Tezos_crypto.Protocol_hash.(equal zero v) then return_unit
        else failwith "%s - Wrong proposal" __LOC__
    | None -> failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
   (* unanimous vote: all delegates --active when p4 started-- vote *)
   List.map_es
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del -> Op.ballot (B b) del Tezos_crypto.Protocol_hash.zero Vote.Yay)
     delegates_p4
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
@@ -663,11 +664,11 @@ let test_successful_vote num_delegates () =
   Context.Vote.get_protocol b >>= fun p ->
   Assert.equal
     ~loc:__LOC__
-    Protocol_hash.equal
+    Tezos_crypto.Protocol_hash.equal
     "Unexpected proposal"
-    Protocol_hash.pp
+    Tezos_crypto.Protocol_hash.pp
     p
-    Protocol_hash.zero
+    Tezos_crypto.Protocol_hash.zero
   >>=? fun () -> return_unit
 
 (* given a list of active delegates,
@@ -719,7 +720,8 @@ let test_not_enough_quorum_in_exploration num_delegates () =
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
-  Op.proposals (B b) proposer [Protocol_hash.zero] >>=? fun operation ->
+  Op.proposals (B b) proposer [Tezos_crypto.Protocol_hash.zero]
+  >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
@@ -741,7 +743,7 @@ let test_not_enough_quorum_in_exploration num_delegates () =
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
   List.map_es
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del -> Op.ballot (B b) del Tezos_crypto.Protocol_hash.zero Vote.Yay)
     voters_without_quorum
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
@@ -773,7 +775,8 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
-  Op.proposals (B b) proposer [Protocol_hash.zero] >>=? fun operation ->
+  Op.proposals (B b) proposer [Tezos_crypto.Protocol_hash.zero]
+  >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
@@ -789,7 +792,7 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   (* all voters vote, for yays;
        no nays, so supermajority is satisfied *)
   List.map_es
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del -> Op.ballot (B b) del Tezos_crypto.Protocol_hash.zero Vote.Yay)
     voters
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
@@ -820,7 +823,7 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
   List.map_es
-    (fun del -> Op.ballot (B b) del Protocol_hash.zero Vote.Yay)
+    (fun del -> Op.ballot (B b) del Tezos_crypto.Protocol_hash.zero Vote.Yay)
     voters_without_quorum
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
@@ -944,7 +947,7 @@ let test_supermajority_in_exploration supermajority () =
   (* assert our proposal won *)
   (Context.Vote.get_current_proposal (B b) >>=? function
    | Some v ->
-       if Protocol_hash.(equal proposal v) then return_unit
+       if Tezos_crypto.Protocol_hash.(equal proposal v) then return_unit
        else failwith "%s - Wrong proposal" __LOC__
    | None -> failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
@@ -1007,7 +1010,7 @@ let test_quorum_capped_maximum num_delegates () =
   let open Alpha_context in
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   (* propose a new protocol *)
-  let protocol = Protocol_hash.zero in
+  let protocol = Tezos_crypto.Protocol_hash.zero in
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
@@ -1047,7 +1050,7 @@ let test_quorum_capped_minimum num_delegates () =
   let open Alpha_context in
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   (* propose a new protocol *)
-  let protocol = Protocol_hash.zero in
+  let protocol = Tezos_crypto.Protocol_hash.zero in
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
@@ -1259,7 +1262,9 @@ let test_proposals_invalid_signature () =
   let open Lwt_result_syntax in
   let* block, proposer = context_init1 () in
   let* contents = Op.proposals_contents (B block) proposer [protos.(0)] in
-  let op = Op.pack_operation (B block) (Some Signature.zero) contents in
+  let op =
+    Op.pack_operation (B block) (Some Tezos_crypto.Signature.zero) contents
+  in
   Incremental.assert_validate_operation_fails
     (invalid_signature __LOC__)
     op
@@ -1276,7 +1281,7 @@ let test_proposals_wrong_voting_period_index () =
   assert_validate_proposals_fails
     ~expected_error:(wrong_voting_period_index ~current_index ~op_index)
     ~proposer
-    ~proposals:[Protocol_hash.zero]
+    ~proposals:[Tezos_crypto.Protocol_hash.zero]
     ~period:op_index
     block
     __LOC__
@@ -1336,14 +1341,14 @@ let test_proposals_source_not_in_vote_listings () =
     assert_validate_proposals_fails
       ~expected_error:proposals_from_unregistered_delegate
       ~proposer
-      ~proposals:[Protocol_hash.zero]
+      ~proposals:[Tezos_crypto.Protocol_hash.zero]
       block
   in
   let assert_fails_with_source_not_in_vote_listings block =
     assert_validate_proposals_fails
       ~expected_error:source_not_in_vote_listings
       ~proposer
-      ~proposals:[Protocol_hash.zero]
+      ~proposals:[Tezos_crypto.Protocol_hash.zero]
       block
   in
   (* Fail when the source has no contract in the storage. *)
@@ -1690,7 +1695,9 @@ let test_ballot_invalid_signature () =
   let open Lwt_result_syntax in
   let* block, voter, proposal = context_init_exploration () in
   let* contents = Op.ballot_contents (B block) voter proposal Vote.Yay in
-  let op = Op.pack_operation (B block) (Some Signature.zero) contents in
+  let op =
+    Op.pack_operation (B block) (Some Tezos_crypto.Signature.zero) contents
+  in
   Incremental.assert_validate_operation_fails
     (invalid_signature __LOC__)
     op
@@ -1912,7 +1919,7 @@ let observe_ballot pre_state post_state op caller_loc =
   let* current_proposal =
     Assert.get_some ~loc:(make_loc __LOC__) current_proposal
   in
-  assert (Protocol_hash.equal proposal current_proposal) ;
+  assert (Tezos_crypto.Protocol_hash.equal proposal current_proposal) ;
   (* Observations *)
   let* post_voting_infos = Context.Delegate.voting_info (B post_state) source in
   let* recorded_ballot =

@@ -162,7 +162,7 @@ new [live_blocks] and [live_operations], triggering also a
 {{!Tezos_shell.module-Prevalidator.flush} flush} of the mempool: every operation
 classified as {{!Tezos_shell.module-Prevalidation.T.result.Applied} Applied} or
 {{!Tezos_shell.module-Prevalidation.T.result.Branch_delayed} Branch_delayed}
-which is anchored (to the {{!Tezos_crypto.module-Block_hash.type-t} block_hash}
+which is anchored (to the {{!Tezos_crypto.module-Tezos_crypto.Block_hash.type-t} block_hash}
 on which the operation is based on when it was created) on a [live block] and
 which is not in the [live operations] (operations which are included in
 [live_blocks]) is set

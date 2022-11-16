@@ -26,7 +26,7 @@
 open Tezos_shell_services
 
 module type Proxy_sig = sig
-  val protocol_hash : Protocol_hash.t
+  val protocol_hash : Tezos_crypto.Protocol_hash.t
 
   (** RPCs provided by the protocol *)
   val directory : Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.t
@@ -34,7 +34,7 @@ module type Proxy_sig = sig
   (** How to build the context to execute RPCs on *)
   val initial_context :
     Proxy_getter.rpc_context_args ->
-    Context_hash.t ->
+    Tezos_crypto.Context_hash.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   val time_between_blocks :
@@ -55,27 +55,28 @@ let register_proxy_context m =
   if
     List.exists
       (fun (module P : Proxy_sig) ->
-        Protocol_hash.(P.protocol_hash = INCOMING_P.protocol_hash))
+        Tezos_crypto.Protocol_hash.(P.protocol_hash = INCOMING_P.protocol_hash))
       !registered
   then
     raise
     @@ Invalid_argument
          (Format.asprintf
             "A proxy environment for protocol %a is registered already"
-            Protocol_hash.pp
+            Tezos_crypto.Protocol_hash.pp
             INCOMING_P.protocol_hash)
   else registered := m :: !registered
 
 let get_all_registered () : proxy_environment list = !registered
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
-    (protocol_hash : Protocol_hash.t) : proxy_environment tzresult Lwt.t =
+    (protocol_hash : Tezos_crypto.Protocol_hash.t) :
+    proxy_environment tzresult Lwt.t =
   let open Lwt_result_syntax in
   let available = !registered in
   let proxy_opt =
     List.find_opt
       (fun (module Proxy : Proxy_sig) ->
-        Protocol_hash.equal protocol_hash Proxy.protocol_hash)
+        Tezos_crypto.Protocol_hash.equal protocol_hash Proxy.protocol_hash)
       available
   in
   match proxy_opt with
@@ -96,14 +97,14 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
                Proceeding with the first available protocol (%a). This will \
                work if the mismatch is harmless, otherwise deserialization is \
                the failure most likely to happen."
-              Protocol_hash.pp
+              Tezos_crypto.Protocol_hash.pp
               protocol_hash
               (Format.pp_print_list
                  ~pp_sep:Format.pp_print_space
-                 Protocol_hash.pp)
+                 Tezos_crypto.Protocol_hash.pp)
               ((List.map (fun (module P : Proxy_sig) -> P.protocol_hash))
                  available)
-              Protocol_hash.pp
+              Tezos_crypto.Protocol_hash.pp
               fst_available_proto
           in
           return fst_available)

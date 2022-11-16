@@ -27,7 +27,7 @@
 
     The floating block store is an append-only store where blocks are
    stored arbitrarily. This structure possess an indexed map
-   {!Block_hash.t} -> (offset × predecessors) which points to its
+   {!Tezos_crypto.Block_hash.t} -> (offset × predecessors) which points to its
    offset in the associated file along with an exponential list of
    predecessors block hashes (as implemented in
    {!Block_store.compute_predecessors}). The structure
@@ -77,23 +77,26 @@ val kind : t -> floating_kind
 
 (** [mem floating_store hash] tests whether [hash] is stored in
     [floating_store]. *)
-val mem : t -> Block_hash.t -> bool Lwt.t
+val mem : t -> Tezos_crypto.Block_hash.t -> bool Lwt.t
 
 (** [find_predecessors floating_store block_hash] reads from the index
     the list of [block_hash]'s predecessors if the block is stored in
     [floating_store], returns [None] otherwise. *)
-val find_predecessors : t -> Block_hash.t -> Block_hash.t list option Lwt.t
+val find_predecessors :
+  t -> Tezos_crypto.Block_hash.t -> Tezos_crypto.Block_hash.t list option Lwt.t
 
 (** [read_block floating_store hash] reads from the file the block of
     [hash] if the block is stored in [floating_store], returns [None]
     otherwise. *)
-val read_block : t -> Block_hash.t -> Block_repr.t option Lwt.t
+val read_block : t -> Tezos_crypto.Block_hash.t -> Block_repr.t option Lwt.t
 
 (** [read_block_and_predecessors floating_store hash] same as
     [read_block] but also returns the block's predecessors. Returns
     [None] if it fails to resolve the given [hash].*)
 val read_block_and_predecessors :
-  t -> Block_hash.t -> (Block_repr.t * Block_hash.t list) option Lwt.t
+  t ->
+  Tezos_crypto.Block_hash.t ->
+  (Block_repr.t * Tezos_crypto.Block_hash.t list) option Lwt.t
 
 (** [append_block floating_store ?flush preds block] stores the
     [block] in [floating_store] updating its index with the given
@@ -104,7 +107,7 @@ val append_block :
   ?flush:bool ->
   ?log_metrics:bool ->
   t ->
-  Block_hash.t trace ->
+  Tezos_crypto.Block_hash.t trace ->
   Block_repr.block ->
   unit tzresult Lwt.t
 
@@ -112,7 +115,9 @@ val append_block :
     (predecessors × blocks) in [floating_store] updating its index
     accordingly. *)
 val append_all :
-  t -> (Block_hash.t list * Block_repr.t) Seq.t -> unit tzresult Lwt.t
+  t ->
+  (Tezos_crypto.Block_hash.t list * Block_repr.t) Seq.t ->
+  unit tzresult Lwt.t
 
 (** [iter_s_raw_fd f fd] unsafe sequential iterator on a file descriptor
     [fd]. Applies [f] on every block encountered.
@@ -134,7 +139,7 @@ val fold_left_s :
     element. The function [f] is given the last read block along with
     its predecessors. *)
 val fold_left_with_pred_s :
-  ('a -> Block_repr.block * Block_hash.t list -> 'a tzresult Lwt.t) ->
+  ('a -> Block_repr.block * Tezos_crypto.Block_hash.t list -> 'a tzresult Lwt.t) ->
   'a ->
   t ->
   'a tzresult Lwt.t
@@ -147,7 +152,7 @@ val iter_s : (Block_repr.t -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
     [floating_store]. Applies [f] on every block with its predecessors
     read. *)
 val iter_with_pred_s :
-  (Block_repr.t * Block_hash.t list -> unit tzresult Lwt.t) ->
+  (Block_repr.t * Tezos_crypto.Block_hash.t list -> unit tzresult Lwt.t) ->
   t ->
   unit tzresult Lwt.t
 
@@ -198,14 +203,16 @@ val fix_integrity :
     appends a block with its [hash] in [dst_store] contained in the
     [buffer]. *)
 val raw_append :
-  t -> Block_hash.t * bytes * int * Block_hash.t list -> unit tzresult Lwt.t
+  t ->
+  Tezos_crypto.Block_hash.t * bytes * int * Tezos_crypto.Block_hash.t list ->
+  unit tzresult Lwt.t
 
 (** [raw_copy_all src_stores block_hashes dst_store] retrieves
     [block_hashes] from [src_stores] and copy them (without decoding)
     to [dst_store] with a buffering mechanism. *)
 val raw_copy_all :
   src_floating_stores:t list ->
-  block_hashes:Block_hash.t list ->
+  block_hashes:Tezos_crypto.Block_hash.t list ->
   dst_floating_store:t ->
   unit tzresult Lwt.t
 
@@ -222,8 +229,8 @@ val raw_copy_all :
     during the iteration. *)
 val raw_retrieve_blocks_seq :
   src_floating_stores:t list ->
-  block_hashes:Block_hash.t list ->
-  (Block_hash.t * int * bytes) tzresult Lwt.t Seq.t
+  block_hashes:Tezos_crypto.Block_hash.t list ->
+  (Tezos_crypto.Block_hash.t * int * bytes) tzresult Lwt.t Seq.t
 
 (** [raw_iterate f store] iterate over all blocks in a store and
     calling [f] providing it with a [buffer] and the

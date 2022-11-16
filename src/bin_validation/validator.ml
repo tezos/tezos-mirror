@@ -51,8 +51,8 @@ module Events = struct
       ~level:Debug
       ~name:"dynload_protocol"
       ~msg:"dynamic loading of protocol {protocol}"
-      ~pp1:Protocol_hash.pp
-      ("protocol", Protocol_hash.encoding)
+      ~pp1:Tezos_crypto.Protocol_hash.pp
+      ("protocol", Tezos_crypto.Protocol_hash.encoding)
 
   let validation_request =
     declare_1
@@ -60,7 +60,8 @@ module Events = struct
       ~level:Debug
       ~name:"validation_request"
       ~msg:"validating block {block}"
-      ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
+      ~pp1:(fun fmt header ->
+        Tezos_crypto.Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
   let precheck_request =
@@ -69,8 +70,8 @@ module Events = struct
       ~level:Debug
       ~name:"precheck_request"
       ~msg:"prechecking block {hash}"
-      ~pp1:Block_hash.pp
-      ("hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("hash", Tezos_crypto.Block_hash.encoding)
 
   let commit_genesis_request =
     declare_1
@@ -78,8 +79,8 @@ module Events = struct
       ~level:Debug
       ~name:"commit_genesis_request"
       ~msg:"committing genesis block {genesis}"
-      ~pp1:Block_hash.pp
-      ("genesis", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("genesis", Tezos_crypto.Block_hash.encoding)
 
   let initialization_request =
     declare_0
@@ -104,8 +105,8 @@ module Events = struct
       ~level:Debug
       ~name:"context_gc_request"
       ~msg:"garbage collecting context below {context_hash}"
-      ~pp1:Context_hash.pp
-      ("context_hash", Context_hash.encoding)
+      ~pp1:Tezos_crypto.Context_hash.pp
+      ("context_hash", Tezos_crypto.Context_hash.encoding)
 
   let termination_request =
     declare_0
@@ -126,8 +127,8 @@ let load_protocol proto protocol_root =
   else
     let cmxs_file =
       protocol_root
-      // Protocol_hash.to_short_b58check proto
-      // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
+      // Tezos_crypto.Protocol_hash.to_short_b58check proto
+      // Format.asprintf "protocol_%a.cmxs" Tezos_crypto.Protocol_hash.pp proto
     in
     let*! () = Events.(emit dynload_protocol proto) in
     match Dynlink.loadfile_private cmxs_file with
@@ -246,7 +247,7 @@ let run ~readonly input output =
         let*! () =
           External_validation.send
             output
-            (Error_monad.result_encoding Context_hash.encoding)
+            (Error_monad.result_encoding Tezos_crypto.Context_hash.encoding)
             commit
         in
         loop cache None

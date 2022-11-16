@@ -35,8 +35,10 @@ type chain = block list
 (** As new blocks and operations are received they are pushed to an Lwt_pipe
    wrapped into this type. *)
 type broadcast =
-  | Broadcast_block of Block_hash.t * Block_header.t * Operation.t list list
-  | Broadcast_op of Operation_hash.t * Alpha_context.packed_operation
+  | Broadcast_block of
+      Tezos_crypto.Block_hash.t * Block_header.t * Operation.t list list
+  | Broadcast_op of
+      Tezos_crypto.Operation_hash.t * Alpha_context.packed_operation
 
 (** The state of a mockup node. *)
 type state = {
@@ -46,29 +48,33 @@ type state = {
   live_depth : int;
       (** How many blocks (counting from the head into the past) are considered live? *)
   mutable chain : chain;  (** The chain as seen by this fake "node". *)
-  mutable mempool : (Operation_hash.t * Mockup.M.Protocol.operation) list;
+  mutable mempool :
+    (Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) list;
       (** Mempool of this fake "node". *)
-  chain_table : chain Block_hash.Table.t;
+  chain_table : chain Tezos_crypto.Block_hash.Table.t;
       (** The chain table of this fake "node". It maps from block hashes to
      blocks. *)
-  global_chain_table : block Block_hash.Table.t;
+  global_chain_table : block Tezos_crypto.Block_hash.Table.t;
       (** The global chain table that allows us to look up blocks that may be
      missing in [chain_table], i.e. not known to this particular node. This
      is used to find unknown predecessors. The real node can ask about an
      unknown block and receive it on request, this is supposed to emulate
      that functionality. *)
-  ctxt_table : Tezos_protocol_environment.rpc_context Context_hash.Table.t;
+  ctxt_table :
+    Tezos_protocol_environment.rpc_context Tezos_crypto.Context_hash.Table.t;
       (** The context table allows us to look up rpc_context by its hash. *)
-  heads_pipe : (Block_hash.t * Block_header.t) Lwt_pipe.Unbounded.t;
+  heads_pipe :
+    (Tezos_crypto.Block_hash.t * Block_header.t) Lwt_pipe.Unbounded.t;
       (** [heads_pipe] is used to implement the [monitor_heads] RPC. *)
   operations_pipe :
-    (Operation_hash.t * Mockup.M.Protocol.operation) option Lwt_pipe.Unbounded.t;
+    (Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) option
+    Lwt_pipe.Unbounded.t;
       (** [operations_pipe] is used to implement the [operations_pipe] RPC. *)
   mutable streaming_operations : bool;
       (** A helper flag used to implement the monitor operations RPC. *)
   broadcast_pipes : broadcast Lwt_pipe.Unbounded.t list;
       (** Broadcast pipes per node. *)
-  genesis_block_true_hash : Block_hash.t;
+  genesis_block_true_hash : Tezos_crypto.Block_hash.t;
       (** True hash of the genesis
                                  block as calculated by the
                                  [Block_header.hash] function. *)
@@ -76,13 +82,13 @@ type state = {
 
 let accounts = Mockup.Protocol_parameters.default_value.bootstrap_accounts
 
-let chain_id = Chain_id.of_string_exn "main"
+let chain_id = Tezos_crypto.Chain_id.of_string_exn "main"
 
 let genesis_block_hash =
-  Block_hash.of_b58check_exn
+  Tezos_crypto.Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
 
-let genesis_predecessor_block_hash = Block_hash.zero
+let genesis_predecessor_block_hash = Tezos_crypto.Block_hash.zero
 
 type propagation = Block | Pass | Delay of float
 
@@ -92,34 +98,40 @@ module type Hooks = sig
   val on_inject_block :
     level:int32 ->
     round:int32 ->
-    block_hash:Block_hash.t ->
+    block_hash:Tezos_crypto.Block_hash.t ->
     block_header:Block_header.t ->
     operations:Operation.t list list ->
     protocol_data:Alpha_context.Block_header.protocol_data ->
-    (Block_hash.t * Block_header.t * Operation.t list list * propagation_vector)
+    (Tezos_crypto.Block_hash.t
+    * Block_header.t
+    * Operation.t list list
+    * propagation_vector)
     tzresult
     Lwt.t
 
   val on_inject_operation :
-    op_hash:Operation_hash.t ->
+    op_hash:Tezos_crypto.Operation_hash.t ->
     op:Alpha_context.packed_operation ->
-    (Operation_hash.t * Alpha_context.packed_operation * propagation_vector)
+    (Tezos_crypto.Operation_hash.t
+    * Alpha_context.packed_operation
+    * propagation_vector)
     tzresult
     Lwt.t
 
   val on_new_head :
-    block_hash:Block_hash.t ->
+    block_hash:Tezos_crypto.Block_hash.t ->
     block_header:Block_header.t ->
-    (Block_hash.t * Block_header.t) option Lwt.t
+    (Tezos_crypto.Block_hash.t * Block_header.t) option Lwt.t
 
   val on_new_operation :
-    Operation_hash.t * Alpha_context.packed_operation ->
-    (Operation_hash.t * Alpha_context.packed_operation) option Lwt.t
+    Tezos_crypto.Operation_hash.t * Alpha_context.packed_operation ->
+    (Tezos_crypto.Operation_hash.t * Alpha_context.packed_operation) option
+    Lwt.t
 
   val check_block_before_processing :
     level:int32 ->
     round:int32 ->
-    block_hash:Block_hash.t ->
+    block_hash:Tezos_crypto.Block_hash.t ->
     block_header:Block_header.t ->
     protocol_data:Alpha_context.Block_header.protocol_data ->
     unit tzresult Lwt.t
@@ -128,7 +140,7 @@ module type Hooks = sig
     level:int32 -> round:int32 -> chain:chain -> unit tzresult Lwt.t
 
   val check_mempool_after_processing :
-    mempool:(Operation_hash.t * Mockup.M.Protocol.operation) list ->
+    mempool:(Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) list ->
     unit tzresult Lwt.t
 
   val stop_on_event : Baking_state.event -> bool
@@ -149,9 +161,12 @@ let locate_blocks (state : state)
     block list tzresult Lwt.t =
   match block with
   | `Hash (hash, rel) -> (
-      match Block_hash.Table.find state.chain_table hash with
+      match Tezos_crypto.Block_hash.Table.find state.chain_table hash with
       | None ->
-          failwith "locate_blocks: can't find the block %a" Block_hash.pp hash
+          failwith
+            "locate_blocks: can't find the block %a"
+            Tezos_crypto.Block_hash.pp
+            hash
       | Some chain0 ->
           let _, chain = List.split_n rel chain0 in
           return chain)
@@ -177,8 +192,8 @@ let live_blocks (state : state) block =
     (List.fold_left
        (fun set ({rpc_context; _} : block) ->
          let hash = rpc_context.Tezos_protocol_environment.block_hash in
-         Block_hash.Set.add hash set)
-       (Block_hash.Set.singleton state.genesis_block_true_hash)
+         Tezos_crypto.Block_hash.Set.add hash set)
+       (Tezos_crypto.Block_hash.Set.singleton state.genesis_block_true_hash)
        segment)
 
 (** Extract the round number from raw fitness. *)
@@ -272,25 +287,27 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
         match block with
         | `Hash (requested_hash, rel) ->
             Int.equal rel 0
-            && Block_hash.equal requested_hash genesis_predecessor_block_hash
+            && Tezos_crypto.Block_hash.equal
+                 requested_hash
+                 genesis_predecessor_block_hash
         | _ -> false
       in
       (* It is important to tell the baker that the genesis block is not in
-         the alpha protocol (we use Protocol_hash.zero). This will make the
+         the alpha protocol (we use Tezos_crypto.Protocol_hash.zero). This will make the
          baker not try to propose alternatives to that block and just accept
-         it as final in that Protocol_hash.zero protocol. The same for
-         predecessor of genesis, it should be in Protocol_hash.zero. *)
+         it as final in that Tezos_crypto.Protocol_hash.zero protocol. The same for
+         predecessor of genesis, it should be in Tezos_crypto.Protocol_hash.zero. *)
       return
         Tezos_shell_services.Block_services.
           {
             current_protocol =
               (if
-               Block_hash.equal hash genesis_block_hash
+               Tezos_crypto.Block_hash.equal hash genesis_block_hash
                || is_predecessor_of_genesis
-              then Protocol_hash.zero
+              then Tezos_crypto.Protocol_hash.zero
               else Protocol.hash);
             next_protocol =
-              (if is_predecessor_of_genesis then Protocol_hash.zero
+              (if is_predecessor_of_genesis then Tezos_crypto.Protocol_hash.zero
               else Protocol.hash);
           }
 
@@ -387,11 +404,11 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
         Mockup.M.Block_services.Mempool.
           {
             applied = ops;
-            refused = Operation_hash.Map.empty;
-            outdated = Operation_hash.Map.empty;
-            branch_refused = Operation_hash.Map.empty;
-            branch_delayed = Operation_hash.Map.empty;
-            unprocessed = Operation_hash.Map.empty;
+            refused = Tezos_crypto.Operation_hash.Map.empty;
+            outdated = Tezos_crypto.Operation_hash.Map.empty;
+            branch_refused = Tezos_crypto.Operation_hash.Map.empty;
+            branch_delayed = Tezos_crypto.Operation_hash.Map.empty;
+            unprocessed = Tezos_crypto.Operation_hash.Map.empty;
           }
 
     let monitor_operations ~applied ~branch_delayed ~branch_refused ~refused =
@@ -471,11 +488,12 @@ let clear_mempool state =
       (fun (_oph, (op : Mockup.M.Protocol.operation)) ->
         let included_in_head =
           List.mem
-            ~equal:Operation_hash.equal
+            ~equal:Tezos_crypto.Operation_hash.equal
             (Alpha_context.Operation.hash_packed op)
             included_ops_hashes
         in
-        Block_hash.Set.mem op.shell.branch live_set && not included_in_head)
+        Tezos_crypto.Block_hash.Set.mem op.shell.branch live_set
+        && not included_in_head)
       state.mempool
   in
   state.mempool <- mempool ;
@@ -549,13 +567,17 @@ let rec process_block state block_hash (block_header : Block_header.t)
   let get_predecessor () =
     let predecessor_hash = block_header.Block_header.shell.predecessor in
     head state >>=? fun head ->
-    match Block_hash.Table.find state.chain_table predecessor_hash with
+    match
+      Tezos_crypto.Block_hash.Table.find state.chain_table predecessor_hash
+    with
     | None | Some [] -> (
         (* Even if the predecessor is not known locally, it might be known by
            some node in the network. The code below "requests" information
            about the block by its hash. *)
         match
-          Block_hash.Table.find state.global_chain_table predecessor_hash
+          Tezos_crypto.Block_hash.Table.find
+            state.global_chain_table
+            predecessor_hash
         with
         | None -> failwith "get_predecessor: unknown predecessor block"
         | Some predecessor ->
@@ -598,7 +620,7 @@ let rec process_block state block_hash (block_header : Block_header.t)
         then return predecessor
         else failwith "get_predecessor: the predecessor block is too old"
   in
-  match Block_hash.Table.find state.chain_table block_hash with
+  match Tezos_crypto.Block_hash.Table.find state.chain_table block_hash with
   | Some _ ->
       (* The block is already known. *)
       return_unit
@@ -616,7 +638,7 @@ let rec process_block state block_hash (block_header : Block_header.t)
           (fun pass ->
             List.map
               (fun (Operation.{shell; proto} as op) ->
-                let hash : Operation_hash.t = Operation.hash op in
+                let hash : Tezos_crypto.Operation_hash.t = Operation.hash op in
                 let protocol_data : Alpha_context.packed_protocol_data =
                   Data_encoding.Binary.of_bytes_exn
                     Protocol.operation_data_encoding
@@ -643,13 +665,19 @@ let rec process_block state block_hash (block_header : Block_header.t)
       in
       let predecessor_hash = block_header.Block_header.shell.predecessor in
       let tail =
-        Block_hash.Table.find state.chain_table predecessor_hash
+        Tezos_crypto.Block_hash.Table.find state.chain_table predecessor_hash
         |> WithExceptions.Option.get ~loc:__LOC__
       in
       let new_chain = new_block :: tail in
-      Block_hash.Table.replace state.chain_table block_hash new_chain ;
-      Block_hash.Table.replace state.global_chain_table block_hash new_block ;
-      Context_hash.Table.replace
+      Tezos_crypto.Block_hash.Table.replace
+        state.chain_table
+        block_hash
+        new_chain ;
+      Tezos_crypto.Block_hash.Table.replace
+        state.global_chain_table
+        block_hash
+        new_block ;
+      Tezos_crypto.Context_hash.Table.replace
         state.ctxt_table
         rpc_context.Tezos_protocol_environment.block_header.context
         rpc_context ;
@@ -738,7 +766,7 @@ let create_fake_node_state ~i ~live_depth
       mempool = [];
       chain = chain0;
       chain_table =
-        Block_hash.Table.of_seq
+        Tezos_crypto.Block_hash.Table.of_seq
           (List.to_seq
              [
                (rpc_context0.block_hash, chain0);
@@ -747,7 +775,7 @@ let create_fake_node_state ~i ~live_depth
              ]);
       global_chain_table;
       ctxt_table =
-        Context_hash.Table.of_seq
+        Tezos_crypto.Context_hash.Table.of_seq
           (List.to_seq
              [
                ( rpc_context0.Tezos_protocol_environment.block_header
@@ -807,7 +835,7 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
     {
       checkout_fun =
         (fun hash ->
-          Context_hash.Table.find state.ctxt_table hash
+          Tezos_crypto.Context_hash.Table.find state.ctxt_table hash
           |> Option.map (fun Tezos_protocol_environment.{context; _} -> context)
           |> Lwt.return);
       finalize_fun = Lwt.return;
@@ -827,9 +855,9 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
   Lwt.pick [listener_process (); baker_process ()] >>=? fun () ->
   User_hooks.check_chain_on_success ~chain:state.chain
 
-let genesis_protocol_data (baker_sk : Signature.secret_key)
-    (predecessor_hash : Block_hash.t) (block_header : Block_header.shell_header)
-    : Bytes.t =
+let genesis_protocol_data (baker_sk : Tezos_crypto.Signature.secret_key)
+    (predecessor_hash : Tezos_crypto.Block_hash.t)
+    (block_header : Block_header.shell_header) : Bytes.t =
   let proof_of_work_nonce =
     Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
   in
@@ -856,7 +884,7 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
       (block_header, contents)
   in
   let signature =
-    Signature.sign
+    Tezos_crypto.Signature.sign
       ~watermark:
         Alpha_context.Block_header.(to_watermark (Block_header chain_id))
       baker_sk
@@ -872,7 +900,7 @@ let deduce_baker_sk
       (Protocol.Alpha_context.Parameters.bootstrap_account
       * Tezos_mockup_commands.Mockup_wallet.bootstrap_secret)
       list) (total_accounts : int) (level : int) :
-    Signature.secret_key tzresult Lwt.t =
+    Tezos_crypto.Signature.secret_key tzresult Lwt.t =
   (match (total_accounts, level) with
   | _, 0 -> return 0 (* apparently this doesn't really matter *)
   | _ ->
@@ -887,7 +915,8 @@ let deduce_baker_sk
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   let secret_key =
-    Signature.Secret_key.of_b58check_exn (Uri.path (secret.sk_uri :> Uri.t))
+    Tezos_crypto.Signature.Secret_key.of_b58check_exn
+      (Uri.path (secret.sk_uri :> Uri.t))
   in
   return secret_key
 
@@ -1062,7 +1091,8 @@ type config = {
   round0 : int64;
   round1 : int64;
   timeout : int;
-  delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
+  delegate_selection :
+    (int32 * (int32 * Tezos_crypto.Signature.public_key_hash) list) list;
   initial_seed : State_hash.t option;
   consensus_committee_size : int;
   consensus_threshold : int;
@@ -1123,7 +1153,7 @@ let run ?(config = default_config) bakers_spec =
      | Error () -> failwith "impossible: negative length of the baker spec"
      | Ok xs -> return xs)
     >>=? fun broadcast_pipes ->
-    let global_chain_table = Block_hash.Table.create 10 in
+    let global_chain_table = Tezos_crypto.Block_hash.Table.create 10 in
     Tezos_mockup_commands.Mockup_wallet.default_bootstrap_accounts
     >>=? fun bootstrap_secrets ->
     let accounts_with_secrets =
@@ -1198,7 +1228,7 @@ let check_block_signature ~block_hash ~(block_header : Block_header.t)
       (block_header.shell, protocol_data.contents)
   in
   if
-    Signature.check
+    Tezos_crypto.Signature.check
       ~watermark:
         Alpha_context.Block_header.(to_watermark (Block_header chain_id))
       public_key
@@ -1208,13 +1238,15 @@ let check_block_signature ~block_hash ~(block_header : Block_header.t)
   else
     failwith
       "unexpected signature for %a; tried with %a@."
-      Block_hash.pp
+      Tezos_crypto.Block_hash.pp
       block_hash
-      Signature.Public_key.pp
+      Tezos_crypto.Signature.Public_key.pp
       public_key
 
 type op_predicate =
-  Operation_hash.t -> Alpha_context.packed_operation -> bool tzresult Lwt.t
+  Tezos_crypto.Operation_hash.t ->
+  Alpha_context.packed_operation ->
+  bool tzresult Lwt.t
 
 let mempool_count_ops ~mempool ~predicate =
   List.map_es (fun (op_hash, op) -> predicate op_hash op) mempool
@@ -1233,7 +1265,7 @@ let mempool_has_op_ref ~mempool ~predicate ~var =
   if result then var := true ;
   return_unit
 
-let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
+let op_is_signed_by ~public_key (op_hash : Tezos_crypto.Operation_hash.t)
     (op : Alpha_context.packed_operation) =
   match op.protocol_data with
   | Operation_data d -> (
@@ -1245,14 +1277,18 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
                 Alpha_context.Operation.to_watermark (Endorsement chain_id)
             | Preendorsement _ ->
                 Alpha_context.Operation.to_watermark (Preendorsement chain_id)
-            | _ -> Signature.Generic_operation)
-      | _ -> failwith "unexpected contents in %a@." Operation_hash.pp op_hash)
+            | _ -> Tezos_crypto.Signature.Generic_operation)
+      | _ ->
+          failwith
+            "unexpected contents in %a@."
+            Tezos_crypto.Operation_hash.pp
+            op_hash)
       >>=? fun watermark ->
       match d.signature with
       | None ->
           failwith
             "did not find a signature for op %a@."
-            Operation_hash.pp
+            Tezos_crypto.Operation_hash.pp
             op_hash
       | Some signature ->
           let unsigned_operation_bytes =
@@ -1261,13 +1297,13 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
               (op.shell, Contents_list d.contents)
           in
           return
-            (Signature.check
+            (Tezos_crypto.Signature.check
                ~watermark
                public_key
                signature
                unsigned_operation_bytes))
 
-let op_is_preendorsement ?level ?round (op_hash : Operation_hash.t)
+let op_is_preendorsement ?level ?round (op_hash : Tezos_crypto.Operation_hash.t)
     (op : Alpha_context.packed_operation) =
   match op.protocol_data with
   | Operation_data d -> (
@@ -1293,9 +1329,13 @@ let op_is_preendorsement ?level ?round (op_hash : Operation_hash.t)
               in
               return (right_level && right_round)
           | _ -> return false)
-      | _ -> failwith "unexpected contents in %a@." Operation_hash.pp op_hash)
+      | _ ->
+          failwith
+            "unexpected contents in %a@."
+            Tezos_crypto.Operation_hash.pp
+            op_hash)
 
-let op_is_endorsement ?level ?round (op_hash : Operation_hash.t)
+let op_is_endorsement ?level ?round (op_hash : Tezos_crypto.Operation_hash.t)
     (op : Alpha_context.packed_operation) =
   match op.protocol_data with
   | Operation_data d -> (
@@ -1321,7 +1361,11 @@ let op_is_endorsement ?level ?round (op_hash : Operation_hash.t)
               in
               return (right_level && right_round)
           | _ -> return false)
-      | _ -> failwith "unexpected contents in %a@." Operation_hash.pp op_hash)
+      | _ ->
+          failwith
+            "unexpected contents in %a@."
+            Tezos_crypto.Operation_hash.pp
+            op_hash)
 
 let op_is_both f g op_hash op =
   f op_hash op >>=? fun f_result ->

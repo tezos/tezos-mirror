@@ -29,7 +29,7 @@ let print_invalid_blocks ppf (b : Shell_services.Chain.invalid_block) =
   Format.fprintf
     ppf
     "@[<v 2>Hash: %a@ Level: %ld@ %a@]"
-    Block_hash.pp
+    Tezos_crypto.Block_hash.pp
     b.hash
     b.level
     pp_print_trace
@@ -66,7 +66,7 @@ let commands () =
         Format.fprintf
           ppf
           "@[<v>%a@]@."
-          (Format.pp_print_list Block_hash.pp)
+          (Format.pp_print_list Tezos_crypto.Block_hash.pp)
           (List.concat heads) ;
         return_unit);
     command

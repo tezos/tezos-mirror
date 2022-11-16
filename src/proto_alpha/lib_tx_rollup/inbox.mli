@@ -41,7 +41,7 @@ type message_result =
 type l2_context_hash = {
   irmin_hash : Tx_rollup_l2_context_hash.t;
       (** The context hash of the commited context, used for checkout *)
-  tree_hash : Context_hash.t;
+  tree_hash : Tezos_crypto.Context_hash.t;
       (** The tree hash is the hash of the underlying tree in the {!Context},
           used to produce proofs *)
 }

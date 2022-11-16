@@ -81,15 +81,14 @@ module Tezos_operation = Tezos_base.TzPervasives.Operation
 
 let to_raw_operation t client : Tezos_operation.t Lwt.t =
   let open Tezos_base.TzPervasives in
-  let branch = Block_hash.of_b58check_exn t.branch in
+  let branch = Tezos_crypto.Block_hash.of_b58check_exn t.branch in
   let* raw = hex t client in
   return Tezos_operation.{shell = {branch}; proto = Hex.to_bytes_exn raw}
 
 let hash t client : [`OpHash of string] Lwt.t =
-  let open Tezos_base.TzPervasives in
   let* op = to_raw_operation t client in
   let hash = Tezos_operation.hash op in
-  return (`OpHash (Operation_hash.to_string hash))
+  return (`OpHash (Tezos_crypto.Operation_hash.to_string hash))
 
 let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
     [`OpHash of string] Lwt.t =

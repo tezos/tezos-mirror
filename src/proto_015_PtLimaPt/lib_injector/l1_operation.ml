@@ -150,7 +150,7 @@ module Manager_operation = struct
             ty
             pp_lazy_expr
             contents
-            Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.Public_key_hash.pp
             claimer
         in
         Format.fprintf
@@ -188,8 +188,8 @@ module Manager_operation = struct
 end
 
 module Hash =
-  Blake2B.Make
-    (Base58)
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
     (struct
       let name = "manager_operation_hash"
 
@@ -200,7 +200,8 @@ module Hash =
       let size = None
     end)
 
-let () = Base58.check_encoded_prefix Hash.b58check_encoding "mop" 53
+let () =
+  Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "mop" 53
 
 type hash = Hash.t
 

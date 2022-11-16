@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 module Request : sig
-  type view = Hash of Block_hash.t | PeerId of P2p_peer.Id.t
+  type view = Hash of Tezos_crypto.Block_hash.t | PeerId of P2p_peer.Id.t
 
   val encoding : view Data_encoding.encoding
 

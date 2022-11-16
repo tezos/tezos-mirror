@@ -156,7 +156,7 @@ let inject_vdf_revelation cctxt hash chain_id solution =
       ~solution
       ()
   in
-  let bytes = Signature.concat bytes Signature.zero in
+  let bytes = Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero in
   Shell_services.Injection.operation cctxt ~chain bytes
 
 (* Checks if the VDF setup saved in the state is equal to the one computed
@@ -182,7 +182,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
   let* level_info = get_level_info cctxt level in
   let level_str = Int32.to_string (Raw_level.to_int32 level) in
   let* () = check_new_cycle state level_info in
-  if Protocol_hash.(protocol <> next_protocol) then
+  if Tezos_crypto.Protocol_hash.(protocol <> next_protocol) then
     let*! () = D_Events.(emit protocol_change_detected) () in
     return_unit
   else

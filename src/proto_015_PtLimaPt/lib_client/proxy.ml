@@ -95,7 +95,7 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
 end
 
 let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
-    (hash : Context_hash.t) :
+    (hash : Tezos_crypto.Context_hash.t) :
     Tezos_protocol_environment.Context.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*! () =

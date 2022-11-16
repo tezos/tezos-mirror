@@ -32,7 +32,9 @@ val constants_sandbox : Constants.parametric
 val constants_test : Constants.parametric
 
 val make_bootstrap_account :
-  Signature.public_key_hash * Signature.public_key * Tez.t ->
+  Tezos_crypto.Signature.public_key_hash
+  * Tezos_crypto.Signature.public_key
+  * Tez.t ->
   Parameters.bootstrap_account
 
 val parameters_of_constants :

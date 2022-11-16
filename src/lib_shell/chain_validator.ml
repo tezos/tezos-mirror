@@ -27,15 +27,15 @@
 open Chain_validator_worker_state
 
 module Name = struct
-  type t = Chain_id.t
+  type t = Tezos_crypto.Chain_id.t
 
-  let encoding = Chain_id.encoding
+  let encoding = Tezos_crypto.Chain_id.encoding
 
   let base = ["validator"; "chain"]
 
-  let pp = Chain_id.pp_short
+  let pp = Tezos_crypto.Chain_id.pp_short
 
-  let equal = Chain_id.equal
+  let equal = Tezos_crypto.Chain_id.equal
 end
 
 module Request = struct
@@ -50,7 +50,7 @@ module Request = struct
         -> (update, error trace) t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
     | Notify_head :
-        P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
+        P2p_peer.Id.t * Tezos_crypto.Block_hash.t * Block_header.t * Mempool.t
         -> (unit, Empty.t) t
     | Disconnection : P2p_peer.Id.t -> (unit, Empty.t) t
 
@@ -71,7 +71,7 @@ module Types = struct
     block_validator : Block_validator.t;
     block_validator_process : Block_validator_process.t;
     global_valid_block_input : Store.Block.t Lwt_watcher.input;
-    global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
+    global_chains_input : (Tezos_crypto.Chain_id.t * bool) Lwt_watcher.input;
     start_prevalidator : bool;
     prevalidator_limits : Shell_limits.prevalidator_limits;
     peer_validator_limits : Shell_limits.peer_validator_limits;
@@ -115,7 +115,7 @@ let shutdown_child nv active_chains =
     (fun ({parameters = {chain_store; global_chains_input; _}; _}, shutdown) ->
       let test_chain_id = Store.Chain.chain_id chain_store in
       Lwt_watcher.notify global_chains_input (test_chain_id, false) ;
-      Chain_id.Table.remove active_chains test_chain_id ;
+      Tezos_crypto.Chain_id.Table.remove active_chains test_chain_id ;
       let* r = Store.Chain.shutdown_testchain nv.parameters.chain_store in
       match r with
       | Error _err ->
@@ -158,7 +158,7 @@ let notify_new_block w peer block =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
-      List.assoc ~equal:Chain_id.equal id (Worker.list table)
+      List.assoc ~equal:Tezos_crypto.Chain_id.equal id (Worker.list table)
       |> Option.iter (fun w ->
              let nv = Worker.state w in
              Lwt_watcher.notify nv.valid_block_input block))
@@ -226,7 +226,8 @@ let may_switch_test_chain w active_chains spawn_child block =
       | Some (child, _) ->
           let child_chain_store = child.parameters.chain_store in
           let child_genesis = Store.Chain.genesis child_chain_store in
-          Lwt.return (Block_hash.equal child_genesis.block genesis_hash)
+          Lwt.return
+            (Tezos_crypto.Block_hash.equal child_genesis.block genesis_hash)
     in
     let expired = expiration < block_header.shell.timestamp in
     if expired && activated then
@@ -364,7 +365,7 @@ let safe_get_prevalidator_filter hash =
           (* This should not happen: it should be handled in the validator. *)
           failwith
             "chain_validator: missing protocol '%a' for the current block."
-            Protocol_hash.pp_short
+            Tezos_crypto.Protocol_hash.pp_short
             hash
       | Some protocol ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
@@ -482,7 +483,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
         in
         Lwt_watcher.notify nv.new_head_input block ;
         let is_head_increment =
-          Block_hash.equal head_hash block_header.shell.predecessor
+          Tezos_crypto.Block_hash.equal head_hash block_header.shell.predecessor
         in
         let event =
           if is_head_increment then Head_increment else Branch_switch
@@ -861,7 +862,10 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
     }
   in
   let* w = Worker.launch table chain_id parameters (module Handlers) in
-  Chain_id.Table.add active_chains (Store.Chain.chain_id chain_store) w ;
+  Tezos_crypto.Chain_id.Table.add
+    active_chains
+    (Store.Chain.chain_id chain_store)
+    w ;
   register_garbage_collect_callback w ;
   Lwt_watcher.notify global_chains_input (Store.Chain.chain_id chain_store, true) ;
   return w
@@ -908,7 +912,7 @@ let child w =
     (Worker.state w).child
     (fun ({parameters = {chain_store; _}; _}, _) ->
       List.assoc
-        ~equal:Chain_id.equal
+        ~equal:Tezos_crypto.Chain_id.equal
         (Store.Chain.chain_id chain_store)
         (Worker.list table))
 

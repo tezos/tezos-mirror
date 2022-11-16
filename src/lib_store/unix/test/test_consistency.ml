@@ -176,7 +176,7 @@ let test_protocol_level_consistency_drop_one history_mode nth
         in
         let*! ctxt = Store.Block.context_exn chain_store b in
         let*! proto_block = Context_ops.get_protocol ctxt in
-        assert (Protocol_hash.(proto = proto_block)) ;
+        assert (Tezos_crypto.Protocol_hash.(proto = proto_block)) ;
         return_unit)
       (Int32.to_int savepoint_level
       -- Int32.to_int (Store.Block.level current_head))
@@ -257,7 +257,7 @@ let test_protocol_level_consistency_remove_file history_mode
         in
         let*! ctxt = Store.Block.context_exn chain_store b in
         let*! proto_block = Context_ops.get_protocol ctxt in
-        assert (Protocol_hash.(proto = proto_block)) ;
+        assert (Tezos_crypto.Protocol_hash.(proto = proto_block)) ;
         return_unit)
       (Int32.to_int savepoint_level
       -- Int32.to_int (Store.Block.level current_head))

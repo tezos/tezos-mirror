@@ -24,21 +24,21 @@
 (*****************************************************************************)
 
 type error +=
-  | Block_not_found of {hash : Block_hash.t; distance : int}
+  | Block_not_found of {hash : Tezos_crypto.Block_hash.t; distance : int}
   | Bad_level of {head_level : Int32.t; given_level : Int32.t}
-  | Block_metadata_not_found of Block_hash.t
+  | Block_metadata_not_found of Tezos_crypto.Block_hash.t
   | Cannot_switch_history_mode of {
       previous_mode : History_mode.t;
       next_mode : History_mode.t;
     }
   | Invalid_head_switch of {
       checkpoint_level : int32;
-      given_head : Block_hash.t * int32;
+      given_head : Tezos_crypto.Block_hash.t * int32;
     }
   | Inconsistent_store_state of string
   | Inconsistent_operations_hash of {
-      expected : Operation_list_list_hash.t;
-      got : Operation_list_list_hash.t;
+      expected : Tezos_crypto.Operation_list_list_hash.t;
+      got : Tezos_crypto.Operation_list_list_hash.t;
     }
 
 let () =
@@ -52,10 +52,10 @@ let () =
         ppf
         "Cannot find block at distance %d from block %a."
         distance
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block_hash)
     Data_encoding.(
-      obj1 (req "block_not_found" @@ tup2 Block_hash.encoding int8))
+      obj1 (req "block_not_found" @@ tup2 Tezos_crypto.Block_hash.encoding int8))
     (function
       | Block_not_found {hash; distance} -> Some (hash, distance) | _ -> None)
     (fun (hash, distance) -> Block_not_found {hash; distance}) ;
@@ -84,9 +84,10 @@ let () =
       Format.fprintf
         ppf
         "Unable to find block %a's metadata."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block_hash)
-    Data_encoding.(obj1 (req "block_metadata_not_found" Block_hash.encoding))
+    Data_encoding.(
+      obj1 (req "block_metadata_not_found" Tezos_crypto.Block_hash.encoding))
     (function
       | Block_metadata_not_found block_hash -> Some block_hash | _ -> None)
     (fun block_hash -> Block_metadata_not_found block_hash) ;
@@ -124,14 +125,14 @@ let () =
       Format.fprintf
         ppf
         "The given head %a (%ld) is below the minimum allowed level %ld."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         head_hash
         head_level
         minimum_allowed_level)
     Data_encoding.(
       obj2
         (req "minimum_allowed_level" int32)
-        (req "given_head" @@ tup2 Block_hash.encoding int32))
+        (req "given_head" @@ tup2 Tezos_crypto.Block_hash.encoding int32))
     (function
       | Invalid_head_switch {checkpoint_level; given_head} ->
           Some (checkpoint_level, given_head)
@@ -147,14 +148,18 @@ let () =
       Format.fprintf
         ppf
         "Inconsistent operation hashes. Expected: %a, got %a."
-        Operation_list_list_hash.pp
+        Tezos_crypto.Operation_list_list_hash.pp
         oph
-        Operation_list_list_hash.pp
+        Tezos_crypto.Operation_list_list_hash.pp
         oph')
     Data_encoding.(
       obj2
-        (req "expected_operation_hashes" Operation_list_list_hash.encoding)
-        (req "received_operation_hashes" Operation_list_list_hash.encoding))
+        (req
+           "expected_operation_hashes"
+           Tezos_crypto.Operation_list_list_hash.encoding)
+        (req
+           "received_operation_hashes"
+           Tezos_crypto.Operation_list_list_hash.encoding))
     (function
       | Inconsistent_operations_hash {expected; got} -> Some (expected, got)
       | _ -> None)
@@ -168,11 +173,11 @@ type cemented_store_inconsistency =
     }
   | Bad_offset of {level : int; cycle : string}
   | Unexpected_level of {
-      block_hash : Block_hash.t;
+      block_hash : Tezos_crypto.Block_hash.t;
       expected : Int32.t;
       got : Int32.t;
     }
-  | Corrupted_index of Block_hash.t
+  | Corrupted_index of Tezos_crypto.Block_hash.t
   | Inconsistent_highest_cemented_level of {
       highest_cemented_level : Int32.t;
       cementing_highwatermark : Int32.t;
@@ -211,7 +216,7 @@ let cemented_store_inconsistency_encoding =
         (Tag 3)
         ~title:"Unexpected level"
         (obj3
-           (req "block_hash" Block_hash.encoding)
+           (req "block_hash" Tezos_crypto.Block_hash.encoding)
            (req "expected" int32)
            (req "got" int32))
         (function
@@ -223,7 +228,7 @@ let cemented_store_inconsistency_encoding =
       case
         (Tag 4)
         ~title:"Corrupted index"
-        (obj1 (req "block_hash" Block_hash.encoding))
+        (obj1 (req "block_hash" Tezos_crypto.Block_hash.encoding))
         (function Corrupted_index h -> Some h | _ -> None)
         (fun h -> Corrupted_index h);
       case
@@ -301,7 +306,7 @@ let store_block_error_encoding =
 
 type error +=
   | Cannot_write_in_readonly
-  | Wrong_predecessor of Block_hash.t * int
+  | Wrong_predecessor of Tezos_crypto.Block_hash.t * int
   | Invalid_blocks_to_cement
   | Wrong_floating_kind_swap
   | Cannot_update_floating_store
@@ -319,31 +324,34 @@ type error +=
   | Missing_last_allowed_fork_level_block
   | Inconsistent_block_hash of {
       level : Int32.t;
-      expected_hash : Block_hash.t;
-      computed_hash : Block_hash.t;
+      expected_hash : Tezos_crypto.Block_hash.t;
+      computed_hash : Tezos_crypto.Block_hash.t;
     }
   | Inconsistent_block_predecessor of {
-      block_hash : Block_hash.t;
+      block_hash : Tezos_crypto.Block_hash.t;
       level : Int32.t;
-      expected_hash : Block_hash.t;
-      computed_hash : Block_hash.t;
+      expected_hash : Tezos_crypto.Block_hash.t;
+      computed_hash : Tezos_crypto.Block_hash.t;
     }
-  | Cannot_encode_block of Block_hash.t
-  | Cannot_store_block of Block_hash.t * store_block_error
-  | Cannot_checkout_context of Block_hash.t * Context_hash.t
+  | Cannot_encode_block of Tezos_crypto.Block_hash.t
+  | Cannot_store_block of Tezos_crypto.Block_hash.t * store_block_error
+  | Cannot_checkout_context of
+      Tezos_crypto.Block_hash.t * Tezos_crypto.Context_hash.t
   | Cannot_find_protocol of int
   | Invalid_genesis_marking
   | Cannot_retrieve_savepoint of Int32.t
-  | Cannot_set_target of (Block_hash.t * Int32.t)
+  | Cannot_set_target of (Tezos_crypto.Block_hash.t * Int32.t)
   | Missing_commit_info of string
   | Inconsistent_chain_store
   | Fork_testchain_not_allowed
-  | Cannot_fork_testchain of Chain_id.t
+  | Cannot_fork_testchain of Tezos_crypto.Chain_id.t
   | Cannot_load_testchain of string
-  | Missing_activation_block of Block_hash.t * Protocol_hash.t * History_mode.t
-  | Inconsistent_protocol_commit_info of Block_hash.t * Protocol_hash.t
+  | Missing_activation_block of
+      Tezos_crypto.Block_hash.t * Tezos_crypto.Protocol_hash.t * History_mode.t
+  | Inconsistent_protocol_commit_info of
+      Tezos_crypto.Block_hash.t * Tezos_crypto.Protocol_hash.t
   | Missing_stored_data of string
-  | Failed_to_get_live_blocks of Block_hash.t
+  | Failed_to_get_live_blocks of Tezos_crypto.Block_hash.t
   | Target_mismatch
   | Bad_head_invariant
 
@@ -367,10 +375,11 @@ let () =
       Format.fprintf
         ppf
         "Failed to get the nth predecessor of %a. The offset is invalid: %d."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash
         offset)
-    Data_encoding.(obj2 (req "hash" Block_hash.encoding) (req "offset" int31))
+    Data_encoding.(
+      obj2 (req "hash" Tezos_crypto.Block_hash.encoding) (req "offset" int31))
     (function
       | Wrong_predecessor (hash, offset) -> Some (hash, offset) | _ -> None)
     (fun (hash, offset) -> Wrong_predecessor (hash, offset)) ;
@@ -579,14 +588,14 @@ let () =
         | Unexpected_level {block_hash; expected; got} ->
             Format.asprintf
               "bad level found for block %a - expected %ld got %ld"
-              Block_hash.pp
+              Tezos_crypto.Block_hash.pp
               block_hash
               expected
               got
         | Corrupted_index h ->
             Format.asprintf
               "%a was not found in the imported store"
-              Block_hash.pp
+              Tezos_crypto.Block_hash.pp
               h
         | Inconsistent_highest_cemented_level
             {highest_cemented_level; cementing_highwatermark} ->
@@ -626,15 +635,15 @@ let () =
         "Inconsistent block: inconsistent hash found for block %ld. Expected \
          %a, got %a."
         level
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         expected_hash
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         computed_hash)
     Data_encoding.(
       obj3
         (req "level" int32)
-        (req "expected_hash" Block_hash.encoding)
-        (req "computed_hash" Block_hash.encoding))
+        (req "expected_hash" Tezos_crypto.Block_hash.encoding)
+        (req "computed_hash" Tezos_crypto.Block_hash.encoding))
     (function
       | Inconsistent_block_hash {level; expected_hash; computed_hash} ->
           Some (level, expected_hash, computed_hash)
@@ -651,19 +660,19 @@ let () =
         ppf
         "Inconsistent block: inconsistent predecessor found for block %a (%ld) \
          - expected: %a vs got: %a."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block_hash
         level
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         expected_hash
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         computed_hash)
     Data_encoding.(
       obj4
-        (req "block_hash" Block_hash.encoding)
+        (req "block_hash" Tezos_crypto.Block_hash.encoding)
         (req "level" int32)
-        (req "expected_hash" Block_hash.encoding)
-        (req "computed_hash" Block_hash.encoding))
+        (req "expected_hash" Tezos_crypto.Block_hash.encoding)
+        (req "computed_hash" Tezos_crypto.Block_hash.encoding))
     (function
       | Inconsistent_block_predecessor
           {block_hash; level; expected_hash; computed_hash} ->
@@ -681,9 +690,9 @@ let () =
       Format.fprintf
         ppf
         "Failed to write block in floating store: cannot encode block %a."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash)
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
     (function Cannot_encode_block hash -> Some hash | _ -> None)
     (fun hash -> Cannot_encode_block hash) ;
   Error_monad.register_error_kind
@@ -695,7 +704,7 @@ let () =
       Format.fprintf
         ppf
         "Failed to store block %a: %s."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash
         (match err with
         | Invalid_block -> "the block is marked as invalid"
@@ -724,7 +733,7 @@ let () =
               genesis_level))
     Data_encoding.(
       obj2
-        (req "hash" Block_hash.encoding)
+        (req "hash" Tezos_crypto.Block_hash.encoding)
         (req "err" store_block_error_encoding))
     (function Cannot_store_block (hash, err) -> Some (hash, err) | _ -> None)
     (fun (hash, err) -> Cannot_store_block (hash, err)) ;
@@ -737,14 +746,14 @@ let () =
       Format.fprintf
         ppf
         "Failed to checkout the context (%a) for block %a."
-        Context_hash.pp
+        Tezos_crypto.Context_hash.pp
         ch
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         bh)
     Data_encoding.(
       obj2
-        (req "block_hash" Block_hash.encoding)
-        (req "context_hash" Context_hash.encoding))
+        (req "block_hash" Tezos_crypto.Block_hash.encoding)
+        (req "context_hash" Tezos_crypto.Context_hash.encoding))
     (function Cannot_checkout_context (bh, ch) -> Some (bh, ch) | _ -> None)
     (fun (bh, ch) -> Cannot_checkout_context (bh, ch)) ;
   Error_monad.register_error_kind
@@ -791,10 +800,11 @@ let () =
         ppf
         "Failed to set the given target %a (%ld): it is either invalid, or not \
          a predecessor of the checkpoint."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         given_target_hash
         given_target_level)
-    Data_encoding.(obj1 (req "given_target" (tup2 Block_hash.encoding int32)))
+    Data_encoding.(
+      obj1 (req "given_target" (tup2 Tezos_crypto.Block_hash.encoding int32)))
     (function Cannot_set_target given_target -> Some given_target | _ -> None)
     (fun given_target -> Cannot_set_target given_target) ;
   Error_monad.register_error_kind
@@ -844,9 +854,9 @@ let () =
       Format.fprintf
         ppf
         "Failed to fork the testchain: the testchain %a already exists."
-        Chain_id.pp
+        Tezos_crypto.Chain_id.pp
         chain_id)
-    Data_encoding.(obj1 (req "chain_id" Chain_id.encoding))
+    Data_encoding.(obj1 (req "chain_id" Tezos_crypto.Chain_id.encoding))
     (function Cannot_fork_testchain chain_id -> Some chain_id | _ -> None)
     (fun chain_id -> Cannot_fork_testchain chain_id) ;
   Error_monad.register_error_kind
@@ -872,16 +882,16 @@ let () =
         ppf
         "Failed to restore snapshot: the expected activation block %a \
          originating the protocol %a was not found for %a."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         bh
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         ph
         History_mode.pp
         hm)
     Data_encoding.(
       obj3
-        (req "block_hash" Block_hash.encoding)
-        (req "protocol_hash" Protocol_hash.encoding)
+        (req "block_hash" Tezos_crypto.Block_hash.encoding)
+        (req "protocol_hash" Tezos_crypto.Protocol_hash.encoding)
         (req "history_mode" History_mode.encoding))
     (function
       | Missing_activation_block (bh, ph, hm) -> Some (bh, ph, hm) | _ -> None)
@@ -896,14 +906,14 @@ let () =
         ppf
         "Failed to restore snapshot: inconsistent commit info found for \
          transition block %a activating protocol %a."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         bh
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         ph)
     Data_encoding.(
       obj2
-        (req "block_hash" Block_hash.encoding)
-        (req "protocol_hash" Protocol_hash.encoding))
+        (req "block_hash" Tezos_crypto.Block_hash.encoding)
+        (req "protocol_hash" Tezos_crypto.Protocol_hash.encoding))
     (function
       | Inconsistent_protocol_commit_info (bh, ph) -> Some (bh, ph) | _ -> None)
     (fun (bh, ph) -> Inconsistent_protocol_commit_info (bh, ph)) ;
@@ -925,13 +935,13 @@ let () =
     ~id:"store.failed_to_get_live_blocks"
     ~title:"Fail to get live blocks"
     ~description:"Unable to compute live blocks from a given block."
-    ~pp:(fun ppf (hash : Block_hash.t) ->
+    ~pp:(fun ppf (hash : Tezos_crypto.Block_hash.t) ->
       Format.fprintf
         ppf
         "Failed to get live blocks from block %a"
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash)
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
     (function Failed_to_get_live_blocks h -> Some h | _ -> None)
     (fun h -> Failed_to_get_live_blocks h) ;
   Error_monad.register_error_kind
@@ -959,11 +969,14 @@ type error +=
   | Unexpected_missing_block of {block_name : string}
   | Unexpected_missing_block_metadata of {block_name : string}
   | Unexpected_missing_activation_block of {
-      block : Block_hash.t;
-      protocol : Protocol_hash.t;
+      block : Tezos_crypto.Block_hash.t;
+      protocol : Tezos_crypto.Protocol_hash.t;
     }
   | Unexpected_missing_protocol of {protocol_level : int}
-  | Inconsistent_genesis of {expected : Block_hash.t; got : Block_hash.t}
+  | Inconsistent_genesis of {
+      expected : Tezos_crypto.Block_hash.t;
+      got : Tezos_crypto.Block_hash.t;
+    }
   | Inconsistent_cementing_highwatermark of {
       highest_cemented_level : Int32.t;
       cementing_highwatermark : Int32.t;
@@ -1018,14 +1031,14 @@ let () =
         ppf
         "The block %a activating protocol %a is unexpectedly missing from the \
          store."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         proto)
     Data_encoding.(
       obj2
-        (req "block" Block_hash.encoding)
-        (req "protocol" Protocol_hash.encoding))
+        (req "block" Tezos_crypto.Block_hash.encoding)
+        (req "protocol" Tezos_crypto.Protocol_hash.encoding))
     (function
       | Unexpected_missing_activation_block {block; protocol} ->
           Some (block, protocol)
@@ -1056,12 +1069,14 @@ let () =
       Format.fprintf
         ppf
         "The genesis (%a) found in the store is not the one expected (%a)."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         got
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         expected)
     Data_encoding.(
-      obj2 (req "expected" Block_hash.encoding) (req "got" Block_hash.encoding))
+      obj2
+        (req "expected" Tezos_crypto.Block_hash.encoding)
+        (req "got" Tezos_crypto.Block_hash.encoding))
     (function
       | Inconsistent_genesis {expected; got} -> Some (expected, got) | _ -> None)
     (fun (expected, got) -> Inconsistent_genesis {expected; got}) ;
@@ -1164,7 +1179,7 @@ let () =
         {genesis; caboose; savepoint; cementing_highwatermark; checkpoint; head})
 
 type corruption_kind =
-  | Inferred_head of Block_hash.t * Int32.t
+  | Inferred_head of Tezos_crypto.Block_hash.t * Int32.t
   | Cannot_find_floating_savepoint
   | Cannot_find_savepoint_candidate
   | Cannot_find_floating_caboose
@@ -1180,7 +1195,7 @@ let corruption_kind_encoding =
       case
         (Tag 0)
         ~title:"Inferred_head"
-        (obj2 (req "hash" Block_hash.encoding) (req "level" int32))
+        (obj2 (req "hash" Tezos_crypto.Block_hash.encoding) (req "level" int32))
         (function
           | Inferred_head (hash, level) -> Some (hash, level) | _ -> None)
         (fun (hash, level) -> Inferred_head (hash, level));
@@ -1235,7 +1250,7 @@ let pp_corruption_kind ppf = function
       Format.fprintf
         ppf
         "inferred head (%a, %ld) must have metadata"
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash
         level
   | Cannot_find_floating_savepoint ->

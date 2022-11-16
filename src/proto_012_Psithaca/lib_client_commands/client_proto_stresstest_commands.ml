@@ -63,7 +63,7 @@ type origin = Explicit | Wallet_pkh | Wallet_alias of string
 type source = {
   pkh : public_key_hash;
   pk : public_key;
-  sk : Signature.secret_key;
+  sk : Tezos_crypto.Signature.secret_key;
 }
 
 type input_source =
@@ -83,17 +83,20 @@ type transfer = {
 }
 
 type state = {
-  current_head_on_start : Block_hash.t;
-  counters : (Block_hash.t * Z.t) Signature.Public_key_hash.Table.t;
+  current_head_on_start : Tezos_crypto.Block_hash.t;
+  counters :
+    (Tezos_crypto.Block_hash.t * Z.t)
+    Tezos_crypto.Signature.Public_key_hash.Table.t;
   mutable pool : source_origin list;
   mutable pool_size : int;
       (** [Some l] if [single_op_per_pkh_per_block] is true *)
   mutable shuffled_pool : source list option;
-  mutable revealed : Signature.Public_key_hash.Set.t;
-  mutable last_block : Block_hash.t;
+  mutable revealed : Tezos_crypto.Signature.Public_key_hash.Set.t;
+  mutable last_block : Tezos_crypto.Block_hash.t;
   mutable last_level : int;
   new_block_condition : unit Lwt_condition.t;
-  injected_operations : Operation_hash.t list Block_hash.Table.t;
+  injected_operations :
+    Tezos_crypto.Operation_hash.t list Tezos_crypto.Block_hash.Table.t;
 }
 
 let verbose = ref false
@@ -131,9 +134,9 @@ let input_source_encoding =
         ~title:"explicit"
         (Tag 0)
         (obj3
-           (req "pkh" Signature.Public_key_hash.encoding)
-           (req "pk" Signature.Public_key.encoding)
-           (req "sk" Signature.Secret_key.encoding))
+           (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
+           (req "pk" Tezos_crypto.Signature.Public_key.encoding)
+           (req "sk" Tezos_crypto.Signature.Secret_key.encoding))
         (function Explicit {pkh; pk; sk} -> Some (pkh, pk, sk) | _ -> None)
         (fun (pkh, pk, sk) -> Explicit {pkh; pk; sk});
       case
@@ -145,7 +148,7 @@ let input_source_encoding =
       case
         ~title:"pkh"
         (Tag 2)
-        (obj1 (req "pkh" Signature.Public_key_hash.encoding))
+        (obj1 (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding))
         (function Wallet_pkh pkh -> Some pkh | _ -> None)
         (fun pkh -> Wallet_pkh pkh);
     ]
@@ -156,8 +159,8 @@ let injected_operations_encoding =
   let open Data_encoding in
   list
     (obj2
-       (req "block_hash_when_injected" Block_hash.encoding)
-       (req "operation_hashes" (list Operation_hash.encoding)))
+       (req "block_hash_when_injected" Tezos_crypto.Block_hash.encoding)
+       (req "operation_hashes" (list Tezos_crypto.Operation_hash.encoding)))
 
 let parse_strategy s =
   match String.split ~limit:1 ':' s with
@@ -196,7 +199,7 @@ let parse_strategy s =
 let normalize_source cctxt =
   let sk_of_sk_uri sk_uri =
     match
-      Signature.Secret_key.of_b58check
+      Tezos_crypto.Signature.Secret_key.of_b58check
         (Uri.path (sk_uri : Client_keys.sk_uri :> Uri.t))
     with
     | Ok sk -> Lwt.return_some sk
@@ -232,8 +235,8 @@ let normalize_source cctxt =
   in
   let key_from_wallet pkh =
     let warning msg pkh =
-      cctxt#warning msg Signature.Public_key_hash.pp pkh >>= fun () ->
-      Lwt.return_none
+      cctxt#warning msg Tezos_crypto.Signature.Public_key_hash.pp pkh
+      >>= fun () -> Lwt.return_none
     in
     (Client_keys.get_key cctxt pkh >>= function
      | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
@@ -243,7 +246,7 @@ let normalize_source cctxt =
              cctxt#warning
                "Cannot extract the secret key form the pkh \"%a\" (alias: \
                 \"%s\") of the wallet"
-               Signature.Public_key_hash.pp
+               Tezos_crypto.Signature.Public_key_hash.pp
                pkh
                alias
              >>= fun () -> Lwt.return_none
@@ -288,13 +291,13 @@ let rec sample_source_from_pool state rng (cctxt : Protocol_client_context.full)
           cctxt#message
             "sample_transfer: %d unused sources for the block next to %a"
             (List.length l)
-            Block_hash.pp
+            Tezos_crypto.Block_hash.pp
             state.last_block)
       >>= fun () -> Lwt.return source
   | Some [] ->
       cctxt#message
         "all available sources have been used for block next to %a"
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         state.last_block
       >>= fun () ->
       Lwt_condition.wait state.new_block_condition >>= fun () ->
@@ -305,7 +308,7 @@ let random_seed rng =
 
 let generate_fresh_source pool rng =
   let seed = random_seed rng in
-  let pkh, pk, sk = Signature.generate_key ~seed () in
+  let pkh, pk, sk = Tezos_crypto.Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
   pool.pool <- fresh :: pool.pool ;
   pool.pool_size <- pool.pool_size + 1 ;
@@ -314,7 +317,7 @@ let generate_fresh_source pool rng =
 (* [heads_iter cctxt f] calls [f head] each time there is a new head
    received by the streamed RPC /monitor/heads/main *)
 let heads_iter (cctxt : Protocol_client_context.full)
-    (f : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t) :
+    (f : Tezos_crypto.Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t) :
     unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   Error_monad.protect
@@ -331,7 +334,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
                   debug_msg (fun () ->
                       cctxt#message
                         "heads_iter: new block received %a@."
-                        Block_hash.pp
+                        Tezos_crypto.Block_hash.pp
                         new_block_hash)
                 in
                 let* protocols =
@@ -340,7 +343,9 @@ let heads_iter (cctxt : Protocol_client_context.full)
                     ~block:(`Hash (new_block_hash, 0))
                     ()
                 in
-                if Protocol_hash.(protocols.current_protocol = Protocol.hash)
+                if
+                  Tezos_crypto.Protocol_hash.(
+                    protocols.current_protocol = Protocol.hash)
                 then
                   let*! () = f block_hash_and_header in
                   loop ()
@@ -350,7 +355,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
                         cctxt#message
                           "heads_iter: new block on protocol %a. Stopping \
                            iteration.@."
-                          Protocol_hash.pp
+                          Tezos_crypto.Protocol_hash.pp
                           protocols.current_protocol)
                   in
                   return_unit)
@@ -365,14 +370,14 @@ let heads_iter (cctxt : Protocol_client_context.full)
         debug_msg (fun () ->
             cctxt#message
               "head iteration for proto %a stopped@."
-              Protocol_hash.pp
+              Tezos_crypto.Protocol_hash.pp
               Protocol.hash)
       in
       return_unit)
     ~on_error:(fun trace ->
       cctxt#error
         "An error while monitoring the new heads for proto %a occured: %a@."
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         Protocol.hash
         Error_monad.pp_print_trace
         trace)
@@ -391,7 +396,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     debug_msg (fun () ->
         cctxt#message
           "sample_transfer: invalid balance %a"
-          Signature.Public_key_hash.pp
+          Tezos_crypto.Signature.Public_key_hash.pp
           src.pkh)
     >>= fun () ->
     (* Sampled source has zero balance: the transfer that created that
@@ -425,7 +430,11 @@ let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
       ({branch}, Contents_list contents)
   in
   let signature =
-    Some (Signature.sign ~watermark:Signature.Generic_operation sk bytes)
+    Some
+      (Tezos_crypto.Signature.sign
+         ~watermark:Tezos_crypto.Signature.Generic_operation
+         sk
+         bytes)
   in
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature}}
@@ -470,7 +479,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
   >>=? fun pcounter ->
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun branch ->
   (* If there is a new block refresh the fresh_pool *)
-  if not (Block_hash.equal branch state.last_block) then (
+  if not (Tezos_crypto.Block_hash.equal branch state.last_block) then (
     state.last_block <- branch ;
     if Option.is_some state.shuffled_pool then
       state.shuffled_pool <-
@@ -480,14 +489,16 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
              (List.map (fun src_org -> src_org.source) state.pool))) ;
   let freshest_counter =
     match
-      Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
+      Tezos_crypto.Signature.Public_key_hash.Table.find
+        state.counters
+        transfer.src.pkh
     with
     | None ->
         (* This is the first operation we inject for this pkh: the counter given
            by the RPC _must_ be the freshest one. *)
         pcounter
     | Some (previous_branch, previous_counter) ->
-        if Block_hash.equal branch previous_branch then
+        if Tezos_crypto.Block_hash.equal branch previous_branch then
           (* We already injected an operation on top of this block: the one stored
              locally is the freshest one. *)
           previous_counter
@@ -497,14 +508,19 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
              given by the RPC. *)
           pcounter
   in
-  (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
-   return true
+  (if
+   Tezos_crypto.Signature.Public_key_hash.Set.mem
+     transfer.src.pkh
+     state.revealed
+  then return true
   else (
     (* Either the [manager_key] RPC tells us the key is already
        revealed, or we immediately inject a reveal operation: in any
        case the key is revealed in the end. *)
     state.revealed <-
-      Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
+      Tezos_crypto.Signature.Public_key_hash.Set.add
+        transfer.src.pkh
+        state.revealed ;
     Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
     >>=? fun pk_opt -> return (Option.is_some pk_opt)))
   >>=? fun already_revealed ->
@@ -528,21 +544,23 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
        {transfer with counter = Some transf_counter}
    in
    let list = Cons (reveal, Single manager_op) in
-   Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-   Signature.Public_key_hash.Table.add
+   Tezos_crypto.Signature.Public_key_hash.Table.remove
+     state.counters
+     transfer.src.pkh ;
+   Tezos_crypto.Signature.Public_key_hash.Table.add
      state.counters
      transfer.src.pkh
      (branch, transf_counter) ;
    (if !verbose then
     cctxt#message
       "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-      Signature.Public_key_hash.pp
+      Tezos_crypto.Signature.Public_key_hash.pp
       transfer.src.pkh
       Z.pp_print
       reveal_counter
       Z.pp_print
       transf_counter
-      Signature.Public_key_hash.pp
+      Tezos_crypto.Signature.Public_key_hash.pp
       transfer.dst
    else Lwt.return_unit)
    >>= fun () ->
@@ -559,19 +577,21 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
         {transfer with counter = Some transf_counter}
     in
     let list = Single manager_op in
-    Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-    Signature.Public_key_hash.Table.add
+    Tezos_crypto.Signature.Public_key_hash.Table.remove
+      state.counters
+      transfer.src.pkh ;
+    Tezos_crypto.Signature.Public_key_hash.Table.add
       state.counters
       transfer.src.pkh
       (branch, transf_counter) ;
     (if !verbose then
      cctxt#message
        "injecting transfer from %a (counter=%a) to %a"
-       Signature.Public_key_hash.pp
+       Tezos_crypto.Signature.Public_key_hash.pp
        transfer.src.pkh
        Z.pp_print
        transf_counter
-       Signature.Public_key_hash.pp
+       Tezos_crypto.Signature.Public_key_hash.pp
        transfer.dst
     else Lwt.return_unit)
     >>= fun () ->
@@ -582,15 +602,18 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
       debug_msg (fun () ->
           cctxt#message
             "inject_transfer: op injected %a"
-            Operation_hash.pp
+            Tezos_crypto.Operation_hash.pp
             op_hash)
       >>= fun () ->
       let ops =
         Option.value
           ~default:[]
-          (Block_hash.Table.find state.injected_operations branch)
+          (Tezos_crypto.Block_hash.Table.find state.injected_operations branch)
       in
-      Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
+      Tezos_crypto.Block_hash.Table.replace
+        state.injected_operations
+        branch
+        (op_hash :: ops) ;
       return_unit
   | Error e ->
       debug_msg (fun () ->
@@ -604,7 +627,7 @@ let save_injected_operations (cctxt : Protocol_client_context.full) state =
   let json =
     Data_encoding.Json.construct
       injected_operations_encoding
-      (Block_hash.Table.fold
+      (Tezos_crypto.Block_hash.Table.fold
          (fun k v acc -> (k, v) :: acc)
          state.injected_operations
          [])
@@ -625,10 +648,10 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
   let ratio_injected_included_op () =
     Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_exit ->
     let inter_cardinal s1 s2 =
-      Operation_hash.Set.cardinal
-        (Operation_hash.Set.inter
-           (Operation_hash.Set.of_list s1)
-           (Operation_hash.Set.of_list s2))
+      Tezos_crypto.Operation_hash.Set.cardinal
+        (Tezos_crypto.Operation_hash.Set.inter
+           (Tezos_crypto.Operation_hash.Set.of_list s1)
+           (Tezos_crypto.Operation_hash.Set.of_list s2))
     in
     let get_included_ops older_block =
       let rec get_included_ops block acc_included_ops =
@@ -656,7 +679,7 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
       get_included_ops current_head_on_exit []
     in
     let injected_ops =
-      Block_hash.Table.fold
+      Tezos_crypto.Block_hash.Table.fold
         (fun k l acc ->
           (* The operations injected during the last block are ignored because
              they should not be currently included. *)
@@ -669,9 +692,9 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
     debug_msg (fun () ->
         cctxt#message
           "injected : %a\nincluded: %a"
-          (Format.pp_print_list Operation_hash.pp)
+          (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
           injected_ops
-          (Format.pp_print_list Operation_hash.pp)
+          (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
           included_ops)
     >>= fun () ->
     let injected_ops_count = List.length injected_ops in
@@ -756,12 +779,14 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       else Lwt_unix.sleep remaining)
       >>= loop
   in
-  let on_new_head : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t =
+  let on_new_head :
+      Tezos_crypto.Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t =
     match state.shuffled_pool with
     (* Some _ if and only if [single_op_per_pkh_per_block] is true. *)
     | Some _ ->
         fun (new_block_hash, new_block_header) ->
-          if not (Block_hash.equal new_block_hash state.last_block) then (
+          if not (Tezos_crypto.Block_hash.equal new_block_hash state.last_block)
+          then (
             state.last_block <- new_block_hash ;
             state.last_level <- Int32.to_int new_block_header.shell.level ;
             state.shuffled_pool <-
@@ -1060,7 +1085,9 @@ let generate_random_transactions =
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
           List.filter_map_p (normalize_source cctxt) sources >>= fun sources ->
-          let counters = Signature.Public_key_hash.Table.create 1023 in
+          let counters =
+            Tezos_crypto.Signature.Public_key_hash.Table.create 1023
+          in
           let rng = Random.State.make [|parameters.seed|] in
           Protocol_client_context.Alpha_block_services.header cctxt ()
           >>=? fun header_on_start ->
@@ -1078,11 +1105,11 @@ let generate_random_transactions =
                       ~rng
                       (List.map (fun src_org -> src_org.source) sources))
                 else None);
-              revealed = Signature.Public_key_hash.Set.empty;
+              revealed = Tezos_crypto.Signature.Public_key_hash.Set.empty;
               last_block = current_head_on_start;
               last_level = Int32.to_int header_on_start.shell.level;
               new_block_condition = Lwt_condition.create ();
-              injected_operations = Block_hash.Table.create 1023;
+              injected_operations = Tezos_crypto.Block_hash.Table.create 1023;
             }
           in
           let exit_callback_id =

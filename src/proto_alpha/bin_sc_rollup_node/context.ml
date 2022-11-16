@@ -98,7 +98,7 @@ let index context = context.index
 module Proof (Hash : sig
   type t
 
-  val of_context_hash : Context_hash.t -> t
+  val of_context_hash : Tezos_crypto.Context_hash.t -> t
 end) (Proof_encoding : sig
   val proof_encoding :
     Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
@@ -202,7 +202,8 @@ module Inbox = struct
     let from_inbox_hash inbox_hash =
       let ctxt_hash = Hash.to_context_hash inbox_hash in
       let store_hash =
-        IStore.Hash.unsafe_of_raw_string (Context_hash.to_string ctxt_hash)
+        IStore.Hash.unsafe_of_raw_string
+          (Tezos_crypto.Context_hash.to_string ctxt_hash)
       in
       `Node store_hash
 

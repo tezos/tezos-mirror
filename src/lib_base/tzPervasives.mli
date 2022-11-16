@@ -28,9 +28,6 @@ include module type of struct
 end
 
 module Error_monad = Tezos_error_monad.Error_monad
-
-include module type of Tezos_crypto
-
 module Data_encoding = Data_encoding
 
 (** The following modules are part of [TzLwtreslib]. We just remove

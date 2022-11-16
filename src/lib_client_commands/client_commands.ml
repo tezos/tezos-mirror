@@ -31,18 +31,18 @@ type network = [`Mainnet | `Testnet]
 
 exception Version_not_found
 
-let versions = Protocol_hash.Table.create 7
+let versions = Tezos_crypto.Protocol_hash.Table.create 7
 
-let get_versions () = Protocol_hash.Table.to_seq versions
+let get_versions () = Tezos_crypto.Protocol_hash.Table.to_seq versions
 
 let register name commands =
   let previous =
     Option.value ~default:(fun _network_opt -> [])
-    @@ Protocol_hash.Table.find versions name
+    @@ Tezos_crypto.Protocol_hash.Table.find versions name
   in
-  Protocol_hash.Table.replace versions name (fun network_opt ->
+  Tezos_crypto.Protocol_hash.Table.replace versions name (fun network_opt ->
       commands network_opt @ previous network_opt)
 
 let commands_for_version version =
   WithExceptions.Option.to_exn ~none:Version_not_found
-  @@ Protocol_hash.Table.find versions version
+  @@ Tezos_crypto.Protocol_hash.Table.find versions version

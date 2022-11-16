@@ -225,7 +225,9 @@ let run_script transaction () =
         let* inc = Incremental.begin_construction b in
         let ctxt = Incremental.alpha_ctxt inc in
         let ctxt =
-          Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
+          Alpha_context.Origination_nonce.init
+            ctxt
+            Tezos_crypto.Operation_hash.zero
         in
         return (parameter, ctxt)
   in

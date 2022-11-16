@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += No_worker_for_source of Signature.Public_key_hash.t
+type error += No_worker_for_source of Tezos_crypto.Signature.Public_key_hash.t
 
 let () =
   register_error_kind
@@ -35,10 +35,11 @@ let () =
       Format.fprintf
         ppf
         "No worker for source %a"
-        Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.Public_key_hash.pp
         s)
     `Permanent
-    Data_encoding.(obj1 (req "source" Signature.Public_key_hash.encoding))
+    Data_encoding.(
+      obj1 (req "source" Tezos_crypto.Signature.Public_key_hash.encoding))
     (function No_worker_for_source s -> Some s | _ -> None)
     (fun s -> No_worker_for_source s)
 

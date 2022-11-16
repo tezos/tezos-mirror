@@ -30,9 +30,9 @@ module Hash : sig
 
   val to_raw_string : t -> string
 
-  val to_context_hash : t -> Context_hash.t
+  val to_context_hash : t -> Tezos_crypto.Context_hash.t
 
-  val of_context_hash : Context_hash.t -> t
+  val of_context_hash : Tezos_crypto.Context_hash.t -> t
 end
 
 module Conf : Irmin_pack.Conf.S

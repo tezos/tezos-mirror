@@ -65,7 +65,7 @@ let () =
     let directory = Tezos_rpc.Directory.empty
 
     let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
-        (hash : Context_hash.t) =
+        (hash : Tezos_crypto.Context_hash.t) =
       let open Lwt_result_syntax in
       let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
       let* (module ProxyDelegation) =

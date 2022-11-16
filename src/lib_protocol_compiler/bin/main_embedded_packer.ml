@@ -78,7 +78,7 @@ module Source = struct
   let sources = Tezos_base.Protocol.%a
 end
 @.|}
-    (Protocol_hash.to_b58check hash)
+    (Tezos_crypto.Protocol_hash.to_b58check hash)
     Protocol.pp_ocaml
     sources
 

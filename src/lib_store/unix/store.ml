@@ -63,13 +63,13 @@ type store = {
   context_index : Context_ops.index;
   protocol_store : Protocol_store.t;
   allow_testchains : bool;
-  protocol_watcher : Protocol_hash.t Lwt_watcher.input;
+  protocol_watcher : Tezos_crypto.Protocol_hash.t Lwt_watcher.input;
   global_block_watcher : (chain_store * block) Lwt_watcher.input;
 }
 
 and chain_store = {
   global_store : store;
-  chain_id : Chain_id.t;
+  chain_id : Tezos_crypto.Chain_id.t;
   chain_dir : [`Chain_dir] Naming.directory;
   chain_config : chain_config;
   block_store : Block_store.t;
@@ -78,8 +78,8 @@ and chain_store = {
   genesis_block_data : block Stored_data.t;
   block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
-    (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
-    Protocol_hash.Table.t;
+    (chain_store * block) Tezos_rpc.Directory.t Tezos_crypto.Protocol_hash.Map.t
+    Tezos_crypto.Protocol_hash.Table.t;
   lockfile : Lwt_unix.file_descr;
 }
 
@@ -94,20 +94,26 @@ and chain_state = {
   (* Following fields are safe to update directly *)
   protocol_levels_data :
     Protocol_levels.activation_block Protocol_levels.t Stored_data.t;
-  invalid_blocks_data : invalid_block Block_hash.Map.t Stored_data.t;
-  forked_chains_data : Block_hash.t Chain_id.Map.t Stored_data.t;
+  invalid_blocks_data :
+    invalid_block Tezos_crypto.Block_hash.Map.t Stored_data.t;
+  forked_chains_data :
+    Tezos_crypto.Block_hash.t Tezos_crypto.Chain_id.Map.t Stored_data.t;
   (* In memory-only: *)
   current_head : Block_repr.t;
   active_testchain : testchain option;
   mempool : Mempool.t;
-  live_blocks : Block_hash.Set.t;
-  live_operations : Operation_hash.Set.t;
+  live_blocks : Tezos_crypto.Block_hash.Set.t;
+  live_operations : Tezos_crypto.Operation_hash.Set.t;
   mutable live_data_cache :
-    (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
+    (Tezos_crypto.Block_hash.t * Tezos_crypto.Operation_hash.Set.t) Ringo.Ring.t
+    option;
   prechecked_blocks : Block_repr.t Block_lru_cache.t;
 }
 
-and testchain = {forked_block : Block_hash.t; testchain_store : chain_store}
+and testchain = {
+  forked_block : Tezos_crypto.Block_hash.t;
+  testchain_store : chain_store;
+}
 
 and block = Block_repr.t
 
@@ -159,7 +165,7 @@ let locked_is_acceptable_block chain_state (hash, level) =
     | None -> Lwt.return_true
     | Some (target_hash, target_level) ->
         if Compare.Int32.(level = target_level) then
-          Lwt.return @@ Block_hash.equal hash target_hash
+          Lwt.return @@ Tezos_crypto.Block_hash.equal hash target_hash
         else Lwt.return_true
 
 let create_lockfile chain_dir =
@@ -202,7 +208,8 @@ module Block = struct
     operations_metadata : Block_validation.operation_metadata list list;
   }
 
-  let equal b b' = Block_hash.equal (Block_repr.hash b) (Block_repr.hash b')
+  let equal b b' =
+    Tezos_crypto.Block_hash.equal (Block_repr.hash b) (Block_repr.hash b')
 
   let descriptor blk = Block_repr.descriptor blk
 
@@ -220,7 +227,7 @@ module Block = struct
   let locked_is_known_invalid chain_state hash =
     let open Lwt_syntax in
     let* invalid_blocks = Stored_data.get chain_state.invalid_blocks_data in
-    Lwt.return (Block_hash.Map.mem hash invalid_blocks)
+    Lwt.return (Tezos_crypto.Block_hash.Map.mem hash invalid_blocks)
 
   let is_known_invalid {chain_state; _} hash =
     Shared.use chain_state (fun chain_state ->
@@ -253,7 +260,7 @@ module Block = struct
 
   let is_genesis chain_store hash =
     let genesis = genesis chain_store in
-    Block_hash.equal hash genesis.Genesis.block
+    Tezos_crypto.Block_hash.equal hash genesis.Genesis.block
 
   let read_block {block_store; _} ?(distance = 0) hash =
     let open Lwt_result_syntax in
@@ -452,7 +459,7 @@ module Block = struct
     in
     let*! genesis_block = Stored_data.get chain_store.genesis_block_data in
     let is_main_chain =
-      Chain_id.equal
+      Tezos_crypto.Chain_id.equal
         chain_store.chain_id
         (WithExceptions.Option.get
            ~loc:__LOC__
@@ -505,7 +512,9 @@ module Block = struct
         in
         let* () =
           fail_unless
-            (Context_hash.equal block_header.shell.context context_hash)
+            (Tezos_crypto.Context_hash.equal
+               block_header.shell.context
+               context_hash)
             (Validation_errors.Inconsistent_hash
                (context_hash, block_header.shell.context))
         in
@@ -628,7 +637,7 @@ module Block = struct
             in
             let testchain_id = Context.compute_testchain_chain_id genesis in
             let forked_hash_opt =
-              Chain_id.Map.find testchain_id forked_chains
+              Tezos_crypto.Chain_id.Map.find testchain_id forked_chains
             in
             return (status, forked_hash_opt))
     | Forking _ -> return (status, Some (Block_repr.hash block))
@@ -657,7 +666,7 @@ module Block = struct
     let open Lwt_syntax in
     Shared.use chain_state (fun chain_state ->
         let* invalid_blocks = Stored_data.get chain_state.invalid_blocks_data in
-        Lwt.return (Block_hash.Map.find hash invalid_blocks))
+        Lwt.return (Tezos_crypto.Block_hash.Map.find hash invalid_blocks))
 
   let read_invalid_blocks {chain_state; _} =
     Shared.use chain_state (fun chain_state ->
@@ -674,7 +683,10 @@ module Block = struct
               (fun invalid_blocks ->
                 Prometheus.Gauge.inc_one Store_metrics.metrics.invalid_blocks ;
                 Lwt.return
-                  (Block_hash.Map.add hash {level; errors} invalid_blocks)))
+                  (Tezos_crypto.Block_hash.Map.add
+                     hash
+                     {level; errors}
+                     invalid_blocks)))
       in
       return_unit
 
@@ -684,7 +696,7 @@ module Block = struct
           chain_state.invalid_blocks_data
           (fun invalid_blocks ->
             Prometheus.Gauge.dec_one Store_metrics.metrics.invalid_blocks ;
-            Lwt.return (Block_hash.Map.remove hash invalid_blocks)))
+            Lwt.return (Tezos_crypto.Block_hash.Map.remove hash invalid_blocks)))
 
   (** Accessors *)
 
@@ -731,8 +743,8 @@ module Block = struct
     else
       Option.map
         (fun ll ->
-          Operation_metadata_list_list_hash.compute
-            (List.map Operation_metadata_list_hash.compute ll))
+          Tezos_crypto.Operation_metadata_list_list_hash.compute
+            (List.map Tezos_crypto.Operation_metadata_list_hash.compute ll))
         (Block_repr.operations_metadata_hashes blk)
 
   (** Metadata accessors *)
@@ -749,8 +761,10 @@ module Block = struct
   let operations_metadata metadata = Block_repr.operations_metadata metadata
 
   let compute_operation_path hashes =
-    let list_hashes = List.map Operation_list_hash.compute hashes in
-    Operation_list_list_hash.compute_path list_hashes
+    let list_hashes =
+      List.map Tezos_crypto.Operation_list_hash.compute hashes
+    in
+    Tezos_crypto.Operation_list_list_hash.compute_path list_hashes
 
   let operations_path block i =
     if i < 0 || validation_passes block <= i then invalid_arg "operations_path" ;
@@ -826,22 +840,27 @@ module Chain_traversal = struct
 
   let live_blocks chain_store block n =
     let fold (bacc, oacc) (head_hash, op_hashes) =
-      let bacc = Block_hash.Set.add head_hash bacc in
+      let bacc = Tezos_crypto.Block_hash.Set.add head_hash bacc in
       let oacc =
         List.fold_left
-          (List.fold_left (fun oacc op -> Operation_hash.Set.add op oacc))
+          (List.fold_left (fun oacc op ->
+               Tezos_crypto.Operation_hash.Set.add op oacc))
           oacc
           op_hashes
       in
       (bacc, oacc)
     in
-    let init = (Block_hash.Set.empty, Operation_hash.Set.empty) in
+    let init =
+      (Tezos_crypto.Block_hash.Set.empty, Tezos_crypto.Operation_hash.Set.empty)
+    in
     folder chain_store block n fold init
 
   let live_blocks_with_ring chain_store block n ring =
     let open Lwt_syntax in
     let fold acc (head_hash, op_hashes) =
-      let op_hash_set = Operation_hash.Set.(of_list (List.flatten op_hashes)) in
+      let op_hash_set =
+        Tezos_crypto.Operation_hash.Set.(of_list (List.flatten op_hashes))
+      in
       (head_hash, op_hash_set) :: acc
     in
     let* l = folder chain_store block n fold [] in
@@ -952,7 +971,7 @@ module Chain = struct
         let*! current_head_descr =
           Stored_data.get chain_state.current_head_data
         in
-        if Block_hash.equal head (fst current_head_descr) then
+        if Tezos_crypto.Block_hash.equal head (fst current_head_descr) then
           return (Some {chain_state with mempool}, ())
         else return (None, ()))
 
@@ -974,20 +993,22 @@ module Chain = struct
       match live_data_cache with
       | Some live_data_cache
         when update_cache
-             && Block_hash.equal
+             && Tezos_crypto.Block_hash.equal
                   (Block.predecessor block)
                   (Block.hash current_head)
              && Ringo.Ring.capacity live_data_cache = expected_capacity -> (
           let most_recent_block = Block.hash block in
           let most_recent_ops =
             Block.all_operation_hashes block
-            |> List.flatten |> Operation_hash.Set.of_list
+            |> List.flatten |> Tezos_crypto.Operation_hash.Set.of_list
           in
           let new_live_blocks =
-            Block_hash.Set.add most_recent_block live_blocks
+            Tezos_crypto.Block_hash.Set.add most_recent_block live_blocks
           in
           let new_live_operations =
-            Operation_hash.Set.union most_recent_ops live_operations
+            Tezos_crypto.Operation_hash.Set.union
+              most_recent_ops
+              live_operations
           in
           match
             Ringo.Ring.add_and_return_erased
@@ -997,10 +1018,12 @@ module Chain = struct
           | None -> Lwt.return (new_live_blocks, new_live_operations)
           | Some (last_block, last_ops) ->
               let diffed_new_live_blocks =
-                Block_hash.Set.remove last_block new_live_blocks
+                Tezos_crypto.Block_hash.Set.remove last_block new_live_blocks
               in
               let diffed_new_live_operations =
-                Operation_hash.Set.diff new_live_operations last_ops
+                Tezos_crypto.Operation_hash.Set.diff
+                  new_live_operations
+                  last_ops
               in
               Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
       | _ when update_cache ->
@@ -1016,9 +1039,12 @@ module Chain = struct
           let live_blocks, live_ops =
             Ringo.Ring.fold
               new_cache
-              ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
+              ~init:
+                ( Tezos_crypto.Block_hash.Set.empty,
+                  Tezos_crypto.Operation_hash.Set.empty )
               ~f:(fun (bhs, opss) (bh, ops) ->
-                (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
+                ( Tezos_crypto.Block_hash.Set.add bh bhs,
+                  Tezos_crypto.Operation_hash.Set.union ops opss ))
           in
           Lwt.return (live_blocks, live_ops)
       | _ -> Chain_traversal.live_blocks chain_store block expected_capacity
@@ -1041,7 +1067,7 @@ module Chain = struct
     let open Lwt_syntax in
     if Compare.Int32.(lvl' > lvl) then Lwt.return_false
     else if Compare.Int32.(lvl = lvl') then
-      Lwt.return (Block_hash.equal hash hash')
+      Lwt.return (Tezos_crypto.Block_hash.equal hash hash')
     else
       let* o =
         Block.read_ancestor_hash_opt
@@ -1051,7 +1077,8 @@ module Chain = struct
       in
       match o with
       | None -> Lwt.return_false
-      | Some hash_found -> Lwt.return (Block_hash.equal hash' hash_found)
+      | Some hash_found ->
+          Lwt.return (Tezos_crypto.Block_hash.equal hash' hash_found)
 
   let is_in_chain chain_store (hash, level) =
     let open Lwt_syntax in
@@ -1535,7 +1562,7 @@ module Chain = struct
                   chain_state.invalid_blocks_data
                   (fun invalid_blocks ->
                     Lwt.return
-                      (Block_hash.Map.filter
+                      (Tezos_crypto.Block_hash.Map.filter
                          (fun _k {level; _} ->
                            if level > snd new_checkpoint then (
                              Prometheus.Gauge.inc_one
@@ -1623,7 +1650,8 @@ module Chain = struct
               in
               match o with
               | None -> tzfail Missing_last_allowed_fork_level_block
-              | Some lafl_hash -> return (Block_hash.equal lafl_hash ancestor)))
+              | Some lafl_hash ->
+                  return (Tezos_crypto.Block_hash.equal lafl_hash ancestor)))
 
   let is_valid_for_checkpoint chain_store given_checkpoint =
     let open Lwt_syntax in
@@ -1759,7 +1787,10 @@ module Chain = struct
                      ( best_head,
                        List.filter
                          (fun (hash, _) ->
-                           not (Block_hash.equal (Block.hash best_head) hash))
+                           not
+                             (Tezos_crypto.Block_hash.equal
+                                (Block.hash best_head)
+                                hash))
                          all_heads )
                  in
                  (* Case 1 *)
@@ -1886,18 +1917,20 @@ module Chain = struct
     let* invalid_blocks_data =
       Stored_data.init
         (Naming.invalid_blocks_file chain_dir)
-        ~initial_data:Block_hash.Map.empty
+        ~initial_data:Tezos_crypto.Block_hash.Map.empty
     in
     let* forked_chains_data =
       Stored_data.init
         (Naming.forked_chains_file chain_dir)
-        ~initial_data:Chain_id.Map.empty
+        ~initial_data:Tezos_crypto.Chain_id.Map.empty
     in
     let current_head = genesis_block in
     let active_testchain = None in
     let mempool = Mempool.empty in
-    let live_blocks = Block_hash.Set.singleton genesis_block.hash in
-    let live_operations = Operation_hash.Set.empty in
+    let live_blocks =
+      Tezos_crypto.Block_hash.Set.singleton genesis_block.hash
+    in
+    let live_operations = Tezos_crypto.Operation_hash.Set.empty in
     let live_data_cache = None in
     let prechecked_blocks = Block_lru_cache.create 10 in
     return
@@ -1996,8 +2029,8 @@ module Chain = struct
     | Some current_head ->
         let active_testchain = None in
         let mempool = Mempool.empty in
-        let live_blocks = Block_hash.Set.empty in
-        let live_operations = Operation_hash.Set.empty in
+        let live_blocks = Tezos_crypto.Block_hash.Set.empty in
+        let live_operations = Tezos_crypto.Operation_hash.Set.empty in
         let live_data_cache = None in
         let prechecked_blocks = Block_lru_cache.create 10 in
         return
@@ -2075,7 +2108,7 @@ module Chain = struct
     in
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
-    let block_rpc_directories = Protocol_hash.Table.create 7 in
+    let block_rpc_directories = Tezos_crypto.Protocol_hash.Table.create 7 in
     let* lockfile = create_lockfile chain_dir in
     let chain_store : chain_store =
       {
@@ -2110,7 +2143,7 @@ module Chain = struct
     let* chain_state = load_chain_state chain_dir block_store in
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
-    let block_rpc_directories = Protocol_hash.Table.create 7 in
+    let block_rpc_directories = Tezos_crypto.Protocol_hash.Table.create 7 in
     let* lockfile = create_lockfile chain_dir in
     let chain_store =
       {
@@ -2182,14 +2215,16 @@ module Chain = struct
     let {forked_chains_data; active_testchain; _} = chain_state in
     match active_testchain with
     | Some testchain
-      when Chain_id.equal chain_id testchain.testchain_store.chain_id ->
+      when Tezos_crypto.Chain_id.equal
+             chain_id
+             testchain.testchain_store.chain_id ->
         return_some testchain
     | _ -> (
         let chain_dir = chain_store.chain_dir in
         let testchains_dir = Naming.testchains_dir chain_dir in
         let testchain_dir = Naming.chain_dir testchains_dir chain_id in
         let*! forked_chains = Stored_data.get forked_chains_data in
-        match Chain_id.Map.find chain_id forked_chains with
+        match Tezos_crypto.Chain_id.Map.find chain_id forked_chains with
         | None -> return_none
         | Some forked_block ->
             let* testchain_store =
@@ -2207,7 +2242,7 @@ module Chain = struct
     let open Lwt_result_syntax in
     let forked_block_hash = Block.hash forked_block in
     let genesis_hash' = Context.compute_testchain_genesis forked_block_hash in
-    assert (Block_hash.equal genesis_hash genesis_hash') ;
+    assert (Tezos_crypto.Block_hash.equal genesis_hash genesis_hash') ;
     let* () =
       fail_unless
         chain_store.global_store.allow_testchains
@@ -2219,8 +2254,10 @@ module Chain = struct
         match active_testchain with
         | Some ({testchain_store; forked_block} as testchain) ->
             (* Already forked and active *)
-            if Chain_id.equal testchain_store.chain_id testchain_id then (
-              assert (Block_hash.equal forked_block forked_block_hash) ;
+            if Tezos_crypto.Chain_id.equal testchain_store.chain_id testchain_id
+            then (
+              assert (
+                Tezos_crypto.Block_hash.equal forked_block forked_block_hash) ;
               return (None, testchain))
             else tzfail (Cannot_fork_testchain testchain_id)
         | None ->
@@ -2274,7 +2311,7 @@ module Chain = struct
                   chain_state.forked_chains_data
                   (fun forked_chains ->
                     Lwt.return
-                      (Chain_id.Map.add
+                      (Tezos_crypto.Chain_id.Map.add
                          testchain_id
                          forked_block_hash
                          forked_chains))
@@ -2380,7 +2417,7 @@ module Chain = struct
       let*! o = find_activation_block chain_store ~protocol_level in
       match o with
       | Some {block = bh, _; _} ->
-          if Block_hash.(bh <> Block.hash block) then
+          if Tezos_crypto.Block_hash.(bh <> Block.hash block) then
             set_protocol_level chain_store ~protocol_level (block, protocol_hash)
           else return_unit
       | None ->
@@ -2459,7 +2496,8 @@ module Chain = struct
     let* o = Block.read_predecessor_opt chain_store block in
     match o with
     | None -> Lwt.return_none (* genesis *)
-    | Some pred when Block_hash.equal (Block.hash pred) (Block.hash block) ->
+    | Some pred
+      when Tezos_crypto.Block_hash.equal (Block.hash pred) (Block.hash block) ->
         Lwt.return_none (* genesis *)
     | Some pred -> (
         let* _, save_point_level = savepoint chain_store in
@@ -2476,25 +2514,27 @@ module Chain = struct
           else Block.protocol_hash_exn chain_store pred
         in
         match
-          Protocol_hash.Table.find chain_store.block_rpc_directories protocol
+          Tezos_crypto.Protocol_hash.Table.find
+            chain_store.block_rpc_directories
+            protocol
         with
         | None -> Lwt.return_none
         | Some map ->
             let* next_protocol = Block.protocol_hash_exn chain_store block in
-            Lwt.return (Protocol_hash.Map.find next_protocol map))
+            Lwt.return (Tezos_crypto.Protocol_hash.Map.find next_protocol map))
 
   let set_rpc_directory chain_store ~protocol_hash ~next_protocol_hash dir =
     let map =
       Option.value
-        ~default:Protocol_hash.Map.empty
-        (Protocol_hash.Table.find
+        ~default:Tezos_crypto.Protocol_hash.Map.empty
+        (Tezos_crypto.Protocol_hash.Table.find
            chain_store.block_rpc_directories
            protocol_hash)
     in
-    Protocol_hash.Table.replace
+    Tezos_crypto.Protocol_hash.Table.replace
       chain_store.block_rpc_directories
       protocol_hash
-      (Protocol_hash.Map.add next_protocol_hash dir map) ;
+      (Tezos_crypto.Protocol_hash.Map.add next_protocol_hash dir map) ;
     Lwt.return_unit
 
   let register_gc_callback chain_store callback =
@@ -2628,7 +2668,7 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
   let stored_genesis = Chain.genesis main_chain_store in
   let* () =
     fail_unless
-      (Block_hash.equal genesis.Genesis.block stored_genesis.block)
+      (Tezos_crypto.Block_hash.equal genesis.Genesis.block stored_genesis.block)
       (Inconsistent_genesis
          {expected = stored_genesis.block; got = genesis.block})
   in
@@ -2664,7 +2704,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
       patch_context
   in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
-  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.Genesis.block in
   let*! context_index, commit_genesis =
     match commit_genesis with
     | Some commit_genesis ->
@@ -2738,7 +2778,7 @@ let close_store global_store =
 let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
   let open Lwt_result_syntax in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
-  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+  let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in
   if not (Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path)
@@ -2809,7 +2849,7 @@ let get_chain_store store chain_id =
   let chain_store = main_chain_store store in
   let rec loop chain_store =
     let open Lwt_result_syntax in
-    if Chain_id.equal (Chain.chain_id chain_store) chain_id then
+    if Tezos_crypto.Chain_id.equal (Chain.chain_id chain_store) chain_id then
       return chain_store
     else
       Shared.use chain_store.chain_state (fun {active_testchain; _} ->
@@ -2966,7 +3006,7 @@ let rec make_pp_chain_store (chain_store : chain_store) =
       proto_level
       pp_block_descriptor
       block
-      Protocol_hash.pp
+      Tezos_crypto.Protocol_hash.pp
       protocol
       (option_pp ~default:"n/a" (fun fmt _ -> Format.fprintf fmt "available"))
       commit_info
@@ -2988,7 +3028,7 @@ let rec make_pp_chain_store (chain_store : chain_store) =
          %a@ target: %a@ @[<v 2>protocol levels:@ %a@]@ @[<v 2>invalid \
          blocks:@ %a@]@ @[<v 2>forked chains:@ %a@]@ @[<v 2>active testchain: \
          %a@]@]"
-        Chain_id.pp
+        Tezos_crypto.Chain_id.pp
         chain_id
         (Naming.dir_path chain_dir)
         Data_encoding.Json.pp
@@ -3032,19 +3072,22 @@ let rec make_pp_chain_store (chain_store : chain_store) =
         target
         (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_protocol_level)
         (Protocol_levels.bindings protocol_levels_data)
-        (Format.pp_print_list ~pp_sep:Format.pp_print_cut Block_hash.pp)
-        (Block_hash.Map.bindings invalid_blocks_data |> List.map fst)
+        (Format.pp_print_list
+           ~pp_sep:Format.pp_print_cut
+           Tezos_crypto.Block_hash.pp)
+        (Tezos_crypto.Block_hash.Map.bindings invalid_blocks_data
+        |> List.map fst)
         (Format.pp_print_list
            ~pp_sep:Format.pp_print_cut
            (fun fmt (chain_id, block_hash) ->
              Format.fprintf
                fmt
                "testchain's chain id: %a, forked block: %a"
-               Chain_id.pp
+               Tezos_crypto.Chain_id.pp
                chain_id
-               Block_hash.pp
+               Tezos_crypto.Block_hash.pp
                block_hash))
-        (Chain_id.Map.bindings forked_chains_data)
+        (Tezos_crypto.Chain_id.Map.bindings forked_chains_data)
         pp_testchain_opt
         ())
 
@@ -3110,7 +3153,7 @@ module Unsafe = struct
       ~(locked_f : chain_store -> 'a tzresult Lwt.t) =
     let open Lwt_result_syntax in
     let store_dir = Naming.store_dir ~dir_path:store_dir in
-    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
     let* lockfile = create_lockfile chain_dir in
     let*! () = lock_for_read lockfile in
@@ -3139,7 +3182,7 @@ module Unsafe = struct
       ~genesis ~genesis_context_hash ~floating_blocks_stream
       ~new_head_with_metadata ~protocol_levels ~history_mode =
     let open Lwt_result_syntax in
-    let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
+    let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
     let genesis_block =
       Block_repr.create_genesis_block ~genesis genesis_context_hash
@@ -3211,12 +3254,12 @@ module Unsafe = struct
     let* () =
       Stored_data.write_file
         (Naming.invalid_blocks_file chain_dir)
-        Block_hash.Map.empty
+        Tezos_crypto.Block_hash.Map.empty
     in
     let* () =
       Stored_data.write_file
         (Naming.forked_chains_file chain_dir)
-        Chain_id.Map.empty
+        Tezos_crypto.Chain_id.Map.empty
     in
     let* () =
       Stored_data.write_file (Naming.genesis_block_file chain_dir) genesis_block
@@ -3259,7 +3302,7 @@ module Unsafe = struct
                   return_unit
               | _ ->
                   fail_unless
-                    (Block_hash.equal real_genesis_hash bh)
+                    (Tezos_crypto.Block_hash.equal real_genesis_hash bh)
                     (Missing_activation_block (bh, protocol, history_mode)))
           | Some _block, None -> return_unit
           | Some block, Some commit_info ->

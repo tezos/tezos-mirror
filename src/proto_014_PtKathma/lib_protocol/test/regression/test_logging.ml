@@ -153,7 +153,8 @@ let test_context () =
   let* b, _contract = Context.init1 ~consensus_threshold:0 () in
   let* inc = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt inc in
-  return @@ Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
+  return
+  @@ Alpha_context.Origination_nonce.init ctxt Tezos_crypto.Operation_hash.zero
 
 let run_script {filename; amount; storage; parameter} () =
   let get_log, logger = logger () in

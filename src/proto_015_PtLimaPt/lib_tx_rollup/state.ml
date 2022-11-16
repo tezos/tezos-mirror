@@ -33,7 +33,7 @@ module Tezos_blocks_cache =
   Ringo_lwt.Functors.Make_opt
     ((val Ringo.(
             map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Block_hash))
+       (Tezos_crypto.Block_hash))
 
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;

@@ -29,7 +29,7 @@
    subscribing to the head monitoring RPC offered by the Tezos node.
 *)
 
-type head = {hash : Block_hash.t; level : int32}
+type head = {hash : Tezos_crypto.Block_hash.t; level : int32}
 
 val head_encoding : head Data_encoding.t
 
@@ -77,7 +77,7 @@ val shutdown : t -> unit Lwt.t
     node otherwise. *)
 val fetch_tezos_block :
   t ->
-  Block_hash.t ->
+  Tezos_crypto.Block_hash.t ->
   Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
 
 (** [nth_predecessor l1_ctxt n head] return [block, history] where [block] is

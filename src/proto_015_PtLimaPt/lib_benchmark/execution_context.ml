@@ -53,7 +53,7 @@ let context_init ~rng_state = context_init_memory ~rng_state
 let make ~rng_state =
   context_init_memory ~rng_state >>=? fun context ->
   let amount = Alpha_context.Tez.one in
-  let chain_id = Chain_id.zero in
+  let chain_id = Tezos_crypto.Chain_id.zero in
   let now = Script_timestamp.of_zint Z.zero in
   let level = Script_int.zero_n in
   let open Script_interpreter in
@@ -88,6 +88,8 @@ let make ~rng_state =
   let ctxt = Incremental.alpha_ctxt vs in
   let ctxt =
     (* Required for eg Create_contract *)
-    Protocol.Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
+    Protocol.Alpha_context.Origination_nonce.init
+      ctxt
+      Tezos_crypto.Operation_hash.zero
   in
   return (ctxt, step_constants)

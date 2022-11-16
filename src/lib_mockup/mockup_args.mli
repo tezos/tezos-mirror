@@ -29,13 +29,13 @@ module Chain_id : sig
    ** This function is useful to get valid, but dummy, chain identifiers out of
    ** command lines in the context of a mockup client.
    *)
-  val of_string : string -> Chain_id.t
+  val of_string : string -> Tezos_crypto.Chain_id.t
 
   (** [dummy] is a valid dummy chain identifier.
    **
    ** Do not use it outside of the context of a mockup client.
    *)
-  val dummy : Chain_id.t
+  val dummy : Tezos_crypto.Chain_id.t
 
   (** [choose ~from_config_file]
    ** produces a valid chain id from the optionally given one.
@@ -44,5 +44,6 @@ module Chain_id : sig
    ** one from the config file.
    ** When both values are [None], it uses the {!dummy}.
    *)
-  val choose : from_config_file:Chain_id.t option -> Chain_id.t
+  val choose :
+    from_config_file:Tezos_crypto.Chain_id.t option -> Tezos_crypto.Chain_id.t
 end

@@ -30,7 +30,7 @@ open Environment
 
 type t = B of Block.t | I of Incremental.t
 
-val branch : t -> Block_hash.t
+val branch : t -> Tezos_crypto.Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
@@ -112,7 +112,8 @@ module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
 
   val get_ballot_list :
-    t -> (Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
+    t ->
+    (Tezos_crypto.Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
 
   val get_current_period : t -> Voting_period.info tzresult Lwt.t
 
@@ -121,20 +122,21 @@ module Vote : sig
   val get_participation_ema : Block.t -> int32 tzresult Lwt.t
 
   val get_listings :
-    t -> (Signature.Public_key_hash.t * int64) list tzresult Lwt.t
+    t -> (Tezos_crypto.Signature.Public_key_hash.t * int64) list tzresult Lwt.t
 
   val get_proposals : t -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
-  val get_current_proposal : t -> Protocol_hash.t option tzresult Lwt.t
+  val get_current_proposal :
+    t -> Tezos_crypto.Protocol_hash.t option tzresult Lwt.t
 
-  val get_protocol : Block.t -> Protocol_hash.t Lwt.t
+  val get_protocol : Block.t -> Tezos_crypto.Protocol_hash.t Lwt.t
 
   val set_participation_ema : Block.t -> int32 -> Block.t Lwt.t
 
   type delegate_info = Alpha_context.Vote.delegate_info = {
     voting_power : Int64.t option;
     current_ballot : Alpha_context.Vote.ballot option;
-    current_proposals : Protocol_hash.t list;
+    current_proposals : Tezos_crypto.Protocol_hash.t list;
     remaining_proposals : int;
   }
 
@@ -190,8 +192,9 @@ module Delegate : sig
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Vote.delegate_info;
-    active_consensus_key : Signature.Public_key_hash.t;
-    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+    active_consensus_key : Tezos_crypto.Signature.Public_key_hash.t;
+    pending_consensus_keys :
+      (Cycle.t * Tezos_crypto.Signature.Public_key_hash.t) list;
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
@@ -259,14 +262,17 @@ module Sc_rollup : sig
   val timeout :
     t ->
     Sc_rollup.t ->
-    Signature.Public_key_hash.t * Signature.Public_key_hash.t ->
+    Tezos_crypto.Signature.Public_key_hash.t
+    * Tezos_crypto.Signature.Public_key_hash.t ->
     Sc_rollup.Game.timeout option tzresult Lwt.t
 
   val ongoing_game_for_staker :
     t ->
     Sc_rollup.t ->
-    Signature.public_key_hash ->
-    (Sc_rollup.Game.t * Signature.public_key_hash * Signature.public_key_hash)
+    Tezos_crypto.Signature.public_key_hash ->
+    (Sc_rollup.Game.t
+    * Tezos_crypto.Signature.public_key_hash
+    * Tezos_crypto.Signature.public_key_hash)
     option
     tzresult
     Lwt.t

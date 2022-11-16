@@ -504,7 +504,7 @@ module Chain_validator = struct
       Worker.declare_counters ~label_names:[label_name] ~namespace ?subsystem ()
     in
     fun chain_id ->
-      let label = Chain_id.to_short_b58check chain_id in
+      let label = Tezos_crypto.Chain_id.to_short_b58check chain_id in
       {
         head_level = head_level label;
         ignored_head_count = ignored_head_count label;

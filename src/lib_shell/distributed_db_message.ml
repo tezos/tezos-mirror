@@ -187,27 +187,31 @@ module Bounded_encoding = struct
 end
 
 type t =
-  | Get_current_branch of Chain_id.t
-  | Current_branch of Chain_id.t * Block_locator.t
-  | Deactivate of Chain_id.t
-  | Get_current_head of Chain_id.t
-  | Current_head of Chain_id.t * Block_header.t * Mempool.t
-  | Get_block_headers of Block_hash.t list
+  | Get_current_branch of Tezos_crypto.Chain_id.t
+  | Current_branch of Tezos_crypto.Chain_id.t * Block_locator.t
+  | Deactivate of Tezos_crypto.Chain_id.t
+  | Get_current_head of Tezos_crypto.Chain_id.t
+  | Current_head of Tezos_crypto.Chain_id.t * Block_header.t * Mempool.t
+  | Get_block_headers of Tezos_crypto.Block_hash.t list
   | Block_header of Block_header.t
-  | Get_operations of Operation_hash.t list
+  | Get_operations of Tezos_crypto.Operation_hash.t list
   | Operation of Operation.t
-  | Get_protocols of Protocol_hash.t list
+  | Get_protocols of Tezos_crypto.Protocol_hash.t list
   | Protocol of Protocol.t
-  | Get_operations_for_blocks of (Block_hash.t * int) list
+  | Get_operations_for_blocks of (Tezos_crypto.Block_hash.t * int) list
   | Operations_for_block of
-      Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
-  | Get_checkpoint of Chain_id.t
-  | Checkpoint of Chain_id.t * Block_header.t
-  | Get_protocol_branch of Chain_id.t * int (* proto_level: uint8 *)
+      Tezos_crypto.Block_hash.t
+      * int
+      * Operation.t list
+      * Tezos_crypto.Operation_list_list_hash.path
+  | Get_checkpoint of Tezos_crypto.Chain_id.t
+  | Checkpoint of Tezos_crypto.Chain_id.t * Block_header.t
+  | Get_protocol_branch of
+      Tezos_crypto.Chain_id.t * int (* proto_level: uint8 *)
   | Protocol_branch of
-      Chain_id.t * int (* proto_level: uint8 *) * Block_locator.t
-  | Get_predecessor_header of Block_hash.t * int32
-  | Predecessor_header of Block_hash.t * int32 * Block_header.t
+      Tezos_crypto.Chain_id.t * int (* proto_level: uint8 *) * Block_locator.t
+  | Get_predecessor_header of Tezos_crypto.Block_hash.t * int32
+  | Predecessor_header of Tezos_crypto.Block_hash.t * int32 * Block_header.t
 
 let encoding =
   let open Data_encoding in
@@ -218,14 +222,14 @@ let encoding =
     case
       ~tag:0x10
       ~title:"Get_current_branch"
-      (obj1 (req "get_current_branch" Chain_id.encoding))
+      (obj1 (req "get_current_branch" Tezos_crypto.Chain_id.encoding))
       (function Get_current_branch chain_id -> Some chain_id | _ -> None)
       (fun chain_id -> Get_current_branch chain_id);
     case
       ~tag:0x11
       ~title:"Current_branch"
       (obj2
-         (req "chain_id" Chain_id.encoding)
+         (req "chain_id" Tezos_crypto.Chain_id.encoding)
          (req "current_branch" Bounded_encoding.block_locator))
       (function
         | Current_branch (chain_id, locator) -> Some (chain_id, locator)
@@ -234,20 +238,20 @@ let encoding =
     case
       ~tag:0x12
       ~title:"Deactivate"
-      (obj1 (req "deactivate" Chain_id.encoding))
+      (obj1 (req "deactivate" Tezos_crypto.Chain_id.encoding))
       (function Deactivate chain_id -> Some chain_id | _ -> None)
       (fun chain_id -> Deactivate chain_id);
     case
       ~tag:0x13
       ~title:"Get_current_head"
-      (obj1 (req "get_current_head" Chain_id.encoding))
+      (obj1 (req "get_current_head" Tezos_crypto.Chain_id.encoding))
       (function Get_current_head chain_id -> Some chain_id | _ -> None)
       (fun chain_id -> Get_current_head chain_id);
     case
       ~tag:0x14
       ~title:"Current_head"
       (obj3
-         (req "chain_id" Chain_id.encoding)
+         (req "chain_id" Tezos_crypto.Chain_id.encoding)
          (req
             "current_block_header"
             (dynamic_size Bounded_encoding.block_header))
@@ -259,7 +263,10 @@ let encoding =
     case
       ~tag:0x20
       ~title:"Get_block_headers"
-      (obj1 (req "get_block_headers" (list ~max_length:10 Block_hash.encoding)))
+      (obj1
+         (req
+            "get_block_headers"
+            (list ~max_length:10 Tezos_crypto.Block_hash.encoding)))
       (function Get_block_headers bhs -> Some bhs | _ -> None)
       (fun bhs -> Get_block_headers bhs);
     case
@@ -272,7 +279,9 @@ let encoding =
       ~tag:0x30
       ~title:"Get_operations"
       (obj1
-         (req "get_operations" (list ~max_length:10 Operation_hash.encoding)))
+         (req
+            "get_operations"
+            (list ~max_length:10 Tezos_crypto.Operation_hash.encoding)))
       (function Get_operations bhs -> Some bhs | _ -> None)
       (fun bhs -> Get_operations bhs);
     case
@@ -284,7 +293,10 @@ let encoding =
     case
       ~tag:0x40
       ~title:"Get_protocols"
-      (obj1 (req "get_protocols" (list ~max_length:10 Protocol_hash.encoding)))
+      (obj1
+         (req
+            "get_protocols"
+            (list ~max_length:10 Tezos_crypto.Protocol_hash.encoding)))
       (function Get_protocols protos -> Some protos | _ -> None)
       (fun protos -> Get_protocols protos);
     case
@@ -302,7 +314,7 @@ let encoding =
             (list
                ~max_length:10
                (obj2
-                  (req "hash" Block_hash.encoding)
+                  (req "hash" Tezos_crypto.Block_hash.encoding)
                   (req "validation_pass" int8)))))
       (function Get_operations_for_blocks keys -> Some keys | _ -> None)
       (fun keys -> Get_operations_for_blocks keys);
@@ -314,7 +326,7 @@ let encoding =
             (req
                "operations_for_block"
                (obj2
-                  (req "hash" Block_hash.encoding)
+                  (req "hash" Tezos_crypto.Block_hash.encoding)
                   (req "validation_pass" int8))))
          Bounded_encoding.operation_list)
       (function
@@ -326,7 +338,7 @@ let encoding =
     case
       ~tag:0x70
       ~title:"Get_checkpoint"
-      (obj1 (req "get_checkpoint" Chain_id.encoding))
+      (obj1 (req "get_checkpoint" Tezos_crypto.Chain_id.encoding))
       (function Get_checkpoint chain -> Some chain | _ -> None)
       (fun chain -> Get_checkpoint chain);
     case
@@ -336,7 +348,7 @@ let encoding =
          (req
             "checkpoint"
             (obj2
-               (req "chain_id" Chain_id.encoding)
+               (req "chain_id" Tezos_crypto.Chain_id.encoding)
                (req "header" Bounded_encoding.block_header))))
       (function
         | Checkpoint (chain_id, header) -> Some (chain_id, header) | _ -> None)
@@ -347,7 +359,9 @@ let encoding =
       (obj1
          (req
             "get_protocol_branch"
-            (obj2 (req "chain" Chain_id.encoding) (req "proto_level" uint8))))
+            (obj2
+               (req "chain" Tezos_crypto.Chain_id.encoding)
+               (req "proto_level" uint8))))
       (function
         | Get_protocol_branch (chain, protocol) -> Some (chain, protocol)
         | _ -> None)
@@ -359,7 +373,7 @@ let encoding =
          (req
             "protocol_branch"
             (obj3
-               (req "chain" Chain_id.encoding)
+               (req "chain" Tezos_crypto.Chain_id.encoding)
                (req "proto_level" uint8)
                (req "locator" Bounded_encoding.block_locator))))
       (function
@@ -374,7 +388,9 @@ let encoding =
       (obj1
          (req
             "get_predecessor_header"
-            (obj2 (req "block" Block_hash.encoding) (req "offset" int32))))
+            (obj2
+               (req "block" Tezos_crypto.Block_hash.encoding)
+               (req "offset" int32))))
       (function
         | Get_predecessor_header (block, offset) -> Some (block, offset)
         | _ -> None)
@@ -386,7 +402,7 @@ let encoding =
          (req
             "predecessor_header"
             (obj3
-               (req "block" Block_hash.encoding)
+               (req "block" Tezos_crypto.Block_hash.encoding)
                (req "offset" int32)
                (req "header" Bounded_encoding.block_header))))
       (function

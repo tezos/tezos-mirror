@@ -141,15 +141,15 @@ let get_commands_for_version ~timeout ctxt network chain block protocol =
           return
             (Some version, Client_commands.commands_for_version version network)
       | Some given_version ->
-          if not (Protocol_hash.equal version given_version) then
+          if not (Tezos_crypto.Protocol_hash.equal version given_version) then
             Format.eprintf
               "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
                The protocol provided via `--protocol` (%a)@,\
                is not the one retrieved from the node (%a).@]@\n\
                @."
-              Protocol_hash.pp_short
+              Tezos_crypto.Protocol_hash.pp_short
               given_version
-              Protocol_hash.pp_short
+              Tezos_crypto.Protocol_hash.pp_short
               version ;
           return
             ( Some version,

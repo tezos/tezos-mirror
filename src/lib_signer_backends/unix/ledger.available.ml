@@ -88,9 +88,10 @@ let () =
 let () =
   let description ledger_hash computed_hash =
     let paren fmt hash_opt =
-      match Base.Option.bind ~f:Blake2B.of_string_opt hash_opt with
+      match Base.Option.bind ~f:Tezos_crypto.Blake2B.of_string_opt hash_opt with
       | None -> ()
-      | Some hash -> Format.fprintf fmt " (%a)" Blake2B.pp_short hash
+      | Some hash ->
+          Format.fprintf fmt " (%a)" Tezos_crypto.Blake2B.pp_short hash
     in
     Format.asprintf
       "The ledger returned a hash%a which doesn't match the independently \
@@ -211,7 +212,9 @@ module Ledger_commands = struct
         let pk = Cstruct.to_bytes pk in
         TzEndian.set_int8 pk 0 0 ;
         (* hackish, but works. *)
-        Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding pk
+        Data_encoding.Binary.of_bytes_exn
+          Tezos_crypto.Signature.Public_key.encoding
+          pk
     | Secp256k1 ->
         let open Libsecp256k1.External in
         let buf = Bigstring.create (Key.compressed_pk_bytes + 1) in
@@ -219,10 +222,10 @@ module Ledger_commands = struct
         EndianBigstring.BigEndian.set_int8 buf 0 1 ;
         let _nb_written = Key.write secp256k1_ctx ~pos:1 buf pk in
         Data_encoding.Binary.of_bytes_exn
-          Signature.Public_key.encoding
+          Tezos_crypto.Signature.Public_key.encoding
           (Bigstring.to_bytes buf)
     | Secp256r1 -> (
-        let open Hacl.P256 in
+        let open Tezos_crypto.Hacl.P256 in
         let buf = Bytes.create (pk_size + 1) in
         match pk_of_bytes (Cstruct.to_bytes pk) with
         | None ->
@@ -230,11 +233,13 @@ module Ledger_commands = struct
         | Some pk ->
             TzEndian.set_int8 buf 0 2 ;
             blit_to_bytes pk ~pos:1 buf ;
-            Data_encoding.Binary.of_bytes_exn Signature.Public_key.encoding buf)
+            Data_encoding.Binary.of_bytes_exn
+              Tezos_crypto.Signature.Public_key.encoding
+              buf)
 
   let get_public_key = public_key_returning_instruction `Get_public_key
 
-  let pkh_of_pk = Signature.Public_key.hash
+  let pkh_of_pk = Tezos_crypto.Signature.Public_key.hash
 
   let public_key ?(first_import : Client_context.io_wallet option) hid curve
       path =
@@ -247,7 +252,7 @@ module Ledger_commands = struct
           cctxt#message
             "Please validate@ (and write down)@ the public key hash@ \
              displayed@ on the Ledger,@ it should be equal@ to `%a`:"
-            Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.Public_key_hash.pp
             pkh
         in
         get_public_key ~prompt:true hid curve path
@@ -289,7 +294,9 @@ module Ledger_commands = struct
     let open Lwt_result_syntax in
     let msg =
       Option.fold watermark ~none:base_msg ~some:(fun watermark ->
-          Bytes.cat (Signature.bytes_of_watermark watermark) base_msg)
+          Bytes.cat
+            (Tezos_crypto.Signature.bytes_of_watermark watermark)
+            base_msg)
     in
     let path = Bip32_path.tezos_root @ path in
     let* hash_opt, signature =
@@ -316,18 +323,23 @@ module Ledger_commands = struct
       match hash_opt with
       | None -> return_unit
       | Some hsh ->
-          let hash_msg = Blake2B.hash_bytes [msg] in
-          let ledger_one = Blake2B.of_bytes_exn (Cstruct.to_bytes hsh) in
-          if Blake2B.equal hash_msg ledger_one then return_unit
+          let hash_msg = Tezos_crypto.Blake2B.hash_bytes [msg] in
+          let ledger_one =
+            Tezos_crypto.Blake2B.of_bytes_exn (Cstruct.to_bytes hsh)
+          in
+          if Tezos_crypto.Blake2B.equal hash_msg ledger_one then return_unit
           else
             tzfail
               (Ledger_signing_hash_mismatch
-                 (Blake2B.to_string ledger_one, Blake2B.to_string hash_msg))
+                 ( Tezos_crypto.Blake2B.to_string ledger_one,
+                   Tezos_crypto.Blake2B.to_string hash_msg ))
     in
     match curve with
     | Ed25519 | Bip32_ed25519 ->
-        let signature = Ed25519.of_bytes_exn (Cstruct.to_bytes signature) in
-        return (Signature.of_ed25519 signature)
+        let signature =
+          Tezos_crypto.Ed25519.of_bytes_exn (Cstruct.to_bytes signature)
+        in
+        return (Tezos_crypto.Signature.of_ed25519 signature)
     | Secp256k1 ->
         (* Remove parity info *)
         Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
@@ -335,8 +347,10 @@ module Ledger_commands = struct
         let open Libsecp256k1.External in
         let signature = Sign.read_der_exn secp256k1_ctx signature in
         let bytes = Sign.to_bytes secp256k1_ctx signature in
-        let signature = Secp256k1.of_bytes_exn (Bigstring.to_bytes bytes) in
-        return (Signature.of_secp256k1 signature)
+        let signature =
+          Tezos_crypto.Secp256k1.of_bytes_exn (Bigstring.to_bytes bytes)
+        in
+        return (Tezos_crypto.Signature.of_secp256k1 signature)
     | Secp256r1 ->
         (* Remove parity info *)
         Cstruct.(set_uint8 signature 0 (get_uint8 signature 0 land 0xfe)) ;
@@ -345,8 +359,10 @@ module Ledger_commands = struct
         (* We use secp256r1 library to extract P256 DER signature. *)
         let signature = Sign.read_der_exn secp256k1_ctx signature in
         let buf = Sign.to_bytes secp256k1_ctx signature in
-        let signature = P256.of_bytes_exn (Bigstring.to_bytes buf) in
-        return (Signature.of_p256 signature)
+        let signature =
+          Tezos_crypto.P256.of_bytes_exn (Bigstring.to_bytes buf)
+        in
+        return (Tezos_crypto.Signature.of_p256 signature)
 
   let get_deterministic_nonce hid curve path msg =
     let open Lwt_result_syntax in
@@ -370,23 +386,26 @@ module Ledger_id = struct
      The “ID” of the ledger is the animals (or pkh) corresponding to
      ["/ed25519/"] (first curve, no path).
   *)
-  type t = Animals of Ledger_names.t | Pkh of Signature.public_key_hash
+  type t =
+    | Animals of Ledger_names.t
+    | Pkh of Tezos_crypto.Signature.public_key_hash
 
   let animals_of_pkh pkh =
-    pkh |> Signature.Public_key_hash.to_string |> Ledger_names.crouching_tiger
+    pkh |> Tezos_crypto.Signature.Public_key_hash.to_string
+    |> Ledger_names.crouching_tiger
 
   let curve = Ledgerwallet_tezos.Ed25519
 
   let get hidapi =
     let open Lwt_result_syntax in
     let* pk = Ledger_commands.get_public_key hidapi curve [] in
-    let pkh = Signature.Public_key.hash pk in
+    let pkh = Tezos_crypto.Signature.Public_key.hash pk in
     let animals = animals_of_pkh pkh in
     return (Animals animals)
 
   let pp ppf = function
     | Animals a -> Ledger_names.pp ppf a
-    | Pkh pkh -> Signature.Public_key_hash.pp ppf pkh
+    | Pkh pkh -> Tezos_crypto.Signature.Public_key_hash.pp ppf pkh
 
   let to_animals = function Animals a -> a | Pkh pkh -> animals_of_pkh pkh
 
@@ -445,7 +464,9 @@ module Ledger_uri = struct
     let open Lwt_result_syntax in
     let host = Uri.host uri in
     let* ledger =
-      match Option.bind host Signature.Public_key_hash.of_b58check_opt with
+      match
+        Option.bind host Tezos_crypto.Signature.Public_key_hash.of_b58check_opt
+      with
       | Some pkh -> return (Ledger_id.Pkh pkh)
       | None -> (
           match Option.bind host parse_animals with
@@ -735,12 +756,19 @@ let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg f =
     {!Signer_implementation.get_public_key} too often. *)
 module Global_cache : sig
   val record :
-    pk_uri -> pk:Signature.public_key -> pkh:Signature.public_key_hash -> unit
+    pk_uri ->
+    pk:Tezos_crypto.Signature.public_key ->
+    pkh:Tezos_crypto.Signature.public_key_hash ->
+    unit
 
-  val get : pk_uri -> (Signature.public_key_hash * Signature.public_key) option
+  val get :
+    pk_uri ->
+    (Tezos_crypto.Signature.public_key_hash * Tezos_crypto.Signature.public_key)
+    option
 end = struct
   let cache :
-      (Signature.Public_key_hash.t * Signature.Public_key.t)
+      (Tezos_crypto.Signature.Public_key_hash.t
+      * Tezos_crypto.Signature.Public_key.t)
       Client_keys.Pk_uri_hashtbl.t =
     Client_keys.Pk_uri_hashtbl.create 13
 
@@ -777,7 +805,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
     let*? v = make_pk_uri (sk :> Uri.t) in
     return v
 
-  let pkh_of_pk = Signature.Public_key.hash
+  let pkh_of_pk = Tezos_crypto.Signature.Public_key.hash
 
   let public_key_maybe_prompt ?(first_import : Client_context.io_wallet option)
       (pk_uri : pk_uri) =
@@ -844,7 +872,8 @@ module Signer_implementation : Client_keys.SIGNER = struct
   let deterministic_nonce_hash (sk : sk_uri) msg =
     let open Lwt_result_syntax in
     let* nonce = deterministic_nonce sk msg in
-    return (Blake2B.to_bytes (Blake2B.hash_bytes [nonce]))
+    return
+      (Tezos_crypto.Blake2B.to_bytes (Tezos_crypto.Blake2B.hash_bytes [nonce]))
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
 end
@@ -853,7 +882,12 @@ end
 let pp_ledger_chain_id fmt s =
   match s with
   | "\x00\x00\x00\x00" -> Format.fprintf fmt "'Unspecified'"
-  | other -> Format.fprintf fmt "%a" Chain_id.pp (Chain_id.of_string_exn other)
+  | other ->
+      Format.fprintf
+        fmt
+        "%a"
+        Tezos_crypto.Chain_id.pp
+        (Tezos_crypto.Chain_id.of_string_exn other)
 
 (** Commands for both ledger applications. *)
 let generic_commands group =
@@ -981,19 +1015,19 @@ let generic_commands group =
                     let*! () =
                       cctxt#message
                         "* Public Key: %a"
-                        Signature.Public_key.pp
+                        Tezos_crypto.Signature.Public_key.pp
                         pk
                     in
                     let*! () =
                       cctxt#message
                         "* Public Key Hash: %a@\n"
-                        Signature.Public_key_hash.pp
+                        Tezos_crypto.Signature.Public_key_hash.pp
                         pkh
                     in
                     match (test_sign, version.app_class) with
                     | true, Tezos -> (
                         let pkh_bytes =
-                          Signature.Public_key_hash.to_bytes pkh
+                          Tezos_crypto.Signature.Public_key_hash.to_bytes pkh
                         in
                         (* Signing requires validation on the device.  *)
                         let*! () =
@@ -1013,7 +1047,7 @@ let generic_commands group =
                             pkh_bytes
                         in
                         match
-                          Signature.check
+                          Tezos_crypto.Signature.check
                             ~watermark:Generic_operation
                             pk
                             signature
@@ -1022,13 +1056,13 @@ let generic_commands group =
                         | false ->
                             failwith
                               "Fatal: Ledger cannot sign with %a"
-                              Signature.Public_key_hash.pp
+                              Tezos_crypto.Signature.Public_key_hash.pp
                               pkh
                         | true ->
                             let*! () =
                               cctxt#message
                                 "Tezos Wallet successfully signed:@ %a."
-                                Signature.pp
+                                Tezos_crypto.Signature.pp
                                 signature
                             in
                             return_unit)
@@ -1161,14 +1195,14 @@ let baking_commands group =
                   curve
                   path
               in
-              let pkh = Signature.Public_key.hash pk in
+              let pkh = Tezos_crypto.Signature.Public_key.hash pk in
               let*! () =
                 cctxt#message
                   "@[<v 0>Authorized baking for address: %a@,\
                    Corresponding full public key: %a@]"
-                  Signature.Public_key_hash.pp
+                  Tezos_crypto.Signature.Public_key_hash.pp
                   pkh
-                  Signature.Public_key.pp
+                  Tezos_crypto.Signature.Public_key.pp
                   pk
               in
               return_some ()));
@@ -1206,11 +1240,13 @@ let baking_commands group =
                  | s -> (
                      try return (`Int32 (Int32.of_string s))
                      with _ -> (
-                       try return (`Chain_id (Chain_id.of_b58check_exn s))
+                       try
+                         return
+                           (`Chain_id (Tezos_crypto.Chain_id.of_b58check_exn s))
                        with _ ->
                          failwith
                            "Parameter %S should be a 32-bits integer or a \
-                            Base58 chain-id"
+                            Tezos_crypto.Base58 chain-id"
                            s)))))
            (hwm_arg "main")
            (hwm_arg "test"))
@@ -1249,7 +1285,7 @@ let baking_commands group =
                   logand 0xFFl (shift_right i32 (n * 8))
                   |> Int32.to_int |> char_of_int
                 in
-                Chain_id.of_string_exn
+                Tezos_crypto.Chain_id.of_string_exn
                   (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i))))
               in
               let* main_chain_id =
@@ -1273,7 +1309,7 @@ let baking_commands group =
                    Watermark: %ld%a -> %ld%a"
                   pp_ledger_chain_id
                   current_ci
-                  Chain_id.pp
+                  Tezos_crypto.Chain_id.pp
                   main_chain_id
                   current_mh
                   pp_round_opt
@@ -1291,19 +1327,21 @@ let baking_commands group =
               let* pk =
                 Ledger_commands.public_key_returning_instruction
                   (`Setup
-                    (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
+                    ( Tezos_crypto.Chain_id.to_string main_chain_id,
+                      main_hwm,
+                      test_hwm ))
                   hidapi
                   curve
                   path
               in
-              let pkh = Signature.Public_key.hash pk in
+              let pkh = Tezos_crypto.Signature.Public_key.hash pk in
               let*! () =
                 cctxt#message
                   "@[<v 0>Authorized baking for address: %a@,\
                    Corresponding full public key: %a@]"
-                  Signature.Public_key_hash.pp
+                  Tezos_crypto.Signature.Public_key_hash.pp
                   pkh
-                  Signature.Public_key.pp
+                  Tezos_crypto.Signature.Public_key.pp
                   pk
               in
               return_some ()));

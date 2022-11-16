@@ -82,7 +82,8 @@ let create ~peer_id_size ~ip_size ~ip_cleanup_delay =
   if ip_size <= 0 then invalid_arg "P2p_acl.create: bad value for ip_size" ;
   let bloomer =
     Bloomer.create (* 512KiB *)
-      ~hash:(fun x -> Blake2B.(to_bytes (hash_string [Ipaddr.V6.to_octets x])))
+      ~hash:(fun x ->
+        Tezos_crypto.Blake2B.(to_bytes (hash_string [Ipaddr.V6.to_octets x])))
       ~hashes:5 (* fixed, good for reasonable values of [ip_size] *)
       ~countdown_bits:4
         (* 16 steps to 0, fixed discrete split of the cleanup delay *)

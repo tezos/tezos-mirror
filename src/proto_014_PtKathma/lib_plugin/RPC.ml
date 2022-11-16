@@ -162,7 +162,7 @@ module Scripts = struct
            (req "input" Script.expr_encoding)
            (req "amount" Tez.encoding)
            (opt "balance" Tez.encoding)
-           (req "chain_id" Chain_id.encoding)
+           (req "chain_id" Tezos_crypto.Chain_id.encoding)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.encoding)
            (opt "self" Contract.originated_encoding)
@@ -215,7 +215,7 @@ module Scripts = struct
         (req "contract" Contract.originated_encoding)
         (req "entrypoint" Entrypoint.simple_encoding)
         (req "input" Script.expr_encoding)
-        (req "chain_id" Chain_id.encoding)
+        (req "chain_id" Tezos_crypto.Chain_id.encoding)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.encoding)
         (opt "gas" Gas.Arith.z_integral_encoding)
@@ -231,7 +231,7 @@ module Scripts = struct
            (req "view" string)
            (req "input" Script.expr_encoding)
            (dft "unlimited_gas" bool false)
-           (req "chain_id" Chain_id.encoding)
+           (req "chain_id" Tezos_crypto.Chain_id.encoding)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
@@ -379,7 +379,7 @@ module Scripts = struct
         ~input:
           (obj2
              (req "operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding))
+             (req "chain_id" Tezos_crypto.Chain_id.encoding))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
 
@@ -412,7 +412,7 @@ module Scripts = struct
           (obj4
              (opt "blocks_before_activation" int32)
              (req "operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding)
+             (req "chain_id" Tezos_crypto.Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "simulate_operation")
@@ -425,7 +425,7 @@ module Scripts = struct
           (obj4
              (opt "blocks_before_activation" int32)
              (req "operation" Operation.encoding)
-             (req "chain_id" Chain_id.encoding)
+             (req "chain_id" Tezos_crypto.Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "simulate_tx_rollup_operation")
@@ -819,7 +819,7 @@ module Scripts = struct
     let operation : _ operation = {shell; protocol_data} in
     let hash = Operation.hash {shell; protocol_data} in
     let ctxt = Origination_nonce.init ctxt hash in
-    let payload_producer = Signature.Public_key_hash.zero in
+    let payload_producer = Tezos_crypto.Signature.Public_key_hash.zero in
     Validate_operation.TMP_for_plugin
     .precheck_manager__do_nothing_on_non_manager_op
       ctxt
@@ -914,7 +914,7 @@ module Scripts = struct
 
   let register () =
     let originate_dummy_contract ctxt script balance =
-      let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
+      let ctxt = Origination_nonce.init ctxt Tezos_crypto.Operation_hash.zero in
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, dummy_contract_hash) ->
       let dummy_contract = Contract.Originated dummy_contract_hash in
@@ -2456,7 +2456,7 @@ let requested_levels ~default_level ctxt cycles levels =
 module Baking_rights = struct
   type t = {
     level : Raw_level.t;
-    delegate : Signature.Public_key_hash.t;
+    delegate : Tezos_crypto.Signature.Public_key_hash.t;
     round : Round.t;
     timestamp : Timestamp.t option;
   }
@@ -2470,7 +2470,7 @@ module Baking_rights = struct
         {level; delegate; round; timestamp})
       (obj4
          (req "level" Raw_level.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
          (req "round" Round.encoding)
          (opt "estimated_time" Timestamp.encoding))
 
@@ -2484,7 +2484,7 @@ module Baking_rights = struct
     type baking_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
-      delegates : Signature.Public_key_hash.t list;
+      delegates : Tezos_crypto.Signature.Public_key_hash.t list;
       max_round : int option;
       all : bool;
     }
@@ -2559,12 +2559,16 @@ module Baking_rights = struct
     @@ List.fold_left
          (fun (acc, previous) r ->
            if
-             Signature.Public_key_hash.Set.exists
-               (Signature.Public_key_hash.equal r.delegate)
+             Tezos_crypto.Signature.Public_key_hash.Set.exists
+               (Tezos_crypto.Signature.Public_key_hash.equal r.delegate)
                previous
            then (acc, previous)
-           else (r :: acc, Signature.Public_key_hash.Set.add r.delegate previous))
-         ([], Signature.Public_key_hash.Set.empty)
+           else
+             ( r :: acc,
+               Tezos_crypto.Signature.Public_key_hash.Set.add
+                 r.delegate
+                 previous ))
+         ([], Tezos_crypto.Signature.Public_key_hash.Set.empty)
          rights
 
   let register () =
@@ -2598,7 +2602,9 @@ module Baking_rights = struct
         | [] -> rights
         | _ :: _ as delegates ->
             let is_requested p =
-              List.exists (Signature.Public_key_hash.equal p.delegate) delegates
+              List.exists
+                (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
+                delegates
             in
             List.filter is_requested rights)
 
@@ -2614,7 +2620,7 @@ end
 
 module Endorsing_rights = struct
   type delegate_rights = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Tezos_crypto.Signature.Public_key_hash.t;
     first_slot : Slot.t;
     endorsing_power : int;
   }
@@ -2633,7 +2639,7 @@ module Endorsing_rights = struct
       (fun (delegate, first_slot, endorsing_power) ->
         {delegate; first_slot; endorsing_power})
       (obj3
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
          (req "endorsing_power" uint16))
 
@@ -2657,7 +2663,7 @@ module Endorsing_rights = struct
     type endorsing_rights_query = {
       levels : Raw_level.t list;
       cycle : Cycle.t option;
-      delegates : Signature.Public_key_hash.t list;
+      delegates : Tezos_crypto.Signature.Public_key_hash.t list;
     }
 
     let endorsing_rights_query =
@@ -2734,7 +2740,7 @@ module Endorsing_rights = struct
               (fun rights_at_level ->
                 let is_requested p =
                   List.exists
-                    (Signature.Public_key_hash.equal p.delegate)
+                    (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
                     delegates
                 in
                 match
@@ -2757,7 +2763,7 @@ end
 module Validators = struct
   type t = {
     level : Raw_level.t;
-    delegate : Signature.Public_key_hash.t;
+    delegate : Tezos_crypto.Signature.Public_key_hash.t;
     slots : Slot.t list;
   }
 
@@ -2768,7 +2774,7 @@ module Validators = struct
       (fun (level, delegate, slots) -> {level; delegate; slots})
       (obj3
          (req "level" Raw_level.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
          (req "slots" (list Slot.encoding)))
 
   module S = struct
@@ -2778,7 +2784,7 @@ module Validators = struct
 
     type validators_query = {
       levels : Raw_level.t list;
-      delegates : Signature.Public_key_hash.t list;
+      delegates : Tezos_crypto.Signature.Public_key_hash.t list;
     }
 
     let validators_query =
@@ -2827,7 +2833,9 @@ module Validators = struct
         | [] -> rights
         | _ :: _ as delegates ->
             let is_requested p =
-              List.exists (Signature.Public_key_hash.equal p.delegate) delegates
+              List.exists
+                (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
+                delegates
             in
             List.filter is_requested rights)
 

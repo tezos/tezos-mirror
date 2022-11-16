@@ -18,5 +18,4 @@
  (flags
   (:standard)
   -open Tezos_error_monad.TzLwtreslib
-  -open Tezos_crypto
   -open Data_encoding))

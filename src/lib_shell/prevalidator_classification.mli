@@ -48,20 +48,21 @@ type 'protocol_data bounded_map
 (** [map bounded_map] gets the underling map of the [bounded_map]. *)
 val map :
   'protocol_data bounded_map ->
-  ('protocol_data Prevalidation.operation * tztrace) Operation_hash.Map.t
+  ('protocol_data Prevalidation.operation * tztrace)
+  Tezos_crypto.Operation_hash.Map.t
 
 (** [cardinal bounded_map] gets the cardinal of the underling map of the [bounded_map] *)
 val cardinal : 'protocol_data bounded_map -> int
 
 type parameters = {
   map_size_limit : int;
-  on_discarded_operation : Operation_hash.t -> unit;
+  on_discarded_operation : Tezos_crypto.Operation_hash.t -> unit;
 }
 
 module Sized_map :
   Tezos_base.Sized.SizedMap
-    with type 'a map := 'a Operation_hash.Map.t
-     and type key = Operation_hash.t
+    with type 'a map := 'a Tezos_crypto.Operation_hash.Map.t
+     and type key = Tezos_crypto.Operation_hash.t
 
 (** Invariants ensured by this module, provided that the caller does
     not {!add} an operation which is already present in [t]:
@@ -93,10 +94,10 @@ type 'protocol_data t = private {
   branch_delayed : 'protocol_data bounded_map;
   mutable applied_rev : 'protocol_data Prevalidation.operation list;
   mutable prechecked : 'protocol_data Prevalidation.operation Sized_map.t;
-  mutable unparsable : Operation_hash.Set.t;
+  mutable unparsable : Tezos_crypto.Operation_hash.Set.t;
   mutable in_mempool :
     ('protocol_data Prevalidation.operation * classification)
-    Operation_hash.Map.t;
+    Tezos_crypto.Operation_hash.Map.t;
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold
@@ -115,14 +116,15 @@ val is_empty : 'protocol_data t -> bool
     in field [in_mempool] of [classes]. It returns the corresponding
     operation and its classification if present, and None otherwise. *)
 val is_in_mempool :
-  Operation_hash.t ->
+  Tezos_crypto.Operation_hash.t ->
   'protocol_data t ->
   ('protocol_data Prevalidation.operation * classification) option
 
 (** [is_known_unparsable oph] returns [true] if the [oph] is
    associated to an operation which is known to be unparsable. [false]
    otherwise. *)
-val is_known_unparsable : Operation_hash.t -> 'protocol_data t -> bool
+val is_known_unparsable :
+  Tezos_crypto.Operation_hash.t -> 'protocol_data t -> bool
 
 (** [remove oph classes] removes operation of hash [oph] from all
     fields of [classes]. If the [oph] was classified as [Applied], the
@@ -138,7 +140,7 @@ val is_known_unparsable : Operation_hash.t -> 'protocol_data t -> bool
     this may invalidate the classification of all the other operations.
     It is left to the caller to restore a consistent state. *)
 val remove :
-  Operation_hash.t ->
+  Tezos_crypto.Operation_hash.t ->
   'protocol_data t ->
   ('protocol_data Prevalidation.operation * classification) option
 
@@ -177,14 +179,14 @@ val add :
    operation. [unparsable] operations are removed automatically by the
    [recycle_operations] function. [on_discard_operation] is also
    called on those operations. *)
-val add_unparsable : Operation_hash.t -> 'protocol_data t -> unit
+val add_unparsable : Tezos_crypto.Operation_hash.t -> 'protocol_data t -> unit
 
 (** Functions to query data on a polymorphic block-like type ['block]. *)
 type 'block block_tools = {
-  hash : 'block -> Block_hash.t;  (** The hash of a block *)
+  hash : 'block -> Tezos_crypto.Block_hash.t;  (** The hash of a block *)
   operations : 'block -> Operation.t list list;
       (** The list of operations of a block ordered by their validation pass *)
-  all_operation_hashes : 'block -> Operation_hash.t list list;
+  all_operation_hashes : 'block -> Tezos_crypto.Operation_hash.t list list;
       (** The list of hashes of operations of a block ordered by their
       validation pass. Could be implemented
       using {!operations} but this lets an alternative implementation
@@ -194,9 +196,9 @@ type 'block block_tools = {
 (** A wrapper over chain-related modules, to make client code easier to
     emulate, and hence to test *)
 type 'block chain_tools = {
-  clear_or_cancel : Operation_hash.t -> unit;
+  clear_or_cancel : Tezos_crypto.Operation_hash.t -> unit;
       (** Removes the operation from the distributed database. *)
-  inject_operation : Operation_hash.t -> Operation.t -> unit Lwt.t;
+  inject_operation : Tezos_crypto.Operation_hash.t -> Operation.t -> unit Lwt.t;
       (** Puts the operation in the distributed database. Returns [false] if
       the [hash] is already in the distributed database *)
   new_blocks :
@@ -233,17 +235,18 @@ type 'block chain_tools = {
 val recycle_operations :
   from_branch:'block ->
   to_branch:'block ->
-  live_blocks:Block_hash.Set.t ->
+  live_blocks:Tezos_crypto.Block_hash.Set.t ->
   classes:'protocol_data t ->
   parse:
-    (Operation_hash.t ->
+    (Tezos_crypto.Operation_hash.t ->
     Operation.t ->
     'protocol_data Prevalidation.operation option) ->
-  pending:'protocol_data Prevalidation.operation Operation_hash.Map.t ->
+  pending:
+    'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t ->
   block_store:'block block_tools ->
   chain:'block chain_tools ->
   handle_branch_refused:bool ->
-  'protocol_data Prevalidation.operation Operation_hash.Map.t Lwt.t
+  'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t Lwt.t
 
 (**/**)
 
@@ -257,7 +260,8 @@ module Internal_for_tests : sig
   val copy : 'protocol_data t -> 'protocol_data t
 
   (** [set_of_bounded_map m] returns all the operation hashes in [m]. *)
-  val set_of_bounded_map : 'protocol_data bounded_map -> Operation_hash.Set.t
+  val set_of_bounded_map :
+    'protocol_data bounded_map -> Tezos_crypto.Operation_hash.Set.t
 
   (** [pp_t_sizes t] prints the [map_size_limit] parameter of [t]
       and the sizes of its fields (number of elements in the map and
@@ -276,7 +280,7 @@ module Internal_for_tests : sig
     refused:bool ->
     outdated:bool ->
     'protocol_data t ->
-    'protocol_data Prevalidation.operation Operation_hash.Map.t
+    'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t
 
   (** [flush classes ~handle_branch_refused] partially resets [classes]:
       - fields [applied_rev], [branch_delayed] and [unparsable] are emptied;
@@ -322,11 +326,12 @@ module Internal_for_tests : sig
     chain:'block chain_tools ->
     from_branch:'block ->
     to_branch:'block ->
-    is_branch_alive:(Block_hash.t -> bool) ->
+    is_branch_alive:(Tezos_crypto.Block_hash.t -> bool) ->
     parse:
-      (Operation_hash.t ->
+      (Tezos_crypto.Operation_hash.t ->
       Operation.t ->
       'protocol_data Prevalidation.operation option) ->
-    'protocol_data Prevalidation.operation Operation_hash.Map.t ->
-    'protocol_data Prevalidation.operation Operation_hash.Map.t Lwt.t
+    'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t ->
+    'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t
+    Lwt.t
 end

@@ -24,7 +24,9 @@
 (*****************************************************************************)
 
 module Request = struct
-  type view = New_head of Block_hash.t | New_branch of Block_hash.t * int
+  type view =
+    | New_head of Tezos_crypto.Block_hash.t
+    | New_branch of Tezos_crypto.Block_hash.t * int
 
   let encoding =
     let open Data_encoding in
@@ -35,7 +37,7 @@ module Request = struct
           ~title:"New_head"
           (obj2
              (req "request" (constant "new_head"))
-             (req "block" Block_hash.encoding))
+             (req "block" Tezos_crypto.Block_hash.encoding))
           (function New_head h -> Some ((), h) | _ -> None)
           (fun ((), h) -> New_head h);
         case
@@ -43,19 +45,20 @@ module Request = struct
           ~title:"New_branch"
           (obj3
              (req "request" (constant "new_branch"))
-             (req "block" Block_hash.encoding)
+             (req "block" Tezos_crypto.Block_hash.encoding)
              (req "locators" int31))
           (function New_branch (h, l) -> Some ((), h, l) | _ -> None)
           (fun ((), h, l) -> New_branch (h, l));
       ]
 
   let pp ppf = function
-    | New_head hash -> Format.fprintf ppf "New head %a" Block_hash.pp hash
+    | New_head hash ->
+        Format.fprintf ppf "New head %a" Tezos_crypto.Block_hash.pp hash
     | New_branch (hash, len) ->
         Format.fprintf
           ppf
           "New branch %a, locator length %d"
-          Block_hash.pp
+          Tezos_crypto.Block_hash.pp
           hash
           len
 end

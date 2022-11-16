@@ -39,8 +39,8 @@ module Event = struct
           | None -> ()
           | Some alias -> Format.fprintf fmt "%s: " alias)
       ("alias", Data_encoding.(option string))
-      ~pp2:Block_hash.pp
-      ("hash", Block_hash.encoding)
+      ~pp2:Tezos_crypto.Block_hash.pp
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ~pp3:(fun fmt level -> Format.fprintf fmt "%ld" level)
       ("level", Data_encoding.int32)
 
@@ -61,10 +61,10 @@ module Event = struct
         "inconsistent context hash - expected: {expected}, replay result: \
          {replay_result}"
       ~level:Error
-      ~pp1:Context_hash.pp
-      ("expected", Context_hash.encoding)
-      ~pp2:Context_hash.pp
-      ("replay_result", Context_hash.encoding)
+      ~pp1:Tezos_crypto.Context_hash.pp
+      ("expected", Tezos_crypto.Context_hash.encoding)
+      ~pp2:Tezos_crypto.Context_hash.pp
+      ("replay_result", Tezos_crypto.Context_hash.encoding)
 
   let pp_json ppf json =
     Format.fprintf
@@ -117,8 +117,8 @@ module Event = struct
         "unexpected receipts layout for block {hash} - expected: {expected}, \
          replay result: {replay_result}"
       ~level:Error
-      ~pp1:Block_hash.pp
-      ("hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ~pp2:pp_list_lengths
       ("expected", Data_encoding.(list int31))
       ~pp3:pp_list_lengths
@@ -254,7 +254,7 @@ let replay_one_block strict main_chain_store validator_process block =
     let* () =
       when_
         (not
-           (Context_hash.equal
+           (Tezos_crypto.Context_hash.equal
               expected_context_hash
               result.validation_store.context_hash))
         (fun () ->

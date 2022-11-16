@@ -54,7 +54,7 @@ let dummy_map =
 let dummy_timestamp = Script_timestamp.of_zint (Z.of_int 42)
 
 let dummy_pk =
-  Signature.Public_key.of_b58check_exn
+  Tezos_crypto.Signature.Public_key.of_b58check_exn
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU"
 
 let dummy_bytes = Bytes.of_string "dummy"

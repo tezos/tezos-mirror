@@ -36,7 +36,7 @@ type config = {
   peers_file : string;
   private_mode : bool;
   identity : P2p_identity.t;
-  proof_of_work_target : Crypto_box.pow_target;
+  proof_of_work_target : Tezos_crypto.Crypto_box.pow_target;
   trust_discovered_peers : bool;
   reconnection_config : Point_reconnection_config.t;
 }

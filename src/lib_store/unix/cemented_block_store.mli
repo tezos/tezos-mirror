@@ -176,17 +176,17 @@ val find_block_file : t -> int32 -> cemented_blocks_file option
 
 (** [is_cemented cemented_store block_hash] checks if the [block_hash]
     is stored in the [cemented_store]. *)
-val is_cemented : t -> Block_hash.t -> bool
+val is_cemented : t -> Tezos_crypto.Block_hash.t -> bool
 
 (** [get_cemented_block_level cemented_store block_hash] returns the
     level of the [block_hash] if present in [cemented_store]. Returns
     [None] otherwise. *)
-val get_cemented_block_level : t -> Block_hash.t -> int32 option
+val get_cemented_block_level : t -> Tezos_crypto.Block_hash.t -> int32 option
 
 (** [get_cemented_block_hash cemented_store block_level] returns the
     hash of the block at [block_level] if present in
     [cemented_store]. Returns [None] otherwise. *)
-val get_cemented_block_hash : t -> int32 -> Block_hash.t option
+val get_cemented_block_hash : t -> int32 -> Tezos_crypto.Block_hash.t option
 
 (** [read_block_metadata cemented_store block_level] returns the
     metadata of the block at [block_level] if present in
@@ -227,14 +227,15 @@ val get_cemented_block_by_level :
 val get_cemented_block_by_hash :
   read_metadata:bool ->
   t ->
-  Block_hash.t ->
+  Tezos_crypto.Block_hash.t ->
   Block_repr.block option tzresult Lwt.t
 
 (** The type used to describe reading sequences used to perform
     buffered block cementing. *)
 type chunk_iterator = {
   chunk_length : int;
-  reading_sequence : (Block_hash.t * int * bytes) tzresult Lwt.t Seq.t;
+  reading_sequence :
+    (Tezos_crypto.Block_hash.t * int * bytes) tzresult Lwt.t Seq.t;
 }
 
 (** [make_chunk_iterator bl] is an utility function that transforms a
@@ -295,6 +296,6 @@ val raw_iter_cemented_file :
     snapshot imports. *)
 val check_indexes_consistency :
   ?post_step:(unit -> unit Lwt.t) ->
-  ?genesis_hash:Block_hash.t ->
+  ?genesis_hash:Tezos_crypto.Block_hash.t ->
   t ->
   unit tzresult Lwt.t

@@ -64,4 +64,4 @@ val commitment_parent_is_not_lcc :
 (** [compute_commitment hash level] emits the event that a new commitment is
     being computed and stored for the block of the given [hash] and at the given
     [level]. *)
-val compute_commitment : Block_hash.t -> Raw_level.t -> unit Lwt.t
+val compute_commitment : Tezos_crypto.Block_hash.t -> Raw_level.t -> unit Lwt.t

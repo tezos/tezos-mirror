@@ -56,7 +56,7 @@ type t = {
   nonce : nonce_config;
   validation : validation_config;
   retries_on_failure : int;
-  user_activated_upgrades : (int32 * Protocol_hash.t) list;
+  user_activated_upgrades : (int32 * Tezos_crypto.Protocol_hash.t) list;
   liquidity_baking_toggle_vote :
     Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote;
   per_block_vote_file : string option;
@@ -73,7 +73,8 @@ val default_nonce_config : nonce_config
 
 val default_retries_on_failure_config : int
 
-val default_user_activated_upgrades : (int32 * Protocol_hash.t) list
+val default_user_activated_upgrades :
+  (int32 * Tezos_crypto.Protocol_hash.t) list
 
 val default_liquidity_baking_toggle_vote :
   Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote
@@ -95,7 +96,7 @@ val make :
   ?nonce:nonce_config ->
   ?context_path:string ->
   ?retries_on_failure:int ->
-  ?user_activated_upgrades:(int32 * Protocol_hash.t) list ->
+  ?user_activated_upgrades:(int32 * Tezos_crypto.Protocol_hash.t) list ->
   ?liquidity_baking_toggle_vote:
     Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote ->
   ?per_block_vote_file:string ->
@@ -114,7 +115,7 @@ val nonce_config_encoding : nonce_config Data_encoding.t
 val retries_on_failure_config_encoding : int Data_encoding.t
 
 val user_activate_upgrades_config_encoding :
-  (int32 * Protocol_hash.t) list Data_encoding.t
+  (int32 * Tezos_crypto.Protocol_hash.t) list Data_encoding.t
 
 val liquidity_baking_toggle_vote_config_encoding :
   Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote

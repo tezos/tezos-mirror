@@ -46,9 +46,9 @@ include
       let path = ["dal"; "slot_headers"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type key = int

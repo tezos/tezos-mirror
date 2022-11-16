@@ -251,7 +251,7 @@ module Term = struct
             let* block =
               match block with
               | Some s -> (
-                  match Block_hash.of_b58check_opt s with
+                  match Tezos_crypto.Block_hash.of_b58check_opt s with
                   | Some bh -> return_some bh
                   | None -> failwith "%s is not a valid block identifier." s)
               | None -> return_none

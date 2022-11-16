@@ -138,6 +138,6 @@ module Event = struct
       ~level:Notice
       ~name:"validate_protocol_sources"
       ~msg:"validating protocol {hash} against sources"
-      ~pp1:Protocol_hash.pp
-      ("hash", Protocol_hash.encoding)
+      ~pp1:Tezos_crypto.Protocol_hash.pp
+      ("hash", Tezos_crypto.Protocol_hash.encoding)
 end

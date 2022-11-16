@@ -43,22 +43,22 @@ module type PROTOCOL = sig
       context ->
       order:[`Sorted | `Undefined] ->
       init:'a ->
-      f:(Signature.public_key_hash -> 'a -> 'a Lwt.t) ->
+      f:(Tezos_crypto.Signature.public_key_hash -> 'a -> 'a Lwt.t) ->
       'a Lwt.t
 
     val pubkey :
       context ->
-      Signature.public_key_hash ->
-      Signature.public_key tzresult Lwt.t
+      Tezos_crypto.Signature.public_key_hash ->
+      Tezos_crypto.Signature.public_key tzresult Lwt.t
 
     val staking_balance :
-      context -> Signature.public_key_hash -> Tez.t tzresult Lwt.t
+      context -> Tezos_crypto.Signature.public_key_hash -> Tez.t tzresult Lwt.t
 
     val deactivated :
-      context -> Signature.public_key_hash -> bool tzresult Lwt.t
+      context -> Tezos_crypto.Signature.public_key_hash -> bool tzresult Lwt.t
   end
 
-  val hash : Protocol_hash.t
+  val hash : Tezos_crypto.Protocol_hash.t
 
   val prepare_context :
     Tezos_protocol_environment.Context.t ->

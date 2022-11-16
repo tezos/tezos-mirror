@@ -147,9 +147,9 @@ let conflicting_endorsements_tag =
         fprintf
           ppf
           "%a / %a"
-          Operation_hash.pp
+          Tezos_crypto.Operation_hash.pp
           (Operation.hash a)
-          Operation_hash.pp
+          Tezos_crypto.Operation_hash.pp
           (Operation.hash b))
 
 let conflicting_preendorsements_tag =
@@ -161,7 +161,7 @@ let conflicting_preendorsements_tag =
         fprintf
           ppf
           "%a / %a"
-          Operation_hash.pp
+          Tezos_crypto.Operation_hash.pp
           (Operation.hash a)
-          Operation_hash.pp
+          Tezos_crypto.Operation_hash.pp
           (Operation.hash b))

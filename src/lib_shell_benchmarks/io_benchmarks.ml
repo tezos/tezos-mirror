@@ -866,13 +866,13 @@ let () = Registration.register (module Irmin_pack_write_bench)
 
 module Read_random_key_bench : Benchmark.S = struct
   type config = {
-    existing_context : string * Context_hash.t;
+    existing_context : string * Tezos_crypto.Context_hash.t;
     subdirectory : string list;
   }
 
   let default_config =
     {
-      existing_context = ("/no/such/directory", Context_hash.zero);
+      existing_context = ("/no/such/directory", Tezos_crypto.Context_hash.zero);
       subdirectory = ["no"; "such"; "key"];
     }
 
@@ -882,7 +882,9 @@ module Read_random_key_bench : Benchmark.S = struct
       (fun {existing_context; subdirectory} -> (existing_context, subdirectory))
       (fun (existing_context, subdirectory) -> {existing_context; subdirectory})
       (obj2
-         (req "existing_context" (tup2 string Context_hash.encoding))
+         (req
+            "existing_context"
+            (tup2 string Tezos_crypto.Context_hash.encoding))
          (req "subdirectory" (list string)))
 
   let name = ns "READ_RANDOM_KEY"
@@ -974,7 +976,7 @@ module Write_random_keys_bench : Benchmark.S = struct
   open Base_samplers
 
   type config = {
-    existing_context : string * Context_hash.t;
+    existing_context : string * Tezos_crypto.Context_hash.t;
     storage_chunk_bytes : int;
     storage_chunks : range;
     max_written_keys : int;
@@ -984,7 +986,7 @@ module Write_random_keys_bench : Benchmark.S = struct
 
   let default_config =
     {
-      existing_context = ("/no/such/directory", Context_hash.zero);
+      existing_context = ("/no/such/directory", Tezos_crypto.Context_hash.zero);
       storage_chunk_bytes = 1000;
       storage_chunks = {min = 1; max = 1000};
       max_written_keys = 10_000;
@@ -1025,7 +1027,9 @@ module Write_random_keys_bench : Benchmark.S = struct
           subdirectory;
         })
       (obj6
-         (req "existing_context" (tup2 string Context_hash.encoding))
+         (req
+            "existing_context"
+            (tup2 string Tezos_crypto.Context_hash.encoding))
          (req "storage_chunk_bytes" int)
          (req "storage_chunks" range_encoding)
          (req "max_written_keys" int)

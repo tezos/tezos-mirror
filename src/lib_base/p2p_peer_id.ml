@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Crypto_box.Public_key_hash
+include Tezos_crypto.Crypto_box.Public_key_hash
 
 let rpc_arg =
   Tezos_rpc.Arg.like

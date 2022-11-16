@@ -169,7 +169,7 @@ module type TREE = sig
   val of_value : t -> value -> tree Lwt.t
 
   (** [hash t] is [t]'s Merkle hash. *)
-  val hash : tree -> Context_hash.t
+  val hash : tree -> Tezos_crypto.Context_hash.t
 
   (** [equal x y] is true iff [x] and [y] have the same Merkle hash. *)
   val equal : tree -> tree -> bool
@@ -186,9 +186,9 @@ module type HASH_VERSION = sig
   (** The type for context views. *)
   type t
 
-  val get_hash_version : t -> Context_hash.Version.t
+  val get_hash_version : t -> Tezos_crypto.Context_hash.Version.t
 
-  val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t
+  val set_hash_version : t -> Tezos_crypto.Context_hash.Version.t -> t Lwt.t
 end
 
 (** Tezos-specific proof types, as opposed to proofs provided by Irmin.
@@ -263,7 +263,7 @@ module Proof_types = struct
   type index = int
 
   (** The type for hashes. *)
-  type hash = Context_hash.t
+  type hash = Tezos_crypto.Context_hash.t
 
   (** The type for (internal) inode proofs.
 
@@ -676,9 +676,11 @@ module type TEZOS_CONTEXT = sig
   (** Close the index. Does not fail when the context is already closed. *)
   val close : index -> unit Lwt.t
 
-  val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
+  val compute_testchain_chain_id :
+    Tezos_crypto.Block_hash.t -> Tezos_crypto.Chain_id.t
 
-  val compute_testchain_genesis : Block_hash.t -> Block_hash.t
+  val compute_testchain_genesis :
+    Tezos_crypto.Block_hash.t -> Tezos_crypto.Block_hash.t
 
   (** Build an empty context from an index. The resulting context should not
       be committed. *)
@@ -689,10 +691,10 @@ module type TEZOS_CONTEXT = sig
 
   val commit_genesis :
     index ->
-    chain_id:Chain_id.t ->
+    chain_id:Tezos_crypto.Chain_id.t ->
     time:Time.Protocol.t ->
-    protocol:Protocol_hash.t ->
-    Context_hash.t tzresult Lwt.t
+    protocol:Tezos_crypto.Protocol_hash.t ->
+    Tezos_crypto.Context_hash.t tzresult Lwt.t
 
   val commit_test_chain_genesis :
     context -> Block_header.t -> Block_header.t Lwt.t
@@ -723,22 +725,26 @@ module type TEZOS_CONTEXT = sig
 
   (** {2 Accessing and Updating Versions} *)
 
-  val exists : index -> Context_hash.t -> bool Lwt.t
+  val exists : index -> Tezos_crypto.Context_hash.t -> bool Lwt.t
 
-  val checkout : index -> Context_hash.t -> context option Lwt.t
+  val checkout : index -> Tezos_crypto.Context_hash.t -> context option Lwt.t
 
-  val checkout_exn : index -> Context_hash.t -> context Lwt.t
+  val checkout_exn : index -> Tezos_crypto.Context_hash.t -> context Lwt.t
 
-  val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
+  val hash :
+    time:Time.Protocol.t -> ?message:string -> t -> Tezos_crypto.Context_hash.t
 
   val commit :
-    time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
+    time:Time.Protocol.t ->
+    ?message:string ->
+    context ->
+    Tezos_crypto.Context_hash.t Lwt.t
 
   (** [gc t h] removes from disk all the data older than the commit
     [hash]. Every operations working on checkouts greater or equal to
     [h] will continue to work. Calling [checkout h'] on GC-ed commits
     will return [None]. *)
-  val gc : index -> Context_hash.t -> unit Lwt.t
+  val gc : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
 
   (** Sync the context with disk. Only useful for read-only instances.
       Does not fail when the context is not in read-only mode. *)
@@ -750,26 +756,30 @@ module type TEZOS_CONTEXT = sig
      strategy mode "always", which is not suitable for GC.*)
   val is_gc_allowed : index -> bool
 
-  val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
+  val set_head :
+    index ->
+    Tezos_crypto.Chain_id.t ->
+    Tezos_crypto.Context_hash.t ->
+    unit Lwt.t
 
-  val set_master : index -> Context_hash.t -> unit Lwt.t
+  val set_master : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
 
   (** {2 Hash version} *)
 
   (** Get the hash version used for the context *)
-  val get_hash_version : context -> Context_hash.Version.t
+  val get_hash_version : context -> Tezos_crypto.Context_hash.Version.t
 
   (** Set the hash version used for the context.  It may recalculate the hashes
     of the whole context, which can be a long process.
     Returns an [Error] if the hash version is unsupported. *)
   val set_hash_version :
-    context -> Context_hash.Version.t -> context tzresult Lwt.t
+    context -> Tezos_crypto.Context_hash.Version.t -> context tzresult Lwt.t
 
   (** {2 Predefined Fields} *)
 
-  val get_protocol : context -> Protocol_hash.t Lwt.t
+  val get_protocol : context -> Tezos_crypto.Protocol_hash.t Lwt.t
 
-  val add_protocol : context -> Protocol_hash.t -> context Lwt.t
+  val add_protocol : context -> Tezos_crypto.Protocol_hash.t -> context Lwt.t
 
   val get_test_chain : context -> Test_chain_status.t Lwt.t
 
@@ -779,50 +789,51 @@ module type TEZOS_CONTEXT = sig
 
   val fork_test_chain :
     context ->
-    protocol:Protocol_hash.t ->
+    protocol:Tezos_crypto.Protocol_hash.t ->
     expiration:Time.Protocol.t ->
     context Lwt.t
 
-  val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
+  val clear_test_chain : index -> Tezos_crypto.Chain_id.t -> unit Lwt.t
 
   val find_predecessor_block_metadata_hash :
-    context -> Block_metadata_hash.t option Lwt.t
+    context -> Tezos_crypto.Block_metadata_hash.t option Lwt.t
 
   val add_predecessor_block_metadata_hash :
-    context -> Block_metadata_hash.t -> context Lwt.t
+    context -> Tezos_crypto.Block_metadata_hash.t -> context Lwt.t
 
   val find_predecessor_ops_metadata_hash :
-    context -> Operation_metadata_list_list_hash.t option Lwt.t
+    context -> Tezos_crypto.Operation_metadata_list_list_hash.t option Lwt.t
 
   val add_predecessor_ops_metadata_hash :
-    context -> Operation_metadata_list_list_hash.t -> context Lwt.t
+    context -> Tezos_crypto.Operation_metadata_list_list_hash.t -> context Lwt.t
 
   val retrieve_commit_info :
     index ->
     Block_header.t ->
-    (Protocol_hash.t
+    (Tezos_crypto.Protocol_hash.t
     * string
     * string
     * Time.Protocol.t
     * Test_chain_status.t
-    * Context_hash.t
-    * Block_metadata_hash.t option
-    * Operation_metadata_list_list_hash.t option
-    * Context_hash.t list)
+    * Tezos_crypto.Context_hash.t
+    * Tezos_crypto.Block_metadata_hash.t option
+    * Tezos_crypto.Operation_metadata_list_list_hash.t option
+    * Tezos_crypto.Context_hash.t list)
     tzresult
     Lwt.t
 
   val check_protocol_commit_consistency :
-    expected_context_hash:Context_hash.t ->
-    given_protocol_hash:Protocol_hash.t ->
+    expected_context_hash:Tezos_crypto.Context_hash.t ->
+    given_protocol_hash:Tezos_crypto.Protocol_hash.t ->
     author:string ->
     message:string ->
     timestamp:Time.Protocol.t ->
     test_chain_status:Test_chain_status.t ->
-    predecessor_block_metadata_hash:Block_metadata_hash.t option ->
-    predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
-    data_merkle_root:Context_hash.t ->
-    parents_contexts:Context_hash.t list ->
+    predecessor_block_metadata_hash:Tezos_crypto.Block_metadata_hash.t option ->
+    predecessor_ops_metadata_hash:
+      Tezos_crypto.Operation_metadata_list_list_hash.t option ->
+    data_merkle_root:Tezos_crypto.Context_hash.t ->
+    parents_contexts:Tezos_crypto.Context_hash.t list ->
     bool Lwt.t
 end
 

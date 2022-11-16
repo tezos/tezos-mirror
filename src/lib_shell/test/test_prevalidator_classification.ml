@@ -54,11 +54,11 @@ module Operation_map = struct
            Format.fprintf
              ppf
              "(%a: (%a, <tztrace>))"
-             Operation_hash.pp
+             Tezos_crypto.Operation_hash.pp
              oph
              Operation.pp
              op.Prevalidation.raw))
-      (Operation_hash.Map.bindings map)
+      (Tezos_crypto.Operation_hash.Map.bindings map)
 
   let pp ppf map =
     Format.fprintf
@@ -68,22 +68,23 @@ module Operation_map = struct
            Format.fprintf
              ppf
              "(%a: %a)"
-             Operation_hash.pp
+             Tezos_crypto.Operation_hash.pp
              oph
              Operation.pp
              op.Prevalidation.raw))
-      (Operation_hash.Map.bindings map)
+      (Tezos_crypto.Operation_hash.Map.bindings map)
 
   (* Uses polymorphic equality on tztraces! *)
   let eq =
-    Operation_hash.Map.equal (fun (o1, t1) (o2, t2) ->
-        Operation_hash.equal o1.Prevalidation.hash o2.hash && t1 = t2)
+    Tezos_crypto.Operation_hash.Map.equal (fun (o1, t1) (o2, t2) ->
+        Tezos_crypto.Operation_hash.equal o1.Prevalidation.hash o2.hash
+        && t1 = t2)
 end
 
 type classification_event =
   | Add_if_not_present of
       Classification.classification * unit Prevalidation.operation
-  | Remove of Operation_hash.t
+  | Remove of Tezos_crypto.Operation_hash.t
   | Flush of bool
 
 let drop oph t =
@@ -166,7 +167,8 @@ let qcheck_eq_false ~actual =
 
 let qcheck_bounded_map_is_empty bounded_map =
   let actual =
-    bounded_map |> Classification.map |> Operation_hash.Map.is_empty
+    bounded_map |> Classification.map
+    |> Tezos_crypto.Operation_hash.Map.is_empty
   in
   qcheck_eq_true ~actual
 
@@ -175,21 +177,21 @@ let qcheck_bounded_map_is_empty bounded_map =
     that these fields are disjoint. *)
 let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let ( +> ) acc next_set =
-    if not (Operation_hash.Set.disjoint acc next_set) then
+    if not (Tezos_crypto.Operation_hash.Set.disjoint acc next_set) then
       QCheck2.Test.fail_reportf
         "Invariant 'The fields: [refused; outdated; branch_refused; \
          branch_delayed; applied] are disjoint' broken by t =@.%a@.%s"
         Classification.Internal_for_tests.pp
         t
         (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
-    Operation_hash.Set.union acc next_set
+    Tezos_crypto.Operation_hash.Set.union acc next_set
   in
   let to_set = Classification.Internal_for_tests.set_of_bounded_map in
   to_set t.refused +> to_set t.outdated +> to_set t.branch_refused
   +> to_set t.branch_delayed
   +> (Classification.Sized_map.to_seq t.prechecked
-     |> Seq.map fst |> Operation_hash.Set.of_seq)
-  +> (Operation_hash.Set.of_list
+     |> Seq.map fst |> Tezos_crypto.Operation_hash.Set.of_seq)
+  +> (Tezos_crypto.Operation_hash.Set.of_list
      @@ List.rev_map (fun op -> op.Prevalidation.hash) t.applied_rev)
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
@@ -207,17 +209,28 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
     of breaking this using [Tezt]. *)
 let check_invariants ?fail_msg (t : unit Classification.t) =
   let to_set map =
-    Operation_hash.Map.to_seq map |> Seq.map fst |> Operation_hash.Set.of_seq
+    Tezos_crypto.Operation_hash.Map.to_seq map
+    |> Seq.map fst |> Tezos_crypto.Operation_hash.Set.of_seq
   in
   let expected_in_mempool = disjoint_union_classified_fields ?fail_msg t in
   let mempool_as_set = to_set t.in_mempool in
-  if not (Operation_hash.Set.equal expected_in_mempool mempool_as_set) then
+  if
+    not
+      (Tezos_crypto.Operation_hash.Set.equal expected_in_mempool mempool_as_set)
+  then
     let set_pp ppf set =
-      set |> Operation_hash.Set.elements
-      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+      set |> Tezos_crypto.Operation_hash.Set.elements
+      |> Format.fprintf
+           ppf
+           "%a"
+           (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
     in
-    let set1 = Operation_hash.Set.diff expected_in_mempool mempool_as_set in
-    let set2 = Operation_hash.Set.diff mempool_as_set expected_in_mempool in
+    let set1 =
+      Tezos_crypto.Operation_hash.Set.diff expected_in_mempool mempool_as_set
+    in
+    let set2 =
+      Tezos_crypto.Operation_hash.Set.diff mempool_as_set expected_in_mempool
+    in
     let sets_report =
       Format.asprintf
         "In individual fields but not in [in_mempool]:\n\
@@ -260,9 +273,10 @@ let event_pp pp = function
         "Add_if_not_present %a %a"
         classification_pp
         classification
-        Operation_hash.pp
+        Tezos_crypto.Operation_hash.pp
         op.Prevalidation.hash
-  | Remove oph -> Format.fprintf pp "Remove %a" Operation_hash.pp oph
+  | Remove oph ->
+      Format.fprintf pp "Remove %a" Tezos_crypto.Operation_hash.pp oph
   | Flush handle_branch_refused ->
       Format.fprintf pp "Flush ~handle_branch_refused:%b" handle_branch_refused
 
@@ -438,7 +452,7 @@ module Bounded = struct
     let binding_pp ppf bindings =
       bindings
       |> List.map (fun value -> value.Prevalidation.hash)
-      |> Format.pp_print_list Operation_hash.pp ppf
+      |> Format.pp_print_list Tezos_crypto.Operation_hash.pp ppf
     in
     Format.asprintf
       "Prevalidator_classification.t:@.%a@.Classification:@.%s@.First \
@@ -451,7 +465,8 @@ module Bounded = struct
       binding_pp
       other_bindings
 
-  let custom_gen (discarded_operations_rev : Operation_hash.t list ref) :
+  let custom_gen
+      (discarded_operations_rev : Tezos_crypto.Operation_hash.t list ref) :
       custom QCheck2.Gen.t =
     let open QCheck2.Gen in
     let* map_size_limit = 1 -- 20 in
@@ -488,10 +503,13 @@ module Bounded = struct
       not
         (List.for_all
            (fun excess_hash ->
-             List.mem ~equal:Operation_hash.equal excess_hash discarded_hashes)
+             List.mem
+               ~equal:Tezos_crypto.Operation_hash.equal
+               excess_hash
+               discarded_hashes)
            excess_hashes)
     then
-      let hashes_pp = Format.pp_print_list Operation_hash.pp in
+      let hashes_pp = Format.pp_print_list Tezos_crypto.Operation_hash.pp in
       QCheck2.Test.fail_reportf
         "Expected all excess hashes to have been discarded but it was \
          not.@.Excess hashes:@.%a@.Discarded hashes:@.%a"
@@ -503,7 +521,8 @@ module Bounded = struct
   let check_map_is_full ~expected_size ~bounded_map =
     if
       Compare.List_length_with.(
-        Operation_hash.Map.bindings (Classification.map bounded_map)
+        Tezos_crypto.Operation_hash.Map.bindings
+          (Classification.map bounded_map)
         <> expected_size)
     then
       QCheck2.Test.fail_reportf
@@ -511,7 +530,8 @@ module Bounded = struct
          %i.@.Bounded_map content:@.%a"
         expected_size
         (List.length
-           (Operation_hash.Map.bindings (Classification.map bounded_map)))
+           (Tezos_crypto.Operation_hash.Map.bindings
+              (Classification.map bounded_map)))
         Classification.Internal_for_tests.bounded_map_pp
         bounded_map
 
@@ -529,10 +549,10 @@ module Bounded = struct
     let hashes =
       first_ops @ other_ops |> List.map (fun op -> op.Prevalidation.hash)
     in
-    let unique_hashes = Operation_hash.Set.of_list hashes in
+    let unique_hashes = Tezos_crypto.Operation_hash.Set.of_list hashes in
     QCheck2.assume
       Compare.List_length_with.(
-        hashes = Operation_hash.Set.cardinal unique_hashes) ;
+        hashes = Tezos_crypto.Operation_hash.Set.cardinal unique_hashes) ;
     (* Remove all operations for the tested classification *)
     let bounded_map =
       match error_classification with
@@ -542,7 +562,7 @@ module Bounded = struct
       | `Outdated _ -> t.outdated
     in
     let () =
-      Operation_hash.Map.iter
+      Tezos_crypto.Operation_hash.Map.iter
         (fun oph _op -> drop oph t)
         (Classification.map bounded_map)
     in
@@ -565,13 +585,15 @@ end
 module To_map = struct
   let map_pp fmt x =
     let map_to_list m =
-      Operation_hash.Map.to_seq m |> Seq.map (fun (_, op) -> op) |> List.of_seq
+      Tezos_crypto.Operation_hash.Map.to_seq m
+      |> Seq.map (fun (_, op) -> op)
+      |> List.of_seq
     in
     let pp_pair fmt op =
       Format.fprintf
         fmt
         "%a:%a"
-        Operation_hash.pp
+        Tezos_crypto.Operation_hash.pp
         op.Prevalidation.hash
         Operation.pp
         op.raw
@@ -579,7 +601,7 @@ module To_map = struct
     Format.fprintf fmt "%a" (Format.pp_print_list pp_pair) (map_to_list x)
 
   let map_eq =
-    Operation_hash.Map.equal (fun op1 op2 ->
+    Tezos_crypto.Operation_hash.Map.equal (fun op1 op2 ->
         Operation.equal op1.Prevalidation.raw op2.raw)
 
   (** [remove_all m1 m2] returns the subset of [m1] thas is not within [m2].
@@ -587,11 +609,11 @@ module To_map = struct
       that are in [m2]. *)
   let remove_all m1 m2 =
     let keys2 =
-      Operation_hash.Map.bindings m2
-      |> List.map fst |> Operation_hash.Set.of_list
+      Tezos_crypto.Operation_hash.Map.bindings m2
+      |> List.map fst |> Tezos_crypto.Operation_hash.Set.of_list
     in
-    Operation_hash.Map.filter
-      (fun key _val -> not (Operation_hash.Set.mem key keys2))
+    Tezos_crypto.Operation_hash.Map.filter
+      (fun key _val -> not (Tezos_crypto.Operation_hash.Set.mem key keys2))
       m1
 
   (** [eq_mod_binding m1 (k, v_opt) m2] holds iff:
@@ -602,13 +624,13 @@ module To_map = struct
         for some unknown value [v]. *)
   let eq_mod_op m1 (k, v_opt) m2 =
     let diff = remove_all m2 m1 in
-    match (Operation_hash.Map.bindings diff, v_opt) with
+    match (Tezos_crypto.Operation_hash.Map.bindings diff, v_opt) with
     | [], _ -> true
     | [(kdiff, vdiff)], Some v
-      when Operation_hash.equal kdiff k
+      when Tezos_crypto.Operation_hash.equal kdiff k
            && Operation.equal v.Prevalidation.raw vdiff.Prevalidation.raw ->
         true
-    | [(kdiff, _)], None when Operation_hash.equal kdiff k -> true
+    | [(kdiff, _)], None when Tezos_crypto.Operation_hash.equal kdiff k -> true
     | _ -> false
 
   (** [to_map_all] calls [Classification.to_map] with all named
@@ -634,7 +656,7 @@ module To_map = struct
     qcheck_eq'
       ~pp:map_pp
       ~eq:map_eq
-      ~expected:Operation_hash.Map.empty
+      ~expected:Tezos_crypto.Operation_hash.Map.empty
       ~actual:(to_map_all t)
       ()
 
@@ -680,7 +702,7 @@ module To_map = struct
       "Starting with:@. %a@.and operation hash %a@. "
       Operation_map.pp
       (to_map_all t)
-      Operation_hash.pp
+      Tezos_crypto.Operation_hash.pp
       op.Prevalidation.hash
 
   let test_map_remove_add =
@@ -705,15 +727,17 @@ module To_map = struct
     let t' = Classification.Internal_for_tests.copy t in
     drop op.Prevalidation.hash t ;
     let initial = to_map_all t in
-    let left = Operation_hash.Map.add op.Prevalidation.hash op initial in
+    let left =
+      Tezos_crypto.Operation_hash.Map.add op.Prevalidation.hash op initial
+    in
     Classification.add classification op t' ;
     let right = to_map_all t' in
     qcheck_eq'
       ~expected:left
       ~actual:right
       ~eq:
-        (Operation_hash.Map.equal (fun op1 op2 ->
-             Operation_hash.equal op1.Prevalidation.hash op2.hash))
+        (Tezos_crypto.Operation_hash.Map.equal (fun op1 op2 ->
+             Tezos_crypto.Operation_hash.equal op1.Prevalidation.hash op2.hash))
       ~pp:map_pp
       ()
 
@@ -739,15 +763,17 @@ module To_map = struct
     Classification.add classification op t ;
     let initial = to_map_all t in
     let oph = op.Prevalidation.hash in
-    let left = Operation_hash.Map.remove oph initial in
+    let left = Tezos_crypto.Operation_hash.Map.remove oph initial in
     drop oph t' ;
     let right = to_map_all t' in
     qcheck_eq'
       ~expected:left
       ~actual:right
       ~eq:
-        (Operation_hash.Map.equal (fun op1 op2 ->
-             Operation_hash.equal op1.Prevalidation.hash op2.Prevalidation.hash))
+        (Tezos_crypto.Operation_hash.Map.equal (fun op1 op2 ->
+             Tezos_crypto.Operation_hash.equal
+               op1.Prevalidation.hash
+               op2.Prevalidation.hash))
       ~pp:map_pp
       ()
 
@@ -784,11 +810,12 @@ module To_map = struct
     let oph = op.Prevalidation.hash in
     let is_in_mempool = is_in_mempool oph t in
     let map =
-      to_map_all t |> Operation_hash.Map.filter (fun oph' _ -> oph' = oph)
+      to_map_all t
+      |> Tezos_crypto.Operation_hash.Map.filter (fun oph' _ -> oph' = oph)
     in
     qcheck_eq'
       ~expected:is_in_mempool
-      ~actual:(Operation_hash.Map.cardinal map = 1)
+      ~actual:(Tezos_crypto.Operation_hash.Map.cardinal map = 1)
       ()
 
   (** Tests that [Classification.to_map] returns an empty map if all parameters
@@ -802,7 +829,7 @@ module To_map = struct
     qcheck_eq'
       ~pp:map_pp
       ~eq:map_eq
-      ~expected:Operation_hash.Map.empty
+      ~expected:Tezos_crypto.Operation_hash.Map.empty
       ~actual:
         (Classification.Internal_for_tests.to_map
            ~applied:false

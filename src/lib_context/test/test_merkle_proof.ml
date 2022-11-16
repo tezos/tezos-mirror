@@ -37,8 +37,8 @@ module Gen = struct
     Bytes.unsafe_of_string s
 
   let hash =
-    let+ s = string_size ~gen:char (return Context_hash.size) in
-    Context_hash.of_string_exn s
+    let+ s = string_size ~gen:char (return Tezos_crypto.Context_hash.size) in
+    Tezos_crypto.Context_hash.of_string_exn s
 
   let rec comb n xs =
     match (n, xs) with
@@ -194,7 +194,8 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       let bytes s = Bytes.of_string s in
       let tree_a : tree = Value (bytes "a") in
       let ch =
-        Context_hash.of_bytes_exn (bytes "01234567890123456789012345678901")
+        Tezos_crypto.Context_hash.of_bytes_exn
+          (bytes "01234567890123456789012345678901")
       in
       let tree_b =
         Extender
@@ -224,7 +225,8 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       let bytes s = Bytes.of_string s in
       let tree_a c : tree = Value (bytes @@ "a" ^ c) in
       let ch =
-        Context_hash.of_bytes_exn (bytes "01234567890123456789012345678901")
+        Tezos_crypto.Context_hash.of_bytes_exn
+          (bytes "01234567890123456789012345678901")
       in
       let inode_tree i : inode_tree =
         let c = string_of_int i in
@@ -411,7 +413,8 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       let bytes s = Bytes.of_string s in
       let tree_a : tree = Value (bytes "a") in
       let ch =
-        Context_hash.of_bytes_exn (bytes "01234567890123456789012345678901")
+        Tezos_crypto.Context_hash.of_bytes_exn
+          (bytes "01234567890123456789012345678901")
       in
       let tree_b =
         Extender
@@ -448,7 +451,8 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       let bytes s = Bytes.of_string s in
       let tree_a c : tree = Value (bytes @@ "a" ^ c) in
       let ch =
-        Context_hash.of_bytes_exn (bytes "01234567890123456789012345678901")
+        Tezos_crypto.Context_hash.of_bytes_exn
+          (bytes "01234567890123456789012345678901")
       in
       let inode_tree i : inode_tree =
         let c = string_of_int i in

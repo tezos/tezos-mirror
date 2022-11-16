@@ -41,7 +41,7 @@ module Simple = struct
         "The rollup node has been slashed because of a timeout issued by \
          {address}"
       ~level:Notice
-      ("address", Signature.Public_key_hash.encoding)
+      ("address", Tezos_crypto.Signature.Public_key_hash.encoding)
 
   let invalid_move =
     declare_0

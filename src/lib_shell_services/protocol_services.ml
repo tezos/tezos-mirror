@@ -26,7 +26,7 @@
 open Data_encoding
 
 module S = struct
-  let protocols_arg = Protocol_hash.rpc_arg
+  let protocols_arg = Tezos_crypto.Protocol_hash.rpc_arg
 
   let contents =
     Tezos_rpc.Service.get_service
@@ -43,7 +43,7 @@ module S = struct
   let list =
     Tezos_rpc.Service.get_service
       ~query:Tezos_rpc.Query.empty
-      ~output:(list Protocol_hash.encoding)
+      ~output:(list Tezos_crypto.Protocol_hash.encoding)
       Tezos_rpc.Path.(root / "protocols")
 
   let fetch =

@@ -553,7 +553,11 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
     let head_hash, head_level = Tezos_store.Store.Block.descriptor head in
-    Format.printf "Head is %a, level %ld\n%!" Block_hash.pp head_hash head_level ;
+    Format.printf
+      "Head is %a, level %ld\n%!"
+      Tezos_crypto.Block_hash.pp
+      head_hash
+      head_level ;
     let predecessor_timestamp = Tezos_store.Store.Block.timestamp head in
     let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
     print_endline "Preparing raw context..." ;
@@ -722,14 +726,14 @@ let get_main proto_hash =
   match
     List.find
       (fun (module Proto : Sigs.PROTOCOL) ->
-        Protocol_hash.(Proto.hash = proto_hash))
+        Tezos_crypto.Protocol_hash.(Proto.hash = proto_hash))
       (Known_protocols.get_all ())
   with
   | None ->
       Format.kasprintf
         invalid_arg
         "Unknown protocol: %a"
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         proto_hash
   | Some (module Proto) ->
       let module Main = Make (Proto) in
@@ -778,16 +782,19 @@ let commands =
         Printf.printf "Getting main chain storage and head...\n%!" ;
         let chain_store = Tezos_store.Store.main_chain_store store in
         let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
-        Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
+        Format.printf "Chain id: %a\n%!" Tezos_crypto.Chain_id.pp chain_id ;
         let*! head = Tezos_store.Store.Chain.current_head chain_store in
         Format.printf
           "Head block: %a\n%!"
-          Block_hash.pp
+          Tezos_crypto.Block_hash.pp
           (Tezos_store.Store.Block.hash head) ;
         let* proto_hash =
           Tezos_store.Store.Block.protocol_hash chain_store head
         in
-        Format.printf "Protocol hash: %a\n%!" Protocol_hash.pp proto_hash ;
+        Format.printf
+          "Protocol hash: %a\n%!"
+          Tezos_crypto.Protocol_hash.pp
+          proto_hash ;
         let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
         print_endline "Pre-preparing raw context..." ;
         let (module Main : Sigs.MAIN) = get_main proto_hash in

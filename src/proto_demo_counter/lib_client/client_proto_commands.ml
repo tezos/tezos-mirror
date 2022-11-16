@@ -51,8 +51,8 @@ let bake (cctxt : Protocol_client_context.full) message : unit tzresult Lwt.t =
   let operations = [List.map snd preapply_result.applied] in
   Shell_services.Injection.block cctxt header_encoded operations
   >>=? fun block_hash ->
-  cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
-  return_unit
+  cctxt#message "Injected block %a" Tezos_crypto.Block_hash.pp_short block_hash
+  >>= fun () -> return_unit
 
 let operation_encoding =
   let open Data_encoding in
@@ -63,7 +63,8 @@ let operation_encoding =
 let forge_op = Data_encoding.Binary.to_bytes_exn operation_encoding
 
 let inject_op (cctxt : Protocol_client_context.full) (pop : Proto_operation.t) =
-  Demo_block_services.hash cctxt () >>=? fun (block_hash : Block_hash.t) ->
+  Demo_block_services.hash cctxt ()
+  >>=? fun (block_hash : Tezos_crypto.Block_hash.t) ->
   let shell_header : Operation.shell_header = Operation.{branch = block_hash} in
   let op : operation = {shell = shell_header; protocol_data = pop} in
   Demo_block_services.Helpers.Preapply.operations cctxt [op] >>=? function
@@ -72,7 +73,7 @@ let inject_op (cctxt : Protocol_client_context.full) (pop : Proto_operation.t) =
       cctxt#message "Operation receipt: %s" receipt_str >>= fun () ->
       let mbytes = forge_op (shell_header, pop) in
       Shell_services.Injection.operation cctxt mbytes >>=? fun op_hash ->
-      let injected = Operation_hash.to_short_b58check op_hash in
+      let injected = Tezos_crypto.Operation_hash.to_short_b58check op_hash in
       cctxt#message "Injected: %s" injected >>= fun () -> return_unit
   | _ -> assert false
 

@@ -39,14 +39,14 @@ val load_context :
 
 (** Make sure that the given context is consistent by trying to read in it *)
 val check_context_consistency :
-  Abstract_context_index.t -> Context_hash.t -> unit tzresult Lwt.t
+  Abstract_context_index.t -> Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t
 
 val begin_construction :
   timestamp:Time.Protocol.t ->
   protocol_data:block_header_data ->
   Abstract_context_index.t ->
   Baking_state.block_info ->
-  Chain_id.t ->
+  Tezos_crypto.Chain_id.t ->
   incremental tzresult Lwt.t
 
 val add_operation :

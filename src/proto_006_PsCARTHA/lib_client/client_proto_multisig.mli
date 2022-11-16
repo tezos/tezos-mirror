@@ -85,7 +85,7 @@ val call_multisig :
   src_sk:Client_keys.sk_uri ->
   multisig_contract:Contract.t ->
   action:multisig_action ->
-  signatures:Signature.t list ->
+  signatures:Tezos_crypto.Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->
@@ -109,7 +109,7 @@ val call_multisig_on_bytes :
   src_sk:Client_keys.sk_uri ->
   multisig_contract:Contract.t ->
   bytes:Bytes.t ->
-  signatures:Signature.t list ->
+  signatures:Tezos_crypto.Signature.t list ->
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->

@@ -178,7 +178,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       | None ->
           failwith
             "PVM state for block hash not available %s"
-            (Block_hash.to_string block_hash)
+            (Tezos_crypto.Block_hash.to_string block_hash)
     in
     let*! number_of_ticks = Number_of_ticks.get node_ctxt.store inbox_level in
     let+ number_of_ticks =

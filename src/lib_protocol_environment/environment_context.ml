@@ -385,10 +385,13 @@ module Context = struct
 
   type cache_key = Environment_cache.key
 
-  type block_cache = {context_hash : Context_hash.t; cache : cache}
+  type block_cache = {context_hash : Tezos_crypto.Context_hash.t; cache : cache}
 
   type source_of_cache =
-    [`Force_load | `Load | `Lazy | `Inherited of block_cache * Context_hash.t]
+    [ `Force_load
+    | `Load
+    | `Lazy
+    | `Inherited of block_cache * Tezos_crypto.Context_hash.t ]
 
   type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
@@ -654,7 +657,8 @@ module Context = struct
     let open Lwt_syntax in
     match mode with
     | `Inherited ({context_hash; cache}, predecessor_context_hash) ->
-        if Context_hash.equal context_hash predecessor_context_hash then
+        if Tezos_crypto.Context_hash.equal context_hash predecessor_context_hash
+        then
           (*
 
              We can safely reuse the cache of the predecessor block.
@@ -699,11 +703,11 @@ module Context = struct
   *)
   module Cache_cache =
   Ringo_lwt.Functors.Make_result_presized (Ringo.SingletonMap (struct
-    type t = Block_hash.t
+    type t = Tezos_crypto.Block_hash.t
 
-    let equal = Block_hash.equal
+    let equal = Tezos_crypto.Block_hash.equal
 
-    let hash = Block_hash.hash
+    let hash = Tezos_crypto.Block_hash.hash
   end))
 
   let cache_cache : (cache, error trace) Cache_cache.t = Cache_cache.create ()
@@ -768,7 +772,7 @@ type validation_result = {
 type quota = {max_size : int; max_op : int option}
 
 type rpc_context = {
-  block_hash : Block_hash.t;
+  block_hash : Tezos_crypto.Block_hash.t;
   block_header : Block_header.shell_header;
   context : Context.t;
 }

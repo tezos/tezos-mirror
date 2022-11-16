@@ -29,7 +29,7 @@ open Tezos_shell_services
     prepared protocol-side and registered here to become available to the
     proxy facility. *)
 module type Proxy_sig = sig
-  val protocol_hash : Protocol_hash.t
+  val protocol_hash : Tezos_crypto.Protocol_hash.t
 
   (** RPCs provided by the protocol *)
   val directory : Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.t
@@ -44,7 +44,7 @@ module type Proxy_sig = sig
     *)
   val initial_context :
     Proxy_getter.rpc_context_args ->
-    Context_hash.t ->
+    Tezos_crypto.Context_hash.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   (** The [time_between_blocks] constant for the given block, if any. *)
@@ -72,5 +72,5 @@ val get_all_registered : unit -> proxy_environment list
 (** Returns a proxy environment for the given protocol. *)
 val get_registered_proxy :
   Tezos_client_base.Client_context.printer ->
-  Protocol_hash.t ->
+  Tezos_crypto.Protocol_hash.t ->
   proxy_environment tzresult Lwt.t

@@ -520,7 +520,9 @@ end)
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
       in
-      let _pkh, public_key, _secret_key = Bls.generate_key ~seed () in
+      let _pkh, public_key, _secret_key =
+        Tezos_crypto.Bls.generate_key ~seed ()
+      in
       Tx_rollup_l2_address.Indexable.value
         (Tx_rollup_l2_address.of_bls_pk public_key)
 

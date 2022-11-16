@@ -34,9 +34,9 @@ let updated_to_checkpoint =
     ~name:"updated_to_checkpoint"
     ~msg:"updated to checkpoint {block_hash} (running in mode {history_mode})"
     ~level:Notice
-    ~pp1:Block_hash.pp
+    ~pp1:Tezos_crypto.Block_hash.pp
     ~pp2:History_mode.Legacy.pp
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("history_mode", History_mode.Legacy.encoding)
 
 let prevalidator_filter_not_found =
@@ -45,8 +45,8 @@ let prevalidator_filter_not_found =
     ~name:"prevalidator_filter_not_found"
     ~msg:"no prevalidator filter found for protocol {protocol_hash}"
     ~level:Warning
-    ~pp1:Protocol_hash.pp
-    ("protocol_hash", Protocol_hash.encoding)
+    ~pp1:Tezos_crypto.Protocol_hash.pp
+    ("protocol_hash", Tezos_crypto.Protocol_hash.encoding)
 
 let prevalidator_reinstantiation_failure =
   declare_1
@@ -72,8 +72,8 @@ let loading_protocol =
     ~name:"loading_protocol"
     ~level:Notice
     ~msg:"loading non-embedded protocol {protocol} from disk"
-    ~pp1:Protocol_hash.pp
-    ("protocol", Protocol_hash.encoding)
+    ~pp1:Tezos_crypto.Protocol_hash.pp
+    ("protocol", Tezos_crypto.Protocol_hash.encoding)
 
 let bootstrapped =
   declare_0

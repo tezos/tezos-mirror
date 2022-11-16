@@ -31,7 +31,7 @@ let proto_param ~name ~desc t =
     ~name
     ~desc
     (Tezos_clic.parameter (fun _ str ->
-         Lwt.return (Protocol_hash.of_b58check str)))
+         Lwt.return (Tezos_crypto.Protocol_hash.of_b58check str)))
     t
 
 let commands () =
@@ -51,7 +51,9 @@ let commands () =
       (fun () (cctxt : #Client_context.full) ->
         let* protos = Shell_services.Protocol.list cctxt in
         let*! () =
-          List.iter_s (fun ph -> cctxt#message "%a" Protocol_hash.pp ph) protos
+          List.iter_s
+            (fun ph -> cctxt#message "%a" Tezos_crypto.Protocol_hash.pp ph)
+            protos
         in
         return_unit);
     command
@@ -78,7 +80,7 @@ let commands () =
                 let*! () =
                   cctxt#message
                     "Injected protocol %a successfully"
-                    Protocol_hash.pp
+                    Tezos_crypto.Protocol_hash.pp
                     hash
                 in
                 return_unit
@@ -105,12 +107,15 @@ let commands () =
         let* proto = Shell_services.Protocol.contents cctxt ph in
         let* () =
           Tezos_base_unix.Protocol_files.write_dir
-            (Protocol_hash.to_short_b58check ph)
+            (Tezos_crypto.Protocol_hash.to_short_b58check ph)
             ~hash:ph
             proto
         in
         let*! () =
-          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph
+          cctxt#message
+            "Extracted protocol %a"
+            Tezos_crypto.Protocol_hash.pp_short
+            ph
         in
         return_unit);
     command
@@ -125,7 +130,7 @@ let commands () =
         let*! () =
           cctxt#message
             "Protocol %a uses environment %s"
-            Protocol_hash.pp
+            Tezos_crypto.Protocol_hash.pp
             protocol_hash
             (Protocol.module_name_of_env_version env)
         in
@@ -144,7 +149,7 @@ let commands () =
             let*! () =
               cctxt#message
                 "Protocol %a successfully fetched."
-                Protocol_hash.pp_short
+                Tezos_crypto.Protocol_hash.pp_short
                 hash
             in
             return_unit

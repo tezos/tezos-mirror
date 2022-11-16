@@ -28,7 +28,7 @@ open Alpha_context
 open Apply_results
 
 type 'kind preapply_result =
-  Operation_hash.t * 'kind operation * 'kind operation_metadata
+  Tezos_crypto.Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type fee_parameter = {
   minimal_fees : Tez.t;
@@ -53,7 +53,9 @@ val preapply :
   'kind preapply_result tzresult Lwt.t
 
 type 'kind result_list =
-  Operation_hash.t * 'kind contents_list * 'kind contents_result_list
+  Tezos_crypto.Operation_hash.t
+  * 'kind contents_list
+  * 'kind contents_result_list
 
 val inject_operation :
   #Protocol_client_context.full ->
@@ -69,7 +71,8 @@ val inject_operation :
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
-type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
+type 'kind result =
+  Tezos_crypto.Operation_hash.t * 'kind contents * 'kind contents_result
 
 val inject_manager_operation :
   #Protocol_client_context.full ->
@@ -79,8 +82,8 @@ val inject_manager_operation :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?verbose_signing:bool ->
-  source:Signature.Public_key_hash.t ->
-  src_pk:Signature.public_key ->
+  source:Tezos_crypto.Signature.Public_key_hash.t ->
+  src_pk:Tezos_crypto.Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   ?fee:Tez.t ->
   ?gas_limit:Z.t ->

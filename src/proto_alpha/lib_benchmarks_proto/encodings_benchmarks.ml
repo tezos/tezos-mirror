@@ -421,7 +421,7 @@ module Timelock = struct
       Base_samplers.sample_in_interval ~range:{min = 1; max = 10000} rng_state
     in
     let chest, chest_key =
-      Timelock.chest_sampler ~plaintext_size ~time ~rng_state
+      Tezos_crypto.Timelock.chest_sampler ~plaintext_size ~time ~rng_state
     in
     ((chest, chest_key), plaintext_size)
 
@@ -429,7 +429,9 @@ module Timelock = struct
     Registration_helpers.register
     @@ make_encode_variable_size_to_string
          ~name:"ENCODING_Chest"
-         ~to_string:(Data_encoding.Binary.to_string_exn Timelock.chest_encoding)
+         ~to_string:
+           (Data_encoding.Binary.to_string_exn
+              Tezos_crypto.Timelock.chest_encoding)
          ~generator:(fun rng_state ->
            let (chest, _), plaintext_size = generator rng_state in
            (chest, {bytes = plaintext_size}))
@@ -440,7 +442,8 @@ module Timelock = struct
     @@ make_encode_fixed_size_to_string
          ~name:"ENCODING_Chest_key"
          ~to_string:
-           (Data_encoding.Binary.to_string_exn Timelock.chest_key_encoding)
+           (Data_encoding.Binary.to_string_exn
+              Tezos_crypto.Timelock.chest_key_encoding)
          ~generator:(fun rng_state ->
            let (_, chest_key), _w = generator rng_state in
            chest_key)
@@ -450,12 +453,18 @@ module Timelock = struct
     Registration_helpers.register
     @@ make_decode_variable_size_from_bytes
          ~name:"DECODING_Chest"
-         ~to_bytes:(Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding)
-         ~from_bytes:(Data_encoding.Binary.of_bytes_exn Timelock.chest_encoding)
+         ~to_bytes:
+           (Data_encoding.Binary.to_bytes_exn
+              Tezos_crypto.Timelock.chest_encoding)
+         ~from_bytes:
+           (Data_encoding.Binary.of_bytes_exn
+              Tezos_crypto.Timelock.chest_encoding)
          ~generator:(fun rng_state ->
            let (chest, _), _ = generator rng_state in
            let b =
-             Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding chest
+             Data_encoding.Binary.to_bytes_exn
+               Tezos_crypto.Timelock.chest_encoding
+               chest
            in
            (chest, {bytes = Bytes.length b}))
          ()
@@ -465,9 +474,11 @@ module Timelock = struct
     @@ make_decode_fixed_size_from_bytes
          ~name:"DECODING_Chest_key"
          ~to_bytes:
-           (Data_encoding.Binary.to_bytes_exn Timelock.chest_key_encoding)
+           (Data_encoding.Binary.to_bytes_exn
+              Tezos_crypto.Timelock.chest_key_encoding)
          ~from_bytes:
-           (Data_encoding.Binary.of_bytes_exn Timelock.chest_key_encoding)
+           (Data_encoding.Binary.of_bytes_exn
+              Tezos_crypto.Timelock.chest_key_encoding)
          ~generator:(fun rng_state ->
            let (_, chest_key), _w = generator rng_state in
            chest_key)

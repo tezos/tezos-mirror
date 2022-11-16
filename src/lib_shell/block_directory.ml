@@ -62,7 +62,8 @@ let read_partial_context =
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
   let open Lwt_result_syntax in
   let dir :
-      (Store.chain_store * Block_hash.t * Block_header.t) Tezos_rpc.Directory.t
+      (Store.chain_store * Tezos_crypto.Block_hash.t * Block_header.t)
+      Tezos_rpc.Directory.t
       ref =
     ref Tezos_rpc.Directory.empty
   in
@@ -728,7 +729,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
       let* ctxt = Store.Block.context chain_store block in
-      let*! l1 = Base58.complete prefix in
+      let*! l1 = Tezos_crypto.Base58.complete prefix in
       let*! l2 = Next_proto.complete_b58prefix ctxt prefix in
       return (l1 @ l2)) ;
   (* merge protocol rpcs... *)

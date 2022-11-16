@@ -31,4 +31,4 @@ val bake :
   Shell_services.block ->
   Data.Command.t ->
   Client_keys.sk_uri ->
-  Block_hash.t tzresult Lwt.t
+  Tezos_crypto.Block_hash.t tzresult Lwt.t

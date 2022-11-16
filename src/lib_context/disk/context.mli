@@ -30,7 +30,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   type error +=
     | Cannot_create_file of string
     | Cannot_open_file of string
-    | Cannot_retrieve_commit_info of Context_hash.t
+    | Cannot_retrieve_commit_info of Tezos_crypto.Context_hash.t
     | Cannot_find_protocol
     | Suspicious_file of int
 
@@ -53,7 +53,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   (** [dump_context] is used to export snapshots of the context at given hashes. *)
   val dump_context :
     index ->
-    Context_hash.t ->
+    Tezos_crypto.Context_hash.t ->
     fd:Lwt_unix.file_descr ->
     on_disk:bool ->
     progress_display_mode:Animation.progress_display_mode ->
@@ -62,7 +62,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   (** Rebuild a context from a given snapshot. *)
   val restore_context :
     index ->
-    expected_context_hash:Context_hash.t ->
+    expected_context_hash:Tezos_crypto.Context_hash.t ->
     nb_context_elements:int ->
     fd:Lwt_unix.file_descr ->
     legacy:bool ->

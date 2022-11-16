@@ -237,7 +237,7 @@ let gen_inbox_message =
     (* We won't test the encoding of these values. It's out of scope. *)
     let payload = Script_repr.unit in
     let sender = Contract_hash.zero in
-    let source = Signature.Public_key_hash.zero in
+    let source = Tezos_crypto.Signature.Public_key_hash.zero in
     (* But the encoding of the rollup's address is our problem. *)
     let+ destination = gen_rollup in
     Internal (Transfer {payload; sender; source; destination})

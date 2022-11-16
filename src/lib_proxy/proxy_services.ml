@@ -59,7 +59,7 @@ type mode =
       sleep : float -> unit Lwt.t;
       sym_block_caching_time : Ptime.span option;
       on_disk_proxy_builder :
-        (Context_hash.t ->
+        (Tezos_crypto.Context_hash.t ->
         Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
         option;
     }
@@ -76,17 +76,19 @@ let get_protocols ?expected_protocol rpc_context chain block =
   match expected_protocol with
   | None -> return protocols
   | Some proto_hash ->
-      if Protocol_hash.equal next_protocol proto_hash then return protocols
+      if Tezos_crypto.Protocol_hash.equal next_protocol proto_hash then
+        return protocols
       else
         failwith
           "Protocol passed to the proxy (%a) and protocol of the node (%a) \
            differ."
-          Protocol_hash.pp
+          Tezos_crypto.Protocol_hash.pp
           proto_hash
-          Protocol_hash.pp
+          Tezos_crypto.Protocol_hash.pp
           next_protocol
 
-type env_cache_key = Tezos_shell_services.Chain_services.chain * Block_hash.t
+type env_cache_key =
+  Tezos_shell_services.Chain_services.chain * Tezos_crypto.Block_hash.t
 
 module Env_cache_key_hashed_type :
   Stdlib.Hashtbl.HashedType with type t = env_cache_key = struct
@@ -94,7 +96,7 @@ module Env_cache_key_hashed_type :
 
   let equal ((lchain, lblock) : t) ((rchain, rblock) : t) =
     (* Avoid using polymorphic equality *)
-    lchain = rchain && Block_hash.equal lblock rblock
+    lchain = rchain && Tezos_crypto.Block_hash.equal lblock rblock
 
   let hash = Hashtbl.hash
 end

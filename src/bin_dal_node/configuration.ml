@@ -26,7 +26,7 @@
 type neighbor = {addr : string; port : int}
 
 type dac = {
-  addresses : Aggregate_signature.public_key_hash list;
+  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
   threshold : int;
   reveal_data_dir : string;
 }
@@ -87,7 +87,9 @@ let dac_encoding : dac Data_encoding.t =
     (fun (addresses, threshold, reveal_data_dir) ->
       {addresses; threshold; reveal_data_dir})
     (obj3
-       (req "addresses" (list Aggregate_signature.Public_key_hash.encoding))
+       (req
+          "addresses"
+          (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
        (req "threshold" uint8)
        (req "reveal-data-dir" string))
 
