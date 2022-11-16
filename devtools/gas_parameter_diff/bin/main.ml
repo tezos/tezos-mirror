@@ -32,10 +32,30 @@ type csv_input_table = csv_input_column list
 
 let parse_input_csv file : csv_input_table =
   let chan = open_in file in
-  let first_line = String.split_on_char ',' (input_line chan) in
-  let second_line = String.split_on_char ',' (input_line chan) in
-  assert (List.length first_line = List.length second_line) ;
-  List.combine first_line second_line
+  let usage_error_string = "Expecting a CSV file with exactly two lines." in
+  let read_a_line () =
+    try input_line chan
+    with _ ->
+      Printf.eprintf
+        "Not enough lines in input %s. %s\n"
+        file
+        usage_error_string ;
+      exit 1
+  in
+  let first_line = String.split_on_char ',' (read_a_line ()) in
+  let second_line = String.split_on_char ',' (read_a_line ()) in
+  (try
+     let _ = input_line chan in
+     Printf.eprintf "Too many lines in input %s. %s\n" file usage_error_string ;
+     exit 1
+   with _ -> ()) ;
+  if List.length first_line <> List.length second_line then (
+    Printf.eprintf
+      "The two lines of the input CSV file %s must have the same number of \
+       columns.\n"
+      file ;
+    exit 1)
+  else List.combine first_line second_line
 
 (* Returns names1 @ List.map fst table2 but without the duplicates *)
 let merge_params names1 (table2, _file_name) =
