@@ -297,6 +297,7 @@ module Inner = struct
   let ensure_validity t =
     let open Result_syntax in
     let srs_size = Srs_g1.size t.srs.raw.srs_g1 in
+    let srs_size_g2 = Srs_g2.size t.srs.raw.srs_g2 in
     let is_pow_of_two x =
       let logx = Z.(log2 (of_int x)) in
       1 lsl logx = x
@@ -318,9 +319,16 @@ module Inner = struct
       fail
         (`Fail
           (Format.asprintf
-             "SRS size is too small. Expected more than %d. Got %d"
+             "SRS on G1 size is too small. Expected more than %d. Got %d"
              t.k
              srs_size))
+    else if t.k > Srs_g2.size t.srs.raw.srs_g2 then
+      fail
+        (`Fail
+          (Format.asprintf
+             "SRS on G2 size is too small. Expected more than %d. Got %d"
+             t.k
+             srs_size_g2))
     else return t
 
   let slot_as_polynomial_length ~slot_size =
@@ -633,17 +641,13 @@ module Inner = struct
     let offset_monomial_degree =
       max_committable_degree - max_allowed_committed_poly_degree
     in
-    assert (offset_monomial_degree < Srs_g2.size t.srs.raw.srs_g2) ;
     let committed_offset_monomial =
       Srs_g2.get t.srs.raw.srs_g2 offset_monomial_degree
     in
-    match committed_offset_monomial with
-    | exception Invalid_argument _ -> false
-    | _ ->
-        let open Bls12_381 in
-        (* checking that cm * committed_offset_monomial = proof *)
-        Pairing.pairing_check
-          [(cm, committed_offset_monomial); (proof, G2.(negate (copy one)))]
+    let open Bls12_381 in
+    (* checking that cm * committed_offset_monomial = proof *)
+    Pairing.pairing_check
+      [(cm, committed_offset_monomial); (proof, G2.(negate (copy one)))]
 
   let inverse domain =
     let n = Array.length domain in
