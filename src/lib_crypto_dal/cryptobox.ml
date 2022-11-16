@@ -646,6 +646,8 @@ module Inner = struct
       max_committable_degree - max_allowed_committed_poly_degree
     in
     let committed_offset_monomial =
+      (* This [get] cannot raise since
+         [offset_monomial_degree <= t.k <= Srs_g2.size t.srs.raw.srs_g2]. *)
       Srs_g2.get t.srs.raw.srs_g2 offset_monomial_degree
     in
     let open Bls12_381 in
