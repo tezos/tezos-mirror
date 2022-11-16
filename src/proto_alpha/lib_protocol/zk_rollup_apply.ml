@@ -411,7 +411,7 @@ let perform_exits ctxt exits =
                 (Ticket_amount.of_zint (Z.abs @@ op.price.amount))
             in
             let* ctxt, diff =
-              Tx_rollup_ticket.transfer_ticket_with_hashes
+              Ticket_transfer.transfer_ticket_with_hashes
                 ctxt
                 ~src_hash:op.price.id
                 ~dst_hash:receiver_ticket_hash

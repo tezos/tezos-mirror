@@ -5440,160 +5440,343 @@ module Withdraw = struct
     ignore i ;
     return_unit
 
-  (** [test_forge_deposit_withdraw_deposit ()] check the following scenario :
-      1. forges new tickets and stores it in contract's storage.
-      2. deposits theses tickets into a tx_rollup
-      3. dispatches them to an account
-      4. forges new tickets
-      3. transfers the tickets from the account to the contract
-      4. deposits the just received tickets into the tx_rollup *)
-  let test_forge_deposit_withdraw_deposit () =
-    context_init1 () >>=? fun (block, account) ->
-    originate block account >>=? fun (block, tx_rollup) ->
-    originate_forge_withdraw_deposit_contract account block
-    >>=? fun (forge_withdraw_deposit_contract, block) ->
+  module Forge_deposit_withdraw (Ctxt : sig
+    val forge_withdraw_deposit_contract : Contract.t
+
+    val account : Contract.t
+
+    val tx_rollup : Tx_rollup.t
+  end) =
+  struct
+    open Lwt_result_syntax
+
     let forge_ticket block =
-      Op.transaction
-        (B block)
-        ~entrypoint:Entrypoint.default
-        ~parameters:
-          (Expr_common.(
-             pair_n
-               [
-                 int (Z.of_int Nat_ticket.contents_nat);
-                 int (Tx_rollup_l2_qty.to_z Nat_ticket.amount);
-               ])
-          |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
-        ~fee:Tez.one
-        account
-        (Originated forge_withdraw_deposit_contract)
-        (Tez.of_mutez_exn 0L)
-      >>=? fun operation -> Block.bake ~operation block
-    in
+      let* operation =
+        Op.transaction
+          (B block)
+          ~entrypoint:Entrypoint.default
+          ~parameters:
+            (Expr_common.(
+               pair_n
+                 [
+                   int (Z.of_int Nat_ticket.contents_nat);
+                   int (Tx_rollup_l2_qty.to_z Nat_ticket.amount);
+                 ])
+            |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
+          ~fee:Tez.one
+          Ctxt.account
+          Ctxt.forge_withdraw_deposit_contract
+          (Tez.of_mutez_exn 0L)
+      in
+      Block.bake ~operation block
+
     let deposit_ticket block =
-      Op.transaction
-        (B block)
-        ~entrypoint:(Entrypoint.of_string_strict_exn "deposit")
-        ~parameters:
-          (Expr_common.(
-             pair_n
-               [
-                 string (Tx_rollup.to_b58check tx_rollup);
-                 string "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K";
-               ])
-          |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
-        ~fee:Tez.one
-        account
-        (Originated forge_withdraw_deposit_contract)
-        (Tez.of_mutez_exn 0L)
-      >>=? fun operation -> Block.bake ~operation block
-    in
+      let* operation =
+        Op.transaction
+          (B block)
+          ~entrypoint:(Entrypoint.of_string_strict_exn "deposit")
+          ~parameters:
+            (Expr_common.(
+               pair_n
+                 [
+                   string (Tx_rollup.to_b58check Ctxt.tx_rollup);
+                   string "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K";
+                 ])
+            |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
+          ~fee:Tez.one
+          Ctxt.account
+          Ctxt.forge_withdraw_deposit_contract
+          (Tez.of_mutez_exn 0L)
+      in
+      Block.bake ~operation block
+
     let dispatch_ticket block =
-      Nat_ticket.withdrawal
-        (B block)
-        ~ticketer:(Originated forge_withdraw_deposit_contract)
-        ~claimer:account
-        tx_rollup
-      >>=? fun (withdraw, ticket_info) ->
+      let* withdraw, ticket_info =
+        Nat_ticket.withdrawal
+          (B block)
+          ~ticketer:Ctxt.forge_withdraw_deposit_contract
+          ~claimer:Ctxt.account
+          Ctxt.tx_rollup
+      in
       let message_index = 0 in
-      finalize_all_commitment_with_withdrawals
-        ~batches:["batch"]
-        ~account
-        ~tx_rollup
-        ~withdrawals:[(message_index, [withdraw])]
-        block
-      >>=? fun (commitment, context_hash_list, committed_level, block) ->
+      let* commitment, context_hash_list, committed_level, block =
+        finalize_all_commitment_with_withdrawals
+          ~batches:["batch"]
+          ~account:Ctxt.account
+          ~tx_rollup:Ctxt.tx_rollup
+          ~withdrawals:[(message_index, [withdraw])]
+          block
+      in
       let context_hash =
-        WithExceptions.Option.get
-          ~loc:__LOC__
-          (List.nth context_hash_list message_index)
+        WithExceptions.Option.get ~loc:__LOC__
+        @@ List.nth context_hash_list message_index
       in
       let message_result_path =
         compute_message_result_path commitment ~message_position:message_index
       in
-      Op.tx_rollup_dispatch_tickets
-        (B block)
-        ~source:account
-        ~message_index
-        ~message_result_path
-        tx_rollup
-        committed_level
-        context_hash
-        [ticket_info]
-      >>=? fun operation -> Block.bake ~operation block
-    in
+      let* operation =
+        Op.tx_rollup_dispatch_tickets
+          (B block)
+          ~source:Ctxt.account
+          ~message_index
+          ~message_result_path
+          Ctxt.tx_rollup
+          committed_level
+          context_hash
+          [ticket_info]
+      in
+      Block.bake ~operation block
+
     let transfer_ticket block =
-      Op.transfer_ticket
-        (B block)
-        ~source:account
-        ~contents:(Script.lazy_expr Nat_ticket.contents)
-        ~ty:(Script.lazy_expr Nat_ticket.ty)
-        ~ticketer:(Originated forge_withdraw_deposit_contract)
-        ~amount:
-          (WithExceptions.Option.get ~loc:__LOC__
-          @@ Ticket_amount.of_zint
-          @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
-        ~destination:(Originated forge_withdraw_deposit_contract)
-        ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
-      >>=? fun operation -> Block.bake ~operation block
-    in
+      let* operation =
+        Op.transfer_ticket
+          (B block)
+          ~source:Ctxt.account
+          ~contents:(Script.lazy_expr Nat_ticket.contents)
+          ~ty:(Script.lazy_expr Nat_ticket.ty)
+          ~ticketer:Ctxt.forge_withdraw_deposit_contract
+          ~amount:
+            (WithExceptions.Option.get ~loc:__LOC__
+            @@ Ticket_amount.of_zint
+            @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
+          ~destination:Ctxt.forge_withdraw_deposit_contract
+          ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
+      in
+      Block.bake ~operation block
+
     let token_one =
-      Nat_ticket.ex_token ~ticketer:(Originated forge_withdraw_deposit_contract)
-    in
+      Nat_ticket.ex_token ~ticketer:Ctxt.forge_withdraw_deposit_contract
+
     let assert_contract_ticket_balance ~__LOC__ block balance =
       assert_ticket_balance
         ~loc:__LOC__
         block
         token_one
-        (Contract (Originated forge_withdraw_deposit_contract))
+        (Contract Ctxt.forge_withdraw_deposit_contract)
         balance
-    in
+
     let assert_account_ticket_balance ~__LOC__ block balance =
       assert_ticket_balance
         ~loc:__LOC__
         block
         token_one
-        (Contract account)
+        (Contract Ctxt.account)
         balance
-    in
+
     let assert_tx_rollup_ticket_balance ~__LOC__ block balance =
       assert_ticket_balance
         ~loc:__LOC__
         block
         token_one
-        (Tx_rollup tx_rollup)
+        (Tx_rollup Ctxt.tx_rollup)
+        balance
+  end
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4083
+     Remove and replace the following test with transfers between
+     originated and implicit accounts directly. *)
+
+  (** [test_forge_deposit_withdraw_deposit ()] checks the following scenario:
+      1. forges new tickets and stores it in contract's storage.
+      2. deposits these tickets into a tx_rollup
+      3. dispatches them to an account
+      4. forges new tickets
+      3. transfers the tickets from the account to the contract
+      4. deposits the just received tickets into the tx_rollup *)
+  let test_forge_deposit_withdraw_deposit () =
+    let open Lwt_result_syntax in
+    let* block, account = context_init1 () in
+    let* block, tx_rollup = originate block account in
+    let* forge_withdraw_deposit_contract, block =
+      originate_forge_withdraw_deposit_contract account block
+    in
+    let open Forge_deposit_withdraw (struct
+      let forge_withdraw_deposit_contract =
+        Contract.Originated forge_withdraw_deposit_contract
+
+      let account = account
+
+      let tx_rollup = tx_rollup
+    end) in
+    (* forge tickets and store them in the contract storage. *)
+    let* block = forge_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block None in
+    let* () = assert_account_ticket_balance ~__LOC__ block None in
+    (* deposit tickets from the contract storage into the tx_rollup. *)
+    let* block = deposit_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block None in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_account_ticket_balance ~__LOC__ block None in
+    (* add withdrawals, then transfer the tickets from tx_rollup to account. *)
+    let* block = dispatch_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block None in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block None in
+    let* () = assert_account_ticket_balance ~__LOC__ block (Some 10) in
+    (* forge new tickets and store them in the contract storage. *)
+    let* block = forge_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block None in
+    let* () = assert_account_ticket_balance ~__LOC__ block (Some 10) in
+    (* transfer tickets from account to the contract. *)
+    let* block = transfer_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block (Some 20) in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block None in
+    let* () = assert_account_ticket_balance ~__LOC__ block None in
+    (* deposit back the tickets that was just transfered. *)
+    let* block = deposit_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) in
+    assert_account_ticket_balance ~__LOC__ block None
+
+  (** [test_forge_deposit_withdraw_implicit_transfer ()] checks the following scenario:
+      1. forges new tickets and stores them in contract's storage
+      2. deposits these tickets into a tx_rollup
+      3. dispatches them to an account
+      4. transfers the dispatched tickets to another implicit account *)
+  let test_forge_deposit_withdraw_implicit_transfer () =
+    let open Lwt_result_syntax in
+    let* block, (account, another_account) = context_init2 () in
+    let* block, tx_rollup = originate block account in
+    let* forge_withdraw_deposit_contract, block =
+      originate_forge_withdraw_deposit_contract account block
+    in
+    let open Forge_deposit_withdraw (struct
+      let forge_withdraw_deposit_contract =
+        Contract.Originated forge_withdraw_deposit_contract
+
+      let account = account
+
+      let tx_rollup = tx_rollup
+    end) in
+    let transfer_ticket_to_implicit_with_wrong_type block =
+      let* operation =
+        Op.transfer_ticket
+          (B block)
+          ~source:account
+          ~contents:(Script.lazy_expr Nat_ticket.contents)
+          ~ty:(Script.lazy_expr @@ Expr.from_string "string")
+          ~ticketer:(Originated forge_withdraw_deposit_contract)
+          ~amount:
+            (WithExceptions.Option.get ~loc:__LOC__
+            @@ Ticket_amount.of_zint
+            @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
+          ~destination:another_account
+          ~entrypoint:Entrypoint.default
+      in
+      Block.bake ~operation block
+    in
+    let transfer_ticket_to_implicit_with_too_large_amount block =
+      let* operation =
+        Op.transfer_ticket
+          (B block)
+          ~source:account
+          ~contents:(Script.lazy_expr Nat_ticket.contents)
+          ~ty:(Script.lazy_expr @@ Expr.from_string "string")
+          ~ticketer:(Originated forge_withdraw_deposit_contract)
+          ~amount:
+            (WithExceptions.Option.get ~loc:__LOC__
+            @@ Ticket_amount.of_zint @@ Z.of_int64
+            @@ Int64.add Nat_ticket.int64_amount 1L)
+          ~destination:another_account
+          ~entrypoint:Entrypoint.default
+      in
+      Block.bake ~operation block
+    in
+    let transfer_ticket_to_self_implicit block =
+      let* operation =
+        Op.transfer_ticket
+          (B block)
+          ~source:account
+          ~contents:(Script.lazy_expr Nat_ticket.contents)
+          ~ty:(Script.lazy_expr @@ Expr.from_string "string")
+          ~ticketer:(Originated forge_withdraw_deposit_contract)
+          ~amount:
+            (WithExceptions.Option.get ~loc:__LOC__
+            @@ Ticket_amount.of_zint
+            @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
+          ~destination:account
+          ~entrypoint:Entrypoint.default
+      in
+      Block.bake ~operation block
+    in
+    let transfer_ticket_to_implicit block =
+      let* operation =
+        Op.transfer_ticket
+          (B block)
+          ~source:account
+          ~contents:(Script.lazy_expr Nat_ticket.contents)
+          ~ty:(Script.lazy_expr Nat_ticket.ty)
+          ~ticketer:(Originated forge_withdraw_deposit_contract)
+          ~amount:
+            (WithExceptions.Option.get ~loc:__LOC__
+            @@ Ticket_amount.of_zint
+            @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
+          ~destination:another_account
+          ~entrypoint:Entrypoint.default
+      in
+      Block.bake ~operation block
+    in
+    let assert_another_account_ticket_balance ~__LOC__ block balance =
+      assert_ticket_balance
+        ~loc:__LOC__
+        block
+        token_one
+        (Contract another_account)
         balance
     in
     (* forge tickets and store them in the contract storage. *)
-    forge_ticket block >>=? fun block ->
-    assert_contract_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block None >>=? fun () ->
+    let* block = forge_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block None in
+    let* () = assert_account_ticket_balance ~__LOC__ block None in
     (* deposit tickets from the contract storage into the tx_rollup. *)
-    deposit_ticket block >>=? fun block ->
-    assert_contract_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block None >>=? fun () ->
+    let* block = deposit_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block None in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_account_ticket_balance ~__LOC__ block None in
     (* add withdrawals, then transfer the tickets from tx_rollup to account. *)
-    dispatch_ticket block >>=? fun block ->
-    assert_contract_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    (* forge new tickets and store them in the contract storage. *)
-    forge_ticket block >>=? fun block ->
-    assert_contract_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    (* transfer tickets from account to the contract. *)
-    transfer_ticket block >>=? fun block ->
-    assert_contract_ticket_balance ~__LOC__ block (Some 20) >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block None >>=? fun () ->
-    deposit_ticket block >>=? fun block ->
-    (* deposit back the tickets that was just transfered. *)
-    assert_contract_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block None
+    let* block = dispatch_ticket block in
+    let* () = assert_contract_ticket_balance ~__LOC__ block None in
+    let* () = assert_tx_rollup_ticket_balance ~__LOC__ block None in
+    let* () = assert_account_ticket_balance ~__LOC__ block (Some 10) in
+    (* transfer the tickets dispatched from tx_rollup to another implicit account (error cases). *)
+    let*! result = transfer_ticket_to_implicit_with_wrong_type block in
+    let* () =
+      Assert.is_error
+        ~pp:(fun pp _ ->
+          Format.pp_print_string
+            pp
+            "tickets with wrong type should not be accepted")
+        ~loc:__LOC__
+        result
+    in
+    let*! result = transfer_ticket_to_implicit_with_too_large_amount block in
+    let* () =
+      Assert.is_error
+        ~pp:(fun pp _ ->
+          Format.pp_print_string
+            pp
+            "over-drafting tickets should not be acceptable")
+        ~loc:__LOC__
+        result
+    in
+    let*! result = transfer_ticket_to_self_implicit block in
+    let* () =
+      Assert.is_error
+        ~pp:(fun pp _ ->
+          Format.pp_print_string
+            pp
+            "transferring tickets to oneself should not be acceptable")
+        ~loc:__LOC__
+        result
+    in
+    let* () = assert_account_ticket_balance ~__LOC__ block (Some 10) in
+    let* () = assert_another_account_ticket_balance ~__LOC__ block None in
+    (* transfer the tickets dispatched from tx_rollup to another implicit account (success case). *)
+    let* block = transfer_ticket_to_implicit block in
+    let* () = assert_account_ticket_balance ~__LOC__ block None in
+    assert_another_account_ticket_balance ~__LOC__ block (Some 10)
 
   let tests =
     [
@@ -5637,10 +5820,14 @@ module Withdraw = struct
         `Quick
         test_multiple_withdrawals_multiple_batches;
       Tztest.tztest
-        "Test multiple withdrawals from the same batch and from different \
-         batches"
+        "Test deposit, followed by withdrawal, followed by deposit"
         `Quick
         test_forge_deposit_withdraw_deposit;
+      Tztest.tztest
+        "Test deposit, followed by withdrawal, followed by transfer to an \
+         implicit account"
+        `Quick
+        test_forge_deposit_withdraw_implicit_transfer;
     ]
 end
 

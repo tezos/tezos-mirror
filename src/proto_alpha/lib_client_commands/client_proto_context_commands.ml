@@ -2862,7 +2862,9 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Transfer tickets from an implicit account to a contract."
+      ~desc:
+        "Transfer tickets from an implicit account to a contract or another \
+         implicit account."
       (args7
          fee_arg
          dry_run_switch
@@ -2884,7 +2886,9 @@ let commands_rw () =
       @@ prefixes ["with"; "entrypoint"]
       @@ Tezos_clic.param
            ~name:"entrypoint"
-           ~desc:"Entrypoint to use on the receiving contract."
+           ~desc:
+             "Entrypoint to use on the receiving contract or implicit account. \
+              Needs to be \"default\" for implicit account destinations."
            entrypoint_parameter
       @@ prefixes ["and"; "contents"]
       @@ Tezos_clic.param

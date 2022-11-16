@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Margiold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,10 +26,7 @@
 
 open Alpha_context
 
-(** This module provides various helpers to manipulate tickets, that
-    are used by the Transaction Rollups. *)
-
-(** [parse_ticket ~consume_deserialization_gas ~ticketer ~contents ~ty
+(** [parse_ticket ~ticketer ~contents ~ty
     ctxt] reconstructs a ticket from individual parts submitted as
     part of a layer-1 operation. *)
 val parse_ticket :
@@ -56,18 +54,6 @@ val parse_ticket_and_operation :
   tzresult
   Lwt.t
 
-(** [make_withdraw_order ctxt tx_rollup ex_token claimer amount]
-    computes a withdraw order that specify that [claimer] is entitled
-    to get the ownership of [amount] units of [ex_token] which were
-    deposited to [tx_rollup]. *)
-val make_withdraw_order :
-  context ->
-  Tx_rollup.t ->
-  Ticket_token.ex_token ->
-  public_key_hash ->
-  Tx_rollup_l2_qty.t ->
-  (context * Tx_rollup_withdraw.order) tzresult Lwt.t
-
 (** [transfer_ticket_with_hashes ctxt ~src_hash ~dst_hash qty] updates
     the table of tickets moves [qty] units of a given ticket from a
     source to a destination, as encoded by [src_hash] and [dst_hash].
@@ -85,7 +71,7 @@ val transfer_ticket_with_hashes :
   context ->
   src_hash:Ticket_hash.t ->
   dst_hash:Ticket_hash.t ->
-  Script_typed_ir.ticket_amount ->
+  Ticket_amount.t ->
   (context * Z.t) tzresult Lwt.t
 
 (** [transfer_ticket ctxt ~src ~dst ex_token qty] updates the table of
@@ -100,5 +86,5 @@ val transfer_ticket :
   src:Destination.t ->
   dst:Destination.t ->
   Ticket_token.ex_token ->
-  Script_typed_ir.ticket_amount ->
+  Ticket_amount.t ->
   (context * Z.t, error trace) result Lwt.t

@@ -39,7 +39,6 @@ type error +=
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
-  | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
@@ -188,15 +187,6 @@ let () =
     (function
       | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
     (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"operation.cannot_transfer_ticket_to_implicit"
-    ~title:"Cannot transfer ticket to implicit account"
-    ~description:"Cannot transfer ticket to implicit account"
-    Data_encoding.unit
-    (function Cannot_transfer_ticket_to_implicit -> Some () | _ -> None)
-    (fun () -> Cannot_transfer_ticket_to_implicit) ;
 
   let description =
     "Smart contract rollups will be enabled in a future proposal."
@@ -818,20 +808,19 @@ let apply_manager_operation :
             Tx_rollup_l2_qty.(amount <= zero)
             Script_tc_errors.Forbidden_zero_ticket_quantity
           >>?= fun () ->
-          Tx_rollup_ticket.parse_ticket
+          Ticket_transfer.parse_ticket
             ~consume_deserialization_gas
             ~ticketer
             ~contents
             ~ty
             ctxt
           >>=? fun (ctxt, ticket_token) ->
-          Tx_rollup_ticket.make_withdraw_order
+          Ticket_balance_key.of_ex_token
             ctxt
-            tx_rollup
+            ~owner:(Tx_rollup tx_rollup)
             ticket_token
-            claimer
-            amount
-          >>=? fun (ctxt, withdrawal) ->
+          >>=? fun (ticket_hash, ctxt) ->
+          let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return
             (withdrawal :: acc_withdraw, (withdrawal, ticket_token) :: acc, ctxt))
         ([], [], ctxt)
@@ -868,7 +857,7 @@ let apply_manager_operation :
           ~owner:(Contract (Contract.Implicit claimer))
           ticket_token
         >>=? fun (claimer_ticket_hash, ctxt) ->
-        Tx_rollup_ticket.transfer_ticket_with_hashes
+        Ticket_transfer.transfer_ticket_with_hashes
           ctxt
           ~src_hash:tx_rollup_ticket_hash
           ~dst_hash:claimer_ticket_hash
@@ -892,9 +881,36 @@ let apply_manager_operation :
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
     -> (
       match destination with
-      | Implicit _ -> fail Cannot_transfer_ticket_to_implicit
+      | Implicit _ ->
+          error_unless
+            Entrypoint.(entrypoint = default)
+            (Script_tc_errors.No_such_entrypoint entrypoint)
+          >>?= fun () ->
+          Ticket_transfer.parse_ticket
+            ~consume_deserialization_gas
+            ~ticketer
+            ~contents
+            ~ty
+            ctxt
+          >>=? fun (ctxt, ticket) ->
+          Ticket_transfer.transfer_ticket
+            ctxt
+            ~src:(Contract source_contract)
+            ~dst:(Contract destination)
+            ticket
+            amount
+          >>=? fun (ctxt, paid_storage_size_diff) ->
+          return
+            ( ctxt,
+              Transfer_ticket_result
+                {
+                  balance_updates = [];
+                  consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+                  paid_storage_size_diff;
+                },
+              [] )
       | Originated destination_hash ->
-          Tx_rollup_ticket.parse_ticket_and_operation
+          Ticket_transfer.parse_ticket_and_operation
             ~consume_deserialization_gas
             ~ticketer
             ~contents
@@ -904,23 +920,23 @@ let apply_manager_operation :
             ~entrypoint
             ~amount
             ctxt
-          >>=? fun (ctxt, ticket_token, op) ->
-          Tx_rollup_ticket.transfer_ticket
+          >>=? fun (ctxt, token, op) ->
+          Ticket_transfer.transfer_ticket
             ctxt
             ~src:(Contract source_contract)
             ~dst:(Contract destination)
-            ticket_token
+            token
             amount
           >>=? fun (ctxt, paid_storage_size_diff) ->
-          let result =
-            Transfer_ticket_result
-              {
-                balance_updates = [];
-                consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
-                paid_storage_size_diff;
-              }
-          in
-          return (ctxt, result, [op]))
+          return
+            ( ctxt,
+              Transfer_ticket_result
+                {
+                  balance_updates = [];
+                  consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+                  paid_storage_size_diff;
+                },
+              [op] ))
   | Origination {delegate; script; credit} ->
       (* Internal originations have their address generated in the interpreter
          so that the script can use it immediately.
