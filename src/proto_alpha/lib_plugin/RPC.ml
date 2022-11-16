@@ -1947,8 +1947,8 @@ module Sc_rollup = struct
     let prefix : RPC_context.t RPC_path.context =
       RPC_path.(open_root / "context" / "sc_rollups")
 
-    let path_sc_rollup :
-        (RPC_context.t, RPC_context.t * Sc_rollup.t) RPC_path.t =
+    let path_sc_rollup : (RPC_context.t, RPC_context.t * Sc_rollup.t) RPC_path.t
+        =
       RPC_path.(prefix / "sc_rollup" /: Sc_rollup.Address.rpc_arg)
 
     let path_sc_rollups : RPC_context.t RPC_path.context =
