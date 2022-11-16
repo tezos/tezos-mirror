@@ -72,16 +72,16 @@ module Internal_state = struct
 
     {[
       stateDiagram
-      Snapshot --> Collect : reboot_flag is not set
-      Snapshot --> Evaluation : reboot_flag is set
+      Collect --> Padding
+      Snapshot --> Evaluation
       state Evaluation {
         Decode --> Link
         Link --> Init
         Init --> Eval
       }
       Evaluation --> Padding : evaluation succeeded
-      Collect --> Padding
-      Padding --> Snapshot
+      Padding --> Snapshot : reboot flag is set
+      Padding --> Collect : reboot flag is not set
       Evaluation --> Stuck : something went wrong
     ]}
   *)

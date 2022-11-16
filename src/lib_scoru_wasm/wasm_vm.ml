@@ -117,17 +117,17 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
         return ~durable Padding
       else return ~status:Failing (Stuck (No_fallback_kernel cause))
   | Stuck e -> return ~status:Failing (Stuck e)
-  | Snapshot -> (
-      let* reboot_status = mark_for_reboot pvm_state in
-      match reboot_status with
-      | `Reboot -> return ~status:Reboot ~durable (initial_boot_state ())
-      | `Forcing_yield -> return ~status:Forcing_yield ~durable Collect
-      | `Yielding -> return ~status:Yielding ~durable Collect)
+  | Snapshot -> return (initial_boot_state ())
   | Collect ->
       return
         ~status:Failing
         (Stuck (Wasm_pvm_errors.invalid_state "Collect is a input tick"))
-  | Padding when is_time_for_snapshot pvm_state -> return ~durable Snapshot
+  | Padding when is_time_for_snapshot pvm_state -> (
+      let* reboot_status = mark_for_reboot pvm_state in
+      match reboot_status with
+      | `Reboot -> return ~status:Reboot Snapshot
+      | `Forcing_yield -> return ~status:Forcing_yield Collect
+      | `Yielding -> return ~status:Yielding Collect)
   | _ when is_time_for_snapshot pvm_state ->
       (* Execution took too many ticks *)
       return ~status:Failing (Stuck Too_many_ticks)
@@ -263,7 +263,7 @@ let next_tick_state pvm_state =
   Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
 let next_last_top_level_call {current_tick; last_top_level_call; _} = function
-  | Forcing_yield | Yielding | Reboot -> current_tick
+  | Forcing_yield | Yielding | Reboot -> Z.succ current_tick
   | Failing | Running -> last_top_level_call
 
 let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _} status =

@@ -137,16 +137,6 @@ let eval_kernel_next tree =
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
       let* tree = eval_to_snapshot ~max_steps:Int64.max_int tree in
-      (* If the reboot key is set, the next phase will be an evaluation, we can
-         safely stop here. Otherwise, the next phase will be a input phase, but
-         the next step (Snapshot) is not an input tick: we simply go to the next
-         input tick. Otherwise, the user needs to step to it themself. *)
-      let* reboot =
-        Repl_helpers.find_key_in_durable tree Constants.reboot_flag_key
-      in
-      let* tree =
-        if reboot = None then eval_until_input_requested tree else return tree
-      in
       let+ info_after = Wasm.get_info tree in
       ( tree,
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))

@@ -47,9 +47,9 @@ let initial_tree ?(max_tick = default_max_tick)
     code =
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in
-  let* empty_tree = empty_tree () in
+  let* tree = empty_tree () in
   let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
-  let* tree = Wasm.install_boot_sector boot_sector empty_tree in
+  let* tree = Wasm.install_boot_sector boot_sector tree in
   let* tree = Wasm.Internal_for_tests.set_max_nb_ticks max_tick_Z tree in
   Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
 
@@ -77,7 +77,7 @@ let rec eval_to_snapshot ?(max_steps = Int64.max_int) tree =
     in
     let* state = Wasm.Internal_for_tests.get_tick_state tree in
     match state with
-    | Snapshot -> return tree
+    | Snapshot | Collect -> return tree
     | _ -> eval_to_snapshot ~max_steps tree
   in
   let* info = Wasm.get_info tree in

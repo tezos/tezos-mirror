@@ -31,7 +31,7 @@ module Parsing = Binary_parser_encodings
 let tick_state_encoding =
   let open Tezos_tree_encoding in
   tagged_union
-    ~default:(fun () -> Snapshot)
+    ~default:(fun () -> Collect)
     (value [] Data_encoding.string)
     [
       case
@@ -96,12 +96,12 @@ let tick_state_encoding =
         (fun err -> Stuck err);
       case
         "collect"
-        (value [] Data_encoding.unit)
+        (return ())
         (function Collect -> Some () | _ -> None)
         (fun () -> Collect);
       case
         "padding"
-        (value [] Data_encoding.unit)
+        (return ())
         (function Padding -> Some () | _ -> None)
         (fun () -> Padding);
     ]
@@ -208,11 +208,26 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
   let install_boot_sector bs tree =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4240
+       We cannot manipulate the durable storage at this point, because
+       the `durable` directory is empty. *)
+    let reboot_flag = Tezos_lazy_containers.Chunked_byte_vector.of_string "" in
     let bs = Tezos_lazy_containers.Chunked_byte_vector.of_string bs in
     Tree_encoding_runner.encode
       Tezos_tree_encoding.(
-        scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector)
-      bs
+        tup2
+          ~flatten:true
+          (* We set the reboot flag in the durable storage to allow a
+             reboot to the evaluation phase once the collection of the
+             first inbox is done.
+
+             After this, the flag is set by the PVM state machine
+             itself (in [compute_step]). *)
+          (scope
+             ["durable"; "kernel"; "env"; "reboot"; "_"]
+             chunked_byte_vector)
+          (scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector))
+      (reboot_flag, bs)
       tree
 
   let compute_step_many ?stop_at_snapshot ~max_steps tree =
@@ -293,7 +308,13 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let set_maximum_reboots_per_input n tree =
       let open Lwt_syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let pvm_state = {pvm_state with maximum_reboots_per_input = n} in
+      let pvm_state =
+        {
+          pvm_state with
+          maximum_reboots_per_input = n;
+          reboot_counter = Z.(min (succ n) pvm_state.reboot_counter);
+        }
+      in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
     let decr_reboot_counter tree =
@@ -308,7 +329,10 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let open Lwt_syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let pvm_state =
-        {pvm_state with reboot_counter = pvm_state.maximum_reboots_per_input}
+        {
+          pvm_state with
+          reboot_counter = Z.succ pvm_state.maximum_reboots_per_input;
+        }
       in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
