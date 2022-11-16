@@ -3494,6 +3494,39 @@ module Sc_rollup : sig
 
   val output_encoding : output Data_encoding.t
 
+  module Dissection_chunk : sig
+    type t = {state_hash : State_hash.t option; tick : Tick.t}
+
+    val equal : t -> t -> bool
+
+    val pp : Format.formatter -> t -> unit
+
+    val default_check :
+      default_number_of_sections:int ->
+      start_chunk:t ->
+      stop_chunk:t ->
+      t list ->
+      unit tzresult
+
+    type error +=
+      | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
+      | Dissection_invalid_number_of_sections of Z.t
+      | Dissection_start_hash_mismatch of {
+          expected : State_hash.t option;
+          given : State_hash.t option;
+        }
+      | Dissection_stop_hash_mismatch of State_hash.t option
+      | Dissection_edge_ticks_mismatch of {
+          dissection_start_tick : Tick.t;
+          dissection_stop_tick : Tick.t;
+          chunk_start_tick : Tick.t;
+          chunk_stop_tick : Tick.t;
+        }
+      | Dissection_ticks_not_increasing
+      | Dissection_invalid_distribution
+      | Dissection_invalid_successive_states_shape
+  end
+
   module PVM : sig
     type boot_sector = string
 
@@ -3855,11 +3888,7 @@ module Sc_rollup : sig
 
     val player_encoding : player Data_encoding.t
 
-    type dissection_chunk = {state_hash : State_hash.t option; tick : Tick.t}
-
-    val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
-
-    val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+    type dissection_chunk = Dissection_chunk.t
 
     type game_state =
       | Dissecting of {
@@ -3956,22 +3985,6 @@ module Sc_rollup : sig
 
     type error +=
       | Dissection_choice_not_found of Tick.t
-      | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
-      | Dissection_invalid_number_of_sections of Z.t
-      | Dissection_start_hash_mismatch of {
-          expected : State_hash.t option;
-          given : State_hash.t option;
-        }
-      | Dissection_stop_hash_mismatch of State_hash.t option
-      | Dissection_edge_ticks_mismatch of {
-          dissection_start_tick : Tick.t;
-          dissection_stop_tick : Tick.t;
-          chunk_start_tick : Tick.t;
-          chunk_stop_tick : Tick.t;
-        }
-      | Dissection_ticks_not_increasing
-      | Dissection_invalid_distribution
-      | Dissection_invalid_successive_states_shape
       | Proof_unexpected_section_size of Z.t
       | Proof_start_state_hash_mismatch of {
           start_state_hash : State_hash.t option;

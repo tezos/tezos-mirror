@@ -167,7 +167,7 @@ let gen_dissection_chunk =
   let open Gen in
   let* state_hash = opt gen_state_hash in
   let+ tick = gen_tick in
-  Sc_rollup_game_repr.{state_hash; tick}
+  Sc_rollup_dissection_chunk_repr.{state_hash; tick}
 
 let gen_dissection =
   let open Gen in
