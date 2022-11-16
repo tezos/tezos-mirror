@@ -95,11 +95,11 @@ let remove_bond :
   Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) contract
   >>=? fun (ctxt, bond) ->
   match bond with
-  | None -> fail (Bond_does_not_exist contract)
+  | None -> tzfail (Bond_does_not_exist contract)
   | Some 0 ->
       Storage.Tx_rollup.Commitment_bond.remove (ctxt, tx_rollup) contract
       >>=? fun (ctxt, _, _) -> return ctxt
-  | Some _ -> fail (Bond_in_use contract)
+  | Some _ -> tzfail (Bond_in_use contract)
 
 let slash_bond ctxt tx_rollup contract =
   Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) contract
@@ -136,7 +136,7 @@ let get :
  fun ctxt tx_rollup state level ->
   find ctxt tx_rollup state level >>=? fun (ctxt, commitment) ->
   match commitment with
-  | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
+  | None -> tzfail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
 let get_finalized :
@@ -159,7 +159,7 @@ let get_finalized :
   Storage.Tx_rollup.Commitment.find (ctxt, tx_rollup) level
   >>=? fun (ctxt, commitment) ->
   match commitment with
-  | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
+  | None -> tzfail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
 let check_commitment_level current_level state commitment =
@@ -186,7 +186,7 @@ let check_commitment_predecessor ctxt state commitment =
   | Some pred_hash, Some expected_hash when Hash.(pred_hash = expected_hash) ->
       return ctxt
   | None, None -> return ctxt
-  | provided, expected -> fail (Wrong_predecessor_hash {provided; expected})
+  | provided, expected -> tzfail (Wrong_predecessor_hash {provided; expected})
 
 let check_commitment_batches_and_merkle_root ctxt state inbox commitment =
   let Tx_rollup_inbox_repr.{inbox_length; merkle_root; _} = inbox in
@@ -298,7 +298,7 @@ let finalize_commitment ctxt rollup state =
       (* We update the state *)
       Tx_rollup_state_repr.record_inbox_deletion state oldest_inbox_level
       >>?= fun state -> return (ctxt, state, oldest_inbox_level)
-  | None -> fail No_commitment_to_finalize
+  | None -> tzfail No_commitment_to_finalize
 
 let remove_commitment ctxt rollup state =
   match Tx_rollup_state_repr.next_commitment_to_remove state with
@@ -316,7 +316,7 @@ let remove_commitment ctxt rollup state =
             Remove_commitment_too_early
       | None ->
           (* unreachable code if the implementation is correct *)
-          fail (Internal_error "Missing finalized_at field"))
+          tzfail (Internal_error "Missing finalized_at field"))
       >>=? fun () ->
       (* Decrement the bond count of the committer *)
       adjust_commitments_count ctxt rollup commitment.committer ~dir:`Decr
@@ -335,7 +335,7 @@ let remove_commitment ctxt rollup state =
         commitment.commitment_hash
         msg_hash
       >>?= fun state -> return (ctxt, state, tail)
-  | None -> fail No_commitment_to_remove
+  | None -> tzfail No_commitment_to_remove
 
 let check_agreed_and_disputed_results ctxt tx_rollup state
     (submitted_commitment : Submitted_commitment.t) ~agreed_result
@@ -382,7 +382,7 @@ let check_agreed_and_disputed_results ctxt tx_rollup state
                   (Wrong_rejection_hash
                      {provided = agreed; expected = `Hash last_hash})
                 >>=? fun () -> return ctxt
-            | None -> fail (Internal_error "Missing commitment predecessor")))
+            | None -> tzfail (Internal_error "Missing commitment predecessor")))
   else
     check_message_result
       ctxt

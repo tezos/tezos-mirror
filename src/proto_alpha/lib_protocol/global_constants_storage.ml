@@ -140,7 +140,7 @@ let () =
 let get context hash =
   Storage.Global_constants.Map.find context hash >>=? fun (context, value) ->
   match value with
-  | None -> fail Nonexistent_global
+  | None -> tzfail Nonexistent_global
   | Some value -> return (context, value)
 
 let expr_to_address_in_context context expr =
@@ -186,7 +186,7 @@ let expand_node context node =
               being a properly formatted hash. *)
           | [String (_, address)], [] -> (
               match Script_expr_hash.of_b58check_opt address with
-              | None -> fail Badly_formed_constant_expression
+              | None -> tzfail Badly_formed_constant_expression
               | Some hash -> (
                   match Expr_hash_map.find hash map with
                   | Some node ->
@@ -204,7 +204,7 @@ let expand_node context node =
                         (Gas_costs.expand_no_constants_branch_cost node)
                       >>?= fun context ->
                       k (context, Expr_hash_map.add hash node map, true) node))
-          | _ -> fail Badly_formed_constant_expression)
+          | _ -> tzfail Badly_formed_constant_expression)
       | Int _ | String _ | Bytes _ | Prim _ | Seq _ ->
           k (context, map, did_expansion) node)
   >>=? fun (context, node, did_expansion) ->
@@ -212,7 +212,7 @@ let expand_node context node =
     (* Gas charged during expansion is at least proportional to the size of the
        resulting node so the execution time of [node_too_large] is already
        covered. *)
-    if node_too_large node then fail Expression_too_large
+    if node_too_large node then tzfail Expression_too_large
     else return (context, node)
   else return (context, node)
 

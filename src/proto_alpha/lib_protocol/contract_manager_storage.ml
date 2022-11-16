@@ -124,7 +124,7 @@ let check_public_key public_key expected_hash =
 let reveal_manager_key ?(check_consistency = true) c manager public_key =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Manager.get c contract >>=? function
-  | Public_key _ -> fail (Previously_revealed_key contract)
+  | Public_key _ -> tzfail (Previously_revealed_key contract)
   | Hash expected_hash ->
       (* Ensure that the manager is equal to the retrieved hash. *)
       error_unless
@@ -153,12 +153,12 @@ let get_manager_key ?error ctxt pkh =
   Storage.Contract.Manager.find ctxt contract >>=? function
   | None -> (
       match error with
-      | None -> fail (Missing_manager_contract contract)
-      | Some error -> fail error)
+      | None -> tzfail (Missing_manager_contract contract)
+      | Some error -> tzfail error)
   | Some (Manager_repr.Hash _) -> (
       match error with
-      | None -> fail (Unrevealed_manager_key contract)
-      | Some error -> fail error)
+      | None -> tzfail (Unrevealed_manager_key contract)
+      | Some error -> tzfail error)
   | Some (Manager_repr.Public_key pk) -> return pk
 
 let remove_existing = Storage.Contract.Manager.remove_existing

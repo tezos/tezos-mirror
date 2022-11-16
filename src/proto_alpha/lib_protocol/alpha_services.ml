@@ -200,7 +200,7 @@ module Snapshot_index = struct
         if Compare.Int32.(Cycle.to_int32 cycle <= Int32.succ preserved_cycles)
         then
           (* Early cycles are corner cases, fail if requested *)
-          fail
+          tzfail
             (No_available_snapshots {min_cycle = Int32.add preserved_cycles 2l})
         else
           let max_snapshot_index =

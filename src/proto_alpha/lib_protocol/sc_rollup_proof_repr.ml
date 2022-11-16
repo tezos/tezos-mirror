@@ -191,7 +191,7 @@ let check p reason =
 
 let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-  | None -> fail Sc_rollup_invalid_serialized_inbox_proof
+  | None -> tzfail Sc_rollup_invalid_serialized_inbox_proof
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 

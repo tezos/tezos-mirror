@@ -86,19 +86,19 @@ let () =
 let get_unrevealed ctxt (level : Level_repr.t) =
   let current_level = Level_storage.current ctxt in
   match Cycle_repr.pred current_level.cycle with
-  | None -> fail Too_early_revelation (* no revelations during cycle 0 *)
+  | None -> tzfail Too_early_revelation (* no revelations during cycle 0 *)
   | Some revealed_cycle -> (
       if Cycle_repr.(revealed_cycle < level.Level_repr.cycle) then
-        fail Too_early_revelation
+        tzfail Too_early_revelation
       else if
         Cycle_repr.(level.Level_repr.cycle < revealed_cycle)
         || Compare.Int32.(
              current_level.cycle_position
              >= Constants_storage.nonce_revelation_threshold ctxt)
-      then fail Too_late_revelation
+      then tzfail Too_late_revelation
       else
         Storage.Seed.Nonce.get ctxt level >>=? function
-        | Revealed _ -> fail Already_revealed_nonce
+        | Revealed _ -> tzfail Already_revealed_nonce
         | Unrevealed status -> return status)
 
 let record_hash ctxt unrevealed =

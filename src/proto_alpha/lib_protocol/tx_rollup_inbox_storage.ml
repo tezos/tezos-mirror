@@ -42,7 +42,7 @@ let get :
     (Raw_context.t * Tx_rollup_inbox_repr.t) tzresult Lwt.t =
  fun ctxt level tx_rollup ->
   find ctxt level tx_rollup >>=? function
-  | _, None -> fail (Inbox_does_not_exist (tx_rollup, level))
+  | _, None -> tzfail (Inbox_does_not_exist (tx_rollup, level))
   | ctxt, Some inbox -> return (ctxt, inbox)
 
 (** [prepare_inbox ctxt rollup state level] prepares the metadata
@@ -71,7 +71,7 @@ let prepare_inbox :
   let current_levels = Tx_rollup_state_repr.head_levels state in
   match current_levels with
   | Some (_, tezos_lvl) when Raw_level_repr.(level < tezos_lvl) ->
-      fail (Internal_error "Trying to write into an inbox from the past")
+      tzfail (Internal_error "Trying to write into an inbox from the past")
   | Some (tx_lvl, tezos_lvl) when Raw_level_repr.(tezos_lvl = level) ->
       (* An inbox should already exists *)
       Storage.Tx_rollup.Inbox.get (ctxt, rollup) tx_lvl
