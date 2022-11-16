@@ -34,7 +34,7 @@ let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
         (message : Sc_rollup_inbox_message_repr.serialized :> string) )
 
 let get_inbox ctxt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* inbox = Store.Inbox.get ctxt in
   return (inbox, ctxt)
 
@@ -55,7 +55,7 @@ let _assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
 
 let add_messages ctxt messages =
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Raw_context in
   let* inbox, ctxt = get_inbox ctxt in
   let* num_messages, total_messages_size, ctxt =
@@ -121,7 +121,7 @@ let serialize_external_messages ctxt external_messages =
   let open Sc_rollup_inbox_message_repr in
   List.fold_left_map_e
     (fun ctxt message ->
-      let open Tzresult_syntax in
+      let open Result_syntax in
       (* Pay gas for serializing an external message. *)
       let* ctxt =
         let bytes_len = String.length message in

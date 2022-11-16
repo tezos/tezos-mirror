@@ -93,7 +93,7 @@ let pp ppf {delegate; consensus_pkh} =
 *)
 
 let check_unused ctxt pkh =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
   fail_when is_active Invalid_consensus_key_update_active
 
@@ -102,14 +102,14 @@ let set_unused = Storage.Consensus_keys.remove
 let set_used = Storage.Consensus_keys.add
 
 let init ctxt delegate pk =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt pkh in
   let*! ctxt = set_used ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
 let active_pubkey ctxt delegate =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* pk =
     Storage.Contract.Consensus_key.get ctxt (Contract_repr.Implicit delegate)
   in
@@ -117,12 +117,12 @@ let active_pubkey ctxt delegate =
   return {consensus_pk = pk; consensus_pkh = pkh; delegate}
 
 let active_key ctxt delegate =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* pk = active_pubkey ctxt delegate in
   return (pkh pk)
 
 let raw_pending_updates ctxt delegate =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! pendings =
     Storage.Contract.Pending_consensus_keys.bindings
       (ctxt, Contract_repr.Implicit delegate)
@@ -130,7 +130,7 @@ let raw_pending_updates ctxt delegate =
   return pendings
 
 let pending_updates ctxt delegate =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* updates = raw_pending_updates ctxt delegate in
   let updates =
     List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
@@ -138,7 +138,7 @@ let pending_updates ctxt delegate =
   return (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk)) updates)
 
 let raw_active_pubkey_for_cycle ctxt delegate cycle =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* pendings = raw_pending_updates ctxt delegate in
   let* active = active_pubkey ctxt delegate in
   let current_level = Raw_context.current_level ctxt in
@@ -152,7 +152,7 @@ let raw_active_pubkey_for_cycle ctxt delegate cycle =
   return active_for_cycle
 
 let active_pubkey_for_cycle ctxt delegate cycle =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* _, consensus_pk = raw_active_pubkey_for_cycle ctxt delegate cycle in
   return
     {
@@ -162,7 +162,7 @@ let active_pubkey_for_cycle ctxt delegate cycle =
     }
 
 let register_update ctxt delegate pk =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let update_cycle =
     let current_level = Raw_context.current_level ctxt in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
@@ -192,7 +192,7 @@ let register_update ctxt delegate pk =
   return ctxt
 
 let activate ctxt ~new_cycle =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Storage.Delegates.fold
     ctxt
     ~order:`Undefined

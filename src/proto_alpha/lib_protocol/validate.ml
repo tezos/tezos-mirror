@@ -631,7 +631,7 @@ module Consensus = struct
   open Validate_errors.Consensus
 
   let check_frozen_deposits_are_positive ctxt delegate_pkh =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* frozen_deposits = Delegate.frozen_deposits ctxt delegate_pkh in
     fail_unless
       Tez.(frozen_deposits.current_amount > zero)
@@ -718,7 +718,7 @@ module Consensus = struct
 
   let check_preendorsement vi ~check_signature
       (operation : Kind.preendorsement operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
     in
@@ -824,7 +824,7 @@ module Consensus = struct
       function will only be called in [Partial_construction] mode. *)
   let check_grandparent_endorsement vi ~check_signature expected operation
       (consensus_content : consensus_content) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let kind = Grandparent_endorsement in
     let level = Level.from_raw vi.ctxt consensus_content.level in
     let* (_ctxt : t), consensus_key =
@@ -905,7 +905,7 @@ module Consensus = struct
       during block validation or construction. *)
   let check_normal_endorsement vi ~check_signature
       (operation : Kind.endorsement operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Endorsement consensus_content)) =
       operation.protocol_data.contents
     in
@@ -977,7 +977,7 @@ module Consensus = struct
 
   let check_endorsement vi ~check_signature
       (operation : Kind.endorsement operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Endorsement consensus_content)) =
       operation.protocol_data.contents
     in
@@ -1058,7 +1058,7 @@ module Consensus = struct
        endorsement encoding. However, once the DAL is ready, this
        operation should be merged with an endorsement or at least
        refined. *)
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Dal_slot_availability op)) =
       operation.protocol_data.contents
     in
@@ -1164,7 +1164,7 @@ module Consensus = struct
 
   let validate_preendorsement ~check_signature info operation_state block_state
       oph (operation : Kind.preendorsement operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
     in
@@ -1193,7 +1193,7 @@ module Consensus = struct
 
   let validate_endorsement ~check_signature info operation_state block_state oph
       operation =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* kind = check_endorsement info ~check_signature operation in
     let*? () =
       check_endorsement_conflict operation_state oph operation
@@ -1225,14 +1225,14 @@ module Voting = struct
       (Wrong_voting_period_index {expected; provided = period_index})
 
   let check_proposals_source_is_registered ctxt source =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! is_registered = Delegate.registered ctxt source in
     fail_unless is_registered (Proposals_from_unregistered_delegate source)
 
   (** Check that the list of proposals is not empty and does not contain
       duplicates. *)
   let check_proposal_list_sanity proposals =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let* () =
       match proposals with [] -> error Empty_proposals | _ :: _ -> ok_unit
     in
@@ -1257,7 +1257,7 @@ module Voting = struct
         error (Wrong_voting_period_kind {current; expected = [Proposal]})
 
   let check_in_listings ctxt source =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! in_listings = Vote.in_listings ctxt source in
     fail_unless in_listings Source_not_in_vote_listings
 
@@ -1272,7 +1272,7 @@ module Voting = struct
          {previous_count = count_in_ctxt; operation_count = proposals_length})
 
   let check_already_proposed ctxt proposer proposals =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     List.iter_es
       (fun proposal ->
         let*! already_proposed = Vote.has_proposed ctxt proposer proposal in
@@ -1345,7 +1345,7 @@ module Voting = struct
       incorrectly signed. *)
   let check_proposals vi ~check_signature (operation : Kind.proposals operation)
       =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Proposals {source; period; proposals})) =
       operation.protocol_data.contents
     in
@@ -1382,7 +1382,7 @@ module Voting = struct
       (regardless of whether this source is a testnet dictator or an
       ordinary manager). *)
   let check_proposals_conflict vs oph (operation : Kind.proposals operation) =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let (Single (Proposals {source; _})) = operation.protocol_data.contents in
     match
       Signature.Public_key_hash.Map.find_opt
@@ -1417,7 +1417,7 @@ module Voting = struct
     {vs with voting_state = {vs.voting_state with proposals_seen}}
 
   let check_ballot_source_is_registered ctxt source =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! is_registered = Delegate.registered ctxt source in
     fail_unless is_registered (Ballot_from_unregistered_delegate source)
 
@@ -1430,7 +1430,7 @@ module Voting = struct
              {current; expected = [Exploration; Promotion]})
 
   let check_current_proposal ctxt op_proposal =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* current_proposal = Vote.get_current_proposal ctxt in
     fail_unless
       (Protocol_hash.equal op_proposal current_proposal)
@@ -1438,7 +1438,7 @@ module Voting = struct
          {current = current_proposal; submitted = op_proposal})
 
   let check_source_has_not_already_voted ctxt source =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! has_ballot = Vote.has_recorded_ballot ctxt source in
     fail_when has_ballot Already_submitted_a_ballot
 
@@ -1467,7 +1467,7 @@ module Voting = struct
       Operation.Invalid_signature] if the operation is unsigned or
       incorrectly signed. *)
   let check_ballot vi ~check_signature (operation : Kind.ballot operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Ballot {source; period; proposal; ballot = _})) =
       operation.protocol_data.contents
     in
@@ -1526,7 +1526,7 @@ module Anonymous = struct
     let (Single (Activate_account {id = edpkh; activation_code})) =
       operation.protocol_data.contents
     in
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let blinded_pkh =
       Blinded_public_key_hash.of_ed25519_pkh activation_code edpkh
     in
@@ -1602,7 +1602,7 @@ module Anonymous = struct
       ~consensus_operation:denunciation_kind vi
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | Single (Preendorsement e1), Single (Preendorsement e2)
     | Single (Endorsement e1), Single (Endorsement e2) ->
@@ -1761,7 +1761,7 @@ module Anonymous = struct
 
   let check_double_baking_evidence vi
       (operation : Kind.double_baking_evidence operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Double_baking_evidence {bh1; bh2})) =
       operation.protocol_data.contents
     in
@@ -1888,7 +1888,7 @@ module Anonymous = struct
 
   let check_drain_delegate info ~check_signature
       (operation : Kind.drain_delegate Operation.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Drain_delegate {delegate; destination; consensus_key})) =
       operation.protocol_data.contents
     in
@@ -2000,7 +2000,7 @@ module Anonymous = struct
 
   let check_seed_nonce_revelation vi
       (operation : Kind.seed_nonce_revelation operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Seed_nonce_revelation {level = commitment_raw_level; nonce})) =
       operation.protocol_data.contents
     in
@@ -2054,7 +2054,7 @@ module Anonymous = struct
     {vs with anonymous_state}
 
   let check_vdf_revelation vi (operation : Kind.vdf_revelation operation) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Single (Vdf_revelation {solution})) =
       operation.protocol_data.contents
     in
@@ -2186,7 +2186,7 @@ module Manager = struct
           check_batch_tail_sanity source counter rest >>? fun () ->
           ok (source, None, counter)
     in
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*? source, revealed_key, first_counter = check_batch contents_list in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
@@ -2358,7 +2358,7 @@ module Manager = struct
 
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) remaining_block_gas =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (Manager_operation
           {source; fee; counter = _; operation; gas_limit; storage_limit}) =
       contents
@@ -2467,7 +2467,7 @@ module Manager = struct
       Gas.Arith.fp ->
       Gas.Arith.fp tzresult Lwt.t =
    fun vi batch_state contents_list remaining_gas ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match contents_list with
     | Single contents ->
         let* batch_state =
@@ -2482,7 +2482,7 @@ module Manager = struct
 
   let check_manager_operation vi ~check_signature
       (operation : _ Kind.manager operation) remaining_block_gas =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let contents_list = operation.protocol_data.contents in
     let* batch_state, source_pk =
       check_sanity_and_find_public_key vi contents_list
@@ -2577,7 +2577,7 @@ module Manager = struct
 
   let validate_manager_operation ~check_signature info operation_state
       block_state oph operation =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* gas_used =
       check_manager_operation
         info
@@ -2614,7 +2614,7 @@ let init_validation_state ctxt mode chain_id all_expected_consensus_features
 *)
 let begin_any_application ctxt chain_id ~predecessor_level
     ~predecessor_timestamp (block_header : Block_header.t) fitness ~is_partial =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let predecessor_round = Fitness.predecessor_round fitness in
   let round = Fitness.round fitness in
   let current_level = Level.current ctxt in
@@ -2701,7 +2701,7 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
 let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
     ~predecessor_timestamp ~predecessor_hash round
     (header_contents : Block_header.contents) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let round_durations = Constants.round_durations ctxt in
   let timestamp = Timestamp.current ctxt in
   let*? () =
@@ -2797,7 +2797,7 @@ let begin_no_predecessor_info ctxt chain_id =
 
 let check_operation ?(check_signature = true) info (type kind)
     (operation : kind operation) : unit tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match operation.protocol_data.contents with
   | Single (Preendorsement _) ->
       let* (_voting_power : int) =
@@ -2851,7 +2851,7 @@ let check_operation ?(check_signature = true) info (type kind)
           remaining_gas
       in
       return_unit
-  | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error
+  | Single (Failing_noop _) -> tzfail Validate_errors.Failing_noop_error
 
 let check_operation_conflict (type kind) operation_conflict_state oph
     (operation : kind operation) =
@@ -3013,7 +3013,7 @@ let remove_operation operation_conflict_state (type kind)
   | Single (Failing_noop _) -> (* Nothing to do *) operation_conflict_state
 
 let check_validation_pass_consistency vi vs validation_pass =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match vi.mode with
   | Mempool | Construction _ -> return vs
   | Application _ | Partial_validation _ -> (
@@ -3028,7 +3028,7 @@ let check_validation_pass_consistency vi vs validation_pass =
                  {expected = previous_vp; provided = validation_pass})
           in
           return {vs with last_op_validation_pass = Some validation_pass}
-      | Some _, None -> fail Validate_errors.Failing_noop_error)
+      | Some _, None -> tzfail Validate_errors.Failing_noop_error)
 
 (** Increment [vs.op_count] for all operations, and record
     non-consensus operation hashes in [vs.recorded_operations_rev]. *)
@@ -3047,7 +3047,7 @@ let record_operation vs ophash validation_pass_opt =
 let validate_operation ?(check_signature = true)
     {info; operation_state; block_state} oph
     (packed_operation : packed_operation) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let {shell; protocol_data = Operation_data protocol_data} =
     packed_operation
   in
@@ -3207,10 +3207,10 @@ let validate_operation ?(check_signature = true)
             block_state
             oph
             operation
-      | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error)
+      | Single (Failing_noop _) -> tzfail Validate_errors.Failing_noop_error)
 
 let are_endorsements_required vi =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ first_level = First_level_of_protocol.get vi.ctxt in
   (* [Comment from Legacy_apply] NB: the first level is the level
      of the migration block. There are no endorsements for this
@@ -3252,7 +3252,7 @@ let compute_payload_hash block_state
     (List.rev block_state.recorded_operations_rev)
 
 let finalize_block {info; block_state; _} =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match info.mode with
   | Application {fitness; predecessor_hash; block_data_contents; _} ->
       let* are_endorsements_required = are_endorsements_required info in

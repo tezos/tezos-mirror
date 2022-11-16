@@ -55,7 +55,7 @@ type atomic_transaction_batch = {transactions : transaction list}
 type outbox_message = Atomic_transaction_batch of atomic_transaction_batch
 
 let make_internal_transfer ctxt ty ~payload ~sender ~source ~destination =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ payload, ctxt =
     Script_ir_translator.unparse_data
       ctxt
@@ -68,7 +68,7 @@ let make_internal_transfer ctxt ty ~payload ~sender ~source ~destination =
     ctxt )
 
 let transactions_batch_of_internal ctxt transactions =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let or_internal_transaction ctxt
       {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint} =
     (* Lookup the contract-hash. *)
@@ -78,7 +78,7 @@ let transactions_batch_of_internal ctxt transactions =
       let* ctxt, _cache_key, cached = Script_cache.find ctxt destination in
       match cached with
       | Some (_script, ex_script) -> return (ex_script, ctxt)
-      | None -> fail Sc_rollup_invalid_destination
+      | None -> tzfail Sc_rollup_invalid_destination
     in
     (* Find the entrypoint type for the given entrypoint. *)
     let*? res, ctxt =
@@ -123,13 +123,13 @@ let transactions_batch_of_internal ctxt transactions =
 
 let outbox_message_of_outbox_message_repr ctxt
     (Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ ts, ctxt = transactions_batch_of_internal ctxt transactions in
   (Atomic_transaction_batch ts, ctxt)
 
 module Internal_for_tests = struct
   let make_transaction ctxt parameters_ty ~parameters ~destination ~entrypoint =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* unparsed_parameters, ctxt =
       Script_ir_translator.unparse_data ctxt Optimized parameters_ty parameters
     in
@@ -147,7 +147,7 @@ module Internal_for_tests = struct
   let make_atomic_batch transactions = Atomic_transaction_batch {transactions}
 
   let serialize_outbox_message (Atomic_transaction_batch {transactions}) =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let to_internal_transaction
         (Transaction
           {

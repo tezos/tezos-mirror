@@ -32,7 +32,7 @@ module Commitment_hash = Commitment.Hash
 (** [address_from_nonce ctxt nonce] produces an address completely determined by
     an operation hash and an origination counter, and accounts for gas spent. *)
 let address_from_nonce ctxt nonce =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* ctxt =
     Raw_context.consume_gas ctxt Sc_rollup_costs.Constants.cost_serialize_nonce
   in
@@ -48,7 +48,7 @@ let address_from_nonce ctxt nonce =
       (ctxt, Sc_rollup_repr.Address.hash_bytes [nonce_bytes])
 
 let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? ctxt, genesis_commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt genesis_commitment
   in
@@ -115,11 +115,11 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   return (address, size, genesis_commitment_hash, ctxt)
 
 let kind ctxt address =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, kind_opt = Store.PVM_kind.find ctxt address in
   match kind_opt with
   | Some k -> return (ctxt, k)
-  | None -> fail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
+  | None -> tzfail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
 
 let list_unaccounted ctxt =
   let open Lwt_syntax in
@@ -127,14 +127,14 @@ let list_unaccounted ctxt =
   Result.return res
 
 let genesis_info ctxt rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, genesis_info = Store.Genesis_info.find ctxt rollup in
   match genesis_info with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | None -> tzfail (Sc_rollup_does_not_exist rollup)
   | Some genesis_info -> return (ctxt, genesis_info)
 
 let get_metadata ctxt rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, genesis_info = genesis_info ctxt rollup in
   let metadata : Sc_rollup_metadata_repr.t =
     {address = rollup; origination_level = genesis_info.level}
@@ -142,10 +142,10 @@ let get_metadata ctxt rollup =
   return (ctxt, metadata)
 
 let get_boot_sector ctxt rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, boot_sector = Storage.Sc_rollup.Boot_sector.find ctxt rollup in
   match boot_sector with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | None -> tzfail (Sc_rollup_does_not_exist rollup)
   | Some boot_sector -> return (ctxt, boot_sector)
 
 let parameters_type ctxt rollup =

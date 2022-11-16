@@ -865,19 +865,19 @@ let status_encoding =
     ]
 
 let find_choice dissection tick =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let rec traverse states =
     match states with
     | ({state_hash = _; tick = state_tick} as curr) :: next :: others ->
         if Sc_rollup_tick_repr.(tick = state_tick) then return (curr, next)
         else traverse (next :: others)
-    | _ -> fail (Dissection_choice_not_found tick)
+    | _ -> tzfail (Dissection_choice_not_found tick)
   in
   traverse dissection
 
 let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     dissection =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let should_be_equal_to expected =
@@ -889,7 +889,7 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
       error_unless Z.(equal len num_sections) (should_be_equal_to num_sections)
     else if Z.(gt dist one) then
       error_unless Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
-    else fail (Dissection_invalid_number_of_sections len)
+    else tzfail (Dissection_invalid_number_of_sections len)
   in
   let* () =
     match (List.hd dissection, List.last_opt dissection) with
@@ -924,19 +924,19 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     | _ ->
         (* This case is probably already handled by the
            [Dissection_invalid_number_of_sections] returned above *)
-        fail (Dissection_invalid_number_of_sections len)
+        tzfail (Dissection_invalid_number_of_sections len)
   in
   let half_dist = Z.(div dist (of_int 2) |> succ) in
   let rec traverse states =
     match states with
     | {state_hash = None; _} :: {state_hash = Some _; _} :: _ ->
-        fail Dissection_invalid_successive_states_shape
+        tzfail Dissection_invalid_successive_states_shape
     | {tick; _} :: ({tick = next_tick; state_hash = _} as next) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           let incr = Sc_rollup_tick_repr.distance tick next_tick in
           if Z.(leq incr half_dist) then traverse (next :: others)
-          else fail Dissection_invalid_distribution
-        else fail Dissection_ticks_not_increasing
+          else tzfail Dissection_invalid_distribution
+        else tzfail Dissection_ticks_not_increasing
     | _ -> return ()
   in
   traverse dissection
@@ -1086,7 +1086,7 @@ let loser_of_results ~alice_result ~bob_result =
   | true, false -> Some Bob
 
 let play dal_parameters ~dal_endorsement_lag ~stakers metadata game refutation =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let mk_loser loser =
     let loser = Index.staker stakers loser in
     Either.Left (Loser {loser; reason = Conflict_resolved})
@@ -1117,7 +1117,7 @@ let play dal_parameters ~dal_endorsement_lag ~stakers metadata game refutation =
              pvm_name = game.pvm_name;
              game_state = new_game_state;
            })
-  | Dissection _, Final_move _ -> fail Dissecting_during_final_move
+  | Dissection _, Final_move _ -> tzfail Dissecting_during_final_move
   | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
       let*? start_chunk, stop_chunk =
         find_choice dissection refutation.choice

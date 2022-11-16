@@ -320,7 +320,7 @@ module History = struct
     *)
 
     let next ~prev_cell ~prev_cell_ptr elt =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let* () =
         error_when
           (Compare.Int.( <= )
@@ -398,7 +398,7 @@ module History = struct
         end)
 
     let add_confirmed_slot_header (t, cache) slot_header =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let prev_cell_ptr = hash_skip_list_cell t in
       let* cache = History_cache.remember prev_cell_ptr t cache in
       let* new_cell = Skip_list.next ~prev_cell:t ~prev_cell_ptr slot_header in
@@ -694,7 +694,7 @@ module History = struct
     let proof_error reason = error @@ dal_proof_error reason
 
     let check_page_proof dal_params proof data pid commitment =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let* dal =
         match Dal.make dal_params with
         | Ok dal -> return dal
@@ -712,7 +712,7 @@ module History = struct
       | Error `Segment_index_out_of_range ->
           fail_with_error_msg "Segment_index_out_of_range"
       | Error `Page_length_mismatch ->
-          fail
+          tzfail
           @@ Unexpected_page_size
                {
                  expected_size = dal_params.page_size;
@@ -720,7 +720,7 @@ module History = struct
                }
 
     let produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let Page.{slot_id; page_index = _} = page_id in
       let deref ptr = History_cache.find ptr hist_cache in
       (* We search for a slot whose ID is equal to target_id. *)
@@ -796,7 +796,7 @@ module History = struct
              are provided."
 
     let produce_proof dal_params page_id ~page_info slots_hist hist_cache =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let* proof_repr, page_data =
         produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache
       in
@@ -826,7 +826,7 @@ module History = struct
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
     let verify_proof_repr dal_params page_id snapshot proof =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let Page.{slot_id; page_index = _} = page_id in
       match proof with
       | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
@@ -916,7 +916,7 @@ module History = struct
           return_none
 
     let verify_proof dal_params page_id snapshot serialized_proof =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
 

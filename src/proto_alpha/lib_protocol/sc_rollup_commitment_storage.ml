@@ -35,27 +35,27 @@ let get_commitment_opt_unsafe ctxt rollup commitment =
   return (res, ctxt)
 
 let get_commitment_unsafe ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* res, ctxt = get_commitment_opt_unsafe ctxt rollup commitment in
   match res with
-  | None -> fail (Sc_rollup_unknown_commitment commitment)
+  | None -> tzfail (Sc_rollup_unknown_commitment commitment)
   | Some commitment -> return (commitment, ctxt)
 
 let last_cemented_commitment ctxt rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, res = Store.Last_cemented_commitment.find ctxt rollup in
   match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | None -> tzfail (Sc_rollup_does_not_exist rollup)
   | Some lcc -> return (lcc, ctxt)
 
 let get_commitment ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Assert that a last cemented commitment exists. *)
   let* _lcc, ctxt = last_cemented_commitment ctxt rollup in
   get_commitment_unsafe ctxt rollup commitment
 
 let last_cemented_commitment_hash_with_level ctxt rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* commitment_hash, ctxt = last_cemented_commitment ctxt rollup in
   let+ {inbox_level; _}, ctxt =
     get_commitment_unsafe ctxt rollup commitment_hash
@@ -63,7 +63,7 @@ let last_cemented_commitment_hash_with_level ctxt rollup =
   (commitment_hash, inbox_level, ctxt)
 
 let set_commitment_added ctxt rollup node new_value =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt, res = Store.Commitment_added.find (ctxt, rollup) node in
   match res with
   | Some old_value ->
@@ -81,12 +81,12 @@ let get_predecessor_opt_unsafe ctxt rollup node =
   return (Option.map (fun (c : Commitment.t) -> c.predecessor) commitment, ctxt)
 
 let get_predecessor_unsafe ctxt rollup node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* commitment, ctxt = get_commitment_unsafe ctxt rollup node in
   return (commitment.predecessor, ctxt)
 
 let hash ctxt commitment =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* ctxt =
     Raw_context.consume_gas
       ctxt
@@ -110,7 +110,7 @@ let hash ctxt commitment =
 
 module Internal_for_tests = struct
   let get_cemented_commitments_with_levels ctxt rollup =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let rec aux ctxt commitments_with_levels commitment_hash =
       let* commitment_opt, ctxt =
         get_commitment_opt_unsafe ctxt rollup commitment_hash

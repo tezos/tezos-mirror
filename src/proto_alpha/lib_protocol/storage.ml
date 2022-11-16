@@ -1715,12 +1715,12 @@ module Sc_rollup = struct
     let to_versioned = Sc_rollup_inbox_repr.to_versioned
 
     let get ctxt =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let* versioned = get ctxt in
       return (of_versioned versioned)
 
     let find ctxt =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let* versioned = find ctxt in
       return (Option.map of_versioned versioned)
 

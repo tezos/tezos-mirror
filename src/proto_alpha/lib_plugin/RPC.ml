@@ -2157,7 +2157,7 @@ module Sc_rollup = struct
   let register_boot_sector () =
     Registration.register1 ~chunked:true S.boot_sector
     @@ fun ctxt address () () ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let+ _ctxt, boot_sector =
       Alpha_context.Sc_rollup.get_boot_sector ctxt address
     in
@@ -2168,7 +2168,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.last_cemented_commitment_hash_with_level
     @@ fun ctxt address () () ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let+ last_cemented_commitment, level, _ctxt =
       Alpha_context.Sc_rollup.Commitment
       .last_cemented_commitment_hash_with_level
@@ -2180,7 +2180,7 @@ module Sc_rollup = struct
   let register_staked_on_commitment () =
     Registration.register2 ~chunked:false S.staked_on_commitment
     @@ fun ctxt address staker () () ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let+ branch, _ctxt =
       Alpha_context.Sc_rollup.Stake_storage.find_staker ctxt address staker
     in
@@ -2207,7 +2207,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.ongoing_refutation_game
       (fun context rollup staker () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let open Sc_rollup.Game.Index in
         let open Sc_rollup.Refutation_storage in
         let* game, _ = get_ongoing_game_for_staker context rollup staker in
@@ -2231,7 +2231,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.timeout
       (fun context rollup (staker1, staker2) () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res =
           Sc_rollup.Refutation_storage.get_timeout context rollup index
@@ -2245,7 +2245,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.timeout_reached
       (fun context rollup (staker1, staker2) () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
         match res with
@@ -2257,7 +2257,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.can_be_cemented
       (fun context rollup commitment_hash () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let*! res =
           Sc_rollup.Stake_storage.cement_commitment
             context

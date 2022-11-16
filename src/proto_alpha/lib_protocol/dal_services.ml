@@ -33,7 +33,7 @@ let assert_dal_feature_enabled ctxt =
     Dal_errors.Dal_feature_disabled
 
 let shards ctxt ~level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Dal.Endorsement in
   assert_dal_feature_enabled ctxt >>?= fun () ->
   let level = Level.from_raw ctxt level in

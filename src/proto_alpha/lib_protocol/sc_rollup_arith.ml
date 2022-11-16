@@ -1365,20 +1365,20 @@ module Make (Context : P) :
   type error += Arith_proof_verification_failed
 
   let verify_proof input_given proof =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! result = Context.verify_proof proof (step_transition input_given) in
     match result with
-    | None -> fail Arith_proof_verification_failed
+    | None -> tzfail Arith_proof_verification_failed
     | Some (_state, request) -> return request
 
   let produce_proof context input_given state =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! result =
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
     | Some (tree_proof, _requested) -> return tree_proof
-    | None -> fail Arith_proof_production_failed
+    | None -> tzfail Arith_proof_production_failed
 
   let verify_origination_proof proof boot_sector =
     let open Lwt_syntax in
@@ -1393,7 +1393,7 @@ module Make (Context : P) :
       match result with None -> return false | Some (_, ()) -> return true
 
   let produce_origination_proof context boot_sector =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! state = initial_state context in
     let*! result =
       Context.produce_proof context state (fun state ->
@@ -1403,7 +1403,7 @@ module Make (Context : P) :
     in
     match result with
     | Some (proof, ()) -> return proof
-    | None -> fail Arith_proof_production_failed
+    | None -> tzfail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)
 

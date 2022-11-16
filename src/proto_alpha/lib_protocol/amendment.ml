@@ -168,7 +168,7 @@ let is_testnet_dictator ctxt chain_id delegate =
     applicable. Of course, there must never be such a dictator on
     mainnet: see {!is_testnet_dictator}. *)
 let apply_testnet_dictator_proposals ctxt chain_id proposals =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! ctxt = Vote.clear_ballots ctxt in
   let*! ctxt = Vote.clear_proposals ctxt in
   let*! ctxt = Vote.clear_current_proposal ctxt in
@@ -188,10 +188,10 @@ let apply_testnet_dictator_proposals ctxt chain_id proposals =
   | _ :: _ :: _ ->
       (* This case should not be possible if the operation has been
          previously validated by {!Validate.validate_operation}. *)
-      fail Validate_errors.Voting.Testnet_dictator_multiple_proposals
+      tzfail Validate_errors.Voting.Testnet_dictator_multiple_proposals
 
 let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt =
     if is_testnet_dictator ctxt chain_id source then
       apply_testnet_dictator_proposals ctxt chain_id proposals
@@ -213,7 +213,7 @@ let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
   return (ctxt, Apply_results.Single_result Proposals_result)
 
 let apply_ballot ctxt (Ballot {source; period = _; proposal = _; ballot}) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt =
     if dictator_proposal_seen ctxt then (* Noop if dictator voted *) return ctxt
     else Vote.record_ballot ctxt source ballot
