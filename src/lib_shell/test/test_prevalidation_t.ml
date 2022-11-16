@@ -56,8 +56,11 @@ module Mock_protocol :
   let begin_validation _ctxt _chain_id _mode ~predecessor:_ ~cache:_ =
     Lwt_result_syntax.return_unit
 
-  let begin_application _ctxt _chain_id _mode ~predecessor:_ ~cache:_ =
-    Lwt_result_syntax.return_unit
+  module Mempool = struct
+    include Mempool
+
+    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = Lwt_result.return ((), ())
+  end
 end
 
 module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
@@ -87,7 +90,7 @@ module Init = struct
 
   let genesis_time = Time.Protocol.of_seconds 0L
 
-  (** [wrap_tzresult_lwt f ()] provides an instance of {!Context.t} to
+  (** [wrap_tzresult_lwt_disk f ()] provides an instance of {!Context.t} to
       a test [f]. For this, it creates a temporary directory on disk,
       populates it with the data required for a {!Context.t} and then calls
       [f] by passing it an empty [Context.t]. After [f] finishes, the state
@@ -193,9 +196,37 @@ let mk_ops () =
   assert (Compare.List_length_with.(ops = nb_ops)) ;
   ops
 
-(** Test that [Prevalidation.apply_operations] only returns [Branch_delayed _]
-    when the protocol's [apply_operation] crashes. *)
-let test_apply_operation_crash ctxt =
+let pp_classification fmt classification =
+  let print_error_classification name trace =
+    Format.fprintf fmt "%s: %a" name pp_print_trace trace
+  in
+  match classification with
+  | `Applied -> Format.fprintf fmt "Applied"
+  | `Prechecked -> Format.fprintf fmt "Prechecked"
+  | `Branch_delayed trace -> print_error_classification "Branch_delayed" trace
+  | `Branch_refused trace -> print_error_classification "Branch_refused" trace
+  | `Refused trace -> print_error_classification "Refused" trace
+  | `Outdated trace -> print_error_classification "Outdated" trace
+
+let check_classification_is_exn loc
+    (classification : Prevalidator_classification.classification) =
+  match classification with
+  | `Branch_delayed [Exn _] -> ()
+  | _ ->
+      QCheck2.Test.fail_reportf
+        "%s:@.Expected classification (Branch_delayed: [Exn]), but got %a"
+        loc
+        pp_classification
+        classification
+
+(** Test that [Prevalidation.add_operation] always returns
+    [Branch_delayed [Exn _]] when the protocol's
+    [Mempool.add_operation] crashes.
+
+    Indeed, recall that [Mock_protocol] is built from
+    [Environment_protocol_T_test.Mock_all_unit] which implements all
+    functions as [assert false]. *)
+let test_add_operation_crash ctxt =
   let open Lwt_result_syntax in
   let timestamp : Time.Protocol.t = now () in
   let ops = mk_ops () in
@@ -210,14 +241,8 @@ let test_apply_operation_crash ctxt =
             (_replacement : P.replacement) ) =
       P.add_operation pv filter_state filter_config op
     in
-    match classification with
-    | `Applied | `Prechecked | `Branch_refused _ | `Refused _ | `Outdated _ ->
-        (* These cases should not happen because
-           [Mock_protocol.apply_operation] is [assert false]. *)
-        assert false
-    | `Branch_delayed _ ->
-        (* This is the only allowed case. *)
-        Lwt.return pv
+    check_classification_is_exn __LOC__ classification ;
+    Lwt.return pv
   in
   let*! _ = List.fold_left_s add_op pv ops in
   return_unit
@@ -351,14 +376,13 @@ let () =
             (Init.wrap_tzresult_lwt_disk test_create);
         ] );
       (* Run only those tests with:
-         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test apply_operation '0..2' *)
-      ( "apply_operation",
+         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test add_operation '0..1' *)
+      ( "add_operation",
         [
           Tztest.tztest
-            "[apply_operation] returns [Branch_delayed] when [apply_operation] \
-             from the protocol crashes"
+            "Proto [add_operation] crash"
             `Quick
-            (Init.wrap_tzresult_lwt_disk test_apply_operation_crash);
+            (Init.wrap_tzresult_lwt_disk test_add_operation_crash);
           Tztest.tztest
             "[apply_operation] makes the [applied] field grow for [Applied] \
              operations (and only for them)"

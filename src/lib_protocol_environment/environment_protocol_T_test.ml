@@ -33,7 +33,9 @@ module Mock_all_unit :
      and type operation_data = unit
      and type operation_receipt = unit
      and type validation_state = unit
-     and type application_state = unit = struct
+     and type application_state = unit
+     and type Mempool.t = unit
+     and type Mempool.validation_info = unit = struct
   type block_header_data = unit
 
   type operation = {
@@ -148,17 +150,17 @@ module Mock_all_unit :
       | Incompatible_mempool
       | Merge_conflict of operation_conflict
 
-    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = Lwt.return_ok ((), ())
+    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = assert false
 
     let encoding = Data_encoding.unit
 
     let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
-      Lwt.return_ok ((), Unchanged)
+      assert false
 
-    let remove_operation () _ = ()
+    let remove_operation () _ = assert false
 
-    let merge ?conflict_handler:_ () () = Ok ()
+    let merge ?conflict_handler:_ () () = assert false
 
-    let operations () = Tezos_crypto.Operation_hash.Map.empty
+    let operations () = assert false
   end
 end
