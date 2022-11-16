@@ -46,8 +46,11 @@ Node
 Client
 ------
 
-- Added command to get contract's balance of ticket with specified ticketer, content type, and content:
+- Added command to get contract's balance of ticket with specified ticketer, content type, and content. Can be used for both implicit and originated contracts.
   ``octez-client get ticket balance for <contract> with ticketer '<ticketer>' and type <type> and content <content>``. (MR :gl:`!6491`)
+
+- Added command to get the complete list of tickets owned by a given contract by scanning the contract's storage. Can only be used for originated contracts.
+  ``octez-client get all ticket balances for <contract>``. (MR :gl:`!6804`)
 
 Baker
 -----

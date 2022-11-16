@@ -1658,6 +1658,11 @@ module Scripts = struct
 end
 
 module Contract = struct
+  let ticket_balances_encoding =
+    let open Data_encoding in
+    list
+      (merge_objs Ticket_token.unparsed_token_encoding (obj1 (req "amount" n)))
+
   module S = struct
     let path =
       (RPC_path.(open_root / "context" / "contracts")
@@ -1716,17 +1721,12 @@ module Contract = struct
         RPC_path.(path /: Contract.rpc_arg / "ticket_balance")
 
     let all_ticket_balances =
-      let open Data_encoding in
-      let ticket_balance_encoding =
-        let open Data_encoding in
-        merge_objs Ticket_token.unparsed_token_encoding (obj1 (req "amount" n))
-      in
       RPC_service.get_service
         ~description:
           "Access the complete list of tickets owned by the given contract by \
            scanning the contract's storage."
         ~query:RPC_query.empty
-        ~output:(list ticket_balance_encoding)
+        ~output:ticket_balances_encoding
         RPC_path.(path /: Contract.rpc_arg / "all_ticket_balances")
   end
 
@@ -1879,8 +1879,17 @@ module Contract = struct
       ()
       ()
 
-  let ticket_balance ctxt block contract key =
+  let get_ticket_balance ctxt block contract key =
     RPC_context.make_call1 S.ticket_balance ctxt block contract () key
+
+  let get_all_ticket_balances ctxt block contract =
+    RPC_context.make_call1
+      S.all_ticket_balances
+      ctxt
+      block
+      (Contract.Originated contract)
+      ()
+      ()
 end
 
 module Big_map = struct
