@@ -1172,21 +1172,53 @@ let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
     @ optional_arg "gas-limit" string_of_int gas_limit
     @ optional_switch "dry-run" dry_run)
 
+type conversion_kind = Script | Data
+
+let convert ?endpoint ~kind ~input ~src_format ~dst_format ?typecheck client =
+  let fmt_to_string = function
+    | `Michelson -> "michelson"
+    | `Binary -> "binary"
+    | `Json -> "json"
+    | `OCaml -> "ocaml"
+  in
+  spawn_command
+    ?endpoint
+    client
+    ([
+       "convert";
+       (match kind with Script -> "script" | Data -> "data");
+       input;
+       "from";
+       fmt_to_string src_format;
+       "to";
+       fmt_to_string dst_format;
+     ]
+    @ optional_arg "type" Fun.id typecheck)
+  |> Process.check_and_read_stdout
+
+let convert_script ~script ~src_format ~dst_format ?typecheck client =
+  convert ~kind:Script ~input:script ~src_format ~dst_format ?typecheck client
+
+let convert_data ~data ~src_format ~dst_format ?typecheck client =
+  convert ~kind:Data ~input:data ~src_format ~dst_format ?typecheck client
+
 let convert_michelson_to_json ~kind ?endpoint ~input client =
   let* client_output =
-    spawn_command
+    convert
       ?endpoint
+      ~kind
+      ~input
+      ~src_format:`Michelson
+      ~dst_format:`Json
       client
-      ["convert"; kind; input; "from"; "michelson"; "to"; "json"]
-    |> Process.check_and_read_stdout
   in
   Lwt.return (Ezjsonm.from_string client_output)
 
 let convert_script_to_json ?endpoint ~script client =
-  convert_michelson_to_json ~kind:"script" ?endpoint ~input:script client
+  convert_michelson_to_json ~kind:Script ?endpoint ~input:script client
 
 let convert_data_to_json ?endpoint ~data client =
-  convert_michelson_to_json ~kind:"data" ?endpoint ~input:data client
+  convert_michelson_to_json ~kind:Data ?endpoint ~input:data client
 
 let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
     ?gas_limit ?dry_run ~alias ~amount ~src ~prg client =
@@ -2341,25 +2373,6 @@ let sign_bytes ~signer ~data client =
   match output =~* rex "Signature: ([a-zA-Z0-9]+)" with
   | Some signature -> Lwt.return signature
   | None -> Test.fail "Couldn't sign message '%s' for %s." data signer
-
-let convert_script ~script ~src_format ~dst_format client =
-  let fmt_to_string = function
-    | `Michelson -> "michelson"
-    | `Binary -> "binary"
-    | `Json -> "json"
-  in
-  spawn_command
-    client
-    [
-      "convert";
-      "script";
-      script;
-      "from";
-      fmt_to_string src_format;
-      "to";
-      fmt_to_string dst_format;
-    ]
-  |> Process.check_and_read_stdout
 
 let bootstrapped client = spawn_command client ["bootstrapped"] |> Process.check
 
