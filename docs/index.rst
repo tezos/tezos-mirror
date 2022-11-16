@@ -212,21 +212,10 @@ Core developers are also provided reference materials for internal APIs of Octez
     </details><br/>
 
 
-Website map
------------
-
-This website (https://tezos.gitlab.io/) provides online developer documentation.
-This documentation is about Octez, although it also documents Tezos in general.
-
-The developer documentation is automatically generated from the master branch
-of the above repository.
-
-The map of this website is detailed next.
-Enjoy learning about Octez and Tezos, how to use them, build on top of them, or contribute to the platftorm!
-
 .. toctree::
    :maxdepth: 2
    :caption: Introduction:
+   :hidden:
 
    introduction/howtoget
    introduction/howtouse
@@ -238,6 +227,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: User doc:
+   :hidden:
 
    user/versioning
    user/setup-client
@@ -251,6 +241,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Shell doc:
+   :hidden:
 
    shell/the_big_picture
    shell/shell
@@ -261,6 +252,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Lima Protocol doc:
+   :hidden:
 
    active/protocol
    active/glossary
@@ -270,6 +262,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Mumbai Protocol doc:
+   :hidden:
 
    mumbai/protocol
    mumbai/glossary
@@ -279,6 +272,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Alpha Development Protocol doc:
+   :hidden:
 
    alpha/protocol
    alpha/glossary
@@ -288,6 +282,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Developer doc:
+   :hidden:
 
    developer/rpc
    developer/michelson_anti_patterns
@@ -295,6 +290,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Core Developer doc:
+   :hidden:
 
    developer/contributing_index
    developer/programming
@@ -309,6 +305,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Protocols:
+   :hidden:
 
    protocols/naming
    protocols/014_kathmandu
@@ -320,6 +317,7 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: Releases:
+   :hidden:
 
    releases/releases
    releases/version-15
@@ -328,14 +326,8 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
 .. toctree::
    :maxdepth: 2
    :caption: APIs:
+   :hidden:
 
    api/api-inline
    api/openapi
    api/errors
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`search`
