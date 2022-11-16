@@ -114,4 +114,4 @@ val store_bytes : t -> int64 -> bytes -> unit Lwt.t
 (** [loaded_chunks vector] returns the chunks of [vector] that have
     been cached in-memory since [vector] has been created, either by
     reading its contents, or by modifying it. *)
-val loaded_chunks : t -> (int64 * Chunk.t) list
+val loaded_chunks : t -> (int64 * Chunk.t option) list

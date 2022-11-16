@@ -61,7 +61,7 @@ module type S = sig
 
   val dup : 'a t -> 'a t
 
-  val loaded_bindings : 'a t -> (key * 'a) list
+  val loaded_bindings : 'a t -> (key * 'a option) list
 end
 
 exception UnexpectedAccess
@@ -76,7 +76,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   type 'a t = {
     origin : tree option;
     produce_value : 'a producer;
-    mutable values : 'a Map.t;
+    mutable values : 'a option Map.t;
   }
 
   let origin {origin; _} = origin
@@ -92,7 +92,12 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
            (Format.pp_print_list
               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
               (fun ppf (k, v) ->
-                Format.fprintf ppf "%s => %a" (Key.to_string k) pp_value v))
+                Format.fprintf
+                  ppf
+                  "%s => %a"
+                  (Key.to_string k)
+                  (Format.pp_print_option pp_value)
+                  v))
     in
     fun fmt map ->
       Format.fprintf
@@ -109,6 +114,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
 
   let create ?(values = Map.empty) ?(produce_value = def_produce_value) ?origin
       () =
+    let values = Map.map Option.some values in
     {produce_value; values; origin}
 
   let get key map =
@@ -117,11 +123,13 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     | None ->
         (* Need to create the missing key-value association. *)
         let+ value = map.produce_value key in
-        map.values <- Map.add key value map.values ;
+        map.values <- Map.add key (Some value) map.values ;
         value
-    | Some value -> Lwt.return value
+    | Some None -> (* The key was removed *) raise UnexpectedAccess
+    | Some (Some value) -> Lwt.return value
 
-  let set key value map = {map with values = Map.add key value map.values}
+  let set key value map =
+    {map with values = Map.add key (Some value) map.values}
 
   let dup {origin; produce_value; values} = {origin; produce_value; values}
 

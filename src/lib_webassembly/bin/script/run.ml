@@ -177,7 +177,8 @@ let input_string string run =
 
 (* Printing *)
 
-let map_to_list m = List.map snd (Lazy_vector.Int32Vector.loaded_bindings m)
+let map_to_list m =
+  List.filter_map snd (Lazy_vector.Int32Vector.loaded_bindings m)
 
 let print_import m im =
   let open Types in

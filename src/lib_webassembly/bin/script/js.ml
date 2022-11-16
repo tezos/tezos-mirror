@@ -204,11 +204,11 @@ type modules = {mutable env : exports Map.t; mutable current : int}
 let exports m : exports Lwt.t =
   let open Lwt.Syntax in
   TzStdLib.List.fold_left_s
-    (fun map (_, exp) ->
+    (fun map exp ->
       let+ t = export_type m exp in
       NameMap.add exp.it.name t map)
     NameMap.empty
-    (Lazy_vector.Int32Vector.loaded_bindings m.it.exports)
+    (List.filter_map snd (Lazy_vector.Int32Vector.loaded_bindings m.it.exports))
 
 let modules () : modules = {env = Map.empty; current = 0}
 
@@ -244,7 +244,7 @@ let lookup (mods : modules) x_opt name at =
 
 let vec_two i j = Vector.(create 2l |> set 0l i |> set 1l j)
 
-let vec_to_list v = Stdlib.List.map snd (Vector.loaded_bindings v)
+let vec_to_list v = Stdlib.List.filter_map snd (Vector.loaded_bindings v)
 
 (* Wrappers *)
 
