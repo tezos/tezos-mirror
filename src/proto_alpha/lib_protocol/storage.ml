@@ -1660,18 +1660,6 @@ module Sc_rollup = struct
         let encoding = Sc_rollups.Kind.encoding
       end)
 
-  module Boot_sector =
-    Indexed_context.Make_carbonated_map
-      (Registered)
-      (struct
-        let name = ["boot_sector"]
-      end)
-      (struct
-        type t = string
-
-        let encoding = Data_encoding.string
-      end)
-
   module Parameters_type =
     Indexed_context.Make_carbonated_map
       (Registered)

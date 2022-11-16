@@ -739,12 +739,6 @@ module Sc_rollup : sig
        and type value = Sc_rollups.Kind.t
        and type t := Raw_context.t
 
-  module Boot_sector :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.t
-       and type value = string
-       and type t := Raw_context.t
-
   module Parameters_type :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t

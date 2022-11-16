@@ -2191,15 +2191,6 @@ module Sc_rollup = struct
     in
     genesis_info
 
-  let register_boot_sector () =
-    Registration.register1 ~chunked:true S.boot_sector
-    @@ fun ctxt address () () ->
-    let open Lwt_result_syntax in
-    let+ _ctxt, boot_sector =
-      Alpha_context.Sc_rollup.get_boot_sector ctxt address
-    in
-    boot_sector
-
   let register_last_cemented_commitment_hash_with_level () =
     Registration.register1
       ~chunked:false
@@ -2314,7 +2305,6 @@ module Sc_rollup = struct
     register_kind () ;
     register_inbox () ;
     register_genesis_info () ;
-    register_boot_sector () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
     register_commitment () ;
@@ -2352,9 +2342,6 @@ module Sc_rollup = struct
       commitment_hash
       ()
       ()
-
-  let boot_sector ctxt block sc_rollup_address =
-    RPC_context.make_call1 S.boot_sector ctxt block sc_rollup_address () ()
 
   let ongoing_refutation_game ctxt block sc_rollup_address staker =
     RPC_context.make_call1

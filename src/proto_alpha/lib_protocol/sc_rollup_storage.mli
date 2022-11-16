@@ -24,17 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [originate context ~kind ~boot_sector] produces an address [a] for
-   a smart contract rollup using the origination nonce found in
+(** [originate context ~kind ~parameters_ty ~genesis_commitment] produces an
+   address [a] for a smart contract rollup using the origination nonce found in
    [context]. This function also initializes the storage with a new
    entry indexed by [a] to remember the [kind] of the rollup at
-   address [a] and also to remember its [boot_sector].
+   address [a].
 
    Also returns the number of allocated bytes.  *)
 val originate :
   Raw_context.t ->
   kind:Sc_rollups.Kind.t ->
-  boot_sector:string ->
   parameters_ty:Script_repr.lazy_expr ->
   genesis_commitment:Sc_rollup_commitment_repr.t ->
   (Sc_rollup_repr.Address.t
@@ -70,10 +69,6 @@ val get_metadata :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   (Raw_context.t * Sc_rollup_metadata_repr.t) tzresult Lwt.t
-
-(** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
-val get_boot_sector :
-  Raw_context.t -> Sc_rollup_repr.t -> (Raw_context.t * string) tzresult Lwt.t
 
 (** [parameters_type ctxt rollup] returns the registered type of a rollup.
     Returns [None] in case there is no registered type for the rollup. *)

@@ -47,7 +47,7 @@ let address_from_nonce ctxt nonce =
       in
       (ctxt, Sc_rollup_repr.Address.hash_bytes [nonce_bytes])
 
-let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
+let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
   let open Lwt_result_syntax in
   let*? ctxt, genesis_commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt genesis_commitment
@@ -63,9 +63,6 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
       ctxt
       address
       {commitment_hash = genesis_commitment_hash; level = origination_level}
-  in
-  let* ctxt, boot_sector_size, _sector_existed =
-    Store.Boot_sector.add ctxt address boot_sector
   in
   let* ctxt, param_ty_size_diff, _added =
     Store.Parameters_type.add ctxt address parameters_ty
@@ -107,8 +104,8 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
   let size =
     Z.of_int
-      (origination_size + stored_kind_size + boot_sector_size + addresses_size
-     + lcc_size_diff + commitment_size_diff + commitment_added_size_diff
+      (origination_size + stored_kind_size + addresses_size + lcc_size_diff
+     + commitment_size_diff + commitment_added_size_diff
      + commitment_staker_count_size_diff + stakers_size_diff
      + param_ty_size_diff + pvm_kind_size + genesis_info_size)
   in
@@ -140,13 +137,6 @@ let get_metadata ctxt rollup =
     {address = rollup; origination_level = genesis_info.level}
   in
   return (ctxt, metadata)
-
-let get_boot_sector ctxt rollup =
-  let open Lwt_result_syntax in
-  let* ctxt, boot_sector = Storage.Sc_rollup.Boot_sector.find ctxt rollup in
-  match boot_sector with
-  | None -> tzfail (Sc_rollup_does_not_exist rollup)
-  | Some boot_sector -> return (ctxt, boot_sector)
 
 let parameters_type ctxt rollup =
   let open Lwt_result_syntax in

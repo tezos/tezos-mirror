@@ -766,10 +766,6 @@ val get_chain_block_context_sc_rollups_all_inbox :
 val get_chain_block_context_sc_rollups_sc_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/boot_sector] *)
-val get_chain_block_context_sc_rollups_sc_rollup_boot_sector :
-  ?chain:string -> ?block:string -> string -> JSON.t t
-
 (** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/stakers_commitments] *)
 val get_chain_block_context_sc_rollups_sc_rollup_stakers_commitments :
   ?chain:string -> ?block:string -> string -> JSON.t t
