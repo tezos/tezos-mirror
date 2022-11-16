@@ -103,8 +103,9 @@ val base_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** [run node] launches the given smart contract rollup node. *)
-val run : t -> unit Lwt.t
+(** [run node arguments ] launches the given smart contract rollup node
+    with the given arguments . *)
+val run : t -> string list -> unit Lwt.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)

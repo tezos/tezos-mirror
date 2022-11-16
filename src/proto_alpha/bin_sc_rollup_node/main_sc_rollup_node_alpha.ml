@@ -100,7 +100,7 @@ let mode_param =
 
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"rpc-addr"
     ~placeholder:"rpc-address|ip"
     ~doc:
@@ -108,12 +108,11 @@ let rpc_addr_arg =
          "The address the smart-contract rollup node listens to. Default value \
           is %s"
          default)
-    ~default
     Client_proto_args.string_parameter
 
 let dal_node_addr_arg =
   let default = Configuration.default_dal_node_addr in
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"dal-node-addr"
     ~placeholder:"dal-node-address|ip"
     ~doc:
@@ -121,12 +120,11 @@ let dal_node_addr_arg =
          "The address of the dal node from which the smart-contract rollup \
           node downloads slots. Default value is %s"
          default)
-    ~default
     Client_proto_args.string_parameter
 
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"rpc-port"
     ~placeholder:"rpc-port"
     ~doc:
@@ -134,12 +132,11 @@ let rpc_port_arg =
          "The port the smart-contract rollup node listens to. Default value is \
           %s"
          default)
-    ~default
     Client_proto_args.int_parameter
 
 let dal_node_port_arg =
   let default = Configuration.default_dal_node_port |> string_of_int in
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"dal-node-port"
     ~placeholder:"dal-node-port"
     ~doc:
@@ -147,7 +144,6 @@ let dal_node_port_arg =
          "The port of the dal node from which the smart-contract rollup node \
           downloads slots from. Default value is %s"
          default)
-    ~default
     Client_proto_args.int_parameter
 
 let data_dir_arg =
@@ -186,11 +182,10 @@ let reconnection_delay_arg =
        (capped to 1.5h): [1.5^reconnection_attempt * delay ± 50%%]."
       default
   in
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"reconnection-delay"
     ~placeholder:"delay"
     ~doc
-    ~default
     (Tezos_clic.parameter (fun _ p ->
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
@@ -270,31 +265,67 @@ let config_init_command =
           data_dir;
           sc_rollup_address;
           sc_rollup_node_operators;
-          rpc_addr;
-          rpc_port;
-          reconnection_delay;
-          dal_node_addr;
-          dal_node_port;
+          rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
+          rpc_port = Option.value ~default:default_rpc_port rpc_port;
+          reconnection_delay =
+            Option.value ~default:default_reconnection_delay reconnection_delay;
+          dal_node_addr =
+            Option.value ~default:default_dal_node_addr dal_node_addr;
+          dal_node_port =
+            Option.value ~default:default_dal_node_port dal_node_port;
           fee_parameters = Operator_purpose_map.empty;
           mode;
           loser_mode;
         }
       in
       let*? config = check_mode config in
-      save config >>=? fun () ->
-      cctxt#message
-        "Smart-contract rollup node configuration written in %s"
-        (filename config)
-      >>= fun _ -> return ())
+      let* () = save config in
+      let*! () =
+        cctxt#message
+          "Smart-contract rollup node configuration written in %s"
+          (filename config)
+      in
+      return_unit)
 
 let run_command =
   let open Tezos_clic in
+  let open Lwt_result_syntax in
   command
     ~group
     ~desc:"Run the rollup daemon."
-    (args1 data_dir_arg)
+    (args6
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       dal_node_addr_arg
+       dal_node_port_arg
+       reconnection_delay_arg)
     (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt >>=? fun () -> return ())
+    (fun ( data_dir,
+           rpc_addr,
+           rpc_port,
+           dal_node_addr,
+           dal_node_port,
+           reconnection_delay )
+         cctxt ->
+      let* configuration = Configuration.load ~data_dir in
+      let configuration =
+        Configuration.
+          {
+            configuration with
+            rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
+            rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
+            dal_node_addr =
+              Option.value ~default:configuration.dal_node_addr dal_node_addr;
+            dal_node_port =
+              Option.value ~default:configuration.dal_node_port dal_node_port;
+            reconnection_delay =
+              Option.value
+                ~default:configuration.reconnection_delay
+                reconnection_delay;
+          }
+      in
+      Daemon.run ~data_dir configuration cctxt)
 
 let import_command =
   let open Tezos_clic in
