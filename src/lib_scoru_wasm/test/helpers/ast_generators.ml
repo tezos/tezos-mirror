@@ -28,7 +28,7 @@ open Tezos_lazy_containers
 open QCheck2.Gen
 module Vector = Tezos_lazy_containers.Lazy_vector.Int32Vector
 
-let small_vector_gen gen = Vector.of_list <$> small_list gen
+let small_vector_gen gen = Vector.of_list <$> list_size (int_range 0 10) gen
 
 let no_region it = Source.{it; at = no_region}
 
@@ -281,7 +281,7 @@ let vector_gen gen =
 
 let vector_z_gen gen =
   let* len = int_range 0 10 in
-  let* seeds = small_list int in
+  let* seeds = list_size (int_range 0 10) int in
   return
     (Lazy_vector.ZVector.create
        ~produce_value:(fun ix ->
@@ -630,7 +630,7 @@ and admin_instr_gen ~module_reg =
 let input_buffer_gen =
   let gen_message =
     let* raw_level = int32 in
-    let* message_counter = map Z.of_int small_nat in
+    let* message_counter = map Z.of_int (int_range 0 10) in
     let+ payload = map Bytes.of_string (small_string ~gen:char) in
     Input_buffer.{raw_level; message_counter; payload}
   in
@@ -648,7 +648,7 @@ let output_info_gen =
   return Output_buffer.{outbox_level; message_index}
 
 let output_buffer_gen =
-  let* l = small_list int in
+  let* l = list_size (int_range 0 10) int in
   let s =
     List.map
       (fun _ ->
