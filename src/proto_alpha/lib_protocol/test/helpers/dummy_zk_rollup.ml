@@ -384,8 +384,10 @@ end = struct
     Hex.to_bytes_exn (`Hex "0002298c03ed7d454a101eb7022bc95f7e5f41ac78")
 
   let dummy_rollup_id =
-    (* zkr1PxS4vgvBsf6XVHRSB7UJKcrTWee8Dp7Wx *)
-    Hex.to_bytes_exn (`Hex "c9a524d4db6514471775c380231afc10f2ef6ba3")
+    let address =
+      Zk_rollup.Address.of_b58check_exn "epx18RJJqrYuJQqhB636BWvukU3XBNQGbtm8C"
+    in
+    Data_encoding.Binary.to_bytes_exn Zk_rollup.Address.encoding address
 
   let dummy_ticket_hash = Bytes.make 32 '0'
 

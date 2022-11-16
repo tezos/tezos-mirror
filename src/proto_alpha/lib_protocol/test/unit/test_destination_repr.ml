@@ -83,7 +83,7 @@ let sc_rollup_address = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3731
    Explain how this address was computed *)
-let zk_rollup_address = "zkr1RePaz42fAmoGVGPhRvoVH5zwr3Sz6ZS93"
+let zk_rollup_address = "epx18RJJqrYuJQqhB636BWvukU3XBNQGbtm8C"
 
 let assert_compat contract destination =
   match destination with
@@ -184,13 +184,13 @@ let test_compare_destination () =
   let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
   let txr1 = !!(Destination_repr.of_b58check tx_rollup_address) in
   let scr1 = !!(Destination_repr.of_b58check sc_rollup_address) in
-  let zkr1 = !!(Destination_repr.of_b58check zk_rollup_address) in
+  let epx1 = !!(Destination_repr.of_b58check zk_rollup_address) in
 
   assert (Destination_repr.(tz1 < kt1)) ;
   assert (Destination_repr.(kt1 < txr1)) ;
   assert (Destination_repr.(tz1 < txr1)) ;
   assert (Destination_repr.(txr1 < scr1)) ;
-  assert (Destination_repr.(scr1 < zkr1)) ;
+  assert (Destination_repr.(scr1 < epx1)) ;
 
   return_unit
 
