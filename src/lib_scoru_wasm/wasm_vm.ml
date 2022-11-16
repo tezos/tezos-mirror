@@ -393,7 +393,8 @@ let should_compute pvm_state =
   | Reveal_required _ | Input_required -> false
   | No_input_required -> true
 
-let compute_step_many ?(stop_at_snapshot = false) ~max_steps pvm_state =
+let compute_step_many ?builtins:_ ?(stop_at_snapshot = false) ~max_steps
+    pvm_state =
   compute_step_many_until
     ~max_steps
     (fun pvm_state ->
@@ -486,5 +487,6 @@ let get_info ({current_tick; last_input_info; _} as pvm_state) =
        {current_tick; last_input_read = last_input_info; input_request}
 
 module Internal_for_tests = struct
-  let compute_step_many_with_hooks ?after_fast_exec:_ = compute_step_many
+  let compute_step_many_with_hooks ?builtins ?after_fast_exec:_ =
+    compute_step_many ?builtins
 end

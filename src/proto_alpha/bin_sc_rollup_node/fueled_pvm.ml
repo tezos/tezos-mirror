@@ -58,6 +58,8 @@ module Make
     | None -> return (state, 0L)
     | Some fuel_left -> f fuel_left state
 
+  exception Error_wrapper of tztrace
+
   (** [eval_until_input ~metadata level message_index ~fuel start_tick
   failing_ticks state] advances a PVM [state] until it wants more
   inputs or there are no more [fuel] (if [Some fuel] is
@@ -68,11 +70,40 @@ module Make
   let eval_until_input ~metadata ~dal_attestation_lag data_dir store level
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
+    let module Builtins = struct
+      let reveal_preimage hash =
+        let hash =
+          (* The 32-byte payload represents the encoded [Reveal_hash.t]. We must
+             decode it properly, instead of converting it byte-for-byte. *)
+          Tezos_webassembly_interpreter.Reveal.reveal_hash_to_string hash
+          |> Data_encoding.Binary.of_string_exn Sc_rollup.Reveal_hash.encoding
+        in
+        let*! data = Reveals.get ~data_dir ~pvm_name:PVM.name ~hash in
+        match data with
+        | Error error ->
+            (* The [Error_wrapper] must be caught upstream and converted into a
+               tzresult. *)
+            Lwt.fail (Error_wrapper error)
+        | Ok data -> Lwt.return data
+
+      let reveal_metadata () =
+        Lwt.return
+          (Data_encoding.Binary.to_string_exn
+             Sc_rollup.Metadata.encoding
+             metadata)
+    end in
+    let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
     let eval_tick fuel tick failing_ticks state =
       let max_steps = F.max_ticks fuel in
       let normal_eval state =
-        let*! state, executed_ticks = PVM.eval_many ~max_steps state in
-        return (state, executed_ticks, failing_ticks)
+        Lwt.catch
+          (fun () ->
+            let*! state, executed_ticks =
+              PVM.eval_many ~builtins ~max_steps state
+            in
+            return (state, executed_ticks, failing_ticks))
+          (function
+            | Error_wrapper error -> Lwt.return (Error error) | exn -> raise exn)
       in
       let failure_insertion_eval state failing_ticks' =
         let*! () =
@@ -99,7 +130,6 @@ module Make
             let* next_state, executed_ticks, failing_ticks =
               eval_tick fuel current_tick failing_ticks state
             in
-
             go
               fuel
               (Int64.add current_tick executed_ticks)

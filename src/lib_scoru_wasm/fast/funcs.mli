@@ -23,57 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_webassembly_interpreter
+open Tezos_wasmer
 open Tezos_scoru_wasm
-module Wasmer = Tezos_wasmer
-module Lazy_containers = Tezos_lazy_containers
 
-let store =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4121
-     Making this global is potentially not a great idea. Maybe lazy? *)
-  let engine = Wasmer.Engine.create Wasmer.Config.{compiler = SINGLEPASS} in
-  Wasmer.Store.create engine
+(** Host state environment for Fast Execution *)
+type host_state = {
+  retrieve_mem : unit -> Memory.t;
+  buffers : Eval.buffers;
+  mutable durable : Durable.t;
+}
 
-let load_kernel durable =
-  let open Lwt.Syntax in
-  let* kernel = Durable.find_value_exn durable Constants.kernel_key in
-  let+ kernel = Lazy_containers.Chunked_byte_vector.to_string kernel in
-  Wasmer.Module.(create store Binary kernel)
-
-let compute builtins durable buffers =
-  let open Lwt.Syntax in
-  let* module_ = load_kernel durable in
-
-  let main_mem = ref None in
-  let retrieve_mem () =
-    match !main_mem with Some x -> x () | None -> assert false
-  in
-
-  let host_state = Funcs.{retrieve_mem; buffers; durable} in
-  let host_funcs = Funcs.make builtins host_state in
-
-  let with_durable f =
-    let+ durable = f host_state.durable in
-    host_state.durable <- durable
-  in
-
-  let* instance = Wasmer.Instance.create store module_ host_funcs in
-
-  let* () =
-    (* At this point we know that the kernel is valid because we parsed and
-       instantiated it. It is now safe to set it as the fallback kernel. *)
-    with_durable Wasm_vm.save_fallback_kernel
-  in
-
-  let exports = Wasmer.Exports.from_instance instance in
-  let kernel_next =
-    Wasmer.(Exports.fn exports "kernel_next" (producer nothing))
-  in
-
-  main_mem := Some (fun () -> Wasmer.Exports.mem0 exports) ;
-
-  let* () = kernel_next () in
-
-  Wasmer.Instance.delete instance ;
-  Wasmer.Module.delete module_ ;
-
-  Lwt.return host_state.durable
+(** [make builtins host_state] generates a list of host functions that can be
+    imported by WebAssembly modules. *)
+val make : Builtins.t -> host_state -> (string * string * extern) list

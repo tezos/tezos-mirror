@@ -211,6 +211,109 @@ let test_reveal_metadata () =
   assert (preimage_in_memory = Bytes.to_string metadata) ;
   return_unit
 
+module Preimage_map = Map.Make (String)
+
+let apply_fast ?(images = Preimage_map.empty) tree =
+  let open Lwt.Syntax in
+  let run_counter = ref 0l in
+  let module Builtins = struct
+    let reveal_preimage hash =
+      let hash = Reveal.reveal_hash_to_string hash in
+      match Preimage_map.find hash images with
+      | None -> Stdlib.failwith "Failed to find preimage"
+      | Some preimage -> Lwt.return preimage
+
+    let reveal_metadata () = Stdlib.failwith "reveal_preimage is not available"
+  end in
+  let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
+  let+ tree =
+    Wasm_utils.eval_until_input_requested
+      ~builtins
+        (* We override the builtins to provide our own [reveal_preimage]
+           implementation. This allows us to rune Fast Exec with
+           kernels that want to reveal stuff. *)
+      ~after_fast_exec:(fun () -> run_counter := Int32.succ !run_counter)
+      ~fast_exec:true
+      ~max_steps:Int64.max_int
+      tree
+  in
+  (* Assert that the FE actual ran. *)
+  if !run_counter <> 1l then
+    Stdlib.failwith "Fast Execution was expected to run!" ;
+  tree
+
+let test_fast_exec_reveal () =
+  let open Lwt.Syntax in
+  let example_hash = "this represents the 32-byte hash" in
+  let example_preimage = "This is the expected preimage" in
+  let images = Preimage_map.singleton example_hash example_preimage in
+
+  let kernel =
+    Format.asprintf
+      {|
+(module
+  (import
+    "rollup_safe_core"
+    "store_write"
+    (func $store_write (param i32 i32 i32 i32 i32) (result i32))
+  )
+
+  (import
+    "rollup_safe_core"
+    "reveal_preimage"
+    (func $reveal_preimage (param i32 i32 i32) (result i32))
+  )
+
+  (memory 1)
+  (export "memory" (memory 0))
+
+  (data (i32.const 0) "%s") ;; The hash we want to reveal
+  (data (i32.const 100) "/foo")
+
+  (func (export "kernel_next") (local $len i32)
+    ;; Reveal something
+    (call $reveal_preimage
+      ;; Address of the hash
+      (i32.const 0)
+      ;; Destination address and length
+      (i32.const 1000) (i32.const 1000)
+    )
+    (local.set $len)
+
+    ;; Write the preimage to the output buffer
+    (call $store_write
+      ;; Key address and length
+      (i32.const 100) (i32.const 4)
+      ;; Offset into the target value
+      (i32.const 0)
+      ;; Memory address and length of the payload to write
+      (i32.const 1000) (local.get $len)
+    )
+    (drop)
+  )
+)
+  |}
+      example_hash
+  in
+
+  let* tree = initial_tree kernel in
+  let* tree = eval_until_input_requested tree in
+  let* tree = set_empty_inbox_step 0l tree in
+  let* tree = apply_fast ~images tree in
+
+  let* durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+
+  let* written_value =
+    Durable.(find_value_exn durable (key_of_string_exn "/foo"))
+  in
+  let* written_value =
+    Tezos_lazy_containers.Chunked_byte_vector.to_string written_value
+  in
+  assert (String.equal written_value example_preimage) ;
+
+  Lwt_result_syntax.return_unit
+
 let tests =
   [
     tztest
@@ -222,4 +325,5 @@ let tests =
       `Quick
       test_reveal_preimage_above_max;
     tztest "Test reveal_metadata" `Quick test_reveal_metadata;
+    tztest "Test reveal_preimage with Fast Exec" `Quick test_fast_exec_reveal;
   ]

@@ -39,13 +39,12 @@ let compute_until_snapshot ~max_steps pvm_state =
       | _ -> Wasm_vm.should_compute pvm_state)
     pvm_state
 
-let compute_fast pvm_state =
+let compute_fast builtins pvm_state =
   let open Lwt.Syntax in
   (* Execute! *)
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4123
      Support performing multiple calls to [Eval.compute]. *)
-  let durable = pvm_state.durable in
-  let* durable = Exec.compute durable pvm_state.buffers in
+  let* durable = Exec.compute builtins pvm_state.durable pvm_state.buffers in
   (* Compute the new tick counter. *)
   let ticks = pvm_state.max_nb_ticks in
   let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
@@ -56,8 +55,9 @@ let compute_fast pvm_state =
   let+ pvm_state = Wasm_vm.compute_step pvm_state in
   (pvm_state, Z.to_int64 ticks)
 
-let rec compute_step_many accum_ticks ?(after_fast_exec = fun () -> ())
-    ?(stop_at_snapshot = false) ~max_steps pvm_state =
+let rec compute_step_many accum_ticks ?builtins
+    ?(after_fast_exec = fun () -> ()) ?(stop_at_snapshot = false) ~max_steps
+    pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
   let eligible_for_fast_exec =
@@ -65,40 +65,43 @@ let rec compute_step_many accum_ticks ?(after_fast_exec = fun () -> ())
   in
   let backup pvm_state =
     let+ pvm_state, ticks =
-      Wasm_vm.compute_step_many ~stop_at_snapshot ~max_steps pvm_state
+      Wasm_vm.compute_step_many ?builtins ~stop_at_snapshot ~max_steps pvm_state
     in
     (pvm_state, Int64.add accum_ticks ticks)
   in
-  if eligible_for_fast_exec then
-    let goto_snapshot_and_retry () =
-      let* pvm_state, ticks = compute_until_snapshot ~max_steps pvm_state in
+  match builtins with
+  | Some builtins when eligible_for_fast_exec -> (
+      let goto_snapshot_and_retry () =
+        let* pvm_state, ticks = compute_until_snapshot ~max_steps pvm_state in
+        match pvm_state.tick_state with
+        | Snapshot ->
+            let max_steps = Int64.sub max_steps ticks in
+            let accum_ticks = Int64.add accum_ticks ticks in
+            let may_compute_more = Wasm_vm.should_compute pvm_state in
+            if may_compute_more && max_steps > 0L then
+              (compute_step_many [@tailcall])
+                accum_ticks
+                ~builtins
+                ~stop_at_snapshot
+                ~after_fast_exec
+                ~max_steps
+                pvm_state
+            else Lwt.return (pvm_state, accum_ticks)
+        | _ -> Lwt.return (pvm_state, ticks)
+      in
+      let go_like_the_wind () =
+        let+ pvm_state, ticks = compute_fast builtins pvm_state in
+        after_fast_exec () ;
+        (pvm_state, Int64.(add ticks accum_ticks))
+      in
       match pvm_state.tick_state with
-      | Snapshot ->
-          let max_steps = Int64.sub max_steps ticks in
-          let accum_ticks = Int64.add accum_ticks ticks in
-          let may_compute_more = Wasm_vm.should_compute pvm_state in
-          if may_compute_more && max_steps > 0L then
-            (compute_step_many [@tailcall])
-              ~stop_at_snapshot
-              accum_ticks
-              ~max_steps
-              pvm_state
-          else Lwt.return (pvm_state, accum_ticks)
-      | _ -> Lwt.return (pvm_state, ticks)
-    in
-    let go_like_the_wind () =
-      let+ pvm_state, ticks = compute_fast pvm_state in
-      after_fast_exec () ;
-      (pvm_state, Int64.(add ticks accum_ticks))
-    in
-    match pvm_state.tick_state with
-    | Snapshot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
-    | _ -> goto_snapshot_and_retry ()
-  else
-    (* The number of ticks we're asked to do is lower than the maximum number
-       of ticks for a top-level cycle. Fast Execution cannot be applied in this
-       case. *)
-    backup pvm_state
+      | Snapshot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
+      | _ -> goto_snapshot_and_retry ())
+  | _ ->
+      (* The number of ticks we're asked to do is lower than the maximum number
+         of ticks for a top-level cycle or no builtins were supplied. Fast
+         Execution cannot be applied in this case. *)
+      backup pvm_state
 
 let compute_step_many = compute_step_many 0L
 
