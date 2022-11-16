@@ -2016,36 +2016,139 @@ let test_refute_invalid_metadata () =
   in
   assert_refute_result ~game_status:expected_game_status incr
 
+let node_proof_to_protocol_proof p =
+  let open Data_encoding.Binary in
+  let open Sc_rollup.Inbox in
+  let enc = serialized_proof_encoding in
+  let bytes =
+    Sc_rollup_helpers.Store_inbox.to_serialized_proof p |> to_bytes_exn enc
+  in
+  of_bytes_exn enc bytes |> of_serialized_proof
+  |> WithExceptions.Option.get ~loc:__LOC__
+
+let full_history_inbox all_inbox_messages =
+  let open Lwt_syntax in
+  let open Sc_rollup_helpers in
+  (* Add the SOL/EOL to the list of inbox messages. *)
+  let all_inbox_messages =
+    List.map
+      (fun (inbox_level, inbox_messages) ->
+        (inbox_level, wrap_messages inbox_level inbox_messages))
+      all_inbox_messages
+  in
+  (* Create a inbox adding the messages from [all_inbox_messages]. *)
+  let* index = Tezos_context_memory.Context.init "inbox" in
+  let ctxt = Tezos_context_memory.Context.empty index in
+  let* inbox = Store_inbox.empty ctxt Raw_level.root in
+  Sc_rollup_helpers.construct_inbox ~inbox ctxt all_inbox_messages
+
+let input_included ~snapshot ~full_history_inbox (l, n) =
+  let open Sc_rollup_helpers in
+  let ctxt, level_tree, history, inbox = full_history_inbox in
+  let* history, history_proof =
+    Store_inbox.form_history_proof ctxt history inbox level_tree
+    >|= Environment.wrap_tzresult
+  in
+  (* Create an inclusion proof of the inbox message at [(l, n)]. *)
+  let* proof, _ =
+    Store_inbox.produce_proof ctxt history history_proof (l, n)
+    >|= Environment.wrap_tzresult
+  in
+  let proof = node_proof_to_protocol_proof proof in
+  let+ inbox_message_verified =
+    Sc_rollup.Inbox.verify_proof (l, n) snapshot proof
+    >|= Environment.wrap_tzresult
+  in
+  Option.map
+    (fun inbox_message -> Sc_rollup.Inbox_message inbox_message)
+    inbox_message_verified
+
 (** Test that the protocol adds a [SOL] and [EOL] for each Tezos level,
     even if no messages are added to the inbox. *)
 let test_sol_and_eol () =
+  let assert_input_included ~snapshot ~full_history_inbox (l, n) input =
+    let* input_verified = input_included ~snapshot ~full_history_inbox (l, n) in
+    Assert.equal
+      ~loc:__LOC__
+      (Option.equal Sc_rollup.input_equal)
+      "Input found with the proof is different from input provided"
+      (fun ppf v ->
+        match v with
+        | None -> Format.pp_print_string ppf "None"
+        | Some v -> Sc_rollup.pp_input ppf v)
+      input_verified
+      input
+  in
+
+  (* Create the first block. *)
   let* block, account = context_init Context.T1 in
 
-  (* SOL and EOL are added in the first inbox. *)
-  let* first_inbox = Context.Sc_rollup.inbox (B block) in
-  let messages_first_inbox =
-    Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter first_inbox
-  in
-  let* () = Assert.equal_int ~loc:__LOC__ 2 (Z.to_int messages_first_inbox) in
-
-  (* SOL and EOL are added when no messages are added. *)
+  (* Bake a second block. *)
   let* block = Block.bake block in
-  let* second_inbox = Context.Sc_rollup.inbox (B block) in
-  let messages_second_inbox =
-    Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter second_inbox
-  in
-  let* () = Assert.equal_int ~loc:__LOC__ 2 (Z.to_int messages_second_inbox) in
 
-  (* SOL and EOL are added when messages are added. *)
+  (* Bake a third block where a message is added. *)
   let* operation = Op.sc_rollup_add_messages (B block) account ["foo"] in
   let* block = Block.bake ~operation block in
-  let* third_inbox = Context.Sc_rollup.inbox (B block) in
-  let messages_third_inbox =
-    Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter third_inbox
-  in
-  let* () = Assert.equal_int ~loc:__LOC__ 3 (Z.to_int messages_third_inbox) in
 
-  return_unit
+  (* Bake an extra block to archive all inbox messages for the snapshot. *)
+  let* block = Block.bake block in
+  let* inbox = Context.Sc_rollup.inbox (B block) in
+  let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
+
+  let level_zero = Raw_level.of_int32_exn 0l in
+  let level_one = Raw_level.of_int32_exn 1l in
+  let level_two = Raw_level.of_int32_exn 2l in
+  let*! ((ctxt, level_tree, history, inbox) as full_history_inbox) =
+    full_history_inbox [(level_zero, []); (level_one, []); (level_two, ["foo"])]
+  in
+
+  (* Assert SOL is at position 0. *)
+  let sol = Sc_rollup_helpers.make_sol ~inbox_level:level_two in
+  let* () =
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (level_two, Z.zero)
+      (Some sol)
+  in
+  (* Assert EOL is at the end of inbox level. *)
+  let eol =
+    Sc_rollup_helpers.make_eol
+      ~inbox_level:level_two
+      ~message_counter:(Z.of_int 2)
+  in
+  let* () =
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (level_two, Z.of_int 2)
+      (Some eol)
+  in
+  (* Assert EOL was the last message of the inbox level. *)
+  let* () =
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (level_two, Z.of_int 3)
+      None
+  in
+
+  (* Assert the computed inbox and protocol's inbox are equal. *)
+  let* _history, history_proof =
+    Sc_rollup_helpers.Store_inbox.form_history_proof
+      ctxt
+      history
+      inbox
+      level_tree
+    >|= Environment.wrap_tzresult
+  in
+  Assert.equal
+    ~loc:__LOC__
+    Sc_rollup.Inbox.equal_history_proof
+    "Computed and protocol inboxes aren't equal"
+    Sc_rollup.Inbox.pp_history_proof
+    snapshot
+    history_proof
 
 (** With [Start_of_level] and [End_of_level] inbox messages in each inbox level,
     it's impossible to give a valid commitment with 0 ticks. *)

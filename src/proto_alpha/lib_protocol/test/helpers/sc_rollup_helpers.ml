@@ -423,3 +423,102 @@ let gen_message_reprs_for_levels_repr ~start_level ~max_level gen_message_repr =
         assert false
   in
   aux [] (max_level - start_level)
+
+module Tree_inbox = struct
+  open Sc_rollup.Inbox
+  module Store = Tezos_context_memory.Context
+
+  module Tree = struct
+    include Store.Tree
+
+    type tree = Store.tree
+
+    type t = Store.t
+
+    type key = string list
+
+    type value = bytes
+  end
+
+  type t = Store.t
+
+  type tree = Tree.tree
+
+  let commit_tree store key tree =
+    let open Lwt_syntax in
+    let* store = Store.add_tree store key tree in
+    let* (_ : Context_hash.t) = Store.commit ~time:Time.Protocol.epoch store in
+    return ()
+
+  let lookup_tree store hash =
+    let open Lwt_syntax in
+    let index = Store.index store in
+    let* _, tree =
+      Store.produce_tree_proof
+        index
+        (`Node (Hash.to_context_hash hash))
+        (fun x -> Lwt.return (x, x))
+    in
+    return (Some tree)
+
+  type proof = Store.Proof.tree Store.Proof.t
+
+  let verify_proof proof f =
+    Lwt.map Result.to_option (Store.verify_tree_proof proof f)
+
+  let produce_proof store tree f =
+    let open Lwt_syntax in
+    let index = Store.index store in
+    let* proof = Store.produce_tree_proof index (`Node (Tree.hash tree)) f in
+    return (Some proof)
+
+  let kinded_hash_to_inbox_hash = function
+    | `Value hash | `Node hash -> Hash.of_context_hash hash
+
+  let proof_before proof = kinded_hash_to_inbox_hash proof.Store.Proof.before
+
+  let proof_encoding =
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    .tree_proof_encoding
+end
+
+module Store_inbox = struct
+  include Sc_rollup.Inbox.Make_hashing_scheme (Tree_inbox)
+end
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3529
+
+   Factor code for the unit test.
+   this and {!Store_inbox} is highly copy-pasted from
+   test/unit/test_sc_rollup_inbox. The main difference is: we use
+   [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
+   former. *)
+let construct_inbox ~inbox ?origination_level ctxt levels_and_messages =
+  let open Lwt_syntax in
+  let open Store_inbox in
+  let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
+  let rec aux history inbox level_tree = function
+    | [] -> return (ctxt, level_tree, history, inbox)
+    | ((level, messages) : Raw_level.t * message list) :: rst ->
+        assert (
+          match origination_level with
+          | Some origination_level -> Raw_level.(origination_level < level)
+          | None -> true) ;
+        let payloads =
+          List.map
+            (fun {input; _} ->
+              match input with
+              | Inbox_message {payload; _} -> payload
+              | Reveal _ -> (* We don't produce any reveals. *) assert false)
+            messages
+        in
+        let* res =
+          add_messages ctxt history inbox level payloads level_tree
+          >|= Environment.wrap_tzresult
+        in
+        let level_tree, history, inbox =
+          WithExceptions.Result.get_ok ~loc:__LOC__ res
+        in
+        aux history inbox (Some level_tree) rst
+  in
+  aux history inbox None levels_and_messages

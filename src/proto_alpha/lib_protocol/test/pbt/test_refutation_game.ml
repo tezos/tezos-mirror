@@ -51,9 +51,6 @@ let qcheck_make_lwt_res ?print ?count ~name ~gen f =
     ~gen
     (fun a -> Lwt_main.run (f a))
 
-(** Lift a computation using environment errors to use shell errors. *)
-let lift k = Lwt.map Environment.wrap_tzresult k
-
 let tick_to_int_exn ?(__LOC__ = __LOC__) t =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
 
@@ -787,68 +784,7 @@ end
 (** {2. ArithPVM utils} *)
 
 module ArithPVM = Arith_pvm
-
-module Tree_inbox = struct
-  open Inbox
-  module Store = Tezos_context_memory.Context
-
-  module Tree = struct
-    include Store.Tree
-
-    type tree = Store.tree
-
-    type t = Store.t
-
-    type key = string list
-
-    type value = bytes
-  end
-
-  type t = Store.t
-
-  type tree = Tree.tree
-
-  let commit_tree store key tree =
-    let open Lwt_syntax in
-    let* store = Store.add_tree store key tree in
-    let* (_ : Context_hash.t) = Store.commit ~time:Time.Protocol.epoch store in
-    return ()
-
-  let lookup_tree store hash =
-    let open Lwt_syntax in
-    let index = Store.index store in
-    let* _, tree =
-      Store.produce_tree_proof
-        index
-        (`Node (Hash.to_context_hash hash))
-        (fun x -> Lwt.return (x, x))
-    in
-    return (Some tree)
-
-  type proof = Store.Proof.tree Store.Proof.t
-
-  let verify_proof proof f =
-    Lwt.map Result.to_option (Store.verify_tree_proof proof f)
-
-  let produce_proof store tree f =
-    let open Lwt_syntax in
-    let index = Store.index store in
-    let* proof = Store.produce_tree_proof index (`Node (Tree.hash tree)) f in
-    return (Some proof)
-
-  let kinded_hash_to_inbox_hash = function
-    | `Value hash | `Node hash -> Hash.of_context_hash hash
-
-  let proof_before proof = kinded_hash_to_inbox_hash proof.Store.Proof.before
-
-  let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-    .tree_proof_encoding
-end
-
-module Store_inbox = struct
-  include Inbox.Make_hashing_scheme (Tree_inbox)
-end
+module Store_inbox = Sc_rollup_helpers.Store_inbox
 
 module Arith_test_pvm = struct
   include ArithPVM
@@ -1102,43 +1038,14 @@ module Player_client = struct
     @@ let+ index = Tezos_context_memory.Context.init id in
        Tezos_context_memory.Context.empty index
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3529
-
-     Factor code for the unit test.
-     this and {!Store_inbox} is highly copy-pasted from
-     test/unit/test_sc_rollup_inbox. The main difference is: we use
-     [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
-     former. *)
-  let construct_inbox ~inbox ctxt levels_and_messages ~origination_level =
-    let open Lwt_syntax in
-    let open Store_inbox in
-    let history = Inbox.History.empty ~capacity:10000L in
-    let rec aux history inbox level_tree = function
-      | [] -> return (ctxt, level_tree, history, inbox)
-      | ((level, messages) : Raw_level.t * message list) :: rst ->
-          assert (Raw_level.(origination_level < level)) ;
-          let payloads =
-            List.map
-              (fun {input; _} ->
-                match input with
-                | Inbox_message {payload; _} -> payload
-                | Reveal _ -> (* We don't produce any reveals. *) assert false)
-              messages
-          in
-          let* res =
-            lift @@ add_messages ctxt history inbox level payloads level_tree
-          in
-          let level_tree, history, inbox =
-            WithExceptions.Result.get_ok ~loc:__LOC__ res
-          in
-          aux history inbox (Some level_tree) rst
-    in
-    aux history inbox None levels_and_messages
-
   (** Construct an inbox based on [levels_and_messages] in the player context. *)
   let construct_inbox ~inbox ~origination_level ctxt levels_and_messages =
     Lwt_main.run
-    @@ construct_inbox ~inbox ~origination_level ctxt levels_and_messages
+    @@ Sc_rollup_helpers.construct_inbox
+         ~inbox
+         ~origination_level
+         ctxt
+         levels_and_messages
 
   (** Generate [our_states] for [levels_and_messages] based on the strategy.
       It needs [start_level] and [max_level] in case it will need to generate
