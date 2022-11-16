@@ -27,6 +27,8 @@ open Protocol
 
 let ns = Namespace.make Registration_helpers.ns "cache"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 (** {2 [Alpha_context.Cache]-related benchmarks} *)
 
 let assert_ok_lwt x =
@@ -161,12 +163,10 @@ module Cache_update_benchmark : Benchmark.S = struct
     (* Looking at the plots, it looks like this benchmark underestimates the constant term.
        In the interpreter, this would warrant a dedicated benchmark for the intercept. *)
     let intercept_variable =
-      Free_variable.of_string
-        (Format.asprintf "%s_const" (Namespace.basename name))
+      fv (Format.asprintf "%s_const" (Namespace.basename name))
     in
     let coeff_variable =
-      Free_variable.of_string
-        (Format.asprintf "%s_coeff" (Namespace.basename name))
+      fv (Format.asprintf "%s_coeff" (Namespace.basename name))
     in
     Model.make
       ~conv:(function {cache_cardinal} -> (cache_cardinal, ()))

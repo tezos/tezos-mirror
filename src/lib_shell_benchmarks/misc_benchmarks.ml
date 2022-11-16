@@ -25,7 +25,9 @@
 
 let ns = Namespace.make Shell_namespace.ns "misc"
 
-let lwt_variable = Free_variable.of_string "lwt_main_run"
+let fv s = Free_variable.of_namespace (ns s)
+
+let lwt_variable = fv "lwt_main_run"
 
 let lwt_model =
   Model.make

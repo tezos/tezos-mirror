@@ -28,6 +28,8 @@ module Size = Gas_input_size
 
 let ns = Namespace.make Registration_helpers.ns "sapling"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 module Apply_diff_bench : Benchmark.S = struct
   include Interpreter_benchmarks.Default_config
   include Interpreter_benchmarks.Default_boilerplate
@@ -74,9 +76,9 @@ module Apply_diff_bench : Benchmark.S = struct
       ~conv:(fun {nb_input; nb_output; _} -> (nb_input, (nb_output, ())))
       ~model:
         (Model.bilinear_affine
-           ~intercept:(Free_variable.of_string "apply_diff_const")
-           ~coeff1:(Free_variable.of_string "apply_diff_inputs")
-           ~coeff2:(Free_variable.of_string "apply_diff_outputs"))
+           ~intercept:(fv "apply_diff_const")
+           ~coeff1:(fv "apply_diff_inputs")
+           ~coeff2:(fv "apply_diff_outputs"))
 
   let models = [("apply_diff", model)]
 

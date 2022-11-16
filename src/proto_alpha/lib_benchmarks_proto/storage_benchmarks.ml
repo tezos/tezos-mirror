@@ -36,6 +36,8 @@ open Protocol
 
 let ns = Namespace.make Registration_helpers.ns "storage"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 (** Creates a dummy raw-context value. *)
 let default_raw_context () =
   let open Lwt_result_syntax in
@@ -170,8 +172,8 @@ module List_key_values_benchmark_boilerplate = struct
           ~model:
             (Model.affine_split_const
                ~intercept1:Builtin_benchmarks.timer_variable
-               ~intercept2:(Free_variable.of_string "list_key_values_intercept")
-               ~coeff:(Free_variable.of_string "list_key_values_step")) );
+               ~intercept2:(fv "list_key_values_intercept")
+               ~coeff:(fv "list_key_values_step")) );
     ]
 end
 

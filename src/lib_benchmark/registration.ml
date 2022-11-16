@@ -34,7 +34,10 @@ let clic_table : unit Tezos_clic.command list ref = ref []
 
 let codegen_table : Model.for_codegen String_table.t = String_table.create 51
 
+(* Table for the sub-namespaces of benchmarks *)
 let namespace_table : unit Name_table.t = Name_table.create 51
+
+let parameter_table : string list Name_table.t = Name_table.create 51
 
 let register_namespace (name : Namespace.t) =
   let rec aux ns name_list =
@@ -49,6 +52,23 @@ let register_namespace (name : Namespace.t) =
 
 let () = Name_table.add namespace_table Namespace.empty ()
 
+let register_parameter model_name (param : Free_variable.t) =
+  let ns = Free_variable.to_namespace param in
+  match Name_table.find_opt parameter_table ns with
+  | None -> Name_table.add parameter_table ns [model_name]
+  | Some l -> Name_table.replace parameter_table ns (model_name :: l)
+
+let aux_register_model name (model : 'a Model.t) =
+  match model with
+  | Preapplied _ -> ()
+  | Packaged {model; _} ->
+      let module M = (val model) in
+      let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
+      let module T1 = Costlang.Beta_normalize (T0) in
+      let module R = M.Def (T1) in
+      let fv_set = T0.prj @@ T1.prj R.model in
+      Free_variable.Set.iter (register_parameter name) fv_set
+
 let register ((module Bench) : Benchmark.t) =
   register_namespace Bench.name ;
   if Name_table.mem bench_table Bench.name then (
@@ -57,7 +77,9 @@ let register ((module Bench) : Benchmark.t) =
       Namespace.pp
       Bench.name ;
     exit 1)
-  else Name_table.add bench_table Bench.name (module Bench)
+  else () ;
+  List.iter (fun (name, m) -> aux_register_model name m) Bench.models ;
+  Name_table.add bench_table Bench.name (module Bench)
 
 let register_for_codegen name model =
   if String_table.mem codegen_table name then
@@ -135,6 +157,11 @@ let all_model_names () =
     String_set.empty
     (all_registered_models ())
   |> String_set.to_seq |> List.of_seq
+
+let all_registered_parameters () =
+  Name_table.to_seq parameter_table
+  |> List.of_seq
+  |> List.sort (fun (p1, _) (p2, _) -> Namespace.compare p1 p2)
 
 let all_custom_commands () = !clic_table
 

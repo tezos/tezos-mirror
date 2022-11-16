@@ -701,6 +701,20 @@ module List_cmd = struct
            Lwt.return_ok res)
          (fun _ str -> Lwt.return_ok str))
 
+  let parameter_param () =
+    Tezos_clic.param
+      ~name:"PARAM-NAME"
+      ~desc:"Name of the parameter"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           let res =
+             List.map
+               (fun (param, _) -> Namespace.to_string param)
+               (Registration.all_registered_parameters ())
+           in
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
+
   let namespace_param () =
     Tezos_clic.param
       ~name:"NAMESPACE"
@@ -796,6 +810,23 @@ module List_cmd = struct
       (Registration.find_benchmarks_in_namespace pattern)
       show_tags
 
+  let params_all_param = Tezos_clic.fixed ["list"; "all"; "parameters"]
+
+  let handler_all_param () () =
+    List.iter
+      (fun (param, models) ->
+        Format.fprintf
+          Format.std_formatter
+          "%a\n\tModels: %a\n"
+          Namespace.pp
+          param
+          (Format.pp_print_list
+             ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
+             Format.pp_print_string)
+          models)
+      (Registration.all_registered_parameters ()) ;
+    Lwt_result_syntax.return_unit
+
   let group =
     {Tezos_clic.name = "list"; title = "Commands for displaying lists"}
 
@@ -847,6 +878,14 @@ module List_cmd = struct
       params_bench_match
       handler_bench_match
 
+  let command_all_param =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all parameters"
+      Tezos_clic.no_options
+      params_all_param
+      handler_all_param
+
   let commands =
     [
       command_all_bench;
@@ -855,6 +894,7 @@ module List_cmd = struct
       command_bench_tags_all;
       command_bench_tags_exact;
       command_bench_match;
+      command_all_param;
     ]
 end
 

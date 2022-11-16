@@ -41,6 +41,8 @@ open Protocol
 
 let ns = Namespace.make Registration_helpers.ns "global_constants_storage"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 let assert_ok_lwt x =
   match Lwt_main.run x with
   | Ok x -> x
@@ -314,9 +316,8 @@ module Set_add : Benchmark.S = struct
     [
       ( "Set_add",
         Model.(
-          make
-            ~conv:(fun size -> (size, ()))
-            ~model:(logn ~coeff:(Free_variable.of_string "size"))) );
+          make ~conv:(fun size -> (size, ())) ~model:(logn ~coeff:(fv "size")))
+      );
     ]
 
   module Int_set = Set.Make (Int)
@@ -372,9 +373,8 @@ module Set_elements : Benchmark.S = struct
     [
       ( "Set_elements",
         Model.(
-          make
-            ~conv:(fun size -> (size, ()))
-            ~model:(linear ~coeff:(Free_variable.of_string "size"))) );
+          make ~conv:(fun size -> (size, ())) ~model:(linear ~coeff:(fv "size")))
+      );
     ]
 
   module Int_set = Set.Make (Int)
@@ -441,9 +441,8 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
           make
             ~conv:(fun Micheline_sampler.{nodes; _} -> (nodes, ()))
             ~model:
-              (Model.affine
-                 ~intercept:(Free_variable.of_string "b58_check_cost")
-                 ~coeff:(Free_variable.of_string "size"))) );
+              (Model.affine ~intercept:(fv "b58_check_cost") ~coeff:(fv "size")))
+      );
     ]
 
   (* To create realistic benchmarks, we generate a random Micheline expression,
@@ -506,9 +505,8 @@ struct
     [
       ( "Global_constants_storage_expr_to_address_in_context",
         Model.(
-          make
-            ~conv:(fun size -> (size, ()))
-            ~model:(linear ~coeff:(Free_variable.of_string "size"))) );
+          make ~conv:(fun size -> (size, ())) ~model:(linear ~coeff:(fv "size")))
+      );
     ]
 
   let create_benchmark rng_state _config () =
@@ -600,9 +598,7 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:
-                (linear ~coeff:(Free_variable.of_string "number of constants")))
-        );
+              ~model:(linear ~coeff:(fv "number of constants"))) );
       ]
 
     (* To test Branch 2 as nearly as possible, we generate a Micheline Seq
@@ -689,10 +685,8 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:
-                (nlogn
-                   ~intercept:(Free_variable.of_string "cst")
-                   ~coeff:(Free_variable.of_string "number of nodes"))) );
+              ~model:(nlogn ~intercept:(fv "cst") ~coeff:(fv "number of nodes")))
+        );
       ]
 
     (** We benchmark this by generating a random Micheline expression without constants

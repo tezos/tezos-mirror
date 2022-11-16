@@ -28,6 +28,8 @@ open Alpha_context
 
 let ns = Namespace.make Registration_helpers.ns "tickets"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 module Ticket_type_shared = struct
   type config = {max_size : int}
 
@@ -87,7 +89,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
       ~model:
         (Model.unknown_const2
            ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(Free_variable.of_string "compare_ticket_hash"))
+           ~const2:(fv "compare_ticket_hash"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -146,7 +148,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
       ~model:
         (Model.unknown_const2
            ~const1:Builtin_benchmarks.timer_variable
-           ~const2:(Free_variable.of_string "compare_contract"))
+           ~const2:(fv "compare_contract"))
 
   let models = [("compare_tickets", compare_model)]
 
@@ -232,11 +234,8 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string
-                (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:
-             (Free_variable.of_string
-                (Format.asprintf "%s_coeff" (Namespace.basename name))))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_has_tickets_model", size_model)]
 
@@ -312,11 +311,8 @@ module Collect_tickets_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string
-                (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:
-             (Free_variable.of_string
-                (Format.asprintf "%s_coeff" (Namespace.basename name))))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_collect_tickets_step_model", size_model)]
 

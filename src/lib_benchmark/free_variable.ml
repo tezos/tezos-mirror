@@ -23,22 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = string
+type t = Namespace.t
 
-let compare = String.compare
+let compare = Namespace.compare
 
-let equal = String.equal
+let equal = Namespace.equal
 
-let of_string x = x
+let of_string = Namespace.of_string
 
-let pp = Format.pp_print_string
+let to_string = Namespace.to_string
+
+let of_namespace x = x
+
+let to_namespace x = x
+
+let pp = Namespace.pp
+
+let pp_short = Namespace.pp_short
 
 module Table = Hashtbl.Make (struct
-  include String
+  include Namespace
 
   let hash = Stdlib.Hashtbl.hash
 end)
 
-module Map = Map.Make (String)
-module Set = Set.Make (String)
-module Sparse_vec = Sparse_vec.String
+module Map = Map.Make (Namespace)
+module Set = Set.Make (Namespace)
+module Sparse_vec = Sparse_vec.Make (Map)
