@@ -405,11 +405,11 @@ let pp_manager_operation_content (type kind) source ppf
         Dal.Slot.Header.pp
         slot_header
   | Zk_rollup_origination _ ->
-      Format.fprintf ppf "Zk rollup origination:@,From: %a" Contract.pp source
+      Format.fprintf ppf "Epoxy origination:@,From: %a" Contract.pp source
   | Zk_rollup_publish _ ->
-      Format.fprintf ppf "Zk rollup publish:@,From: %a" Contract.pp source
+      Format.fprintf ppf "Epoxy publish:@,From: %a" Contract.pp source
   | Zk_rollup_update _ ->
-      Format.fprintf ppf "Zk rollup update:@,From: %a" Contract.pp source
+      Format.fprintf ppf "Epoxy update:@,From: %a" Contract.pp source
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -888,9 +888,9 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_recover_bond_result _ -> "smart contract bond retrieval"
     | Dal_publish_slot_header_result _ ->
         "data availability slot header publishing"
-    | Zk_rollup_origination_result _ -> "zk rollup originate"
-    | Zk_rollup_publish_result _ -> "zk rollup publish"
-    | Zk_rollup_update_result _ -> "zk rollup update"
+    | Zk_rollup_origination_result _ -> "epoxy originate"
+    | Zk_rollup_publish_result _ -> "epoxy publish"
+    | Zk_rollup_update_result _ -> "epoxy update"
   in
   let pp_manager_operation_contents_result (type kind) ppf
       (result : kind successful_manager_operation_result) =
