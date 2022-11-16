@@ -346,10 +346,10 @@ end) : sig
     Plonk.Main_protocol.verifier_public_parameters
     * Plonk.Main_protocol.transcript
 
-  (** [craft_update state ~zk_rollup ?private_ops public_ops] will apply
-     first the [public_ops], then the [private_ops]. While doing so,
-      the public inputs for every circuit will be collected. A Plonk proof
-      of correctness of the application these operations is created. *)
+  (** [craft_update state ~zk_rollup ?private_ops ?exit_validities public_ops]
+      will apply first the [public_ops], then the [private_ops]. While doing so,
+      the public inputs for every circuit will be collected. A Plonk proof of
+      correctness of the application these operations is created. *)
   val craft_update :
     Zk_rollup.State.t ->
     zk_rollup:Zk_rollup.t ->

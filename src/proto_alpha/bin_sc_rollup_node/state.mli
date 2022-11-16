@@ -53,6 +53,6 @@ val hash_of_level : _ Store.t -> int32 -> Tezos_crypto.Block_hash.t Lwt.t
 val level_of_hash :
   _ Store.t -> Tezos_crypto.Block_hash.t -> int32 tzresult Lwt.t
 
-(** [set_block_level_and_has store head] registers the correspondences
+(** [set_block_level_and_hash store head] registers the correspondences
     [head.level |-> head.hash] and [head.hash |-> head.level] in the store. *)
 val set_block_level_and_hash : Store.rw -> Layer1.head -> unit Lwt.t
