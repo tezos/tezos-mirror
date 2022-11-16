@@ -981,6 +981,14 @@ module Target = struct
 
   type preprocessor_dep = File of string
 
+  type release_status = Unreleased | Experimental | Released | Auto_opam
+
+  let show_release_status = function
+    | Unreleased -> "Unreleased"
+    | Experimental -> "Experimental"
+    | Released -> "Released"
+    | Auto_opam -> "Auto_opam"
+
   type internal = {
     bisect_ppx : bool;
     time_measurement_ppx : bool;
@@ -1014,7 +1022,7 @@ module Target = struct
     private_modules : string list;
     profile : string option;
     opam_only_deps : t list;
-    release : bool;
+    release_status : release_status;
     static : bool;
     synopsis : string option;
     description : string option;
@@ -1174,7 +1182,7 @@ module Target = struct
     ?private_modules:string list ->
     ?profile:string ->
     ?opam_only_deps:t option list ->
-    ?release:bool ->
+    ?release_status:release_status ->
     ?static:bool ->
     ?synopsis:string ->
     ?description:string ->
@@ -1245,8 +1253,8 @@ module Target = struct
       ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
       ?(opam_with_test = Always) ?(optional = false) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?profile
-      ?(opam_only_deps = []) ?(release = false) ?static ?synopsis ?description
-      ?(time_measurement_ppx = false) ?(virtual_modules = [])
+      ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static ?synopsis
+      ?description ?(time_measurement_ppx = false) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
@@ -1547,7 +1555,7 @@ module Target = struct
         private_modules;
         profile;
         opam_only_deps;
-        release;
+        release_status;
         static;
         synopsis;
         description;
@@ -2154,6 +2162,162 @@ let deduplicate_list ?merge get_key list =
   in
   List.fold_left add ([], String_set.empty) list |> fst |> List.rev
 
+(* [Explicitly_unreleased i]: this opam package was explicitly specified not to be released
+   in the definition of its internal target [i].
+   [Explicitly_released i]: this opam package was explicitly specified to be released
+   in the definition of its internal target [i].
+   [Transitively_released p]: this opam package needs to be released because package [p],
+   which is released, depends on it. *)
+type opam_release_status =
+  | Explicitly_unreleased of Target.internal
+  | Explicitly_released of Target.internal
+  | Transitively_released of string
+  | Auto
+
+(* [height] is 1 for leaves, 1 + max dependency height for nodes. *)
+type opam_dependency_graph_node = {
+  mutable dependencies : String_set.t;
+  mutable release_status : opam_release_status;
+  mutable propagated : bool;
+  mutable height : int;
+}
+
+(* This function relies on [check_circular_opam_deps] having been run prior. *)
+let compute_opam_release_graph () : opam_dependency_graph_node String_map.t =
+  (* First step:
+     - compute [dependencies];
+     - propagate [release_status] constraints inside opam packages.
+     This step does not propagate [release_status] constraints to dependencies.
+     This is done in a later step because we need all nodes to exist first. *)
+  let graph =
+    let node_of_internals package_name internals =
+      let released_example = ref None in
+      let unreleased_example = ref None in
+      let add_status internal =
+        match internal.Target.release_status with
+        | Auto_opam -> ()
+        | Unreleased | Experimental -> unreleased_example := Some internal
+        | Released -> released_example := Some internal
+      in
+      List.iter add_status internals ;
+      let release_status =
+        match (!released_example, !unreleased_example) with
+        | None, None -> Auto
+        | Some internal, None -> Explicitly_released internal
+        | None, Some internal -> Explicitly_unreleased internal
+        | Some a, Some b ->
+            error
+              "In %s, %S has release status %s, and in %s, %S has release \
+               status %s; those two targets cannot be in the same opam package \
+               %S.\n"
+              a.path
+              (Target.kind_name_for_errors a.kind)
+              (Target.show_release_status a.release_status)
+              b.path
+              (Target.kind_name_for_errors b.kind)
+              (Target.show_release_status b.release_status)
+              package_name ;
+            exit 1
+      in
+      let dependencies =
+        let add_dependency acc (target : Target.t) =
+          match Target.get_internal target with
+          | None | Some {opam = None; _} -> acc
+          | Some {opam = Some pkg; _} ->
+              if pkg = package_name then acc else String_set.add pkg acc
+        in
+        let add_internal_dependency acc internal =
+          List.fold_left add_dependency acc (Target.all_internal_deps internal)
+        in
+        List.fold_left add_internal_dependency String_set.empty internals
+      in
+      {dependencies; release_status; propagated = false; height = 0}
+    in
+    String_map.mapi node_of_internals !Target.by_opam
+  in
+  let with_node package_name k =
+    match String_map.find_opt package_name graph with
+    | None ->
+        (* We added all opam packages to [graph] in the first step. *)
+        assert false
+    | Some node -> k node
+  in
+  (* Propagate [release_status] constraints down the dependency tree:
+     if a package is released, its dependencies must be released too. *)
+  let rec propagate_from parent_name parent_node =
+    if not parent_node.propagated then
+      match parent_node.release_status with
+      | Explicitly_unreleased _ | Auto -> parent_node.propagated <- true
+      | Explicitly_released _ | Transitively_released _ ->
+          let propagate_to dependency_name =
+            with_node dependency_name @@ fun dependency_node ->
+            match dependency_node.release_status with
+            | Explicitly_unreleased _ ->
+                let rec output_reason = function
+                  | Explicitly_unreleased internal ->
+                      Printf.eprintf
+                        "  because in %s, %S is explicitly not released\n"
+                        internal.path
+                        (Target.kind_name_for_errors internal.kind)
+                  | Explicitly_released internal ->
+                      Printf.eprintf
+                        "  because in %s, %S is explicitly released\n"
+                        internal.path
+                        (Target.kind_name_for_errors internal.kind)
+                  | Transitively_released reverse_dep ->
+                      Printf.eprintf
+                        "  because its reverse dependency %S is released\n"
+                        reverse_dep ;
+                      with_node reverse_dep @@ fun reverse_node ->
+                      output_reason reverse_node.release_status
+                  | Auto ->
+                      (* Package is neither released nor released, why is there
+                         a contradiction? *)
+                      assert false
+                in
+                Printf.eprintf "Package %S is released\n" parent_name ;
+                output_reason parent_node.release_status ;
+                Printf.eprintf "Package %S is not released\n" dependency_name ;
+                output_reason dependency_node.release_status ;
+                error
+                  "Released package %S cannot depend on unreleased package %S.\n"
+                  parent_name
+                  dependency_name ;
+                exit 1
+            | Explicitly_released _ | Transitively_released _ ->
+                (* Either [dependency_node] has already been propagated,
+                   or it hasn't but will be later since we visit all nodes
+                   with [String_map.iter]. *)
+                ()
+            | Auto ->
+                dependency_node.release_status <-
+                  Transitively_released parent_name ;
+                (* In case [dependency_node] has already been propagated,
+                   we need to re-propagate it now that it has changed. *)
+                dependency_node.propagated <- false ;
+                propagate_from dependency_name dependency_node
+          in
+          String_set.iter propagate_to parent_node.dependencies ;
+          parent_node.propagated <- true
+  in
+  String_map.iter propagate_from graph ;
+  (* Compute heights. *)
+  let rec compute_height node =
+    if node.height <= 0 then
+      let max_dep_height : int =
+        String_set.fold
+          (fun dependency_name height ->
+            with_node dependency_name @@ fun dependency_node ->
+            compute_height dependency_node ;
+            max height dependency_node.height)
+          node.dependencies
+          0
+      in
+      node.height <- max_dep_height + 1
+  in
+  String_map.iter (fun _ -> compute_height) graph ;
+  graph
+
 let generate_dune_files () =
   Target.iter_internal_by_path @@ fun path internals ->
   let node_preload =
@@ -2592,18 +2756,20 @@ let generate_binaries_for_release () =
   write "script-inputs/binaries-for-release" @@ fun fmt ->
   !Target.registered
   |> List.iter (fun (internal : Target.internal) ->
-         if internal.release then
-           match internal.kind with
-           | Public_library _ | Private_library _ | Private_executable _
-           | Test_executable _ ->
-               error
-                 "Target %s is marked with ~release:true but is not a public \
-                  executable.\n"
-                 (Target.name_for_errors (Internal internal))
-           | Public_executable ne_list ->
-               Ne_list.to_list ne_list
-               |> List.iter (fun (full_name : Target.full_name) ->
-                      Format.fprintf fmt "%s@." full_name.public_name))
+         match internal.release_status with
+         | Unreleased | Auto_opam -> ()
+         | Experimental ->
+             (* [binaries-for-release] is only used in tag releases. *)
+             ()
+         | Released -> (
+             match internal.kind with
+             | Public_library _ | Private_library _ | Private_executable _
+             | Test_executable _ ->
+                 ()
+             | Public_executable ne_list ->
+                 Ne_list.to_list ne_list
+                 |> List.iter (fun (full_name : Target.full_name) ->
+                        Format.fprintf fmt "%s@." full_name.public_name)))
 
 let generate_static_packages () =
   write "script-inputs/static-packages" @@ fun fmt ->
@@ -2884,108 +3050,56 @@ let packages_dir, release, remove_extra_files =
   in
   (!packages_dir, release, !remove_extra_files)
 
-let generate_opam_ci () =
-  let depends_on_unreleased_packages l =
-    let rec fold ~seen acc t =
-      let name = Target.name_for_errors t in
-      if String_set.mem name seen then (seen, acc)
+let generate_opam_ci opam_release_graph =
+  (* We only need to test released packages, since those are the only one
+     that will need to pass the public Opam CI. *)
+  let released_packages, unreleased_packages =
+    List.partition
+      (fun (_, node) ->
+        match node.release_status with
+        | Explicitly_unreleased _ | Auto -> false
+        | Explicitly_released _ | Transitively_released _ -> true)
+      (String_map.bindings opam_release_graph)
+  in
+  (* Due to technical limitations of the CI, we want to avoid starting
+     all opam package tests at the same time. Instead, we start them by batch,
+     with a delay between each batch. To this end we sort jobs by height
+     in the dependency tree, then split the resulting list. The idea is that
+     the higher in the dependency tree a job is, the longer it takes to run,
+     and the sooner we want it to start. *)
+  let released_packages =
+    let by_height_and_name (name1, node1) (name2, node2) =
+      (* Smaller heights first, to put them in the first batches. *)
+      let c = Int.compare node2.height node1.height in
+      if c <> 0 then c
       else
-        let seen = String_set.add name seen in
-        match t with
-        | Vendored {released_on_opam = false; name; _} ->
-            (seen, String_set.add name acc)
-        | t -> (
-            match Target.get_internal t with
-            | None -> (seen, acc)
-            | Some i ->
-                List.fold_left
-                  (fun (seen, acc) (t : Target.t) -> fold ~seen acc t)
-                  (seen, acc)
-                  i.deps)
+        (* For more stability (better diffs) we also sort by name. *)
+        String.compare name1 name2
     in
-
-    List.fold_left
-      (fun (seen, acc) (internal : Target.internal) ->
-        fold ~seen acc (Internal internal))
-      (String_set.empty, String_set.empty)
-      l
-    |> snd
+    List.sort by_height_and_name released_packages
   in
-  let only_test_or_private_targets l =
-    List.for_all
-      (fun (internal : Target.internal) ->
-        match internal.kind with
-        | Public_executable _ -> not internal.release
-        | Public_library _ -> false
-        | Private_executable _ | Private_library _ -> true
-        | Test_executable _ -> true)
-      l
+  let batch_count = 7 in
+  let package_count = List.length released_packages in
+  let released_packages =
+    (* We want each batch to contain about [package_count / batch_count].
+       But we want to round up so that we don't have more than [batch_count] batches. *)
+    let batch_size = (package_count + batch_count - 1) / batch_count in
+    List.mapi (fun i (pkg, _) -> (1 + (i / batch_size), pkg)) released_packages
   in
-  (* [deps] maps a package name to its (internal) opam deps. *)
-  let deps : (string, Opam.dependency list) Hashtbl.t = Hashtbl.create 17 in
-  Target.iter_internal_by_opam (fun package_name internal_pkgs ->
-      let opam_deps =
-        internal_pkgs
-        |> List.concat_map (fun i ->
-               Target.all_internal_deps i
-               |> List.filter_map Target.get_internal
-               |> List.map (fun i -> Target.Internal i)
-               |> List.concat_map
-                    (as_opam_dependency
-                       ~for_release:false
-                       ~for_conflicts:false
-                       ~for_package:package_name
-                       ~with_test:Never
-                       ~optional:false))
-        |> deduplicate_list
-             ~merge:(fun a _b -> a)
-             (fun {Opam.package; _} -> package)
-      in
-      Hashtbl.add deps package_name opam_deps) ;
-  (* [rank] is used to perform a topological sort. A package should
-     receive a rank higher than all its dependencies. *)
-  let rank : (string, int) Hashtbl.t = Hashtbl.create 17 in
-  let rec compute_rank (name : string) : int =
-    match Hashtbl.find_opt rank name with
-    | Some rank -> rank
-    | None ->
-        let deps = Hashtbl.find deps name in
-        let max_rank =
-          deps
-          |> List.map (fun (opam_dep : Opam.dependency) ->
-                 compute_rank opam_dep.package)
-          |> List.fold_left max 0
-        in
-        Hashtbl.replace rank name (max_rank + 1) ;
-        max_rank + 1
+  let unreleased_packages =
+    List.map (fun (pkg, _) -> (0, pkg)) unreleased_packages
   in
-  Target.iter_internal_by_opam (fun package_name _internal_pkgs ->
-      let (_ : int) = compute_rank package_name in
-      ()) ;
+  (* Merge and sort by name for nicer diffs. *)
+  let packages =
+    let by_name (_, a) (_, b) = String.compare a b in
+    List.sort by_name (released_packages @ unreleased_packages)
+  in
+  (* Now [packages] is a list of [batch_index, package_name]
+     where [batch_index] is 0 for packages that we do not need to test. *)
   write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
   pp_do_not_edit ~comment_start:"#" fmt () ;
-  (* Decide whether an opam package should be tested in the CI or
-     not. If not, remove it from [rank] so that we do not consider it in
-     the later stage. *)
-  Target.iter_internal_by_opam (fun package_name internal_pkgs ->
-      if only_test_or_private_targets internal_pkgs then (
-        Hashtbl.remove rank package_name ;
-        Format.fprintf
-          fmt
-          "@.# Ignoring package %s, it only contains tests or private targets\n"
-          package_name)
-      else
-        let unreleased = depends_on_unreleased_packages internal_pkgs in
-        if not (String_set.is_empty unreleased) then (
-          Hashtbl.remove rank package_name ;
-          Format.fprintf
-            fmt
-            "@.# Ignoring package %s, it depends on vendored packages\n\
-             # that do not exists inside the official opam-repository:\n"
-            package_name ;
-          String_set.iter (Format.fprintf fmt "# - %s\n") unreleased)) ;
-
-  let template d =
+  (* Output one template per batch. *)
+  for i = 1 to batch_count do
     Format.fprintf
       fmt
       {|@..rules_template__trigger_opam_batch_%d:
@@ -3016,45 +3130,29 @@ let generate_opam_ci () =
       start_in: %d minutes
     - when: never # default
 |}
-      d
-      d
-      d
-      d
-  in
-  for i = 1 to (Hashtbl.length rank / 30) + 1 do
-    template i
+      i
+      i
+      i
+      i
   done ;
-  (* We setup one job per opam package and have around 200 packages.
-     Due to technical limitations of the CI, we want to avoid starting
-     that many jobs at the same time.  Gitlab allows to delay a job
-     using `when:delayed` and `start_in:SPAN`.  We start multiple
-     small batch of opam jobs leaving few seconds/minutes between them. *)
-  Hashtbl.fold (fun name rank acc -> (name, rank) :: acc) rank []
-  (* We sort elements in descending rank order. The goal is to assign
-     smaller delay to packages with the most dependencies (as the job should take longer to run). *)
-  |> List.sort (fun (n1, r1) (n2, r2) ->
-         match compare (r2 : int) r1 with
-         | 0 -> compare (n1 : string) n2
-         | c -> c)
-  |> List.mapi (fun i (name, _) ->
-         (* group jobs by 30, delay each group by 1 minute *)
-         let delayed_by = 1 + (i / 30) in
-         (name, delayed_by))
-  (* We sort elements by name because we don't want the jobs to move around when topological sort changes *)
-  |> List.sort (fun (n1, _) (n2, _) -> compare (n1 : string) n2)
-  |> List.iter (fun (package_name, delayed_by) ->
-         Format.fprintf
-           fmt
-           {|@.opam:%s:
+  (* Output one job per released package. *)
+  let output_job (batch_index, package_name) =
+    if batch_index > 0 then
+      Format.fprintf
+        fmt
+        {|@.opam:%s:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_%d
   variables:
     package: %s
 |}
-           package_name
-           delayed_by
-           package_name)
+        package_name
+        batch_index
+        package_name
+    else Format.fprintf fmt "@.# Ignoring unreleased package %s.\n" package_name
+  in
+  List.iter output_job packages
 
 let generate_profiles ~default_profile =
   let deps : Version.constraints String_map.t String_map.t ref =
@@ -3166,7 +3264,8 @@ let generate ~make_tezt_exe ~default_profile =
     generate_dune_project_files () ;
     generate_package_json_file () ;
     generate_static_packages () ;
-    generate_opam_ci () ;
+    let opam_release_graph = compute_opam_release_graph () in
+    generate_opam_ci opam_release_graph ;
     generate_binaries_for_release () ;
     generate_profiles ~default_profile ;
     Option.iter (generate_opam_files_for_release packages_dir) release
