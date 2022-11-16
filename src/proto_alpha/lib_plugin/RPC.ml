@@ -2057,6 +2057,23 @@ module Sc_rollup = struct
         ~output
         RPC_path.(path_sc_rollup / "game")
 
+    let stakers_commitments =
+      let output =
+        Sc_rollup.(
+          Data_encoding.(
+            list
+              (obj2
+                 (req "staker" Staker.encoding)
+                 (req "commitment" Commitment.Hash.encoding))))
+      in
+      RPC_service.get_service
+        ~description:
+          "List of stakers for a given rollup, associated to the commitments \
+           they are staked on"
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(path_sc_rollup / "stakers_commitments")
+
     let conflicts =
       let query =
         let open RPC_query in
@@ -2236,6 +2253,13 @@ module Sc_rollup = struct
         in
         return game)
 
+  let register_stakers_commitments () =
+    Registration.register1
+      ~chunked:false
+      S.stakers_commitments
+      (fun context rollup () () ->
+        Sc_rollup.Storage.stakers_commitments_uncarbonated context rollup)
+
   let register_conflicts () =
     Registration.register1
       ~chunked:false
@@ -2296,6 +2320,7 @@ module Sc_rollup = struct
     register_commitment () ;
     register_root () ;
     register_ongoing_refutation_game () ;
+    register_stakers_commitments () ;
     register_conflicts () ;
     register_timeout () ;
     register_timeout_reached () ;
@@ -2338,6 +2363,9 @@ module Sc_rollup = struct
       block
       sc_rollup_address
       staker
+
+  let stakers_commitments ctxt rollup =
+    RPC_context.make_call1 S.stakers_commitments ctxt rollup
 
   let conflicts ctxt block sc_rollup_address staker =
     RPC_context.make_call1 S.conflicts ctxt block sc_rollup_address staker

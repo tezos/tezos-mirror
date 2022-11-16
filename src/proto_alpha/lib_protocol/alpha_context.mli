@@ -3734,6 +3734,11 @@ module Sc_rollup : sig
       context -> rollup -> (Hash.t * Raw_level.t * context) tzresult Lwt.t
   end
 
+  module Storage : sig
+    val stakers_commitments_uncarbonated :
+      context -> t -> (Staker.t * Commitment.Hash.t) list tzresult Lwt.t
+  end
+
   val originate :
     context ->
     kind:Kind.t ->
