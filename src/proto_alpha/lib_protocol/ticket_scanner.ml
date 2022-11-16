@@ -257,8 +257,7 @@ module Ticket_collection = struct
 
   type accumulator = ex_ticket list
 
-  type 'a continuation =
-    Alpha_context.context -> accumulator -> 'a tzresult Lwt.t
+  type 'a continuation = context -> accumulator -> 'a tzresult Lwt.t
 
   (* Currently this always returns the original list.
 
@@ -297,7 +296,7 @@ module Ticket_collection = struct
 
   let tickets_of_set :
       type a ret.
-      Alpha_context.context ->
+      context ->
       a Script_typed_ir.comparable_ty ->
       a Script_typed_ir.set ->
       accumulator ->

@@ -235,7 +235,7 @@
         "Ticket_token_map",
         "Ticket_operations_diff",
         "Ticket_accounting",
-        "Tx_rollup_ticket",
+        "Ticket_transfer",
 
         "Script_interpreter_defs",
         "Script_interpreter",
