@@ -85,7 +85,7 @@ type sc_rollup_constants = {
     kind [kind]. *)
 let boot_sector_of = function
   | "arith" -> ""
-  | "wasm_2_0_0" -> Constant.wasm_incomplete_kernel_boot_sector
+  | "wasm_2_0_0" -> Constant.wasm_echo_kernel_boot_sector
   | kind -> raise (Invalid_argument kind)
 
 let get_sc_rollup_constants client =
@@ -1228,8 +1228,8 @@ let commitment_not_stored_if_non_final sc_rollup_node sc_rollup_client sc_rollup
        %R)" ;
   unit
 
-let commitments_messages_reset sc_rollup_node sc_rollup_client sc_rollup _node
-    client =
+let commitments_messages_reset kind sc_rollup_node sc_rollup_client sc_rollup
+    _node client =
   (* For `sc_rollup_commitment_period_in_blocks` levels after the sc rollup
      origination, i messages are sent to the rollup, for a total of
      `sc_rollup_commitment_period_in_blocks *
@@ -1287,11 +1287,20 @@ let commitments_messages_reset sc_rollup_node sc_rollup_client sc_rollup _node
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
-   Check.(stored_number_of_ticks = Some (2 * levels_to_commitment))
+   let expected =
+     match kind with
+     | "arith" -> 2 * levels_to_commitment
+     | "wasm_2_0_0" ->
+         3 (* one snapshot for collecting, two snapshots for SOL and EOL *)
+         * 11_000_000_000 (* number of ticks in a snapshots *)
+         * levels_to_commitment (* number of inboxes *)
+     | _ -> failwith "incorrect kind"
+   in
+   Check.(stored_number_of_ticks = Some expected)
      (Check.option Check.int)
      ~error_msg:
-       "Number of messages processed by commitment is different from the \
-        number of messages expected (%L = %R)") ;
+       "Number of ticks processed by commitment is different from the number \
+        of ticks expected (%L = %R)") ;
   let* published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1501,13 +1510,15 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
          (* input ticks *)
      | "wasm_2_0_0" ->
          11_000_000_000
-         (* ticks to load first inbox commitments:
-            snapshot --> collect --> padding --> snapshot
+         (* Number of ticks per snapshot,
             see Lib_scoru_wasm.Constants.wasm_max_tick *)
-         + 1 (* snapshot --> decode *)
-         + 1 (* decode -> stuck *)
-         + (2 * (levels_to_commitment - 1))
-         (* input ticks for the rest of the inboxes  *)
+         * 3
+           (* 1 snapshot for collecting messages, 2 snapshots for EOL and SOL *)
+         * levels_to_commitment
+         (* Number of inbox to process *)
+         + 1
+         (* One more tick to enter the next period (it’s only the case
+            for the first commitment period) *)
      | _ -> assert false
    in
    Check.(stored_number_of_ticks = Some expected_number_of_ticks)
@@ -3226,7 +3237,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_commitment_scenario
     ~variant:"messages_reset"
-    commitments_messages_reset
+    (commitments_messages_reset kind)
     protocols
     ~kind ;
   test_commitment_scenario
