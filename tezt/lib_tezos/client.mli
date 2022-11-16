@@ -1239,7 +1239,7 @@ val typecheck_script :
   ?gas:int ->
   ?legacy:bool ->
   t ->
-  string Lwt.t
+  unit Lwt.t
 
 (** Same as [typecheck_script], but do not wait for the process to exit. *)
 val spawn_typecheck_script :

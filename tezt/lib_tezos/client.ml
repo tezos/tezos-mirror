@@ -1601,7 +1601,7 @@ let typecheck_script ~script ?(details = false) ?(emacs = false)
     ?gas
     ~legacy
     client
-  |> Process.check_and_read_stdout
+  |> Process.check
 
 let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
     ~contract ?input ?(unlimited_gas = false) client =

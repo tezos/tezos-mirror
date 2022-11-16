@@ -83,7 +83,7 @@ let test_formatted_typechecks =
       ~dst_format:`Michelson
       client
   in
-  let* _ = Client.typecheck_script ~script:formatted_script client in
+  let* () = Client.typecheck_script ~script:formatted_script client in
   unit
 
 let test_formatted_hash =
