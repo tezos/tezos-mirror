@@ -928,7 +928,8 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup_address
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info
+         sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1089,7 +1090,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
 let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in

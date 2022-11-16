@@ -67,22 +67,22 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6315
 
 
-./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
+./octez-client rpc get '/chains/main/blocks/head/context/sc_rollups/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/commitment/[SC_ROLLUP_COMMITMENT_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/sc_rollups/sc_rollup/[SC_ROLLUP_HASH]/commitment/[SC_ROLLUP_COMMITMENT_HASH]'
 { "compressed_state":
     "[SC_ROLLUP_PVM_STATE_HASH]",
   "inbox_level": 2,
   "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
   "number_of_ticks": "0" }
 
-./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
+./octez-client rpc get '/chains/main/blocks/head/context/sc_rollups/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
 { "level": 3,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/commitment/[SC_ROLLUP_COMMITMENT_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/sc_rollups/sc_rollup/[SC_ROLLUP_HASH]/commitment/[SC_ROLLUP_COMMITMENT_HASH]'
 { "compressed_state":
     "[SC_ROLLUP_PVM_STATE_HASH]",
   "inbox_level": 3,
