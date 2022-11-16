@@ -22,7 +22,6 @@ module Test = struct
 
     aux [] k
 
-  (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
   let bench_DAL_crypto_params () =
     let open Tezos_error_monad.Error_monad.Result_syntax in
     (* We take mainnet parameters we divide by [16] to speed up the test. *)
@@ -122,4 +121,4 @@ let () =
   in
 
   Random.init seed ;
-  Alcotest.run "Kate Amortized" [("DAL cryptobox", test)]
+  Alcotest.run "DAL cryptobox" [("test case", test)]
