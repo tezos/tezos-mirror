@@ -82,6 +82,16 @@ let shard () =
     Tezos_rpc.Path.(
       open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
+let shards () =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4111
+     Bound size of the input *)
+  Tezos_rpc.Service.post_service
+    ~description:"Fetch shards as bytes"
+    ~query:Tezos_rpc.Query.empty
+    ~output:(Data_encoding.list Cryptobox.shard_encoding)
+    ~input:Data_encoding.(list int31)
+    Tezos_rpc.Path.(open_root / "shards" /: Cryptobox.Commitment.rpc_arg)
+
 let monitor_slot_headers () =
   Tezos_rpc.Service.get_service
     ~description:"Monitor stored slot headers"

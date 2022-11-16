@@ -83,6 +83,22 @@ let handle_shard ctxt ((_, commitment), shard) () () =
     commitment
     shard
 
+let handle_shards ctxt (_, commitment) () shards =
+  let open Lwt_result_syntax in
+  let*? {dal_parameters; _} = Node_context.get_ready ctxt in
+  let shards =
+    let open Slot_manager in
+    List.fold_left
+      (fun acc id -> Shard_id_set.add id acc)
+      Shard_id_set.empty
+      shards
+  in
+  Slot_manager.get_shards
+    (Node_context.get_store ctxt).slots_store
+    dal_parameters
+    commitment
+    shards
+
 let handle_monitor_slot_headers ctxt () () () =
   let stream, stopper = Store.open_slots_stream (Node_context.get_store ctxt) in
   let shutdown () = Lwt_watcher.shutdown stopper in
@@ -112,8 +128,24 @@ let register_show_slot_pages ctxt dir =
 
 let shard_service = Services.shard ()
 
+let shards_service :
+    ( [`POST],
+      unit,
+      unit * Cryptobox.commitment,
+      unit,
+      int list,
+      Cryptobox.shard list )
+    Tezos_rpc.Service.service =
+  Services.shards ()
+
+let register_shards ctxt dir =
+  Tezos_rpc.Directory.register dir shards_service (handle_shards ctxt)
+
 let register_shard ctxt dir =
   Tezos_rpc.Directory.register dir shard_service (handle_shard ctxt)
+
+let shards_rpc ctxt commitment shards =
+  Tezos_rpc.Context.make_call shards_service ctxt ((), commitment) () shards
 
 let shard_rpc ctxt commitment shard =
   Tezos_rpc.Context.make_call shard_service ctxt (((), commitment), shard) () ()
@@ -138,6 +170,7 @@ let register ctxt =
   Tezos_rpc.Directory.empty
   |> register_stored_slot_headers ctxt
   |> register_split_slot ctxt |> register_show_slot ctxt |> register_shard ctxt
+  |> register_shards ctxt
   |> register_show_slot_pages ctxt
   |> register_monitor_slot_headers ctxt
 

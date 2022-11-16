@@ -776,11 +776,11 @@ let test_dal_node_rebuild_from_shards =
     |> List.map (fun i -> i * crypto_params.redundancy_factor)
   in
   let* shards =
-    Lwt_list.fold_left_s
-      (fun acc shard_id ->
-        let* shard =
-          RPC.call dal_node (Rollup.Dal.RPC.shard ~slot_header ~shard_id)
-        in
+    RPC.call dal_node (Rollup.Dal.RPC.shards ~slot_header downloaded_shard_ids)
+  in
+  let shards =
+    List.fold_left
+      (fun acc shard ->
         let shard =
           match Data_encoding.Json.from_string shard with
           | Ok s -> s
@@ -789,9 +789,9 @@ let test_dal_node_rebuild_from_shards =
         let shard =
           Data_encoding.Json.destruct Cryptobox.shard_encoding shard
         in
-        return @@ Cryptobox.IntMap.add shard.index shard.share acc)
+        Cryptobox.IntMap.add shard.index shard.share acc)
       Cryptobox.IntMap.empty
-      downloaded_shard_ids
+      shards
   in
   let cryptobox = Rollup.Dal.make parameters.cryptobox in
   let reformed_slot =

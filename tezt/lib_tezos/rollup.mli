@@ -249,6 +249,11 @@ module Dal : sig
     val shard :
       slot_header:string -> shard_id:int -> (Dal_node.t, string) RPC_core.t
 
+    (** [shards ~slot_header shard_ids] gets a subset of shards from a given
+        slot header *)
+    val shards :
+      slot_header:string -> int list -> (Dal_node.t, string list) RPC_core.t
+
     (** [dac_store_preimage data] posts [data] on dac/store_preimage *)
     val dac_store_preimage : string -> (Dal_node.t, string) RPC_core.t
   end
