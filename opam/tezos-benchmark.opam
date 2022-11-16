@@ -15,7 +15,7 @@ depends: [
   "tezos-crypto"
   "tezos-micheline"
   "tezos-clic"
-  "data-encoding" { >= "0.6" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "prbnmcn-cgrph" { = "0.0.2" }
   "prbnmcn-dagger" { = "0.0.2" }
   "prbnmcn-dagger-stats" { = "0.0.2" }

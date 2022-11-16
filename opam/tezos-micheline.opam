@@ -15,7 +15,7 @@ depends: [
   "zarith_stubs_js"
   "tezos-stdlib"
   "tezos-error-monad"
-  "data-encoding" { >= "0.6" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
