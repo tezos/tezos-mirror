@@ -203,7 +203,7 @@ type solution = {
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;
   (* The scores of the models with the estimated coefficients. *)
-  scores_list : (string * Inference.scores) list;
+  scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
 let load_solution (fn : string) : solution =

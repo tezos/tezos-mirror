@@ -43,9 +43,10 @@ type problem =
 
 type scores = {r2_score : float; rmse_score : float}
 
-let scores_to_csv_column scores bench_name =
+let scores_to_csv_column (model_name, bench_name) scores =
+  let name = model_name ^ "-" ^ Namespace.to_string bench_name in
   [
-    ["R2_score_" ^ bench_name; "RMSE_score_" ^ bench_name];
+    ["R2_score-" ^ name; "RMSE_score-" ^ name];
     [Float.to_string scores.r2_score; Float.to_string scores.rmse_score];
   ]
 
