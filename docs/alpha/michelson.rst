@@ -527,17 +527,17 @@ Stack operations
 
 A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
--  ``DROP``: Drop the top element of the stack.
-- ``DROP n``: Drop the ``n`` topmost elements of the stack.
--  ``DUP``: Duplicate the top element of the stack.
--  ``DUP n``: Duplicate the ``n``-th element of the stack.
--  ``SWAP``: Exchange the top two elements of the stack.
+-  ``DROP``: Drop the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DROP>`__).
+- ``DROP n``: Drop the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DROPN>`__).
+-  ``DUP``: Duplicate the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUP>`__).
+-  ``DUP n``: Duplicate the ``n``-th element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUPN>`__).
+-  ``SWAP``: Exchange the top two elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SWAP>`__).
 - ``DIG n``: Take the element at depth ``n`` of the stack and move it
-  on top.
-- ``DUG n``: Place the element on top of the stack at depth ``n``.
--  ``PUSH 'a x``: Push a constant value of a given type onto the stack.
--  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type ``'a`` and return type ``'b`` onto the stack.
-- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the code, recursively, with the given parameter type ``'a`` and return a value of type ``'b`` onto the stack (if it terminates before gas exhaustion).
+  on top (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIG>`__).
+- ``DUG n``: Place the element on top of the stack at depth ``n`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUG>`__).
+-  ``PUSH 'a x``: Push a constant value of a given type onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PUSH>`__).
+-  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type ``'a`` and return type ``'b`` onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA>`__).
+- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the code, recursively, with the given parameter type ``'a`` and return a value of type ``'b`` onto the stack (if it terminates before gas exhaustion) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA_REC>`__).
 
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
