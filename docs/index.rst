@@ -122,7 +122,7 @@ If you are looking for a more accessible and pedagogical exposition on how to wr
     </details><br/>
 
 
-.. image:: images/core_developer_6.png
+.. image:: images/contributing_to_octez_6.png
       :width: 100%
       :alt: Contributing
 
