@@ -454,11 +454,41 @@ module Transfer = struct
     in
     Lwt_list.iter_s test_batch_transfer accounts
 
+  let forbidden_set_delegate_tz4 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate forbidden on tz4"
+      ~tags:["client"; "set_delegate"; "bls"; "tz4"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* () =
+      match protocol with
+      | Kathmandu | Lima -> unit
+      | Alpha ->
+          let* () = Client.import_secret_key client Constant.tz4_account in
+          airdrop_and_reveal client [Constant.tz4_account]
+    in
+    let*? set_delegate_process =
+      Client.set_delegate
+        client
+        ~src:Constant.tz4_account.public_key_hash
+        ~delegate:Constant.tz4_account.public_key_hash
+    in
+    let msg =
+      match protocol with
+      | Kathmandu | Lima -> rex "Invalid contract notation \"tz4.*\""
+      | Alpha ->
+          rex
+            "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
+    in
+    Process.check_error set_delegate_process ~exit_code:1 ~msg
+
   let register protocols =
     alias_pkh_destination protocols ;
     alias_pkh_source protocols ;
     transfer_tz4 protocols ;
-    batch_transfers_tz4 protocols
+    batch_transfers_tz4 protocols ;
+    forbidden_set_delegate_tz4 protocols
 end
 
 module Dry_run = struct

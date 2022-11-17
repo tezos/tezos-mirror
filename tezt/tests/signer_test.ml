@@ -82,28 +82,39 @@ let signer_bls_test =
     ~title:"BLS signer test"
     ~tags:["node"; "baker"; "signer"; "bls"]
   @@ fun protocol ->
-  let* client0 = Client.init_mockup ~protocol () in
-  Log.info "Generate BLS keys for client" ;
-  let* keys =
-    Lwt_list.map_s
-      (fun i ->
-        Client.gen_and_show_keys
-          ~alias:(sf "bootstrap_bls_%d" i)
-          ~sig_alg:"bls"
-          client0)
-      (Base.range 1 5)
+  let* _node, client = Client.init_with_protocol `Client ~protocol () in
+  let* signer = Signer.init ~keys:[Constant.tz4_account] () in
+  let* () =
+    let uri = Signer.uri signer in
+    Client.import_signer_key client Constant.tz4_account uri
   in
-  let* client = signer_test protocol ~keys in
-  Log.info "Checking that block was signed with BLS" ;
-  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
-  let block_sig = JSON.(block |-> "header" |-> "signature" |> as_string) in
-  let block_sig_prefix = String.sub block_sig 0 5 in
-  Check.((block_sig_prefix = "BLsig") string)
-    ~error_msg:"Signature starts with %L but should start with %R" ;
-  let baker = JSON.(block |-> "metadata" |-> "baker" |> as_string) in
-  let baker_prefix = String.sub baker 0 3 in
-  Check.((baker_prefix = "tz4") string)
-    ~error_msg:"Baker starts with %L but should start with %R" ;
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:Constant.tz4_account.public_key_hash
+      ~burn_cap:(Tez.of_int 1)
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let get_balance_tz4 client =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:Constant.tz4_account.public_key_hash
+         ()
+  in
+  let* balance_0 = get_balance_tz4 client in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 5)
+      ~giver:Constant.tz4_account.public_key_hash
+      ~receiver:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* balance_1 = get_balance_tz4 client in
+  Check.((Tez.mutez_int64 balance_0 > Tez.mutez_int64 balance_1) int64)
+    ~error_msg:"Tz4 sender %s has decreased balance after transfer" ;
   unit
 
 let register ~protocols =

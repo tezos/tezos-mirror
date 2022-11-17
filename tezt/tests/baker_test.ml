@@ -83,7 +83,7 @@ let baker_stresstest =
 let baker_bls_test =
   Protocol.register_test
     ~__FILE__
-    ~title:"BLS baker test"
+    ~title:"No BLS baker test"
     ~tags:["node"; "baker"; "bls"]
   @@ fun protocol ->
   let* client0 = Client.init_mockup ~protocol () in
@@ -97,20 +97,31 @@ let baker_bls_test =
           client0)
       (Base.range 1 5)
   in
-  let* client = baker_test protocol ~keys in
-  Log.info "Checking that block was signed with BLS" ;
-  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
-  let block_sig = JSON.(block |-> "header" |-> "signature" |> as_string) in
-  let block_sig_prefix = String.sub block_sig 0 5 in
-  Check.((block_sig_prefix = "BLsig") string)
-    ~error_msg:"Signature starts with %L but should start with %R" ;
-  let baker = JSON.(block |-> "metadata" |-> "baker" |> as_string) in
-  let baker_prefix = String.sub baker 0 3 in
-  Check.((baker_prefix = "tz4") string)
-    ~error_msg:"Baker starts with %L but should start with %R" ;
-  unit
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
+      ~base:(Right (protocol, None))
+      []
+  in
+  let* _node, client =
+    Client.init_with_node ~keys:(Constant.activator :: keys) `Client ()
+  in
+  let activate_process =
+    Client.spawn_activate_protocol
+      ~protocol
+      ~timestamp:Now
+      ~parameter_file
+      client
+  in
+  let msg =
+    match protocol with
+    | Kathmandu | Lima -> rex "Invalid protocol_parameters"
+    | Alpha ->
+        rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
+  in
+  Process.check_error activate_process ~exit_code:1 ~msg
 
 let register ~protocols =
   baker_simple_test protocols ;
   baker_stresstest protocols ;
-  baker_bls_test [Alpha]
+  baker_bls_test protocols
