@@ -150,7 +150,7 @@ let signatures =
 
 let random_signature = QCheck2.Gen.oneofl signatures
 
-let pkhs =
+let tz1s =
   List.map
     Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
     [
@@ -158,6 +158,18 @@ let pkhs =
       "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU";
     ]
+
+let random_tz1 = QCheck2.Gen.oneofl tz1s
+
+let pkhs =
+  tz1s
+  @ List.map
+      Signature.Public_key_hash.of_b58check_exn
+      [
+        "tz2Jm2r4qtQX1iwhxxT9EKu8vBMHD9Dj27ks";
+        "tz3fHbB7Ps3H1qaHh3LUaxKXV9rxEyywXKZR";
+        "tz4WfXTPegMWubvgoCX4ouQYwuMBHVS2bZsB";
+      ]
 
 let random_pkh = QCheck2.Gen.oneofl pkhs
 
@@ -168,6 +180,9 @@ let pks =
       "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
       "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
       "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
+      "sppk7bBaRRbtYEzAwisKDEX7kG3FxrEiPFopvGw8WRC3qrKcMtEZkiQ";
+      "p2pk67djGuEtWh938UdTeMzp7fqw4YbAFwKsNvGy3QbX8HofaT8PV1K";
+      "BLpk1xAfV72egRyLxkFPSFxf73ntmvVxaeBTDu9sgNb9Lu7eJxRFz8XCgzEpuBEwKvTbGzTVNbS4";
     ]
 
 let random_pk = QCheck2.Gen.oneofl pks
@@ -437,7 +452,7 @@ let generate_double_baking =
 let generate_activate_account =
   let open QCheck2.Gen in
   let* activation_code = random_code in
-  let+ id = random_pkh in
+  let+ id = random_tz1 in
   let id =
     match id with
     | Tezos_crypto.Signature.Ed25519 pkh -> pkh

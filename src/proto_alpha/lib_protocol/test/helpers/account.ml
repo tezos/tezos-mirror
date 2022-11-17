@@ -40,11 +40,17 @@ let random_seed ~rng_state =
   Bytes.init Tezos_crypto.Hacl.Ed25519.sk_size (fun _i ->
       Char.chr (Random.State.int rng_state 256))
 
+let random_algo ~rng_state : Tezos_crypto.Signature.algo =
+  match Random.State.int rng_state 3 with
+  | 0 -> Ed25519
+  | 1 -> Secp256k1
+  | 2 -> P256
+  | 3 -> Bls
+  | _ -> assert false
+
 let new_account ?(rng_state = Random.State.make_self_init ())
-    ?(seed = random_seed ~rng_state) () =
-  let pkh, pk, sk =
-    Tezos_crypto.Signature.generate_key ~algo:Ed25519 ~seed ()
-  in
+    ?(seed = random_seed ~rng_state) ?(algo = random_algo ~rng_state) () =
+  let pkh, pk, sk = Tezos_crypto.Signature.generate_key ~algo ~seed () in
   let account = {pkh; pk; sk} in
   Tezos_crypto.Signature.Public_key_hash.Table.add known_accounts pkh account ;
   account

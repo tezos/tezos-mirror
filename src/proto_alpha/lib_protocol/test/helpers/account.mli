@@ -40,10 +40,16 @@ val activator_account : account
 
 val dummy_account : account
 
-(** [new_account ?rng_state ?seed ()] creates a new account with the given [seed] (or
-    [rng_state] to generate the seed) and add it to the global account state.
+(** [new_account ?rng_state ?seed ?algo ()] creates a new account with curve
+    [algo] with the given [seed] (or [rng_state] to generate the seed) and add
+    it to the global account state.
 *)
-val new_account : ?rng_state:Random.State.t -> ?seed:Bytes.t -> unit -> account
+val new_account :
+  ?rng_state:Random.State.t ->
+  ?seed:Bytes.t ->
+  ?algo:Tezos_crypto.Signature.algo ->
+  unit ->
+  account
 
 val add_account : t -> unit
 
