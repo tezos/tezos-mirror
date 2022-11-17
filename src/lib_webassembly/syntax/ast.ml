@@ -533,40 +533,41 @@ let export_type (m : module_) (ex : export) : extern_type Lwt.t =
   let open Lwt.Syntax in
   let {edesc; _} = ex.it in
   let* its =
-    TzStdLib.List.map_s
-      (fun (_, i) -> import_type m i)
+    TzStdLib.List.filter_map_s
+      (fun (_, i) -> TzStdLib.Option.map_s (import_type m) i)
       (Vector.loaded_bindings m.it.imports)
   in
   let open Lib.List32 in
   match edesc.it with
   | FuncExport x ->
       let+ fts' =
-        TzStdLib.List.map_s
-          (fun (_, f) -> func_type_for m f.it.ftype)
+        TzStdLib.List.filter_map_s
+          (fun (_, f) ->
+            TzStdLib.Option.map_s (fun f -> func_type_for m f.it.ftype) f)
           (Vector.loaded_bindings m.it.funcs)
       in
       let fts = funcs its @ fts' in
       ExternFuncType (nth fts x.it)
   | TableExport x ->
       let+ tts' =
-        TzStdLib.List.map_s
-          (fun (_, t) -> Lwt.return t.it.ttype)
+        TzStdLib.List.filter_map_s
+          (fun (_, t) -> Lwt.return (Option.map (fun t -> t.it.ttype) t))
           (Vector.loaded_bindings m.it.tables)
       in
       let tts = tables its @ tts' in
       ExternTableType (nth tts x.it)
   | MemoryExport x ->
       let+ mts' =
-        TzStdLib.List.map_s
-          (fun (_, m) -> Lwt.return m.it.mtype)
+        TzStdLib.List.filter_map_s
+          (fun (_, m) -> Lwt.return (Option.map (fun m -> m.it.mtype) m))
           (Vector.loaded_bindings m.it.memories)
       in
       let mts = memories its @ mts' in
       ExternMemoryType (nth mts x.it)
   | GlobalExport x ->
       let+ gts' =
-        TzStdLib.List.map_s
-          (fun (_, g) -> Lwt.return g.it.gtype)
+        TzStdLib.List.filter_map_s
+          (fun (_, g) -> Lwt.return (Option.map (fun g -> g.it.gtype) g))
           (Vector.loaded_bindings m.it.globals)
       in
       let gts = globals its @ gts' in

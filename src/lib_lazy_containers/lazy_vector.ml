@@ -100,7 +100,7 @@ module type S = sig
 
   val to_list : 'a t -> 'a list Lwt.t
 
-  val loaded_bindings : 'a t -> (key * 'a) list
+  val loaded_bindings : 'a t -> (key * 'a option) list
 
   val first_key : 'a t -> key
 end
@@ -254,7 +254,7 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   let unsafe_concat lhs rhs =
     let lhs = loaded_bindings lhs |> List.map snd in
     let rhs = loaded_bindings rhs |> List.map snd in
-    of_list (lhs @ rhs)
+    of_list (List.filter_map Fun.id (lhs @ rhs))
 
   let first_key vector = vector.first
 end

@@ -193,7 +193,7 @@ module type S = sig
   (** [loaded_bindings vector] returns the [(key * 'a) list] representation of
       the vector [vector] containing only the loaded values, in order of
       increasing keys. This function is a witness of internal mutations. *)
-  val loaded_bindings : 'a t -> (key * 'a) list
+  val loaded_bindings : 'a t -> (key * 'a option) list
 
   (** [first_key v] returns the first key of the given vector [v]. *)
   val first_key : 'a t -> key

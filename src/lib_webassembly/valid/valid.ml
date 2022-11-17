@@ -141,7 +141,7 @@ let vec_to_list v =
 
      The validation is never used in the rollup (in a context were values can be
      shallow), hence the vectors will be fully loaded. *)
-  Stdlib.List.map snd (Lazy_vector.Int32Vector.loaded_bindings v)
+  Stdlib.List.filter_map snd (Lazy_vector.Int32Vector.loaded_bindings v)
 
 (* Type Synthesis *)
 

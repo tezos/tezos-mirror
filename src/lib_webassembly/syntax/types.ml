@@ -181,7 +181,7 @@ let string_of_result_type ts =
      Ensure `string_of_*` functions are never used in the PVM, since it will be
      wrong on partial values. It can only be used during the execution of the
      testsuite. *)
-  let ts = List.map snd (Lazy_vector.Int32Vector.loaded_bindings ts) in
+  let ts = List.filter_map snd (Lazy_vector.Int32Vector.loaded_bindings ts) in
   "[" ^ String.concat " " (List.map string_of_value_type ts) ^ "]"
 
 let string_of_func_type (FuncType (ins, out)) =

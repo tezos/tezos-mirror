@@ -87,7 +87,8 @@ module type S = sig
 
   (** [get key map] retrieves the element at [key].
 
-      @raises Exn.Bounds when trying to access an invalid key  *)
+      @raise UnexpectedAccess when trying to access an invalid key
+      (e.g., when the key has been deleted). *)
   val get : key -> 'a t -> 'a Lwt.t
 
   (** [set key value map] sets the element at [key] to [value].
@@ -109,7 +110,7 @@ module type S = sig
   (** [loaded_bindings map] returns the [(key * 'a) list] representation of the
       map [map] containing only the loaded values, in order of increasing keys.
       This function is a witness of internal mutations. *)
-  val loaded_bindings : 'a t -> (key * 'a) list
+  val loaded_bindings : 'a t -> (key * 'a option) list
 end
 
 (** [UnexpectedAccess] is raised in the default of the [produce_value] argument

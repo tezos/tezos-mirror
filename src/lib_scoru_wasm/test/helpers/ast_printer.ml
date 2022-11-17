@@ -180,7 +180,10 @@ let pp_map pp out map =
       "%s"
       (Tezos_webassembly_interpreter.Ast.string_of_name name)
   in
-  pp_list (pp_pair pp_name pp) out (Instance.NameMap.loaded_bindings map)
+  pp_list
+    (pp_pair pp_name (Format.pp_print_option pp))
+    out
+    (Instance.NameMap.loaded_bindings map)
 
 let pp_elems out ref = pp_vector Values.pp_ref_ out !ref
 

@@ -67,16 +67,21 @@ let commit_memory mem partial_memory =
       (Tezos_webassembly_interpreter.Partial_memory.content partial_memory)
   in
   List.iter
-    (fun (chunk_id, chunk) ->
-      let start =
-        Int64.mul chunk_id Lazy_containers.Chunked_byte_vector.Chunk.size
-      in
-      let body = Lazy_containers.Chunked_byte_vector.Chunk.to_bytes chunk in
-      Bytes.iteri
-        (fun i char ->
-          let addr = Int64.(add start (of_int i) |> to_int) in
-          Wasmer.Memory.set mem addr (Char.code char |> Unsigned.UInt8.of_int))
-        body)
+    (function
+      | chunk_id, Some chunk ->
+          let start =
+            Int64.mul chunk_id Lazy_containers.Chunked_byte_vector.Chunk.size
+          in
+          let body = Lazy_containers.Chunked_byte_vector.Chunk.to_bytes chunk in
+          Bytes.iteri
+            (fun i char ->
+              let addr = Int64.(add start (of_int i) |> to_int) in
+              Wasmer.Memory.set
+                mem
+                addr
+                (Char.code char |> Unsigned.UInt8.of_int))
+            body
+      | _ -> ())
     chunks
 
 let compute durable (buffers : Tezos_webassembly_interpreter.Eval.buffers) =

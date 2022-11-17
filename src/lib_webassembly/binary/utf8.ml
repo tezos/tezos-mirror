@@ -31,7 +31,7 @@ and encode' = function
       encode_int n @ encode' ns
 
 let encode_unsafe ns =
-  let ns = List.map snd (Lazy_vector.Int32Vector.loaded_bindings ns) in
+  let ns = List.filter_map snd (Lazy_vector.Int32Vector.loaded_bindings ns) in
   encode_list ns
 
 let con b = if b land 0xc0 = 0x80 then b land 0x3f else raise Utf8
