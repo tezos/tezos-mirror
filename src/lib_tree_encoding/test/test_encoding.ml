@@ -298,6 +298,44 @@ let test_lazy_vector () =
     = Lazy_vector.IntVector.to_string Fun.id decoded_vector) ;
   return_unit
 
+let test_lazy_vector_pop () =
+  let open Tree_encoding in
+  let open Lwt_result_syntax in
+  let int_vec_enc =
+    int_lazy_vector
+      (value [] Data_encoding.int31)
+      (value [] Data_encoding.int31)
+  in
+  let*! tree = empty_tree () in
+  let assert_value_at_index ~ix tree expected =
+    let key = string_of_int ix in
+    let*! value = Tree.find tree ["contents"; key] in
+    assert (value = expected) ;
+    return_unit
+  in
+  let vec = Tezos_lazy_containers.Lazy_vector.IntVector.of_list [0; 1; 2; 3] in
+  (* Encode the lazy vector to the tree. *)
+  let*! tree = encode int_vec_enc vec tree in
+  let* () =
+    assert_value_at_index ~ix:0 tree (Some (Bytes.of_string "\000\000\000\000"))
+  in
+  (* Decode the lazy vector from the tree and check the first value. *)
+  let*! vec = decode int_vec_enc tree in
+  let*! first_value, vec =
+    Tezos_lazy_containers.Lazy_vector.IntVector.pop vec
+  in
+  assert (first_value = 0) ;
+  (* Encode the lazy vector to the tree again and check the value in the tree. *)
+  let*! tree = encode int_vec_enc vec tree in
+  let* () = assert_value_at_index ~ix:0 tree None in
+  (* Decode the lazy vector and check its first value. *)
+  let*! vec = decode int_vec_enc tree in
+  let*! first_value, _vec =
+    Tezos_lazy_containers.Lazy_vector.IntVector.pop vec
+  in
+  assert (first_value = 1) ;
+  return_unit
+
 let test_chunked_byte_vector () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
@@ -540,6 +578,7 @@ let tests =
       test_add_to_decoded_empty_map;
     tztest "Lazy tree" `Quick test_wrapped_tree;
     tztest "Lazy vector" `Quick test_lazy_vector;
+    tztest "Lazy vector pop" `Quick test_lazy_vector_pop;
     tztest "Chunked byte vector" `Quick test_chunked_byte_vector;
     tztest "Tuples" `Quick test_tuples;
     tztest "Option" `Quick test_option;

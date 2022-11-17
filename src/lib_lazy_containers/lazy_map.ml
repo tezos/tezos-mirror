@@ -59,6 +59,8 @@ module type S = sig
 
   val set : key -> 'a -> 'a t -> 'a t
 
+  val remove : key -> 'a t -> 'a t
+
   val dup : 'a t -> 'a t
 
   val loaded_bindings : 'a t -> (key * 'a option) list
@@ -131,6 +133,8 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   let set key value map =
     {map with values = Map.add key (Some value) map.values}
 
+  let remove key map = {map with values = Map.add key None map.values}
+
   let dup {origin; produce_value; values} = {origin; produce_value; values}
 
   let loaded_bindings m = Map.bindings m.values
@@ -161,6 +165,8 @@ module Mutable = struct
 
     val set : key -> 'a -> 'a t -> unit
 
+    val remove : key -> 'a t -> unit
+
     val snapshot : 'a t -> 'a Map.t
   end
 
@@ -179,6 +185,8 @@ module Mutable = struct
     let get key map_ref = Map.get key !map_ref
 
     let set key value map_ref = map_ref := Map.set key value !map_ref
+
+    let remove key map_ref = map_ref := Map.remove key !map_ref
 
     let snapshot map_ref = !map_ref
   end

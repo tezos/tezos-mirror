@@ -96,6 +96,9 @@ module type S = sig
       @raises Exn.Bounds when trying to set an invalid key *)
   val set : key -> 'a -> 'a t -> 'a t
 
+  (** [remove key map] marks the element at [key] as removed. *)
+  val remove : key -> 'a t -> 'a t
+
   (** [dup map] duplicates [map].
 
       {b Note:} the [produce_value] continuation is shared between the
@@ -147,6 +150,8 @@ module Mutable : sig
     val get : key -> 'a t -> 'a Lwt.t
 
     val set : key -> 'a -> 'a t -> unit
+
+    val remove : key -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Map.t
   end

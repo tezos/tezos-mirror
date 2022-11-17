@@ -206,11 +206,12 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     let open Lwt.Syntax in
     if Key.(unsigned_compare zero map.num_elements < 0) then
       let+ x = get Key.zero map in
+      let values = Map.remove map.first map.values in
       ( x,
         {
-          map with
           first = Key.succ map.first;
           num_elements = Key.pred map.num_elements;
+          values;
         } )
     else raise Bounds
 
