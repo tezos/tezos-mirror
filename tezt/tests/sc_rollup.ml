@@ -774,7 +774,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
   let expected_status =
     match kind with
     | "arith" -> "Halted"
-    | "wasm_2_0_0" -> "Computing"
+    | "wasm_2_0_0" -> "Waiting for input message"
     | _ -> raise (Invalid_argument kind)
   in
   Check.(status = expected_status)
@@ -1509,16 +1509,14 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
          1 (* boot sector *) + 1 (* metadata *) + (2 * levels_to_commitment)
          (* input ticks *)
      | "wasm_2_0_0" ->
-         11_000_000_000
          (* Number of ticks per snapshot,
             see Lib_scoru_wasm.Constants.wasm_max_tick *)
+         let snapshot_ticks = 11_000_000_000 in
+         snapshot_ticks
          * 3
            (* 1 snapshot for collecting messages, 2 snapshots for EOL and SOL *)
          * levels_to_commitment
-         (* Number of inbox to process *)
-         + 1
-         (* One more tick to enter the next period (it’s only the case
-            for the first commitment period) *)
+         (* Number of inbox that are actually processed process *)
      | _ -> assert false
    in
    Check.(stored_number_of_ticks = Some expected_number_of_ticks)

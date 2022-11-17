@@ -123,7 +123,7 @@ let test_get_info () =
     let last_input_read =
       Some (make_inbox_info ~inbox_level ~message_counter)
     in
-    {current_tick = Z.zero; last_input_read; input_request = No_input_required}
+    {current_tick = Z.zero; last_input_read; input_request = Input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info.last_input_read = None) ;

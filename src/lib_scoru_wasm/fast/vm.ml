@@ -39,25 +39,21 @@ let compute_until_snapshot ~max_steps pvm_state =
       | _ -> Wasm_vm.should_compute pvm_state)
     pvm_state
 
-let assert_decode = function Decode _ -> true | _ -> false
-
 let compute_fast pvm_state =
   let open Lwt.Syntax in
-  (* Move from [Snapshot] to [Decode], to patch the durable state. *)
-  let* pvm_state = Wasm_vm.compute_step pvm_state in
-  assert (assert_decode pvm_state.tick_state) ;
   (* Execute! *)
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4123
      Support performing multiple calls to [Eval.compute]. *)
   let durable = pvm_state.durable in
-  let+ durable = Exec.compute durable pvm_state.buffers in
+  let* durable = Exec.compute durable pvm_state.buffers in
   (* Compute the new tick counter. *)
   let ticks = pvm_state.max_nb_ticks in
-  let current_tick = Z.(add pvm_state.last_top_level_call ticks) in
-  (* Revert the tick state to [Snapshot]. *)
-  let tick_state = Snapshot in
+  let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
+  (* Revert the tick state to [Padding]. *)
+  let tick_state = Padding in
   (* Assemble state *)
   let pvm_state = {pvm_state with durable; current_tick; tick_state} in
+  let+ pvm_state = Wasm_vm.compute_step pvm_state in
   (pvm_state, Z.to_int64 ticks)
 
 let rec compute_step_many accum_ticks ?(after_fast_exec = fun () -> ())
@@ -77,7 +73,7 @@ let rec compute_step_many accum_ticks ?(after_fast_exec = fun () -> ())
     let goto_snapshot_and_retry () =
       let* pvm_state, ticks = compute_until_snapshot ~max_steps pvm_state in
       match pvm_state.tick_state with
-      | Snapshot when not stop_at_snapshot ->
+      | Snapshot ->
           let max_steps = Int64.sub max_steps ticks in
           let accum_ticks = Int64.add accum_ticks ticks in
           let may_compute_more = Wasm_vm.should_compute pvm_state in
@@ -96,13 +92,7 @@ let rec compute_step_many accum_ticks ?(after_fast_exec = fun () -> ())
       (pvm_state, Int64.(add ticks accum_ticks))
     in
     match pvm_state.tick_state with
-    | Snapshot -> (
-        let* reboot_mark = Wasm_vm.mark_for_reboot pvm_state in
-        match reboot_mark with
-        | `Reboot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
-        | `Yielding | `Forcing_yield ->
-            (* Go to next [Collect] state *)
-            backup pvm_state)
+    | Snapshot -> Lwt.catch go_like_the_wind (fun _ -> backup pvm_state)
     | _ -> goto_snapshot_and_retry ()
   else
     (* The number of ticks we're asked to do is lower than the maximum number
