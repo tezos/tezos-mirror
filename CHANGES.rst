@@ -58,6 +58,9 @@ Node
 - The ``pending_operations`` RPC can now be run in ``binary`` format when using
   version ``1``. (MR :gl:`!6783`)
 
+- Removed the ``node_`` prefix in identifiers of the
+  ``config_validation`` and ``config_file`` events and errors.
+
 Client
 ------
 
