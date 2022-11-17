@@ -511,16 +511,16 @@ Control structures
 
 A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
--  ``FAILWITH``: Explicitly abort the current program.
--  ``{}``: Empty sequence.
--  ``{ I ; C }``: Sequence.
--  ``IF bt bf``: Conditional branching.
--  ``LOOP body``: A generic loop.
--  ``LOOP_LEFT body``: A loop with an accumulator.
--  ``DIP code``: Runs code protecting the top element of the stack.
--  ``DIP n code``: Runs code protecting the ``n`` topmost elements of the stack.
--  ``EXEC``: Execute a function from the stack.
--  ``APPLY``: Partially apply a tuplified function from the stack.
+-  ``FAILWITH``: Explicitly abort the current program (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH>`__).
+-  ``{}``: Empty sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOOP>`__).
+-  ``{ I ; C }``: Sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SEQ>`__).
+-  ``IF bt bf``: Conditional branching (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF>`__).
+-  ``LOOP body``: A generic loop (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP>`__).
+-  ``LOOP_LEFT body``: A loop with an accumulator (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP_LEFT>`__).
+-  ``DIP code``: Runs code protecting the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIP>`__).
+-  ``DIP n code``: Runs code protecting the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIPN>`__).
+-  ``EXEC``: Execute a function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EXEC>`__).
+-  ``APPLY``: Partially apply a tuplified function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-APPLY>`__).
 
 Stack operations
 ~~~~~~~~~~~~~~~~
