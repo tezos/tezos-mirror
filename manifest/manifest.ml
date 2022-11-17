@@ -524,6 +524,16 @@ module Opam = struct
         description;
         x_opam_monorepo_opam_provided;
       } =
+    if synopsis = "" then invalid_arg "Manifest.Opam.pp: empty synopsis" ;
+    (match synopsis.[0] with
+    | 'A' .. 'Z' -> ()
+    | _ ->
+        invalid_arg
+          ("Manifest.Opam.pp: synopsis must start with a capital letter: "
+         ^ synopsis)) ;
+    if synopsis.[String.length synopsis - 1] = '.' then
+      invalid_arg
+        ("Manifest.Opam.pp: synopsis cannot end with a period: " ^ synopsis) ;
     let depopts, depends = List.partition (fun dep -> dep.optional) depends in
     let depopts, conflicts =
       (* Opam documentation says this about [depopts]:
