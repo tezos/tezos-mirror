@@ -5792,7 +5792,15 @@ let () =
     in
     test "main" ~alias:"" ~path:"tezt/tests" ~opam:"" ~deps:(deps @ test_libs)
   in
-  generate ~make_tezt_exe ~default_profile:"octez-deps"
+  generate
+    ~make_tezt_exe
+    ~default_profile:"octez-deps"
+    ~add_to_meta_package:
+      [
+        (* [ledgerwallet_tezos] is an optional dependency, but we want
+           [opam install octez] to always install it. *)
+        ledgerwallet_tezos;
+      ]
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
