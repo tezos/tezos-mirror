@@ -55,6 +55,7 @@ __pycache__
 /tezos-dal-node
 /octez-dal-node
 /octez-binaries
+/octez-wasm-*
 
 /src/proto_*/parameters/*-parameters.json
 
