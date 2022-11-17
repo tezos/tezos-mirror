@@ -304,7 +304,17 @@ let test_roundtrip ~count ~title ~gen ~eq encoding =
     |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
   in
   let test rdt input =
-    let output = Roundtrip.make encoding rdt input in
+    let output =
+      try Roundtrip.make encoding rdt input
+      with exn ->
+        QCheck2.Test.fail_reportf
+          "%s %s roundtrip error: error %s on %a"
+          title
+          (Roundtrip.target rdt)
+          (Printexc.to_string exn)
+          pp
+          input
+    in
     let success = eq input output in
     if not success then
       QCheck2.Test.fail_reportf
