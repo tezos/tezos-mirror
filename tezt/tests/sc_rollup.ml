@@ -280,6 +280,21 @@ let number_of_ticks (_hash, (commitment : Sc_rollup_client.commitment), _level)
     =
   commitment.number_of_ticks
 
+let stakers_commitments ~sc_rollup client =
+  let* json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_stakers_commitments
+         sc_rollup
+  in
+  let stakers_commitments =
+    List.map (fun json_sc ->
+        let staker = JSON.(json_sc |-> "staker" |> as_string) in
+        let commitment = JSON.(json_sc |-> "commitment" |> as_string) in
+        (staker, commitment))
+    @@ JSON.as_list json
+  in
+  return stakers_commitments
+
 let last_cemented_commitment_hash_with_level ~sc_rollup client =
   let* json =
     RPC.Client.call client
@@ -459,6 +474,76 @@ let test_rollup_get_genesis_info ~kind =
     (genesis_level = origination_level)
       int
       ~error_msg:"expected value %L, got %R") ;
+  unit
+
+(* Retrieve stakers and their commitments
+   --------------------------------------
+
+   We manage to properly retrieve stakers with the associated commitments they
+   are staked on.
+*)
+
+let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
+    ~sc_rollup ~src client =
+  let commitment : Sc_rollup_client.commitment =
+    {
+      compressed_state = Constant.sc_rollup_compressed_state;
+      inbox_level;
+      predecessor;
+      number_of_ticks;
+    }
+  in
+  let*! () = publish_commitment ~src ~commitment client sc_rollup in
+  let* () = Client.bake_for_and_wait client in
+  get_staked_on_commitment ~sc_rollup ~staker:src client
+
+let test_stakers_commitments ~kind =
+  test_l1_scenario
+    {
+      variant = None;
+      tags = ["stakers"; "commitments"];
+      description = "retrieve stakers with associated commitments";
+    }
+    ~kind
+  @@ fun sc_rollup _tezos_node tezos_client ->
+  let* inbox_level = Client.level tezos_client in
+  let staker_1 = Constant.bootstrap1.public_key_hash in
+  let staker_2 = Constant.bootstrap2.public_key_hash in
+  let* predecessor, _ =
+    last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
+  in
+  let* {commitment_period_in_blocks; _} =
+    get_sc_rollup_constants tezos_client
+  in
+  let* commitment_1 =
+    publish_dummy_commitment
+      ~inbox_level:(inbox_level + commitment_period_in_blocks)
+      ~predecessor
+      ~sc_rollup
+      ~src:staker_1
+      tezos_client
+  in
+  let* commitment_2 =
+    publish_dummy_commitment
+      ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks))
+      ~predecessor:commitment_1
+      ~sc_rollup
+      ~src:staker_2
+      tezos_client
+  in
+  let* stakers_commitments = stakers_commitments ~sc_rollup tezos_client in
+  let check staker_commitment_1 staker_commitment_2 =
+    Check.(
+      (staker_commitment_1 = staker_commitment_2)
+        (tuple2 string string)
+        ~error_msg:"expected value %L, got %R")
+  in
+  List.iteri
+    (fun i staker_commitment ->
+      if i = 0 then check staker_commitment (staker_1, commitment_1)
+      else if i = 1 then check staker_commitment (staker_2, commitment_2)
+      else ())
+    stakers_commitments ;
   unit
 
 (* Pushing message in the inbox
@@ -2233,20 +2318,6 @@ let test_rollup_client_list_keys ~kind =
       ~error_msg:"Expecting\n%L\ngot\n%R\nas keys from the client.") ;
   unit
 
-let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
-    ~sc_rollup ~src client =
-  let commitment : Sc_rollup_client.commitment =
-    {
-      compressed_state = Constant.sc_rollup_compressed_state;
-      inbox_level;
-      predecessor;
-      number_of_ticks;
-    }
-  in
-  let*! () = publish_commitment ~src ~commitment client sc_rollup in
-  let* () = Client.bake_for_and_wait client in
-  get_staked_on_commitment ~sc_rollup ~staker:src client
-
 let test_consecutive_commitments _rollup_node _rollup_client sc_rollup
     _tezos_node tezos_client =
   let* inbox_level = Client.level tezos_client in
@@ -3159,6 +3230,7 @@ let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
+  test_stakers_commitments ~kind protocols ;
   test_rollup_inbox_size ~kind protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
