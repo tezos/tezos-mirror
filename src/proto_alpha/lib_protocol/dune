@@ -82,6 +82,7 @@
   Sc_rollup_metadata_repr
   Sc_rollup_tick_repr
   Sc_rollup_inbox_message_repr
+  Sc_rollup_inbox_merkelized_payload_hashes_repr
   Sc_rollup_outbox_message_repr
   Sc_rollup_PVM_sig
   Sc_rollup_arith
@@ -353,6 +354,8 @@
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_inbox_merkelized_payload_hashes_repr.ml
+  sc_rollup_inbox_merkelized_payload_hashes_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
@@ -607,6 +610,8 @@
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_inbox_merkelized_payload_hashes_repr.ml
+  sc_rollup_inbox_merkelized_payload_hashes_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
@@ -866,6 +871,8 @@
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
+  sc_rollup_inbox_merkelized_payload_hashes_repr.ml
+  sc_rollup_inbox_merkelized_payload_hashes_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
   sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli

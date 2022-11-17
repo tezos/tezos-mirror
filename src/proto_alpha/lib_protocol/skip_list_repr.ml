@@ -61,6 +61,12 @@ module type S = sig
     'content ->
     ('content, 'ptr) cell
 
+  val find :
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    cell_ptr:'ptr ->
+    target_index:int ->
+    ('content, 'ptr) cell option
+
   val back_path :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     cell_ptr:'ptr ->
@@ -285,20 +291,33 @@ end) : S = struct
     in
     binary_search 0 (length cell.back_pointers - 1)
 
-  let back_path ~deref ~cell_ptr ~target_index =
-    Option.bind (deref cell_ptr) @@ fun cell ->
+  let rev_back_path ~deref ~cell_ptr ~target_index =
+    let open Option_syntax in
+    let* cell = deref cell_ptr in
     let powers = list_powers cell in
     let rec aux path ptr =
       let path = ptr :: path in
-      Option.bind (deref ptr) @@ fun cell ->
+      let* cell = deref ptr in
       let index = cell.index in
-      if Compare.Int.(target_index = index) then Some (List.rev path)
-      else if Compare.Int.(target_index > index) then None
+      if Compare.Int.(target_index = index) then return path
+      else if Compare.Int.(target_index > index) then fail
       else
-        Option.bind (best_skip cell target_index powers) @@ fun best_idx ->
-        Option.bind (back_pointer cell best_idx) @@ fun ptr -> aux path ptr
+        let* best_idx = best_skip cell target_index powers in
+        let* ptr = back_pointer cell best_idx in
+        aux path ptr
     in
     aux [] cell_ptr
+
+  let find ~deref ~cell_ptr ~target_index =
+    let open Option_syntax in
+    let* rev_back_path = rev_back_path ~deref ~cell_ptr ~target_index in
+    let* cell_ptr = List.hd rev_back_path in
+    deref cell_ptr
+
+  let back_path ~deref ~cell_ptr ~target_index =
+    let open Option_syntax in
+    let+ rev_back_path = rev_back_path ~deref ~cell_ptr ~target_index in
+    List.rev rev_back_path
 
   let mem equal x l =
     let open FallbackArray in

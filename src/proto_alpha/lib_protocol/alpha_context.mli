@@ -3180,6 +3180,59 @@ module Sc_rollup : sig
     val serialize : t -> serialized tzresult
 
     val deserialize : serialized -> t tzresult
+
+    module Hash : S.HASH
+
+    val hash_serialized_message : serialized -> Hash.t
+  end
+
+  module Inbox_merkelized_payload_hashes : sig
+    module Hash : S.HASH
+
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val equal : t -> t -> bool
+
+    val hash : t -> Hash.t
+
+    val get_payload_hash : t -> Inbox_message.Hash.t
+
+    val get_index : t -> int
+
+    type merkelized_and_payload = {
+      merkelized : t;
+      payload : Inbox_message.serialized;
+    }
+
+    module History : sig
+      include
+        Bounded_history_repr.S
+          with type key = Hash.t
+           and type value = merkelized_and_payload
+
+      val no_history : t
+    end
+
+    val genesis :
+      History.t -> Inbox_message.serialized -> (History.t * t) tzresult
+
+    val add_payload :
+      History.t -> t -> Inbox_message.serialized -> (History.t * t) tzresult
+
+    type proof
+
+    val proof_encoding : proof Data_encoding.t
+
+    val produce_proof :
+      History.t -> index:int -> t -> (merkelized_and_payload * proof) option
+
+    val verify_proof : proof -> (t * t) tzresult
+
+    module Internal_for_tests : sig
+      val find_predecessor_payload : History.t -> index:int -> t -> t option
+    end
   end
 
   type inbox_message = {
