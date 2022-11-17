@@ -137,7 +137,7 @@ let test_imcompatible_mempool () =
       =
     extract_values ctxt block
   in
-  let _vs, mempool1 =
+  let (_vs : Mempool.validation_info), mempool1 =
     Mempool.init
       ctxt
       Tezos_crypto.Chain_id.zero
@@ -153,7 +153,7 @@ let test_imcompatible_mempool () =
       =
     extract_values ctxt2 block2
   in
-  let _vs, mempool2 =
+  let (_vs : Mempool.validation_info), mempool2 =
     Mempool.init
       ctxt2
       Tezos_crypto.Chain_id.zero

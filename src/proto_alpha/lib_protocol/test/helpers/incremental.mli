@@ -80,32 +80,36 @@ val validate_operation :
   Operation.packed ->
   incremental tzresult Lwt.t
 
-(** [add_operation ?expect_failure ?expect_apply_failure ?check_size i
-    op] tries to validate then apply [op] in the validation and
-    application state of [i]. If the validation of [op] succeeds, the
-    function returns the incremental value with a validation state
-    updated after the application of [op]. Otherwise raise the error
-    from the validation of [op].
+(** [add_operation ?expect_failure ?expect_apply_failure
+    ?allow_manager_failure ?check_size i op] tries to validate then
+    apply [op] in the validation and application state of [i]. If the
+    validation of [op] succeeds, the function returns the incremental
+    value with a validation state updated after the application of
+    [op]. Otherwise raise the error from the validation of [op].
 
     Optional arguments allow to override defaults:
 
     {ul {li [?expect_failure:(error list -> unit tzresult Lwt.t)]:
     validation of [op] is expected to fail and [expect_failure] should
     handle the error. In case validate does not fail and
-    [expect_failure] is provided, [validate_operation] fails.}
+    [expect_failure] is provided, [validate_operation] fails.}}
 
     {ul {li [?expect_apply_failure:(error list -> unit tzresult
     Lwt.t)]: application of [op] is expected to fail and
-    [expect_apply_failure] should handle the error. In case the
+    [expect_apply_failure] should handle the errror. In case the
     application of [op] does not fail and [expect_apply_failure] is
-    provided, [add_operation] fails.}
+    provided, [add_operation] fails.}}
+
+    {ul {li [?allow_manager_failure] marks that manager operation
+    failures after fee taken are ignored.}}
 
     {li [?check_size:bool]: enable the check that an operation size
     should not exceed [Constants_repr.max_operation_data_length].
-    Enabled (set to [true]) by default. }} *)
+    Enabled (set to [true]) by default. } *)
 val add_operation :
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
+  ?allow_manager_failure:bool ->
   ?check_size:bool ->
   incremental ->
   Operation.packed ->
