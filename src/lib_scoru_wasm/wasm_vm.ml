@@ -435,8 +435,13 @@ let set_input_step input_info message pvm_state =
     | Eval _ -> return_stuck "evaluation"
     | Padding -> return_stuck "padding"
   in
-  (* Increase the current tick counter and mark that no input is required. *)
-  {pvm_state with tick_state; current_tick = Z.succ pvm_state.current_tick}
+  (* Increase the current tick counter and update last input *)
+  {
+    pvm_state with
+    tick_state;
+    current_tick = Z.succ pvm_state.current_tick;
+    last_input_info = Some input_info;
+  }
 
 let reveal_step payload pvm_state =
   let open Lwt_syntax in

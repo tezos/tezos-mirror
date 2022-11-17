@@ -157,7 +157,6 @@ let encode_tick_state tree =
 let test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
-  let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
   let* tree = encode_tick_state tree in
   let* tree =
     Wasm.set_input_step
@@ -178,7 +177,7 @@ let test_set_input () =
   let expected_info =
     let open Wasm_pvm_state in
     let last_input_read =
-      Some (make_inbox_info ~inbox_level:5 ~message_counter:10)
+      Some (make_inbox_info ~inbox_level:0 ~message_counter:1)
     in
     {current_tick = Z.one; last_input_read; input_request = Input_required}
   in

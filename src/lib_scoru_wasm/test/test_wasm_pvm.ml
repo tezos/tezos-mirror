@@ -571,6 +571,20 @@ let build_snapshot_wasm_state_from_set_input
       new_last_top_level_call
       tree
   in
+  (* The kernel had read two inputs (SOL and EOL). *)
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tezos_tree_encoding.value
+         ["wasm"; "input"]
+         Wasm_pvm_sig.input_info_encoding)
+      {
+        inbox_level =
+          Stdlib.Option.get (Tezos_base.Bounded.Non_negative_int32.of_value 0l);
+        message_counter = Z.one;
+      }
+      tree
+  in
+
   (* The kernel will have been set as the fallback kernel. *)
   let* durable =
     Test_encodings_util.Tree_encoding_runner.decode
