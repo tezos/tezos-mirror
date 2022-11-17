@@ -5496,6 +5496,7 @@ let _octez_proxy_server =
     ~path:"src/bin_proxy_server"
     ~internal_name:"main_proxy_server"
     ~synopsis:"Octez: `octez-proxy-server` binary"
+    ~release:true
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
