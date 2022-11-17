@@ -469,35 +469,3 @@ class TestRememberContract:
                 'munch',
                 ['--arg', big_arg, "--entrypoint", "list_nat"],
             )
-
-    # Test that a large operation under 32KB can be injected in the node
-    # (variant using a big nat).
-    def test_operation_size_with_nat_ok(self, client: Client):
-        # The encoding for nat uses a byte to encode 7 bits of the number
-        # so the size of 2 ** (7 * n) is about n bytes
-        big_arg = 2 ** (7 * 30 * 1024)
-
-        client.transfer(
-            10,
-            'bootstrap1',
-            'munch',
-            ['--arg', f"{big_arg}", "--entrypoint", "nat"],
-        )
-        utils.bake(client)
-
-    # Test that a large operation over 32KB cannot be injected in the node,
-    # and the error is not a stack overflow
-    # (variant using a big nat).
-    def test_operation_size_with_nat_fail(self, client: Client):
-        # The encoding for nat uses a byte to encode 7 bits of the number
-        # so the size of 2 ** (7 * n) is about n bytes
-        big_arg = 2 ** (7 * 33 * 1024)
-
-        expected_error = "Oversized operation"
-        with assert_run_failure(expected_error):
-            client.transfer(
-                10,
-                'bootstrap1',
-                'munch',
-                ['--arg', f"{big_arg}", "--entrypoint", "nat"],
-            )
