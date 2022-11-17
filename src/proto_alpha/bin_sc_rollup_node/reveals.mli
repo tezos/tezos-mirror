@@ -48,8 +48,6 @@
    sources of reveal data so that the rollup node can automatically
    download data in advance. *)
 
-open Protocol.Alpha_context
-
 (** Source of data  *)
 type source =
   | String of string  (** A string containing the whole data *)
@@ -71,22 +69,3 @@ val get :
   pvm_name:string ->
   hash:Protocol.Sc_rollup_reveal_hash.t ->
   string tzresult Lwt.t
-
-(** [import ~data_dir pvm_kind ~filename] turns the content of ~filename into a
-    chunk of pages of (at most) 4KB and stores them on disk in [data_dir]. It
-    returns the hash of the first chunk. *)
-val import :
-  data_dir:string ->
-  Sc_rollup.Kind.t ->
-  filename:string ->
-  Protocol.Sc_rollup_reveal_hash.t tzresult
-
-(** [chunkify pvm_kind source] turns the content of ~filename into a chunk of
-    pages of (at most) 4KB. It returns the map of chunks and the hash of the
-    first chunk. *)
-val chunkify :
-  Sc_rollup.Kind.t ->
-  source ->
-  (string Protocol.Sc_rollup_reveal_hash.Map.t
-  * Protocol.Sc_rollup_reveal_hash.t)
-  tzresult

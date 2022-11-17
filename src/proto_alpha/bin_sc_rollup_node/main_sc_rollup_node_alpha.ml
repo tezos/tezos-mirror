@@ -197,14 +197,6 @@ let reconnection_delay_arg =
     (Tezos_clic.parameter (fun _ p ->
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
-let filename_arg =
-  Tezos_clic.default_arg
-    ~long:"filename"
-    ~placeholder:"filename"
-    ~doc:"The path to the file to import."
-    ~default:"import.in"
-    Client_proto_args.string_parameter
-
 let injector_retention_period_arg =
   let default =
     Configuration.default_injector_retention_period |> string_of_int
@@ -226,20 +218,6 @@ let injector_retention_period_arg =
              "injector-retention-period should be smaller than %d"
              Configuration.max_injector_retention_period ;
          p)
-
-let pvm_name_arg =
-  Tezos_clic.default_arg
-    ~long:"pvm-name"
-    ~placeholder:"pvm_name"
-    ~doc:"The name of the PVM."
-    ~default:"arith"
-    Client_proto_args.string_parameter
-
-let pvm_kind_arg =
-  Tezos_clic.map_arg pvm_name_arg ~f:(fun _ name ->
-      match Protocol.Alpha_context.Sc_rollup.Kind.of_name name with
-      | None -> failwith "Invalid PVM name %s" name
-      | Some kind -> return kind)
 
 let group =
   {
@@ -372,23 +350,10 @@ let run_command =
       in
       Daemon.run ~data_dir configuration cctxt)
 
-let import_command =
-  let open Tezos_clic in
-  command
-    ~group
-    ~desc:"Import data to be used in reveal ticks."
-    (args3 data_dir_arg filename_arg pvm_kind_arg)
-    (prefixes ["import"] @@ stop)
-    (fun (data_dir, filename, pvm_kind) cctxt ->
-      let open Lwt_result_syntax in
-      let*? hash = Reveals.import ~data_dir pvm_kind ~filename in
-      let*! () = cctxt#message "%a" Protocol.Sc_rollup_reveal_hash.pp hash in
-      return_unit)
-
 let sc_rollup_commands () =
   List.map
     (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
-    [config_init_command; run_command; import_command]
+    [config_init_command; run_command]
 
 let select_commands _ _ =
   return (sc_rollup_commands () @ Client_helpers_commands.commands ())

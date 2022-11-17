@@ -40,6 +40,12 @@ type error +=
   | Non_positive_size_of_payload
   | Merkle_tree_branching_factor_not_high_enough
 
+type pagination_scheme = Merkle_tree_V0 | Hash_chain_V0
+
+let pagination_scheme_encoding =
+  Data_encoding.string_enum
+    [("Merkle_tree_V0", Merkle_tree_V0); ("Hash_chain_V0", Hash_chain_V0)]
+
 let () =
   register_error_kind
     `Permanent
@@ -376,4 +382,87 @@ module Merkle_tree = struct
         (* Hashes_version_tag used in hashes pages is 1. *)
         let hashes_version = 0
       end))
+end
+
+module Hash_chain = struct
+  module type PAGE_FMT = sig
+    type h
+
+    val content_limit : int
+
+    val hash_to_string : h -> string
+
+    (** Serializes a successor hash and content into a single page (an element in
+        the hash link) *)
+    val serialize_content : h -> string -> string
+  end
+
+  module Make (Hashing_scheme : sig
+    include Dac_preimage_data_manager.REVEAL_HASH
+
+    val scheme : supported_hashes
+  end)
+  (P : PAGE_FMT with type h = Hashing_scheme.t) =
+  struct
+    let hash bytes =
+      Hashing_scheme.hash_bytes ~scheme:Hashing_scheme.scheme [bytes]
+
+    let to_b58check = Hashing_scheme.to_b58check
+
+    let link_chunks chunks : (Hashing_scheme.t * bytes) list =
+      let rec link_chunks_rev linked_pages rev_pages =
+        match rev_pages with
+        | [] -> linked_pages
+        | chunk :: rev_chunks ->
+            let page =
+              match linked_pages with
+              | [] -> chunk
+              | (succ_hash, _) :: _ -> P.serialize_content succ_hash chunk
+            in
+            let page = Bytes.of_string page in
+            let hash = hash page in
+            (link_chunks_rev [@tailcall])
+              ((hash, page) :: linked_pages)
+              rev_chunks
+      in
+      let rev_chunks = List.rev chunks in
+      link_chunks_rev [] rev_chunks
+
+    let make_hash_chain data =
+      let open Result_syntax in
+      let+ chunks = String.chunk_bytes P.content_limit data in
+      link_chunks chunks
+
+    (** Main function for computing a hash chain from a byte sequence. Returns the
+        chain head hash.[for_each_page] may be supplied to run post processing 
+        tasks on each page, for example, to persisit a serialized page to disk.
+      *)
+    let serialize_payload ~for_each_page payload =
+      let open Lwt_result_syntax in
+      let* () =
+        fail_unless (Bytes.length payload > 0) Payload_cannot_be_empty
+      in
+      let*? hash_chain = make_hash_chain payload in
+      let+ () = List.iter_es for_each_page hash_chain in
+      Stdlib.List.hd hash_chain |> fst
+  end
+
+  module V0 =
+    Make
+      (struct
+        include Sc_rollup_reveal_hash
+
+        let scheme = Sc_rollup_reveal_hash.Blake2B
+      end)
+      (struct
+        type h = Sc_rollup_reveal_hash.t
+
+        let content_limit =
+          (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
+
+        let hash_to_string = Sc_rollup_reveal_hash.to_b58check
+
+        let serialize_content succ_hash content =
+          Format.asprintf "%s hash:%s" content (hash_to_string succ_hash)
+      end)
 end

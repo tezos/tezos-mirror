@@ -270,8 +270,9 @@ module Dal : sig
     val shards :
       slot_header:string -> int list -> (Dal_node.t, string list) RPC_core.t
 
-    (** [dac_store_preimage data] posts [data] on dac/store_preimage *)
-    val dac_store_preimage : string -> (Dal_node.t, string) RPC_core.t
+    (** [dac_store_preimage data pagination_scheme] posts [data] on dac/store_preimage with
+        pagination_scheme [pagination_scheme]*)
+    val dac_store_preimage : string -> string -> (Dal_node.t, string) RPC_core.t
   end
 
   module RPC : sig
