@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_dal_node_services
+val split_slot :
+  ( [`POST],
+    unit,
+    unit,
+    bool,
+    Tezos_crypto_dal.Cryptobox.slot,
+    string )
+  Tezos_rpc.Service.service
 
-class type cctxt =
-  object
-    inherit Tezos_rpc.Context.generic
-  end
+val slot :
+  ( [`GET],
+    unit,
+    unit * Tezos_crypto_dal.Cryptobox.commitment,
+    bool,
+    unit,
+    Tezos_crypto_dal.Cryptobox.slot )
+  Tezos_rpc.Service.service
 
-class unix_cctxt ~rpc_config : cctxt =
-  object
-    inherit
-      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-        rpc_config
-        (Tezos_rpc_http.Media_type.Command_line.of_command_line
-           rpc_config.media_type)
-  end
+val slot_pages :
+  ( [`GET],
+    unit,
+    unit * Tezos_crypto_dal.Cryptobox.commitment,
+    unit,
+    unit,
+    Tezos_crypto_dal.Cryptobox.page list )
+  Tezos_rpc.Service.service
 
-let make_unix_cctxt ~addr ~port =
-  let endpoint = Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port) in
-  let rpc_config =
-    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
-  in
-  new unix_cctxt ~rpc_config
+val stored_slot_headers :
+  ( [`GET],
+    unit,
+    unit * Tezos_crypto.Block_hash.t,
+    unit,
+    unit,
+    (int * Tezos_crypto_dal.Cryptobox.commitment) list )
+  Tezos_rpc.Service.service
 
-let call (cctxt : #cctxt) = cctxt#call_service
+val shard :
+  ( [`GET],
+    unit,
+    (unit * Tezos_crypto_dal.Cryptobox.commitment) * int,
+    unit,
+    unit,
+    Tezos_crypto_dal.Cryptobox.shard )
+  Tezos_rpc.Service.service
 
-let get_slot cctxt ?(trim_slot = false) header =
-  call cctxt Services.slot ((), header) trim_slot ()
+val shards :
+  ( [`POST],
+    unit,
+    unit * Tezos_crypto_dal.Cryptobox.commitment,
+    unit,
+    int trace,
+    Tezos_crypto_dal.Cryptobox.shard list )
+  Tezos_rpc.Service.service
 
-let get_shard cctxt header shard_index =
-  call cctxt Services.shard (((), header), shard_index) () ()
-
-let get_slot_pages cctxt header =
-  call cctxt Services.slot_pages ((), header) () ()
+val monitor_slot_headers :
+  ( [`GET],
+    unit,
+    unit,
+    unit,
+    unit,
+    Tezos_crypto_dal.Cryptobox.commitment )
+  Tezos_rpc.Service.service

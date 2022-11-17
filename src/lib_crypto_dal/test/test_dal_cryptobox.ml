@@ -52,9 +52,7 @@ module Test = struct
         let cm = Cryptobox.commit t p in
         let* pi = Cryptobox.prove_page t p 1 in
         let page = Bytes.sub msg page_size page_size in
-        let* check =
-          Cryptobox.verify_page t cm {index = 1; content = page} pi
-        in
+        let* check = Cryptobox.verify_page t cm ~page_index:1 page pi in
         assert check ;
         let enc_shards = Cryptobox.shards_from_polynomial t p in
         let c_indices =

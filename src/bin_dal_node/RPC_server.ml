@@ -108,25 +108,17 @@ let handle_monitor_slot_headers ctxt () () () =
 let register_stored_slot_headers ctxt dir =
   Tezos_rpc.Directory.register
     dir
-    (Services.stored_slot_headers ())
+    Services.stored_slot_headers
     (handle_stored_slot_headers ctxt)
 
 let register_split_slot ctxt dir =
-  Tezos_rpc.Directory.register0
-    dir
-    (Services.split_slot ())
-    (handle_split_slot ctxt)
+  Tezos_rpc.Directory.register0 dir Services.split_slot (handle_split_slot ctxt)
 
 let register_show_slot ctxt dir =
-  Tezos_rpc.Directory.register dir (Services.slot ()) (handle_slot ctxt)
+  Tezos_rpc.Directory.register dir Services.slot (handle_slot ctxt)
 
 let register_show_slot_pages ctxt dir =
-  Tezos_rpc.Directory.register
-    dir
-    (Services.slot_pages ())
-    (handle_slot_pages ctxt)
-
-let shard_service = Services.shard ()
+  Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)
 
 let shards_service :
     ( [`POST],
@@ -136,21 +128,26 @@ let shards_service :
       int list,
       Cryptobox.shard list )
     Tezos_rpc.Service.service =
-  Services.shards ()
+  Services.shards
 
 let register_shards ctxt dir =
   Tezos_rpc.Directory.register dir shards_service (handle_shards ctxt)
 
 let register_shard ctxt dir =
-  Tezos_rpc.Directory.register dir shard_service (handle_shard ctxt)
+  Tezos_rpc.Directory.register dir Services.shard (handle_shard ctxt)
 
 let shards_rpc ctxt commitment shards =
   Tezos_rpc.Context.make_call shards_service ctxt ((), commitment) () shards
 
 let shard_rpc ctxt commitment shard =
-  Tezos_rpc.Context.make_call shard_service ctxt (((), commitment), shard) () ()
+  Tezos_rpc.Context.make_call
+    Services.shard
+    ctxt
+    (((), commitment), shard)
+    ()
+    ()
 
-let monitor_slot_headers_service = Services.monitor_slot_headers ()
+let monitor_slot_headers_service = Services.monitor_slot_headers
 
 let register_monitor_slot_headers ctxt dir =
   Tezos_rpc.Directory.gen_register

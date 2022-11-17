@@ -89,10 +89,10 @@ module type VERIFIER = sig
       Fails if the size of the srs on the group G2 is too small. *)
   val verify_commitment : t -> commitment -> commitment_proof -> bool
 
-  (** The original slot can be split into a list of pages of size
-     [page_size]. A page is consequently encoded as a pair of an
-     [index] and the content of this page. *)
-  type page = {index : int; content : bytes}
+  (** The original slot can be split into a list of pages of fixed
+     size. This size is given by the parameter [page_size] given to the
+     function {!val:make}. *)
+  type page = bytes
 
   (** A proof that the evaluation of points of a polynomial is part of
      a commitment. *)
@@ -115,6 +115,7 @@ module type VERIFIER = sig
   val verify_page :
     t ->
     commitment ->
+    page_index:int ->
     page ->
     page_proof ->
     (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
