@@ -1199,7 +1199,7 @@ module Make (Context : P) :
          is merged. *)
     (* The parameters below are those of mainnet in protocol constants, divided
        by 16. *)
-    let endorsement_lag = 1l in
+    let attestation_lag = 1l in
     let page_size = 4096 / 64 in
     let slot_size = (1 lsl 20) / 64 in
     let number_of_slots = 256 / 64 in
@@ -1235,7 +1235,7 @@ module Make (Context : P) :
                More generally, the whole condition below will be reworked. *)
             if
               Compare.Int32.(
-                delta > 1l && delta <= Int32.mul 2l endorsement_lag)
+                delta > 1l && delta <= Int32.mul 2l attestation_lag)
             then
               let* index = mk_slot_index slot in
               let* page_index = mk_page_index page in

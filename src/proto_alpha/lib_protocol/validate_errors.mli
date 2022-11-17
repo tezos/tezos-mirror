@@ -38,7 +38,7 @@ module Consensus : sig
     | Preendorsement
     | Endorsement
     | Grandparent_endorsement
-    | Dal_slot_availability
+    | Dal_attestation
 
   (** Errors for preendorsements and endorsements. *)
   type error +=

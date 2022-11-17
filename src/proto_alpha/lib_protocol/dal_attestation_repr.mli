@@ -23,18 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Slot endorsement representation for the data-availability layer.
+(** Slot attestation representation for the data-availability layer.
 
     {1 Overview}
 
     For the data-availability layer, the layer 1 provides a list of
-   slots at every level (see {!dal_slot_repr}). Slots are not posted
-   directly onto L1 blocks. Stakeholders (via endorsements) can commit
-   on the availability of the data.
+   slots at every level (see {!Dal_slot_repr}). Slots are not posted
+   directly onto L1 blocks. Stakeholders, called attestors in this
+   context, can commit on the availability of the data (via
+   endorsements or attestation operations, see
+   https://gitlab.com/tezos/tezos/-/issues/3115).
 
-    The slot is uniformly split into shards. Each endorser commits for
-   every slot at every level on the availability of all shards they
-   are assigned to.
+    The slot is uniformly split into shards. Each attestor commits,
+   for every slot, on the availability of all shards they are assigned
+   to.
 
     This module encapsulates the representation of this commitment
    that aims to be provided with endorsement operations. To avoid
@@ -42,39 +44,39 @@
 
 type t
 
-type available_slots = t
+type attested_slots = t
 
-(** The shape of Dal endorsement operations injected by delegates. *)
+(** The shape of Dal attestation operations injected by delegates. *)
 type operation = {
-  endorser : Signature.Public_key_hash.t;
-      (** The endorser who attests the availability of the slots. *)
-  slot_availability : t;
+  attestor : Signature.Public_key_hash.t;
+      (** The account who attests the availability of the slots. *)
+  attestation : t;
       (** The bitset of slots that are attested to be available. *)
   level : Raw_level_repr.t;
       (** The level at which the operation is valid. It should be equal to the
-          attested slot's published level plus the DAL endorsement lag. *)
+          attested slot's published level plus the DAL attestation lag. *)
 }
 
 val encoding : t Data_encoding.t
 
-(** [empty] returns an empty [slot_endorsement] which commits that
+(** [empty] returns an empty [slot_attestation] which commits that
    every slot are unavailable. *)
 val empty : t
 
-(** [is_available slot_endorsement ~index] returns [true] if the
-   [slot_endorsement] commits that the slot at [index] is
+(** [is_attested slot_attestation ~index] returns [true] if the
+   [slot_attestation] commits that the slot at [index] is
    available. *)
-val is_available : t -> Dal_slot_repr.Index.t -> bool
+val is_attested : t -> Dal_slot_repr.Index.t -> bool
 
-(** [commit slot_endorsement index] commits into [slot_endorsement]
+(** [commit slot_attestation index] commits into [slot_attestation]
    that the [index] is available. *)
 val commit : t -> Dal_slot_repr.Index.t -> t
 
-(** [occupied_size_in_bits slot_endorsement] returns the size in bits of an endorsement. *)
+(** [occupied_size_in_bits slot_attestation] returns the size in bits of an attestation. *)
 val occupied_size_in_bits : t -> int
 
 (** [expected_size_in_bits ~max_index] returns the expected size (in
-   bits) of an endorsement considering the maximum index for a slot is
+   bits) of an attestation considering the maximum index for a slot is
    [max_index]. *)
 val expected_size_in_bits : max_index:Dal_slot_repr.Index.t -> int
 
@@ -84,13 +86,13 @@ type shard_index = int
 module Shard_map : Map.S with type key = shard_index
 
 (** This module is used to record the various data-availability
-   endorsements.
+   attestations.
 
-   For each endorser, a list of shards is associated. For each slots
-   declared available (see {!type:t}) we record that those shards were
-   available.
+   For each attestor, a list of shards is associated. For each
+   attested slot (see {!type:t}) we record that those shards were
+   deemed available.
 
-  This information will be used at the end of block finalisation to
+   This information will be used at the end of block finalisation to
    have the protocol declaring whether the slot is available.  *)
 module Accountability : sig
   (** The data-structure used to record the shards-slots availability. *)
@@ -101,7 +103,7 @@ module Accountability : sig
      Consider using the [Bounded] module. In particular, change the
      semantics of [is_slot_available] accordingly. *)
 
-  (** [init ~length] initialises a new accountability data-structures
+  (** [init ~length] initialises a new accountability data-structure
      with at most [length] slots and where for every slot, no shard is
      available. *)
   val init : length:int -> t
@@ -111,7 +113,7 @@ module Accountability : sig
      are available. It is the responsibility of the caller to ensure
      the shard indices are positive numbers. A negative shard index is
      ignored. *)
-  val record_shards_availability : t -> available_slots -> shard_index list -> t
+  val record_shards_availability : t -> attested_slots -> shard_index list -> t
 
   (** [is_slot_available t ~threshold ~number_of_shards slot] returns
      [true] if the number of shards recorded in [t] for the [slot] is

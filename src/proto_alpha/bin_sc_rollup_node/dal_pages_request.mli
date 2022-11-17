@@ -51,10 +51,10 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
     - the size of the list, in case it is not empty, is equal to the expected
       number of pages in a slot.
 
-    [dal_endorsement_lag] is used to retrieve the correct entry in [store].
+    [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val slot_pages :
-  dal_endorsement_lag:int ->
+  dal_attestation_lag:int ->
   Node_context.t ->
   Dal.slot_id ->
   Dal.Page.content list option tzresult Lwt.t
@@ -67,10 +67,10 @@ val slot_pages :
     otherwise, some content is only returned for confirmed pages (slots) for
     which the content has already been downloaded and saved to the store.
 
-    [dal_endorsement_lag] is used to retrieve the correct entry in [store].
+    [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val page_content :
-  dal_endorsement_lag:int ->
+  dal_attestation_lag:int ->
   Node_context.t ->
   Dal.Page.t ->
   Dal.Page.content option tzresult Lwt.t

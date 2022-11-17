@@ -845,7 +845,7 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
         Lwt.return
           (`Branch_refused
             [Environment.wrap_tzerror Consensus_operation_in_far_future])
-  | Single (Dal_slot_availability _)
+  | Single (Dal_attestation _)
   | Single (Seed_nonce_revelation _)
   | Single (Double_preendorsement_evidence _)
   | Single (Double_endorsement_evidence _)
@@ -1390,7 +1390,7 @@ let post_filter config ~(filter_state : state) ~validation_state_before:_
       match contents with
       | Single_result (Preendorsement_result _)
       | Single_result (Endorsement_result _)
-      | Single_result (Dal_slot_availability_result _)
+      | Single_result (Dal_attestation_result _)
       | Single_result (Seed_nonce_revelation_result _)
       | Single_result (Double_preendorsement_evidence_result _)
       | Single_result (Double_endorsement_evidence_result _)

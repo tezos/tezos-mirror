@@ -125,7 +125,7 @@ val stop : t -> State_hash.t
         output from the [input] proof is too recent to be allowed into
         the PVM proof ;
 
-      - DAL parameters and [dal_endorsement_lag], to be able to check the page
+      - DAL parameters and [dal_attestation_lag], to be able to check the page
         content membership to a slot if needed ;
 
       - the [pvm_name], used to check that the proof given has the right
@@ -140,7 +140,7 @@ val valid :
   Raw_level_repr.t ->
   Dal_slot_repr.History.t ->
   Dal_slot_repr.parameters ->
-  dal_endorsement_lag:int ->
+  dal_attestation_lag:int ->
   pvm_name:string ->
   t ->
   (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
@@ -169,7 +169,7 @@ module type PVM_with_context_and_state = sig
 
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
      This interface might not be resilient to dal parameters changes
-     (cryptobox parameters or dal_endorsement_lag for instance). *)
+     (cryptobox parameters or dal_attestation_lag for instance). *)
   module Dal_with_history : sig
     (** The reference/snapshot cell of the DAL skip list that stores
         confirmed slots. *)
@@ -198,7 +198,7 @@ module type PVM_with_context_and_state = sig
 
     (** The lag between the time an endorsement is published on L1
         (its published_level) and the level it should be confirmed. *)
-    val dal_endorsement_lag : int
+    val dal_attestation_lag : int
   end
 end
 

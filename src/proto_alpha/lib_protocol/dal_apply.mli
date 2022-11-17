@@ -28,16 +28,15 @@
 
 open Alpha_context
 
-(** [validate_data_availability ctxt op] ensures that
-   [op.slot_availability] is valid and cannot prevent an operation containing
-   [op.slot_availability] to be refused on top of [ctxt]. If an [Error _] is
-   returned, the [op.slot_availability] is not valid. *)
-val validate_data_availability : t -> Dal.Endorsement.operation -> unit tzresult
+(** [validate_attestation ctxt op] ensures that [op.attestation] is
+   valid and cannot prevent an operation containing [op.attestation]
+   to be refused on top of [ctxt]. If an [Error _] is returned, the
+   [op.attestation] is not valid. *)
+val validate_attestation : t -> Dal.Attestation.operation -> unit tzresult
 
-(** [apply_data_availability ctxt op] applies
-   [op.slot_availability] into the [ctxt] assuming [op.endorser] issued those
-   endorsements. *)
-val apply_data_availability : t -> Dal.Endorsement.operation -> t tzresult
+(** [apply_attestation ctxt op] applies [op.attestation] into the
+   [ctxt] assuming [op.attestor] issued those attestations. *)
+val apply_attestation : t -> Dal.Attestation.operation -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
    valid and cannot prevent an operation containing [slot_header] to be
@@ -51,12 +50,12 @@ val validate_publish_slot_header : t -> Dal.Slot.Header.t -> unit tzresult
 val apply_publish_slot_header : t -> Dal.Slot.Header.t -> t tzresult
 
 (** [finalisation ctxt] should be executed at block finalisation
-   time. A set of slots available at level [ctxt.current_level - lag]
-   is returned encapsulated into the endorsement data-structure.
+   time. A set of slots attested at level [ctxt.current_level - lag]
+   is returned encapsulated into the attestation data-structure.
 
    [lag] is a parametric constant specific to the data-availability
    layer.  *)
-val finalisation : t -> (t * Dal.Endorsement.t option) tzresult Lwt.t
+val finalisation : t -> (t * Dal.Attestation.t option) tzresult Lwt.t
 
 (** [initialize ctxt ~level] should be executed at block
    initialisation time. It allows to cache the committee for [level]

@@ -660,7 +660,7 @@ let dal_slot_availibility ctxt delegate =
     >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
   in
   let* committee =
-    Alpha_context.Dal.Endorsement.compute_committee
+    Alpha_context.Dal.Attestation.compute_committee
       ctxt
       pkh_from_tenderbake_slot
   in
@@ -671,13 +671,12 @@ let dal_slot_availibility ctxt delegate =
   with
   | None -> return_none
   | Some _interval ->
-      (* The content of the endorsement does not matter for covalidity. *)
-      let slot_availability = Dal.Endorsement.empty in
+      (* The content of the attestation does not matter for covalidity. *)
+      let attestation = Dal.Attestation.empty in
       let level = Raw_level.succ level.Level.level in
-      return_some
-        (Dal_slot_availability {endorser = delegate; slot_availability; level})
+      return_some (Dal_attestation {attestor = delegate; attestation; level})
 
-let dal_slot_availability_descriptor =
+let dal_attestation_descriptor =
   let open Lwt_result_syntax in
   {
     parameters =
@@ -860,7 +859,7 @@ let manager_descriptor max_batch_size nb_accounts =
 type op_kind =
   | KEndorsement
   | KPreendorsement
-  | KDalslotavail
+  | KDalattestation
   | KBallotExp
   | KBallotProm
   | KProposals
@@ -877,7 +876,7 @@ let op_kind_of_packed_operation op =
   match contents with
   | Single (Preendorsement _) -> KPreendorsement
   | Single (Endorsement _) -> KEndorsement
-  | Single (Dal_slot_availability _) -> KDalslotavail
+  | Single (Dal_attestation _) -> KDalattestation
   | Single (Seed_nonce_revelation _) -> KNonce
   | Single (Vdf_revelation _) -> KVdf
   | Single (Double_endorsement_evidence _) -> KDbl_consensus
@@ -898,7 +897,7 @@ let pp_op_kind fmt kind =
     | KManager -> "manager"
     | KEndorsement -> "endorsement"
     | KPreendorsement -> "preendorsement"
-    | KDalslotavail -> "dal_slot"
+    | KDalattestation -> "dal_attestation"
     | KBallotExp -> "ballot"
     | KBallotProm -> "ballot"
     | KProposals -> "proposals"
@@ -913,7 +912,7 @@ let descriptor_of ~nb_bootstrap ~max_batch_size = function
   | KManager -> manager_descriptor max_batch_size nb_bootstrap
   | KEndorsement -> endorsement_descriptor
   | KPreendorsement -> preendorsement_descriptor
-  | KDalslotavail -> dal_slot_availability_descriptor
+  | KDalattestation -> dal_attestation_descriptor
   | KBallotExp -> ballot_exploration_descriptor
   | KBallotProm -> ballot_promotion_descriptor
   | KProposals -> proposal_descriptor
@@ -940,7 +939,7 @@ let non_exclusive_kinds =
     KManager;
     KEndorsement;
     KPreendorsement;
-    KDalslotavail;
+    KDalattestation;
     KActivate;
     KDbl_consensus;
     KDbl_baking;

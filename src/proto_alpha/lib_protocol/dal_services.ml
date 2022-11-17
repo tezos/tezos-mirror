@@ -34,7 +34,7 @@ let assert_dal_feature_enabled ctxt =
 
 let shards ctxt ~level =
   let open Lwt_result_syntax in
-  let open Dal.Endorsement in
+  let open Dal.Attestation in
   assert_dal_feature_enabled ctxt >>?= fun () ->
   let level = Level.from_raw ctxt level in
   let pkh_from_tenderbake_slot slot =
@@ -44,6 +44,6 @@ let shards ctxt ~level =
   (* We do not cache this committee. This function being used by RPCs
      to know the DAL committee at some particular level. *)
   let* committee =
-    Dal.Endorsement.compute_committee ctxt pkh_from_tenderbake_slot
+    Dal.Attestation.compute_committee ctxt pkh_from_tenderbake_slot
   in
   Signature.Public_key_hash.Map.bindings committee.pkh_to_shards |> return

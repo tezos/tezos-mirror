@@ -26,29 +26,29 @@
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3103
 
    This may be a bit heavy in practice. We could also assume that in
-   practice, this bitfield will contain many bits to one. Hence, we
+   practice, many bits in this bitfield will be set to one. Hence, we
    could consider a better encoding which is smaller in the optimistic
    case. For example:
 
-   1. When all the slots are endorsed, the encoding can be represented
+   1. When all the slots are attested, the encoding can be represented
    in one bit.
 
    2. Otherwise, we can pack slots by [8]. Have a header of [slots/8]
    which is [1] if all the slots in this set are [1], [0]
    otherwise. For all pack with a bit set to [0], we give the explicit
    representation. Hence, if there are [256] slots, and [2] are not
-   endorsed, this representation will be of size [32] bits + [16] bits
+   attested, this representation will be of size [32] bits + [16] bits
    = [48] bits which is better than [256] bits. *)
 type t = Bitset.t
 
-type available_slots = t
+type attested_slots = t
 
 type operation = {
-  endorser : Signature.Public_key_hash.t;
+  attestor : Signature.Public_key_hash.t;
       (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4165
-         Compute this from the endorsed slots in [slot_availability] below,
+         Compute the endorser from the attested slots in [slot_attestation] below,
          or provide a field `min_endorser_slot : int / int32` *)
-  slot_availability : t;
+  attestation : t;
   level : Raw_level_repr.t;
 }
 
@@ -56,7 +56,7 @@ let encoding = Bitset.encoding
 
 let empty = Bitset.empty
 
-let is_available t index =
+let is_attested t index =
   let open Dal_slot_repr.Index in
   match Bitset.mem t (to_int index) with
   | Ok b -> b
@@ -79,7 +79,7 @@ let commit t index =
 let occupied_size_in_bits = Bitset.occupied_size_in_bits
 
 let expected_size_in_bits ~max_index =
-  (* We compute an encoding of the data-availability endorsements
+  (* We compute an encoding of the data-availability attestations
      which is a (tight) upper bound of what we expect. *)
   let open Bitset in
   let open Dal_slot_repr.Index in
@@ -107,7 +107,7 @@ module Accountability = struct
     let l =
       List.init
         ~when_negative_length:
-          "Dal_endorsement_repr.Accountability.init: length cannot be negative"
+          "Dal_attestation_repr.Accountability.init: length cannot be negative"
         length
         (fun _ -> Bitset.empty)
     in

@@ -44,21 +44,21 @@ let slot_of_int_e n =
   | None -> tzfail Dal_errors.Dal_slot_index_above_hard_limit
   | Some slot_index -> return slot_index
 
-let validate_data_availability ctxt op =
+let validate_attestation ctxt op =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4163
-     check the signature of the endorser as well *)
-  let Dal.Endorsement.{endorser = _; slot_availability; level = given} = op in
+     check the signature of the attestor as well *)
+  let Dal.Attestation.{attestor = _; attestation; level = given} = op in
   let* max_index =
     slot_of_int_e @@ ((Constants.parametric ctxt).dal.number_of_slots - 1)
   in
-  let maximum_size = Dal.Endorsement.expected_size_in_bits ~max_index in
-  let size = Dal.Endorsement.occupied_size_in_bits slot_availability in
+  let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
+  let size = Dal.Attestation.occupied_size_in_bits attestation in
   let* () =
     error_unless
       Compare.Int.(size <= maximum_size)
-      (Dal_endorsement_size_limit_exceeded {maximum_size; got = size})
+      (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
   let current = Level.(current ctxt).level in
   let delta_levels = Raw_level.diff current given in
@@ -71,15 +71,15 @@ let validate_data_availability ctxt op =
     Compare.Int32.(delta_levels < 0l)
     (Dal_operation_for_future_level {current; given})
 
-let apply_data_availability ctxt op =
+let apply_attestation ctxt op =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  let Dal.Endorsement.{endorser; slot_availability; level = _} = op in
-  match Dal.Endorsement.shards_of_endorser ctxt ~endorser with
+  let Dal.Attestation.{attestor; attestation; level = _} = op in
+  match Dal.Attestation.shards_of_attestor ctxt ~attestor with
   | None ->
       let level = Level.current ctxt in
-      error (Dal_data_availibility_endorser_not_in_committee {endorser; level})
+      error (Dal_data_availibility_attestor_not_in_committee {attestor; level})
   | Some shards ->
-      Ok (Dal.Endorsement.record_available_shards ctxt slot_availability shards)
+      Ok (Dal.Attestation.record_available_shards ctxt attestation shards)
 
 let validate_publish_slot_header ctxt
     Dal.Slot.Header.{id = {index; published_level}; _} =
@@ -136,7 +136,7 @@ let finalisation ctxt =
            level where the game started.
       *)
       Dal.Slot.finalize_pending_slot_headers ctxt
-      >|=? fun (ctxt, slot_availability) -> (ctxt, Some slot_availability))
+      >|=? fun (ctxt, attestation) -> (ctxt, Some attestation))
 
 let initialisation ctxt ~level =
   let open Lwt_result_syntax in
@@ -149,10 +149,10 @@ let initialisation ctxt ~level =
         >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
       in
       (* This committee is cached because it is the one we will use
-         for the validation of the DAL endorsements. *)
+         for the validation of the DAL attestations. *)
       let* committee =
-        Alpha_context.Dal.Endorsement.compute_committee
+        Alpha_context.Dal.Attestation.compute_committee
           ctxt
           pkh_from_tenderbake_slot
       in
-      return (Alpha_context.Dal.Endorsement.init_committee ctxt committee))
+      return (Alpha_context.Dal.Attestation.init_committee ctxt committee))

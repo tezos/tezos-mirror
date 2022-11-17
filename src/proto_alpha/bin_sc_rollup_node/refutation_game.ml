@@ -119,7 +119,7 @@ module Make (Interpreter : Interpreter.S) :
       be unconfirmed on L1, this function returns [None]. If the data of the
       slot are not saved to the store, the function returns a failure
       in the error monad. *)
-  let page_info_from_pvm_state node_ctxt ~dal_endorsement_lag
+  let page_info_from_pvm_state node_ctxt ~dal_attestation_lag
       (dal_params : Dal.parameters) start_state =
     let open Lwt_result_syntax in
     let*! input_request = PVM.is_input_state start_state in
@@ -127,7 +127,7 @@ module Make (Interpreter : Interpreter.S) :
     | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
         let Dal.Page.{slot_id; page_index} = page_id in
         let* pages =
-          Dal_pages_request.slot_pages ~dal_endorsement_lag node_ctxt slot_id
+          Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
         in
         match pages with
         | None -> return_none (* The slot is not confirmed. *)
@@ -199,11 +199,11 @@ module Make (Interpreter : Interpreter.S) :
     in
     let dal_l1_parameters = parametric_constants.dal in
     let dal_parameters = dal_l1_parameters.cryptobox_parameters in
-    let dal_endorsement_lag = dal_l1_parameters.endorsement_lag in
+    let dal_attestation_lag = dal_l1_parameters.attestation_lag in
 
     let* page_info =
       page_info_from_pvm_state
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         node_ctxt
         dal_parameters
         start_state
@@ -235,7 +235,7 @@ module Make (Interpreter : Interpreter.S) :
 
         let history_cache = dal_slots_history_cache
 
-        let dal_endorsement_lag = dal_endorsement_lag
+        let dal_attestation_lag = dal_attestation_lag
 
         let dal_parameters = dal_parameters
 
@@ -257,7 +257,7 @@ module Make (Interpreter : Interpreter.S) :
         game.inbox_level
         dal_slots_history
         dal_parameters
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         ~pvm_name:game.pvm_name
         proof
       >|= Environment.wrap_tzresult

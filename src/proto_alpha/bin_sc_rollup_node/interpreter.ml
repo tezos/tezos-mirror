@@ -98,13 +98,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     (* Retrieve the previous PVM state from store. *)
     let* ctxt, predecessor_state = state_of_head node_ctxt ctxt predecessor in
     let metadata = metadata node_ctxt in
-    let dal_endorsement_lag =
-      node_ctxt.protocol_constants.parametric.dal.endorsement_lag
+    let dal_attestation_lag =
+      node_ctxt.protocol_constants.parametric.dal.attestation_lag
     in
     let* state, num_messages, inbox_level, _fuel =
       Free_pvm.eval_block_inbox
         ~metadata
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         ~fuel:(Fuel.Free.of_ticks 0L)
         node_ctxt
         hash
@@ -198,13 +198,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         Layer1.{hash = predecessor_hash; level = pred_level}
     in
     let metadata = metadata node_ctxt in
-    let dal_endorsement_lag =
-      node_ctxt.protocol_constants.parametric.dal.endorsement_lag
+    let dal_attestation_lag =
+      node_ctxt.protocol_constants.parametric.dal.attestation_lag
     in
     let* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox
         ~metadata
-        ~dal_endorsement_lag
+        ~dal_attestation_lag
         ~fuel:(Fuel.Accounted.of_ticks tick_distance)
         node_ctxt
         hash

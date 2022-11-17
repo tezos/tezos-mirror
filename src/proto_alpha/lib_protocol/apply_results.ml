@@ -1078,10 +1078,10 @@ type 'kind contents_result =
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
-  | Dal_slot_availability_result : {
+  | Dal_attestation_result : {
       delegate : Signature.Public_key_hash.t;
     }
-      -> Kind.dal_slot_availability contents_result
+      -> Kind.dal_attestation contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
@@ -1312,22 +1312,22 @@ module Encoding = struct
               {balance_updates; delegate; consensus_key; endorsement_power});
       }
 
-  let dal_slot_availability_case =
+  let dal_attestation_case =
     Case
       {
-        op_case = Operation.Encoding.dal_slot_availability_case;
+        op_case = Operation.Encoding.dal_attestation_case;
         encoding = obj1 (req "delegate" Signature.Public_key_hash.encoding);
         select =
           (function
-          | Contents_result (Dal_slot_availability_result _ as op) -> Some op
+          | Contents_result (Dal_attestation_result _ as op) -> Some op
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Dal_slot_availability _ as op), res) ->
+          | Contents_and_result ((Dal_attestation _ as op), res) ->
               Some (op, res)
           | _ -> None);
-        proj = (function Dal_slot_availability_result {delegate} -> delegate);
-        inj = (fun delegate -> Dal_slot_availability_result {delegate});
+        proj = (function Dal_attestation_result {delegate} -> delegate);
+        inj = (fun delegate -> Dal_attestation_result {delegate});
       }
 
   let seed_nonce_revelation_case =
@@ -1561,7 +1561,7 @@ module Encoding = struct
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preendorsement_result _) -> None
           | Contents_result (Endorsement_result _) -> None
-          | Contents_result (Dal_slot_availability_result _) -> None
+          | Contents_result (Dal_attestation_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Vdf_revelation_result _) -> None
@@ -1935,7 +1935,7 @@ let contents_result_encoding =
          make vdf_revelation_case;
          make endorsement_case;
          make preendorsement_case;
-         make dal_slot_availability_case;
+         make dal_attestation_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -2002,7 +2002,7 @@ let contents_and_result_encoding =
          make vdf_revelation_case;
          make endorsement_case;
          make preendorsement_case;
-         make dal_slot_availability_case;
+         make dal_attestation_case;
          make double_preendorsement_evidence_case;
          make double_endorsement_evidence_case;
          make double_baking_evidence_case;
@@ -2149,8 +2149,8 @@ let kind_equal :
   | Endorsement _, _ -> None
   | Preendorsement _, Preendorsement_result _ -> Some Eq
   | Preendorsement _, _ -> None
-  | Dal_slot_availability _, Dal_slot_availability_result _ -> Some Eq
-  | Dal_slot_availability _, _ -> None
+  | Dal_attestation _, Dal_attestation_result _ -> Some Eq
+  | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq
@@ -3053,7 +3053,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_slot_availability : Dal.Endorsement.t option;
+  dal_attestation : Dal.Attestation.t option;
 }
 
 let block_metadata_encoding =
@@ -3072,7 +3072,7 @@ let block_metadata_encoding =
               balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
-              dal_slot_availability;
+              dal_attestation;
             } ->
          ( ( proposer,
              baker,
@@ -3083,10 +3083,8 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              implicit_operations_results ),
-           ( proposer_active_key,
-             baker_active_key,
-             consumed_gas,
-             dal_slot_availability ) ))
+           (proposer_active_key, baker_active_key, consumed_gas, dal_attestation)
+         ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -3099,7 +3097,7 @@ let block_metadata_encoding =
               ( proposer_active_key,
                 baker_active_key,
                 consumed_gas,
-                dal_slot_availability ) ) ->
+                dal_attestation ) ) ->
          {
            proposer = {delegate = proposer; consensus_pkh = proposer_active_key};
            baker = {delegate = baker; consensus_pkh = baker_active_key};
@@ -3111,7 +3109,7 @@ let block_metadata_encoding =
            balance_updates;
            liquidity_baking_toggle_ema;
            implicit_operations_results;
-           dal_slot_availability;
+           dal_attestation;
          })
        (merge_objs
           (obj9
@@ -3136,4 +3134,4 @@ let block_metadata_encoding =
                 This varopt is here while the DAL is behind a feature
                 flag. This should be replaced by a required field once
                 the feature flag will be activated. *)
-             (varopt "dal_slot_availability" Dal.Endorsement.encoding)))
+             (varopt "dal_attestation" Dal.Attestation.encoding)))

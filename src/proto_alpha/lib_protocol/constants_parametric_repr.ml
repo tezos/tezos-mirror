@@ -28,7 +28,7 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  endorsement_lag : int;
+  attestation_lag : int;
   availability_threshold : int;
   cryptobox_parameters : Dal.parameters;
 }
@@ -39,24 +39,24 @@ let dal_encoding =
     (fun {
            feature_enable;
            number_of_slots;
-           endorsement_lag;
+           attestation_lag;
            availability_threshold;
            cryptobox_parameters;
          } ->
       ( ( feature_enable,
           number_of_slots,
-          endorsement_lag,
+          attestation_lag,
           availability_threshold ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              number_of_slots,
-             endorsement_lag,
+             attestation_lag,
              availability_threshold ),
            cryptobox_parameters ) ->
       {
         feature_enable;
         number_of_slots;
-        endorsement_lag;
+        attestation_lag;
         availability_threshold;
         cryptobox_parameters;
       })
@@ -64,7 +64,7 @@ let dal_encoding =
        (obj4
           (req "feature_enable" bool)
           (req "number_of_slots" int16)
-          (req "endorsement_lag" int16)
+          (req "attestation_lag" int16)
           (req "availability_threshold" int16))
        Dal.parameters_encoding)
 

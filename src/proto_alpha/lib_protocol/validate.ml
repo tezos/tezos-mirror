@@ -129,7 +129,7 @@ type consensus_state = {
   preendorsements_seen : Operation_hash.t Slot.Map.t;
   endorsements_seen : Operation_hash.t Slot.Map.t;
   grandparent_endorsements_seen : Operation_hash.t Slot.Map.t;
-  dal_slot_availability_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
+  dal_attestation_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
 }
 
 let slot_map_encoding element_encoding =
@@ -148,24 +148,24 @@ let consensus_state_encoding =
               preendorsements_seen;
               endorsements_seen;
               grandparent_endorsements_seen;
-              dal_slot_availability_seen;
+              dal_attestation_seen;
             } ->
          ( predecessor_level,
            preendorsements_seen,
            endorsements_seen,
            grandparent_endorsements_seen,
-           dal_slot_availability_seen ))
+           dal_attestation_seen ))
        (fun ( predecessor_level,
               preendorsements_seen,
               endorsements_seen,
               grandparent_endorsements_seen,
-              dal_slot_availability_seen ) ->
+              dal_attestation_seen ) ->
          {
            predecessor_level;
            preendorsements_seen;
            endorsements_seen;
            grandparent_endorsements_seen;
-           dal_slot_availability_seen;
+           dal_attestation_seen;
          })
        (obj5
           (req "predecessor_level" Raw_level.encoding)
@@ -177,7 +177,7 @@ let consensus_state_encoding =
              "grandparent_endorsements_seen"
              (slot_map_encoding Operation_hash.encoding))
           (req
-             "dal_slot_availability_seen"
+             "dal_attestation_seen"
              (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
 
 let init_consensus_state ~predecessor_level =
@@ -186,7 +186,7 @@ let init_consensus_state ~predecessor_level =
     preendorsements_seen = Slot.Map.empty;
     endorsements_seen = Slot.Map.empty;
     grandparent_endorsements_seen = Slot.Map.empty;
-    dal_slot_availability_seen = Signature.Public_key_hash.Map.empty;
+    dal_attestation_seen = Signature.Public_key_hash.Map.empty;
   }
 
 type voting_state = {
@@ -509,7 +509,7 @@ let init_block_state vi =
 let get_initial_ctxt {info; _} = info.ctxt
 
 (** Validation of consensus operations (validation pass [0]):
-    preendorsement, endorsement, and dal_slot_availability. *)
+    preendorsement, endorsement, and dal_attestation. *)
 module Consensus = struct
   let expected_endorsement_features ~predecessor_level ~predecessor_round branch
       payload_hash =
@@ -1047,8 +1047,7 @@ module Consensus = struct
       remove_normal_endorsement vs consensus_content
     else remove_grandparent_endorsement vs consensus_content
 
-  let check_dal_slot_availability vi
-      (operation : Kind.dal_slot_availability operation) =
+  let check_dal_attestation vi (operation : Kind.dal_attestation operation) =
     (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
        This is a temporary operation. Some checks are missing for the
        moment. In particular, the signature is not
@@ -1059,44 +1058,36 @@ module Consensus = struct
        operation should be merged with an endorsement or at least
        refined. *)
     let open Lwt_result_syntax in
-    let (Single (Dal_slot_availability op)) =
-      operation.protocol_data.contents
-    in
+    let (Single (Dal_attestation op)) = operation.protocol_data.contents in
     let*? () =
       (* Note that this function checks the dal feature flag. *)
-      Dal_apply.validate_data_availability vi.ctxt op
+      Dal_apply.validate_attestation vi.ctxt op
     in
     return_unit
 
-  let check_dal_slot_availability_conflict vs oph
-      (operation : Kind.dal_slot_availability operation) =
-    let (Single
-          (Dal_slot_availability {endorser; slot_availability = _; level = _}))
-        =
+  let check_dal_attestation_conflict vs oph
+      (operation : Kind.dal_attestation operation) =
+    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
       operation.protocol_data.contents
     in
     match
       Signature.Public_key_hash.Map.find_opt
-        endorser
-        vs.consensus_state.dal_slot_availability_seen
+        attestor
+        vs.consensus_state.dal_attestation_seen
     with
     | None -> ok_unit
     | Some existing ->
         Error (Operation_conflict {existing; new_operation = oph})
 
-  let wrap_dal_slot_availability_conflict = function
+  let wrap_dal_attestation_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
         error
           Validate_errors.Consensus.(
-            Conflicting_consensus_operation
-              {kind = Dal_slot_availability; conflict})
+            Conflicting_consensus_operation {kind = Dal_attestation; conflict})
 
-  let add_dal_slot_availability vs oph
-      (operation : Kind.dal_slot_availability operation) =
-    let (Single
-          (Dal_slot_availability {endorser; slot_availability = _; level = _}))
-        =
+  let add_dal_attestation vs oph (operation : Kind.dal_attestation operation) =
+    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
       operation.protocol_data.contents
     in
     {
@@ -1104,30 +1095,24 @@ module Consensus = struct
       consensus_state =
         {
           vs.consensus_state with
-          dal_slot_availability_seen =
+          dal_attestation_seen =
             Signature.Public_key_hash.Map.add
-              endorser
+              attestor
               oph
-              vs.consensus_state.dal_slot_availability_seen;
+              vs.consensus_state.dal_attestation_seen;
         };
     }
 
-  let remove_dal_slot_availability vs
-      (operation : Kind.dal_slot_availability operation) =
-    let (Single
-          (Dal_slot_availability {endorser; slot_availability = _; level = _}))
-        =
+  let remove_dal_attestation vs (operation : Kind.dal_attestation operation) =
+    let (Single (Dal_attestation {attestor; attestation = _; level = _})) =
       operation.protocol_data.contents
     in
-    let dal_slot_availability_seen =
+    let dal_attestation_seen =
       Signature.Public_key_hash.Map.remove
-        endorser
-        vs.consensus_state.dal_slot_availability_seen
+        attestor
+        vs.consensus_state.dal_attestation_seen
     in
-    {
-      vs with
-      consensus_state = {vs.consensus_state with dal_slot_availability_seen};
-    }
+    {vs with consensus_state = {vs.consensus_state with dal_attestation_seen}}
 
   let check_construction_preendorsement_round_consistency vi block_state kind
       (consensus_content : consensus_content) =
@@ -2809,8 +2794,7 @@ let check_operation ?(check_signature = true) info (type kind)
         Consensus.check_endorsement info ~check_signature operation
       in
       return_unit
-  | Single (Dal_slot_availability _) ->
-      Consensus.check_dal_slot_availability info operation
+  | Single (Dal_attestation _) -> Consensus.check_dal_attestation info operation
   | Single (Proposals _) ->
       Voting.check_proposals info ~check_signature operation
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
@@ -2866,8 +2850,8 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
-  | Single (Dal_slot_availability _) ->
-      Consensus.check_dal_slot_availability_conflict
+  | Single (Dal_attestation _) ->
+      Consensus.check_dal_attestation_conflict
         operation_conflict_state
         oph
         operation
@@ -2938,8 +2922,8 @@ let add_valid_operation operation_conflict_state oph (type kind)
         oph
         operation
         endorsement_kind
-  | Single (Dal_slot_availability _) ->
-      Consensus.add_dal_slot_availability operation_conflict_state oph operation
+  | Single (Dal_attestation _) ->
+      Consensus.add_dal_attestation operation_conflict_state oph operation
   | Single (Proposals _) ->
       Voting.add_proposals operation_conflict_state oph operation
   | Single (Ballot _) ->
@@ -2983,8 +2967,8 @@ let remove_operation operation_conflict_state (type kind)
       Consensus.remove_preendorsement operation_conflict_state operation
   | Single (Endorsement _) ->
       Consensus.remove_endorsement operation_conflict_state operation
-  | Single (Dal_slot_availability _) ->
-      Consensus.remove_dal_slot_availability operation_conflict_state operation
+  | Single (Dal_attestation _) ->
+      Consensus.remove_dal_attestation operation_conflict_state operation
   | Single (Proposals _) ->
       Voting.remove_proposals operation_conflict_state operation
   | Single (Ballot _) -> Voting.remove_ballot operation_conflict_state operation
@@ -3081,15 +3065,15 @@ let validate_operation ?(check_signature = true)
             block_state
             oph
             operation
-      | Single (Dal_slot_availability _) ->
+      | Single (Dal_attestation _) ->
           let open Consensus in
-          let* () = check_dal_slot_availability info operation in
+          let* () = check_dal_attestation info operation in
           let*? () =
-            check_dal_slot_availability_conflict operation_state oph operation
-            |> wrap_dal_slot_availability_conflict
+            check_dal_attestation_conflict operation_state oph operation
+            |> wrap_dal_attestation_conflict
           in
           let operation_state =
-            add_dal_slot_availability operation_state oph operation
+            add_dal_attestation operation_state oph operation
           in
           return {info; operation_state; block_state}
       | Single (Proposals _) ->

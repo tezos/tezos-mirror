@@ -221,7 +221,7 @@ module Dal : sig
     type t = {
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
-      endorsement_lag : int;
+      attestation_lag : int;
     }
 
     val parameter_file : Protocol.t -> string Lwt.t

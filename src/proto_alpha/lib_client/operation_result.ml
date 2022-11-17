@@ -1078,10 +1078,10 @@ let pp_contents_and_result :
         Consensus_key.pp
         {delegate; consensus_pkh = consensus_key}
         endorsement_power
-  | Dal_slot_availability _, Dal_slot_availability_result {delegate} ->
+  | Dal_attestation _, Dal_attestation_result {delegate} ->
       Format.fprintf
         ppf
-        "@[<v 2>Slot availability:@,Delegate: %a@]"
+        "@[<v 2>Slot attestation:@,Delegate: %a@]"
         Tezos_crypto.Signature.Public_key_hash.pp
         delegate
   | ( Double_endorsement_evidence {op1; op2},

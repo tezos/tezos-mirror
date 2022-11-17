@@ -781,7 +781,7 @@ module Constants : sig
     type dal = {
       feature_enable : bool;
       number_of_slots : int;
-      endorsement_lag : int;
+      attestation_lag : int;
       availability_threshold : int;
       cryptobox_parameters : Dal.parameters;
     }
@@ -2912,14 +2912,14 @@ module Dal : sig
     val equal : t -> t -> bool
   end
 
-  (** This module re-exports definitions from {!Dal_endorsement_repr} and
+  (** This module re-exports definitions from {!Dal_attestation_repr} and
       {!Raw_context.Dal}. *)
-  module Endorsement : sig
+  module Attestation : sig
     type t
 
     type operation = {
-      endorser : public_key_hash;
-      slot_availability : t;
+      attestor : public_key_hash;
+      attestation : t;
       level : Raw_level.t;
     }
 
@@ -2931,14 +2931,14 @@ module Dal : sig
 
     val empty : t
 
-    val is_available : t -> Slot_index.t -> bool
+    val is_attested : t -> Slot_index.t -> bool
 
     val occupied_size_in_bits : t -> int
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
-    val shards_of_endorser :
-      context -> endorser:public_key_hash -> shard_index list option
+    val shards_of_attestor :
+      context -> attestor:public_key_hash -> shard_index list option
 
     val record_available_shards : context -> t -> int list -> context
 
@@ -3023,7 +3023,7 @@ module Dal : sig
     val finalize_current_slot_headers : context -> context Lwt.t
 
     val finalize_pending_slot_headers :
-      context -> (context * Endorsement.t) tzresult Lwt.t
+      context -> (context * Attestation.t) tzresult Lwt.t
   end
 
   module Slots_history : sig
@@ -3060,11 +3060,11 @@ end
 module Dal_errors : sig
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3168
      do not expose these errors and return them in functions
-     from Dal_slot_repr or Dal_endorsement_repr. *)
+     from Dal_slot_repr or Dal_attestation_repr. *)
   type error +=
     | Dal_feature_disabled
     | Dal_slot_index_above_hard_limit
-    | Dal_endorsement_unexpected_size of {expected : int; got : int}
+    | Dal_attestation_unexpected_size of {expected : int; got : int}
     | Dal_publish_slot_header_future_level of {
         provided : Raw_level.t;
         expected : Raw_level.t;
@@ -3078,10 +3078,10 @@ module Dal_errors : sig
         maximum : Dal.Slot_index.t;
       }
     | Dal_publish_slot_header_candidate_with_low_fees of {proposed_fees : Tez.t}
-    | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
+    | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
     | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
-    | Dal_data_availibility_endorser_not_in_committee of {
-        endorser : Signature.Public_key_hash.t;
+    | Dal_data_availibility_attestor_not_in_committee of {
+        attestor : Signature.Public_key_hash.t;
         level : Level.t;
       }
     | Dal_operation_for_old_level of {
@@ -3818,7 +3818,7 @@ module Sc_rollup : sig
 
         val dal_parameters : Dal.parameters
 
-        val dal_endorsement_lag : int
+        val dal_attestation_lag : int
       end
     end
 
@@ -3830,7 +3830,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       Dal.Slots_history.t ->
       Dal.parameters ->
-      dal_endorsement_lag:int ->
+      dal_attestation_lag:int ->
       pvm_name:string ->
       t ->
       (input option * input_request) tzresult Lwt.t
@@ -3937,7 +3937,7 @@ module Sc_rollup : sig
 
     val play :
       Dal.parameters ->
-      dal_endorsement_lag:int ->
+      dal_attestation_lag:int ->
       stakers:Index.t ->
       Metadata.t ->
       t ->
@@ -4312,7 +4312,7 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
-  type dal_slot_availability = Dal_slot_availability_kind
+  type dal_attestation = Dal_attestation_kind
 
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
@@ -4479,9 +4479,7 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
-  | Dal_slot_availability :
-      Dal.Endorsement.operation
-      -> Kind.dal_slot_availability contents
+  | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
       nonce : Nonce.t;
@@ -4724,7 +4722,7 @@ module Operation : sig
   type consensus_watermark =
     | Endorsement of Chain_id.t
     | Preendorsement of Chain_id.t
-    | Dal_slot_availability of Chain_id.t
+    | Dal_attestation of Chain_id.t
 
   val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -4795,7 +4793,7 @@ module Operation : sig
 
     val endorsement_case : Kind.endorsement case
 
-    val dal_slot_availability_case : Kind.dal_slot_availability case
+    val dal_attestation_case : Kind.dal_attestation case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 

@@ -73,7 +73,7 @@ module Consensus = struct
     | Preendorsement
     | Endorsement
     | Grandparent_endorsement
-    | Dal_slot_availability
+    | Dal_attestation
 
   let consensus_operation_kind_encoding =
     Data_encoding.string_enum
@@ -81,14 +81,14 @@ module Consensus = struct
         ("Preendorsement", Preendorsement);
         ("Endorsement", Endorsement);
         ("Grandparent_endorsement", Grandparent_endorsement);
-        ("Dal_slot_availability", Dal_slot_availability);
+        ("Dal_attestation", Dal_attestation);
       ]
 
   let consensus_operation_kind_pp fmt = function
     | Preendorsement -> Format.fprintf fmt "Preendorsement"
     | Endorsement -> Format.fprintf fmt "Endorsement"
     | Grandparent_endorsement -> Format.fprintf fmt "Grandparent endorsement"
-    | Dal_slot_availability -> Format.fprintf fmt "Dal_slot_availability"
+    | Dal_attestation -> Format.fprintf fmt "Dal_attestation"
 
   (** Errors for preendorsements and endorsements. *)
   type error +=

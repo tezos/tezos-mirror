@@ -59,11 +59,11 @@ let () =
     (function Dal_invalid_page_for_slot page_id -> Some page_id | _ -> None)
     (fun page_id -> Dal_invalid_page_for_slot page_id)
 
-let store_entry_from_published_level ~dal_endorsement_lag ~published_level store
+let store_entry_from_published_level ~dal_attestation_lag ~published_level store
     =
   State.hash_of_level store
   @@ Int32.(
-       add (of_int dal_endorsement_lag) (Raw_level.to_int32 published_level))
+       add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
 
 let check_confirmation_status_and_download
     ({Node_context.store; dal_cctxt; _} as node_ctxt) ~confirmed_in_block_hash
@@ -103,11 +103,11 @@ let check_confirmation_status_and_download
     in
     return_none
 
-let slot_pages ~dal_endorsement_lag ({Node_context.store; _} as node_ctxt)
+let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
     Dal.Slot.Header.{published_level; index} =
   let open Lwt_result_syntax in
   let*! confirmed_in_block_hash =
-    store_entry_from_published_level ~dal_endorsement_lag ~published_level store
+    store_entry_from_published_level ~dal_attestation_lag ~published_level store
   in
   let*! processed =
     Store.Dal_processed_slots.find
@@ -137,13 +137,13 @@ let slot_pages ~dal_endorsement_lag ({Node_context.store; _} as node_ctxt)
         pages
       |> List.map snd |> Option.some |> return
 
-let page_content ~dal_endorsement_lag ({Node_context.store; _} as node_ctxt)
+let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
     page_id =
   let open Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let*! confirmed_in_block_hash =
-    store_entry_from_published_level ~dal_endorsement_lag ~published_level store
+    store_entry_from_published_level ~dal_attestation_lag ~published_level store
   in
   let*! processed =
     Store.Dal_processed_slots.find

@@ -231,20 +231,20 @@ type block_metadata = {
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
-  dal_slot_availability : bool Array.t option;
+  dal_attestation : bool Array.t option;
 }
 
 let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "metadata"] @@ fun json ->
-  let dal_slot_availability =
-    match JSON.(json |-> "dal_slot_availability" |> as_string_opt) with
+  let dal_attestation =
+    match JSON.(json |-> "dal_attestation" |> as_string_opt) with
     | None -> None
     | Some slots ->
-        let slot_availability = Z.of_string slots in
-        let length = Z.numbits slot_availability in
+        let attestation = Z.of_string slots in
+        let length = Z.numbits attestation in
         let array = Array.make length false in
         List.iter
-          (fun i -> if Z.testbit slot_availability i then array.(i) <- true)
+          (fun i -> if Z.testbit attestation i then array.(i) <- true)
           (range 0 (length - 1)) ;
         Some array
   in
@@ -256,7 +256,7 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
     | Some proposer -> proposer
   in
   let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
-  {dal_slot_availability; protocol; next_protocol; proposer; max_operations_ttl}
+  {dal_attestation; protocol; next_protocol; proposer; max_operations_ttl}
 
 let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string

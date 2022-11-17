@@ -50,7 +50,7 @@
         "Entrypoint_repr",
 
         "Dal_slot_repr",
-        "Dal_endorsement_repr",
+        "Dal_attestation_repr",
 
         "Sc_rollup_repr",
         "Sc_rollup_metadata_repr",

@@ -37,13 +37,13 @@ let compute_available_slot_headers ctxt seen_slot_headers =
   let fold_available_slots (rev_slot_headers, available_slot_headers) slot =
     if Raw_context.Dal.is_slot_index_available ctxt slot.Header.id.index then
       ( slot :: rev_slot_headers,
-        Dal_endorsement_repr.commit available_slot_headers slot.Header.id.index
+        Dal_attestation_repr.commit available_slot_headers slot.Header.id.index
       )
     else (rev_slot_headers, available_slot_headers)
   in
   List.fold_left
     fold_available_slots
-    ([], Dal_endorsement_repr.empty)
+    ([], Dal_attestation_repr.empty)
     seen_slot_headers
 
 let get_slot_headers_history ctxt =
@@ -63,16 +63,16 @@ let update_skip_list ctxt ~confirmed_slot_headers =
 let finalize_pending_slot_headers ctxt =
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
-  match Raw_level_repr.(sub raw_level dal.endorsement_lag) with
-  | None -> return (ctxt, Dal_endorsement_repr.empty)
-  | Some level_endorsed -> (
-      Storage.Dal.Slot.Headers.find ctxt level_endorsed >>=? function
-      | None -> return (ctxt, Dal_endorsement_repr.empty)
+  match Raw_level_repr.(sub raw_level dal.attestation_lag) with
+  | None -> return (ctxt, Dal_attestation_repr.empty)
+  | Some level_attested -> (
+      Storage.Dal.Slot.Headers.find ctxt level_attested >>=? function
+      | None -> return (ctxt, Dal_attestation_repr.empty)
       | Some seen_slots ->
           let rev_confirmed_slot_headers, available_slot_headers =
             compute_available_slot_headers ctxt seen_slots
           in
           let confirmed_slot_headers = List.rev rev_confirmed_slot_headers in
           update_skip_list ctxt ~confirmed_slot_headers >>=? fun ctxt ->
-          Storage.Dal.Slot.Headers.remove ctxt level_endorsed >>= fun ctxt ->
+          Storage.Dal.Slot.Headers.remove ctxt level_attested >>= fun ctxt ->
           return (ctxt, available_slot_headers))

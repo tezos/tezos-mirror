@@ -56,12 +56,12 @@ let regression_test ~__FILE__ ?(tags = []) title f =
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
-let setup ?(endorsement_lag = 1) ?commitment_period ?challenge_window
+let setup ?(attestation_lag = 1) ?commitment_period ?challenge_window
     ?dal_enable f ~protocol =
   let parameters =
     make_int_parameter
-      ["dal_parametric"; "endorsement_lag"]
-      (Some endorsement_lag)
+      ["dal_parametric"; "attestation_lag"]
+      (Some attestation_lag)
     @ make_int_parameter
         ["sc_rollup_commitment_period_in_blocks"]
         commitment_period
@@ -271,9 +271,7 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
       inject
         ~force:true
         ~signer:Constant.bootstrap1
-        (slot_availability
-           ~level
-           ~endorsement:(Array.make number_of_slots false))
+        (dal_attestation ~level ~attestation:(Array.make number_of_slots false))
         client)
   in
   let* (`OpHash oph2) =
@@ -291,8 +289,8 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
       ~error_msg:"Expected mempool: %R. Got: %L. (Order does not matter)") ;
   let* () = Client.bake_for_and_wait client in
   let* block_metadata = RPC.(call node @@ get_chain_block_metadata ()) in
-  if block_metadata.dal_slot_availability <> None then
-    Test.fail "Did not expect to find \"dal_slot_availibility\"" ;
+  if block_metadata.dal_attestation <> None then
+    Test.fail "Did not expect to find \"dal_attestation\"" ;
   let* bytes = RPC_legacy.raw_bytes client in
   if not JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
@@ -326,10 +324,10 @@ let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
           ]
           client)
 
-let slot_availability ?level ?(force = false) ~signer ~nb_slots availability
+let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
     client =
-  let endorsement = Array.make nb_slots false in
-  List.iter (fun i -> endorsement.(i) <- true) availability ;
+  let attestation = Array.make nb_slots false in
+  List.iter (fun i -> attestation.(i) <- true) availability ;
   let* level =
     match level with
     | Some level -> return level
@@ -338,7 +336,7 @@ let slot_availability ?level ?(force = false) ~signer ~nb_slots availability
         return @@ (level + 1)
   in
   Operation.Consensus.(
-    inject ~force ~signer (slot_availability ~level ~endorsement) client)
+    inject ~force ~signer (dal_attestation ~level ~attestation) client)
 
 type status = Applied | Failed of {error_id : string}
 
@@ -511,31 +509,29 @@ let test_slot_management_logic =
   check_manager_operation_status operations_result Applied oph2 ;
   let nb_slots = parameters.number_of_slots in
   let* _ =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap1 [1; 0] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap1 [1; 0] client
   in
   let* _ =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap2 [1; 0] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap2 [1; 0] client
   in
-  let* _ = slot_availability ~nb_slots ~signer:Constant.bootstrap3 [1] client in
-  let* _ = slot_availability ~nb_slots ~signer:Constant.bootstrap4 [1] client in
-  let* _ = slot_availability ~nb_slots ~signer:Constant.bootstrap5 [1] client in
+  let* _ = dal_attestation ~nb_slots ~signer:Constant.bootstrap3 [1] client in
+  let* _ = dal_attestation ~nb_slots ~signer:Constant.bootstrap4 [1] client in
+  let* _ = dal_attestation ~nb_slots ~signer:Constant.bootstrap5 [1] client in
   let* () = Client.bake_for_and_wait client in
   let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
-  let dal_slot_availability =
-    match metadata.dal_slot_availability with
+  let attestation =
+    match metadata.dal_attestation with
     | None ->
         assert false
         (* Field is part of the encoding when the feature flag is true *)
     | Some x -> x
   in
   Check.(
-    (dal_slot_availability.(0) = false)
+    (attestation.(0) = false)
       bool
-      ~error_msg:"Expected slot 0 to be unavailable") ;
+      ~error_msg:"Expected slot 0 to be un-attested") ;
   Check.(
-    (dal_slot_availability.(1) = true)
-      bool
-      ~error_msg:"Expected slot 1 to be available") ;
+    (attestation.(1) = true) bool ~error_msg:"Expected slot 1 to be attested") ;
   check_dal_raw_context node
 
 (** This test tests various situations related to DAL slots attestation. It's
@@ -548,14 +544,14 @@ let test_slots_attestation_operation_behavior =
     ~tags:["dal"]
     ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
-  setup ~endorsement_lag:5 ~dal_enable:true ~protocol
+  setup ~attestation_lag:5 ~dal_enable:true ~protocol
   @@ fun parameters cryptobox node client _bootstrap ->
   (* Some helpers *)
   let nb_slots = parameters.number_of_slots in
-  let lag = parameters.endorsement_lag in
+  let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ~level =
-    slot_availability
+    dal_attestation
       ~force:true
       ~nb_slots
       ~level
@@ -573,14 +569,14 @@ let test_slots_attestation_operation_behavior =
   in
   let check_slots_availability ~__LOC__ ~attested =
     let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
-    let dal_slot_availability =
+    let dal_attestation =
       (* Field is part of the encoding when the feature flag is true *)
-      Option.get metadata.dal_slot_availability
+      Option.get metadata.dal_attestation
     in
     List.iter
       (fun i ->
         Check.(
-          (Array.get dal_slot_availability i = true)
+          (Array.get dal_attestation i = true)
             bool
             ~error_msg:
               (Format.sprintf
@@ -652,7 +648,7 @@ let test_slots_attestation_operation_behavior =
     Lwt_list.map_s
       (fun signer ->
         let* (`OpHash h) =
-          slot_availability ~force:true ~nb_slots ~level ~signer [10] client
+          dal_attestation ~force:true ~nb_slots ~level ~signer [10] client
         in
         return h)
       [bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
@@ -904,7 +900,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
      3. (Rollup node is implicitely subscribed to all slots)
      4. Publish the three slot headers for slots 0, 1, 2
      5. Check that the rollup node fetched the slot headers from L1
-     6. After lag levels, endorse only slots 1 and 2
+     6. After lag levels, attest only slots 1 and 2
      7. Check that no slots are downloaded by the rollup node if
         the PVM does not request them
      8. Send external messages to trigger the request of dal pages for
@@ -986,23 +982,23 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   Check.(commitments = expected_commitments)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
-  (* 6. endorse only slots 1 and 2. *)
+  (* 6. attest only slots 1 and 2. *)
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let nb_slots = parameters.number_of_slots in
   let* _op_hash =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap1 [2; 1] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap1 [2; 1] client
   in
   let* _op_hash =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap2 [2; 1] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap2 [2; 1] client
   in
   let* _op_hash =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap3 [2; 1] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap3 [2; 1] client
   in
   let* _op_hash =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap4 [2; 1] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap4 [2; 1] client
   in
   let* _op_hash =
-    slot_availability ~nb_slots ~signer:Constant.bootstrap5 [2; 1] client
+    dal_attestation ~nb_slots ~signer:Constant.bootstrap5 [2; 1] client
   in
   let* () = Client.bake_for_and_wait client in
   let* slot_confirmed_level =
@@ -1011,7 +1007,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   Check.(slot_confirmed_level = slots_published_level + 1)
     Check.int
     ~error_msg:
-      "Current level has moved past slot endorsement level (current = %L, \
+      "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
   (* 7. Check that no slots have been downloaded *)
   let* downloaded_confirmed_slots =
@@ -1041,9 +1037,9 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   Check.(level = slot_confirmed_level + 1)
     Check.int
     ~error_msg:
-      "Current level has moved past slot endorsement level (current = %L, \
+      "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
-  (* 9. Wait for the rollup node to download the endorsed slots. *)
+  (* 9. Wait for the rollup node to download the attested slots. *)
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
   let* downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages
