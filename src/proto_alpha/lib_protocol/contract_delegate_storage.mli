@@ -27,6 +27,12 @@
    responsible for maintaining the tables {!Storage.Contract.Delegate}
    and {!Storage.Contract.Delegated}. *)
 
+type error +=
+  | (* `Permanent *)
+      Forbidden_tz4_delegate of Bls.Public_key_hash.t
+        (** Delegates cannot be tz4 accounts (i.e. BLS public key hashes). This
+            error is returned when we try to register such a delegate.  *)
+
 (** [find ctxt contract] returns the delegate associated to [contract], or [None]
     if [contract] has no delegate. *)
 val find :
