@@ -1138,7 +1138,7 @@ let generate_random_transactions =
                (fun _retcode -> save_injected_operations ())) ;
           launch cctxt parameters state rng save_pool)
 
+let commands = [generate_random_transactions]
+
 let commands network () =
-  match network with
-  | Some `Mainnet -> []
-  | Some `Testnet | None -> [generate_random_transactions]
+  match network with Some `Mainnet -> [] | Some `Testnet | None -> commands
