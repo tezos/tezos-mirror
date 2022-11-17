@@ -117,13 +117,7 @@
 
 *)
 
-module Hash : sig
-  include S.HASH
-
-  val of_context_hash : Context_hash.t -> t
-
-  val to_context_hash : t -> Context_hash.t
-end
+module Hash : S.HASH
 
 module V1 : sig
   (** The type of the inbox for a smart-contract rollup as stored

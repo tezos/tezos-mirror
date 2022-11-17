@@ -121,11 +121,6 @@ module Hash = struct
 
   let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
 
-  let of_context_hash context_hash =
-    Context_hash.to_bytes context_hash |> of_bytes_exn
-
-  let to_context_hash hash = to_bytes hash |> Context_hash.of_bytes_exn
-
   include Path_encoding.Make_hex (H)
 end
 

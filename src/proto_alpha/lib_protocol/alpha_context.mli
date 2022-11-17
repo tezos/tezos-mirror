@@ -3299,13 +3299,7 @@ module Sc_rollup : sig
 
     val pp_history_proof : Format.formatter -> history_proof -> unit
 
-    module Hash : sig
-      include S.HASH
-
-      val of_context_hash : Context_hash.t -> t
-
-      val to_context_hash : t -> Context_hash.t
-    end
+    module Hash : S.HASH
 
     module History :
       Bounded_history_repr.S
