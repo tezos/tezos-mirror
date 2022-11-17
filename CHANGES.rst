@@ -43,6 +43,21 @@ Node
 - Fixed an issue that could left a lock file if a snapshot import was
   cancelled.
 
+- **Breaking change**: the default ``?version`` of the ``pending_operations``
+  RPC is now 1 instead of 0. Version 1 is more consistent as
+  ``branch_delayed``/``branch_refused``/``outdated``/``refused`` operations are
+  encoded like ``applied`` operations: the ``"hash"`` field is included in the
+  object instead of being separate in an array. The same change applies to
+  ``unprocessed`` operations, except that those do not contain the ``error``
+  field. More details can be found by calling the
+  ``describe/chains/main/mempool/pending_operations`` RPC. You can get back the
+  previous encoding with ``?version=0`` but note that version 0 is now
+  deprecated and may be removed starting from the next major release of Octez.
+  (MR :gl:`!6783`)
+
+- The ``pending_operations`` RPC can now be run in ``binary`` format when using
+  version ``1``. (MR :gl:`!6783`)
+
 Client
 ------
 

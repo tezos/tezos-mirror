@@ -3006,9 +3006,8 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
     RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
   let open JSON in
-  (* get (and log) applied operations *)
-  let applied_ophs =
-    let classification = "applied" in
+  (* get (and log) applied and refused operations *)
+  let get_ophs_and_log_fees classification =
     List.map
       (fun op ->
         let oph = get_hash op in
@@ -3016,25 +3015,8 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
         oph)
       (ops |-> classification |> as_list)
   in
-  (* get (and log) refused operations *)
-  let refused_ophs =
-    let classification = "refused" in
-    List.map
-      (fun op ->
-        match op |> as_list with
-        | [oph; descr] ->
-            let oph = as_string oph in
-            log_op
-              classification
-              oph
-              (descr |-> "contents" |=> 0 |-> "fee" |> as_int) ;
-            oph
-        | _ ->
-            Test.fail
-              "Unexpected JSON structure for refused operation in %s's mempool."
-              name)
-      (ops |-> classification |> as_list)
-  in
+  let applied_ophs = get_ophs_and_log_fees "applied" in
+  let refused_ophs = get_ophs_and_log_fees "refused" in
   (* various checks about applied and refused operations *)
   Check.(
     (* Not using [List.compare_length_with] allows for a more informative
@@ -3295,11 +3277,11 @@ let test_pending_operation_version =
   (* Step 4 *)
   (* Get pending operations using different version of the RPC and check  *)
   let* mempool_v0 =
-    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client_1
+    @@ RPC.get_chain_mempool_pending_operations ~version:"0" ()
   in
   let* mempool_v1 =
-    RPC.Client.call client_1
-    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
   in
   let ophs_refused_v0 = get_refused_operation_hash_list_v0 mempool_v0 in
   let ophs_refused_v1 = get_refused_operation_hash_list_v1 mempool_v1 in
