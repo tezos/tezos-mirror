@@ -791,6 +791,7 @@ module Ctypes = struct
     function_description : description;
     generated_types : string;
     generated_entry_point : string;
+    c_library_flags : string list;
   }
 
   let to_dune desc =
@@ -808,12 +809,12 @@ module Ctypes = struct
               S "-Wno-discarded-qualifiers";
               S ("-I" ^ desc.extra_search_dir);
             ];
-            [
-              S "c_library_flags";
-              S ":standard";
-              S ("-l" ^ desc.external_library_name);
-              S ("-L" ^ desc.extra_search_dir);
-            ];
+            of_atom_list
+              (["c_library_flags"; ":standard"]
+              @ desc.c_library_flags
+              @ [
+                  "-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir;
+                ]);
           ];
         ];
         [S "headers"; [S "include"; S desc.include_header]];

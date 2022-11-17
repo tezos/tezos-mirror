@@ -505,6 +505,7 @@ module Ctypes : sig
         (** Module in which the generated stub types are placed *)
     generated_entry_point : string;
         (* Output module name of the final generated stub module *)
+    c_library_flags : string list;
   }
 end
 
