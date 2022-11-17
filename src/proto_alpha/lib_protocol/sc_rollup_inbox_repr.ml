@@ -202,8 +202,6 @@ module V1 = struct
 
    The metadata contains :
    - [level] : the inbox level ;
-   - [message_counter] : the number of messages in the [level]'s inbox ;
-     the number of messages that have not been consumed by a commitment cementing ;
    - [nb_messages_in_commitment_period] :
      the number of messages during the commitment period ;
    - [current_level_proof] : the [current_level] and its root hash ;
@@ -222,7 +220,6 @@ module V1 = struct
   type t = {
     level : Raw_level_repr.t;
     nb_messages_in_commitment_period : int64;
-    message_counter : Z.t;
     (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
     current_level_proof : unit -> level_proof;
     old_levels_messages : history_proof;
@@ -238,7 +235,6 @@ module V1 = struct
     let {
       level;
       nb_messages_in_commitment_period;
-      message_counter;
       current_level_proof;
       old_levels_messages;
     } =
@@ -249,7 +245,6 @@ module V1 = struct
          equal
            nb_messages_in_commitment_period
            inbox2.nb_messages_in_commitment_period)
-    && Z.equal message_counter inbox2.message_counter
     && equal_level_proof
          (current_level_proof ())
          (inbox2.current_level_proof ())
@@ -259,7 +254,6 @@ module V1 = struct
       {
         level;
         nb_messages_in_commitment_period;
-        message_counter;
         current_level_proof;
         old_levels_messages;
       } =
@@ -268,7 +262,6 @@ module V1 = struct
       "@[<hov 2>{ level = %a@;\
        current messages hash  = %a@;\
        nb_messages_in_commitment_period = %s@;\
-       message_counter = %a@;\
        old_levels_messages = %a@;\
        }@]"
       Raw_level_repr.pp
@@ -276,14 +269,10 @@ module V1 = struct
       pp_level_proof
       (current_level_proof ())
       (Int64.to_string nb_messages_in_commitment_period)
-      Z.pp_print
-      message_counter
       pp_history_proof
       old_levels_messages
 
   let inbox_level inbox = inbox.level
-
-  let inbox_message_counter inbox = inbox.message_counter
 
   let old_levels_messages inbox = inbox.old_levels_messages
 
@@ -293,31 +282,26 @@ module V1 = struct
     Data_encoding.(
       conv
         (fun {
-               message_counter;
                nb_messages_in_commitment_period;
                level;
                current_level_proof;
                old_levels_messages;
              } ->
-          ( message_counter,
-            nb_messages_in_commitment_period,
+          ( nb_messages_in_commitment_period,
             level,
             current_level_proof (),
             old_levels_messages ))
-        (fun ( message_counter,
-               nb_messages_in_commitment_period,
+        (fun ( nb_messages_in_commitment_period,
                level,
                current_level_proof,
                old_levels_messages ) ->
           {
-            message_counter;
             nb_messages_in_commitment_period;
             level;
             current_level_proof = (fun () -> current_level_proof);
             old_levels_messages;
           })
-        (obj5
-           (req "message_counter" n)
+        (obj4
            (req "nb_messages_in_commitment_period" int64)
            (req "level" Raw_level_repr.encoding)
            (req "current_level_proof" level_proof_encoding)
@@ -349,8 +333,6 @@ let to_versioned inbox = V1 inbox [@@inline]
 
 let key_of_message ix =
   ["message"; Data_encoding.Binary.to_string_exn Data_encoding.n ix]
-
-let number_of_messages_key = ["number_of_messages"]
 
 type serialized_proof = string
 
