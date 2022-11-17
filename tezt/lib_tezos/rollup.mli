@@ -229,12 +229,27 @@ module Dal : sig
     val from_client : Client.t -> t Lwt.t
   end
 
+  (** Abstract version of a slot to deal with messages content which
+     are smaller than the expected size of a slot. *)
+  type slot
+
+  (** [make_slot ?padding content client] produces a slot. If
+     [padding=true] (which is the default), then the content is padded
+     to reach the expected size given by the [slot_size] field of
+     {!type:Cryptobox.parameters}. [client] is used to get the
+     corresponding parameters (see {!val: Parameters.from_client}). *)
+  val make_slot : ?padding:bool -> string -> Client.t -> slot Lwt.t
+
+  (** [content_of_slot slot] retrieves the original content of a slot
+     by removing the padding. *)
+  val content_of_slot : slot -> string
+
   module RPC : sig
     (** [split_slot data] posts [data] on slot/split *)
-    val split_slot : string -> (Dal_node.t, string) RPC_core.t
+    val split_slot : slot -> (Dal_node.t, string) RPC_core.t
 
     (** [slot_content slot_header] gets slot/content of [slot_header] *)
-    val slot_content : string -> (Dal_node.t, string) RPC_core.t
+    val slot_content : string -> (Dal_node.t, slot) RPC_core.t
 
     (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
     val slot_pages : string -> (Dal_node.t, string list) RPC_core.t

@@ -684,7 +684,9 @@ let init_dal_node protocol =
   let* () = Dal_node.run dal_node in
   return (node, client, dal_node)
 
-let split_slot node slot = RPC.call node (Rollup.Dal.RPC.split_slot slot)
+let split_slot node client content =
+  let* slot = Rollup.Dal.make_slot content client in
+  RPC.call node (Rollup.Dal.RPC.split_slot slot)
 
 let test_dal_node_slot_management =
   Protocol.register_test
@@ -692,22 +694,26 @@ let test_dal_node_slot_management =
     ~title:"dal node slot management"
     ~tags:["dal"; "dal_node"]
   @@ fun protocol ->
-  let* _node, _client, dal_node = init_dal_node protocol in
+  let* _node, client, dal_node = init_dal_node protocol in
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
-  let* slot_header = split_slot dal_node slot_content in
-  let* received_slot_content =
+  let* slot_header = split_slot dal_node client slot_content in
+  let* received_slot =
     RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_header)
   in
+  let received_slot_content = Rollup.Dal.content_of_slot received_slot in
+  Check.(
+    (slot_content = received_slot_content)
+      string
+      ~error_msg:"Wrong slot content: Expected: %L. Got: %R") ;
   (* Only check that the function to retrieve pages succeeds, actual
      contents are checked in the test `rollup_node_stores_dal_slots`. *)
   let* _slots_as_pages =
     RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_header)
   in
-  assert (slot_content = received_slot_content) ;
   return ()
 
 let publish_and_store_slot node client dal_node source index content =
-  let* slot_header = split_slot dal_node content in
+  let* slot_header = split_slot dal_node client content in
   let commitment =
     Cryptobox.Commitment.of_b58check_opt slot_header
     |> mandatory "The b58check-encoded slot header is not valid"
@@ -834,8 +840,8 @@ let test_dal_node_test_slots_propagation =
   let p2 = wait_for_stored_slot dal_node3 slot_header2_exp in
   let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
   let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
-  let* slot_header1 = split_slot dal_node1 "content1" in
-  let* slot_header2 = split_slot dal_node2 "content2" in
+  let* slot_header1 = split_slot dal_node1 client "content1" in
+  let* slot_header2 = split_slot dal_node2 client "content2" in
   Check.(
     (slot_header1_exp = slot_header1) string ~error_msg:"Expected:%L. Got: %R") ;
   Check.(
@@ -916,11 +922,11 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
 
   (* 1. Send three slots to dal node and obtain corresponding headers. *)
   let slot_contents_0 = " 10 " in
-  let* commitment_0 = split_slot dal_node slot_contents_0 in
+  let* commitment_0 = split_slot dal_node client slot_contents_0 in
   let slot_contents_1 = " 200 " in
-  let* commitment_1 = split_slot dal_node slot_contents_1 in
+  let* commitment_1 = split_slot dal_node client slot_contents_1 in
   let slot_contents_2 = " 400 " in
-  let* commitment_2 = split_slot dal_node slot_contents_2 in
+  let* commitment_2 = split_slot dal_node client slot_contents_2 in
   (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client

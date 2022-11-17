@@ -98,13 +98,3 @@ val save_shards :
   Cryptobox.commitment ->
   Cryptobox.share Cryptobox.IntMap.t ->
   unit tzresult Lwt.t
-
-module Utils : sig
-  (** [trim_x00 s] removes trailing '\000' at the end of [s] and returns
-      a new [slot]. This function is needed to debug the fetched slot and
-      remove spurious uneeded data form it. *)
-  val trim_x00 : slot -> slot
-
-  (** [fill_x00 slot_size s] fills [s] with '\000' to match [slot_size] *)
-  val fill_x00 : int -> slot -> slot
-end

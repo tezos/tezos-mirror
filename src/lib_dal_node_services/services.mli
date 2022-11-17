@@ -27,7 +27,7 @@ val split_slot :
   ( [`POST],
     unit,
     unit,
-    bool,
+    unit,
     Tezos_crypto_dal.Cryptobox.slot,
     string )
   Tezos_rpc.Service.service
@@ -36,7 +36,7 @@ val slot :
   ( [`GET],
     unit,
     unit * Tezos_crypto_dal.Cryptobox.commitment,
-    bool,
+    unit,
     unit,
     Tezos_crypto_dal.Cryptobox.slot )
   Tezos_rpc.Service.service

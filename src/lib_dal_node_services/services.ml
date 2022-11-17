@@ -24,31 +24,19 @@
 (*****************************************************************************)
 open Tezos_crypto_dal
 
-let split_query =
-  let open Tezos_rpc.Query in
-  query (fun fill_x00 -> fill_x00)
-  |+ flag "fill" (fun fill_x00 -> fill_x00)
-  |> seal
-
 let split_slot =
   Tezos_rpc.Service.post_service
     ~description:"Split and store a slot"
-    ~query:split_query
+    ~query:Tezos_rpc.Query.empty
     ~input:Data_encoding.bytes
     ~output:Data_encoding.string
       (* see [Slot_manager.Slot_header.to_b58check] *)
     Tezos_rpc.Path.(open_root / "slot" / "split")
 
-let slot_query =
-  let open Tezos_rpc.Query in
-  query (fun trim_x00 -> trim_x00)
-  |+ flag "trim" (fun trim_x00 -> trim_x00)
-  |> seal
-
 let slot =
   Tezos_rpc.Service.get_service
     ~description:"Show content of a slot"
-    ~query:slot_query
+    ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.bytes
     Tezos_rpc.Path.(
       open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)

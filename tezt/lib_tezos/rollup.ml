@@ -533,6 +533,30 @@ module Dal = struct
         }
   end
 
+  let pad n message =
+    let padding = String.make n '\000' in
+    message ^ padding
+
+  type slot = string
+
+  let make_slot ?(padding = true) slot client =
+    let* parameters = Parameters.from_client client in
+    let expected_size = parameters.cryptobox.slot_size in
+    let slot_size = String.length slot in
+    if String.contains slot '\000' then
+      Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
+    if slot_size < expected_size && padding then
+      return (pad (expected_size - slot_size) slot)
+    else return slot
+
+  let content_of_slot slot =
+    (* We make the assumption that the content of a slot (for test
+       purpose only) does not contain two `\000` in a row. This
+       invariant is ensured by [make_slot]. *)
+    String.split_on_char '\000' slot
+    |> List.filter (fun str -> not (str = String.empty))
+    |> String.concat "\000"
+
   module RPC = struct
     let make ?data ?query_string =
       RPC.make
@@ -557,19 +581,10 @@ module Dal = struct
           (encode_bytes_to_hex_string slot)
       in
       let data = JSON.unannotate slot in
-      make
-        ~data
-        POST
-        ["slot"; "split"]
-        ~query_string:[("fill", "")]
-        JSON.as_string
+      make ~data POST ["slot"; "split"] JSON.as_string
 
     let slot_content slot_header =
-      make
-        GET
-        ["slot"; "content"; slot_header]
-        ~query_string:[("trim", "")]
-        get_bytes_from_json_string_node
+      make GET ["slot"; "content"; slot_header] get_bytes_from_json_string_node
 
     let slot_pages slot_header =
       make GET ["slot"; "pages"; slot_header] (fun pages ->
@@ -617,10 +632,6 @@ module Dal = struct
     | Error (`Fail msg) -> on_error msg
 
   module Commitment = struct
-    let pad n message =
-      let padding = String.make n '\000' in
-      message ^ padding
-
     let dummy_commitment
         ?(on_error =
           fun str -> Test.fail "Rollup.Dal.dummy_commitment failed: %s" str)

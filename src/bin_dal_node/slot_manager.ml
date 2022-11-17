@@ -281,27 +281,3 @@ let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
       ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
   in
   return @@ List.map (fun page -> String.to_bytes page) pages
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
-
-   This can work only if a slot never ends with a `\000`. But I am not
-   sure in general such thing is required. *)
-module Utils = struct
-  let trim_x00 b =
-    let len = ref 0 in
-    let () =
-      try
-        (* Counts the number of \000 from the end of the bytes *)
-        for i = Bytes.length b - 1 downto 0 do
-          if Bytes.get b i = '\000' then incr len else raise Exit
-        done
-      with Exit -> ()
-    in
-    Bytes.sub b 0 (Bytes.length b - !len)
-
-  let fill_x00 slot_size b =
-    let len = Bytes.length b in
-    let extended = Bytes.extend b 0 (slot_size - len) in
-    let () = Bytes.fill extended len (slot_size - len) '\000' in
-    extended
-end
