@@ -98,9 +98,7 @@ let init_protocols store history_mode =
   let* () =
     Protocol_levels.iter_es
       (fun proto_level {Protocol_levels.activation_block; _} ->
-        let activation_block_hash, activation_block_level =
-          activation_block.Protocol_levels.block
-        in
+        let activation_block_hash, activation_block_level = activation_block in
         (* We cannot consider gc-ed blocks *)
         if activation_block_level < Int32.succ savepoint_level then return_unit
         else
@@ -191,21 +189,13 @@ let check_protocol_levels_availability chain_store ~expected_protocols
   let*! savepoint_hash, _ = Store.Chain.savepoint chain_store in
   let* savepoint = Store.Block.read_block chain_store savepoint_hash in
   let savepoint_proto_level = Store.Block.proto_level savepoint in
-  Protocol_levels.iter_es
+  Protocol_levels.iter
     (fun proto_level _ ->
       if proto_level < savepoint_proto_level then
         assert (not (Protocol_levels.mem proto_level recovered_protocols))
-      else if proto_level >= savepoint_proto_level then
-        let recovered_activation_block =
-          Protocol_levels.find proto_level recovered_protocols
-        in
-        match recovered_activation_block with
-        | None -> assert false
-        | Some {Protocol_levels.activation_block = {commit_info; _}; _} ->
-            assert (Option.is_some commit_info)
-      else assert false ;
-      return_unit)
-    expected_protocols
+      else assert (Protocol_levels.mem proto_level recovered_protocols))
+    expected_protocols ;
+  return_unit
 
 let test_protocol_level_consistency_remove_file history_mode
     (store_dir, context_dir) store =

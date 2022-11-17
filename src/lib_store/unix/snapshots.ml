@@ -2329,7 +2329,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         Protocol_levels.(
           filter
             (fun level {activation_block; _} ->
-              let block = activation_block.block in
+              let block = activation_block in
               level >= Store.Block.proto_level minimum_block
               || Store.Block.is_genesis chain_store (fst block))
             protocol_levels)
@@ -2898,11 +2898,7 @@ module Raw_importer : IMPORTER = struct
                   {
                     Protocol_levels.protocol =
                       activation_block.Protocol_levels.Legacy.protocol;
-                    activation_block =
-                      {
-                        Protocol_levels.block = activation_block.block;
-                        commit_info = activation_block.commit_info;
-                      };
+                    activation_block = activation_block.block;
                     (* Only snapshot with legacy semantics will have
                        legacy encoding. *)
                     expect_predecessor_context = false;
@@ -3195,11 +3191,7 @@ module Tar_importer : IMPORTER = struct
                       {
                         Protocol_levels.protocol =
                           activation_block.Protocol_levels.Legacy.protocol;
-                        activation_block =
-                          {
-                            Protocol_levels.block = activation_block.block;
-                            commit_info = activation_block.commit_info;
-                          };
+                        activation_block = activation_block.block;
                         (* Only snapshot with legacy semantics will have
                            legacy encoding. *)
                         expect_predecessor_context = false;

@@ -70,99 +70,9 @@ module Protocol_levels = struct
     let compare = Compare.Int.compare
   end)
 
-  type commit_info = {
-    author : string;
-    message : string;
-    test_chain_status : Test_chain_status.t;
-    predecessor_block_metadata_hash : Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
-    data_merkle_root : Context_hash.t;
-    parents_contexts : Context_hash.t list;
-  }
-
-  let commit_info_of_tuple
-      ( _protocol_hash,
-        author,
-        message,
-        _timestamp,
-        test_chain_status,
-        data_merkle_root,
-        predecessor_block_metadata_hash,
-        predecessor_ops_metadata_hash,
-        parents_contexts ) =
-    {
-      author;
-      message;
-      test_chain_status;
-      data_merkle_root;
-      predecessor_block_metadata_hash;
-      predecessor_ops_metadata_hash;
-      parents_contexts;
-    }
-
-  let commit_info_encoding =
-    let open Data_encoding in
-    conv
-      (fun {
-             author;
-             message;
-             test_chain_status;
-             data_merkle_root;
-             predecessor_block_metadata_hash;
-             predecessor_ops_metadata_hash;
-             parents_contexts;
-           } ->
-        ( author,
-          message,
-          test_chain_status,
-          data_merkle_root,
-          predecessor_block_metadata_hash,
-          predecessor_ops_metadata_hash,
-          parents_contexts ))
-      (fun ( author,
-             message,
-             test_chain_status,
-             data_merkle_root,
-             predecessor_block_metadata_hash,
-             predecessor_ops_metadata_hash,
-             parents_contexts ) ->
-        {
-          author;
-          message;
-          test_chain_status;
-          data_merkle_root;
-          predecessor_block_metadata_hash;
-          predecessor_ops_metadata_hash;
-          parents_contexts;
-        })
-      (obj7
-         (req "author" string)
-         (req "message" string)
-         (req "test_chain_status" Test_chain_status.encoding)
-         (req "data_merkle_root" Context_hash.encoding)
-         (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
-         (opt
-            "predecessor_ops_metadata_hash"
-            Operation_metadata_list_list_hash.encoding)
-         (req "parents_contexts" (list Context_hash.encoding)))
-
-  type activation_block = {
-    block : block_descriptor;
-    commit_info : commit_info option;
-  }
-
-  let activation_block_encoding =
-    let open Data_encoding in
-    conv
-      (fun {block; commit_info} -> (block, commit_info))
-      (fun (block, commit_info) -> {block; commit_info})
-      (obj2
-         (req "block" block_descriptor_encoding)
-         (opt "commit_info" commit_info_encoding))
-
   type protocol_info = {
     protocol : Protocol_hash.t;
-    activation_block : activation_block;
+    activation_block : block_descriptor;
     expect_predecessor_context : bool;
   }
 
@@ -175,7 +85,7 @@ module Protocol_levels = struct
         {protocol; activation_block; expect_predecessor_context})
       (obj3
          (req "protocol" Protocol_hash.encoding)
-         (req "activation_block" activation_block_encoding)
+         (req "activation_block" block_descriptor_encoding)
          (req "expect_predecessor_context" bool))
 
   let encoding =
@@ -186,6 +96,63 @@ module Protocol_levels = struct
       Data_encoding.(list (tup2 uint8 protocol_info_encoding))
 
   module Legacy = struct
+    type commit_info = {
+      author : string;
+      message : string;
+      test_chain_status : Test_chain_status.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
+      data_merkle_root : Context_hash.t;
+      parents_contexts : Context_hash.t list;
+    }
+
+    let commit_info_encoding =
+      let open Data_encoding in
+      conv
+        (fun {
+               author;
+               message;
+               test_chain_status;
+               data_merkle_root;
+               predecessor_block_metadata_hash;
+               predecessor_ops_metadata_hash;
+               parents_contexts;
+             } ->
+          ( author,
+            message,
+            test_chain_status,
+            data_merkle_root,
+            predecessor_block_metadata_hash,
+            predecessor_ops_metadata_hash,
+            parents_contexts ))
+        (fun ( author,
+               message,
+               test_chain_status,
+               data_merkle_root,
+               predecessor_block_metadata_hash,
+               predecessor_ops_metadata_hash,
+               parents_contexts ) ->
+          {
+            author;
+            message;
+            test_chain_status;
+            data_merkle_root;
+            predecessor_block_metadata_hash;
+            predecessor_ops_metadata_hash;
+            parents_contexts;
+          })
+        (obj7
+           (req "author" string)
+           (req "message" string)
+           (req "test_chain_status" Test_chain_status.encoding)
+           (req "data_merkle_root" Context_hash.encoding)
+           (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+           (opt
+              "predecessor_ops_metadata_hash"
+              Operation_metadata_list_list_hash.encoding)
+           (req "parents_contexts" (list Context_hash.encoding)))
+
     type activation_block = {
       block : block_descriptor;
       protocol : Protocol_hash.t;

@@ -886,20 +886,6 @@ let find_activation_blocks_in_floating block_store ~head ~savepoint_level
   in
   loop (Block_repr.proto_level head) head head
 
-let craft_activation_block context_index block =
-  let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let* commit_info =
-    Lwt.catch
-      (fun () ->
-        let* tup =
-          Context.retrieve_commit_info context_index (Block_repr.header block)
-        in
-        return_some (Protocol_levels.commit_info_of_tuple tup))
-      (fun _ -> return_none)
-  in
-  return {Protocol_levels.block = Block_repr.descriptor block; commit_info}
-
 let find_two_lowest_block_with_proto_level block_store ~head ~savepoint_level
     proto_level =
   let open Lwt_result_syntax in
@@ -958,7 +944,7 @@ let fix_protocol_levels chain_dir block_store context_index genesis
         | None -> return (proto_level :: invalid_protocol_levels)
         | Some proto_info -> (
             let activation_block_level =
-              snd proto_info.Protocol_levels.activation_block.block
+              snd proto_info.Protocol_levels.activation_block
             in
             let level_to_read =
               if
@@ -1043,7 +1029,6 @@ let fix_protocol_levels chain_dir block_store context_index genesis
                  = Block_repr.proto_level succ_lowest))
             (Corrupted_store (Cannot_find_activation_block invalid_proto_level))
         in
-        let* activation_block = craft_activation_block context_index b in
         let*! protocol =
           let*! ctxt =
             if is_genesis then

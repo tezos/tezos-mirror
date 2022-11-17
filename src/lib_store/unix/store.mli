@@ -879,9 +879,7 @@ module Chain : sig
   (** [find_activation_block chain_store ~protocol_level] returns the
       block that activated the protocol of level [protocol_level]. *)
   val find_activation_block :
-    chain_store ->
-    protocol_level:int ->
-    Protocol_levels.activation_block option Lwt.t
+    chain_store -> protocol_level:int -> block_descriptor option Lwt.t
 
   (** [find_protocol chain_store ~protocol_level] returns the protocol
       with the level [protocol_level]. *)

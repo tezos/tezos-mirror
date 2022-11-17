@@ -280,12 +280,6 @@ let exists context_index context_hash =
   | Disk_index index -> Context.exists index context_hash
   | Memory_index index -> Tezos_context_memory.Context.exists index context_hash
 
-let retrieve_commit_info context_index header =
-  match context_index with
-  | Disk_index index -> Context.retrieve_commit_info index header
-  | Memory_index index ->
-      Tezos_context_memory.Context.retrieve_commit_info index header
-
 let close context_index =
   match context_index with
   | Disk_index index -> Context.close index
