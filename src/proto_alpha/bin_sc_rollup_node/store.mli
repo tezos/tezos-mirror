@@ -123,6 +123,16 @@ module Histories :
      and type value = Sc_rollup.Inbox.History.t
      and type 'a store = 'a store
 
+(** messages histories from the rollup node. Each history contains the messages
+    of one level. The store is indexed by a level in order to maintain a small
+    structure in memory. Only the message history of one level is fetched when
+    computing the proof. *)
+module Level_tree_histories :
+  Store_sigs.Append_only_map
+    with type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+     and type value = Sc_rollup.Inbox_merkelized_payload_hashes.History.t
+     and type 'a store = 'a store
+
 (** Storage containing commitments and corresponding commitment hashes that the
     rollup node has knowledge of. *)
 module Commitments :

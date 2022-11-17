@@ -460,69 +460,13 @@ let gen_message_reprs_for_levels_repr ~start_level ~max_level gen_message_repr =
   in
   aux [] (max_level - start_level)
 
-module Tree_inbox = struct
-  open Sc_rollup.Inbox
-  module Store = Tezos_context_memory.Context
+module Level_tree_histories =
+  Map.Make (Sc_rollup.Inbox_merkelized_payload_hashes.Hash)
 
-  module Tree = struct
-    include Store.Tree
-
-    type tree = Store.tree
-
-    type t = Store.t
-
-    type key = string list
-
-    type value = bytes
-  end
-
-  type t = Store.t
-
-  type tree = Tree.tree
-
-  let commit_tree store key tree =
-    let open Lwt_syntax in
-    let* store = Store.add_tree store key tree in
-    let* (_ : Tezos_crypto.Context_hash.t) =
-      Store.commit ~time:Time.Protocol.epoch store
-    in
-    return ()
-
-  let lookup_tree store hash =
-    let open Lwt_syntax in
-    let index = Store.index store in
-    let* _, tree =
-      Store.produce_tree_proof
-        index
-        (`Node (Hash.to_context_hash hash))
-        (fun x -> Lwt.return (x, x))
-    in
-    return (Some tree)
-
-  type proof = Store.Proof.tree Store.Proof.t
-
-  let verify_proof proof f =
-    Lwt.map Result.to_option (Store.verify_tree_proof proof f)
-
-  let produce_proof store tree f =
-    let open Lwt_syntax in
-    let index = Store.index store in
-    let* proof = Store.produce_tree_proof index (`Node (Tree.hash tree)) f in
-    return (Some proof)
-
-  let kinded_hash_to_inbox_hash = function
-    | `Value hash | `Node hash -> Hash.of_context_hash hash
-
-  let proof_before proof = kinded_hash_to_inbox_hash proof.Store.Proof.before
-
-  let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-    .tree_proof_encoding
-end
-
-module Store_inbox = struct
-  include Sc_rollup.Inbox.Make_hashing_scheme (Tree_inbox)
-end
+let get_level_tree_history level_tree_histories level_tree_hash =
+  Level_tree_histories.find level_tree_hash level_tree_histories
+  |> WithExceptions.Option.get ~loc:__LOC__
+  |> Lwt.return
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3529
 
@@ -531,12 +475,12 @@ end
    test/unit/test_sc_rollup_inbox. The main difference is: we use
    [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
    former. *)
-let construct_inbox ~inbox ?origination_level ctxt levels_and_inputs =
-  let open Lwt_syntax in
-  let open Store_inbox in
+let construct_inbox ~inbox ?origination_level levels_and_inputs =
+  let open Result_syntax in
   let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
-  let rec aux history inbox level_tree = function
-    | [] -> return (ctxt, level_tree, history, inbox)
+  let level_tree_histories = Level_tree_histories.empty in
+  let rec aux level_tree_histories history inbox = function
+    | [] -> return (level_tree_histories, history, inbox)
     | ((level, inputs) : Raw_level.t * Sc_rollup.input list) :: rst ->
         assert (
           match origination_level with
@@ -549,13 +493,29 @@ let construct_inbox ~inbox ?origination_level ctxt levels_and_inputs =
               | Reveal _ -> (* We don't produce any reveals. *) assert false)
             inputs
         in
-        let* res =
-          add_messages ctxt history inbox level payloads level_tree
-          >|= Environment.wrap_tzresult
+        let level_tree_history =
+          Sc_rollup.Inbox_merkelized_payload_hashes.History.empty
+            ~capacity:1000L
         in
-        let level_tree, history, inbox =
-          WithExceptions.Result.get_ok ~loc:__LOC__ res
+        let* level_tree_history, level_tree, history, inbox =
+          Sc_rollup.Inbox.add_messages
+            level_tree_history
+            history
+            inbox
+            level
+            payloads
+            None
+          |> Environment.wrap_tzresult
         in
-        aux history inbox (Some level_tree) rst
+        let level_tree_hash =
+          Sc_rollup.Inbox_merkelized_payload_hashes.hash level_tree
+        in
+        let level_tree_histories =
+          Level_tree_histories.add
+            level_tree_hash
+            level_tree_history
+            level_tree_histories
+        in
+        aux level_tree_histories history inbox rst
   in
-  aux history inbox None levels_and_inputs
+  aux level_tree_histories history inbox levels_and_inputs

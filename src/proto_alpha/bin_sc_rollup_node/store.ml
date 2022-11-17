@@ -211,6 +211,26 @@ module Histories =
       let encoding = Sc_rollup.Inbox.History.encoding
     end)
 
+(** level tree history for the inbox at a given block *)
+module Level_tree_histories =
+  Make_append_only_map
+    (struct
+      let path = ["level_tree_histories"]
+    end)
+    (struct
+      type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+
+      let to_path_representation =
+        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.to_b58check
+    end)
+    (struct
+      let name = "level_tree_history"
+
+      type value = Sc_rollup.Inbox_merkelized_payload_hashes.History.t
+
+      let encoding = Sc_rollup.Inbox_merkelized_payload_hashes.History.encoding
+    end)
+
 module Commitments =
   Make_append_only_map
     (struct

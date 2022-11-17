@@ -35,7 +35,7 @@ open Protocol
 open QCheck2
 open Lib_test.Qcheck2_helpers
 
-let lift k = Lwt.map Environment.wrap_tzresult k
+let lift k = Environment.wrap_tzresult k
 
 (** {2 Generators} *)
 
@@ -92,25 +92,22 @@ let gen_inbox level =
   let* tail = small_list gen_msg in
   let payloads = hd :: tail in
   let level_tree_and_inbox =
-    let open Lwt_result_syntax in
-    let* ctxt = Context.default_raw_context () in
-    let inbox_ctxt = Raw_context.recover ctxt in
-    let*! empty_inbox = Sc_rollup_inbox_repr.empty inbox_ctxt level in
+    let open Result_syntax in
+    let empty_inbox = Sc_rollup_inbox_repr.empty level in
     lift
-    @@ let*? input_messages =
+    @@ let* input_messages =
          List.map_e
            (fun msg -> Sc_rollup_inbox_message_repr.(serialize (External msg)))
            payloads
        in
        Sc_rollup_inbox_repr.add_messages_no_history
-         inbox_ctxt
          empty_inbox
          level
          input_messages
          None
   in
   return
-  @@ (Lwt_main.run level_tree_and_inbox |> function
+  @@ (level_tree_and_inbox |> function
       | Ok v -> snd v
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))

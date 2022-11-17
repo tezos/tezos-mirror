@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Store_sigs
 
 (** The type of indexed repository for contexts. The parameter indicates if the
@@ -150,42 +148,6 @@ end) : sig
       verified. *)
   val verify_proof :
     proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-end
-
-(** Aggregated collection of messages from the L1 inbox. *)
-module MessageTrees : sig
-  (** The value of a messages tree  *)
-  type value
-
-  (** [find context] returns the messages tree stored in the [context], if any. *)
-  val find : _ t -> value option Lwt.t
-
-  (** [set context msg_tree] saves the messages tree [msg_tree] in the context
-      and returns the updated context. Note: [set] does not perform any write on
-      disk, this information must be committed using {!commit}. *)
-  val set : 'a t -> value -> 'a t Lwt.t
-end
-
-(** L1 inboxes representation in the rollup node. This is a version of the
-    protocols inboxes specialized to message trees ({!MessageTrees}) and which
-    can produce proofs for inboxes stored in the context. *)
-module Inbox : sig
-  type t = Sc_rollup.Inbox.t
-
-  module Message : module type of Sc_rollup.Inbox_message
-
-  val pp : Format.formatter -> t -> unit
-
-  val encoding : t Data_encoding.t
-
-  val inbox_level : t -> Raw_level.t
-
-  type history_proof = Sc_rollup.Inbox.history_proof
-
-  include
-    Sc_rollup.Inbox.Merkelized_operations
-      with type tree = MessageTrees.value
-       and type inbox_context = rw_index
 end
 
 (** State of the PVM that this rollup node deals with *)

@@ -3316,6 +3316,82 @@ module Sc_rollup : sig
 
     val serialized_proof_encoding : serialized_proof Data_encoding.t
 
+    val add_messages :
+      Inbox_merkelized_payload_hashes.History.t ->
+      History.t ->
+      t ->
+      Raw_level.t ->
+      Inbox_message.serialized list ->
+      Inbox_merkelized_payload_hashes.t option ->
+      (Inbox_merkelized_payload_hashes.History.t
+      * Inbox_merkelized_payload_hashes.t
+      * History.t
+      * t)
+      tzresult
+
+    val add_messages_no_history :
+      t ->
+      Raw_level.t ->
+      Inbox_message.serialized list ->
+      Inbox_merkelized_payload_hashes.t option ->
+      (Inbox_merkelized_payload_hashes.t * t) tzresult
+
+    val form_history_proof :
+      History.t -> t -> (History.t * history_proof) tzresult
+
+    val take_snapshot : t -> history_proof
+
+    type inclusion_proof
+
+    val inclusion_proof_encoding : inclusion_proof Data_encoding.t
+
+    val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
+
+    val number_of_proof_steps : inclusion_proof -> int
+
+    val verify_inclusion_proof :
+      inclusion_proof -> history_proof -> history_proof tzresult
+
+    type proof
+
+    val pp_proof : Format.formatter -> proof -> unit
+
+    val to_serialized_proof : proof -> serialized_proof
+
+    val of_serialized_proof : serialized_proof -> proof option
+
+    val verify_proof :
+      Raw_level.t * Z.t ->
+      history_proof ->
+      proof ->
+      inbox_message option tzresult
+
+    val produce_proof :
+      get_level_tree_history:
+        (Inbox_merkelized_payload_hashes.Hash.t ->
+        Inbox_merkelized_payload_hashes.History.t Lwt.t) ->
+      History.t ->
+      history_proof ->
+      Raw_level.t * Z.t ->
+      (proof * inbox_message option) tzresult Lwt.t
+
+    val empty : Raw_level.t -> t
+
+    module Internal_for_tests : sig
+      val eq_tree :
+        Inbox_merkelized_payload_hashes.t ->
+        Inbox_merkelized_payload_hashes.t ->
+        bool
+
+      val produce_inclusion_proof :
+        History.t ->
+        history_proof ->
+        history_proof ->
+        inclusion_proof option tzresult
+
+      val serialized_proof_of_string : string -> serialized_proof
+    end
+
     val add_external_messages :
       context -> string list -> (t * Z.t * context) tzresult Lwt.t
 
@@ -3722,11 +3798,13 @@ module Sc_rollup : sig
       val reveal : Reveal_hash.t -> string option Lwt.t
 
       module Inbox_with_history : sig
-        include Inbox.Merkelized_operations with type inbox_context = context
-
         val inbox : Inbox.history_proof
 
         val history : Inbox.History.t
+
+        val get_level_tree_history :
+          Inbox_merkelized_payload_hashes.Hash.t ->
+          Inbox_merkelized_payload_hashes.History.t Lwt.t
       end
 
       module Dal_with_history : sig

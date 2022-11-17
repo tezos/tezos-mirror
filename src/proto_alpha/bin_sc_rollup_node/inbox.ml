@@ -38,6 +38,8 @@ module State = struct
 
   let add_history = Store.Histories.add
 
+  let add_messages_history = Store.Level_tree_histories.add
+
   let level_of_hash = State.level_of_hash
 
   (** [inbox_of_head node_ctxt store block] returns the latest inbox at the
@@ -165,38 +167,46 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages (node_ctxt : _ Node_context.t) ctxt level inbox history
-    messages =
+let add_messages level inbox history messages =
   let open Lwt_result_syntax in
-  let*! messages_tree = Context.MessageTrees.find ctxt in
+  let messages_history =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+
+       We need to set a geq value than the actual number of messages here. *)
+    Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity:10000L
+  in
   lift
   @@
-  if messages = [] then return (history, inbox, ctxt)
+  if messages = [] then return (messages_history, None, history, inbox)
   else
     let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-       The number of messages during commitment period is broken with the
-       unique inbox. *)
-    (*
-    let commitment_period =
-      node_ctxt.protocol_constants.parametric.sc_rollup
-        .commitment_period_in_blocks |> Int32.of_int
-    in
-    let inbox =
-      Sc_rollup.Inbox.refresh_commitment_period ~commitment_period ~level inbox
-    in
-    *)
-    let* messages_tree, history, inbox =
-      Context.Inbox.add_messages
-        node_ctxt.context
+
+                 The number of messages during commitment period is broken with the
+                 unique inbox. *)
+    (* let commitment_period =
+     *   node_ctxt.protocol_constants.parametric.sc_rollup
+     *     .commitment_period_in_blocks |> Int32.of_int
+     * in
+     * let inbox =
+     *   Sc_rollup.Inbox.refresh_commitment_period
+     *     ~commitment_period
+     *     ~level
+     *     inbox
+     * in *)
+    let*? messages_history, messages_tree, history, inbox =
+      Sc_rollup.Inbox.add_messages
+        messages_history
         history
         inbox
         level
         messages
-        messages_tree
+        None
     in
-    let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
-    return (history, inbox, ctxt)
+    let messages_tree_hash =
+      Sc_rollup.Inbox_merkelized_payload_hashes.hash messages_tree
+    in
+    return (messages_history, Some messages_tree_hash, history, inbox)
 
 let process_head (node_ctxt : _ Node_context.t)
     Layer1.({level; hash = head_hash} as head) =
@@ -228,10 +238,19 @@ let process_head (node_ctxt : _ Node_context.t)
         return (Context.empty node_ctxt.context)
       else Node_context.checkout_context node_ctxt predecessor.hash
     in
-    let* history, inbox, ctxt =
-      add_messages node_ctxt ctxt level inbox history messages
+    let* messages_history, messages_hash, history, inbox =
+      add_messages level inbox history messages
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
+    let*! () =
+      match messages_hash with
+      | None -> Lwt.return_unit
+      | Some messages_hash ->
+          State.add_messages_history
+            node_ctxt.store
+            messages_hash
+            messages_history
+    in
     let*! () = State.add_inbox node_ctxt.store head_hash inbox in
     let*! () = State.add_history node_ctxt.store head_hash history in
     return ctxt

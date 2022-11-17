@@ -99,7 +99,7 @@ val get_payload_hash : t -> Sc_rollup_inbox_message_repr.Hash.t
 val get_index : t -> int
 
 (** Given two t [(a, b)] and a {!Sc_rollup_inbox_message_repr.serialized}
-[payload], a [proof] guarantees that [payload] hash is equal to [a] and that
+    [payload], a [proof] guarantees that [payload] hash is equal to [a] and that
     [a] is an ancestor of [b]; i.e. [get_index a < get_index b]. *)
 type proof
 

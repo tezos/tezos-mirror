@@ -2040,18 +2040,7 @@ let test_refute_invalid_metadata () =
   in
   assert_refute_result ~game_status:expected_game_status incr
 
-let node_proof_to_protocol_proof p =
-  let open Data_encoding.Binary in
-  let open Sc_rollup.Inbox in
-  let enc = serialized_proof_encoding in
-  let bytes =
-    Sc_rollup_helpers.Store_inbox.to_serialized_proof p |> to_bytes_exn enc
-  in
-  of_bytes_exn enc bytes |> of_serialized_proof
-  |> WithExceptions.Option.get ~loc:__LOC__
-
 let full_history_inbox all_inbox_messages =
-  let open Lwt_syntax in
   let open Sc_rollup_helpers in
   (* Add the SOL/Info_per_level/EOL to the list of inbox messages. *)
   let all_inbox_messages =
@@ -2061,9 +2050,6 @@ let full_history_inbox all_inbox_messages =
       all_inbox_messages
   in
   (* Create a inbox adding the messages from [all_inbox_messages]. *)
-  let* index = Tezos_context_memory.Context.init "inbox" in
-  let ctxt = Tezos_context_memory.Context.empty index in
-  let* inbox = Store_inbox.empty ctxt Raw_level.root in
   let all_inbox_inputs =
     List.map
       (fun (level, messages) ->
@@ -2073,28 +2059,33 @@ let full_history_inbox all_inbox_messages =
             messages ))
       all_inbox_messages
   in
-  Sc_rollup_helpers.construct_inbox ~inbox ctxt all_inbox_inputs
+  let inbox = Sc_rollup.Inbox.empty Raw_level.root in
+  Sc_rollup_helpers.construct_inbox ~inbox all_inbox_inputs
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Sc_rollup_helpers in
-  let ctxt, level_tree, history, inbox = full_history_inbox in
-  let* history, history_proof =
-    Store_inbox.form_history_proof ctxt history inbox level_tree
-    >|= Environment.wrap_tzresult
+  let level_tree_histories, history, inbox = full_history_inbox in
+  let*? history, history_proof =
+    Sc_rollup.Inbox.form_history_proof history inbox
+    |> Environment.wrap_tzresult
   in
   (* Create an inclusion proof of the inbox message at [(l, n)]. *)
   let* proof, _ =
-    Store_inbox.produce_proof ctxt history history_proof (l, n)
+    Sc_rollup.Inbox.produce_proof
+      ~get_level_tree_history:(get_level_tree_history level_tree_histories)
+      history
+      history_proof
+      (l, n)
     >|= Environment.wrap_tzresult
   in
-  let proof = node_proof_to_protocol_proof proof in
-  let+ inbox_message_verified =
+  let*? inbox_message_verified =
     Sc_rollup.Inbox.verify_proof (l, n) snapshot proof
-    >|= Environment.wrap_tzresult
+    |> Environment.wrap_tzresult
   in
-  Option.map
-    (fun inbox_message -> Sc_rollup.Inbox_message inbox_message)
-    inbox_message_verified
+  return
+  @@ Option.map
+       (fun inbox_message -> Sc_rollup.Inbox_message inbox_message)
+       inbox_message_verified
 
 (** Test that the protocol adds a [SOL], [Info_per_level] and [EOL] for each
     Tezos level, even if no messages are added to the inbox. *)
@@ -2139,7 +2130,7 @@ let test_automatically_added_internal_messages () =
   let level_zero = Raw_level.of_int32_exn 0l in
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
-  let*! ((ctxt, level_tree, history, inbox) as full_history_inbox) =
+  let*? ((_level_tree_histories, history, inbox) as full_history_inbox) =
     full_history_inbox
       [
         (level_zero, level_zero_info, []);
@@ -2197,13 +2188,9 @@ let test_automatically_added_internal_messages () =
   in
 
   (* Assert the computed inbox and protocol's inbox are equal. *)
-  let* _history, history_proof =
-    Sc_rollup_helpers.Store_inbox.form_history_proof
-      ctxt
-      history
-      inbox
-      level_tree
-    >|= Environment.wrap_tzresult
+  let*? _history, history_proof =
+    Sc_rollup.Inbox.form_history_proof history inbox
+    |> Environment.wrap_tzresult
   in
   Assert.equal
     ~loc:__LOC__
