@@ -28,14 +28,9 @@ open Tezos_rpc_http
 open Tezos_rpc_http_server
 open Tezos_dal_node_services
 
-let handle_split_slot ctxt fill slot =
+let handle_split_slot ctxt () slot =
   let open Lwt_result_syntax in
-  let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
-  let slot =
-    if fill then
-      Slot_manager.Utils.fill_x00 dal_parameters.Cryptobox.slot_size slot
-    else slot
-  in
+  let*? {dal_constants; _} = Node_context.get_ready ctxt in
   let store = Node_context.get_store ctxt in
   let+ commitment =
     Slot_manager.split_and_store
@@ -46,18 +41,14 @@ let handle_split_slot ctxt fill slot =
   in
   Cryptobox.Commitment.to_b58check commitment
 
-let handle_slot ctxt (_, commitment) trim () =
+let handle_slot ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
-  let* slot =
-    Slot_manager.get_slot
-      dal_parameters
-      dal_constants
-      (Node_context.get_store ctxt).slots_store
-      commitment
-  in
-  let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
-  return slot
+  Slot_manager.get_slot
+    dal_parameters
+    dal_constants
+    (Node_context.get_store ctxt).slots_store
+    commitment
 
 let handle_stored_slot_headers ctxt (_, block_hash) () () =
   let open Lwt_result_syntax in
