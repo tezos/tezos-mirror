@@ -155,7 +155,7 @@ module type PVM_with_context_and_state = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option
+  val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option Lwt.t
 
   module Inbox_with_history : sig
     include
