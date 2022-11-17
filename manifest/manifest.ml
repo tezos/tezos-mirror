@@ -2633,6 +2633,56 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     x_opam_monorepo_opam_provided;
   }
 
+let generate_opam_meta_package opam_release_graph add_to_meta_package : Opam.t =
+  let depends1 : Opam.dependency list =
+    Fun.flip List.concat_map add_to_meta_package @@ fun target ->
+    match target with
+    | None -> []
+    | Some target ->
+        as_opam_dependency
+          ~for_release:true
+          ~for_conflicts:false
+          ~for_package:"octez"
+          ~with_test:Never
+          ~optional:false
+          target
+  in
+  (* Include all packages that are explicitly released. *)
+  let depends2 =
+    Fun.flip List.filter_map (String_map.bindings opam_release_graph)
+    @@ fun (package, node) ->
+    match node.release_status with
+    | Explicitly_unreleased _ | Auto | Transitively_released _ ->
+        (* No need to put transitively released packages explicitly in the meta-package.
+           They are, by definition, transitive dependencies of explicitly released
+           opam packages, which we do put in the meta-package. *)
+        None
+    | Explicitly_released _ ->
+        Some
+          {
+            Opam.package;
+            version = Exactly Version;
+            with_test = Never;
+            optional = false;
+          }
+  in
+  {
+    maintainer = "contact@tezos.com";
+    authors = ["Tezos devteam"];
+    homepage = "https://www.tezos.com/";
+    doc = "https://tezos.gitlab.io";
+    bug_reports = "https://gitlab.com/tezos/tezos/issues";
+    dev_repo = "git+https://gitlab.com/tezos/tezos.git";
+    licenses = ["MIT"];
+    depends = depends1 @ depends2;
+    conflicts = [];
+    build = [];
+    synopsis = "Main virtual package for Octez, an implementation of Tezos";
+    url = None;
+    description = None;
+    x_opam_monorepo_opam_provided = [];
+  }
+
 let generate_opam_files () =
   (* We store all opam files in the predefined directory <ROOT>/opam.
      That way, `opam pin` can work out of the box. *)
@@ -2642,15 +2692,21 @@ let generate_opam_files () =
   pp_do_not_edit ~comment_start:"#" fmt () ;
   Opam.pp fmt opam
 
-let generate_opam_files_for_release packages_dir release =
-  Target.iter_internal_by_opam @@ fun package internal_pkgs ->
-  let opam_filename =
-    packages_dir // package // (package ^ "." ^ release.version) // "opam"
+let generate_opam_files_for_release packages_dir opam_release_graph
+    add_to_meta_package release =
+  let write_opam package opam =
+    let opam_filename =
+      packages_dir // package // (package ^ "." ^ release.version) // "opam"
+    in
+    (* We don't use [write] here because we don't want these opam files
+       to be considered by the [check_for_non_generated_files] check *)
+    write_raw opam_filename @@ fun fmt -> Opam.pp fmt opam
   in
-  let opam = generate_opam ~release package internal_pkgs in
-  (* We don't use [write] here because we don't want these opam files
-     to be considered by the [check_for_non_generated_files] check *)
-  write_raw opam_filename @@ fun fmt -> Opam.pp fmt opam
+  ( Target.iter_internal_by_opam @@ fun package internal_pkgs ->
+    write_opam package (generate_opam ~release package internal_pkgs) ) ;
+  write_opam
+    "octez"
+    (generate_opam_meta_package opam_release_graph add_to_meta_package)
 
 (* Bumping the dune lang version can result in different dune stanza
    semantic and could require changes to the generation logic. *)
@@ -3262,7 +3318,7 @@ let generate_profiles ~default_profile =
   in
   String_map.iter generate_profile merged
 
-let generate ~make_tezt_exe ~default_profile =
+let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
   Printexc.record_backtrace true ;
   try
     register_tezt_targets ~make_tezt_exe ;
@@ -3276,7 +3332,12 @@ let generate ~make_tezt_exe ~default_profile =
     generate_opam_ci opam_release_graph ;
     generate_binaries_for_release () ;
     generate_profiles ~default_profile ;
-    Option.iter (generate_opam_files_for_release packages_dir) release
+    Option.iter
+      (generate_opam_files_for_release
+         packages_dir
+         opam_release_graph
+         add_to_meta_package)
+      release
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
