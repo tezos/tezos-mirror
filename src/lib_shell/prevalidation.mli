@@ -120,6 +120,12 @@ module type T = sig
         representation of the mempool. *)
     val get_valid_operations :
       t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+
+    (** Type {!Tezos_protocol_environment.PROTOCOL.Mempool.validation_info}. *)
+    type validation_info
+
+    (** Modify the [validation_info] field of the internal state [t]. *)
+    val set_validation_info : t -> validation_info -> t
   end
 end
 
@@ -164,4 +170,6 @@ module Internal_for_tests : sig
        and type filter_state = Filter.Mempool.state
        and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
+       and type Internal_for_tests.validation_info =
+        Filter.Proto.Mempool.validation_info
 end

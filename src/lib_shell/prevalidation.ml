@@ -140,6 +140,10 @@ module type T = sig
   module Internal_for_tests : sig
     val get_valid_operations :
       t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+
+    type validation_info
+
+    val set_validation_info : t -> validation_info -> t
   end
 end
 
@@ -149,7 +153,9 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
      and type validation_state = Filter.Proto.validation_state
      and type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
-     and type chain_store = Chain_store.chain_store = struct
+     and type chain_store = Chain_store.chain_store
+     and type Internal_for_tests.validation_info =
+      Filter.Proto.Mempool.validation_info = struct
   module Proto = Filter.Proto
 
   type protocol_operation = Proto.operation
@@ -338,6 +344,10 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
 
   module Internal_for_tests = struct
     let get_valid_operations {mempool; _} = Proto.Mempool.operations mempool
+
+    type validation_info = Proto.Mempool.validation_info
+
+    let set_validation_info state validation_info = {state with validation_info}
   end
 end
 
