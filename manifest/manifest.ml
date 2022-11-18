@@ -1090,7 +1090,14 @@ module Target = struct
      so that we can create opam files with multiple targets. *)
   let by_opam = ref String_map.empty
 
+  (* Set to [false] by [generate] to prevent further modifying the above references. *)
+  let can_register = ref true
+
   let register_internal ({path; opam; _} as internal) =
+    if not !can_register then
+      invalid_arg
+        "cannot register new targets after calling Manifest.check or \
+         Manifest.generate" ;
     let old = String_map.find_opt path !by_path |> Option.value ~default:[] in
     by_path := String_map.add path (internal :: old) !by_path ;
     Option.iter
@@ -3259,6 +3266,7 @@ let generate ~make_tezt_exe ~default_profile =
   Printexc.record_backtrace true ;
   try
     register_tezt_targets ~make_tezt_exe ;
+    Target.can_register := false ;
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;
@@ -3277,6 +3285,7 @@ let generate ~make_tezt_exe ~default_profile =
 let check ?exclude () =
   if !checks_done then failwith "Cannot run check twice" ;
   checks_done := true ;
+  Target.can_register := false ;
   Printexc.record_backtrace true ;
   try
     check_circular_opam_deps () ;
