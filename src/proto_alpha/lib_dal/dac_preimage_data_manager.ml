@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
 open Environment.Error_monad
 
 type error += Cannot_write_dac_page_to_disk of string
@@ -56,4 +57,4 @@ module Make (Hash : Dac_pages_encoding.HASH) = struct
     | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_b58check hash)
 end
 
-module Reveal_hash = Make (Sc_rollup_PVM_sig.Reveal_hash)
+module Reveal_hash = Make (Sc_rollup.Reveal_hash)

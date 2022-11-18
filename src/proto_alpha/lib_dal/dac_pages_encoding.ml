@@ -31,6 +31,7 @@
  *)
 
 open Protocol
+open Alpha_context
 open Environment.Error_monad
 
 type error +=
@@ -368,7 +369,7 @@ module Merkle_tree = struct
 
   module V0 =
     Make
-      (Sc_rollup_PVM_sig.Reveal_hash)
+      (Sc_rollup.Reveal_hash)
       (Make_version (struct
         (* Cntents_version_tag used in contents pages is 0. *)
         let contents_version = 0
