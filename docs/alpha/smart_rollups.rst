@@ -575,7 +575,8 @@ the following WASM program in text format.
                                  (local.get $hello_length)))))
 
 This program can be compiled to the WASM binary format with
-general-purpose tool like [WABT](https://github.com/WebAssembly/wabt).
+general-purpose tool like
+`WABT <https://github.com/WebAssembly/wabt>`_.
 
 ::
 
