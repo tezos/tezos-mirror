@@ -1174,13 +1174,13 @@ let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
 
 type conversion_kind = Script | Data
 
+let conversion_format_to_string = function
+  | `Michelson -> "michelson"
+  | `Binary -> "binary"
+  | `Json -> "json"
+  | `OCaml -> "ocaml"
+
 let convert ?endpoint ~kind ~input ~src_format ~dst_format ?typecheck client =
-  let fmt_to_string = function
-    | `Michelson -> "michelson"
-    | `Binary -> "binary"
-    | `Json -> "json"
-    | `OCaml -> "ocaml"
-  in
   spawn_command
     ?endpoint
     client
@@ -1189,9 +1189,9 @@ let convert ?endpoint ~kind ~input ~src_format ~dst_format ?typecheck client =
        (match kind with Script -> "script" | Data -> "data");
        input;
        "from";
-       fmt_to_string src_format;
+       conversion_format_to_string src_format;
        "to";
-       fmt_to_string dst_format;
+       conversion_format_to_string dst_format;
      ]
     @ optional_arg "type" Fun.id typecheck)
   |> Process.check_and_read_stdout

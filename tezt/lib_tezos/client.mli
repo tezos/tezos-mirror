@@ -1749,6 +1749,11 @@ val spawn_contract_entrypoint_type :
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
 
+(** Show a conversion format as used for the [convert*] function
+    family *)
+val conversion_format_to_string :
+  [< `Binary | `Json | `Michelson | `OCaml] -> string
+
 (** Use octez-client to convert a script between given forms. *)
 val convert_script :
   script:string ->
