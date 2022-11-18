@@ -135,6 +135,17 @@ module Types (S : Ctypes.TYPE) = struct
             (SINGLEPASS, constant "SINGLEPASS" int64_t);
           ]
     end
+
+    (** [wasmer_features_t] *)
+    module Features = struct
+      type s
+
+      type t = s Ctypes.structure
+
+      let t : t typ =
+        let name = "wasmer_features_t" in
+        typedef (structure name) name
+    end
   end
 
   (** [wasm_config_t] *)

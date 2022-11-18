@@ -85,6 +85,58 @@ module Functions (S : FOREIGN) = struct
           "wasmer_is_compiler_available"
           (Types.Wasmer.Compiler.t @-> returning bool)
     end
+
+    module Features = struct
+      let new_ =
+        foreign
+          "wasmer_features_new"
+          (void @-> returning (ptr Types.Wasmer.Features.t))
+
+      let bulk_memory =
+        foreign
+          "wasmer_features_bulk_memory"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let memory64 =
+        foreign
+          "wasmer_features_memory64"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let module_linking =
+        foreign
+          "wasmer_features_module_linking"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let multi_memory =
+        foreign
+          "wasmer_features_multi_memory"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let multi_value =
+        foreign
+          "wasmer_features_multi_value"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let reference_types =
+        foreign
+          "wasmer_features_reference_types"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let simd =
+        foreign
+          "wasmer_features_simd"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let tail_call =
+        foreign
+          "wasmer_features_tail_call"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+
+      let threads =
+        foreign
+          "wasmer_features_threads"
+          (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
+    end
   end
 
   (** Functions with the [wasm_config_] prefix *)
@@ -96,6 +148,11 @@ module Functions (S : FOREIGN) = struct
       foreign
         "wasm_config_set_compiler"
         (ptr Types.Config.t @-> Types.Wasmer.Compiler.t @-> returning void)
+
+    let set_features =
+      foreign
+        "wasm_config_set_features"
+        (ptr Types.Config.t @-> ptr Types.Wasmer.Features.t @-> returning void)
 
     let delete =
       foreign "wasm_config_delete" (ptr Types.Config.t @-> returning void)
