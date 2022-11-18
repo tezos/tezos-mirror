@@ -32,13 +32,13 @@ val lookup :
   Tezos_webassembly_interpreter.Instance.extern
 
 (** [lookup_opt name] is exactly [lookup name] but returns an option instead of
-    raising `Not_found`. *)
+      raising `Not_found`. *)
 val lookup_opt :
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
 (** [all] represents all registered host functions that are important for the
-    SCORU WASM PVM. *)
+      SCORU WASM PVM. *)
 val all : Tezos_webassembly_interpreter.Host_funcs.registry
 
 exception Bad_input
@@ -50,138 +50,173 @@ module Error : sig
   type t =
     | Store_key_too_large
         (** The store key submitted as an argument of a host function exceeds
-            the authorized limit. Has code `-1`. *)
+              the authorized limit. Has code `-1`. *)
     | Store_invalid_key
         (** The store key submitted as an argument of a host function cannot be
-            parsed. Has code `-2`. *)
+              parsed. Has code `-2`. *)
     | Store_not_a_value
         (** The contents (if any) of the store under the key submitted as an
-            argument of a host function is not a value. Has code `-3`. *)
+              argument of a host function is not a value. Has code `-3`. *)
     | Store_invalid_access
         (** An access in a value of the durable storage has failed, supposedly
-            out of bounds of a value. Has code `-4`. *)
+              out of bounds of a value. Has code `-4`. *)
     | Store_value_size_exceeded
         (** Writing a value has exceeded 2^31 bytes. Has code `-5`. *)
     | Memory_invalid_access
         (** An address is out of bound of the memory. Has code `-6`. *)
     | Input_output_too_large
         (** The input or output submitted as an argument of a host function
-            exceeds the authorized limit. Has code `-7`. *)
+              exceeds the authorized limit. Has code `-7`. *)
     | Generic_invalid_access
         (** Generic error code for unexpected errors. Has code `-8`. *)
     | Store_readonly_value
         (** A value cannot be modified if it is readonly. Has code `-9`. *)
+    | Memory_out_of_bounds
+        (** Attempted access to an address outside the bounds of memory if it is readonly. Has code `-10`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32
 end
 
+module type Memory_access = sig
+  type t
+
+  type size := int
+
+  type addr := int32
+
+  val store_bytes : t -> addr -> string -> unit Lwt.t
+
+  val load_bytes : t -> addr -> size -> string Lwt.t
+
+  val store_num :
+    t -> addr -> addr -> Tezos_webassembly_interpreter.Values.num -> unit Lwt.t
+
+  val bound : t -> int64
+
+  val exn_to_error : default:Error.t -> exn -> Error.t
+end
+
+module Memory_access_interpreter : Memory_access
+
 module Aux : sig
-  (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
-       ~num_bytes] reads num_bytes from the memory of module_inst starting at
-       src and writes this to the output_buffer. It also checks that
-       the input payload is no larger than `max_output`. It returns 0 for Ok and
-      1 for `output too large`.*)
-  val write_output :
-    output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    src:int32 ->
-    num_bytes:int32 ->
-    int32 Lwt.t
+  module type S = sig
+    type memory
 
-  (** [aux_write_memory ~input_buffer ~module_inst ~level_offset
-       ~id_offset ~dst ~max_bytes] reads `input_buffer` and writes its
-       components to the memory of `module_inst` based on the memory
-       addreses offsets described. It also checks that the input
-       payload is no larger than `max_input` and crashes with `input
-       too large` otherwise. It returns the size of the payload. Note
-       also that, if the level increases this function also updates
-       the level of the output buffer and resets its id to zero. *)
-  val read_input :
-    input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
-    output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    level_offset:int32 ->
-    id_offset:int32 ->
-    dst:int32 ->
-    max_bytes:int32 ->
-    int32 Lwt.t
+    (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
+     ~num_bytes] reads num_bytes from the memory of module_inst starting at
+     src and writes this to the output_buffer. It also checks that
+     the input payload is no larger than `max_output`. It returns 0 for Ok and
+    1 for `output too large`.*)
+    val write_output :
+      output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
+      memory:memory ->
+      src:int32 ->
+      num_bytes:int32 ->
+      int32 Lwt.t
 
-  val store_has :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    int32 Lwt.t
+    (** [aux_write_memory ~input_buffer ~module_inst ~level_offset
+     ~id_offset ~dst ~max_bytes] reads `input_buffer` and writes its
+     components to the memory of `module_inst` based on the memory
+     addreses offsets described. It also checks that the input
+     payload is no larger than `max_input` and crashes with `input
+     too large` otherwise. It returns the size of the payload. Note
+     also that, if the level increases this function also updates
+     the level of the output buffer and resets its id to zero. *)
+    val read_input :
+      input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
+      output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
+      memory:memory ->
+      level_offset:int32 ->
+      id_offset:int32 ->
+      dst:int32 ->
+      max_bytes:int32 ->
+      int32 Lwt.t
 
-  val store_delete :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    (Durable.t * int32) Lwt.t
+    val store_has :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      int32 Lwt.t
 
-  val store_copy :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    from_key_offset:int32 ->
-    from_key_length:int32 ->
-    to_key_offset:int32 ->
-    to_key_length:int32 ->
-    (Durable.t * int32) Lwt.t
+    val store_delete :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      (Durable.t * int32) Lwt.t
 
-  val store_move :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    from_key_offset:int32 ->
-    from_key_length:int32 ->
-    to_key_offset:int32 ->
-    to_key_length:int32 ->
-    (Durable.t * int32) Lwt.t
+    val store_copy :
+      durable:Durable.t ->
+      memory:memory ->
+      from_key_offset:int32 ->
+      from_key_length:int32 ->
+      to_key_offset:int32 ->
+      to_key_length:int32 ->
+      (Durable.t * int32) Lwt.t
 
-  val store_value_size :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    int32 Lwt.t
+    val store_move :
+      durable:Durable.t ->
+      memory:memory ->
+      from_key_offset:int32 ->
+      from_key_length:int32 ->
+      to_key_offset:int32 ->
+      to_key_length:int32 ->
+      (Durable.t * int32) Lwt.t
 
-  val store_read :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    value_offset:int32 ->
-    dest:int32 ->
-    max_bytes:int32 ->
-    int32 Lwt.t
+    val store_value_size :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      int32 Lwt.t
 
-  val store_write :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    value_offset:int32 ->
-    src:int32 ->
-    num_bytes:int32 ->
-    (Durable.t * int32) Lwt.t
+    val store_read :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      value_offset:int32 ->
+      dest:int32 ->
+      max_bytes:int32 ->
+      int32 Lwt.t
 
-  val store_list_size :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    (Durable.t * int64) Lwt.t
+    val store_write :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      value_offset:int32 ->
+      src:int32 ->
+      num_bytes:int32 ->
+      (Durable.t * int32) Lwt.t
 
-  val store_get_nth_key :
-    durable:Durable.t ->
-    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    key_offset:int32 ->
-    key_length:int32 ->
-    index:int64 ->
-    dst:int32 ->
-    max_size:int32 ->
-    int32 Lwt.t
+    val store_list_size :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      (Durable.t * int64) Lwt.t
+
+    val store_get_nth_key :
+      durable:Durable.t ->
+      memory:memory ->
+      key_offset:int32 ->
+      key_length:int32 ->
+      index:int64 ->
+      dst:int32 ->
+      max_size:int32 ->
+      int32 Lwt.t
+
+    val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
+  end
+
+  module Make (Memory_access : Memory_access) :
+    S with type memory = Memory_access.t
+
+  include
+    S with type memory = Tezos_webassembly_interpreter.Instance.memory_inst
 end
 
 module Internal_for_tests : sig
@@ -193,12 +228,12 @@ module Internal_for_tests : sig
   val read_input : Tezos_webassembly_interpreter.Instance.func_inst
 
   (** [store_has] returns whether a key corresponds to a value and/or subtrees.
-      Namely, it returns the following enum:
-      - [0]: There is no value at [key], nor subtrees under [key].
-      - [1]: There is a value at [key], but no subtrees under [key].
-      - [2]: There is no value at [key], but there are subtrees under [key].
-      - [3]: There is a value at [key], and subtrees under [key].
-  *)
+        Namely, it returns the following enum:
+        - [0]: There is no value at [key], nor subtrees under [key].
+        - [1]: There is a value at [key], but no subtrees under [key].
+        - [2]: There is no value at [key], but there are subtrees under [key].
+        - [3]: There is a value at [key], and subtrees under [key].
+    *)
   val store_has : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_delete : Tezos_webassembly_interpreter.Instance.func_inst
