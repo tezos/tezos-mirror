@@ -240,11 +240,10 @@ let status ?hooks ?(block = "head") sc_client =
 
 let outbox ?hooks ?(block = "cemented") ~outbox_level sc_client =
   let open Lwt.Syntax in
-  rpc_get_rich
+  rpc_get
     ?hooks
     sc_client
-    ["global"; "block"; block; "outbox"]
-    [("outbox_level", string_of_int outbox_level)]
+    ["global"; "block"; block; "outbox"; string_of_int outbox_level; "messages"]
 
 let last_stored_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]

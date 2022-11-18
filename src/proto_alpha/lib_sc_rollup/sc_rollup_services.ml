@@ -565,6 +565,33 @@ module Global = struct
               (req "result" string)
               (opt "contents" Dal.Page.content_encoding))
         (path / "dal" / "slot_page")
+
+    module Outbox = struct
+      let level_param =
+        let destruct s =
+          match Int32.of_string_opt s with
+          | None -> Error "Invalid level"
+          | Some l -> (
+              match Raw_level.of_int32 l with
+              | Error _ -> Error "Invalid level"
+              | Ok l -> Ok l)
+        in
+        let construct = Format.asprintf "%a" Raw_level.pp in
+        Tezos_rpc.Arg.make ~name:"level" ~construct ~destruct ()
+
+      include Make_services (struct
+        type nonrec prefix = prefix * Raw_level.t
+
+        let prefix = prefix / "outbox" /: level_param
+      end)
+
+      let messages =
+        Tezos_rpc.Service.get_service
+          ~description:"Outbox at block for a given outbox level"
+          ~query:Tezos_rpc.Query.empty
+          ~output:Data_encoding.(list Sc_rollup.output_encoding)
+          (path / "messages")
+    end
   end
 end
 
