@@ -205,15 +205,9 @@ let get_pending_length ctxt rollup =
   return (ctxt, pending_length pl)
 
 (** Same as [Tezos_stdlib.Utils.fold_n_times] but with Lwt and Error monad *)
-let fold_n_times_es :
-    when_negative:error trace ->
-    int ->
-    ('a -> 'a tzresult Lwt.t) ->
-    'a ->
-    'a tzresult Lwt.t =
- fun ~when_negative n f e ->
+let fold_n_times_es ~when_negative n f e =
   let open Lwt_result_syntax in
-  if Compare.Int.(n < 0) then fail when_negative
+  if Compare.Int.(n < 0) then tzfail when_negative
   else
     let rec go acc = function
       | 0 -> return acc
@@ -237,7 +231,7 @@ let get_prefix ctxt rollup n =
       (* Get the l2 ops corresponding to indeces [hd + n - 1 .. hd],
          so that the accumulated list is in the right order *)
       fold_n_times_es
-        ~when_negative:(Error_monad.trace_of_error Zk_rollup_negative_length)
+        ~when_negative:Zk_rollup_negative_length
         n
         (fun (ctxt, ops, i) ->
           let* ctxt, op = pending_op ctxt rollup i in
@@ -269,8 +263,7 @@ let update ctxt rollup ~pending_to_drop ~new_account =
     | Ok head ->
         let* ctxt, freed, _i =
           fold_n_times_es
-            ~when_negative:
-              (Error_monad.trace_of_error Zk_rollup_negative_length)
+            ~when_negative:Zk_rollup_negative_length
             pending_to_drop
             (fun (ctxt, freed, i) ->
               let* ctxt, new_freed, _bound =
