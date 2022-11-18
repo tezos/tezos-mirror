@@ -2703,7 +2703,16 @@ let generate_opam_files_for_release packages_dir opam_release_graph
     write_raw opam_filename @@ fun fmt -> Opam.pp fmt opam
   in
   ( Target.iter_internal_by_opam @@ fun package internal_pkgs ->
-    write_opam package (generate_opam ~release package internal_pkgs) ) ;
+    match String_map.find_opt package opam_release_graph with
+    | None ->
+        (* Graph contains all internal packages. *)
+        assert false
+    | Some node -> (
+        match node.release_status with
+        | Explicitly_unreleased _ | Auto -> ()
+        | Explicitly_released _ | Transitively_released _ ->
+            write_opam package (generate_opam ~release package internal_pkgs))
+  ) ;
   write_opam
     "octez"
     (generate_opam_meta_package opam_release_graph add_to_meta_package)
