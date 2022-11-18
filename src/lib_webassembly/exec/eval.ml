@@ -543,17 +543,25 @@ let invoke_step ~init ?(durable = Durable_storage.empty)
                   in
                   let vs' = Vector.prepend_list res vs' in
                   (durable, Inv_stop {code = (vs', es); fresh_frame = None})
-              | Reveal_func f ->
-                  let* reveal, {base; max_bytes} = f available_memories args in
-                  Lwt.return
-                    ( durable,
-                      Inv_reveal_tick
-                        {
-                          reveal;
-                          max_bytes;
-                          base_destination = base;
-                          code = (vs', es);
-                        } ))
+              | Reveal_func f -> (
+                  let* result = f available_memories args in
+                  match result with
+                  | Ok (reveal, {base; max_bytes}) ->
+                      Lwt.return
+                        ( durable,
+                          Inv_reveal_tick
+                            {
+                              reveal;
+                              max_bytes;
+                              base_destination = base;
+                              code = (vs', es);
+                            } )
+                  | Error err_code ->
+                      let err_code = Num (I32 err_code) in
+                      let vs' = Vector.prepend_list [err_code] vs' in
+                      Lwt.return
+                        ( durable,
+                          Inv_stop {code = (vs', es); fresh_frame = None} )))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
       {
@@ -1554,28 +1562,7 @@ let is_reveal_tick = function
       Some reveal
   | _ -> None
 
-let reveal module_reg base_destination max_bytes frame payload =
-  let open Lwt.Syntax in
-  Lwt.catch
-    (fun () ->
-      let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ no_region) in
-      let payload_size = Bytes.length payload in
-      let revealed_bytes = min payload_size (Int32.to_int max_bytes) in
-      let payload = Bytes.sub payload 0 revealed_bytes in
-      let+ () =
-        Memory.store_bytes mem base_destination (Bytes.to_string payload)
-      in
-      Int32.of_int revealed_bytes)
-    (function
-      | ( Memory.Bounds (* Memory.store_bytes *)
-        | Lazy_map.UnexpectedAccess (* resolve_module_ref *) ) as exn ->
-          raise exn
-      | exn ->
-          let raw_exn = Printexc.to_string exn in
-          raise (Reveal_error (Reveal_payload_decoding raw_exn)))
-
-let reveal_step module_reg payload =
+let reveal_step reveal module_reg payload =
   let open Lwt.Syntax in
   function
   | {
@@ -1583,13 +1570,14 @@ let reveal_step module_reg payload =
         SK_Next (frame, top, LS_Craft_frame (label, Inv_reveal_tick inv));
       _;
     } as config ->
+      let* inst = resolve_module_ref module_reg frame.frame_specs.inst in
+      let* memory = memory inst (0l @@ no_region) in
       let+ bytes_count =
         reveal
-          module_reg
-          inv.base_destination
-          inv.max_bytes
-          frame.frame_specs
-          payload
+          ~memory
+          ~dst:inv.base_destination
+          ~max_bytes:inv.max_bytes
+          ~payload
       in
       let vs, es = inv.code in
       let vs = Vector.cons (Num (I32 bytes_count)) vs in

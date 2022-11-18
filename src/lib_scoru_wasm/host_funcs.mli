@@ -209,6 +209,16 @@ module Aux : sig
       max_size:int32 ->
       int32 Lwt.t
 
+    (** [reveal mem base size payload] is intended to be the function used
+        by the PVM to load at most [size] bytes of the result [payload] of
+        a reveal step in [mem], at address [base] *)
+    val reveal :
+      memory:memory ->
+      dst:int32 ->
+      max_bytes:int32 ->
+      payload:bytes ->
+      int32 Lwt.t
+
     val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
   end
 

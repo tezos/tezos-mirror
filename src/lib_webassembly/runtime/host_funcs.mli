@@ -8,7 +8,7 @@ type reveal_destination = {base : int32; max_bytes : int32}
 type reveal_func =
   available_memories ->
   Values.value list ->
-  (Reveal.reveal * reveal_destination) Lwt.t
+  (Reveal.reveal * reveal_destination, int32) result Lwt.t
 
 (** The type of a Host function implementation *)
 type host_func =
