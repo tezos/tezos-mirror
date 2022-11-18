@@ -740,10 +740,16 @@ module type TEZOS_CONTEXT = sig
     context ->
     Tezos_crypto.Context_hash.t Lwt.t
 
-  (** [gc t h] removes from disk all the data older than the commit
-    [hash]. Every operations working on checkouts greater or equal to
-    [h] will continue to work. Calling [checkout h'] on GC-ed commits
-    will return [None]. *)
+  (** [gc index commit_hash] removes from disk all the data older than
+      the [commit_hash]. Operations needing to checkout commits
+      greater or equal to [commit_hash] will continue to work. Calling
+      [checkout h'] on GC-ed commits will return [None].
+
+      From the irmin point of view, a successful gc call on a
+      [commit_hash] will result in a new prefix file containing that
+      [commit_hash] as a root commit. This prefix file is considered
+      as standalone as all the data referenced by that commit is
+      contained in that file. *)
   val gc : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
 
   (** [wait_gc_completion index] will return a blocking thread if an
