@@ -952,7 +952,9 @@ module Make (Context : P) :
           match metadata with
           | Some {address; _} when Address.(destination = address) -> (
               match Micheline.root payload with
-              | String (_, payload) -> return (Some payload)
+              | Bytes (_, payload) ->
+                  let payload = Bytes.to_string payload in
+                  return (Some payload)
               | _ -> return None)
           | _ -> return None)
       | Ok (Internal Start_of_level) ->
