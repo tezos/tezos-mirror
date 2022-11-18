@@ -50,11 +50,6 @@
     According the rollup management protocol, the payload must be obtained
     through {!Sc_rollup_inbox_message_repr.serialize} which follows a documented
     format.
-
-    FIXME: https://gitlab.com/tezos/tezos/-/issues/3649
-
-    This type cannot be extended in a retro-compatible way. It should
-    be put into a variant.
 *)
 
 type inbox_message = {
