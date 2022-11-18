@@ -97,18 +97,6 @@ let () =
       | Merkle_tree_branching_factor_not_high_enough -> Some () | _ -> None)
     (fun () -> Merkle_tree_branching_factor_not_high_enough)
 
-module type HASH = sig
-  type t
-
-  val encoding : t Data_encoding.t
-
-  val to_b58check : t -> string
-
-  val hash_bytes : ?key:bytes -> bytes list -> t
-
-  val size : int
-end
-
 (** Encoding of DAC payload as a Merkle tree with an arbitrary branching
     factor greater or equal to 2. The serialization process works as follows:
     {ul
@@ -170,7 +158,7 @@ module Merkle_tree = struct
     let hashes_version_tag = (2 * V.hashes_version) + 1
   end
 
-  module Make (Hashing_scheme : HASH) (V : VERSION) = struct
+  module Make (Hashing_scheme : Environment.S.HASH) (V : VERSION) = struct
     let hash bytes = Hashing_scheme.hash_bytes [bytes]
 
     let hash_encoding = Hashing_scheme.encoding
