@@ -101,6 +101,8 @@ module Handler = struct
   let resolve_plugin_and_set_ready config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+       Handle situtation where plugin is not found *)
     let open Lwt_result_syntax in
     let handler stopper
         (_block_hash, (_block_header : Tezos_base.Block_header.t)) =
@@ -200,6 +202,8 @@ module Handler = struct
 end
 
 let daemonize handlers =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+     Improve concurrent tasks by using workers *)
   let open Lwt_result_syntax in
   let* handlers = List.map_es (fun x -> x) handlers in
   let (_ : Lwt_exit.clean_up_callback_id) =
@@ -213,7 +217,6 @@ let daemonize handlers =
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
-
    Improve general architecture, handle L1 disconnection etc
 *)
 let run ~data_dir cctxt =
