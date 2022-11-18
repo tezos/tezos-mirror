@@ -386,7 +386,7 @@ validator does not reveal its nonce by the end of the cycle, it does not receive
 its endorsing rewards. If a validator double signs, that is, it double bakes
 (which means signing different blocks at the same level and same round) or
 it double (pre)endorses (which means voting on two different proposals at the
-same level and round), the frozen deposit is slashed. The slashed amount for double baking
+same level and round), a part of the frozen deposit is slashed. The slashed amount for double baking
 is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double (pre)endorsing is
 a fixed percentage ``RATIO_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ENDORSEMENT``
 of the frozen deposit. The payload producer that includes the misbehavior
