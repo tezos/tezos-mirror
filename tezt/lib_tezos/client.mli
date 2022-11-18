@@ -949,14 +949,6 @@ val spawn_originate_contract :
   t ->
   Process.t
 
-(** Convert the given smart contract from Michelson to JSON string. *)
-val convert_script_to_json :
-  ?endpoint:endpoint -> script:string -> t -> Ezjsonm.value Lwt.t
-
-(** Convert the given Michelson constant to JSON string. *)
-val convert_data_to_json :
-  ?endpoint:endpoint -> data:string -> t -> Ezjsonm.value Lwt.t
-
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)
 type stresstest_contract_parameters = {
@@ -1757,13 +1749,36 @@ val spawn_contract_entrypoint_type :
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
 
+(** Show a conversion format as used for the [convert*] function
+    family *)
+val conversion_format_to_string :
+  [< `Binary | `Json | `Michelson | `OCaml] -> string
+
 (** Use octez-client to convert a script between given forms. *)
 val convert_script :
   script:string ->
   src_format:[`Michelson | `Json | `Binary] ->
-  dst_format:[`Michelson | `Json | `Binary] ->
+  dst_format:[`Michelson | `Json | `Binary | `OCaml] ->
+  ?typecheck:string ->
   t ->
   string Lwt.t
+
+(** Use octez-client to convert a script between given forms. *)
+val convert_data :
+  data:string ->
+  src_format:[`Michelson | `Json | `Binary] ->
+  dst_format:[`Michelson | `Json | `Binary | `OCaml] ->
+  ?typecheck:string ->
+  t ->
+  string Lwt.t
+
+(** Convert the given smart contract from Michelson to JSON string. *)
+val convert_script_to_json :
+  ?endpoint:endpoint -> script:string -> t -> Ezjsonm.value Lwt.t
+
+(** Convert the given Michelson constant to JSON string. *)
+val convert_data_to_json :
+  ?endpoint:endpoint -> data:string -> t -> Ezjsonm.value Lwt.t
 
 (** Run [octez-client bootstrapped]. *)
 val bootstrapped : t -> unit Lwt.t
