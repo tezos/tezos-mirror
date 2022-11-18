@@ -1414,5 +1414,7 @@ struct
       | Error `Page_length_mismatch -> Ok false
       | Error `Segment_index_out_of_range -> Error `Segment_index_out_of_range
       | Ok r -> Ok r
+
+    let commitment_proof_encoding = Commitment_proof.encoding
   end
 end

@@ -44,7 +44,7 @@ type t
    aims to be provided for the economic protocol. The other interface,
    called the {!module:Builder} is for the shell.
 
-    A [Verifier], has hinted by the name, mainly needs to check
+    A [Verifier], as hinted by the name, mainly needs to check
    proofs:
 
     1. A proof that a commitment is valid
@@ -61,6 +61,8 @@ type t
 
 type commitment
 
+type commitment_proof
+
 type page_proof
 
 module Verifier :
@@ -68,6 +70,7 @@ module Verifier :
     with type t = t
      and type parameters = parameters
      and type commitment = commitment
+     and type commitment_proof = commitment_proof
      and type page_proof = page_proof
 
 include
@@ -75,6 +78,7 @@ include
     with type t := t
      and type parameters := parameters
      and type commitment := commitment
+     and type commitment_proof := commitment_proof
      and type page_proof := page_proof
 
 (** The primitives exposed in this modules require some
@@ -189,7 +193,7 @@ val verify_shard : t -> commitment -> shard -> shard_proof -> bool
 
 (** [prove_commitment t polynomial] produces a proof that the
      slot represented by [polynomial] has its size bounded by
-     [t.slot size]. *)
+     [t.slot_size]. *)
 val prove_commitment : t -> polynomial -> commitment_proof
 
 (** [prove_page] produces a proof that the [n]th page computed
