@@ -49,7 +49,7 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val process : Layer1.head -> Node_context.t -> unit tzresult Lwt.t
+  val process : Layer1.head -> Node_context.rw -> unit tzresult Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) :
@@ -76,8 +76,8 @@ module Make (Interpreter : Interpreter.S) :
   (** [inject_next_move node_ctxt source ~refutation ~opponent] submits an L1
       operation (signed by [source]) to issue the next move in the refutation
       game. *)
-  let inject_next_move (node_ctxt : Node_context.t) source ~refutation ~opponent
-      =
+  let inject_next_move (node_ctxt : _ Node_context.t) source ~refutation
+      ~opponent =
     let refute_operation =
       Sc_rollup_refute {rollup = node_ctxt.rollup_address; refutation; opponent}
     in
@@ -129,6 +129,7 @@ module Make (Interpreter : Interpreter.S) :
         let* pages =
           Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
         in
+        let*! pages = Delayed_write_monad.apply node_ctxt pages in
         match pages with
         | None -> return_none (* The slot is not confirmed. *)
         | Some pages -> (
@@ -375,7 +376,7 @@ module Make (Interpreter : Interpreter.S) :
     let* refutation = next_move node_ctxt game in
     inject_next_move node_ctxt self ~refutation:(Some refutation) ~opponent
 
-  let play_timeout (node_ctxt : Node_context.t) self stakers =
+  let play_timeout (node_ctxt : _ Node_context.t) self stakers =
     let timeout_operation =
       Sc_rollup_timeout {rollup = node_ctxt.rollup_address; stakers}
     in

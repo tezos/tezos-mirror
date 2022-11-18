@@ -27,12 +27,12 @@
 open Store_sigs
 
 module Make (B : BACKEND) = struct
-  type t = B.t
+  type 'a t = 'a B.t
 
   module Make_map (S : STORAGE_INFO) (K : KEY) (V : VALUE) = struct
     type key = K.key
 
-    type store = B.t
+    type 'a store = 'a B.t
 
     type value = V.value
 
@@ -94,7 +94,7 @@ module Make (B : BACKEND) = struct
   end
 
   module Make_mutable_value (S : STORAGE_INFO) (V : VALUE) = struct
-    type store = B.t
+    type 'a store = 'a B.t
 
     type value = V.value
 
@@ -124,7 +124,7 @@ module Make (B : BACKEND) = struct
       (K2 : COMPARABLE_KEY)
       (V : VALUE) =
   struct
-    type store = B.t
+    type 'a store = 'a B.t
 
     type primary_key = K1.key
 

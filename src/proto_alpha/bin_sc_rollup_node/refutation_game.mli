@@ -30,7 +30,7 @@ module type S = sig
 
   (** [process head node_ctxt] reacts to any operations of [head] related to
       refutation games. *)
-  val process : Layer1.head -> Node_context.t -> unit tzresult Lwt.t
+  val process : Layer1.head -> Node_context.rw -> unit tzresult Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) : S with module PVM = Interpreter.PVM

@@ -38,10 +38,10 @@ module type S = sig
     metadata:Sc_rollup.Metadata.t ->
     dal_attestation_lag:int ->
     fuel:fuel ->
-    Node_context.t ->
+    _ Node_context.t ->
     Tezos_crypto.Block_hash.t ->
     state ->
-    (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t
+    (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult Lwt.t
 end
 
 module Make
@@ -53,7 +53,7 @@ module Make
   type fuel = F.t
 
   let continue_with_fuel consumption initial_fuel state f =
-    let open Lwt_result_syntax in
+    let open Delayed_write_monad.Lwt_result_syntax in
     match F.consume consumption initial_fuel with
     | None -> return (state, 0L)
     | Some fuel_left -> f fuel_left state
@@ -70,6 +70,7 @@ module Make
   let eval_until_input ~metadata ~dal_attestation_lag data_dir store level
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
+    let open Delayed_write_monad.Lwt_result_syntax in
     let module Builtins = struct
       let reveal_preimage hash =
         let hash =
@@ -127,7 +128,7 @@ module Make
       else
         match input_request with
         | No_input_required ->
-            let* next_state, executed_ticks, failing_ticks =
+            let>* next_state, executed_ticks, failing_ticks =
               eval_tick fuel current_tick failing_ticks state
             in
             go
@@ -151,7 +152,7 @@ module Make
             | Some fuel ->
                 go fuel (Int64.succ current_tick) failing_ticks next_state)
         | Needs_reveal (Request_dal_page page_id) -> (
-            let* content_opt =
+            let>* content_opt =
               Dal_pages_request.page_content ~dal_attestation_lag store page_id
             in
             let*! next_state =
@@ -180,7 +181,8 @@ module Make
   let feed_input ~metadata ~dal_attestation_lag data_dir store level
       message_index ~fuel ~failing_ticks state input =
     let open Lwt_result_syntax in
-    let* state, fuel, tick, failing_ticks =
+    let open Delayed_write_monad.Lwt_result_syntax in
+    let>* state, fuel, tick, failing_ticks =
       eval_until_input
         ~metadata
         ~dal_attestation_lag
@@ -195,7 +197,7 @@ module Make
     in
     let consumption = F.of_ticks tick in
     continue_with_fuel consumption fuel state @@ fun fuel state ->
-    let* input, failing_ticks =
+    let>* input, failing_ticks =
       match failing_ticks with
       | xtick :: failing_ticks' ->
           if xtick = tick then
@@ -211,7 +213,7 @@ module Make
       | _ -> return (input, failing_ticks)
     in
     let*! state = PVM.set_input (Inbox_message input) state in
-    let* state, _fuel, tick, _failing_ticks =
+    let>* state, _fuel, tick, _failing_ticks =
       eval_until_input
         ~metadata
         ~dal_attestation_lag
@@ -228,9 +230,11 @@ module Make
 
   let eval_block_inbox ~metadata ~dal_attestation_lag ~fuel
       (Node_context.{data_dir; store; loser_mode; _} as node_context) hash
-      (state : state) : (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t
-      =
+      (state : state) :
+      (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult
+      Lwt.t =
     let open Lwt_result_syntax in
+    let open Delayed_write_monad.Lwt_result_syntax in
     (* Obtain inbox and its messages for this block. *)
     let*! inbox = Store.Inboxes.find store hash in
     match inbox with
@@ -264,7 +268,7 @@ module Make
               ~level
               ~message_index:message_counter
           in
-          let* state, executed_ticks =
+          let>* state, executed_ticks =
             feed_input
               ~metadata
               ~dal_attestation_lag
@@ -280,8 +284,8 @@ module Make
           return (state, F.of_ticks executed_ticks)
         in
         (* Iterate the PVM state with all the messages for this level. *)
-        let* state, fuel =
-          List.fold_left_i_es feed_message (state, fuel) messages
+        let>* state, fuel =
+          list_fold_left_i_es feed_message (state, fuel) messages
         in
         return (state, num_messages, inbox_level, fuel)
 end

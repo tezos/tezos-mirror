@@ -65,6 +65,29 @@ let store_entry_from_published_level ~dal_attestation_lag ~published_level store
   @@ Int32.(
        add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
 
+(* The cache allows to not fetch pages on the DAL node more than necessary. *)
+module Pages_cache =
+  Ringo_lwt.Functors.Make
+    ((val Ringo.(
+            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+       (struct
+         include Cryptobox.Commitment
+
+         let hash commitment =
+           Data_encoding.Binary.to_string_exn
+             Cryptobox.Commitment.encoding
+             commitment
+           |> Hashtbl.hash
+       end))
+
+let get_slot_pages =
+  let pages_cache = Pages_cache.create 16 (* 130MB *) in
+  fun dal_cctxt commitment ->
+    Pages_cache.find_or_replace
+      pages_cache
+      commitment
+      (Dal_node_client.get_slot_pages dal_cctxt)
+
 let check_confirmation_status_and_download
     ({Node_context.store; dal_cctxt; _} as node_ctxt) ~confirmed_in_block_hash
     ~published_in_block_hash index =
@@ -85,23 +108,23 @@ let check_confirmation_status_and_download
         ~primary_key:published_in_block_hash
         ~secondary_key:index
     in
-    let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
-    let*! () =
+    let* pages = get_slot_pages dal_cctxt commitment in
+    let save_pages node_ctxt =
       Dal_slots_tracker.save_confirmed_slot
         node_ctxt
         confirmed_in_block_hash
         index
         pages
     in
-    return_some pages
+    return (Delayed_write_monad.delay_write (Some pages) save_pages)
   else
-    let*! () =
+    let save_slot node_ctxt =
       Dal_slots_tracker.save_unconfirmed_slot
         node_ctxt
         confirmed_in_block_hash
         index
     in
-    return_none
+    return (Delayed_write_monad.delay_write None save_slot)
 
 let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
     Dal.Slot.Header.{published_level; index} =
@@ -125,21 +148,25 @@ let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
         ~published_in_block_hash
         ~confirmed_in_block_hash
         index
-  | Some `Unconfirmed -> return None
+  | Some `Unconfirmed -> return (Delayed_write_monad.no_write None)
   | Some `Confirmed ->
       let*! pages =
         Store.Dal_slot_pages.list_secondary_keys_with_values
           store
           ~primary_key:confirmed_in_block_hash
       in
-      List.filter
-        (fun ((slot_idx, _page_idx), _v) -> Dal.Slot_index.equal index slot_idx)
-        pages
-      |> List.map snd |> Option.some |> return
+      let pages =
+        List.filter_map
+          (fun ((slot_idx, _page_idx), v) ->
+            if Dal.Slot_index.equal index slot_idx then Some v else None)
+          pages
+      in
+      return (Delayed_write_monad.no_write (Some pages))
 
 let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
     page_id =
   let open Lwt_result_syntax in
+  let open Delayed_write_monad.Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let*! confirmed_in_block_hash =
@@ -164,7 +191,7 @@ let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
       let*! published_in_block_hash =
         State.hash_of_level store (Raw_level.to_int32 published_level)
       in
-      let* pages =
+      let>* pages =
         check_confirmation_status_and_download
           node_ctxt
           ~published_in_block_hash
@@ -172,7 +199,7 @@ let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
           index
       in
       match pages with
-      | None -> (* Slot is not confirmed *) return_none
+      | None -> (* Slot is not confirmed *) return None
       | Some (* Slot is confirmed *) pages -> (
           match List.nth_opt pages page_index with
           | Some page -> return @@ Some page

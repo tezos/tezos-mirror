@@ -33,7 +33,7 @@ module Make (PVM : Pvm.S) = struct
   (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
-  let process_included_l1_operation (type kind) (node_ctxt : Node_context.t)
+  let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       head ~source:_ (operation : kind manager_operation)
       (result : kind successful_manager_operation_result) =
     let open Lwt_result_syntax in
@@ -159,11 +159,11 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let before_origination (node_ctxt : Node_context.t) Layer1.{level; _} =
+  let before_origination (node_ctxt : _ Node_context.t) Layer1.{level; _} =
     let origination_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
     level < origination_level
 
-  let rec processed_finalized_block (node_ctxt : Node_context.t)
+  let rec processed_finalized_block (node_ctxt : _ Node_context.t)
       Layer1.({hash; level} as block) =
     let open Lwt_result_syntax in
     let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
@@ -187,7 +187,8 @@ module Make (PVM : Pvm.S) = struct
     let*! () = State.mark_finalized_head node_ctxt.store block in
     return_unit
 
-  let process_head (node_ctxt : Node_context.t) Layer1.({hash; level} as head) =
+  let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
+      =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
     let* ctxt = Inbox.process_head node_ctxt head in
@@ -287,7 +288,7 @@ module Make (PVM : Pvm.S) = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
-  let daemonize configuration (node_ctxt : Node_context.t) =
+  let daemonize configuration (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
     let rec loop (l1_ctxt : Layer1.t) =
       let*! () =
@@ -331,8 +332,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
-  let check_initial_state_hash {Node_context.cctxt; rollup_address; context; _}
-      =
+  let check_initial_state_hash {Node_context.cctxt; rollup_address; _} =
     let open Lwt_result_syntax in
     let* l1_reference_initial_state_hash =
       RPC.Sc_rollup.initial_pvm_state_hash
@@ -340,7 +340,7 @@ module Make (PVM : Pvm.S) = struct
         (cctxt#chain, cctxt#block)
         rollup_address
     in
-    let*! s = PVM.initial_state context in
+    let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! l2_initial_state_hash = PVM.state_hash s in
     if
       not
@@ -388,7 +388,7 @@ module Make (PVM : Pvm.S) = struct
       let* () =
         Injector.init
           node_ctxt.cctxt
-          node_ctxt
+          (Node_context.readonly node_ctxt)
           ~data_dir:configuration.data_dir
           ~signers
       in
@@ -422,9 +422,11 @@ let run ~data_dir (configuration : Configuration.t)
       configuration.sc_rollup_node_operators
   in
   let*! store =
-    Store.load Configuration.(default_storage_dir configuration.data_dir)
+    Store.load
+      Read_write
+      Configuration.(default_storage_dir configuration.data_dir)
   in
-  let*! context = Context.load configuration in
+  let*! context = Context.load Read_write configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init

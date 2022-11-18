@@ -3520,7 +3520,7 @@ module Sc_rollup : sig
 
       val state_hash : state -> hash Lwt.t
 
-      val initial_state : context -> state Lwt.t
+      val initial_state : empty:state -> state Lwt.t
 
       val install_boot_sector : state -> string -> state Lwt.t
 

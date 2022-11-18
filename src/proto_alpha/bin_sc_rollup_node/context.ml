@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Store_sigs
 module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
 
 module IStore = struct
@@ -39,9 +40,19 @@ module IStoreTree =
 
 type tree = IStore.tree
 
-type index = {path : string; repo : IStore.Repo.t}
+type 'a raw_index = {path : string; repo : IStore.Repo.t}
 
-type t = {index : index; tree : tree}
+type 'a index = 'a raw_index constraint 'a = [< `Read | `Write > `Read]
+
+type rw_index = [`Read | `Write] index
+
+type ro_index = [`Read] index
+
+type 'a t = {index : 'a index; tree : tree}
+
+type rw = [`Read | `Write] t
+
+type ro = [`Read] t
 
 type commit = IStore.commit
 
@@ -62,14 +73,18 @@ let pp_hash fmt h =
   IStore.Hash.to_raw_string h
   |> Hex.of_string |> Hex.show |> Format.pp_print_string fmt
 
-let load configuration =
+let load : type a. a mode -> Configuration.t -> a raw_index Lwt.t =
+ fun mode configuration ->
   let open Lwt_syntax in
   let open Configuration in
   let path = default_context_dir configuration.data_dir in
-  let+ repo = IStore.Repo.v (Irmin_pack.config path) in
+  let readonly = match mode with Read_only -> true | Read_write -> false in
+  let+ repo = IStore.Repo.v (Irmin_pack.config ~readonly path) in
   {path; repo}
 
 let close ctxt = IStore.Repo.close ctxt.repo
+
+let readonly (index : [> `Read] index) = (index :> [`Read] index)
 
 let raw_commit ?(message = "") index tree =
   let info = IStore.Info.v ~author:"Tezos" 0L ~message in
@@ -112,7 +127,7 @@ struct
   module Tree = struct
     include IStoreTree
 
-    type nonrec t = index
+    type t = rw_index
 
     type tree = IStore.tree
 
@@ -189,7 +204,7 @@ module Inbox = struct
             .tree_proof_encoding
         end)
 
-    type t = index
+    type t = rw_index
 
     let commit_tree index _key tree =
       let open Lwt_syntax in
@@ -217,6 +232,8 @@ module PVMState = struct
   type value = tree
 
   let key = ["pvm_state"]
+
+  let empty () = IStore.Tree.empty ()
 
   let find ctxt = IStore.Tree.find_tree ctxt.tree key
 

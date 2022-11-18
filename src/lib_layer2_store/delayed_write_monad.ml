@@ -23,36 +23,74 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [is_processed store hash] returns [true] if the block with [hash] has
-    already been processed by the daemon. *)
-val is_processed : _ Store.t -> Tezos_crypto.Block_hash.t -> bool Lwt.t
+type ('a, 'store) t = {result : 'a; write : ('store -> unit Lwt.t) option}
 
-(** [mark_processed_head store head] remembers that the [head] is processed. The
-    system should not have to come back to it. *)
-val mark_processed_head : Store.rw -> Layer1.head -> unit Lwt.t
+let no_write result = {result; write = None}
 
-(** [last_processed_head_opt store] returns the last processed head if it
-    exists. *)
-val last_processed_head_opt : _ Store.t -> Layer1.head option Lwt.t
+let delay_write result write = {result; write = Some write}
 
-(** [mark_finalized_head store head] remembers that the [head] is finalized. By
-    construction, every block whose level is smaller than [head]'s is also
-    finalized. *)
-val mark_finalized_head : Store.rw -> Layer1.head -> unit Lwt.t
+let map f {result; write} = {result = f result; write}
 
-(** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
-val get_finalized_head_opt : _ Store.t -> Layer1.head option Lwt.t
+let map_es f {result; write} =
+  let open Lwt_result_syntax in
+  let+ result = f result in
+  {result; write}
 
-(** [hash_of_level store level] returns the current block hash for a
-   given [level]. Raise [Invalid_argument] if [hash] does not belong
-   to [store]. *)
-val hash_of_level : _ Store.t -> int32 -> Tezos_crypto.Block_hash.t Lwt.t
+let bind f {result; write = write1} =
+  let open Lwt_syntax in
+  let {result; write = write2} = f result in
+  let write =
+    match (write1, write2) with
+    | None, None -> None
+    | Some write, None | None, Some write -> Some write
+    | Some write1, Some write2 ->
+        Some
+          (fun node_ctxt ->
+            let* () = write1 node_ctxt in
+            write2 node_ctxt)
+  in
+  {result; write}
 
-(** [level_of_hash store hash] returns the level for Tezos block hash [hash] if
-    it is known by the rollup node. *)
-val level_of_hash :
-  _ Store.t -> Tezos_crypto.Block_hash.t -> int32 tzresult Lwt.t
+let apply node_ctxt {result; write} =
+  let open Lwt_syntax in
+  let+ () =
+    match write with None -> return_unit | Some write -> write node_ctxt
+  in
+  result
 
-(** [set_block_level_and_has store head] registers the correspondences
-    [head.level |-> head.hash] and [head.hash |-> head.level] in the store. *)
-val set_block_level_and_hash : Store.rw -> Layer1.head -> unit Lwt.t
+let ignore {result; _} = result
+
+module Lwt_result_syntax = struct
+  let bind f a =
+    let open Lwt_result_syntax in
+    let* a = a in
+    let* b = f a.result in
+    let write =
+      match (a.write, b.write) with
+      | None, None -> None
+      | Some write, None | None, Some write -> Some write
+      | Some write1, Some write2 ->
+          Some
+            (fun node_ctxt ->
+              let open Lwt_syntax in
+              let* () = write1 node_ctxt in
+              write2 node_ctxt)
+    in
+    return {result = b.result; write}
+
+  let map f a = Lwt_result.map (map f) a
+
+  let ( let>* ) a f = bind f a
+
+  let ( let>+ ) a f = map f a
+
+  let return x = Lwt_result.return (no_write x)
+
+  let list_fold_left_i_es f acc l =
+    List.fold_left_i_es
+      (fun i acc x ->
+        let>* acc = Lwt.return_ok acc in
+        f i acc x)
+      (no_write acc)
+      l
+end

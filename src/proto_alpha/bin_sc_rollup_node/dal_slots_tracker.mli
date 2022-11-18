@@ -38,19 +38,19 @@ type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
 (** [is_slot_confirmed node_ctxt head slot_index] checks whether the slot
     with index [slot_index] has been confirmed in [head]. *)
 val is_slot_confirmed :
-  Node_context.t -> Layer1.head -> Dal.Slot_index.t -> bool tzresult Lwt.t
+  _ Node_context.t -> Layer1.head -> Dal.Slot_index.t -> bool tzresult Lwt.t
 
 (** [save_unconfirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
 *)
 val save_unconfirmed_slot :
-  Node_context.t -> Tezos_crypto.Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
+  Node_context.rw -> Tezos_crypto.Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
 
 (** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
     The contents of the slot are set to [pages] in [node_ctxt.store]. *)
 val save_confirmed_slot :
-  Node_context.t ->
+  Node_context.rw ->
   Tezos_crypto.Block_hash.t ->
   Dal.Slot_index.t ->
   Dal.Page.content list ->
@@ -63,18 +63,18 @@ val save_confirmed_slot :
       ones the rollup node will download, and stores the results in
       [Store.Dal_confirmed_slots].}
     }  *)
-val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
+val process_head : Node_context.rw -> Layer1.head -> unit tzresult Lwt.t
 
 (** [slots_history_of_hash node_ctxt block_hash] returns the DAL confirmed slots
    history at the end of the given [block_hash] validation. *)
 val slots_history_of_hash :
-  Node_context.t ->
+  _ Node_context.t ->
   Layer1.head ->
   Protocol.Alpha_context.Dal.Slots_history.t tzresult Lwt.t
 
 (** [slots_history_cache_of_hash node_ctxt block_hash] returns the DAL confirmed
    slots history cache at the end of the given [block_hash] validation. *)
 val slots_history_cache_of_hash :
-  Node_context.t ->
+  _ Node_context.t ->
   Layer1.head ->
   Protocol.Alpha_context.Dal.Slots_history.History_cache.t tzresult Lwt.t

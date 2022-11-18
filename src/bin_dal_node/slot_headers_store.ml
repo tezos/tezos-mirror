@@ -32,9 +32,11 @@ end)
 
 module Store = Store_utils.Make (IStore)
 
-type t = Store.t
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4154
+   Use type parameter to track effects. *)
+type t = [`Read | `Write] Store.t
 
-let load = IStore.load
+let load = IStore.load Read_write
 
 (* Published slot headers per block hash,
    stored as a list of bindings from `Dal_slot_index.t`

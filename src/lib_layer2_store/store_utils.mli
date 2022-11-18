@@ -26,4 +26,4 @@
 
 open Store_sigs
 
-module Make (B : BACKEND) : Store_sigs.Store with type t = B.t
+module Make (B : BACKEND) : Store_sigs.Store with type +'a t = 'a B.t

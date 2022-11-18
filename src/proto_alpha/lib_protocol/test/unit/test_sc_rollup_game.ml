@@ -277,7 +277,8 @@ let test_invalid_serialized_inbox_proof () =
   let dal_snapshot = Dal.Slots_history.genesis in
   let dal_parameters = Default_parameters.constants_mainnet.dal in
   let ctxt = Tezos_context_memory.make_empty_context () in
-  let*! state = Arith_pvm.initial_state ctxt in
+  let empty = Tezos_context_memory.Context.Tree.empty ctxt in
+  let*! state = Arith_pvm.initial_state ~empty in
   (* We evaluate the boot sector, so the [input_requested] is a
      [First_after]. *)
   let*! state = Arith_pvm.eval state in

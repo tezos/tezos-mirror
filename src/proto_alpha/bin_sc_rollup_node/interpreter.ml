@@ -29,19 +29,19 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val metadata : Node_context.t -> Sc_rollup.Metadata.t
+  val metadata : _ Node_context.t -> Sc_rollup.Metadata.t
 
   (** [process_head node_ctxt head] interprets the messages associated
       with a [head] from a chain [event]. This requires the inbox to be updated
       beforehand. *)
   val process_head :
-    Node_context.t -> Context.t -> Layer1.head -> unit tzresult Lwt.t
+    Node_context.rw -> Context.rw -> Layer1.head -> unit tzresult Lwt.t
 
   (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
       for a given [tick] if this [tick] happened before
       [level]. Otherwise, returns [None].*)
   val state_of_tick :
-    Node_context.t ->
+    _ Node_context.t ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t
@@ -59,7 +59,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
       stored in [node_ctxt]. *)
-  let metadata (node_ctxt : Node_context.t) =
+  let metadata (node_ctxt : _ Node_context.t) =
     let address = node_ctxt.rollup_address in
     let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
     Sc_rollup.Metadata.{address; origination_level}
@@ -69,7 +69,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       we're following.
       It must be called with [block_hash.level] = [node_ctxt.genesis_info.level].
   *)
-  let get_boot_sector block_hash (node_ctxt : Node_context.t) =
+  let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
     let exception Found_boot_sector of string in
     let* block = Layer1.fetch_tezos_block node_ctxt.l1_ctxt block_hash in
@@ -111,10 +111,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         | _ -> missing_boot_sector ())
 
   let genesis_state block_hash node_ctxt ctxt =
-    let open Node_context in
     let open Lwt_result_syntax in
     let* boot_sector = get_boot_sector block_hash node_ctxt in
-    let*! initial_state = PVM.initial_state node_ctxt.context in
+    let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
     let*! ctxt = PVM.State.set ctxt genesis_state in
     return (ctxt, genesis_state)
@@ -142,7 +141,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let dal_attestation_lag =
       node_ctxt.protocol_constants.parametric.dal.attestation_lag
     in
-    let* state, num_messages, inbox_level, _fuel =
+    let* eval_result =
       Free_pvm.eval_block_inbox
         ~metadata
         ~dal_attestation_lag
@@ -151,7 +150,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         hash
         predecessor_state
     in
-
+    let*! state, num_messages, inbox_level, _fuel =
+      Delayed_write_monad.apply node_ctxt eval_result
+    in
     (* Write final state to store. *)
     let*! ctxt = PVM.State.set ctxt state in
     let*! context_hash = Context.commit ctxt in
@@ -195,7 +196,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return_unit
 
   (** [process_head node_ctxt head] runs the PVM for the given head. *)
-  let process_head (node_ctxt : Node_context.t) ctxt head =
+  let process_head (node_ctxt : _ Node_context.t) ctxt head =
     let open Lwt_result_syntax in
     let first_inbox_level =
       Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
@@ -230,6 +231,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       evaluation of the inbox at block [hash] for at most [tick_distance]. *)
   let run_for_ticks node_ctxt predecessor_hash hash level tick_distance =
     let open Lwt_result_syntax in
+    let open Delayed_write_monad.Lwt_result_syntax in
     let pred_level = Raw_level.to_int32 level |> Int32.pred in
     let* ctxt = Node_context.checkout_context node_ctxt predecessor_hash in
     let* _ctxt, state =
@@ -242,7 +244,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let dal_attestation_lag =
       node_ctxt.protocol_constants.parametric.dal.attestation_lag
     in
-    let* state, _counter, _level, _fuel =
+    let>* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox
         ~metadata
         ~dal_attestation_lag
@@ -286,6 +288,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
               event.level
               tick_distance
           in
+          let state = Delayed_write_monad.ignore state in
           let*! hash = PVM.state_hash state in
           return (Some (state, hash))
 end

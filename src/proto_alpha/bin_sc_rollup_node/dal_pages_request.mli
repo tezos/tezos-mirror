@@ -55,9 +55,9 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
 *)
 val slot_pages :
   dal_attestation_lag:int ->
-  Node_context.t ->
+  _ Node_context.t ->
   Dal.slot_id ->
-  Dal.Page.content list option tzresult Lwt.t
+  Dal.Page.content list option Node_context.delayed_write tzresult Lwt.t
 
 (** Retrieve the content of the page identified by the given ID from the store.
 
@@ -71,6 +71,6 @@ val slot_pages :
 *)
 val page_content :
   dal_attestation_lag:int ->
-  Node_context.t ->
+  _ Node_context.t ->
   Dal.Page.t ->
-  Dal.Page.content option tzresult Lwt.t
+  Dal.Page.content option Node_context.delayed_write tzresult Lwt.t

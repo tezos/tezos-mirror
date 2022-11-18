@@ -424,10 +424,9 @@ module type S = sig
 
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
-  (** A state is initialized in a given context. A [context]
-      represents the executable environment needed by the state to
-      exist. Typically, the rollup node storage can be part of this
-      context to allow the PVM state to be persistent. *)
+  (** A [context] represents the executable environment needed by the state to
+      exist. Typically, the rollup node storage can be part of this context to
+      allow the PVM state to be persistent. *)
   type context
 
   (** A [hash] characterizes the contents of a state. *)
@@ -496,12 +495,10 @@ module type S = sig
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
 
-  (** [initial_state context] is the initial state of the PVM, before
-      its specialization with a given [boot_sector].
-
-      The [context] argument is required for technical reasons and does
-      not impact the result. *)
-  val initial_state : context -> state Lwt.t
+  (** [initial_state ~empty] is the initial state of the PVM, before its
+      specialization with a given [boot_sector]. The initial state is built on
+      the [empty] state which must be provided. *)
+  val initial_state : empty:state -> state Lwt.t
 
   (** [install_boot_sector state boot_sector] specializes the initial
       [state] of a PVM using a dedicated [boot_sector], submitted at

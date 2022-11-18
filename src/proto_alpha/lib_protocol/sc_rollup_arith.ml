@@ -45,7 +45,7 @@ module PS = Sc_rollup_PVM_sig
   Its value is the result of the following snippet
 
   {|
-  let*! state = Prover.initial_state context in
+  let*! state = Prover.initial_state ~empty in
   Prover.state_hash state
   |}
 *)
@@ -818,15 +818,14 @@ module Make (Context : P) :
 
   open Monad
 
-  let initial_state ctxt =
-    let state = Tree.empty ctxt in
+  let initial_state ~empty =
     let m =
       let open Monad.Syntax in
       let* () = Status.set Halted in
       return ()
     in
     let open Lwt_syntax in
-    let* state, _ = run m state in
+    let* state, _ = run m empty in
     return state
 
   let install_boot_sector state boot_sector =
@@ -1394,7 +1393,7 @@ module Make (Context : P) :
 
   let produce_origination_proof context boot_sector =
     let open Lwt_result_syntax in
-    let*! state = initial_state context in
+    let*! state = initial_state ~empty:(Tree.empty context) in
     let*! result =
       Context.produce_proof context state (fun state ->
           let open Lwt_syntax in

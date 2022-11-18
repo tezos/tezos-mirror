@@ -159,7 +159,7 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let process_head (node_ctxt : Node_context.t)
+let process_head (node_ctxt : _ Node_context.t)
     Layer1.({level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
   let first_inbox_level =

@@ -31,72 +31,82 @@ type path = string list
 (** Keys in Map-like storage functors are represented as strings. *)
 type key_path_representation = string
 
+type rw = [`Read | `Write]
+
+type ro = [`Read]
+
+type _ mode = Read_only : ro mode | Read_write : rw mode
+
 (** [BACKEND] is the module type defining the backend for persisting data to
     disk. It is used by the functors in [Store_utils] to create Storage
     modules that persist data structures on disk. *)
 module type BACKEND = sig
   (** The type for representing storage backends that can be accessed by the
-      module. *)
-  type t
+      module. The type parameter indicates whether the storage can be only read
+      or both read and written. *)
+  type +'a t
 
   (** [make_key_path path raw_key] constructs a new path from [path]
       and the [raw_key] key_path_representation. *)
   val make_key_path : path -> key_path_representation -> path
 
   (** [load location] loads the backend storage from [location]. *)
-  val load : string -> t Lwt.t
+  val load : 'a mode -> string -> 'a t Lwt.t
 
   (** [flush location] flushes to disk a sequence of changes to the data stored
       at [location]. *)
-  val flush : t -> unit
+  val flush : [> `Write] t -> unit
 
   (** [close t] closes the storage backend [t]. *)
-  val close : t -> unit Lwt.t
+  val close : _ t -> unit Lwt.t
 
   (** [set_exn t path b] sets the contents for the store [t] at [path] to the
       sequence of bytes [b]. The write operation can fail, in which case an
       exception is thrown. *)
-  val set_exn : t -> path -> bytes -> unit Lwt.t
+  val set_exn : [> `Write] t -> path -> bytes -> unit Lwt.t
 
   (** [get t path] returns the contents for the store [t] at the location
       indicated by [path]. It can fail if [t] does not have any content
       stored at [path]. *)
-  val get : t -> path -> bytes Lwt.t
+  val get : [> `Read] t -> path -> bytes Lwt.t
 
   (** [mem t path] returns whether the storage backend [t] contains any
       data at the location indicated by [path]. *)
-  val mem : t -> path -> bool Lwt.t
+  val mem : [> `Read] t -> path -> bool Lwt.t
 
   (** [find t path] is the same as [get t path], except that an optional
       value is returned. This value is [None] if the backend storage [t]
       does not have any content stored at location [path]. *)
-  val find : t -> path -> bytes option Lwt.t
+  val find : [> `Read] t -> path -> bytes option Lwt.t
 
   (** [path_to_string] converts a path to a string. *)
   val path_to_string : path -> string
+
+  (** [readonly t] returns a read only version of the storage [t]. *)
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 (** Module type respresenting a [Mutable_value] that is persisted on store. *)
 module type Mutable_value = sig
   (** The type of the [store] that is used for persisting data on disk. *)
-  type store
+  type +'a store
 
   (** The type of the values that will be persisted. *)
   type value
 
   (** [set store value] persists [value] for this [Mutable_value] on [store]. *)
-  val set : store -> value -> unit Lwt.t
+  val set : [> `Write] store -> value -> unit Lwt.t
 
   (** [get store] retrieves the value persisted in [store] for this
       [Mutable_value]. If the underlying storage backend fails to retrieve the
       contents of the mutable value by throwing an exception, then the
       exception is propagated by [get store].  *)
-  val get : store -> value Lwt.t
+  val get : [> `Read] store -> value Lwt.t
 
   (** [find store] returns an optional value containing the value persisted
         in [store] for this [Mutable_value]. If no value is persisted for the
         [Mutable_value], [None] is returned. *)
-  val find : store -> value option Lwt.t
+  val find : [> `Read] store -> value option Lwt.t
 end
 
 (** This module contains information about where to store and retrieve contents
@@ -134,7 +144,7 @@ end
 (** Generic module type for maps to be persisted on disk. *)
 module type Map = sig
   (** The type of the [store] that is used for persisting data on disk. *)
-  type store
+  type +'a store
 
   (** The type of keys persisted by the map. *)
   type key
@@ -144,27 +154,37 @@ module type Map = sig
 
   (** [mem store key] checks whether there is a binding of the map for key [key]
       in [store]. *)
-  val mem : store -> key -> bool Lwt.t
+  val mem : [> `Read] store -> key -> bool Lwt.t
 
   (** [get store key] retrieves from [store] the value associated with [key] in
       the map. It raises an error if such a value does not exist. *)
-  val get : store -> key -> value Lwt.t
+  val get : [> `Read] store -> key -> value Lwt.t
 
   (** [find store key] retrieves from [store] the value associated with [key]
       in the map. If the value exists it is returned as an optional value.
       Otherwise, [None] is returned. *)
-  val find : store -> key -> value option Lwt.t
+  val find : [> `Read] store -> key -> value option Lwt.t
 
   (** [find_with_default ~on_default store key] retrieves from [store] the
-      value associated with [key] in the map. 
-      If the value exists it is returned as is. 
+      value associated with [key] in the map.
+      If the value exists it is returned as is.
       Otherwise, [on_default] is returned. *)
   val find_with_default :
-    store -> key -> on_default:(unit -> value) -> value Lwt.t
+    [> `Read] store -> key -> on_default:(unit -> value) -> value Lwt.t
 
-  (** [add store key value] adds a binding from [key] to [value] to
-      the map, and persists it to disk. *)
-  val add : store -> key -> value -> unit Lwt.t
+  (** [add store key value] adds a binding from [key] to [value] to the map, and
+      persists it to disk. *)
+  val add : [> `Write] store -> key -> value -> unit Lwt.t
+end
+
+(** Generic module type for append-only maps to be persisted on disk. *)
+module type Append_only_map = sig
+  include Map
+
+  (** [add store key value] adds a binding from [key] to [value] to the map, and
+      persists it to disk. If [key] already exists in the store, it must be
+      bound to [value]. *)
+  val add : rw store -> key -> value -> unit Lwt.t
 end
 
 (** [Nested_map] is a map where values are indexed by both a primary and
@@ -175,7 +195,7 @@ end
 *)
 module type Nested_map = sig
   (** The type of the [store] that is used for persisting data on disk. *)
-  type store
+  type +'a store
 
   (** [primary_key] is the type of primary keys for the [Nested_map]. *)
   type primary_key
@@ -197,7 +217,7 @@ module type Nested_map = sig
       value for the nested map persisted on [store] for the nested map,
       indexed by [primary_key] and then by [secondary_key]. *)
   val mem :
-    store ->
+    [> `Read] store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
     bool Lwt.t
@@ -207,7 +227,7 @@ module type Nested_map = sig
       any. If such a value does not exist, it raises the exception
       [Get_failed {primary_key; secondary_key}]. *)
   val get :
-    store ->
+    [> `Read] store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
     value Lwt.t
@@ -218,7 +238,7 @@ module type Nested_map = sig
       [None] if there is not a value bound to [primary_key] and [seconary_key]
       in the [store] for the [Nested_map]. *)
   val find :
-    store ->
+    [> `Read] store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
     value option Lwt.t
@@ -227,24 +247,27 @@ module type Nested_map = sig
       of bindings of the nested map that share the same [~primary_key]. For
       each of these bindings, both the secondary_key and value are returned. *)
   val list_secondary_keys_with_values :
-    store -> primary_key:primary_key -> (secondary_key * value) list Lwt.t
+    [> `Read] store ->
+    primary_key:primary_key ->
+    (secondary_key * value) list Lwt.t
 
   (** [list_secondary_keys store ~primary_key] retrieves from [store]
       the list of secondary_keys for which a value indexed by both
       [primary_key] and secondary key is persisted on disk. *)
   val list_secondary_keys :
-    store -> primary_key:primary_key -> secondary_key list Lwt.t
+    [> `Read] store -> primary_key:primary_key -> secondary_key list Lwt.t
 
   (** [list_values store ~primary_key] retrieves from [store] the list of
       values for which a binding with primary key [primary_key] and
       arbitrary secondary key exists. *)
-  val list_values : store -> primary_key:primary_key -> value list Lwt.t
+  val list_values :
+    [> `Read] store -> primary_key:primary_key -> value list Lwt.t
 
   (** [add store ~primary_key ~secondary_key value] persists [value] to
       disk. The value is bound to the [primary_key] and [secondary_key].
   *)
   val add :
-    store ->
+    rw store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
     value ->
@@ -268,55 +291,54 @@ module type COMPARABLE_KEY = sig
 end
 
 module type Store = sig
-  type t
+  type +'a t
 
-  (** [Make_updatable_map(S)(K)(V)] constructs a [Map] which can be persisted
-    on store. The module [B] defines the underlying store that will be used the
-    map on disk. The module [S] defines storage-dependent information about how
-    the map will be saved on and retrieved from the store (for example, it
-    defines the map location in the store). The module [K] defines the
-    information related to keys of the map, and the module [V] contains
-    information about how values will be stored to and retrieved from the
-    store. The resulting map allows to update the contents of an existing value
-    for a key.
+  (** [Make_updatable_map(S)(K)(V)] constructs a [Map] which can be persisted on
+      store. The module [S] defines storage-dependent information about how the
+      map will be saved on and retrieved from the store (for example, it defines
+      the map location in the store). The module [K] defines the information
+      related to keys of the map, and the module [V] contains information about
+      how values will be stored to and retrieved from the store. The resulting
+      map allows to update the contents of an existing value for a key.
 *)
   module Make_updatable_map (S : STORAGE_INFO) (K : KEY) (V : VALUE) :
-    Map with type store = t and type key = K.key and type value = V.value
+    Map with type 'a store = 'a t and type key = K.key and type value = V.value
 
-  (** [Make_append_only_map(B)(S)(K)(V)] constructs a [Map] which can be
-    persisted on store. The module [B] defines the underlying store that will
-    be used for the map on disk. The module [S] defines storage-dependent
-    information about how the map will be saved on and retrieved from the store
-    (for example, it defines the map location in the store). The module [K]
-    contains information related to keys of the map, and the module [V]
-    contains information about how values will be stored to and retrieved from
-    the store. The resulting map forbids updating the contents of an existing
-    value with a new value, different from the previous one.
+  (** [Make_append_only_map(S)(K)(V)] constructs an [Append_only_map] which can be
+      persisted on store. The module [S] defines storage-dependent information
+      about how the map will be saved on and retrieved from the store (for
+      example, it defines the map location in the store). The module [K]
+      contains information related to keys of the map, and the module [V]
+      contains information about how values will be stored to and retrieved from
+      the store. The resulting map forbids updating the contents of an existing
+      value with a new value, different from the previous one.
 *)
   module Make_append_only_map (S : STORAGE_INFO) (K : KEY) (V : VALUE) :
-    Map with type store = t and type key = K.key and type value = V.value
+    Append_only_map
+      with type 'a store = 'a t
+       and type key = K.key
+       and type value = V.value
 
   (** [Make_mutable_value(S)(V)] constructs a [Mutable_value] for persisting a
-    mutable value in a store. The underlying backend for the store is defined
-    by the module parameter [B]. The module parameter [S] defines the location
-    of the  mutable value in the store, and the module parameter [V] contains
-    information about the type of values that the constructed module will
-    persist in the underlying store. *)
+      mutable value in a store. The module parameter [S] defines the location of
+      the mutable value in the store, and the module parameter [V] contains
+      information about the type of values that the constructed module will
+      persist in the underlying store. *)
   module Make_mutable_value (S : STORAGE_INFO) (V : VALUE) :
-    Mutable_value with type store = t and type value = V.value
+    Mutable_value with type 'a store = 'a t and type value = V.value
 
-  (** Make_nested_map(B)(S)(K1)(K2)(V) constructs a [Nested_map]  module using
-    module parameter [B] to define the storage backend, module parameter [S]
-    to define where the map is going to be persisted on store, [K1] and [K2]
-    to define the primary and secondary key, respectively, and [V] to define
-    the values of the resulting [Nested_map]. *)
+  (** Make_nested_map(S)(K1)(K2)(V) constructs a [Nested_map] module using
+      module parameter [S] to define where the map is going to be persisted on
+      store, [K1] and [K2] to define the primary and secondary key,
+      respectively, and [V] to define the values of the resulting
+      [Nested_map]. *)
   module Make_nested_map
       (S : STORAGE_INFO)
       (K1 : KEY)
       (K2 : COMPARABLE_KEY)
       (V : VALUE) :
     Nested_map
-      with type store = t
+      with type 'a store = 'a t
        and type primary_key = K1.key
        and type secondary_key = K2.key
        and type value = V.value

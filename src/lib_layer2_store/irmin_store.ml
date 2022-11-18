@@ -23,6 +23,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+open Store_sigs
+
 module Make (N : sig
   val name : string
 end) =
@@ -33,9 +36,13 @@ struct
 
   let make_key_path path key = path @ [key]
 
-  let load data_dir =
+  type nonrec +'a t = t
+
+  let load : type a. a mode -> string -> a t Lwt.t =
+   fun mode data_dir ->
     let open Lwt_syntax in
-    let* repo = Repo.v (Irmin_pack.config data_dir) in
+    let readonly = match mode with Read_only -> true | Read_write -> false in
+    let* repo = Repo.v (Irmin_pack.config ~readonly data_dir) in
     main repo
 
   let flush store = flush (repo store)
@@ -55,4 +62,6 @@ struct
     let full_path = path_to_string path in
     let info () = info full_path in
     set_exn ~info store path bytes
+
+  let readonly = Fun.id
 end
