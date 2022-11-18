@@ -31,4 +31,5 @@ let () =
   Test_retry.register () ;
   Test_diff.register () ;
   Test_process.register () ;
+  Test_michelson_script.register () ;
   Test.run ()
