@@ -30,8 +30,6 @@ val num_elements : t -> Z.t
 (** [reset buffer] removes the current contents of the buffer. *)
 val reset : t -> unit
 
-(* TODO: #3340 Note that op does not clean up the list. *)
-
 (** [dequeue buffer] pops the current message from buffer and returns it.
     Note that the input buffer models a FIFO queue so the current message is
     the oldest in the queue. If the queue is empty it raises
