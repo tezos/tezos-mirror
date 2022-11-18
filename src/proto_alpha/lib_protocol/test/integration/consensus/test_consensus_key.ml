@@ -176,6 +176,18 @@ let test_drain_empty_delegate ~exclude_ck () =
         "Drain delegate without enough balance for allocation burn or drain \
          fees")
 
+let test_tz4_consensus_key () =
+  Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
+  let account1_pkh = Context.Contract.pkh contracts in
+  let consensus_account = Account.new_account ~algo:Bls () in
+  let delegate = account1_pkh in
+  let consensus_pk = consensus_account.pk in
+  let consensus_pkh = consensus_account.pkh in
+  transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+  >>=? fun blk' ->
+  update_consensus_key blk' delegate consensus_pk >>= fun res ->
+  Assert.proto_error_with_info ~loc:__LOC__ res "Consensus key cannot be a tz4"
+
 let test_endorsement_with_consensus_key () =
   Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
   let account1_pkh = Context.Contract.pkh contracts in
@@ -265,6 +277,7 @@ let tests =
         "test empty drain delegate with ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
+      tztest "test tz4 consensus key" `Quick test_tz4_consensus_key;
       tztest
         "test endorsement with ck"
         `Quick

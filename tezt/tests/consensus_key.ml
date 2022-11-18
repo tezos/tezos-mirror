@@ -90,6 +90,7 @@ let test_update_consensus_key =
   let* key_a = Client.gen_and_show_keys client in
   let* key_b = Client.gen_and_show_keys client in
   let* key_c = Client.gen_and_show_keys client in
+  let* key_bls = Client.gen_and_show_keys ~sig_alg:"bls" client in
   let* destination = Client.gen_and_show_keys client in
 
   let* () =
@@ -143,6 +144,14 @@ let test_update_consensus_key =
       ~expect_failure:true
       ~src:Constant.bootstrap2.alias
       ~pk:Constant.bootstrap1.alias
+      client
+  in
+  Log.info "Invalid update: changing the consensus key to a BLS key." ;
+  let* () =
+    Client.update_consensus_key
+      ~expect_failure:true
+      ~src:Constant.bootstrap1.alias
+      ~pk:key_bls.alias
       client
   in
 
