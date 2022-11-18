@@ -27,6 +27,9 @@ val alloc : unit -> t
     necessarily equal to the length of the content of the inbox (see #3340). *)
 val num_elements : t -> Z.t
 
+(** [reset buffer] removes the current contents of the buffer. *)
+val reset : t -> unit
+
 (* TODO: #3340 Note that op does not clean up the list. *)
 
 (** [dequeue buffer] pops the current message from buffer and returns it.

@@ -585,6 +585,27 @@ let build_snapshot_wasm_state_from_set_input
       tree
   in
 
+  (* The input buffer is being cleared. *)
+  let* tree =
+    Test_encodings_util.Tree.remove tree ["value"; "pvm"; "buffers"; "input"]
+  in
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tezos_tree_encoding.value
+         ["value"; "pvm"; "buffers"; "input"; "length"]
+         Data_encoding.n)
+      Z.zero
+      tree
+  in
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tezos_tree_encoding.value
+         ["value"; "pvm"; "buffers"; "input"; "head"]
+         Data_encoding.n)
+      Z.zero
+      tree
+  in
+
   (* The kernel will have been set as the fallback kernel. *)
   let* durable =
     Test_encodings_util.Tree_encoding_runner.decode
@@ -1362,6 +1383,42 @@ let test_set_inputs number_of_inputs level tree =
   assert (state = Padding) ;
   tree
 
+let test_inbox_cleanup () =
+  let open Lwt_syntax in
+  let check_messages_count tree count =
+    let+ buffer = Wasm.Internal_for_tests.get_input_buffer tree in
+    let inputs_before_exec =
+      Tezos_lazy_containers.Lazy_vector.Mutable.ZVector.num_elements buffer
+    in
+    assert (inputs_before_exec = Z.of_int count)
+  in
+  let module_ =
+    {|
+      (module
+        (memory 0)
+        (export "mem" (memory 0))
+        (func (export "kernel_next")
+          (nop)
+        )
+      )
+    |}
+  in
+  let max_tick = 1000L in
+  let* tree = initial_tree ~max_tick ~from_binary:false module_ in
+  let* tree = set_empty_inbox_step 0l tree in
+  (* Before executing: EOL and SOL. *)
+  let* () = check_messages_count tree 2 in
+  (* Go to the very last [Padding] state. *)
+  let* tree, _ = Wasm.compute_step_many ~max_steps:Int64.(pred max_tick) tree in
+  (* Before yielding: EOL and SOL still, since the module does not
+     read the content of the inbox. *)
+  let* () = check_messages_count tree 2 in
+  (* Yield with one more step. *)
+  let* tree = Wasm.compute_step tree in
+  (* After yielding, the inbox has been cleared. *)
+  let* () = check_messages_count tree 0 in
+  Lwt_result_syntax.return_unit
+
 let test_scheduling_multiple_inboxes input_numbers =
   let open Lwt_result_syntax in
   let module_ =
@@ -1489,4 +1546,5 @@ let tests =
       "Test scheduling with 5 inboxes with a different input number"
       `Quick
       test_scheduling_five_inboxes;
+    tztest "Test inbox clean-up" `Quick test_inbox_cleanup;
   ]

@@ -113,8 +113,21 @@ let test_move_subtrees () =
       v
       (Stdlib.List.init n Fun.id)
   in
+  (* Proof with reading the complete list (setting a key on top of
+     that does not change a thing). *)
+  let* big_proof =
+    produce_proof context tree (fun tree ->
+        (* decoding *)
+        let* v1, v2, v3 = Tree_encoding.decode encoding tree in
+        let* l = Vector.to_list v1 in
+        let v1 = Vector.of_list l in
+        (* swap, encode *)
+        let+ tree' = Tree_encoding.encode encoding (v3, v1, v2) tree in
+        (tree', ()))
+  in
   let check_proof_size n =
-    let* proof =
+    (* Proof with swap *)
+    let* small_proof =
       produce_proof context tree (fun tree ->
           (* decoding *)
           let* v1, v2, v3 = Tree_encoding.decode encoding tree in
@@ -126,26 +139,15 @@ let test_move_subtrees () =
     (* We check an experimentally defined law: 350 is the cost of
        reading the three vectors info (first_key, num_elements), and
        500 is the cost of accessing one element in the vector. *)
-    assert_proof_size proof (350 + (n * 500)) ;
+    assert_proof_size small_proof (350 + (n * 500)) ;
+    (* We check that  *)
+    assert (proof_size small_proof < proof_size big_proof) ;
     Lwt.return ()
   in
   let* () = check_proof_size 2 in
   let* () = check_proof_size 10 in
   let* () = check_proof_size 100 in
 
-  (* Finally, we check the cost of recreating one of the vector is
-     very high. *)
-  let* proof =
-    produce_proof context tree (fun tree ->
-        (* decoding *)
-        let* v1, v2, v3 = Tree_encoding.decode encoding tree in
-        let* l = Vector.to_list v1 in
-        let v1 = Vector.of_list l in
-        (* swap, encode *)
-        let+ tree' = Tree_encoding.encode encoding (v3, v1, v2) tree in
-        (tree', ()))
-  in
-  assert (100_000 < proof_size proof) ;
   Lwt.return_ok ()
 
 let test_move_and_read_subtrees () =
