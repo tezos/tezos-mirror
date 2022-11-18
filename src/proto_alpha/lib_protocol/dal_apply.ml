@@ -81,12 +81,16 @@ let apply_attestation ctxt op =
   | Some shards ->
       Ok (Dal.Attestation.record_available_shards ctxt attestation shards)
 
-let validate_publish_slot_header ctxt
-    Dal.Slot.Header.{id = {index; published_level}; _} =
+let validate_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
   let open Constants in
-  let Parametric.{dal = {number_of_slots; _}; _} = parametric ctxt in
+  let Dal.Slot.Header.{id = {index; published_level}; _} =
+    operation.Dal.Slot.Header.header
+  in
+  let Parametric.{dal = {number_of_slots; cryptobox_parameters; _}; _} =
+    parametric ctxt
+  in
   let* number_of_slots = slot_of_int_e (number_of_slots - 1) in
   let* () =
     error_unless
@@ -103,16 +107,26 @@ let validate_publish_slot_header ctxt
       (Dal_publish_slot_header_future_level
          {provided = published_level; expected = current_level})
   in
-  error_when
-    Raw_level.(current_level > published_level)
-    (Dal_publish_slot_header_past_level
-       {provided = published_level; expected = current_level})
+  let* () =
+    error_when
+      Raw_level.(current_level > published_level)
+      (Dal_publish_slot_header_past_level
+         {provided = published_level; expected = current_level})
+  in
+  let* proof_ok =
+    Dal.Slot.Header.verify_commitment cryptobox_parameters operation
+  in
+  error_unless
+    proof_ok
+    (Dal_publish_slot_header_invalid_proof {slot_header = operation})
 
-let apply_publish_slot_header ctxt slot_header =
+let apply_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  Dal.Slot.register_slot_header ctxt slot_header >>? fun (ctxt, updated) ->
+  Dal.Slot.register_slot_header ctxt operation.Dal.Slot.Header.header
+  >>? fun (ctxt, updated) ->
   if updated then ok ctxt
-  else error (Dal_publish_slot_header_duplicate {slot_header})
+  else
+    error (Dal_publish_slot_header_duplicate {slot_header = operation.header})
 
 let finalisation ctxt =
   only_if_dal_feature_enabled

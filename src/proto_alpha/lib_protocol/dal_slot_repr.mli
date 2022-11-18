@@ -70,6 +70,16 @@ module Commitment : sig
   val zero : t
 end
 
+module Commitment_proof : sig
+  (** A slot commitment proof is provided via the environment. *)
+  type t = Dal.commitment_proof
+
+  val encoding : t Data_encoding.t
+
+  (** A dummy value for a commitment proof. *)
+  val zero : t
+end
+
 (** An `Index.t` is a possible value for a slot index. We assume this value
     to be a positive 8-bit integer. Note that this is a hard constraint,
     which is independent of protocol constants. If a choice is ever made to
@@ -102,15 +112,23 @@ module Header : sig
       and the slot's index. *)
   type id = {published_level : Raw_level_repr.t; index : Index.t}
 
-  (** For Layer-1, a slot is described by its slot {!id} and the slot's KATE
-      commitment hash. *)
+  (** For Layer-1, a slot is described by its slot {!id} and the
+     slot's commitment. *)
   type t = {id : id; commitment : Commitment.t}
+
+  (** A "publish slot header" operation contains a slot header
+     together with a proof that the slot size is smaller than
+     [slot_size]. *)
+  type operation = {header : t; proof : Commitment_proof.t}
 
   (** encoding for values of type {!id}. *)
   val id_encoding : id Data_encoding.t
 
   (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
+
+  (** encoding for values of type {!operation}. *)
+  val operation_encoding : operation Data_encoding.t
 
   (** pretty-printer for values of type {!id}. *)
   val pp_id : Format.formatter -> id -> unit
@@ -120,6 +138,10 @@ module Header : sig
 
   (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
+
+  (** check that for the given slot header operation, the commitment
+      proof is correct wrt the commitment *)
+  val verify_commitment : parameters -> operation -> bool tzresult
 end
 
 (** A DAL slot is decomposed to a successive list of pages with fixed content

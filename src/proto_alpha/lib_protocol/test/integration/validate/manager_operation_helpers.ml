@@ -474,6 +474,9 @@ let init_ctxt_only ctxtreq =
     Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
       {Context.default_test_constants with consensus_threshold = 0}
   in
+  let*? _cryptobox =
+    Dal_helpers.mk_cryptobox initial_params.constants.dal.cryptobox_parameters
+  in
   let* block, contracts =
     Context.init_with_parameters_n (manager_parameters initial_params ctxtreq) 7
   in
@@ -1131,8 +1134,10 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
   in
   let index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
   let slot =
-    Alpha_context.Dal.Slot.Header.{id = {published_level; index}; commitment}
+    Alpha_context.Dal.Slot.Header.
+      {header = {id = {published_level; index}; commitment}; proof}
   in
   Op.dal_publish_slot_header
     ?fee:oinfos.fee

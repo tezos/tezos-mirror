@@ -42,12 +42,13 @@ val apply_attestation : t -> Dal.Attestation.operation -> t tzresult
    valid and cannot prevent an operation containing [slot_header] to be
    refused on top of [ctxt]. If an [Error _] is returned, the [slot_header]
    is not valid. *)
-val validate_publish_slot_header : t -> Dal.Slot.Header.t -> unit tzresult
+val validate_publish_slot_header :
+  t -> Dal.Slot.Header.operation -> unit tzresult
 
 (** [apply_publish_slot_header ctxt slot_header] applies the publication of
    slot header [slot_header] on top of [ctxt]. Fails if the slot contains
    already a slot header. *)
-val apply_publish_slot_header : t -> Dal.Slot.Header.t -> t tzresult
+val apply_publish_slot_header : t -> Dal.Slot.Header.operation -> t tzresult
 
 (** [finalisation ctxt] should be executed at block finalisation
    time. A set of slots attested at level [ctxt.current_level - lag]

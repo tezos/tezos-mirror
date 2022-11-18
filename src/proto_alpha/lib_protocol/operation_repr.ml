@@ -425,7 +425,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header : {
-      slot_header : Dal_slot_repr.Header.t;
+      slot_header : Dal_slot_repr.Header.operation;
     }
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
@@ -1162,7 +1162,8 @@ module Encoding = struct
         {
           tag = dal_publish_slot_header_tag;
           name = "dal_publish_slot_header";
-          encoding = obj1 (req "slot_header" Dal_slot_repr.Header.encoding);
+          encoding =
+            obj1 (req "slot_header" Dal_slot_repr.Header.operation_encoding);
           select =
             (function
             | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);

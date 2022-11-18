@@ -403,7 +403,7 @@ let pp_manager_operation_content (type kind) source ppf
         ppf
         "Data availability slot header publishing:@,Slot: %a"
         Dal.Slot.Header.pp
-        slot_header
+        slot_header.header
   | Zk_rollup_origination _ ->
       Format.fprintf ppf "Epoxy origination:@,From: %a" Contract.pp source
   | Zk_rollup_publish _ ->
