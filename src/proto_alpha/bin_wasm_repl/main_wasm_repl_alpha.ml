@@ -65,7 +65,12 @@ let handle_module binary name module_ =
   let* () = typecheck_module ast in
   let* () = import_pvm_host_functions () in
   let* _ = link ast in
-  let*! tree = initial_tree ~from_binary:binary module_ in
+  let*! tree =
+    initial_tree
+      ~max_tick:(Z.to_int64 Tezos_scoru_wasm.Constants.wasm_max_tick)
+      ~from_binary:binary
+      module_
+  in
   let*! tree = eval_until_input_requested tree in
   return tree
 
