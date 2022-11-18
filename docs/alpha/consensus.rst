@@ -366,7 +366,7 @@ maximum 2333 extra endorsements it could have theoretically included.) Finally, 
 delegate C, whose active stake at some cycle is 5% of the total stake. Note that
 his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
 2,867,200`` slots. Assume also that the endorsing power of C's endorsements
-included during that cycle has been ``3,123,456`` slots. Given that this number is
+included during that cycle has been ``2,123,456`` slots. Given that this number is
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
 reward of ``2,867,200 * 0.002857 = 8191.59`` tez for that cycle.
 
