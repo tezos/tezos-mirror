@@ -35,6 +35,14 @@ type commitment = {
 
 type slot_header = {level : int; commitment : string; index : int}
 
+type simulation_result = {
+  state_hash : string;
+  status : string;
+  output : JSON.t;
+  inbox_level : int;
+  num_ticks : int;
+}
+
 (** [create ?name ?path ?base_dir ?path node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -49,35 +57,48 @@ val create :
 
 (** [sc_rollup_address client] returns the smart contract rollup
    address of the node associated to the [client]. *)
-val sc_rollup_address : ?hooks:Process.hooks -> t -> string Lwt.t
+val sc_rollup_address : ?hooks:Process.hooks -> t -> string Runnable.process
 
 (** [rpc_get client path] issues a GET request for [path]. *)
-val rpc_get : ?hooks:Process.hooks -> t -> Client.path -> JSON.t Lwt.t
+val rpc_get :
+  ?hooks:Process.hooks -> t -> Client.path -> JSON.t Runnable.process
+
+(** [rpc_post client path data] issues a POST request for [path] with [data]. *)
+val rpc_post :
+  ?hooks:Process.hooks -> t -> Client.path -> JSON.t -> JSON.t Runnable.process
 
 (** [total_ticks ?block client] gets the total number of ticks for the PVM. *)
-val total_ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Lwt.t
+val total_ticks :
+  ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
 
 (** [ticks ?block client] gets the number of ticks for the PVM for the [block]
     (default ["head"]). *)
-val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Lwt.t
+val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
 
 (** [state_hash ?block client] gets the corresponding PVM state hash for the
     [block] (default ["head"]). *)
-val state_hash : ?hooks:Process.hooks -> ?block:string -> t -> string Lwt.t
+val state_hash :
+  ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
 
 (** [state_value ?block client key] gets the corresponding PVM state value
     mapped to [key] for the [block] (default ["head"]). *)
 val state_value :
-  ?hooks:Process.hooks -> ?block:string -> t -> key:string -> bytes Lwt.t
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  t ->
+  key:string ->
+  bytes Runnable.process
 
 (** [status ?block client] gets the corresponding PVM status for the [block]
     (default ["head"]). *)
-val status : ?hooks:Process.hooks -> ?block:string -> t -> string Lwt.t
+val status :
+  ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
 
 (** [outbox ?block client] gets the rollup outbox for the [block] (default
     ["cemented"] which is the block corresponding to the last cemented
     level). *)
-val outbox : ?hooks:Process.hooks -> ?block:string -> t -> string Lwt.t
+val outbox :
+  ?hooks:Process.hooks -> ?block:string -> t -> JSON.t Runnable.process
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
@@ -125,22 +146,44 @@ val commitment_with_hash_and_level_from_json :
 (** [last_stored_commitment client] gets the last commitment with its hash
     stored by the rollup node. *)
 val last_stored_commitment :
-  ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
+  ?hooks:Process.hooks ->
+  t ->
+  (string * commitment * int option) option Runnable.process
 
 (** [last_published_commitment client] gets the last commitment published by the rollup node,
 with its hash and level when the commitment was first published. *)
 val last_published_commitment :
-  ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
+  ?hooks:Process.hooks ->
+  t ->
+  (string * commitment * int option) option Runnable.process
 
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)
 val dal_slot_headers :
-  ?hooks:Process.hooks -> ?block:string -> t -> slot_header list Lwt.t
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  t ->
+  slot_header list Runnable.process
 
 (** [dal_downloaded_confirmed_slot_pages ?block client] returns the confirmed
     slots downloaded after processing the [block] (default ["head"]). *)
 val dal_downloaded_confirmed_slot_pages :
-  ?hooks:Process.hooks -> ?block:string -> t -> (int * string list) list Lwt.t
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  t ->
+  (int * string list) list Runnable.process
+
+(** [simulate ?block client ?reveal_pages messages] simulates the evaluation of
+    input [messages] for the rollup PVM at [block] (default
+    ["head"]). [reveal_pages] can be used to provide data to be used for the
+    revelation ticks. *)
+val simulate :
+  ?hooks:Process_hooks.t ->
+  ?block:string ->
+  t ->
+  ?reveal_pages:string list ->
+  string list ->
+  simulation_result Runnable.process
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

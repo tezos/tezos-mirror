@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,46 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Node_context
 open Protocol.Alpha_context
 
-module Make (PVM : Pvm.S) = struct
-  let get_state_of_lcc node_ctxt =
-    let open Lwt_result_syntax in
-    let*! lcc_level =
-      Store.Last_cemented_commitment_level.get node_ctxt.store
-    in
-    let*! block_hash =
-      State.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
-    in
-    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
-    let*! state = PVM.State.find ctxt in
-    return state
+module type S = sig
+  module PVM : Pvm.S
 
-  let proof_of_output node_ctxt output =
-    let open Lwt_result_syntax in
-    let*! commitment_hash =
-      Store.Last_cemented_commitment_hash.get node_ctxt.store
-    in
-    let* state = get_state_of_lcc node_ctxt in
-    match state with
-    | None ->
-        (*
-           This case should never happen as origination creates an LCC which
-           must have been considered by the rollup node at startup time.
-        *)
-        failwith "Error producing outbox proof (no cemented state in the node)"
-    | Some state -> (
-        let*! proof = PVM.produce_output_proof node_ctxt.context state output in
-        match proof with
-        | Ok proof ->
-            let serialized_proof =
-              Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
-            in
-            return @@ (commitment_hash, serialized_proof)
-        | Error err ->
-            failwith
-              "Error producing outbox proof (%a)"
-              Environment.Error_monad.pp
-              err)
+  module Accounted_pvm :
+    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Accounted.t
+
+  module Free_pvm :
+    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
+
+  (** [process_head node_ctxt head] interprets the messages associated
+      with a [head] from a chain [event]. This requires the inbox to be updated
+      beforehand. *)
+  val process_head :
+    Node_context.rw -> Context.rw -> Layer1.head -> unit tzresult Lwt.t
+
+  (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
+      for a given [tick] if this [tick] happened before
+      [level]. Otherwise, returns [None].*)
+  val state_of_tick :
+    _ Node_context.t ->
+    Sc_rollup.Tick.t ->
+    Raw_level.t ->
+    (PVM.state * PVM.hash) option tzresult Lwt.t
+
+  (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
+      block [head], or the state at rollup genesis if the block is before the
+      rollup origination. *)
+  val state_of_head :
+    'a Node_context.t ->
+    'a Context.t ->
+    Layer1.head ->
+    ('a Context.t * PVM.state) tzresult Lwt.t
 end
+
+(** Functor to construct an interpreter for a given PVM. *)
+module Make (PVM : Pvm.S) : S with module PVM = PVM

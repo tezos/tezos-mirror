@@ -29,40 +29,33 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val metadata : _ Node_context.t -> Sc_rollup.Metadata.t
+  module Accounted_pvm :
+    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Accounted.t
 
-  (** [process_head node_ctxt head] interprets the messages associated
-      with a [head] from a chain [event]. This requires the inbox to be updated
-      beforehand. *)
+  module Free_pvm :
+    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
+
   val process_head :
     Node_context.rw -> Context.rw -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
-      for a given [tick] if this [tick] happened before
-      [level]. Otherwise, returns [None].*)
   val state_of_tick :
     _ Node_context.t ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t
+
+  val state_of_head :
+    'a Node_context.t ->
+    'a Context.t ->
+    Layer1.head ->
+    ('a Context.t * PVM.state) tzresult Lwt.t
 end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module PVM = PVM
-
-  module Interpreter_event : Interpreter_event.S with type state := PVM.state =
-    Interpreter_event.Make (PVM)
-
-  module Accounted_pvm =
-    Fueled_pvm.Make (PVM) (Interpreter_event) (Fuel.Accounted)
-  module Free_pvm = Fueled_pvm.Make (PVM) (Interpreter_event) (Fuel.Free)
-
-  (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
-      stored in [node_ctxt]. *)
-  let metadata (node_ctxt : _ Node_context.t) =
-    let address = node_ctxt.rollup_address in
-    let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
-    Sc_rollup.Metadata.{address; origination_level}
+  module Fueled_pvm = Fueled_pvm.Make (PVM)
+  module Accounted_pvm = Fueled_pvm.Accounted
+  module Free_pvm = Fueled_pvm.Free
 
   (** [get_boot_sector block_hash node_ctxt] fetches the operations in the
       [block_hash] and looks for the bootsector used to originate the rollup
@@ -137,14 +130,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
     let* ctxt, predecessor_state = state_of_head node_ctxt ctxt predecessor in
-    let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.protocol_constants.parametric.dal.attestation_lag
-    in
     let* eval_result =
       Free_pvm.eval_block_inbox
-        ~metadata
-        ~dal_attestation_lag
         ~fuel:(Fuel.Free.of_ticks 0L)
         node_ctxt
         hash
@@ -189,8 +176,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         {num_messages; num_ticks; initial_tick}
     in
     (* Produce events. *)
+    let*! state_hash = PVM.state_hash state in
     let*! () =
-      Interpreter_event.transitioned_pvm inbox_level state num_messages
+      Interpreter_event.transitioned_pvm
+        inbox_level
+        state_hash
+        last_tick
+        num_messages
     in
 
     return_unit
@@ -240,14 +232,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         ctxt
         Layer1.{hash = predecessor_hash; level = pred_level}
     in
-    let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.protocol_constants.parametric.dal.attestation_lag
-    in
     let>* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox
-        ~metadata
-        ~dal_attestation_lag
         ~fuel:(Fuel.Accounted.of_ticks tick_distance)
         node_ctxt
         hash

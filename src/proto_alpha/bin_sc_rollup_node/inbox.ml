@@ -29,7 +29,7 @@
 open Protocol
 open Alpha_context
 
-let lift = Lwt.map Environment.wrap_tzresult
+let lift promise = Lwt.map Environment.wrap_tzresult promise
 
 module State = struct
   let add_messages = Store.Messages.add
@@ -159,6 +159,39 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
+let add_messages (node_ctxt : _ Node_context.t) ctxt level inbox history
+    messages =
+  let open Lwt_result_syntax in
+  let*! messages_tree = Context.MessageTrees.find ctxt in
+  lift
+  @@
+  if messages = [] then return (history, inbox, ctxt)
+  else
+    let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+       The number of messages during commitment period is broken with the
+       unique inbox. *)
+    (*
+    let commitment_period =
+      node_ctxt.protocol_constants.parametric.sc_rollup
+        .commitment_period_in_blocks |> Int32.of_int
+    in
+    let inbox =
+      Sc_rollup.Inbox.refresh_commitment_period ~commitment_period ~level inbox
+    in
+    *)
+    let* messages_tree, history, inbox =
+      Context.Inbox.add_messages
+        node_ctxt.context
+        history
+        inbox
+        level
+        messages
+        messages_tree
+    in
+    let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
+    return (history, inbox, ctxt)
+
 let process_head (node_ctxt : _ Node_context.t)
     Layer1.({level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
@@ -181,49 +214,16 @@ let process_head (node_ctxt : _ Node_context.t)
     let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
     let* inbox = State.inbox_of_head node_ctxt predecessor in
     let* history = State.history_of_head node_ctxt predecessor in
+    let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
     let* ctxt =
-      if level <= Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-      then
+      if Raw_level.(level <= node_ctxt.Node_context.genesis_info.level) then
         (* This is before we have interpreted the boot sector, so we start
            with an empty context in genesis *)
         return (Context.empty node_ctxt.context)
       else Node_context.checkout_context node_ctxt predecessor.hash
     in
-    let*! messages_tree = Context.MessageTrees.find ctxt in
     let* history, inbox, ctxt =
-      lift
-      @@ let*? level = Raw_level.of_int32 level in
-         let*? messages =
-           List.map_e Sc_rollup.Inbox_message.serialize messages
-         in
-         if messages = [] then return (history, inbox, ctxt)
-         else
-           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-                 The number of messages during commitment period is broken with the
-                 unique inbox. *)
-           (* let commitment_period =
-            *   node_ctxt.protocol_constants.parametric.sc_rollup
-            *     .commitment_period_in_blocks |> Int32.of_int
-            * in
-            * let inbox =
-            *   Sc_rollup.Inbox.refresh_commitment_period
-            *     ~commitment_period
-            *     ~level
-            *     inbox
-            * in *)
-           let* messages_tree, history, inbox =
-             Context.Inbox.add_messages
-               node_ctxt.context
-               history
-               inbox
-               level
-               messages
-               messages_tree
-           in
-
-           let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
-           return (history, inbox, ctxt)
+      add_messages node_ctxt ctxt level inbox history messages
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
     let*! () = State.add_inbox node_ctxt.store head_hash inbox in
@@ -240,5 +240,9 @@ let history_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
   let* level = State.level_of_hash node_ctxt.Node_context.store hash in
   State.history_of_head node_ctxt {hash; level}
+
+let inbox_of_head = State.inbox_of_head
+
+let history_of_head = State.history_of_head
 
 let start () = Inbox_event.starting ()

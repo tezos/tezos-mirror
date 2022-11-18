@@ -205,6 +205,12 @@ let pvm_name_arg =
     ~default:"arith"
     Client_proto_args.string_parameter
 
+let pvm_kind_arg =
+  Tezos_clic.map_arg pvm_name_arg ~f:(fun _ name ->
+      match Protocol.Alpha_context.Sc_rollup.Kind.of_name name with
+      | None -> failwith "Invalid PVM name %s" name
+      | Some kind -> return kind)
+
 let group =
   {
     Tezos_clic.name = "sc_rollup.node";
@@ -331,13 +337,16 @@ let import_command =
   let open Tezos_clic in
   command
     ~group
-    ~desc:"Run the rollup daemon."
-    (args3 data_dir_arg filename_arg pvm_name_arg)
+    ~desc:"Import data to be used in reveal ticks."
+    (args3 data_dir_arg filename_arg pvm_kind_arg)
     (prefixes ["import"] @@ stop)
-    (fun (data_dir, filename, pvm_name) cctxt ->
-      let hash = Reveals.import ~data_dir ~filename ~pvm_name in
-      cctxt#message "%a" Protocol.Alpha_context.Sc_rollup.Reveal_hash.pp hash
-      >>= return)
+    (fun (data_dir, filename, pvm_kind) cctxt ->
+      let open Lwt_result_syntax in
+      let*? hash = Reveals.import ~data_dir pvm_kind ~filename in
+      let*! () =
+        cctxt#message "%a" Protocol.Alpha_context.Sc_rollup.Reveal_hash.pp hash
+      in
+      return_unit)
 
 let sc_rollup_commands () =
   List.map

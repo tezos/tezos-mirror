@@ -977,7 +977,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
   in
-  let* slots_headers =
+  let*! slots_headers =
     Sc_rollup_client.dal_slot_headers ~hooks sc_rollup_client
   in
   let commitments =
@@ -1016,7 +1016,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
   (* 7. Check that no slots have been downloaded *)
-  let* downloaded_confirmed_slots =
+  let*! downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
   in
   let expected_number_of_downloaded_or_unconfirmed_slots = 0 in
@@ -1047,7 +1047,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
        expected = %R)" ;
   (* 9. Wait for the rollup node to download the attested slots. *)
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
-  let* downloaded_confirmed_slots =
+  let*! downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages
       ~block:confirmed_level_as_string
       sc_rollup_client
@@ -1145,7 +1145,7 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
   let* _lvl =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
-  let* encoded_value =
+  let*! encoded_value =
     Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
   in
   match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with

@@ -3290,6 +3290,8 @@ module Sc_rollup : sig
 
     val inbox_level : t -> Raw_level.t
 
+    val number_of_messages_during_commitment_period : t -> int64
+
     type history_proof
 
     val equal_history_proof : history_proof -> history_proof -> bool

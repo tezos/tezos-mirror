@@ -156,10 +156,14 @@ let register_test ?(regression = false) ~__FILE__ ~tags ~title f =
   if regression then Protocol.register_regression_test ~__FILE__ ~title ~tags f
   else Protocol.register_test ~__FILE__ ~title ~tags f
 
-let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
+let setup_l1 ?commitment_period ?challenge_window
+    ?max_number_of_messages_per_commitment_period ?timeout protocol =
   let parameters =
     make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
+    @ make_parameter
+        "sc_rollup_max_number_of_messages_per_commitment_period"
+        max_number_of_messages_per_commitment_period
     @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
     @ [(["sc_rollup_enable"], `Bool true)]
   in
@@ -250,7 +254,8 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
   scenario sc_rollup tezos_node tezos_client
 
 let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
-    ?challenge_window ?timeout {variant; tags; description} scenario =
+    ?challenge_window ?timeout ?max_number_of_messages_per_commitment_period
+    {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
     ?regression
@@ -266,7 +271,12 @@ let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
          | None -> ""))
   @@ fun protocol ->
   let* tezos_node, tezos_client =
-    setup_l1 ?commitment_period ?challenge_window ?timeout protocol
+    setup_l1
+      ?commitment_period
+      ?challenge_window
+      ?timeout
+      ?max_number_of_messages_per_commitment_period
+      protocol
   in
   let* rollup_node, rollup_client, sc_rollup =
     setup_rollup ~kind ?boot_sector tezos_node tezos_client
@@ -421,7 +431,7 @@ let test_rollup_node_running ~kind =
         failwith "Please install curl"
     | Some sc_rollup_from_rpc -> JSON.as_string sc_rollup_from_rpc
   in
-  let* sc_rollup_from_client =
+  let*! sc_rollup_from_client =
     Sc_rollup_client.sc_rollup_address ~hooks rollup_client
   in
   if sc_rollup_from_rpc <> sc_rollup then
@@ -656,11 +666,14 @@ let fetch_messages_from_block client =
    tree which must have the same root hash as the one stored by the
    protocol in the context.
 *)
-let test_rollup_inbox_of_rollup_node ~variant scenario ~kind =
+let test_rollup_inbox_of_rollup_node
+    ?max_number_of_messages_per_commitment_period ?(extra_tags = []) ~variant
+    scenario ~kind =
   test_full_scenario
+    ?max_number_of_messages_per_commitment_period
     {
       variant = Some variant;
-      tags = ["inbox"];
+      tags = ["inbox"] @ extra_tags;
       description = "maintenance of inbox in the rollup node";
     }
     ~kind
@@ -787,6 +800,47 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node 5 in
   unit
 
+(* Simulation of messages *)
+let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
+    client =
+  let level = Node.get_level node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let msg1 = "3 3 + out" in
+  let*! sim_result =
+    Sc_rollup_client.simulate
+      sc_rollup_client
+      ~reveal_pages:
+        (List.init 12 (fun j ->
+             String.init 1024 (fun i -> Char.chr (i * j mod 256))))
+      [msg1]
+  in
+  let* () = send_message client (to_text_messages_arg [msg1]) in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + 1)
+  in
+  let*! real_state_hash = Sc_rollup_client.state_hash sc_rollup_client in
+  let*! real_outbox = Sc_rollup_client.outbox sc_rollup_client ~block:"head" in
+  Check.((sim_result.state_hash = real_state_hash) string)
+    ~error_msg:"Simulated resulting state hash is %L but should have been %R" ;
+  Check.((JSON.encode sim_result.output = JSON.encode real_outbox) string)
+    ~error_msg:"Simulated resulting outbox is %L but should have been %R" ;
+  let*? sim_result = Sc_rollup_client.simulate sc_rollup_client [] in
+  let* () =
+    Process.check_error ~msg:(rex "Tried to add zero messages") sim_result
+  in
+  let* constants = get_sc_rollup_constants client in
+  let too_many_msgs =
+    List.init
+      constants.max_number_of_messages_per_commitment_period
+      (Fun.const "")
+  in
+  (* In the context of "head", there is already one message in the inbox, so if
+     we add max messages, we'll be over the limit. *)
+  let*? sim_result = Sc_rollup_client.simulate sc_rollup_client too_many_msgs in
+  Process.check_error
+    ~msg:(rex "Maximum number of messages reached for commitment period")
+    sim_result
+
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
@@ -850,12 +904,12 @@ let test_rollup_node_boots_into_initial_state ~kind =
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
 
-  let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+  let*! ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
   Check.(ticks = 0)
     Check.int
     ~error_msg:"Unexpected initial tick count (%L = %R)" ;
 
-  let* status = Sc_rollup_client.status ~hooks sc_rollup_client in
+  let*! status = Sc_rollup_client.status ~hooks sc_rollup_client in
   let expected_status =
     match kind with
     | "arith" -> "Halted"
@@ -913,10 +967,10 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
   in
   (* Called with monotonically increasing [i] *)
   let test_message i =
-    let* prev_state_hash =
+    let*! prev_state_hash =
       Sc_rollup_client.state_hash ~hooks sc_rollup_client
     in
-    let* prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+    let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
     let message = sf "%d %d + value" i ((i + 2) * 2) in
     let* () =
       match forwarder with
@@ -943,7 +997,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
     let* () =
       match kind with
       | "arith" ->
-          let* encoded_value =
+          let*! encoded_value =
             Sc_rollup_client.state_value
               ~hooks
               sc_rollup_client
@@ -977,12 +1031,12 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       | _otherwise -> raise (Invalid_argument kind)
     in
 
-    let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
+    let*! state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
     Check.(state_hash <> prev_state_hash)
       Check.string
       ~error_msg:"State hash has not changed (%L <> %R)" ;
 
-    let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+    let*! ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
     Check.(ticks >= prev_ticks)
       Check.int
       ~error_msg:"Tick counter did not advance (%L >= %R)" ;
@@ -1161,7 +1215,7 @@ let commitment_stored sc_rollup_node sc_rollup_client sc_rollup _node client =
       sc_rollup_node
       store_commitment_level
   in
-  let* stored_commitment =
+  let*! stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
   let stored_inbox_level = Option.map inbox_level stored_commitment in
@@ -1171,7 +1225,7 @@ let commitment_stored sc_rollup_node sc_rollup_client sc_rollup _node client =
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   (* Bake one level for commitment to be included *)
   let* () = Client.bake_for_and_wait client in
-  let* published_commitment =
+  let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   check_commitment_eq
@@ -1228,17 +1282,19 @@ let mode_publish mode publishes sc_rollup_node sc_rollup_client sc_rollup node
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level
   and* _ = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Both rollup nodes have reached level %d." level ;
-  let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client
-  and* state_hash_other =
+  let state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client
+  and state_hash_other =
     Sc_rollup_client.state_hash ~hooks sc_rollup_other_client
   in
+  let*! state_hash = state_hash in
+  let*! state_hash_other = state_hash_other in
   Check.((state_hash = state_hash_other) string)
     ~error_msg:
       "State hash of other rollup node is %R but the first rollup node has %L" ;
-  let* published_commitment =
+  let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
-  let* other_published_commitment =
+  let*! other_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_other_client
   in
   if published_commitment = None then
@@ -1294,7 +1350,7 @@ let commitment_not_stored_if_non_final sc_rollup_node sc_rollup_client sc_rollup
       sc_rollup_node
       (store_commitment_level + levels_to_finalize)
   in
-  let* commitment =
+  let*! commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
   let stored_inbox_level = Option.map inbox_level commitment in
@@ -1302,7 +1358,7 @@ let commitment_not_stored_if_non_final sc_rollup_node sc_rollup_client sc_rollup
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
-  let* commitment =
+  let*! commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   let published_inbox_level = Option.map inbox_level commitment in
@@ -1363,7 +1419,7 @@ let commitments_messages_reset kind sc_rollup_node sc_rollup_client sc_rollup
       sc_rollup_node
       (init_level + (2 * levels_to_commitment) + block_finality_time)
   in
-  let* stored_commitment =
+  let*! stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
   let stored_inbox_level = Option.map inbox_level stored_commitment in
@@ -1386,7 +1442,7 @@ let commitments_messages_reset kind sc_rollup_node sc_rollup_client sc_rollup
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
-  let* published_commitment =
+  let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   check_commitment_eq
@@ -1468,10 +1524,10 @@ let commitment_stored_robust_to_failures sc_rollup_node sc_rollup_client
       sc_rollup_node'
       level_commitment_is_stored
   in
-  let* stored_commitment =
+  let*! stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
-  let* stored_commitment' =
+  let*! stored_commitment' =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client'
   in
   check_commitment_eq
@@ -1578,7 +1634,7 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
       sc_rollup_node
       (init_level + levels_to_commitment + block_finality_time)
   in
-  let* stored_commitment =
+  let*! stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
   let stored_inbox_level = Option.map inbox_level stored_commitment in
@@ -1609,7 +1665,7 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
-  let* published_commitment =
+  let*! published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   check_commitment_eq
@@ -1715,10 +1771,10 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
       sc_rollup_node
       (commitment_inbox_level + block_finality_time)
   in
-  let* rollup_node1_stored_commitment =
+  let*! rollup_node1_stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
-  let* rollup_node1_published_commitment =
+  let*! rollup_node1_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   let () =
@@ -1795,7 +1851,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
     Check.int
     ~error_msg:"Current level has moved past cementation inbox level (%L = %R)" ;
   (* Check that no commitment was published. *)
-  let* rollup_node2_last_published_commitment =
+  let*! rollup_node2_last_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
   let rollup_node2_last_published_commitment_inbox_level =
@@ -1810,7 +1866,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
   in
   (* Check that the commitment stored by the second rollup node
      is the same commmitment stored by the first rollup node. *)
-  let* rollup_node2_stored_commitment =
+  let*! rollup_node2_stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client'
   in
   let () =
@@ -1832,7 +1888,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
       sc_rollup_node'
       (level_after_cementation + commitment_period)
   in
-  let* rollup_node2_last_published_commitment =
+  let*! rollup_node2_last_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
   let rollup_node2_last_published_commitment_inbox_level =
@@ -1893,7 +1949,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
       sc_rollup_node
       (commitment_inbox_level + block_finality_time)
   in
-  let* rollup_node1_published_commitment =
+  let*! rollup_node1_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   Check.(
@@ -1908,7 +1964,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
   let* commitment_publish_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (commitment_finalized_level + 1)
   in
-  let* rollup_node1_published_commitment =
+  let*! rollup_node1_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   Check.(
@@ -1941,7 +1997,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
     Check.int
     ~error_msg:"Current level has moved past cementation inbox level (%L = %R)" ;
   (* Check that no commitment was published. *)
-  let* rollup_node2_published_commitment =
+  let*! rollup_node2_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
   check_commitment_eq
@@ -2077,7 +2133,7 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
   let init_hash = JSON.(init_commitment |-> "compressed_state" |> as_string) in
   let* () = Sc_rollup_node.run rollup_node [] in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. rollup_node init_level in
-  let* node_state_hash = Sc_rollup_client.state_hash ~hooks rollup_client in
+  let*! node_state_hash = Sc_rollup_client.state_hash ~hooks rollup_client in
   Check.(
     (init_hash = node_state_hash)
       string
@@ -2179,7 +2235,7 @@ let test_rollup_arith_uses_reveals ~kind =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
   in
 
-  let* encoded_value =
+  let*! encoded_value =
     Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
   in
   let value =
@@ -2443,7 +2499,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
       ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
-  let* _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
+  let*! _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
   unit
 
 let rec swap i l =
@@ -3050,8 +3106,8 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
     repeat blocks_to_wait @@ fun () -> Client.bake_for client
   in
   let trigger_outbox_message_execution address =
-    let* outbox = Sc_rollup_client.outbox sc_client in
-    Log.info "Outbox is %s" outbox ;
+    let*! outbox = Sc_rollup_client.outbox sc_client in
+    Log.info "Outbox is %s" (JSON.encode outbox) ;
     let* answer =
       let message_index = 0 in
       let outbox_level = 4 in
@@ -3137,7 +3193,7 @@ let test_rpcs ~kind =
     }
   @@ fun sc_rollup_node sc_client sc_rollup node client ->
   let* () = Sc_rollup_node.run sc_rollup_node [] in
-  let* sc_rollup_address =
+  let*! sc_rollup_address =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "sc_rollup_address"]
   in
   let sc_rollup_address = JSON.as_string sc_rollup_address in
@@ -3151,7 +3207,7 @@ let test_rpcs ~kind =
     Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node (level + n)
   in
   let* l1_block_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
-  let* l2_block_hash =
+  let*! l2_block_hash =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
@@ -3163,13 +3219,13 @@ let test_rpcs ~kind =
   let* l1_block_hash =
     RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
-  let* l2_block_hash =
+  let*! l2_block_hash =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "5"; "hash"]
   in
   let l2_block_hash = JSON.as_string l2_block_hash in
   Check.((l1_block_hash = l2_block_hash) string)
     ~error_msg:"Block 5 on L1 is %L where as on L2 it is %R" ;
-  let* l2_finalied_block_level =
+  let*! l2_finalied_block_level =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
@@ -3178,7 +3234,7 @@ let test_rpcs ~kind =
   let l2_finalied_block_level = JSON.as_int l2_finalied_block_level in
   Check.((l2_finalied_block_level = level + n - 2) int)
     ~error_msg:"Finalized block is %L but should be %R" ;
-  let* l2_num_messages =
+  let*! l2_num_messages =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
@@ -3187,34 +3243,34 @@ let test_rpcs ~kind =
   let l2_num_messages = JSON.as_int l2_num_messages in
   Check.((l2_num_messages = batch_size + 2) int)
     ~error_msg:"Number of messages of head is %L but should be %R" ;
-  let* _status =
+  let*! _status =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
       ["global"; "block"; "head"; "status"]
   in
-  let* _ticks =
+  let*! _ticks =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
       ["global"; "block"; "head"; "ticks"]
   in
-  let* _state_hash =
+  let*! _state_hash =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
       ["global"; "block"; "head"; "state_hash"]
   in
-  let* _outbox =
+  let*! _outbox =
     Sc_rollup_client.rpc_get
       ~hooks
       sc_client
       ["global"; "block"; "head"; "outbox"]
   in
-  let* _head =
+  let*! _head =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]
   in
-  let* _level =
+  let*! _level =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_level"]
   in
   unit
@@ -3381,6 +3437,13 @@ let register ~protocols =
     ~boot_sector1:"10 10 10 + +"
     ~boot_sector2:"31"
     ~kind:"arith"
+    protocols ;
+  test_rollup_inbox_of_rollup_node
+    ~kind:"arith"
+    ~variant:"simulation"
+    ~extra_tags:["simulation"]
+    ~max_number_of_messages_per_commitment_period:300
+    sc_rollup_node_simulate
     protocols ;
   (* Specific Wasm PVM tezts *)
   test_rollup_node_run_with_kernel

@@ -192,10 +192,10 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     in
     (* Called with monotonically increasing [i] *)
     let test_message i =
-      let* prev_state_hash =
+      let*! prev_state_hash =
         Sc_rollup_client.state_hash ~hooks sc_rollup_client
       in
-      let* prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+      let*! prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
       let message = sf "%d %d + value" i ((i + 2) * 2) in
       let* () =
         match forwarder with
@@ -220,7 +220,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       let* () =
         match kind with
         | "arith" ->
-            let* encoded_value =
+            let*! encoded_value =
               Sc_rollup_client.state_value
                 ~hooks
                 sc_rollup_client
@@ -254,12 +254,12 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         | _otherwise -> raise (Invalid_argument kind)
       in
 
-      let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
+      let*! state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
       Check.(state_hash <> prev_state_hash)
         Check.string
         ~error_msg:"State hash has not changed (%L <> %R)" ;
 
-      let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+      let*! ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
       Check.(ticks >= prev_ticks)
         Check.int
         ~error_msg:"Tick counter did not advance (%L >= %R)" ;

@@ -197,23 +197,82 @@ let get_output_message_encoding () =
       | Error _ -> cctxt#message "Error while encoding outbox message.")
       >>= fun () -> return_unit)
 
-(** [call_get cctxt raw_url] executes a GET RPC call against the [raw_url]. *)
-let call_get (cctxt : #Configuration.sc_client_context) raw_url =
+let call ?body meth raw_url (cctxt : #Configuration.sc_client_context) =
   let open Lwt_result_syntax in
-  let meth = `GET in
   let uri = Uri.of_string raw_url in
-  let* answer = cctxt#generic_media_type_call meth uri in
+  let body =
+    (* This code is similar to a piece of code in [fill_in]
+       function. An RPC is declared as POST, PATCH or PUT, but the
+       body is not given. In that case, the body should be an empty
+       JSON object. *)
+    match (meth, body) with
+    | _, Some _ -> body
+    | `DELETE, None | `GET, None -> None
+    | `PATCH, None | `PUT, None | `POST, None -> Some (`O [])
+  in
+  let* answer = cctxt#generic_media_type_call ?body meth uri in
   let*! () = display_answer cctxt answer in
   return_unit
 
-let rpc_get_command =
-  Tezos_clic.command
-    ~desc:"Call an RPC with the GET method."
-    Tezos_clic.no_options
-    (Tezos_clic.prefixes ["rpc"; "get"]
-    @@ Tezos_clic.string ~name:"url" ~desc:"the RPC URL"
-    @@ Tezos_clic.stop)
-    (fun () url cctxt -> call_get cctxt url)
+let call_with_json meth raw_url json (cctxt : #Configuration.sc_client_context)
+    =
+  match Ezjsonm.value_from_string_result json with
+  | Error err ->
+      cctxt#error
+        "Failed to parse the provided json: %s\n%!"
+        (Ezjsonm.read_error_description err)
+  | Ok body -> call meth ~body raw_url cctxt
+
+let call_with_file_or_json meth url maybe_file
+    (cctxt : #Configuration.sc_client_context) =
+  let open Lwt_result_syntax in
+  let* json =
+    match TzString.split ':' ~limit:1 maybe_file with
+    | ["file"; filename] ->
+        Lwt.catch
+          (fun () ->
+            Lwt_result.ok @@ Lwt_io.(with_file ~mode:Input filename read))
+          (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
+    | _ -> return maybe_file
+  in
+  call_with_json meth url json cctxt
+
+let rpc_commands () =
+  let open Tezos_clic in
+  let group = {name = "rpc"; title = "Commands for the low level RPC layer"} in
+  [
+    command
+      ~group
+      ~desc:"Call an RPC with the GET method."
+      no_options
+      (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
+      (fun () -> call `GET);
+    command
+      ~group
+      ~desc:"Call an RPC with the POST method."
+      no_options
+      (prefixes ["rpc"; "post"]
+      @@ string ~name:"url" ~desc:"the RPC URL"
+      @@ stop)
+      (fun () -> call `POST);
+    command
+      ~group
+      ~desc:
+        "Call an RPC with the POST method, providing input data via the \
+         command line."
+      no_options
+      (prefixes ["rpc"; "post"]
+      @@ string ~name:"url" ~desc:"the RPC URL"
+      @@ prefix "with"
+      @@ string
+           ~name:"input"
+           ~desc:
+             "the raw JSON input to the RPC\n\
+              For instance, use `{}` to send the empty document.\n\
+              Alternatively, use `file:path` to read the JSON data from a file."
+      @@ stop)
+      (fun () -> call_with_file_or_json `POST);
+  ]
 
 module Keys = struct
   open Tezos_client_base.Client_keys
@@ -272,9 +331,9 @@ let all () =
     get_state_value_command ();
     get_output_proof ();
     get_output_message_encoding ();
-    rpc_get_command;
     Keys.generate_keys ();
     Keys.list_keys ();
     Keys.show_address ();
     Keys.import_secret_key ();
   ]
+  @ rpc_commands ()

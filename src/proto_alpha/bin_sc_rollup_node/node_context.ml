@@ -106,6 +106,11 @@ let checkout_context node_ctxt block_hash =
            (block_hash, Some (Context.hash_to_raw_string context_hash)))
   | Some ctxt -> return ctxt
 
+let metadata node_ctxt =
+  let address = node_ctxt.rollup_address in
+  let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
+  Sc_rollup.Metadata.{address; origination_level}
+
 let readonly (node_ctxt : _ t) =
   {
     node_ctxt with

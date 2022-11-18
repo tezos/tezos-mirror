@@ -54,5 +54,28 @@ val history_of_hash :
   Tezos_crypto.Block_hash.t ->
   Sc_rollup.Inbox.History.t tzresult Lwt.t
 
+(** [inbox_of_head node_ctxt block_head] returns the rollup inbox at the end of
+    the given validation of [block_head]. *)
+val inbox_of_head :
+  _ Node_context.t -> Layer1.head -> Sc_rollup.Inbox.t tzresult Lwt.t
+
+(** [history_of_head node_ctxt block_head] returns the rollup inbox history at
+    the end of the given validation of [block_head]. *)
+val history_of_head :
+  _ Node_context.t -> Layer1.head -> Sc_rollup.Inbox.History.t tzresult Lwt.t
+
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
+
+(** [add_messages node_ctxt ctxt inbox_level inbox history messages] adds
+    [messages] to the [inbox] whose history is [history]. The new inbox level is
+    given as [inbox_level]. It takes a context [ctxt] and returns a new
+    [history], [inbox] and context [ctxt] with an updated message tree. *)
+val add_messages :
+  Node_context.rw ->
+  'a Context.t ->
+  Raw_level.t ->
+  Sc_rollup.Inbox.t ->
+  Sc_rollup.Inbox.History.t ->
+  Sc_rollup.Inbox_message.t list ->
+  (Sc_rollup.Inbox.History.t * Sc_rollup.Inbox.t * 'a Context.t) tzresult Lwt.t

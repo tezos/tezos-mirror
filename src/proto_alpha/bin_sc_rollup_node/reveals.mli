@@ -50,6 +50,12 @@
 
 open Protocol.Alpha_context
 
+(** Source of data  *)
+type source =
+  | String of string  (** A string containing the whole data *)
+  | File of string
+      (** A file name whose associated file contains the whole data *)
+
 (** [get ~data_dir ~pvm_name ~hash] retrieves the data associated with
     the reveal hash [hash] from disk. May fail with:
     {ul
@@ -66,11 +72,19 @@ val get :
   hash:Sc_rollup.Reveal_hash.t ->
   string tzresult Lwt.t
 
-(** [import ~data_dir ~pvm_name ~filename] turns the content of ~filename
-    into a chunk of pages of (at most) 4KB, returning the hash of the first
-    chunk. *)
+(** [import ~data_dir pvm_kind ~filename] turns the content of ~filename into a
+    chunk of pages of (at most) 4KB and stores them on disk in [data_dir]. It
+    returns the hash of the first chunk. *)
 val import :
   data_dir:string ->
-  pvm_name:string ->
+  Sc_rollup.Kind.t ->
   filename:string ->
-  Sc_rollup.Reveal_hash.t
+  Sc_rollup.Reveal_hash.t tzresult
+
+(** [chunkify pvm_kind source] turns the content of ~filename into a chunk of
+    pages of (at most) 4KB. It returns the map of chunks and the hash of the
+    first chunk. *)
+val chunkify :
+  Sc_rollup.Kind.t ->
+  source ->
+  (string Sc_rollup.Reveal_hash.Map.t * Sc_rollup.Reveal_hash.t) tzresult
