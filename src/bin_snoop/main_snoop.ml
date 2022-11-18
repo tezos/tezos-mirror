@@ -214,15 +214,16 @@ and infer_cmd_full_auto model_name workload_data solver
     | Cmdline.NoReport -> None
     | _ -> Some (Report.create_empty ~name:"Report")
   in
+  let scores_list = [] in
   Option.iter
     (fun filename ->
       let oc = open_out filename in
       Dep_graph.D.output_graph oc graph ;
       close_out oc)
     infer_opts.dot_file ;
-  let map, report =
+  let map, scores_list, report =
     Dep_graph.T.fold
-      (fun workload_file (overrides_map, report) ->
+      (fun workload_file (overrides_map, scores_list, report) ->
         Format.eprintf "Processing: %s@." workload_file ;
         let measure = Hashtbl.find measurements workload_file in
         let overrides var = Free_variable.Map.find var overrides_map in
@@ -267,13 +268,15 @@ and infer_cmd_full_auto model_name workload_data solver
             overrides_map
             solution.mapping
         in
+        let scores_label = (model_name, Bench.name) in
+        let scores_list = (scores_label, solution.scores) :: scores_list in
         perform_plot measure model_name problem solution infer_opts ;
-        perform_csv_export solution infer_opts ;
-        (overrides_map, report))
+        perform_csv_export scores_label solution infer_opts ;
+        (overrides_map, scores_list, report))
       graph
-      (overrides_map, report)
+      (overrides_map, scores_list, report)
   in
-  perform_save_solution map infer_opts ;
+  perform_save_solution map scores_list infer_opts ;
   match (infer_opts.report, report) with
   | Cmdline.NoReport, _ -> ()
   | Cmdline.ReportToStdout, Some report ->
@@ -302,27 +305,35 @@ and solver_of_string (solver : string)
       exit 1
 
 and process_output measure model_name problem solution infer_opts =
-  perform_csv_export solution infer_opts ;
+  let (Measure.Measurement ((module Bench), _)) = measure in
+  let scores_label = (model_name, Bench.name) in
+  perform_csv_export scores_label solution infer_opts ;
   let map = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
-  perform_save_solution map infer_opts ;
+  perform_save_solution map [(scores_label, solution.scores)] infer_opts ;
   perform_plot measure model_name problem solution infer_opts
 
-and perform_csv_export solution (infer_opts : Cmdline.infer_parameters_options)
-    =
+and perform_csv_export scores_label solution
+    (infer_opts : Cmdline.infer_parameters_options) =
   match infer_opts.csv_export with
   | None -> ()
   | Some filename -> (
       let solution_csv_opt = Inference.solution_to_csv solution in
       match solution_csv_opt with
       | None -> ()
-      | Some solution_csv -> Csv.append_columns ~filename solution_csv)
+      | Some solution_csv ->
+          let Inference.{scores; _} = solution in
+          Csv.append_columns
+            ~filename
+            Inference.(scores_to_csv_column scores_label scores) ;
+          Csv.append_columns ~filename solution_csv)
 
 and perform_save_solution (solution : float Free_variable.Map.t)
+    (scores_list : ((string * Namespace.t) * Inference.scores) list)
     (infer_opts : Cmdline.infer_parameters_options) =
   match infer_opts.save_solution with
   | None -> ()
   | Some filename ->
-      Codegen.save_solution solution filename ;
+      Codegen.(save_solution {map = solution; scores_list} filename) ;
       Format.eprintf "Saved solution to %s@." filename
 
 and perform_plot measure model_name problem solution

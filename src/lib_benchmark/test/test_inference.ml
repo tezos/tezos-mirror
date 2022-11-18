@@ -89,7 +89,7 @@ module T () = struct
 
   let problem = Inference.make_problem ~data ~model ~overrides:(fun _ -> None)
 
-  let {Inference.mapping; weights = _} =
+  let {Inference.mapping; weights = _; scores = _} =
     Inference.solve_problem
       problem
       (Inference.Lasso {alpha = 1.0; positive = false})

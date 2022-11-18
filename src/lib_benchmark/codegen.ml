@@ -198,9 +198,13 @@ let pp_module fmtr items =
 module Lift_then_print = Costlang.Let_lift (Codegen)
 
 (* ------------------------------------------------------------------------- *)
-(* The data required to perform code generation is a map from variables to
-   (floating point) coefficients. *)
-type solution = float Free_variable.Map.t
+type solution = {
+  (* The data required to perform code generation is a map from variables to
+     (floating point) coefficients. *)
+  map : float Free_variable.Map.t;
+  (* The scores of the models with the estimated coefficients. *)
+  scores_list : ((string * Namespace.t) * Inference.scores) list;
+}
 
 let load_solution (fn : string) : solution =
   In_channel.with_open_bin fn Marshal.from_channel
@@ -213,7 +217,7 @@ let save_solution (s : solution) (fn : string) =
 let codegen (Model.For_codegen model) (sol : solution)
     (transform : Costlang.transform) (name : string) =
   let subst fv =
-    match Free_variable.Map.find fv sol with
+    match Free_variable.Map.find fv sol.map with
     | None ->
         raise (Fixed_point_transform.Codegen_error (Variable_not_found fv))
     | Some f -> f
