@@ -24,6 +24,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += WASM_proof_verification_failed
+
+type error += WASM_proof_production_failed
+
+type error += WASM_output_proof_production_failed
+
+type error += WASM_invalid_claim_about_outbox
+
+let () =
+  let open Data_encoding in
+  let msg = "Invalid claim about outbox" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_wasm_invalid_claim_about_outbox"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.pp_print_string fmt msg)
+    ~description:msg
+    unit
+    (function WASM_invalid_claim_about_outbox -> Some () | _ -> None)
+    (fun () -> WASM_invalid_claim_about_outbox) ;
+  let msg = "Output proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_wasm_output_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function WASM_output_proof_production_failed -> Some () | _ -> None)
+    (fun () -> WASM_output_proof_production_failed) ;
+  let msg = "Proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_wasm_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function WASM_proof_production_failed -> Some () | _ -> None)
+    (fun () -> WASM_proof_production_failed)
+
 module V2_0_0 = struct
   (*
     This is the state hash of reference that both the prover of the
@@ -340,16 +381,12 @@ module V2_0_0 = struct
       in
       return (state, request)
 
-    type error += WASM_proof_verification_failed
-
     let verify_proof input_given proof =
       let open Lwt_result_syntax in
       let*! result = Context.verify_proof proof (step_transition input_given) in
       match result with
       | None -> tzfail WASM_proof_verification_failed
       | Some (_state, request) -> return request
-
-    type error += WASM_proof_production_failed
 
     let produce_proof context input_given state =
       let open Lwt_result_syntax in
@@ -438,10 +475,6 @@ module V2_0_0 = struct
       let* result = Context.verify_proof p.output_proof transition in
       match result with None -> return false | Some _ -> return true
 
-    type error += Wasm_output_proof_production_failed
-
-    type error += Wasm_invalid_claim_about_outbox
-
     let produce_output_proof context state output_proof_output =
       let open Lwt_result_syntax in
       let*! output_proof_state = state_hash state in
@@ -453,8 +486,8 @@ module V2_0_0 = struct
       match result with
       | Some (output_proof, true) ->
           return {output_proof; output_proof_state; output_proof_output}
-      | Some (_, false) -> fail Wasm_invalid_claim_about_outbox
-      | None -> fail Wasm_output_proof_production_failed
+      | Some (_, false) -> fail WASM_invalid_claim_about_outbox
+      | None -> fail WASM_output_proof_production_failed
 
     module Internal_for_tests = struct
       let insert_failure state =
