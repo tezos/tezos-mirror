@@ -27,4 +27,4 @@ open Tezos_scoru_wasm
 open Tezos_webassembly_interpreter
 
 (** [compute durable buffers] applies one call to [kernel_next]. *)
-val compute : Durable.t -> Eval.buffers -> Durable.t Lwt.t
+val compute : Builtins.t -> Durable.t -> Eval.buffers -> Durable.t Lwt.t

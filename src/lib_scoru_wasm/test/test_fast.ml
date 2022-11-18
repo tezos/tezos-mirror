@@ -24,12 +24,28 @@
 (*****************************************************************************)
 
 open Tztest
+open Tezos_webassembly_interpreter
+module Preimage_map = Map.Make (String)
 
-let apply_fast counter tree =
+let apply_fast ?(images = Preimage_map.empty) counter tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
+  let module Builtins = struct
+    let reveal_preimage hash =
+      let hash = Reveal.reveal_hash_to_string hash in
+      match Preimage_map.find hash images with
+      | None -> Stdlib.failwith "Failed to find preimage"
+      | Some preimage -> Lwt.return preimage
+
+    let reveal_metadata () = Stdlib.failwith "reveal_preimage is not available"
+  end in
+  let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
   let+ tree =
     Wasm_utils.eval_until_input_requested
+      ~builtins
+        (* We override the builtins to provide our own [reveal_preimage]
+           implementation. This allows us to run Fast Exec with kernels that
+           want to reveal stuff. *)
       ~after_fast_exec:(fun () -> run_counter := Int32.succ !run_counter)
       ~fast_exec:true
       ~max_steps:Int64.max_int
@@ -42,12 +58,36 @@ let apply_fast counter tree =
       Stdlib.failwith "Fast Execution was expected to run!" ;
   tree
 
-let apply_slow =
-  Wasm_utils.eval_until_input_requested
-    ~fast_exec:false
-    ~max_steps:Int64.max_int
+let rec apply_slow ?images tree =
+  let open Lwt.Syntax in
+  let* tree =
+    Wasm_utils.eval_until_input_requested
+      ~fast_exec:false
+      ~max_steps:Int64.max_int
+      tree
+  in
+  (* Sometimes the evaluation will stop when a revelation is required.
+     We don't want to expose this intermediate state because the Fast Execution
+     doesn't either. The following step takes care of that by trying to
+     satisfy the revelation request. *)
+  (check_reveal [@tailcall]) ?images tree
 
-let test_against_both ~from_binary ~kernel ~messages =
+and check_reveal ?(images = Preimage_map.empty) tree =
+  let open Lwt.Syntax in
+  let* info = Wasm_utils.Wasm.get_info tree in
+  match info.input_request with
+  | Reveal_required (Reveal_raw_data hash) -> (
+      let hash = Reveal.reveal_hash_to_string hash in
+      match Preimage_map.find hash images with
+      | None -> Lwt.return tree
+      | Some preimage ->
+          let* tree =
+            Wasm_utils.Wasm.reveal_step (Bytes.of_string preimage) tree
+          in
+          (apply_slow [@tailcall]) ~images tree)
+  | _ -> Lwt.return tree
+
+let test_against_both ?images ~from_binary ~kernel ~messages () =
   let open Lwt.Syntax in
   let make_folder apply (tree, counter, hashes) message =
     let* tree = apply counter tree in
@@ -80,8 +120,8 @@ let test_against_both ~from_binary ~kernel ~messages =
     hash :: hashes
   in
 
-  let* fast_hashes = run_with apply_fast in
-  let* slow_hashes = run_with (fun _ tree -> apply_slow tree) in
+  let* fast_hashes = run_with (apply_fast ?images) in
+  let* slow_hashes = run_with (fun _ -> apply_slow ?images) in
 
   assert (List.equal Tezos_crypto.Context_hash.equal slow_hashes fast_hashes) ;
 
@@ -91,9 +131,9 @@ let test_computation =
   Wasm_utils.test_with_kernel "computation" (fun kernel ->
       (* Providing 4 empty messages basically means calling the kernel
          entrypoint 4 times. *)
-      test_against_both ~from_binary:true ~kernel ~messages:[""; ""; ""; ""])
+      test_against_both ~from_binary:true ~kernel ~messages:[""; ""; ""; ""] ())
 
-let test_store_read_write () =
+let test_store_read_write =
   let kernel =
     {|
 (module
@@ -197,17 +237,72 @@ let test_store_read_write () =
   in
   test_against_both ~from_binary:false ~kernel ~messages:(List.repeat 100 "")
 
+let test_reveal_preimage =
+  let example_hash = "this represents the 32-byte hash" in
+  let example_preimage = "This is the expected preimage" in
+  let images = Preimage_map.singleton example_hash example_preimage in
+
+  let kernel =
+    Format.asprintf
+      {|
+(module
+  (import
+    "rollup_safe_core"
+    "store_write"
+    (func $store_write (param i32 i32 i32 i32 i32) (result i32))
+  )
+
+  (import
+    "rollup_safe_core"
+    "reveal_preimage"
+    (func $reveal_preimage (param i32 i32 i32) (result i32))
+  )
+
+  (memory 1)
+  (export "memory" (memory 0))
+
+  (data (i32.const 0) "%s") ;; The hash we want to reveal
+  (data (i32.const 100) "/foo")
+
+  (func (export "kernel_next") (local $len i32)
+    ;; Reveal something
+    (call $reveal_preimage
+      ;; Address of the hash
+      (i32.const 0)
+      ;; Destination address and length
+      (i32.const 1000) (i32.const 1000)
+    )
+    (local.set $len)
+
+    ;; Write the preimage to the output buffer
+    (call $store_write
+      ;; Key address and length
+      (i32.const 100) (i32.const 4)
+      ;; Offset into the target value
+      (i32.const 0)
+      ;; Memory address and length of the payload to write
+      (i32.const 1000) (local.get $len)
+    )
+    (drop)
+  )
+)
+  |}
+      example_hash
+  in
+  test_against_both ~images ~from_binary:false ~kernel ~messages:[""; ""]
+
 let test_tx =
   let open Lwt.Syntax in
   Wasm_utils.test_with_kernel "tx-kernel-no-verif" (fun kernel ->
       let* messages =
         Wasm_utils.read_test_messages ["deposit.out"; "withdrawal.out"]
       in
-      test_against_both ~from_binary:true ~kernel ~messages)
+      test_against_both ~from_binary:true ~kernel ~messages ())
 
 let tests =
   [
     tztest "Computation kernel" `Quick test_computation;
     tztest "Store read/write kernel" `Quick test_store_read_write;
+    tztest "Reveal_preimage kernel" `Quick test_reveal_preimage;
     tztest "TX kernel" `Quick test_tx;
   ]
