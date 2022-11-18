@@ -89,7 +89,13 @@ let () =
         List.assoc ~equal:String.equal "blake2b" Bench.models
         |> WithExceptions.Option.get ~loc:__LOC__
       in
-      let solution = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
+      let solution =
+        Codegen.
+          {
+            map = Free_variable.Map.of_seq (List.to_seq solution.mapping);
+            scores_list = [];
+          }
+      in
       (match
          Codegen.codegen
            (Model.For_codegen model)
