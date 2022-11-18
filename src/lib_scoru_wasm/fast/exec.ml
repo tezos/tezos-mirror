@@ -55,7 +55,6 @@ let compute builtins durable buffers =
     let+ durable = f host_state.durable in
     host_state.durable <- durable
   in
-
   let* instance = Wasmer.Instance.create store module_ host_funcs in
 
   let* () =
