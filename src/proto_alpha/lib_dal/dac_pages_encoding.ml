@@ -31,7 +31,7 @@
  *)
 
 open Protocol
-module Logging = Environment.Logging
+open Environment.Error_monad
 
 type error +=
   | Payload_cannot_be_empty

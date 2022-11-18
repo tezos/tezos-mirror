@@ -35,6 +35,9 @@
     Add tests to check actual (sequences of) bytes in serialized pages. *)
 
 open Protocol
+open Alpha_context
+
+let lift f = Lwt.map Environment.wrap_tzresult f
 
 (* Tests are run against a mock storage backend where a Hash-indexed/Bytes-valued Map
    is used to simulate adding and retrieving files to a directory.
@@ -44,6 +47,8 @@ module Hashes_map = Sc_rollup_PVM_sig.Reveal_hash.Map
 type hashes_map = bytes Hashes_map.t
 
 module Make_Merkle_tree_V0_backend () = struct
+  open Environment.Error_monad
+
   type error +=
     | Page_already_saved of Sc_rollup_PVM_sig.Reveal_hash.t
     | Page_is_missing of Sc_rollup_PVM_sig.Reveal_hash.t
@@ -57,13 +62,14 @@ module Make_Merkle_tree_V0_backend () = struct
         let () = backend := Hashes_map.add hash bytes !backend in
         return_unit
     | Some old_bytes ->
-        fail_when (not @@ Bytes.equal old_bytes bytes) (Page_already_saved hash)
+        if Bytes.equal old_bytes bytes then return_unit
+        else tzfail @@ Page_already_saved hash
 
   let load_page hash =
     let open Lwt_result_syntax in
     let bytes = Hashes_map.find hash !backend in
     match bytes with
-    | None -> fail @@ [Page_is_missing hash]
+    | None -> tzfail @@ Page_is_missing hash
     | Some bytes -> return bytes
 
   let number_of_pages () = List.length @@ Hashes_map.bindings !backend
@@ -75,7 +81,8 @@ let assert_equal_bytes ~loc msg =
 let assert_fails_with ~loc k expected_err =
   let open Lwt_result_syntax in
   let*! res = k in
-  Assert.error ~loc res (( = ) expected_err)
+  let res = Environment.wrap_tzresult res in
+  Assert.error ~loc res (( = ) (Environment.wrap_tzerror expected_err))
 
 module Merkle_tree = struct
   module V0 = struct
@@ -129,13 +136,15 @@ module Merkle_tree = struct
       let max_page_size = 70 in
       let payload = Bytes.of_string "Hello payload" in
       let* hash =
-        serialize_payload
-          ~max_page_size
-          payload
-          ~for_each_page:Backend.save_page
+        lift
+        @@ serialize_payload
+             ~max_page_size
+             payload
+             ~for_each_page:Backend.save_page
       in
       let* retrieved_payload =
-        deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
+        lift
+        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
       in
       let map_size = Backend.number_of_pages () in
       let* () = Assert.equal_int ~loc:__LOC__ map_size 1 in
@@ -170,13 +179,15 @@ module Merkle_tree = struct
            ad minim veniam, quis nostrud exercitation ullamco"
       in
       let* hash =
-        serialize_payload
-          ~max_page_size
-          payload
-          ~for_each_page:Backend.save_page
+        lift
+        @@ serialize_payload
+             ~max_page_size
+             payload
+             ~for_each_page:Backend.save_page
       in
       let* retrieved_payload =
-        deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
+        lift
+        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
       in
       let map_size = Backend.number_of_pages () in
       let* () = Assert.equal_int ~loc:__LOC__ map_size 6 in
@@ -208,13 +219,15 @@ module Merkle_tree = struct
         List.repeat 195 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
       in
       let* hash =
-        serialize_payload
-          ~max_page_size
-          payload
-          ~for_each_page:Backend.save_page
+        lift
+        @@ serialize_payload
+             ~max_page_size
+             payload
+             ~for_each_page:Backend.save_page
       in
       let* retrieved_payload =
-        deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
+        lift
+        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
       in
       let map_size = Backend.number_of_pages () in
       let* () = Assert.equal_int ~loc:__LOC__ map_size 4 in
@@ -376,13 +389,15 @@ module Merkle_tree = struct
            Allor si mosse, e io li tenni dietro."
       in
       let* hash =
-        serialize_payload
-          ~max_page_size
-          payload
-          ~for_each_page:Backend.save_page
+        lift
+        @@ serialize_payload
+             ~max_page_size
+             payload
+             ~for_each_page:Backend.save_page
       in
       let* retrieved_payload =
-        deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
+        lift
+        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
       in
       assert_equal_bytes
         ~loc:__LOC__

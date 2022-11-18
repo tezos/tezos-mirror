@@ -1,25 +1,29 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
 open Environment
-
-type Error_monad.error += Cannot_serialize_page_payload
-
-let () =
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"cannot_serialize_dac_page"
-    ~title:"DAC page could not be serialized"
-    ~description:"Error when serializing DAC page"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Error when serializing DAC page")
-    Data_encoding.unit
-    (function Cannot_serialize_page_payload -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_page_payload)
-
-let map_proto_error (res : 'a tzresult Lwt.t) (error : Error_monad.error) :
-    ('a, Error_monad.error Error_monad.trace) result Lwt.t =
-  let open Lwt_result_syntax in
-  let*! res = res in
-  match res with
-  | Ok res -> Error_monad.return res
-  | Error _ -> Error_monad.fail error
 
 module Registration = struct
   let register0_noctxt ~chunked s f dir =
@@ -52,9 +56,7 @@ module DAC = struct
       ~chunked:false
       S.dac_store_preimage
       (fun () input ->
-        map_proto_error
-          (handle_serialize_dac_store_preimage reveal_data_dir input)
-          Cannot_serialize_page_payload)
+        handle_serialize_dac_store_preimage reveal_data_dir input)
 
   let register reveal_data_dir =
     (RPC_directory.empty : unit RPC_directory.t)

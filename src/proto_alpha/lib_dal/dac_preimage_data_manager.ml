@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+open Environment.Error_monad
 
 type error += Cannot_write_dac_page_to_disk of string
 
