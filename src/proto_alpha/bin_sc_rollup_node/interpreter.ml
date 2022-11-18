@@ -64,15 +64,56 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
     Sc_rollup.Metadata.{address; origination_level}
 
+  (** [get_boot_sector block_hash node_ctxt] fetches the operations in the
+      [block_hash] and looks for the bootsector used to originate the rollup
+      we're following.
+      It must be called with [block_hash.level] = [node_ctxt.genesis_info.level].
+  *)
+  let get_boot_sector block_hash (node_ctxt : Node_context.t) =
+    let open Lwt_result_syntax in
+    let exception Found_boot_sector of string in
+    let* block = Layer1.fetch_tezos_block node_ctxt.l1_ctxt block_hash in
+    let missing_boot_sector () =
+      failwith
+        "Boot sector not found in Tezos block %a"
+        Tezos_crypto.Block_hash.pp
+        block_hash
+    in
+    Lwt.catch
+      (fun () ->
+        let apply (type kind) accu ~source:_
+            (operation : kind manager_operation)
+            (result : kind Apply_results.successful_manager_operation_result) =
+          match (operation, result) with
+          | ( Sc_rollup_originate {kind; boot_sector; _},
+              Sc_rollup_originate_result {address; _} )
+            when node_ctxt.rollup_address = address && node_ctxt.kind = kind ->
+              raise (Found_boot_sector boot_sector)
+          | _ -> accu
+        in
+        let apply_internal (type kind) accu ~source:_
+            (_operation : kind Apply_internal_results.internal_operation)
+            (_result :
+              kind Apply_internal_results.successful_internal_operation_result)
+            =
+          accu
+        in
+        let*? () =
+          Layer1_services.(
+            process_applied_manager_operations
+              (Ok ())
+              block.operations
+              {apply; apply_internal})
+        in
+        missing_boot_sector ())
+      (function
+        | Found_boot_sector boot_sector -> return boot_sector
+        | _ -> missing_boot_sector ())
+
   let genesis_state block_hash node_ctxt ctxt =
     let open Node_context in
     let open Lwt_result_syntax in
-    let* boot_sector =
-      Plugin.RPC.Sc_rollup.boot_sector
-        node_ctxt.cctxt
-        (node_ctxt.cctxt#chain, `Hash (block_hash, 0))
-        node_ctxt.rollup_address
-    in
+    let* boot_sector = get_boot_sector block_hash node_ctxt in
     let*! initial_state = PVM.initial_state node_ctxt.context in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
     let*! ctxt = PVM.State.set ctxt genesis_state in

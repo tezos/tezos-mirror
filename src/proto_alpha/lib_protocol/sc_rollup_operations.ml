@@ -264,12 +264,7 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
       ~origination_level:(Level.current ctxt).level
   in
   let+ address, size, genesis_commitment_hash, ctxt =
-    Sc_rollup.originate
-      ctxt
-      ~kind
-      ~boot_sector
-      ~parameters_ty
-      ~genesis_commitment
+    Sc_rollup.originate ctxt ~kind ~parameters_ty ~genesis_commitment
   in
   ({address; size; genesis_commitment_hash}, ctxt)
 

@@ -104,12 +104,7 @@ let new_sc_rollup ctxt =
         ~origination_level:(Raw_context.current_level ctxt).level
         kind
     in
-    Sc_rollup_storage.originate
-      ctxt
-      ~kind
-      ~boot_sector
-      ~parameters_ty
-      ~genesis_commitment
+    Sc_rollup_storage.originate ctxt ~kind ~parameters_ty ~genesis_commitment
   in
   (rollup, genesis_hash, ctxt)
 

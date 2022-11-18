@@ -239,7 +239,6 @@ module Sc_rollup_add_external_messages_benchmark = struct
         @@ Sc_rollup_storage.originate
              ctxt
              ~kind
-             ~boot_sector
              ~parameters_ty
              ~genesis_commitment
       in

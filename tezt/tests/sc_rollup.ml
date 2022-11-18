@@ -2046,7 +2046,8 @@ let test_reinject_failed_commitment ~kind =
 (* Check that the SC rollup is correctly originated with a boot sector.
    -------------------------------------------------------
 
-   Originate a rollup with a custom boot sector and check if the RPC returns it.
+   Originate a rollup with a custom boot sector and check if the rollup's
+   genesis state hash is correct.
 *)
 let test_rollup_origination_boot_sector ~boot_sector ~kind =
   test_full_scenario
@@ -2058,11 +2059,6 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
       description = "boot_sector is correctly set";
     }
   @@ fun rollup_node rollup_client sc_rollup _tezos_node tezos_client ->
-  let* client_boot_sector =
-    RPC.Client.call ~hooks tezos_client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_boot_sector sc_rollup
-  in
-  let client_boot_sector = JSON.as_string client_boot_sector in
   let* genesis_info =
     RPC.Client.call ~hooks tezos_client
     @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
@@ -2086,10 +2082,7 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
     (init_hash = node_state_hash)
       string
       ~error_msg:"State hashes should be equal! (%L, %R)") ;
-  Check.(boot_sector = client_boot_sector)
-    Check.string
-    ~error_msg:"expected value %L, got %R"
-  |> return
+  unit
 
 (** Check that a node makes use of the boot sector.
     -------------------------------------------------------

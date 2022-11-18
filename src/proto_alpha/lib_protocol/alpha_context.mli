@@ -3742,7 +3742,6 @@ module Sc_rollup : sig
   val originate :
     context ->
     kind:Kind.t ->
-    boot_sector:string ->
     parameters_ty:Script.lazy_expr ->
     genesis_commitment:Commitment.t ->
     (t * Z.t * Commitment.Hash.t * context) tzresult Lwt.t
@@ -4083,8 +4082,6 @@ module Sc_rollup : sig
 
   val genesis_info :
     context -> rollup -> (context * Commitment.genesis_info) tzresult Lwt.t
-
-  val get_boot_sector : context -> t -> (context * string) tzresult Lwt.t
 
   (** This module discloses definitions that are only useful for tests and
     must not be used otherwise. *)
