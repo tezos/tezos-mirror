@@ -325,6 +325,12 @@ val snapshot_import : ?reconstruct:bool -> t -> string -> unit Lwt.t
 (** Same as [snapshot_import], but do not wait for the process to exit. *)
 val spawn_snapshot_import : ?reconstruct:bool -> t -> string -> Process.t
 
+(** Run [octez-node reconstruct]. *)
+val reconstruct : t -> unit Lwt.t
+
+(** Same as [reconstruct], but do not wait for the process to exit. *)
+val spawn_reconstruct : t -> Process.t
+
 (** Spawn [octez-node run].
 
     The resulting promise is fulfilled as soon as the node has been spawned.

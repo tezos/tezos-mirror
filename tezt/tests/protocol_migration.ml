@@ -30,31 +30,57 @@
    Subject:      Checks the migration of protocol alpha
 *)
 
+let connect (client_1, node_1) (client_2, node_2) =
+  let* () = Client.Admin.trust_address client_1 ~peer:node_2 in
+  let* () = Client.Admin.trust_address client_2 ~peer:node_1 in
+  let* () = Client.Admin.connect_address client_2 ~peer:node_1 in
+  Client.Admin.connect_address client_1 ~peer:node_2
+
+let disconnect (client_1, node_1) (client_2, node_2) =
+  let* node_1_id = Node.wait_for_identity node_1
+  and* node_2_id = Node.wait_for_identity node_2 in
+  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id in
+  Client.Admin.kick_peer client_2 ~peer:node_1_id
+
+let get_proposer ~level client =
+  let block = string_of_int level in
+  let* metadata =
+    RPC.Client.call client @@ RPC.get_chain_block_metadata ~block ()
+  in
+  Lwt.return metadata.proposer
+
+let all_bootstrap_keys =
+  List.map (fun b -> b.Account.alias) (Array.to_list Account.Bootstrap.keys)
+
 (** Boilerplate code to create a user-migratable node. Used in the tests below. **)
-let user_migratable_node_init ~migration_level ~migrate_to =
+let user_migratable_node_init ?node_name ?client_name ~migration_level
+    ~migrate_to () =
   let* node =
     Node.init
+      ?name:node_name
       ~patch_config:
         (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
            [(migration_level, migrate_to)])
       [Synchronisation_threshold 0; Private_mode]
   in
-  let* client = Client.(init ~endpoint:(Node node) ()) in
+  let* client = Client.(init ?name:client_name ~endpoint:(Node node) ()) in
   Lwt.return (client, node)
 
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
-let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
-    ~migrate_to =
-  Test.register
-    ~__FILE__
-    ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
-    ~tags:["protocol"; "migration"; "sandbox"]
-  @@ fun () ->
+let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
+    ~migration_level ~migrate_from ~migrate_to () =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
-  let* client, _node = user_migratable_node_init ~migration_level ~migrate_to in
-  Log.info "Node initialized" ;
+  let* client, node =
+    user_migratable_node_init
+      ?node_name
+      ?client_name
+      ~migration_level
+      ~migrate_to
+      ()
+  in
+  Log.info "Node %s initialized" (Node.name node) ;
   let* () = Client.activate_protocol ~protocol:migrate_from client in
   Log.info "Protocol activated" ;
   (* Bake until migration *)
@@ -93,19 +119,163 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
-  repeat 5 (fun () -> Client.bake_for_and_wait client)
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  return (client, node)
 
 (** Test all levels for one cycle, after the first cycle. *)
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
-    test_protocol_migration
+    Test.register
+      ~__FILE__
+      ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
+      ~tags:["protocol"; "migration"; "sandbox"]
+    @@ fun () ->
+    let* _client, _node =
+      perform_protocol_migration
+        ~blocks_per_cycle
+        ~migration_level
+        ~migrate_from
+        ~migrate_to
+        ()
+    in
+    unit
+  done
+
+(** Test migration from [migrate_from] to [migrate_to].
+
+    After migration, test snapshots:
+     - node0: activate PROTO_A, migrate to PROTO_B, bake, export
+              a snapshot in full and rolling modes, and terminate
+     - node1: import full, bake
+     - node2: import rolling, sync, bake
+     - node3: reconstruct full, sync, bake
+     - all 4 are synced  *)
+let test_migration_with_snapshots ~migrate_from ~migrate_to =
+  let migration_level = 8 in
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let baker = Constant.bootstrap1 in
+  let node_params = Node.[Synchronisation_threshold 0; Private_mode] in
+  let patch_config =
+    Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  Test.register
+    ~__FILE__
+    ~title:(Printf.sprintf "protocol migration with snapshots")
+    ~tags:["protocol"; "migration"; "sandbox"; "snapshot"]
+  @@ fun () ->
+  let* client0, node0 =
+    perform_protocol_migration
+      ~node_name:"node0"
+      ~client_name:"client0"
       ~blocks_per_cycle
       ~migration_level
       ~migrate_from
       ~migrate_to
-  done
+      ()
+  in
+  let rolling_available = 60 in
+  Log.info
+    "Bake to 'rolling_available' = %d and terminate node0"
+    rolling_available ;
+  let level = Node.get_level node0 in
+  let synchronize head_node nodes =
+    let level = Node.get_level head_node in
+    Log.info
+      "Synchronize node(s) %s with %s"
+      (String.concat "," (List.map (fun node -> Node.name node) nodes))
+      (Node.name head_node) ;
+    Lwt_list.iter_p
+      (fun node ->
+        let* (_ : int) = Node.wait_for_level node level in
+        unit)
+      nodes
+  in
+  let* () =
+    repeat (rolling_available - level + 1) @@ fun () ->
+    let level_before = Node.get_level node0 in
+    let* () = Client.propose_for ~key:[baker.alias] client0 in
+    let* () =
+      Client.preendorse_for ~key:all_bootstrap_keys ~force:true client0
+    in
+    let* () = Client.endorse_for ~key:all_bootstrap_keys ~force:true client0 in
+    let* level_after = Node.wait_for_level node0 (level_before + 1) in
+    Log.debug "Manually baked to level %d" level_after ;
+    unit
+  in
+  let level = Node.get_level node0 in
+  Check.(
+    (level = rolling_available + 1)
+      int
+      ~error_msg:"Expected node to be at level %R, was at %L"
+      ~__LOC__) ;
+  Log.info "Terminate node0" ;
+  let* () = Node.terminate node0 in
+  Log.info "Export snapshots" ;
+  let file_full = Temp.file "snapshot.full" in
+  let file_rolling = Temp.file "snapshot.rolling" in
+  let* () =
+    Node.snapshot_export
+      ~history_mode:Full_history
+      ~export_level:level
+      node0
+      file_full
+  in
+  Log.info "Exported full snapshot in %s" file_full ;
+  let* () =
+    Node.snapshot_export
+      ~history_mode:Rolling_history
+      ~export_level:level
+      node0
+      file_rolling
+  in
+  Log.info "Exported rolling snapshot in %s" file_rolling ;
+  Log.info "Import full snapshot in node1" ;
+  let* node1 =
+    Node.init
+      ~name:"node1"
+      ~snapshot:(file_full, false)
+      ~patch_config
+      node_params
+  in
+  let* client1 = Client.init ~name:"client1" ~endpoint:(Node node1) () in
+  let* () = Client.bake_for_and_wait ~minimal_timestamp:true client1 in
+  Log.info "Import rolling snapshot in node2" ;
+  let* node2 =
+    Node.init
+      ~name:"node2"
+      ~snapshot:(file_rolling, false)
+      ~patch_config
+      node_params
+  in
+  let* client2 = Client.init ~name:"client2" ~endpoint:(Node node2) () in
+  let* () = connect (client1, node1) (client2, node2) in
+  let* () = synchronize node1 [node2] in
+  let* () = Client.bake_for_and_wait ~minimal_timestamp:true client2 in
+  Log.info "Reconstruct full node3" ;
+  let node3 = Node.create ~name:"node3" node_params in
+  let* () = Node.config_init node3 node_params in
+  Node.Config_file.update node3 patch_config ;
+  let* () = Node.snapshot_import node3 file_full in
+  let* () = Node.reconstruct node3 in
+  let* () = Node.run node3 node_params in
+  let* () = Node.wait_for_ready node3 in
+  let* client3 = Client.init ~name:"client3" ~endpoint:(Node node3) () in
+  let* () = connect (client1, node1) (client3, node3) in
+  let* () = connect (client2, node2) (client3, node3) in
+  let* () = synchronize node1 [node2; node3] in
+  let* () = Client.bake_for_and_wait ~minimal_timestamp:true client3 in
+  Log.info "Rerun node0" ;
+  let* () = Node.run node0 node_params in
+  let* () = Node.wait_for_ready node0 in
+  let* () = connect (client1, node1) (client0, node0) in
+  let* () = connect (client2, node2) (client0, node0) in
+  let* () = connect (client3, node3) (client0, node0) in
+  let* () = synchronize node1 [node0; node2; node3] in
+  unit
 
 (** [block_check ~level ~expected_block_type ~migrate_to ~migrate_from client]
     is generic check that a block of type [expected_block_type] contains
@@ -281,7 +451,9 @@ let test_migration_with_bakers ?(migration_level = 4)
         "to_" ^ Protocol.tag migrate_to;
       ]
   @@ fun () ->
-  let* client, node = user_migratable_node_init ~migration_level ~migrate_to in
+  let* client, node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
   let* () =
     start_protocol
       ~expected_bake_for_blocks:migration_level
@@ -341,28 +513,6 @@ let test_migration_with_bakers ?(migration_level = 4)
   Log.info "Checking blocks have correct protocol metadata" ;
   loop ~_from:(migration_level - 1) ~_to:(last_interesting_level - 1)
 
-let connect (client_1, node_1) (client_2, node_2) =
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2 in
-  let* () = Client.Admin.trust_address client_2 ~peer:node_1 in
-  let* () = Client.Admin.connect_address client_2 ~peer:node_1 in
-  Client.Admin.connect_address client_1 ~peer:node_2
-
-let disconnect (client_1, node_1) (client_2, node_2) =
-  let* node_1_id = Node.wait_for_identity node_1
-  and* node_2_id = Node.wait_for_identity node_2 in
-  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id in
-  Client.Admin.kick_peer client_2 ~peer:node_1_id
-
-let get_proposer ~level client =
-  let block = string_of_int level in
-  let* metadata =
-    RPC.Client.call client @@ RPC.get_chain_block_metadata ~block ()
-  in
-  Lwt.return metadata.proposer
-
-let all_account_keys =
-  List.map (fun b -> b.Account.alias) (Array.to_list Account.Bootstrap.keys)
-
 (** [test_forked_migration_manual] generates the following scenario:
     - start 2 connected nodes
     - bake until migration_level - 1
@@ -401,10 +551,10 @@ let test_forked_migration_manual ?(migration_level = 4)
          (Protocol.tag migrate_to))
   @@ fun () ->
   let* ((client_1, node_1) as cn1) =
-    user_migratable_node_init ~migrate_to ~migration_level
+    user_migratable_node_init ~migrate_to ~migration_level ()
   in
   let* ((client_2, node_2) as cn2) =
-    user_migratable_node_init ~migrate_to ~migration_level
+    user_migratable_node_init ~migrate_to ~migration_level ()
   in
 
   let* () = connect cn1 cn2 in
@@ -426,7 +576,7 @@ let test_forked_migration_manual ?(migration_level = 4)
     repeat n (fun () ->
         let* () =
           Client.propose_for
-            ~key:all_account_keys
+            ~key:all_bootstrap_keys
             ~protocol:migrate_from
             client_2
             ~minimal_timestamp:true
@@ -435,12 +585,12 @@ let test_forked_migration_manual ?(migration_level = 4)
         let* () =
           Client.preendorse_for
             ~protocol:migrate_from
-            ~key:all_account_keys
+            ~key:all_bootstrap_keys
             client_2
             ~force:true
         in
         Client.endorse_for
-          ~key:all_account_keys
+          ~key:all_bootstrap_keys
           client_2
           ~protocol:migrate_from
           ~force:true)
@@ -581,13 +731,13 @@ let test_forked_migration_bakers ?(migration_level = 4)
          (Protocol.tag migrate_to))
   @@ fun () ->
   let* ((client_1, node_1) as cn1) =
-    user_migratable_node_init ~migrate_to ~migration_level
+    user_migratable_node_init ~migrate_to ~migration_level ()
   in
   let* ((client_2, node_2) as cn2) =
-    user_migratable_node_init ~migrate_to ~migration_level
+    user_migratable_node_init ~migrate_to ~migration_level ()
   in
   let* ((client_3, node_3) as cn3) =
-    user_migratable_node_init ~migrate_to ~migration_level
+    user_migratable_node_init ~migrate_to ~migration_level ()
   in
 
   let* () = connect cn1 cn2
@@ -764,4 +914,5 @@ let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to () ;
-  test_forked_migration_manual ~migrate_from ~migrate_to ()
+  test_forked_migration_manual ~migrate_from ~migrate_to () ;
+  test_migration_with_snapshots ~migrate_from ~migrate_to

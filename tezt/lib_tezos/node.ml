@@ -441,6 +441,13 @@ let spawn_snapshot_import ?(reconstruct = false) node file =
 let snapshot_import ?reconstruct node file =
   spawn_snapshot_import ?reconstruct node file |> Process.check
 
+let spawn_reconstruct node =
+  spawn_command
+    node
+    ["reconstruct"; "--data-dir"; node.persistent_state.data_dir]
+
+let reconstruct node = spawn_reconstruct node |> Process.check
+
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
   node.persistent_state.pending_ready <- [] ;
