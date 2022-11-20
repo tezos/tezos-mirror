@@ -2783,6 +2783,12 @@ let test_refutation protocols ~kind =
     match kind with
     | "arith" ->
         [
+          (* As a reminder, the format of loser modes is a space-separated
+             list of space-separated triples of integers. The first integer
+             is the inbox level of the failure, the second integer is the
+             message index of the failure, and the third integer is the
+             index of the failing tick during the processing of this
+             message. *)
           ("inbox_proof_at_genesis", (["3 0 0"], inputs_for 10, 80, [], []));
           ("pvm_proof_at_genesis", (["3 0 1"], inputs_for 10, 80, [], []));
           ("inbox_proof", (["5 0 0"], inputs_for 10, 80, [], []));
