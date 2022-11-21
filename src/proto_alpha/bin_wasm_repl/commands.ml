@@ -31,7 +31,7 @@ open Tezos_scoru_wasm
 type eval_step =
   | Tick  (** Tick per tick *)
   | Result  (** Up to Eval (Result (SK_Result _ | SK_Trap _)) *)
-  | Kernel_next  (** Up to the end of the current `kernal_next` *)
+  | Kernel_run  (** Up to the end of the current `kernal_run` *)
   | Inbox  (** Until input requested *)
 
 (* Possible commands for the REPL. *)
@@ -50,7 +50,7 @@ type commands =
 let parse_eval_step = function
   | "tick" -> Some Tick
   | "result" -> Some Result
-  | "kernel_next" -> Some Kernel_next
+  | "kernel_run" -> Some Kernel_run
   | "inbox" -> Some Inbox
   | _ -> None
 
@@ -130,9 +130,9 @@ let eval_to_result tree =
       in
       (tree, ticks))
 
-(* [eval_kernel_next tree] evals up to the end of the current `kernel_next` (or
+(* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
    starts a new one if already at snapshot point). *)
-let eval_kernel_next tree =
+let eval_kernel_run tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
@@ -155,7 +155,7 @@ let eval_until_input_requested tree =
 let eval = function
   | Tick -> compute_step
   | Result -> eval_to_result
-  | Kernel_next -> eval_kernel_next
+  | Kernel_run -> eval_kernel_run
   | Inbox -> eval_until_input_requested
 
 let set_raw_message_input_step level counter encoded_message tree =

@@ -28,8 +28,12 @@
 let wasm_main_module_name = "main"
 
 (* This is the name of the main function of the module. We require the
-   kernel to expose a function named [kernel_next]. *)
-let wasm_entrypoint = "kernel_next"
+   kernel to expose a function named [kernel_run]. *)
+let wasm_entrypoint = "kernel_run"
+
+(* The name of the WASM module which exports the host functions to the
+   WASM kernel. *)
+let wasm_host_funcs_virual_module = "smart_rollup_core"
 
 (* Number of ticks between snapshotable states,
    should be chosen low enough to maintain refutability.

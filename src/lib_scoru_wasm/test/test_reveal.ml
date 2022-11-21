@@ -40,12 +40,12 @@ let reveal_preimage_module hash_addr preimage_addr max_bytes =
   Format.sprintf
     {|
       (module
-        (import "rollup_safe_core" "reveal_preimage"
+        (import "smart_rollup_core" "reveal_preimage"
           (func $reveal_preimage (param i32 i32 i32) (result i32))
         )
         (memory 1)
         (export "mem" (memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (call $reveal_preimage (i32.const %ld) (i32.const %ld) (i32.const %ld))
         )
       )
@@ -58,12 +58,12 @@ let reveal_metadata_module metadata_addr =
   Format.sprintf
     {|
       (module
-        (import "rollup_safe_core" "reveal_metadata"
+        (import "smart_rollup_core" "reveal_metadata"
           (func $reveal_metadata (param i32) (result i32))
         )
         (memory 1)
         (export "mem" (memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (call $reveal_metadata (i32.const %ld))
         )
       )
@@ -253,13 +253,13 @@ let test_fast_exec_reveal () =
       {|
 (module
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "store_write"
     (func $store_write (param i32 i32 i32 i32 i32) (result i32))
   )
 
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "reveal_preimage"
     (func $reveal_preimage (param i32 i32 i32) (result i32))
   )
@@ -270,7 +270,7 @@ let test_fast_exec_reveal () =
   (data (i32.const 0) "%s") ;; The hash we want to reveal
   (data (i32.const 100) "/foo")
 
-  (func (export "kernel_next") (local $len i32)
+  (func (export "kernel_run") (local $len i32)
     ;; Reveal something
     (call $reveal_preimage
       ;; Address of the hash

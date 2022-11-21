@@ -549,16 +549,11 @@ programs must be fully deterministic. As a consequence,
 A valid kernel is a WASM module that satisfies the following
 constraints:
 
-#. It exports a function ``kernel_next`` that takes no argument and
+#. It exports a function ``kernel_run`` that takes no argument and
    returns nothing.
 #. It declares and exports exactly one memory.
 #. It only imports the host functions, exported by the (virtual)
-   module ``rollup_safe_core``.
-
-.. warning::
-
-   We expect ``rollup_safe_core`` to be renamed ``rollup_core`` before
-   smart rollups land on Tezos mainnet.
+   module ``smart_rollup_core``.
 
 For instance, the mandatory example of a ``hello, world!`` kernel is
 the following WASM program in text format.
@@ -566,12 +561,12 @@ the following WASM program in text format.
 .. code::
 
     (module
-      (import "rollup_safe_core" "write_debug"
+      (import "smart_rollup_core" "write_debug"
          (func $write_debug (param i32 i32) (result i32)))
       (memory 1)
       (export "mem" (memory 0))
       (data (i32.const 100) "hello, world!")
-      (func (export "kernel_next")
+      (func (export "kernel_run")
         (local $hello_address i32)
         (local $hello_length i32)
         (local.set $hello_address (i32.const 100))
@@ -619,7 +614,7 @@ Execution Environment
 ^^^^^^^^^^^^^^^^^^^^^
 In a nutshell, the life cycle of a smart rollup is a never-ending
 interleaving of fetching inputs from the layer-1, and executing the
-``kernel_next`` function exposed by the WASM kernel.
+``kernel_run`` function exposed by the WASM kernel.
 
 State
 """""
@@ -627,8 +622,8 @@ State
 The smart rollup carries two states:
 
 #. A transient state, that is reset after each call to the
-   ``kernel_next`` function and is akin to RAM.
-#. A persistent state, that is preserved across ``kernel_next`` calls.
+   ``kernel_run`` function and is akin to RAM.
+#. A persistent state, that is preserved across ``kernel_run`` calls.
    The persistent state consists in an *inbox* that is regularly
    populated with the inputs coming from the layer-1, the *outbox*
    which the kernel can populate with contract calls targeting smart
@@ -653,40 +648,40 @@ a WASM kernel has to filter the inputs that are relevant for its
 purpose from the ones it does not need to process.
 
 Once the inbox has been populated with the inputs of the Tezos block,
-the ``kernel_next`` function is called, from a clean “transient”
+the ``kernel_run`` function is called, from a clean “transient”
 state. More precisely, the WASM kernel is parsed, linked, initialized,
-then ``kernel_next`` is called.
+then ``kernel_run`` is called.
 
-By default, the WASM kernel yields when ``kernel_next`` returns. In
+By default, the WASM kernel yields when ``kernel_run`` returns. In
 this case, the WASM kernel execution is put on hold while the input of
 the next inbox are being loaded. The inputs that were not consumed by
-``kernel_next`` are dropped. ``kernel_next`` can prevent the WASM
+``kernel_run`` are dropped. ``kernel_run`` can prevent the WASM
 kernel from yielding by writing arbitrary data under the path
 ``/kernel/env/reboot`` in its durable storage. In such a case (known
-as reboot), ``kernel_next`` is called again, without dropping unread
-inputs. This value is removed between each call of ``kernel_next``,
-and the ``kernel_next`` function can postpone yielding at most 1,000
+as reboot), ``kernel_run`` is called again, without dropping unread
+inputs. This value is removed between each call of ``kernel_run``,
+and the ``kernel_run`` function can postpone yielding at most 1,000
 reboots for each Tezos level.
 
-A call to ``kernel_next`` cannot take an arbitrary amount of time to
+A call to ``kernel_run`` cannot take an arbitrary amount of time to
 complete, because diverging computations are not compatible with the
 optimistic rollup infrastructure of Tezos. To dodge the halting
 problem, the reference interpreter of WASM used during the rejection
 enforces a bound on the number of ticks used in a call to
-``kernel_next``. Once the maximum number of ticks is reached, the
-execution of ``kernel_next`` is trapped (*i.e.*, interrupted with an
+``kernel_run``. Once the maximum number of ticks is reached, the
+execution of ``kernel_run`` is trapped (*i.e.*, interrupted with an
 error).
 
 The current bound is set to 11,000,000,000 ticks. ``octez-wasm-repl``
-is probably the best tool available to verify the ``kernel_next``
+is probably the best tool available to verify the ``kernel_run``
 function does not take more ticks than authorized.
 
 The direct consequence of this setup is that it might be necessary for
 a WASM kernel to span a long computation across several calls to
-``kernel_next``, and therefore to serialize any data it needs in the
+``kernel_run``, and therefore to serialize any data it needs in the
 durable storage to avoid loosing them.
 
-Finally, the kernel can verify if the previous ``kernel_next``
+Finally, the kernel can verify if the previous ``kernel_run``
 invocation was trapped by verifying if some data are stored under the
 path ``/kernel/env/stuck``.
 
@@ -708,7 +703,7 @@ allows it to interact with the components of persistent state.
 ``read_input``
   Loads the oldest input still present in the inbox of the smart
   rollup in the transient memory of the WASM kernel. This means that
-  the input is lost at the next invocation of ``kernel_next`` if it is
+  the input is lost at the next invocation of ``kernel_run`` if it is
   not written in the durable storage.
 
 ``write_output``
@@ -828,7 +823,7 @@ following.
 .. code:: rust
 
    #[no_mangle]
-   pub extern "C" fn kernel_next() {
+   pub extern "C" fn kernel_run() {
    }
 
 This code can be easily computed with ``cargo`` with the following
@@ -876,11 +871,11 @@ Host Functions in Rust
 
 Exposing host functions exported by the WASM runtime to a Rust program
 is actually really straightforward. The ``link`` pragma is used to specify the
-module that exports them (in our case, ``rollup_safe_core``).
+module that exports them (in our case, ``smart_rollup_core``).
 
 .. code:: rust
 
-   #[link(wasm_import_module = "rollup_safe_core")]
+   #[link(wasm_import_module = "smart_rollup_core")]
    extern "C" {
        /// Returns the number of bytes written to `dst`, or an error code.
        pub fn read_input(
@@ -1142,17 +1137,17 @@ command ``show inbox``.
 
 The first input of an inbox at the beginning of a level is
 `Start_of_level`, and is represented by the message ``\000\001`` on
-the kernel side. We can now start a `kernel_next` evaluation:
+the kernel side. We can now start a `kernel_run` evaluation:
 
 .. code::
 
-  > step kernel_next
+  > step kernel_run
   Evaluation took 10000 ticks so far
   Status: Evaluating
   Internal state: Snapshot
 
 
-The memory of the interpreter is flushed between two `kernel_next`
+The memory of the interpreter is flushed between two `kernel_run`
 call (at the `Snapshot` internal state), however the ``durable
 storage`` can be used as a persistent memory. Let's assume this kernel
 wrote data at key `/store/key`:
@@ -1166,7 +1161,7 @@ Since the representation of values is decided by the kernel, the REPL can only
 return its raw value. It is possible however to inspect the memory by stopping
 the PVM before its snapshot internal state, with ``step result``, and
 inspect the memory at pointer `n` and length `l`, and finaly evaluate until the
-next `kernel_next`:
+next `kernel_run`:
 
 .. code::
 
@@ -1178,7 +1173,7 @@ next `kernel_next`:
   > show memory at p for l bytes
   `<hexadecimal value>`
 
-  > step kernel_next
+  > step kernel_run
   Evaluation took 7500 ticks so far
   Status: Evaluating
   Internal state: Snapshot

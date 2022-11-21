@@ -177,9 +177,9 @@ let test_output () =
           (type (;0;) (func (param i32 i32 i32 i32 i32) (result i32)))
           (type $t0 (func (param i32 i32) (result i32)))
           (type $t3 (func (param i32 i32 i32 i32) (result i32)))
-          (import "rollup_safe_core" "read_input" (func $read_input (type $t3)))
-          (import "rollup_safe_core" "write_output" (func $write_output (type $t0)))
-          (func (export "kernel_next")
+          (import "smart_rollup_core" "read_input" (func $read_input (type $t3)))
+          (import "smart_rollup_core" "write_output" (func $write_output (type $t0)))
+          (func (export "kernel_run")
             (local $size i32)
             (local.set $size (call $read_input
                              (i32.const %d)

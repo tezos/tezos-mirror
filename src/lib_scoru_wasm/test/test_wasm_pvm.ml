@@ -70,13 +70,13 @@ let should_run_debug_kernel () =
   let module_ =
     {|
 (module
- (import "rollup_safe_core" "write_debug"
+ (import "smart_rollup_core" "write_debug"
          (func $write_debug (param i32 i32)))
  ;; Durable keys
  (data (i32.const 100) "hello")
  (memory 1)
  (export "mem" (memory 0))
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $hello_address i32)
        (local $hello_length i32)
 
@@ -114,7 +114,7 @@ let should_run_store_has_kernel () =
   let module_ =
     {|
 (module
- (import "rollup_safe_core" "store_has"
+ (import "smart_rollup_core" "store_has"
          (func $store_has (param i32 i32) (result i32)))
  ;; Durable keys
  (data (i32.const 100) "/hi/bye/hello/other")
@@ -127,7 +127,7 @@ let should_run_store_has_kernel () =
        (i32.ne)
        (if (then unreachable))
        )
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $hi_address i32)
        (local $hi_length i32)
        (local $hi_bye_length i32)
@@ -197,13 +197,13 @@ let should_run_store_list_size_kernel () =
   let module_ =
     {|
 (module
- (import "rollup_safe_core" "store_list_size"
+ (import "smart_rollup_core" "store_list_size"
          (func $store_list_size (param i32 i32) (result i64)))
  ;; Durable keys
  (data (i32.const 100) "/one")
  (memory 1)
  (export "mem" (memory 0))
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $one_address i32)
        (local $one_length i32)
 
@@ -246,7 +246,7 @@ let should_run_store_delete_kernel () =
   let module_ =
     {|
 (module
- (import "rollup_safe_core" "store_delete"
+ (import "smart_rollup_core" "store_delete"
          (func $store_delete (param i32 i32) (result i32)))
  ;; Durable keys
  (data (i32.const 100) "/one") ;; /one
@@ -255,7 +255,7 @@ let should_run_store_delete_kernel () =
  (data (i32.const 114) "/four") ;; /four
  (memory 1)
  (export "mem" (memory 0))
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $one_address i32)
        (local $one_length i32)
        (local $four_address i32)
@@ -328,8 +328,8 @@ let should_run_store_move_kernel () =
       {|
 (module
   (type (;0;) (func (param i32 i32 i32 i32) (result i32)))
-  (import "rollup_safe_core" "store_move" (func $store_move (type 0)))
-  (func (export "kernel_next")
+  (import "smart_rollup_core" "store_move" (func $store_move (type 0)))
+  (func (export "kernel_run")
     (local i32)
     (call $store_move
       (i32.const %d)
@@ -360,7 +360,7 @@ let should_run_store_move_kernel () =
     Wasm.Internal_for_tests.get_tick_state tree
   in
   assert (not @@ is_stuck state_before_first_message) ;
-  (* consume a message and run kernel_next until we need next message *)
+  (* consume a message and run kernel_run until we need next message *)
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
@@ -389,8 +389,8 @@ let should_run_store_copy_kernel () =
       {|
 (module
   (type (;0;) (func (param i32 i32 i32 i32) (result i32)))
-  (import "rollup_safe_core" "store_copy" (func $store_move (type 0)))
-  (func (export "kernel_next")
+  (import "smart_rollup_core" "store_copy" (func $store_move (type 0)))
+  (func (export "kernel_run")
     (local i32)
     (call $store_move
       (i32.const %d)
@@ -421,7 +421,7 @@ let should_run_store_copy_kernel () =
     Wasm.Internal_for_tests.get_tick_state tree
   in
   assert (not @@ is_stuck state_before_first_message) ;
-  (* consume a message and run kernel_next until we need next message *)
+  (* consume a message and run kernel_run until we need next message *)
   let* tree = set_empty_inbox_step 0l tree in
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
@@ -443,13 +443,13 @@ let test_modify_read_only_storage_kernel () =
   let module_ =
     {|
 (module
- (import "rollup_safe_core" "store_write"
+ (import "smart_rollup_core" "store_write"
          (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
- (import "rollup_safe_core" "store_delete"
+ (import "smart_rollup_core" "store_delete"
          (func $store_delete (param i32 i32) (result i32)))
- (import "rollup_safe_core" "store_move"
+ (import "smart_rollup_core" "store_move"
          (func $store_move (param i32 i32 i32 i32) (result i32)))
- (import "rollup_safe_core" "store_copy"
+ (import "smart_rollup_core" "store_copy"
          (func $store_copy (param i32 i32 i32 i32) (result i32)))
  ;; Durable keys
  (data (i32.const 100) "/readonly/kernel/boot.wasm")
@@ -462,7 +462,7 @@ let test_modify_read_only_storage_kernel () =
        (i32.ne)
        (if (then unreachable)))
 
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $fallback_kernel_address i32)
        (local $fallback_kernel_length i32)
        (local $kernel_address i32)
@@ -640,7 +640,7 @@ let test_snapshotable_state () =
       (module
         (memory 1)
         (export "mem"(memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (nop)
         )
       )
@@ -684,7 +684,7 @@ let test_rebuild_snapshotable_state () =
       (module
         (memory 1)
         (export "mem"(memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (nop)
         )
       )
@@ -743,7 +743,7 @@ let test_rebuild_snapshotable_state () =
 
 let test_unkown_host_function_truncated () =
   let open Lwt_result_syntax in
-  let rollup_safe_core = "rollup_safe_core" in
+  let smart_rollup_core = "smart_rollup_core" in
   let unknown_function = String.make 100 'a' in
   (* This module imports an unknown function of length 100, which is the maximum
      accepted by our interpreter. The error message will be trunctated *)
@@ -756,12 +756,12 @@ let test_unkown_host_function_truncated () =
           )
           (memory 1)
           (export "mem" (memory 0))
-          (func (export "kernel_next")
+          (func (export "kernel_run")
             (unreachable)
           )
         )
     |}
-      rollup_safe_core
+      smart_rollup_core
       unknown_function
   in
   (* Let's first init the tree to compute. *)
@@ -773,7 +773,7 @@ let test_unkown_host_function_truncated () =
   (* The message as originally outputed before being
      truncated. *)
   let reason =
-    Format.sprintf "Unexpected import: %s.%s" rollup_safe_core unknown_function
+    Format.sprintf "Unexpected import: %s.%s" smart_rollup_core unknown_function
   in
   (* Let's check the message will be indeed truncated, otherwise this test is
      not relevant. *)
@@ -791,7 +791,7 @@ let test_bulk_noops () =
       (module
         (memory 0)
         (export "mem" (memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (nop)
         )
       )
@@ -836,11 +836,11 @@ let test_durable_store_io () =
       {|
         (module
           (type (;0;) (func (param i32 i32 i32 i32 i32) (result i32)))
-          (import "rollup_safe_core" "store_read"
+          (import "smart_rollup_core" "store_read"
             (func $store_read (type 0)))
-          (import "rollup_safe_core" "store_write"
+          (import "smart_rollup_core" "store_write"
             (func $store_write (type 0)))
-          (func (export "kernel_next")
+          (func (export "kernel_run")
             (local i32)
             (call $store_read (i32.const %d)
                               (i32.const %d)
@@ -917,13 +917,13 @@ let reveal_upgrade_kernel () =
   Format.sprintf
     {|
 (module
-  (import "rollup_safe_core" "store_write"
+  (import "smart_rollup_core" "store_write"
     (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
-  (import "rollup_safe_core" "store_delete"
+  (import "smart_rollup_core" "store_delete"
     (func $store_delete (param i32 i32) (result i32)))
-  (import "rollup_safe_core" "reveal_preimage"
+  (import "smart_rollup_core" "reveal_preimage"
     (func $reveal_preimage (param i32 i32 i32) (result i32)))
-  (func (export "kernel_next")
+  (func (export "kernel_run")
     (local $preimage_size i32)
 
     (local $hash_start i32)
@@ -1029,7 +1029,7 @@ let test_reveal_upgrade_kernel_ok () =
 (module
  (memory 1)
  (export "mem" (memory 0))
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (nop)
        )
  )
@@ -1170,11 +1170,11 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
     Format.sprintf
       {|
 (module
- (import "rollup_safe_core" "store_write"
+ (import "smart_rollup_core" "store_write"
          (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
- (import "rollup_safe_core" "store_read"
+ (import "smart_rollup_core" "store_read"
          (func $store_read (param i32 i32 i32 i32 i32) (result i32)))
- (import "rollup_safe_core" "store_has"
+ (import "smart_rollup_core" "store_has"
          (func $store_has (param i32 i32) (result i32)))
  ;; Durable keys
  (data (i32.const %d) "%s")
@@ -1236,7 +1236,7 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
        (local.get $reboot_counter_value)
        )
 
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $reboot_flag_key i32)
        (local $reboot_flag_length i32)
        (local $reboot_flag_value_offset i32)
@@ -1281,7 +1281,7 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
       reboot_counter_key_offset
       reboot_counter_key_length
       reboot_counter_in_memory_offset
-      (* `kernel_next` function *)
+      (* `kernel_run` function *)
       data_offset_start (* == reboot_key's offset *)
       reboot_key_length
       reboot_flag_in_memory_offset
@@ -1397,7 +1397,7 @@ let test_inbox_cleanup () =
       (module
         (memory 0)
         (export "mem" (memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (nop)
         )
       )
@@ -1426,7 +1426,7 @@ let test_scheduling_multiple_inboxes input_numbers =
       (module
         (memory 0)
         (export "mem" (memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (nop)
         )
       )

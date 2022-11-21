@@ -138,19 +138,19 @@ let test_store_read_write =
     {|
 (module
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "write_debug"
     (func $write_debug (param i32 i32))
   )
 
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "store_write"
     (func $store_write (param i32 i32 i32 i32 i32) (result i32))
   )
 
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "store_read"
     (func $store_read (param i32 i32 i32 i32 i32) (result i32))
   )
@@ -161,7 +161,7 @@ let test_store_read_write =
   (data (i32.const 0) "Hello World")
   (data (i32.const 100) "/foo")
 
-  (func (export "kernel_next") (local $n i64)
+  (func (export "kernel_run") (local $n i64)
     (call $write_debug
       ;; Memory address and length of the string to log
       ;; Should be "Hello" as defined above
@@ -247,13 +247,13 @@ let test_reveal_preimage =
       {|
 (module
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "store_write"
     (func $store_write (param i32 i32 i32 i32 i32) (result i32))
   )
 
   (import
-    "rollup_safe_core"
+    "smart_rollup_core"
     "reveal_preimage"
     (func $reveal_preimage (param i32 i32 i32) (result i32))
   )
@@ -264,7 +264,7 @@ let test_reveal_preimage =
   (data (i32.const 0) "%s") ;; The hash we want to reveal
   (data (i32.const 100) "/foo")
 
-  (func (export "kernel_next") (local $len i32)
+  (func (export "kernel_run") (local $len i32)
     ;; Reveal something
     (call $reveal_preimage
       ;; Address of the hash

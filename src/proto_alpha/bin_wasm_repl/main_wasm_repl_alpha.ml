@@ -43,7 +43,7 @@ let import_pvm_host_functions () =
   Repl_helpers.trap_exn (fun () ->
       Lwt.return
         (Tezos_webassembly_interpreter.Import.register
-           ~module_name:"rollup_safe_core"
+           ~module_name:"smart_rollup_core"
            lookup))
 
 (* [link module_ast] checks a module actually uses the host functions with their
