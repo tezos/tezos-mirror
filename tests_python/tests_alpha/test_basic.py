@@ -143,7 +143,12 @@ class TestRawContext:
         run_json = {
             'operation': {
                 "branch": head_hash,
-                "contents": [{"kind": "failing_noop", "arbitrary": message}],
+                "contents": [
+                    {
+                        "kind": "failing_noop",
+                        "arbitrary": bytes(message, 'utf-8').hex(),
+                    }
+                ],
                 'signature': signature,
             },
             'chain_id': chain_id,
