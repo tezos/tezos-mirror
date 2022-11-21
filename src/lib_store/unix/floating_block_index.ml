@@ -27,19 +27,19 @@
    time: if a block has fewer than 12 predecessors then it is padded
    so its size remain constant. *)
 module Block_info = struct
-  type t = {offset : int; predecessors : Tezos_crypto.Block_hash.t list}
+  type t = {offset : int; predecessors : Block_hash.t list}
 
   let max_predecessors = 12
 
   let encoded_list_size =
-    let r = max_predecessors * Tezos_crypto.Block_hash.size (* uint16 *) in
+    let r = max_predecessors * Block_hash.size (* uint16 *) in
     assert (r < 1 lsl 16) ;
     r
 
   let encoded_size = 8 + 1 + encoded_list_size
 
   (* Format:
-     <file_offset>(8) + <list_size>(1) + <list>(list_size * Tezos_crypto.Block_hash.size) *)
+     <file_offset>(8) + <list_size>(1) + <list>(list_size * Block_hash.size) *)
 
   let t =
     let open Repr in
@@ -58,11 +58,11 @@ module Block_info = struct
       (fun i h ->
         (* Start reading after the <file_offset>(8) + <list_lize>(1) *)
         Bytes.blit
-          (Tezos_crypto.Block_hash.to_bytes h)
+          (Block_hash.to_bytes h)
           0
           bytes
-          (8 + 1 + (i * Tezos_crypto.Block_hash.size))
-          Tezos_crypto.Block_hash.size)
+          (8 + 1 + (i * Block_hash.size))
+          Block_hash.size)
       v.predecessors ;
     Bytes.unsafe_to_string bytes
 
@@ -80,13 +80,13 @@ module Block_info = struct
     current_offset := !current_offset + 1 ;
     let predecessors = ref [] in
     let limit = !current_offset in
-    current_offset := limit + ((list_size - 1) * Tezos_crypto.Block_hash.size) ;
+    current_offset := limit + ((list_size - 1) * Block_hash.size) ;
     while !current_offset >= limit do
       predecessors :=
-        (String.sub str !current_offset Tezos_crypto.Block_hash.size
-        |> Tezos_crypto.Block_hash.of_string_exn)
+        (String.sub str !current_offset Block_hash.size
+        |> Block_hash.of_string_exn)
         :: !predecessors ;
-      current_offset := !current_offset - Tezos_crypto.Block_hash.size
+      current_offset := !current_offset - Block_hash.size
     done ;
     {offset; predecessors = !predecessors}
 
@@ -96,9 +96,7 @@ module Block_info = struct
       fmt
       "@[offset: %d, predecessors : [ @[<hov>%a @]]@]"
       v.offset
-      (pp_print_list
-         ~pp_sep:(fun fmt () -> fprintf fmt " ;@,")
-         Tezos_crypto.Block_hash.pp)
+      (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " ;@,") Block_hash.pp)
       v.predecessors
 end
 

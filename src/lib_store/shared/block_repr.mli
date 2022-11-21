@@ -35,9 +35,8 @@ open Store_types
 type contents = {
   header : Block_header.t;
   operations : Operation.t list list;
-  block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
-  operations_metadata_hashes :
-    Tezos_crypto.Operation_metadata_hash.t list list option;
+  block_metadata_hash : Block_metadata_hash.t option;
+  operations_metadata_hashes : Operation_metadata_hash.t list list option;
 }
 
 (** The type for a block's [metadata] stored on disk. This
@@ -67,7 +66,7 @@ type metadata = {
     users to re-use the same structure to store freshly loaded
     metadata. *)
 type block = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   contents : contents;
   mutable metadata : metadata option;
 }
@@ -85,7 +84,7 @@ type legacy_metadata = {
 }
 
 type legacy_block = {
-  legacy_hash : Tezos_crypto.Block_hash.t;
+  legacy_hash : Block_hash.t;
   legacy_contents : contents;
   mutable legacy_metadata : legacy_metadata option;
 }
@@ -101,7 +100,7 @@ val legacy_encoding : legacy_block Data_encoding.t
 (** [create_genesis_block ~genesis context_hash] creates a default
     genesis block for the given [genesis] and its [context_hash] that
     contains metadata. *)
-val create_genesis_block : genesis:Genesis.t -> Tezos_crypto.Context_hash.t -> t
+val create_genesis_block : genesis:Genesis.t -> Context_hash.t -> t
 
 (** Encoding for {!contents}. *)
 val contents_encoding : contents Data_encoding.t
@@ -128,7 +127,7 @@ val descriptor : t -> block_descriptor
 (** [hash block] returns the stored [block]'s hash. It is not
     guaranteed to be the same as [Block_header.hash (header block)]
     (e.g. in sandbox, the genesis block might have a fake hash). *)
-val hash : t -> Tezos_crypto.Block_hash.t
+val hash : t -> Block_hash.t
 
 (** [operations block] returns the list of list of operations
     contained in the [block]. *)
@@ -144,24 +143,23 @@ val level : t -> Int32.t
 
 val proto_level : t -> int
 
-val predecessor : t -> Tezos_crypto.Block_hash.t
+val predecessor : t -> Block_hash.t
 
 val timestamp : t -> Time.Protocol.t
 
 val validation_passes : t -> int
 
-val operations_hash : t -> Tezos_crypto.Operation_list_list_hash.t
+val operations_hash : t -> Operation_list_list_hash.t
 
 val fitness : t -> Fitness.t
 
-val context : t -> Tezos_crypto.Context_hash.t
+val context : t -> Context_hash.t
 
 val protocol_data : t -> Bytes.t
 
-val block_metadata_hash : t -> Tezos_crypto.Block_metadata_hash.t option
+val block_metadata_hash : t -> Block_metadata_hash.t option
 
-val operations_metadata_hashes :
-  t -> Tezos_crypto.Operation_metadata_hash.t list list option
+val operations_metadata_hashes : t -> Operation_metadata_hash.t list list option
 
 (** {2 Metadata accessors} *)
 
@@ -190,10 +188,7 @@ val operations_metadata :
     - Are the stored operations hashes consistent regarding the stored
       operations hashes? *)
 val check_block_consistency :
-  ?genesis_hash:Tezos_crypto.Block_hash.t ->
-  ?pred_block:t ->
-  t ->
-  unit tzresult Lwt.t
+  ?genesis_hash:Block_hash.t -> ?pred_block:t -> t -> unit tzresult Lwt.t
 
 (** [decode_metadata data] decodes metadata from [data] encoded either
     with the new encoding or the legacy one. *)

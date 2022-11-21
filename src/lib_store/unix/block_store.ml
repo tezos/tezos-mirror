@@ -44,8 +44,7 @@ type block_store = {
   savepoint : block_descriptor Stored_data.t;
   status_data : status Stored_data.t;
   block_cache : Block_repr.t Block_lru_cache.t;
-  mutable gc_callback :
-    (Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t) option;
+  mutable gc_callback : (Context_hash.t -> unit tzresult Lwt.t) option;
   merge_mutex : Lwt_mutex.t;
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
@@ -54,7 +53,7 @@ type block_store = {
 
 type t = block_store
 
-type key = Block of (Tezos_crypto.Block_hash.t * int)
+type key = Block of (Block_hash.t * int)
 
 let status_encoding =
   let open Data_encoding in
@@ -169,7 +168,7 @@ let compute_predecessors block_store block =
       | Some pred' -> loop (pred' :: predecessors_acc) pred' (dist + 1)
   in
   let predecessor = predecessor block in
-  if Tezos_crypto.Block_hash.equal block.hash predecessor then
+  if Block_hash.equal block.hash predecessor then
     (* genesis *)
     Lwt.return [block.hash]
   else
@@ -226,9 +225,7 @@ let mem block_store key =
       match o with
       | None -> return_false
       | Some predecessor_hash
-        when Tezos_crypto.Block_hash.equal
-               block_store.genesis_block.hash
-               predecessor_hash ->
+        when Block_hash.equal block_store.genesis_block.hash predecessor_hash ->
           return_true
       | Some predecessor_hash ->
           let*! is_known_in_floating =
@@ -251,11 +248,8 @@ let read_block ~read_metadata block_store key_kind =
       match o with
       | None -> return_none
       | Some adjusted_hash ->
-          if
-            Tezos_crypto.Block_hash.equal
-              block_store.genesis_block.hash
-              adjusted_hash
-          then return_some block_store.genesis_block
+          if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
+            return_some block_store.genesis_block
           else
             let fetch_block adjusted_hash =
               (* First look in the floating stores *)
@@ -297,11 +291,8 @@ let read_block_metadata block_store key_kind =
       match o with
       | None -> return_none
       | Some adjusted_hash -> (
-          if
-            Tezos_crypto.Block_hash.equal
-              block_store.genesis_block.hash
-              adjusted_hash
-          then return (Block_repr.metadata block_store.genesis_block)
+          if Block_hash.equal block_store.genesis_block.hash adjusted_hash then
+            return (Block_repr.metadata block_store.genesis_block)
           else
             (* First look in the floating stores *)
             let*! o =
@@ -876,9 +867,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
      {stores}. cementing_highwatermark < b.lafl <= new_head_lafl
 
      HYPOTHESIS: all blocks at a given level have the same lafl. *)
-  let visited =
-    ref (Tezos_crypto.Block_hash.Set.singleton (Block_repr.hash lafl_block))
-  in
+  let visited = ref (Block_hash.Set.singleton (Block_repr.hash lafl_block)) in
   let blocks_lafl = ref BlocksLAFL.empty in
   let*! () = Store_events.(emit start_retreiving_cycles) () in
   let* () =
@@ -911,8 +900,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
                 Block_repr_unix.raw_get_block_predecessor block_bytes
               in
               let block_hash = Block_repr_unix.raw_get_block_hash block_bytes in
-              if Tezos_crypto.Block_hash.Set.mem block_predecessor !visited then (
-                visited := Tezos_crypto.Block_hash.Set.add block_hash !visited ;
+              if Block_hash.Set.mem block_predecessor !visited then (
+                visited := Block_hash.Set.add block_hash !visited ;
                 let*! predecessors =
                   let*! pred_opt =
                     Floating_block_store.find_predecessors store block_hash
@@ -1237,7 +1226,7 @@ let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
   let savepoint_hash = fst new_savepoint in
   if
     History_mode.(equal history_mode Archive)
-    || Tezos_crypto.Block_hash.(savepoint_hash = fst previous_savepoint)
+    || Block_hash.(savepoint_hash = fst previous_savepoint)
   then (* No GC required *) return_unit
   else
     match block_store.gc_callback with

@@ -182,12 +182,12 @@ let fork_testchain =
       "the test chain {chain_id} for protocol {protocol_hash} with genesis \
        block hash {genesis_hash} was initialized from {fork_block} and is now \
        registered in the store"
-    ~pp1:Tezos_crypto.Chain_id.pp
-    ("chain_id", Tezos_crypto.Chain_id.encoding)
-    ~pp2:Tezos_crypto.Protocol_hash.pp
-    ("protocol_hash", Tezos_crypto.Protocol_hash.encoding)
-    ~pp3:Tezos_crypto.Block_hash.pp
-    ("genesis_hash", Tezos_crypto.Block_hash.encoding)
+    ~pp1:Chain_id.pp
+    ("chain_id", Chain_id.encoding)
+    ~pp2:Protocol_hash.pp
+    ("protocol_hash", Protocol_hash.encoding)
+    ~pp3:Block_hash.pp
+    ("genesis_hash", Block_hash.encoding)
     ~pp4:pp_block_descriptor
     ("fork_block", block_descriptor_encoding)
 
@@ -384,8 +384,8 @@ let restore_protocol_activation =
     ~name:"restore_protocol_activation"
     ~msg:"protocol {protocol_level} ({protocol_hash}) was successfully restored"
     ("protocol_level", Data_encoding.int31)
-    ~pp2:Tezos_crypto.Protocol_hash.pp
-    ("protocol_hash", Tezos_crypto.Protocol_hash.encoding)
+    ~pp2:Protocol_hash.pp
+    ("protocol_hash", Protocol_hash.encoding)
 
 let update_protocol_table =
   declare_4
@@ -396,11 +396,11 @@ let update_protocol_table =
       "the protocol table was updated: protocol {proto_hash} (level \
        {proto_level}) was activated on block {block_hash} (level \
        {block_level})"
-    ("proto_hash", Tezos_crypto.Protocol_hash.encoding)
-    ~pp1:Tezos_crypto.Protocol_hash.pp_short
+    ("proto_hash", Protocol_hash.encoding)
+    ~pp1:Protocol_hash.pp_short
     ("proto_level", Data_encoding.int31)
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
-    ~pp3:Tezos_crypto.Block_hash.pp
+    ("block_hash", Block_hash.encoding)
+    ~pp3:Block_hash.pp
     ("block_level", Data_encoding.int32)
     ~pp4:pp_int32
 

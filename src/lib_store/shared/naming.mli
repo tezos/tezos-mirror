@@ -62,13 +62,13 @@ val protocol_store_dir :
 
 (** Protocol file *)
 val protocol_file :
-  [`Protocol_dir] directory -> Tezos_crypto.Protocol_hash.t -> [`Protocol] file
+  [`Protocol_dir] directory -> Protocol_hash.t -> [`Protocol] file
 
 (** {2 Chain directory} *)
 
 val chain_dir :
   [< `Store_dir | `Testchains_dir] directory ->
-  Tezos_crypto.Chain_id.t ->
+  Chain_id.t ->
   [`Chain_dir] directory
 
 val lock_file : [`Chain_dir] directory -> [`Lockfile] file
@@ -111,13 +111,11 @@ val target_file :
 
 val invalid_blocks_file :
   [`Chain_dir] directory ->
-  ([`Invalid_blocks], invalid_block Tezos_crypto.Block_hash.Map.t) encoded_file
+  ([`Invalid_blocks], invalid_block Block_hash.Map.t) encoded_file
 
 val forked_chains_file :
   [`Chain_dir] directory ->
-  ( [`Forked_chains],
-    Tezos_crypto.Block_hash.t Tezos_crypto.Chain_id.Map.t )
-  encoded_file
+  ([`Forked_chains], Block_hash.t Chain_id.Map.t) encoded_file
 
 (** {2 Block store}  *)
 

@@ -30,33 +30,25 @@ type t
 
 (** [mem pstore proto_hash] tests the existence of the protocol
     indexed by [proto_hash] in the store. *)
-val mem : t -> Tezos_crypto.Protocol_hash.t -> bool
+val mem : t -> Protocol_hash.t -> bool
 
 (** [all pstore] returns the set of all stored protocols in [pstore]. *)
-val all : t -> Tezos_crypto.Protocol_hash.Set.t
+val all : t -> Protocol_hash.Set.t
 
 (** [raw_store pstore proto_hash proto_bytes] stores on disk the
     protocol [proto_bytes] (encoded bytes) indexed as
     [proto_hash]. Returns [None] if the protocol already exists. *)
-val raw_store :
-  t ->
-  Tezos_crypto.Protocol_hash.t ->
-  bytes ->
-  Tezos_crypto.Protocol_hash.t option Lwt.t
+val raw_store : t -> Protocol_hash.t -> bytes -> Protocol_hash.t option Lwt.t
 
 (** [store pstore proto_hash protocol] stores on disk the protocol
     [protocol] indexed as [proto_hash]. Returns [None] if the protocol
     already exists. *)
-val store :
-  t ->
-  Tezos_crypto.Protocol_hash.t ->
-  Protocol.t ->
-  Tezos_crypto.Protocol_hash.t option Lwt.t
+val store : t -> Protocol_hash.t -> Protocol.t -> Protocol_hash.t option Lwt.t
 
 (** [read pstore proto_hash] reads from [pstore] and returns the
    protocol indexed by [proto_hash]. Returns [None] if the protocol
    cannot be read. *)
-val read : t -> Tezos_crypto.Protocol_hash.t -> Protocol.t option Lwt.t
+val read : t -> Protocol_hash.t -> Protocol.t option Lwt.t
 
 (** [init store_dir] creates a store relatively to [store_dir] path
     or loads it if it already exists. *)

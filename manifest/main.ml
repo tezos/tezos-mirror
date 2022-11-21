@@ -2242,6 +2242,7 @@ let octez_store_shared =
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_crypto |> open_;
         octez_shell_services |> open_;
         aches;
         aches_lwt;
@@ -2277,6 +2278,7 @@ let octez_store_unix =
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
+        octez_crypto |> open_;
         lwt_watcher;
         aches;
         aches_lwt;
@@ -2307,6 +2309,7 @@ let octez_store_unix_reconstruction =
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_crypto |> open_;
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
         octez_validation |> open_;
@@ -2324,6 +2327,7 @@ let octez_store_unix_snapshots =
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_crypto |> open_;
         octez_shell_services |> open_;
         octez_context |> open_;
         octez_validation |> open_;
@@ -2345,6 +2349,7 @@ tezos-store is a virtual library that provides two implementations:
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_crypto |> open_;
         octez_rpc;
         lwt_watcher;
         octez_shell_services |> open_;
@@ -2369,6 +2374,7 @@ let _octez_store_mocked =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_crypto |> open_;
         octez_shell_services |> open_;
         octez_context_memory |> open_;
         octez_context_ops |> open_;
@@ -5315,6 +5321,7 @@ let _octez_store_tests =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_crypto |> open_;
         octez_context_ops |> open_;
         octez_store_shared |> open_;
         octez_store_unix |> open_;

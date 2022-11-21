@@ -61,8 +61,7 @@ type t = {
 
 type chunk_iterator = {
   chunk_length : int;
-  reading_sequence :
-    (Tezos_crypto.Block_hash.t * int * bytes) tzresult Lwt.t Seq.t;
+  reading_sequence : (Block_hash.t * int * bytes) tzresult Lwt.t Seq.t;
 }
 
 let make_chunk_iterator bl =

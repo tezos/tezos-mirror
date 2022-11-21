@@ -29,10 +29,9 @@ let fork_testchain chain_store (blocks, forked_block) =
   let open Lwt_result_syntax in
   let forked_block_hash = Store.Block.hash forked_block in
   let genesis_hash =
-    Tezos_crypto.Block_hash.hash_bytes
-      [Tezos_crypto.Block_hash.to_bytes forked_block_hash]
+    Block_hash.hash_bytes [Block_hash.to_bytes forked_block_hash]
   in
-  let testchain_id = Tezos_crypto.Chain_id.of_block_hash genesis_hash in
+  let testchain_id = Chain_id.of_block_hash genesis_hash in
   let head_header = Store.Block.header forked_block in
   let test_protocol = Tezos_protocol_alpha.Protocol.hash in
   let expiration = Time.Protocol.epoch in
@@ -146,10 +145,7 @@ let test_shutdown store =
           | Some testchain'' ->
               let testchain_store'' = Store.Chain.testchain_store testchain'' in
               let testchain_id'' = Store.Chain.chain_id testchain_store'' in
-              Assert.equal
-                ~eq:Tezos_crypto.Chain_id.equal
-                testchain_id
-                testchain_id'' ;
+              Assert.equal ~eq:Chain_id.equal testchain_id testchain_id'' ;
               assert_presence_in_store testchain_store'' blocks))
 
 let tests =

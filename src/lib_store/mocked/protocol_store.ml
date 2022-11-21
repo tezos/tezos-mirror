@@ -23,15 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Protocol_table = Tezos_crypto.Protocol_hash.Table
+module Protocol_table = Protocol_hash.Table
 
 type t = Protocol.t Protocol_table.t
 
-let mem table protocol_hash =
-  Tezos_crypto.Protocol_hash.Table.mem table protocol_hash
+let mem table protocol_hash = Protocol_hash.Table.mem table protocol_hash
 
-let all table =
-  Protocol_table.to_seq_keys table |> Tezos_crypto.Protocol_hash.Set.of_seq
+let all table = Protocol_table.to_seq_keys table |> Protocol_hash.Set.of_seq
 
 let raw_store store protocol_hash bytes =
   if mem store protocol_hash then Lwt.return_none

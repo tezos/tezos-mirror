@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Super-set of {!Tezos_crypto.Block_hash} to satisfy {!Index.Key} interface. *)
+(** Super-set of {!Block_hash} to satisfy {!Index.Key} interface. *)
 
-include module type of Tezos_crypto.Block_hash
+include module type of Block_hash
 
 val t : t Repr.t
 

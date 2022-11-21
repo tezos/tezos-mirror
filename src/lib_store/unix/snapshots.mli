@@ -86,7 +86,7 @@ type error +=
       stored : History_mode.t;
     }
   | Invalid_export_block of {
-      block : Tezos_crypto.Block_hash.t option;
+      block : Block_hash.t option;
       reason :
         [ `Pruned
         | `Pruned_pred
@@ -99,15 +99,15 @@ type error +=
   | Invalid_export_path of string
   | Snapshot_file_not_found of string
   | Inconsistent_protocol_hash of {
-      expected : Tezos_crypto.Protocol_hash.t;
-      got : Tezos_crypto.Protocol_hash.t;
+      expected : Protocol_hash.t;
+      got : Protocol_hash.t;
     }
   | Inconsistent_context_hash of {
-      expected : Tezos_crypto.Context_hash.t;
-      got : Tezos_crypto.Context_hash.t;
+      expected : Context_hash.t;
+      got : Context_hash.t;
     }
-  | Inconsistent_context of Tezos_crypto.Context_hash.t
-  | Cannot_decode_protocol of Tezos_crypto.Protocol_hash.t
+  | Inconsistent_context of Context_hash.t
+  | Cannot_decode_protocol of Protocol_hash.t
   | Cannot_write_metadata of string
   | Cannot_read of {
       kind :
@@ -128,7 +128,7 @@ type error +=
   | Missing_cemented_file of string
   | Corrupted_floating_store
   | Invalid_protocol_file of string
-  | Target_block_validation_failed of Tezos_crypto.Block_hash.t * string
+  | Target_block_validation_failed of Block_hash.t * string
   | Directory_already_exists of string
   | Empty_floating_store
   | Cannot_remove_tmp_export_directory of string
@@ -136,8 +136,7 @@ type error +=
       expected : Distributed_db_version.Name.t;
       got : Distributed_db_version.Name.t;
     }
-  | Inconsistent_imported_block of
-      Tezos_crypto.Block_hash.t * Tezos_crypto.Block_hash.t
+  | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Wrong_snapshot_file of {filename : string}
 
 (** Current version of snapshots *)
@@ -206,7 +205,7 @@ val import :
   ?patch_context:
     (Tezos_protocol_environment.Context.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
-  ?block:Tezos_crypto.Block_hash.t ->
+  ?block:Block_hash.t ->
   ?check_consistency:bool ->
   dst_store_dir:string ->
   dst_context_dir:string ->

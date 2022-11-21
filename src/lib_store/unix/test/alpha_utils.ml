@@ -59,58 +59,49 @@ end
 
 module Account = struct
   type t = {
-    pkh : Tezos_crypto.Signature.Public_key_hash.t;
-    pk : Tezos_crypto.Signature.Public_key.t;
-    sk : Tezos_crypto.Signature.Secret_key.t;
+    pkh : Signature.Public_key_hash.t;
+    pk : Signature.Public_key.t;
+    sk : Signature.Secret_key.t;
   }
 
   let pp fmt {pkh; pk; sk} =
     Format.fprintf
       fmt
       "pkh: %a@ pk: %a@ nsk: %a"
-      Tezos_crypto.Signature.Public_key_hash.pp
+      Signature.Public_key_hash.pp
       pkh
-      Tezos_crypto.Signature.Public_key.pp
+      Signature.Public_key.pp
       pk
-      Tezos_crypto.Signature.Secret_key.pp
+      Signature.Secret_key.pp
       sk
 
   type account = t
 
-  let known_accounts = Tezos_crypto.Signature.Public_key_hash.Table.create 17
+  let known_accounts = Signature.Public_key_hash.Table.create 17
 
   let new_account ?seed () =
-    let pkh, pk, sk = Tezos_crypto.Signature.generate_key ?seed () in
+    let pkh, pk, sk = Signature.generate_key ?seed () in
     let account = {pkh; pk; sk} in
-    Tezos_crypto.Signature.Public_key_hash.Table.add known_accounts pkh account ;
+    Signature.Public_key_hash.Table.add known_accounts pkh account ;
     account
 
   let add_account ({pkh; _} as account) =
-    Tezos_crypto.Signature.Public_key_hash.Table.replace
-      known_accounts
-      pkh
-      account
+    Signature.Public_key_hash.Table.replace known_accounts pkh account
 
   let activator_account = new_account ()
 
   let find pkh =
     let open Lwt_result_syntax in
-    match
-      Tezos_crypto.Signature.Public_key_hash.Table.find known_accounts pkh
-    with
+    match Signature.Public_key_hash.Table.find known_accounts pkh with
     | Some v -> return v
-    | None ->
-        failwith
-          "Missing account: %a"
-          Tezos_crypto.Signature.Public_key_hash.pp
-          pkh
+    | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
   let find_alternate pkh =
     let exception Found of t in
     try
-      Tezos_crypto.Signature.Public_key_hash.Table.iter
+      Signature.Public_key_hash.Table.iter
         (fun pkh' account ->
-          if not (Tezos_crypto.Signature.Public_key_hash.equal pkh pkh') then
+          if not (Signature.Public_key_hash.equal pkh pkh') then
             raise (Found account))
         known_accounts ;
       raise Not_found
@@ -136,9 +127,7 @@ module Account = struct
 
   let new_commitment ?seed () =
     let open Lwt_result_syntax in
-    let pkh, pk, sk =
-      Tezos_crypto.Signature.generate_key ?seed ~algo:Ed25519 ()
-    in
+    let pkh, pk, sk = Signature.generate_key ?seed ~algo:Ed25519 () in
     let unactivated_account = {pkh; pk; sk} in
     let open Commitment in
     let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
@@ -243,11 +232,7 @@ let get_next_baker_excluding rpc_ctxt excludes block =
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.find
       (fun {Plugin.RPC.Baking_rights.delegate; _} ->
-        not
-          (List.mem
-             ~equal:Tezos_crypto.Signature.Public_key_hash.equal
-             delegate
-             excludes))
+        not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -299,7 +284,7 @@ module Forge = struct
         operations_hash;
         proto_level;
         validation_passes = List.length Main.validation_passes;
-        context = Tezos_crypto.Context_hash.zero (* to update later *);
+        context = Context_hash.zero (* to update later *);
       }
 
   let set_seed_nonce_hash seed_nonce_hash {baker; shell; contents} =
@@ -316,7 +301,7 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Tezos_crypto.Signature.sign
+      Signature.sign
         ~watermark:Block_header.(to_watermark (Block_header chain_id))
         delegate.sk
         unsigned_bytes
@@ -351,9 +336,9 @@ module Forge = struct
       | {expected_commitment = false; _} -> None
     in
     let operations_hash =
-      Tezos_crypto.Operation_list_list_hash.compute
+      Operation_list_list_hash.compute
         (List.map
-           Tezos_crypto.Operation_list_hash.compute
+           Operation_list_hash.compute
            (List.map (List.map Operation.hash_packed) operations))
     in
     let shell =
@@ -426,9 +411,9 @@ let default_accounts =
   let open Account in
   let to_account (pkh, pk, sk) =
     {
-      pkh = Tezos_crypto.Signature.Public_key_hash.of_b58check_exn pkh;
-      pk = Tezos_crypto.Signature.Public_key.of_b58check_exn pk;
-      sk = Tezos_crypto.Signature.Secret_key.of_b58check_exn sk;
+      pkh = Signature.Public_key_hash.of_b58check_exn pkh;
+      pk = Signature.Public_key.of_b58check_exn pk;
+      sk = Signature.Secret_key.of_b58check_exn sk;
     }
   in
   let accounts = List.map to_account initial_accounts in
@@ -455,9 +440,9 @@ let patch_context ctxt ~json =
       predecessor = Test_utils.genesis.block;
       timestamp = Test_utils.genesis.time;
       validation_passes = 0;
-      operations_hash = Tezos_crypto.Operation_list_list_hash.empty;
+      operations_hash = Operation_list_list_hash.empty;
       fitness = [];
-      context = Tezos_crypto.Context_hash.zero;
+      context = Context_hash.zero;
     }
   in
   let proto_params =
@@ -465,7 +450,7 @@ let patch_context ctxt ~json =
   in
   let* ctxt = Context_ops.add ctxt ["version"] (Bytes.of_string "genesis") in
   let* ctxt = Context_ops.add ctxt protocol_param_key proto_params in
-  let* r = Main.init Tezos_crypto.Chain_id.zero ctxt shell in
+  let* r = Main.init Chain_id.zero ctxt shell in
   match r with
   | Error e -> failwith "%a" Environment.Error_monad.pp_trace e
   | Ok {context; _} -> return_ok context
@@ -531,9 +516,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let* {shell; contents; baker} =
     Forge.forge_header rpc_ctxt ?policy ~operations pred
   in
-  let protocol_data =
-    {Block_header.contents; signature = Tezos_crypto.Signature.zero}
-  in
+  let protocol_data = {Block_header.contents; signature = Signature.zero} in
   let*! context =
     match Store.Block.block_metadata_hash pred with
     | None -> Lwt.return ctxt
@@ -624,7 +607,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       header.protocol_data
   in
   let block_hash_metadata =
-    Some (Tezos_crypto.Block_metadata_hash.hash_bytes [block_header_metadata])
+    Some (Block_metadata_hash.hash_bytes [block_header_metadata])
   in
   let block_header =
     {Tezos_base.Block_header.shell = header.shell; protocol_data}
@@ -632,8 +615,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let operations_metadata_hashes =
     Some
       (List.map
-         (List.map (fun r ->
-              Tezos_crypto.Operation_metadata_hash.hash_bytes [r]))
+         (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
          (WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])))
   in
   return
@@ -716,7 +698,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         return b
   | None ->
       let h = Tezos_base.Block_header.hash block_header in
-      Format.eprintf "block %a already stored@." Tezos_crypto.Block_hash.pp h ;
+      Format.eprintf "block %a already stored@." Block_hash.pp h ;
       Store.Block.read_block chain_store h
 
 let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =

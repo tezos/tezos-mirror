@@ -13,6 +13,7 @@
   test_testchain)
  (libraries
   tezos-base
+  tezos-crypto
   tezos-context-ops
   tezos-store.shared
   tezos-store.unix
@@ -32,6 +33,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_crypto
   -open Tezos_context_ops
   -open Tezos_store_shared
   -open Tezos_store_unix

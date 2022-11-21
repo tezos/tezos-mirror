@@ -66,7 +66,7 @@ let equal_metadata ?msg m1 m2 =
   Assert.equal ?msg ~pp ~eq m1 m2
 
 let genesis_hash =
-  Tezos_crypto.Block_hash.of_b58check_exn
+  Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
 
 let genesis =
@@ -166,7 +166,7 @@ let dummy_patch_context ctxt =
   let*! ctxt = Context_ops.add ctxt ["protocol_parameters"] proto_params in
   let*! res =
     Protocol.Main.init
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ctxt
       {
         level = 0l;
@@ -174,9 +174,9 @@ let dummy_patch_context ctxt =
         predecessor = genesis.block;
         timestamp = genesis.time;
         validation_passes = 0;
-        operations_hash = Tezos_crypto.Operation_list_list_hash.empty;
+        operations_hash = Operation_list_list_hash.empty;
         fitness = [];
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
   in
   let*? {context; _} = Environment.wrap_tzresult res in
@@ -338,8 +338,7 @@ let wrap_simple_store_init_test ?history_mode ?(speed = `Quick) ?patch_context
     (wrap_simple_store_init ?history_mode ?patch_context ?keep_dir ?with_gc f)
 
 let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
-    ?(constants = default_protocol_constants)
-    ?(context = Tezos_crypto.Context_hash.zero)
+    ?(constants = default_protocol_constants) ?(context = Context_hash.zero)
     (pred_block_hash, pred_block_level) =
   let level = Int32.succ pred_block_level in
   let header =
@@ -352,7 +351,7 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
           timestamp = Time.Protocol.(add epoch (Int64.of_int32 level));
           validation_passes =
             List.length Tezos_protocol_alpha.Protocol.Main.validation_passes;
-          operations_hash = Tezos_crypto.Operation_list_list_hash.zero;
+          operations_hash = Operation_list_list_hash.zero;
           fitness = [Bytes.create 8];
           context;
         };
@@ -415,13 +414,12 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
           header;
           operations;
           block_metadata_hash =
-            (if Random.bool () then Some Tezos_crypto.Block_metadata_hash.zero
-            else None);
+            (if Random.bool () then Some Block_metadata_hash.zero else None);
           operations_metadata_hashes =
             (if Random.bool () then
              Some
                (List.map
-                  (List.map (fun _ -> Tezos_crypto.Operation_metadata_hash.zero))
+                  (List.map (fun _ -> Operation_metadata_hash.zero))
                   operations)
             else None);
         };
@@ -434,13 +432,13 @@ let prune_block block = block.Block_repr.metadata <- None
 
 let pp_block fmt b =
   let h, lvl = Store.Block.descriptor b in
-  Format.fprintf fmt "%a (%ld)" Tezos_crypto.Block_hash.pp h lvl
+  Format.fprintf fmt "%a (%ld)" Block_hash.pp h lvl
 
 let raw_descriptor b = (Block_repr.hash b, Block_repr.level b)
 
 let pp_raw_block fmt b =
   let h, lvl = raw_descriptor b in
-  Format.fprintf fmt "%a (%ld)" Tezos_crypto.Block_hash.pp h lvl
+  Format.fprintf fmt "%a (%ld)" Block_hash.pp h lvl
 
 let store_raw_block chain_store (raw_block : Block_repr.t) =
   let open Lwt_syntax in
@@ -489,7 +487,7 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
   | Ok None ->
       Alcotest.failf
         "store_raw_block: could not store block %a (%ld)"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         (Block_repr.hash raw_block)
         (Block_repr.level raw_block)
   | Error _ as err -> Lwt.return err
@@ -791,8 +789,7 @@ module Example_tree = struct
       (fun k b o ->
         match o with
         | None ->
-            if Tezos_crypto.Block_hash.equal block_hash (Store.Block.hash b)
-            then Some k
+            if Block_hash.equal block_hash (Store.Block.hash b) then Some k
             else None
         | x -> x)
       tbl

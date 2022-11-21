@@ -128,7 +128,7 @@ let append_block ?(flush = true) ?(log_metrics = false) floating_store
       return_unit)
 
 let append_all floating_store
-    (blocks : (Tezos_crypto.Block_hash.t list * Block_repr.t) Seq.t) =
+    (blocks : (Block_hash.t list * Block_repr.t) Seq.t) =
   let open Lwt_result_syntax in
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
       let*! eof_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in

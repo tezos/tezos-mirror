@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
+  "tezos-crypto"
   "tezos-shell-services"
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }

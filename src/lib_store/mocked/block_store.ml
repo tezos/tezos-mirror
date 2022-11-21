@@ -25,9 +25,9 @@
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
 
-type key = Block of (Tezos_crypto.Block_hash.t * int)
+type key = Block of (Block_hash.t * int)
 
-module Block_table = Tezos_crypto.Block_hash.Table
+module Block_table = Block_hash.Table
 
 module Level_table = Hashtbl.Make (struct
   type t = int32

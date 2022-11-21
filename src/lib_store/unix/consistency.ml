@@ -166,9 +166,7 @@ let check_consistency chain_dir genesis =
   let*! genesis_block = Stored_data.get genesis_data in
   let* () =
     fail_unless
-      (Tezos_crypto.Block_hash.equal
-         (Block_repr.hash genesis_block)
-         genesis.Genesis.block)
+      (Block_hash.equal (Block_repr.hash genesis_block) genesis.Genesis.block)
       (Inconsistent_genesis
          {expected = genesis.block; got = Block_repr.hash genesis_block})
   in
@@ -316,7 +314,7 @@ let fix_head chain_dir block_store genesis_block =
            cemented block known. *)
         if
           cemented_block_files <> []
-          && Tezos_crypto.Block_hash.equal
+          && Block_hash.equal
                (Block_repr.hash genesis_block)
                (Block_repr.hash floating_head)
         then
@@ -740,7 +738,7 @@ let check_block_protocol_hash context_index ~expected block =
   protect @@ fun () ->
   let*! ctxt = Context.checkout_exn context_index (Block_repr.context block) in
   let*! got = Context.get_protocol ctxt in
-  return Tezos_crypto.Protocol_hash.(got = expected)
+  return Protocol_hash.(got = expected)
 
 (** Look into the cemented store for the lowest block with an
     associated proto level that is above the savepoint. *)
@@ -1104,7 +1102,7 @@ let fix_chain_state chain_dir block_store ~head ~cementing_highwatermark
   let* () =
     Stored_data.write_file
       (Naming.invalid_blocks_file chain_dir)
-      Tezos_crypto.Block_hash.Map.empty
+      Block_hash.Map.empty
   in
   let* () =
     Stored_data.write_file (Naming.forked_chains_file chain_dir) forked_chains
@@ -1145,12 +1143,12 @@ let infer_history_mode chain_dir block_store genesis caboose savepoint =
   in
   let history_mode =
     (* Caboose is not genesis: we sure are in rolling*)
-    if not (Tezos_crypto.Block_hash.equal (fst caboose) genesis.Genesis.block)
-    then History_mode.Rolling offset
+    if not (Block_hash.equal (fst caboose) genesis.Genesis.block) then
+      History_mode.Rolling offset
     else if
       (* Caboose is genesis and savepoint is not genesis: we can be in
          both rolling and full. We choose full as the less destructive. *)
-      not (Tezos_crypto.Block_hash.equal (fst savepoint) genesis.block)
+      not (Block_hash.equal (fst savepoint) genesis.block)
     then Full offset
     else if
       (* Caboose is genesis and savepoint is genesis and there are as
@@ -1273,7 +1271,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
       ~savepoint
       ~caboose
       ~alternate_heads:[]
-      ~forked_chains:Tezos_crypto.Chain_id.Map.empty
+      ~forked_chains:Chain_id.Map.empty
       ~protocol_levels
       ~chain_config
       ~genesis
