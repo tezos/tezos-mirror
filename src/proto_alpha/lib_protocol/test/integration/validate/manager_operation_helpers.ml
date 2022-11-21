@@ -35,6 +35,8 @@ let gb_limit = Gas.Arith.(integral_of_int_exn 100_000)
 
 let half_gb_limit = Gas.Arith.(integral_of_int_exn 50_000)
 
+let default_fund = Tez.of_mutez_exn 400_000_000_000L
+
 (** {2 Datatypes} *)
 
 (** Context abstraction in a test. *)
@@ -152,9 +154,9 @@ let disabled_zkru = {all_enabled with zkru = false}
 let ctxt_req_default_to_flag flags =
   {
     hard_gas_limit_per_block = None;
-    fund_src = Some Tez.one;
+    fund_src = Some default_fund;
     fund_dest = Some Tez.one;
-    fund_del = Some Tez.one;
+    fund_del = Some default_fund;
     reveal_accounts = true;
     fund_tx = Some Tez.one;
     fund_sc = Some Tez.one;
@@ -346,8 +348,8 @@ let delegation block source delegate =
   let* block = Block.bake block ~operation in
   let* del_opt_new = Context.Contract.delegate_opt (B block) contract_source in
   let* del = Assert.get_some ~loc:__LOC__ del_opt_new in
-  let+ () = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
-  block
+  let* () = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
+  return block
 
 let originate_tx_rollup block rollup_account =
   let open Lwt_result_syntax in
@@ -506,14 +508,14 @@ let init_infos :
     | Some _ ->
         let account = Account.new_account () in
         let* block = fund_account block bootstrap account.pkh fund in
-        let+ block, rollup =
+        let* block, rollup =
           match originate_rollup with
           | None -> return (block, None)
           | Some f ->
               let+ block, rollup = f block account in
               (block, Some rollup)
         in
-        (block, Some account, rollup)
+        return (block, Some account, rollup)
   in
   let reveal_accounts_operations b l =
     List.filter_map_es
@@ -1300,7 +1302,7 @@ let rec contents_infos :
       let*? fee = manop.fee +? probes.fee in
       let gas_limit = Gas.Arith.add probes.gas_limit manop.gas_limit in
       let nb_counter = succ probes.nb_counter in
-      let _ = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
+      let* () = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
       return {fee; source = probes.source; gas_limit; nb_counter}
 
 (** Computes a [probes] from a list of manager contents. *)
@@ -1324,23 +1326,25 @@ let available_gas = function
 let witness ctxt source =
   let open Lwt_result_syntax in
   let* b_in = Context.Contract.balance ctxt source in
-  let+ c_in = Context.Contract.counter ctxt source in
+  let* c_in = Context.Contract.counter ctxt source in
   let g_in = available_gas ctxt in
-  (b_in, c_in, g_in)
+  return (b_in, c_in, g_in)
 
 (** According to the witness in pre-state and the probes, computes the
-    expected outputs. In any mode the expected witness:
+    expected outputs. In any mode, when the source is not deallocated,
+    the expected witness:
     - the balance of source should be the one in the pre-state minus
     the fee of probes,
     - the counter of source should be the one in the pre-state plus
     the number of counter in probes.
 
-    Concerning the expected available gas in the block: - In
-   [Application] mode, it cannot be computed, so we do not expect any,
-   - In [Mempool] mode, it is the remaining gas after removing the gas
-   of probes gas from an empty block, - In the [Construction] mode, it
-   is the remaining gas after removing the gas of probes from the
-   available gas in the pre-state.*)
+    Concerning the expected available gas in the block:
+    - In [Application] mode, it cannot be computed, so we do not expect
+    any,
+    - In [Mempool] mode, it is the remaining gas after removing the gas
+    of probes gas from an empty block,
+    - In the [Construction] mode, it is the remaining gas after removing
+    the gas of probes from the available gas in the pre-state.*)
 let expected_witness witness probes ~mode ctxt =
   let open Lwt_result_syntax in
   let b_in, c_in, g_in = witness in
@@ -1348,7 +1352,7 @@ let expected_witness witness probes ~mode ctxt =
   let c_expected =
     Manager_counter.Internal_for_tests.add c_in probes.nb_counter
   in
-  let+ g_expected =
+  let* g_expected =
     match (g_in, mode) with
     | Some g_in, Construction ->
         return_some (Gas.Arith.sub g_in (Gas.Arith.fp probes.gas_limit))
@@ -1364,89 +1368,109 @@ let expected_witness witness probes ~mode ctxt =
     | None, Construction ->
         failwith "In Construction mode the witness should return a gas level"
   in
-  (b_expected, c_expected, g_expected)
+  return (b_expected, c_expected, g_expected)
 
 (** The validity of a test in positve case, observes that validation
-   of a manager operation implies the fee payment. This observation
-   differs according to the validation calling [mode] (see type mode
-   for more details). Given the values of witness in the pre-state,
-   the probes of the operation probes and the values of witness in the
-   post-state, if the validation succeeds then we observe in the
-   post-state:
+    of a manager operation implies the fee payment. This observation
+    differs according to the validation calling [mode] (see type mode
+    for more details) and that the [source] has been [deallocated].
+    Given the values of witness in the pre-state, the probes of the
+    operation probes and the values of witness in the post-state, if
+    the validation succeeds while deallocating the [source], [source]
+    must be unallocated in the post-state.
 
-    The balance of source decreases by the fee of probes when
-   [only_validate] marks that only the validate succeeds.
+    In case of successful validation Without deallocation, then we
+    observe in the post-state:
 
-    The balance of source decreases at least by fee of probes when
-   [not only_validate] marks that the application has succeeded,
+    The balance of source decreases at least by fee of probes when the
+    application has succeeded,
 
     Its counter in the pre-state increases by the number of counter of
-   probes.
+    probes.
 
-    The remaining gas in the pre-state decreases by the gas of probes,
-   in [Construction] and [Mempool] mode.
+    The remaining gas in the pre-state decreases at least by the gas
+    of probes, in [Construction] and [Mempool] mode.
 
     In [Mempool] mode, the remaining gas in the pre-state is always
-   the available gas in an empty block.
+    the available gas in an empty block.
 
     In the [Application] mode, we do not perform any check on the
-   available gas. *)
-let observe ~only_validate ~mode ctxt_pre ctxt_post op =
+    available gas. *)
+let observe ~mode ~deallocated ctxt_pre ctxt_post op =
   let open Lwt_result_syntax in
-  let* probes = manager_content_infos op in
-  let contract = Contract.Implicit probes.source in
-  let* witness_in = witness ctxt_pre contract in
-  let* b_out, c_out, g_out = witness ctxt_post contract in
-  let* b_expected, c_expected, g_expected =
-    expected_witness witness_in probes ~mode ctxt_post
+  let check_deallocated ctxt contract =
+    let* actxt = Context.to_alpha_ctxt ctxt in
+    let*! res = Contract.must_be_allocated actxt contract in
+    match Environment.wrap_tzresult res with
+    | Ok () ->
+        failwith
+          "%a should have been deallocated@."
+          Tezos_crypto.Signature.Public_key_hash.pp
+          (Context.Contract.pkh contract)
+    | Error
+        [
+          Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract _);
+        ] ->
+        return_unit
+    | Error errs ->
+        failwith "unexpected error, got %a@." Error_monad.pp_print_trace errs
   in
-  let b_cmp =
-    Assert.equal
-      ~loc:__LOC__
-      (if only_validate then Tez.( = ) else Tez.( <= ))
-      (if only_validate then "Balance update (=)" else "Balance update (<=)")
-      Tez.pp
-  in
-  let* () = b_cmp b_out b_expected in
-  let _ =
-    Assert.equal
-      Manager_counter.equal
-      ~loc:__LOC__
-      "Counter incrementation"
-      Manager_counter.pp
-      c_out
-      c_expected
-  in
-  let g_msg =
-    match mode with
-    | Application -> "Gas consumption (application)"
-    | Mempool -> "Gas consumption (mempool)"
-    | Construction -> "Gas consumption (construction)"
-  in
-  match g_expected with
-  | None -> Assert.is_none ~loc:__LOC__ ~pp:Gas.Arith.pp g_out
-  | Some g_expected ->
-      let* g_out = Assert.get_some ~loc:__LOC__ g_out in
+  let check_still_allocated ctxt_pre ctxt_post probes contract =
+    let* witness_in = witness ctxt_pre contract in
+    let* b_out, c_out, g_out = witness ctxt_post contract in
+    let* b_expected, c_expected, g_expected =
+      expected_witness witness_in probes ~mode ctxt_post
+    in
+    let b_cmp =
       Assert.equal
         ~loc:__LOC__
-        Gas.Arith.equal
-        g_msg
-        Gas.Arith.pp
-        g_out
-        g_expected
+        Tez.( <= )
+        "Balance decreases at least by fees"
+        Tez.pp
+    in
+    let* () = b_cmp b_out b_expected in
+    let* () =
+      Assert.equal
+        Manager_counter.equal
+        ~loc:__LOC__
+        "Counter incrementation"
+        Manager_counter.pp
+        c_out
+        c_expected
+    in
+    let g_msg =
+      match mode with
+      | Application -> "Gas consumption (application)"
+      | Mempool -> "Gas consumption (mempool)"
+      | Construction -> "Gas consumption (construction)"
+    in
+    match g_expected with
+    | None -> Assert.is_none ~loc:__LOC__ ~pp:Gas.Arith.pp g_out
+    | Some g_expected ->
+        let* g_out = Assert.get_some ~loc:__LOC__ g_out in
+        Assert.equal
+          ~loc:__LOC__
+          Gas.Arith.( <= )
+          g_msg
+          Gas.Arith.pp
+          g_out
+          g_expected
+  in
+  let* probes = manager_content_infos op in
+  let contract = Contract.Implicit probes.source in
+  if deallocated then check_deallocated ctxt_post contract
+  else check_still_allocated ctxt_pre ctxt_post probes contract
 
-let observe_list ~only_validate ~mode ctxt_pre ctxt_post ops =
-  List.iter
-    (fun op ->
-      let _ = observe ~only_validate ~mode ctxt_pre ctxt_post op in
-      ())
-    ops
+let observe_list ~mode ~deallocated ctxt_pre ctxt_post ops =
+  List.iter_es (fun op -> observe ~mode ~deallocated ctxt_pre ctxt_post op) ops
 
-let validate_operations inc_in ops =
+let validate_operations_effects inc_in ops =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun inc op ->
-      let* inc_out = Incremental.validate_operation inc op in
+      let* inc_out =
+        Incremental.add_operation ~allow_manager_failure:true inc op
+      in
       return inc_out)
     inc_in
     ops
@@ -1458,24 +1482,24 @@ let pre_state_of_mode ~mode infos =
   let open Lwt_result_syntax in
   match mode with
   | Construction | Mempool ->
-      let+ inc = Incremental.begin_construction infos.ctxt.block in
-      Context.I inc
+      let* inc = Incremental.begin_construction infos.ctxt.block in
+      return (Context.I inc)
   | Application -> return (Context.B infos.ctxt.block)
 
 (** In [Construction] and [Mempool] mode, the post-state is
    incrementally built upon a pre-state, whereas in the [Application]
    mode it is obtained by baking. *)
-let post_state_of_mode ?(only_validate = false) ~mode ctxt ops infos =
+let post_state_of_mode ?(_only_validate = false) ~mode ctxt ops infos =
   let open Lwt_result_syntax in
   match (mode, ctxt) with
   | (Construction | Mempool), Context.I inc_pre ->
-      let* inc_post = validate_operations inc_pre ops in
-      let+ block = Incremental.finalize_block inc_post in
-      (Context.I inc_post, {infos with ctxt = {infos.ctxt with block}})
+      let* inc_post = validate_operations_effects inc_pre ops in
+      let* block = Incremental.finalize_block inc_post in
+      return (Context.I inc_post, {infos with ctxt = {infos.ctxt with block}})
   | Application, Context.B b ->
       let+ block =
         Block.bake
-          ~allow_manager_failures:only_validate
+          ~allow_manager_failures:true
           ~baking_mode:Application
           ~operations:ops
           b
@@ -1489,33 +1513,20 @@ let post_state_of_mode ?(only_validate = false) ~mode ctxt ops infos =
 (** A positive test builds a pre-state from a mode, and a setting
    context, then it computes a post-state from the mode, the setting
    context and the operations. Finally, it observes the result
-   according to the only_validate status for each operation.
+   according to the [emptying] status for each operation.
 
-   See [observe] for more details on the observational validation. *)
-let validate_with_diagnostic ~only_validate ~mode (infos : infos) ops =
-  let open Lwt_result_syntax in
-  let* ctxt_pre = pre_state_of_mode ~mode infos in
-  let* ctxt_post, infos =
-    post_state_of_mode ~only_validate ~mode ctxt_pre ops infos
-  in
-  let _ = observe_list ~only_validate ~mode ctxt_pre ctxt_post ops in
-  return infos
-
-(** If only the operation validation succeeds; e.g. the rest of the
-   application failed then [only_validate] must be set for the
-   observation validation.
-
-    Default mode is [Construction]. See [observe] for more details. *)
-let only_validate_diagnostic ?(mode = Construction) (infos : infos) ops =
-  validate_with_diagnostic ~only_validate:true ~mode infos ops
-
-(** If the whole operation application succeeds; e.g. the fee
-   payment and the full application succeed then [not only_validate]
-   must be set.
+   See [observe] for more details on the observational validation.
+   If the operation validation succeeds but should be deallocated,
+   then [deallocated ] must be set.
 
     Default mode is [Construction]. *)
-let validate_diagnostic ?(mode = Construction) (infos : infos) ops =
-  validate_with_diagnostic ~only_validate:false ~mode infos ops
+let validate_diagnostic ?(deallocated = false) ?(mode = Construction)
+    (infos : infos) ops =
+  let open Lwt_result_syntax in
+  let* ctxt_pre = pre_state_of_mode ~mode infos in
+  let* ctxt_post, infos = post_state_of_mode ~mode ctxt_pre ops infos in
+  let* () = observe_list ~mode ~deallocated ctxt_pre ctxt_post ops in
+  return infos
 
 let add_operations ~expect_failure inc_in ops =
   let open Lwt_result_syntax in

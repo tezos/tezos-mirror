@@ -294,7 +294,7 @@ let high_fee_diagnostic (infos : infos) op =
 
 let test_high_fee infos kind =
   let open Lwt_result_syntax in
-  let*? fee = Tez.(one +? one) |> Environment.wrap_tzresult in
+  let*? fee = Tez.(one +? default_fund) |> Environment.wrap_tzresult in
   let* op =
     select_op
       {
@@ -412,29 +412,23 @@ let test_exceeding_block_gas ~mode infos kind =
 
     Notice that in the first two cases only validate succeeds while
     in the last case, the full application also succeeds.
-    In the first 2 case, we observe in the output context that:
-     - the counter is the successor of the one stored in the initial context,
-     - the balance decreased by fee,
-     - the available gas in the block decreased by gas limit.
-    In the last case, we observe in the output context that:
+    In the case of emptying the balance of an undelegated implicit source,
+    we observe in the output context that the source is deallocated.
+
+    Otherwise, we observe in the output context that:
      - the counter is the successor of the one stored in the initial context,
      - the balance is at least decreased by fee,
-     - the available gas in the block decreased by gas limit. *)
+     - the available gas in the block decreased at least gas limit. *)
 
 (** Fee payment*)
 let test_validate infos kind =
   let open Lwt_result_syntax in
-  let* counter =
-    Context.Contract.counter
-      (B infos.ctxt.block)
-      (contract_of (get_source infos))
-  in
   let* op =
     select_op
       {
         (operation_req_default kind) with
         force_reveal = Some true;
-        counter = Some counter;
+        amount = Some Tez.one;
       }
       infos
   in
@@ -458,7 +452,7 @@ let test_emptying_self_delegate infos kind =
       }
       infos
   in
-  let* (_ : infos) = only_validate_diagnostic infos [op] in
+  let* (_ : infos) = validate_diagnostic infos [op] in
   return_unit
 
 (** Minimum gas cost to pass the validation:
@@ -485,7 +479,7 @@ let test_empty_undelegate infos kind =
       }
       infos
   in
-  let* (_ : infos) = only_validate_diagnostic infos [op] in
+  let* (_ : infos) = validate_diagnostic ~deallocated:true infos [op] in
   return_unit
 
 (** No gas consumer with the minimal gas limit for manager operations

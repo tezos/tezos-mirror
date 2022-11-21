@@ -293,7 +293,7 @@ let high_fee_diagnostic (infos : infos) op =
 
 let test_high_fee infos kind =
   let open Lwt_result_syntax in
-  let*? fee = Tez.(one +? one) |> Environment.wrap_tzresult in
+  let*? fee = Tez.(one +? default_fund) |> Environment.wrap_tzresult in
   let* op =
     select_op
       {
@@ -457,7 +457,7 @@ let test_emptying_self_delegate infos kind =
       }
       infos
   in
-  let* _ = only_validate_diagnostic infos [op] in
+  let* _ = validate_diagnostic infos [op] in
   return_unit
 
 (** Minimum gas cost to pass the validation:
@@ -484,7 +484,7 @@ let test_empty_undelegate infos kind =
       }
       infos
   in
-  let* _ = only_validate_diagnostic infos [op] in
+  let* _ = validate_diagnostic ~deallocated:true infos [op] in
   return_unit
 
 (** No gas consumer with the minimal gas limit for manager operations
