@@ -69,7 +69,9 @@ odoc: docexes
 odoc-lite: docexes
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
-	rsync --recursive --links --perms --exclude="src/proto_0*" \
+	rsync --recursive --links --perms \
+	  --include="src/proto_014*" --include="src/proto_015*" \
+	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
 	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
 	# The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
