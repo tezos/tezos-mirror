@@ -226,8 +226,8 @@ let update_neighbors dal_node neighbors =
     (JSON.put ("neighbors", JSON.annotate ~origin:"dal_node_config" neighbors))
 
 let wait_for_stored_slot dal_node slot_header =
-  Dal_node.wait_for dal_node "stored_slot.v0" (fun e ->
-      if JSON.(e |-> "slot_header" |> as_string) = slot_header then Some ()
+  Dal_node.wait_for dal_node "stored_slot_shards.v0" (fun e ->
+      if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
       else None)
 
 let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =

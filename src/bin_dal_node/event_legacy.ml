@@ -86,13 +86,13 @@ let data_dir_not_found =
     ~level:Error
     ("path", Data_encoding.(string))
 
-let stored_slot =
+let stored_slot_shards =
   declare_2
     ~section
-    ~name:"stored_slot"
-    ~msg:"Slot stored: slot_header {slot_header}, shards {shards}"
+    ~name:"stored_slot_shards"
+    ~msg:"Slot stored: commitment {commitment}, shards {shards}"
     ~level:Notice
-    ("slot_header", Data_encoding.string)
+    ("commitment", Data_encoding.string)
     ("shards", Data_encoding.int31)
 
 let fetched_slot =

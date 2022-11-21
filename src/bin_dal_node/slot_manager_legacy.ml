@@ -147,7 +147,8 @@ let save store watcher slot_header shards =
       shards
   in
   let*! () =
-    Event.(emit stored_slot (slot_header_b58, Cryptobox.IntMap.cardinal shards))
+    Event.(
+      emit stored_slot_shards (slot_header_b58, Cryptobox.IntMap.cardinal shards))
   in
   Lwt_watcher.notify watcher slot_header ;
   return_unit
