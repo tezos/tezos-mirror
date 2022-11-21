@@ -982,9 +982,17 @@ let test_workers _test_mode_tag _protocol ?endpoint client =
 
 let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let protocol_hash = Protocol.hash protocol in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_errors in
+  (* Turn off logging to avoid polluting the logs with the error schema *)
+  let* _ =
+    RPC.Client.call ?endpoint ~log_output:false client @@ RPC.get_errors
+  in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocols in
-  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocol protocol_hash in
+  (* Turn off logging to avoid polluting the logs with full protocol
+     source code *)
+  let* _ =
+    RPC.Client.call ?endpoint ~log_output:false client
+    @@ RPC.get_protocol protocol_hash
+  in
   let* _ =
     RPC.Client.call ?endpoint client @@ RPC.get_fetch_protocol protocol_hash
   in
