@@ -32,11 +32,7 @@ type serialized = string
 
 let length = String.length
 
-let serialized_encoding =
-  let open Data_encoding in
-  (* Deal with unprintable string *)
-  let json = conv Bytes.of_string Bytes.to_string bytes in
-  splitted ~json ~binary:string
+let serialized_encoding = Data_encoding.(string' Hex)
 
 let proof_of_serialized_opt = Data_encoding.Binary.of_string_opt encoding
 
