@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Event_legacy
+include module type of Event_legacy

@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* In this legacy module, we only use legacy events. *)
+module Event = Event_legacy
+
 type error +=
   | Splitting_failed of string
   | Merging_failed of string
