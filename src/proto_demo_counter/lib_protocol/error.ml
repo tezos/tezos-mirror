@@ -44,7 +44,7 @@ let () =
         ppf
         "Cannot parse the protocol parameter: %s"
         (Bytes.to_string bytes))
-    (obj1 (req "contents" bytes))
+    (obj1 (req "contents" (bytes Hex)))
     (function Failed_to_parse_parameter data -> Some data | _ -> None)
     (fun data -> Failed_to_parse_parameter data) ;
   register_error_kind
