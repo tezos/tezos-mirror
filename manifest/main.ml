@@ -4795,7 +4795,7 @@ module Protocol = Protocol
         ~release:true
         ~deps:
           [
-            octez_base |> open_ ~m:"TzPervasives"
+            octez_base |> open_ |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_clic;
             octez_client_commands |> open_;
@@ -4811,6 +4811,7 @@ module Protocol = Protocol
             octez_rpc;
             octez_rpc_http;
             octez_rpc_http_server;
+            octez_workers |> open_;
             octez_dal_node_services;
             octez_dal_node_lib |> open_;
             octez_shell_services |> open_;

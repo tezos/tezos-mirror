@@ -209,6 +209,31 @@ let originate_sc_rollups ~kind n client =
       let* addr = originate_sc_rollup ~kind client in
       return (String_set.add addr addrs))
 
+let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
+  let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  let ops_contents =
+    List.map (fun op -> JSON.(op |-> "contents" |> as_list)) ops |> List.flatten
+  in
+  match
+    List.find_all
+      (fun content ->
+        JSON.(content |-> "kind" |> as_string) = kind && extra content)
+      ops_contents
+  with
+  | [] -> Test.fail "Block does not contain %s" what
+  | contents ->
+      List.iter
+        (fun content ->
+          let status =
+            JSON.(
+              content |-> "metadata" |-> "operation_result" |-> "status"
+              |> as_string)
+          in
+          Check.((status = "applied") string)
+            ~error_msg:(sf "%s status in block is %%L instead of %%R" what))
+        contents ;
+      contents
+
 (* Configuration of a rollup node
    ------------------------------
 
@@ -486,6 +511,18 @@ let test_rollup_get_genesis_info ~kind =
       ~error_msg:"expected value %L, got %R") ;
   unit
 
+(* Wait for the [injecting_pending] event from the injector. *)
+let wait_for_injecting_event ?(tags = []) ?count node =
+  Sc_rollup_node.wait_for node "injecting_pending.v0" @@ fun json ->
+  let event_tags = JSON.(json |-> "tags" |> as_list |> List.map as_string) in
+  let event_count = JSON.(json |-> "count" |> as_int) in
+  match count with
+  | Some c when c <> event_count -> None
+  | _ ->
+      if List.for_all (fun t -> List.mem t event_tags) tags then
+        Some event_count
+      else None
+
 (* Retrieve stakers and their commitments
    --------------------------------------
 
@@ -563,11 +600,11 @@ let test_stakers_commitments ~kind =
    the Tezos node. Then we can observe that the messages are included in the
    inbox.
 *)
-let send_message ?(src = Constant.bootstrap2.alias) client msg =
+let send_message_client ?(src = Constant.bootstrap2.alias) client msg =
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
   Client.bake_for_and_wait client
 
-let send_messages ?src ?batch_size n client =
+let send_messages_client ?src ?batch_size n client =
   let messages =
     List.map
       (fun i ->
@@ -578,7 +615,57 @@ let send_messages ?src ?batch_size n client =
         "text:" ^ Ezjsonm.to_string json)
       (range 1 n)
   in
-  Lwt_list.iter_s (fun msg -> send_message ?src client msg) messages
+  Lwt_list.iter_s (fun msg -> send_message_client ?src client msg) messages
+
+let send_message_batcher_aux ?hooks client sc_node sc_client msgs =
+  let batched =
+    Sc_rollup_node.wait_for sc_node "batched.v0" (Fun.const (Some ()))
+  in
+  let added_to_injector =
+    Sc_rollup_node.wait_for sc_node "add_pending.v0" (Fun.const (Some ()))
+  in
+  let injected = wait_for_injecting_event ~tags:["add_messages"] sc_node in
+  let*! hashes = Sc_rollup_client.inject ?hooks sc_client msgs in
+  (* New head will trigger injection  *)
+  let* () = Client.bake_for_and_wait client in
+  (* Injector should get messages right away because the batcher is configured
+     to not have minima. *)
+  let* _ = batched in
+  let* _ = added_to_injector in
+  let* _ = injected in
+  return hashes
+
+let send_message_batcher ?hooks client sc_node sc_client msgs =
+  let* hashes = send_message_batcher_aux ?hooks client sc_node sc_client msgs in
+  (* Next head will include messages  *)
+  let* () = Client.bake_for_and_wait client in
+  return hashes
+
+let send_messages_batcher ?hooks ?batch_size n client sc_node sc_client =
+  let batches =
+    List.map
+      (fun i ->
+        let batch_size = match batch_size with None -> i | Some v -> v in
+        List.map (fun j -> Format.sprintf "%d-%d" i j) (range 1 batch_size))
+      (range 1 n)
+  in
+  let* rhashes =
+    Lwt_list.fold_left_s
+      (fun acc msgs ->
+        let* hashes =
+          send_message_batcher_aux ?hooks client sc_node sc_client msgs
+        in
+        return (List.rev_append hashes acc))
+      []
+      batches
+  in
+  (* Next head will include messages of last batch *)
+  let* () = Client.bake_for_and_wait client in
+  return (List.rev rhashes)
+
+let send_message = send_message_client
+
+let send_messages = send_messages_client
 
 let to_text_messages_arg msgs =
   let json = Ezjsonm.list Ezjsonm.string msgs in
@@ -803,7 +890,6 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
 (* Simulation of messages *)
 let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
     client =
-  let level = Node.get_level node in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let msg1 = "3 3 + out" in
   let*! sim_result =
@@ -816,7 +902,10 @@ let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
   in
   let* () = send_message client (to_text_messages_arg [msg1]) in
   let* _ =
-    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + 1)
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      (Node.get_level node)
   in
   let*! real_state_hash = Sc_rollup_client.state_hash sc_rollup_client in
   let*! real_outbox = Sc_rollup_client.outbox sc_rollup_client ~block:"head" in
@@ -840,6 +929,85 @@ let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
   Process.check_error
     ~msg:(rex "Maximum number of messages reached for commitment period")
     sim_result
+
+(* Rollup node batcher *)
+let sc_rollup_node_batcher sc_rollup_node sc_rollup_client _sc_rollup node
+    client =
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  Log.info "Sending one message to the batcher" ;
+  let msg1 = "3 3 + out" in
+  let*! hashes = Sc_rollup_client.inject sc_rollup_client [msg1] in
+  let msg1_hash = match hashes with [h] -> h | _ -> assert false in
+  let*! retrieved_msg1 =
+    Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
+  in
+  Check.((retrieved_msg1 = msg1) string)
+    ~error_msg:"Message in queue is %L but injected %R." ;
+  let*! queue = Sc_rollup_client.batcher_queue sc_rollup_client in
+  Check.((queue = [(msg1_hash, msg1)]) (list (tuple2 string string)))
+    ~error_msg:"Queue is %L but should be %R." ;
+  (* This block triggers injection in the injector. *)
+  let* () = Client.bake_for_and_wait client in
+  (* We bake so that msg1 is included. *)
+  let* () = Client.bake_for_and_wait client in
+  let* _ =
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      (Node.get_level node)
+  in
+  Log.info "Sending multiple messages to the batcher" ;
+  let msg2 =
+    (* "012456789 012456789 012456789 ..." *)
+    String.init 2048 (fun i ->
+        let i = i mod 11 in
+        if i = 10 then ' ' else Char.chr (i + 48))
+  in
+  let*! hashes1 =
+    Sc_rollup_client.inject sc_rollup_client (List.init 9 (Fun.const msg2))
+  in
+  let* hashes2 =
+    send_message_batcher
+      client
+      sc_rollup_node
+      sc_rollup_client
+      (List.init 9 (Fun.const msg2))
+  in
+  let*! queue = Sc_rollup_client.batcher_queue sc_rollup_client in
+  Check.((queue = []) (list (tuple2 string string)))
+    ~error_msg:"Queue is %L should be %empty R." ;
+  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+  let contents1 =
+    check_l1_block_contains
+      ~kind:"sc_rollup_add_messages"
+      ~what:"add messages operations"
+      block
+  in
+  let incl_count = 0 in
+  let incl_count =
+    List.fold_left
+      (fun count c -> count + JSON.(c |-> "message" |> as_list |> List.length))
+      incl_count
+      contents1
+  in
+  (* We bake to trigger second injection by injector. *)
+  let* () = Client.bake_for_and_wait client in
+  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+  let contents2 =
+    check_l1_block_contains
+      ~kind:"sc_rollup_add_messages"
+      ~what:"add messages operations"
+      block
+  in
+  let incl_count =
+    List.fold_left
+      (fun count c -> count + JSON.(c |-> "message" |> as_list |> List.length))
+      incl_count
+      contents2
+  in
+  Check.((incl_count = List.length hashes1 + List.length hashes2) int)
+    ~error_msg:"Only %L messages are included instead of %R." ;
+  unit
 
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
@@ -3199,13 +3367,15 @@ let test_rpcs ~kind =
   let sc_rollup_address = JSON.as_string sc_rollup_address in
   Check.((sc_rollup_address = sc_rollup) string)
     ~error_msg:"SC rollup address of node is %L but should be %R" ;
-  let level = Node.get_level node in
   let n = 15 in
   let batch_size = 5 in
-  let* () = send_messages ~batch_size n client in
-  let* _ =
-    Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node (level + n)
+  let* hashes =
+    send_messages_batcher ~hooks ~batch_size n client sc_rollup_node sc_client
   in
+  Check.((List.length hashes = n * batch_size) int)
+    ~error_msg:"Injected %L messages but should have injected %R" ;
+  let level = Node.get_level node in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node level in
   let* l1_block_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
   let*! l2_block_hash =
     Sc_rollup_client.rpc_get
@@ -3232,7 +3402,7 @@ let test_rpcs ~kind =
       ["global"; "block"; "finalized"; "level"]
   in
   let l2_finalied_block_level = JSON.as_int l2_finalied_block_level in
-  Check.((l2_finalied_block_level = level + n - 2) int)
+  Check.((l2_finalied_block_level = level - 2) int)
     ~error_msg:"Finalized block is %L but should be %R" ;
   let*! l2_num_messages =
     Sc_rollup_client.rpc_get
@@ -3304,6 +3474,12 @@ let register ~kind ~protocols =
     ~kind
     ~variant:"handles_chain_reorg"
     sc_rollup_node_handles_chain_reorg
+    protocols ;
+  test_rollup_inbox_of_rollup_node
+    ~kind
+    ~variant:"batcher"
+    ~extra_tags:["batcher"]
+    sc_rollup_node_batcher
     protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;

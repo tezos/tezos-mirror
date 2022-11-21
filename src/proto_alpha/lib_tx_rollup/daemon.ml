@@ -533,56 +533,6 @@ let queue_gc_operations state =
   let* () = queue_finalize_commitment state in
   queue_remove_commitment state
 
-let time_until_next_block state (header : Tezos_base.Block_header.t) =
-  let open Result_syntax in
-  let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _} =
-    state.State.constants.parametric
-  in
-  let next_level_timestamp =
-    let* durations =
-      Round.Durations.create
-        ~first_round_duration:minimal_block_delay
-        ~delay_increment_per_round
-    in
-    let* predecessor_round = Fitness.round_from_raw header.shell.fitness in
-    Round.timestamp_of_round
-      durations
-      ~predecessor_timestamp:header.shell.timestamp
-      ~predecessor_round
-      ~round:Round.zero
-  in
-  let next_level_timestamp =
-    Result.value
-      next_level_timestamp
-      ~default:
-        (WithExceptions.Result.get_ok
-           ~loc:__LOC__
-           Timestamp.(header.shell.timestamp +? minimal_block_delay))
-  in
-  Ptime.diff
-    (Time.System.of_protocol_exn next_level_timestamp)
-    (Time.System.now ())
-
-let trigger_injection state header =
-  let open Lwt_syntax in
-  (* Queue request for injection of operation that must be delayed *)
-  (* Waiting only half the time until next block to allow for propagation *)
-  let promise =
-    let delay =
-      Ptime.Span.to_float_s (time_until_next_block state header) /. 2.
-    in
-    let* () =
-      if delay <= 0. then return_unit
-      else
-        let* () = Event.(emit inject_wait) delay in
-        Lwt_unix.sleep delay
-    in
-    Injector.inject ~strategy:`Delay_block ()
-  in
-  ignore promise ;
-  (* Queue request for injection of operation that must be injected each block *)
-  Injector.inject ~strategy:`Each_block ()
-
 let dispatch_withdrawals_on_l1 state level =
   let open Lwt_result_syntax in
   match state.State.signers.dispatch_withdrawals with
@@ -803,7 +753,7 @@ let process_head ?(notify_sync = true) state
   let*! () =
     match current_header with
     | None -> Lwt.return_unit
-    | Some current_header -> trigger_injection state current_header
+    | Some header -> Injector.inject ~header ()
   in
   return_unit
 
@@ -1029,7 +979,7 @@ let run configuration cctxt =
              (* Batches of L2 operations are submitted with a delay after each
                 block, to allow for more operations to arrive and be included in
                 the following block. *)
-             (signers.submit_batch, `Delay_block, [Submit_batch]);
+             (signers.submit_batch, `Delay_block 0.5, [Submit_batch]);
              (signers.finalize_commitment, `Each_block, [Finalize_commitment]);
              (signers.remove_commitment, `Each_block, [Remove_commitment]);
              (signers.rejection, `Each_block, [Rejection]);

@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
-end
+type t = {
+  counter : Z.t;
+      (** Each message is given a unique counter to allow for the batcher to
+          receive multiple identical messages. *)
+  content : string;  (** The actual content of the message. *)
+}
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+let content_encoding =
+  let open Data_encoding in
+  def "sc_l2_message" ~description:"A hex encoded smart contact rollup message"
+  @@ conv String.to_bytes String.of_bytes bytes
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {counter; content} -> (counter, content))
+    (fun (counter, content) -> {counter; content})
+  @@ obj2 (req "counter" z) (req "content" content_encoding)
+
+let make =
+  let counter = ref Z.zero in
+  fun content ->
+    let m = {content; counter = !counter} in
+    counter := Z.succ !counter ;
+    m
+
+let content m = m.content
+
+module Hash =
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
+    (struct
+      let name = "sc_rollup_l2_message"
+
+      let title = "A SCORU L2 message"
+
+      let b58check_prefix = "\003\250\179\247\196" (* scmsg(55) *)
+
+      let size = None
+    end)
+
+let () =
+  Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "scmsg" 55
+
+type hash = Hash.t
+
+let hash t = Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding t]

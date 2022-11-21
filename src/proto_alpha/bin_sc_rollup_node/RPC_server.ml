@@ -138,6 +138,13 @@ module Make_directory (S : PARAM) = struct
     let*? ctxt = ctxt in
     f ctxt query input
 
+  let register1 service f =
+    let open Lwt_result_syntax in
+    register (Tezos_rpc.Service.subst1 service)
+    @@ fun (ctxt, arg) query input ->
+    let*? ctxt = ctxt in
+    f ctxt arg query input
+
   let build_directory node_ctxt =
     !directory
     |> Tezos_rpc.Directory.map (fun prefix ->
@@ -229,11 +236,11 @@ module Common = struct
     state.num_ticks
 end
 
-module Make (Interpreter : Interpreter.S) = struct
-  module PVM = Interpreter.PVM
+module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
+  module PVM = Simulation.PVM
+  module Interpreter = Simulation.Interpreter
   module Outbox = Outbox.Make (PVM)
   module Free_pvm = Interpreter.Free_pvm
-  module Simulation = Simulation.Make (Interpreter)
 
   let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in
@@ -396,6 +403,24 @@ module Make (Interpreter : Interpreter.S) = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.simulate
     @@ fun (node_ctxt, block) () {messages; reveal_pages} ->
     simulate_messages node_ctxt block ~reveal_pages messages
+
+  let () =
+    Local_directory.register0 Sc_rollup_services.Local.injection
+    @@ fun _node_ctxt () messages -> Batcher.register_messages messages
+
+  let () =
+    Local_directory.register0 Sc_rollup_services.Local.batcher_queue
+    @@ fun _node_ctxt () () ->
+    let open Lwt_result_syntax in
+    let*? queue = Batcher.get_queue () in
+    return queue
+
+  let () =
+    Local_directory.register1 Sc_rollup_services.Local.batcher_message
+    @@ fun _node_ctxt hash () () ->
+    let open Lwt_result_syntax in
+    let*? msg = Batcher.find_message hash in
+    return msg
 
   let register node_ctxt =
     List.fold_left

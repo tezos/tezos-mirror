@@ -112,6 +112,13 @@ module Encodings = struct
             "reveal_pages"
             (list hex_string)
             ~description:"Pages (at most 4kB) to be used for revelation ticks")
+
+  let queued_message =
+    obj2
+      (req "hash" L2_message.Hash.encoding)
+      (req "message" L2_message.encoding)
+
+  let batcher_queue = list queued_message
 end
 
 module Arg = struct
@@ -149,6 +156,16 @@ module Arg = struct
       ~construct:construct_block_id
       ~destruct:destruct_block_id
       ()
+
+  let l2_message_hash : L2_message.hash Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
+      ~descr:"A L2 message hash."
+      ~name:"l2_message_hash"
+      ~construct:L2_message.Hash.to_b58check
+      ~destruct:(fun s ->
+        L2_message.Hash.of_b58check_opt s
+        |> Option.to_result ~none:"Invalid L2 message hash")
+      ()
 end
 
 module type PREFIX = sig
@@ -171,6 +188,14 @@ module Make_services (P : PREFIX) = struct
   let make_call2 s =
     Tezos_rpc.Context.make_call2 (Tezos_rpc.Service.prefix prefix s)
 end
+
+type simulate_query = {fuel : int64 option}
+
+let simulate_query : simulate_query Tezos_rpc.Query.t =
+  let open Tezos_rpc.Query in
+  query (fun fuel -> {fuel})
+  |+ opt_field "fuel" Tezos_rpc.Arg.int64 (fun t -> t.fuel)
+  |> seal
 
 module Global = struct
   open Tezos_rpc.Path
@@ -453,4 +478,36 @@ module Local = struct
       ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (path / "last_published_commitment")
+
+  let injection =
+    Tezos_rpc.Service.post_service
+      ~description:"Inject messages in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def
+            "messages"
+            ~description:"Messages to inject"
+            (list L2_message.content_encoding))
+      ~output:
+        Data_encoding.(
+          def
+            "message_hashes"
+            ~description:"Hashes of injected L2 messages"
+            (list L2_message.Hash.encoding))
+      (path / "batcher" / "injection")
+
+  let batcher_queue =
+    Tezos_rpc.Service.get_service
+      ~description:"List messages present in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.batcher_queue
+      (path / "batcher" / "queue")
+
+  let batcher_message =
+    Tezos_rpc.Service.get_service
+      ~description:"List messages present in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.option L2_message.encoding)
+      (path / "batcher" / "queue" /: Arg.l2_message_hash)
 end

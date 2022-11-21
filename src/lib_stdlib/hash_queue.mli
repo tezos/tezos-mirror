@@ -101,4 +101,11 @@ module Make
 
   (** Returns the elements from oldest to newest. *)
   val elements : t -> V.t list
+
+  (** Returns the keys of the elements stored in the queue from oldest to
+      newest. *)
+  val keys : t -> K.t list
+
+  (** Returns the bindings stored in the queue from oldest to newest. *)
+  val bindings : t -> (K.t * V.t) list
 end

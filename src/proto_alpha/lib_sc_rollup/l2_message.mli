@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
-end
+(** Type of L2 messages.  *)
+type t
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+(** [make message] constructs a message with content [message]. *)
+val make : string -> t
+
+(** [content message] returns the string content of [message], i.e.
+    [content (make s) = s]. *)
+val content : t -> string
+
+(** Hash with b58check encoding scmsg(55), for hashes of L2 messages. *)
+module Hash : Tezos_crypto.S.HASH
+
+(** Alias for message hash *)
+type hash = Hash.t
+
+(**  {2 Serialization} *)
+
+val content_encoding : string Data_encoding.t
+
+val encoding : t Data_encoding.t
+
+val hash : t -> Hash.t

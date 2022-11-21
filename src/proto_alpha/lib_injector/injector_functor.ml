@@ -36,7 +36,7 @@ open Injector_errors
    Centralize this and maybe make it configurable. *)
 let confirmations = 2
 
-type injection_strategy = [`Each_block | `Delay_block]
+type injection_strategy = [`Each_block | `Delay_block of float]
 
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2755
    Persist injector data on disk *)
@@ -185,6 +185,7 @@ module Make (Rollup : PARAMETERS) = struct
   type state = {
     cctxt : Protocol_client_context.full;
         (** The client context which is used to perform the injections. *)
+    constants : Constants.t;  (** The constants of the protocol. *)
     signer : signer;  (** The signer for this worker. *)
     tags : Tags.t;
         (** The tags of this worker, for both informative and identification
@@ -214,7 +215,8 @@ module Make (Rollup : PARAMETERS) = struct
     let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
-  let init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags =
+  let init_injector cctxt constants ~data_dir rollup_node_state ~signer strategy
+      tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -297,6 +299,7 @@ module Make (Rollup : PARAMETERS) = struct
     return
       {
         cctxt = injector_context (cctxt :> #Protocol_client_context.full);
+        constants;
         signer;
         tags;
         strategy;
@@ -948,6 +951,7 @@ module Make (Rollup : PARAMETERS) = struct
 
     type parameters = {
       cctxt : Protocol_client_context.full;
+      constants : Constants.t;
       data_dir : string;
       rollup_node_state : Rollup.rollup_node_state;
       strategy : injection_strategy;
@@ -987,9 +991,16 @@ module Make (Rollup : PARAMETERS) = struct
     type launch_error = error trace
 
     let on_launch _w signer
-        Types.{cctxt; data_dir; rollup_node_state; strategy; tags} =
+        Types.{cctxt; constants; data_dir; rollup_node_state; strategy; tags} =
       trace (Step_failed "initialization")
-      @@ init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags
+      @@ init_injector
+           cctxt
+           constants
+           ~data_dir
+           rollup_node_state
+           ~signer
+           strategy
+           tags
 
     let on_error (type a b) w st (r : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
@@ -1040,11 +1051,11 @@ module Make (Rollup : PARAMETERS) = struct
                 let strategy =
                   match (strategy, other_strategy) with
                   | `Each_block, `Each_block -> `Each_block
-                  | `Delay_block, _ | _, `Delay_block ->
+                  | `Delay_block f, _ | _, `Delay_block f ->
                       (* Delay_block strategy takes over because we can always wait a
                          little bit more to inject operation which are to be injected
                          "each block". *)
-                      `Delay_block
+                      `Delay_block f
                 in
                 (strategy, Tags.union other_tags tags)
           in
@@ -1055,6 +1066,9 @@ module Make (Rollup : PARAMETERS) = struct
         Tezos_crypto.Signature.Public_key_hash.Map.empty
         signers
     in
+    let* constants =
+      Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
+    in
     Tezos_crypto.Signature.Public_key_hash.Map.iter_es
       (fun signer (strategy, tags) ->
         let+ worker =
@@ -1063,6 +1077,7 @@ module Make (Rollup : PARAMETERS) = struct
             signer
             {
               cctxt = (cctxt :> Protocol_client_context.full);
+              constants;
               data_dir;
               rollup_node_state;
               strategy;
@@ -1125,22 +1140,71 @@ module Make (Rollup : PARAMETERS) = struct
         true
     | Some tags -> not (Tags.disjoint state.tags tags)
 
-  let has_strategy ~strategy state =
-    match strategy with
-    | None ->
-        (* Not filtering on strategy *)
-        true
-    | Some strategy -> state.strategy = strategy
+  let time_until_next_block constants (header : Tezos_base.Block_header.t) =
+    let open Result_syntax in
+    let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _}
+        =
+      constants.Constants.parametric
+    in
+    let next_level_timestamp =
+      let* durations =
+        Round.Durations.create
+          ~first_round_duration:minimal_block_delay
+          ~delay_increment_per_round
+      in
+      let* predecessor_round = Fitness.round_from_raw header.shell.fitness in
+      Round.timestamp_of_round
+        durations
+        ~predecessor_timestamp:header.shell.timestamp
+        ~predecessor_round
+        ~round:Round.zero
+    in
+    let next_level_timestamp =
+      Result.value
+        next_level_timestamp
+        ~default:
+          (WithExceptions.Result.get_ok
+             ~loc:__LOC__
+             Timestamp.(header.shell.timestamp +? minimal_block_delay))
+    in
+    Ptime.diff
+      (Time.System.of_protocol_exn next_level_timestamp)
+      (Time.System.now ())
 
-  let inject ?tags ?strategy () =
+  let delay_stategy state header f =
+    let open Lwt_syntax in
+    match state.strategy with
+    | `Each_block -> f ()
+    | `Delay_block delay_factor ->
+        let time_until_next_block =
+          match header with
+          | None ->
+              state.constants.Constants.parametric.minimal_block_delay
+              |> Period.to_seconds |> Int64.to_float
+          | Some header ->
+              time_until_next_block state.constants header
+              |> Ptime.Span.to_float_s
+        in
+        let delay = time_until_next_block *. delay_factor in
+        if delay <= 0. then f ()
+        else
+          let promise =
+            let* () = Event.(emit1 inject_wait) state delay in
+            let* () = Lwt_unix.sleep delay in
+            f ()
+          in
+          ignore promise ;
+          return_unit
+
+  let inject ?tags ?header () =
     let workers = Worker.list table in
     let tags = Option.map Tags.of_list tags in
     List.iter_p
       (fun (_signer, w) ->
         let open Lwt_syntax in
         let worker_state = Worker.state w in
-        if has_tag_in ~tags worker_state && has_strategy ~strategy worker_state
-        then
+        if has_tag_in ~tags worker_state then
+          delay_stategy worker_state header @@ fun () ->
           let* _pushed = Worker.Queue.push_request w Request.Inject in
           return_unit
         else Lwt.return_unit)

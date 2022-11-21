@@ -177,6 +177,27 @@ let test_elements () =
   let elts = Queue.elements q in
   Assert.Int.List.equal ~loc:__LOC__ vs elts
 
+let test_keys () =
+  let q = init_queue 10 10 in
+  let ks, _ = gen_values 10 |> List.split in
+  let keys = Queue.keys q in
+  Assert.String.List.equal ~loc:__LOC__ ks keys
+
+let test_bindings () =
+  let q = init_queue 10 10 in
+  let bs = gen_values 10 in
+  let bndgs = Queue.bindings q in
+  let module Assert_bindings = Assert.Make_equalities (struct
+    type t = (string * int) list
+
+    let eq = Stdlib.( = )
+
+    let pp =
+      Format.pp_print_list (fun fmt (k, v) ->
+          Format.fprintf fmt "[%s -> %d]" k v)
+  end) in
+  Assert_bindings.equal ~loc:__LOC__ bs bndgs
+
 let test_take_replace_keep_order () =
   let q = init_queue 10 5 in
   let _ = Queue.take_at_most q 3 in
@@ -215,6 +236,8 @@ let () =
           ("clear", `Quick, test_clear);
           ("fold", `Quick, test_fold);
           ("elements", `Quick, test_elements);
+          ("keys", `Quick, test_keys);
+          ("bindings", `Quick, test_bindings);
           ("take_replace_keep_order", `Quick, test_take_replace_keep_order);
         ] );
     ]

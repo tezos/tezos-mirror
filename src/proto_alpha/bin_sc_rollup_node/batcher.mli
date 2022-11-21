@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
+open Protocol
+open Alpha_context
+
+module type S = sig
+  (** [init config ~signer node_ctxt] initializes and starts the batcher for
+      [signer]. If [config.simulation] is [true] (the default), messages added
+      to the batcher are simulated in an incremental simulation context. *)
+  val init :
+    Configuration.batcher ->
+    signer:public_key_hash ->
+    _ Node_context.t ->
+    unit tzresult Lwt.t
+
+  (** Return [true] if the batcher was started for this node. *)
+  val active : unit -> bool
+
+  (** Retrieve an L2 message from the queue. *)
+  val find_message : L2_message.hash -> L2_message.t option tzresult
+
+  (** List all queued messages in the order they appear in the queue, i.e. the
+      message that were added first to the queue are at the end of list. *)
+  val get_queue : unit -> (L2_message.hash * L2_message.t) list tzresult
+
+  (** [register_messages messages] registers new L2 [messages] in the queue of
+      the batcher for future injection on L1. If the batcher was initialized
+      with [simualte = true], the messages are evaluated the batcher's
+      incremental simulation context. In this case, when the application fails,
+      the messages are not queued.  *)
+  val register_messages : string list -> L2_message.hash list tzresult Lwt.t
+
+  (** Create L2 batches of operations from the queue and pack them in an L1
+      batch operation. The batch operation is queued in the injector for
+      injection on the Tezos node. *)
+  val batch : unit -> unit tzresult Lwt.t
+
+  (** Notify a new L2 head to the batcher worker. *)
+  val new_head : Layer1.head -> unit tzresult Lwt.t
+
+  (** Shutdown the batcher, waiting for the ongoing request to be processed. *)
+  val shutdown : unit -> unit Lwt.t
 end
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+module Make (Simulation : Simulation.S) : S

@@ -279,6 +279,30 @@ let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
              num_ticks = obj |> get "num_ticks" |> as_string |> int_of_string;
            })
 
+let inject ?hooks sc_client messages =
+  let messages_json =
+    `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
+    |> JSON.annotate ~origin:"injection messages"
+  in
+  rpc_post ?hooks sc_client ["local"; "batcher"; "injection"] messages_json
+  |> Runnable.map @@ fun obj -> JSON.as_list obj |> List.map JSON.as_string
+
+let batcher_queue ?hooks sc_client =
+  rpc_get ?hooks sc_client ["local"; "batcher"; "queue"]
+  |> Runnable.map @@ fun obj ->
+     JSON.as_list obj
+     |> List.map @@ fun o ->
+        let hash = JSON.(o |> get "hash" |> as_string) in
+        let hex_msg = JSON.(o |> get "message" |> get "content" |> as_string) in
+        (hash, Hex.to_string (`Hex hex_msg))
+
+let get_batcher_msg ?hooks sc_client msg_hash =
+  rpc_get ?hooks sc_client ["local"; "batcher"; "queue"; msg_hash]
+  |> Runnable.map @@ fun obj ->
+     if JSON.is_null obj then failwith "Message is not in the queue" ;
+     let hex_msg = JSON.(obj |> get "content" |> as_string) in
+     Hex.to_string (`Hex hex_msg)
+
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command
     ?hooks

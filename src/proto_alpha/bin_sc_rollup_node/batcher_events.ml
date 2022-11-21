@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,17 +23,64 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module Simulation = Simulation.Make (Interpreter)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-  module Batcher = Batcher.Make (Simulation)
-  module RPC_server = RPC_server.Make (Simulation) (Batcher)
-end
+include Internal_event.Simple
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+let section = ["sc_rollup_node"; "batcher"]
+
+let queue =
+  declare_1
+    ~section
+    ~name:"queue"
+    ~msg:"adding {nb_messages} to queue"
+    ~level:Notice
+    ("nb_messages", Data_encoding.int31)
+
+let batched =
+  declare_2
+    ~section
+    ~name:"batched"
+    ~msg:"batched {nb_messages} messages into {nb_batches} batches"
+    ~level:Notice
+    ("nb_batches", Data_encoding.int31)
+    ("nb_messages", Data_encoding.int31)
+
+module Worker = struct
+  open Batcher_worker_types
+
+  let section = section @ ["worker"]
+
+  let request_failed =
+    declare_3
+      ~section
+      ~name:"request_failed"
+      ~msg:"request {view} failed ({worker_status}): {errors}"
+      ~level:Warning
+      ("view", Request.encoding)
+      ~pp1:Request.pp
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp2:Worker_types.pp_status
+      ("errors", Error_monad.trace_encoding)
+      ~pp3:Error_monad.pp_print_trace
+
+  let request_completed_notice =
+    declare_2
+      ~section
+      ~name:"request_completed_notice"
+      ~msg:"{view} {worker_status}"
+      ~level:Notice
+      ("view", Request.encoding)
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp1:Request.pp
+      ~pp2:Worker_types.pp_status
+
+  let request_completed_debug =
+    declare_2
+      ~section
+      ~name:"request_completed_debug"
+      ~msg:"{view} {worker_status}"
+      ~level:Debug
+      ("view", Request.encoding)
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp1:Request.pp
+      ~pp2:Worker_types.pp_status
+end

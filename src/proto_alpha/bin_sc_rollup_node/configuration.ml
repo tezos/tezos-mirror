@@ -42,6 +42,14 @@ type operators = Tezos_crypto.Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 
+type batcher = {
+  simulate : bool;
+  min_batch_elements : int;
+  min_batch_size : int;
+  max_batch_elements : int;
+  max_batch_size : int;
+}
+
 type t = {
   data_dir : string;
   sc_rollup_address : Sc_rollup.t;
@@ -54,6 +62,7 @@ type t = {
   loser_mode : Loser_mode.t;
   dal_node_addr : string;
   dal_node_port : int;
+  batcher : batcher;
 }
 
 let default_data_dir =
@@ -160,6 +169,55 @@ let default_fee_parameters =
       Operator_purpose_map.add purpose (default_fee_parameter ~purpose ()) acc)
     Operator_purpose_map.empty
     purposes
+
+let default_batcher_simulate = true
+
+let default_batcher_min_batch_elements = 10
+
+let default_batcher_min_batch_size = 10
+
+let default_batcher_max_batch_elements = max_int
+
+let protocol_max_batch_size =
+  let empty_message_op : _ Operation.t =
+    let open Protocol in
+    let open Alpha_context in
+    let open Operation in
+    {
+      shell = {branch = Tezos_crypto.Block_hash.zero};
+      protocol_data =
+        {
+          signature = Some Tezos_crypto.Signature.zero;
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source = Tezos_crypto.Signature.Public_key_hash.zero;
+                   fee = Tez.of_mutez_exn Int64.max_int;
+                   counter = Manager_counter.Internal_for_tests.of_int max_int;
+                   gas_limit =
+                     Gas.Arith.integral_of_int_exn ((max_int - 1) / 1000);
+                   storage_limit = Z.of_int max_int;
+                   operation = Sc_rollup_add_messages {messages = [""]};
+                 });
+        };
+    }
+  in
+  Protocol.Constants_repr.max_operation_data_length
+  - Data_encoding.Binary.length
+      Operation.encoding
+      (Operation.pack empty_message_op)
+
+let default_batcher_max_batch_size = protocol_max_batch_size
+
+let default_batcher =
+  {
+    simulate = default_batcher_simulate;
+    min_batch_elements = default_batcher_min_batch_elements;
+    min_batch_size = default_batcher_min_batch_size;
+    max_batch_elements = default_batcher_max_batch_elements;
+    max_batch_size = default_batcher_max_batch_size;
+  }
 
 let string_of_purpose = function
   | Publish -> "publish"
@@ -362,6 +420,54 @@ let mode_encoding =
       ("custom", Custom);
     ]
 
+let batcher_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (fun {
+           simulate;
+           min_batch_elements;
+           min_batch_size;
+           max_batch_elements;
+           max_batch_size;
+         } ->
+      ( simulate,
+        min_batch_elements,
+        min_batch_size,
+        max_batch_elements,
+        max_batch_size ))
+    (fun ( simulate,
+           min_batch_elements,
+           min_batch_size,
+           max_batch_elements,
+           max_batch_size ) ->
+      if max_batch_size > protocol_max_batch_size then
+        Error
+          (Format.sprintf
+             "max_batch_size must be smaller than %d"
+             protocol_max_batch_size)
+      else if min_batch_size <= 0 then Error "min_batch_size must be positive"
+      else if max_batch_size < min_batch_size then
+        Error "max_batch_size must be greater than min_batch_size"
+      else if min_batch_elements <= 0 then
+        Error "min_batch_elements must be positive"
+      else if max_batch_elements < min_batch_elements then
+        Error "max_batch_elements must be greater than min_batch_elements"
+      else
+        Ok
+          {
+            simulate;
+            min_batch_elements;
+            min_batch_size;
+            max_batch_elements;
+            max_batch_size;
+          })
+  @@ obj5
+       (dft "simulate" bool default_batcher_simulate)
+       (dft "min_batch_elements" int31 default_batcher_min_batch_elements)
+       (dft "min_batch_size" int31 default_batcher_min_batch_size)
+       (dft "max_batch_elements" int31 default_batcher_max_batch_elements)
+       (dft "max_batch_size" int31 default_batcher_max_batch_size)
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -377,6 +483,7 @@ let encoding : t Data_encoding.t =
            loser_mode;
            dal_node_addr;
            dal_node_port;
+           batcher;
          } ->
       ( ( data_dir,
           sc_rollup_address,
@@ -387,7 +494,7 @@ let encoding : t Data_encoding.t =
           fee_parameters,
           mode,
           loser_mode ),
-        (dal_node_addr, dal_node_port) ))
+        (dal_node_addr, dal_node_port, batcher) ))
     (fun ( ( data_dir,
              sc_rollup_address,
              sc_rollup_node_operators,
@@ -397,7 +504,7 @@ let encoding : t Data_encoding.t =
              fee_parameters,
              mode,
              loser_mode ),
-           (dal_node_addr, dal_node_port) ) ->
+           (dal_node_addr, dal_node_port, batcher) ) ->
       {
         data_dir;
         sc_rollup_address;
@@ -410,6 +517,7 @@ let encoding : t Data_encoding.t =
         loser_mode;
         dal_node_addr;
         dal_node_port;
+        batcher;
       })
     (merge_objs
        (obj9
@@ -454,9 +562,10 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj2
+       (obj3
           (dft "DAL node address" string default_dal_node_addr)
-          (dft "DAL node port" int16 default_dal_node_port)))
+          (dft "DAL node port" int16 default_dal_node_port)
+          (dft "batcher" batcher_encoding default_batcher)))
 
 let check_mode config =
   let open Result_syntax in
