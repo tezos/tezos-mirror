@@ -551,19 +551,24 @@ let to_list = function Contents_list l -> contents_list_to_list l
 (* This first version of of_list has the type (_, string) result expected by
    the conv_with_guard combinator of Data_encoding. For a more conventional
    return type see [of_list] below. *)
-let rec of_list_internal = function
+let of_list_internal contents =
+  let rec of_list_internal acc = function
+    | [] -> Ok acc
+    | Contents o :: os -> (
+        match (o, acc) with
+        | ( Manager_operation _,
+            Contents_list (Single (Manager_operation _) as rest) ) ->
+            (of_list_internal [@tailcall]) (Contents_list (Cons (o, rest))) os
+        | Manager_operation _, Contents_list (Cons _ as rest) ->
+            (of_list_internal [@tailcall]) (Contents_list (Cons (o, rest))) os
+        | _ ->
+            Error
+              "Operation list of length > 1 should only contain manager \
+               operations.")
+  in
+  match List.rev contents with
   | [] -> Error "Operation lists should not be empty."
-  | [Contents o] -> Ok (Contents_list (Single o))
-  | Contents o :: os -> (
-      of_list_internal os >>? fun (Contents_list os) ->
-      match (o, os) with
-      | Manager_operation _, Single (Manager_operation _) ->
-          Ok (Contents_list (Cons (o, os)))
-      | Manager_operation _, Cons _ -> Ok (Contents_list (Cons (o, os)))
-      | _ ->
-          Error
-            "Operation list of length > 1 should only contains manager \
-             operations.")
+  | Contents o :: os -> of_list_internal (Contents_list (Single o)) os
 
 type error += Contents_list_error of string (* `Permanent *)
 
@@ -1862,24 +1867,35 @@ module Encoding = struct
           encoding of operations. *)
        :: List.map make_contents contents_cases
 
-  let rec of_contents_and_signature_prefix = function
-    | [Actual_contents (Contents o)] -> Ok (Contents_list (Single o), None)
-    | [Actual_contents (Contents o); Signature_prefix prefix] ->
-        Ok (Contents_list (Single o), Some prefix)
-    | [] | [Signature_prefix _] -> Error "Operation lists should not be empty."
-    | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
-    | Actual_contents (Contents o) :: os -> (
-        of_contents_and_signature_prefix os
-        >>? fun (Contents_list os, prefix) ->
-        match (o, os) with
-        | Manager_operation _, Single (Manager_operation _) ->
-            Ok (Contents_list (Cons (o, os)), prefix)
-        | Manager_operation _, Cons _ ->
-            Ok (Contents_list (Cons (o, os)), prefix)
-        | _ ->
-            Error
-              "Operation list of length > 1 should only contains manager \
-               operations.")
+  let of_contents_and_signature_prefix contents_and_prefix =
+    let open Result_syntax in
+    let rec loop acc = function
+      | [] -> Ok acc
+      | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
+      | Actual_contents (Contents o) :: os -> (
+          match (o, acc) with
+          | ( Manager_operation _,
+              Contents_list (Single (Manager_operation _) as rest) ) ->
+              (loop [@tailcall]) (Contents_list (Cons (o, rest))) os
+          | Manager_operation _, Contents_list (Cons _ as rest) ->
+              (loop [@tailcall]) (Contents_list (Cons (o, rest))) os
+          | _ ->
+              Error
+                "Operation list of length > 1 should only contain manager \
+                 operations.")
+    in
+    let rev_contents, prefix =
+      match List.rev contents_and_prefix with
+      | Signature_prefix prefix :: rev_contents -> (rev_contents, Some prefix)
+      | rev_contents -> (rev_contents, None)
+    in
+    let+ packed_contents =
+      match rev_contents with
+      | [] -> Error "Operation lists should not be empty."
+      | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
+      | Actual_contents (Contents o) :: os -> loop (Contents_list (Single o)) os
+    in
+    (packed_contents, prefix)
 
   let protocol_data_binary_encoding =
     conv_with_guard
