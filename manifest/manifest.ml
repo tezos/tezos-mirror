@@ -2843,18 +2843,6 @@ let generate_binaries_for_release () =
                  |> List.iter (fun (full_name : Target.full_name) ->
                         Format.fprintf fmt "%s@." full_name.public_name)))
 
-let generate_static_packages () =
-  write "script-inputs/static-packages" @@ fun fmt ->
-  Target.iter_internal_by_opam (fun package internals ->
-      if
-        List.exists
-          (fun (internal : Target.internal) ->
-            match internal.kind with
-            | Public_executable _ | Private_executable _ -> internal.static
-            | Public_library _ | Private_library _ | Test_executable _ -> false)
-          internals
-      then Format.fprintf fmt "%s\n" package)
-
 let generate_workspace env dune =
   let pp_dune fmt dune =
     if not (Dune.is_empty dune) then Format.fprintf fmt "@.%a@." Dune.pp dune
@@ -3336,7 +3324,6 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     generate_opam_files () ;
     generate_dune_project_files () ;
     generate_package_json_file () ;
-    generate_static_packages () ;
     let opam_release_graph = compute_opam_release_graph () in
     generate_opam_ci opam_release_graph ;
     generate_binaries_for_release () ;
