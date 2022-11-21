@@ -127,8 +127,6 @@ let wrap_encoding_error =
 
 let encode enc v = Data_encoding.Binary.to_string enc v |> wrap_encoding_error
 
-let share_path slot_header shard_id = [slot_header; string_of_int shard_id]
-
 let decode_share s =
   Data_encoding.Binary.of_string Cryptobox.share_encoding s
   |> Result.map_error (fun e ->
@@ -140,7 +138,9 @@ let save store watcher slot_header shards =
   let* () =
     Cryptobox.IntMap.iter_es
       (fun i share ->
-        let path = share_path slot_header_b58 i in
+        let path =
+          Store.Legacy_paths.slot_shard_by_commitment slot_header_b58 i
+        in
         let*? share = encode Cryptobox.share_encoding share in
         let*! metadata = Store.set ~msg:"Share stored" store path share in
         return metadata)
@@ -203,7 +203,8 @@ let save_shards store watcher dal_constants slot_header shards =
 let fold_stored_shards ~check_shards store dal_parameters f init slot_header =
   let open Lwt_result_syntax in
   let slot_header = Cryptobox.Commitment.to_b58check slot_header in
-  let*! shards = Store.list store [slot_header] in
+  let path = Store.Legacy_paths.slot_shards_by_commitment slot_header in
+  let*! shards = Store.list store path in
   let*? () =
     if check_shards then check_slot_consistency dal_parameters shards else Ok ()
   in
@@ -228,10 +229,11 @@ module Shard_id_set = Set.Make (Int)
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
   let slot_header = Cryptobox.Commitment.to_b58check slot_header in
+  let path = Store.Legacy_paths.slot_shard_by_commitment slot_header shard_id in
   let* share =
     Lwt.catch
       (fun () ->
-        let*! r = Store.get store (share_path slot_header shard_id) in
+        let*! r = Store.get store path in
         return r)
       (function
         | Invalid_argument _ -> fail [Slot_not_found] | e -> fail [Exn e])
