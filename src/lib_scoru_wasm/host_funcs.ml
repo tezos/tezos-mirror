@@ -132,13 +132,12 @@ module Aux = struct
       num_bytes:int32 ->
       int32 Lwt.t
 
-    (** [aux_write_memory ~input_buffer ~module_inst ~level_offset
+    (** [read_input ~input_buffer ~output_buffer ~memory ~level_offset
      ~id_offset ~dst ~max_bytes] reads `input_buffer` and writes its
-     components to the memory of `module_inst` based on the memory
-     addreses offsets described. It also checks that the input
-     payload is no larger than `max_input` and crashes with `input
-     too large` otherwise. It returns the size of the payload. Note
-     also that, if the level increases this function also updates
+     components to the memory based on the memory addreses offsets described.
+     It also checks that the input payload is no larger than `max_input` and
+     fails with `Input_output_too_large` otherwise. It returns the size of the
+     payload. Note also that, if the level increases this function also updates
      the level of the output buffer and resets its id to zero. *)
     val read_input :
       input_buffer:Input_buffer.t ->
