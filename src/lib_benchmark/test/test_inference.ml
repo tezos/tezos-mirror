@@ -57,13 +57,15 @@ module T () = struct
   (* ----------------------------------------------------------------------- *)
   (* Define the model we're going to use to fit *)
 
-  let fv_const = Free_variable.of_string "const"
+  let fv_const = Free_variable.of_string "test/const"
 
-  let fv_quad = Free_variable.of_string "quadratic_term"
+  let fv_quad = Free_variable.of_string "test/quadratic_term"
 
   let quadratic_affine =
     let open Model in
     let module M = struct
+      let name = Namespace.(make root "test") "quadratic_affine"
+
       type arg_type = int * unit
 
       module Def (X : Costlang.S) = struct

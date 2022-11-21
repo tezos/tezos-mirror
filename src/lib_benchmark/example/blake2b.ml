@@ -35,8 +35,16 @@ let ns = Namespace.make Namespace.root "example"
 
 let fv s = Free_variable.of_namespace (ns s)
 
+let name = ns "Blake2b_example"
+
+let model_blake2b =
+  Model.affine
+    ~name
+    ~intercept:(fv "blake2b_const")
+    ~coeff:(fv "blake2b_ns_p_byte")
+
 module Blake2b_bench : Benchmark.S = struct
-  let name = ns "Blake2b_example"
+  let name = name
 
   let info = "Illustrating tezos-benchmark by benchmarking blake2b"
 
@@ -78,13 +86,7 @@ module Blake2b_bench : Benchmark.S = struct
   let models =
     [
       ( "blake2b",
-        Model.make
-          ~conv:(fun {nbytes} -> (nbytes, ()))
-          ~model:
-            (Model.affine
-               ~name
-               ~intercept:(fv "blake2b_const")
-               ~coeff:(fv "blake2b_ns_p_byte")) );
+        Model.make ~conv:(fun {nbytes} -> (nbytes, ())) ~model:model_blake2b );
     ]
 
   let blake2b_benchmark rng_state config () =
