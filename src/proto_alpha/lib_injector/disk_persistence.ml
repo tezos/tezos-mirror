@@ -335,6 +335,8 @@ struct
 
   let length q = Q.length q.queue
 
+  let find_opt q k = Q.find_opt q.queue k
+
   let load_from_disk ~warn_unreadable ~capacity ~data_dir ~filter =
     let open Lwt_result_syntax in
     let* q = create ~data_dir capacity in

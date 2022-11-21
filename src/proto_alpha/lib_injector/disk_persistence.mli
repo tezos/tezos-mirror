@@ -127,6 +127,10 @@ end) : sig
       of [q] (in memory). The elements are iterated from oldest to newest. *)
   val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
 
+  (** [find_opt q k] is [Some v] if [k] is bound to [v] in [q]. It is [None]
+      otherwise. *)
+  val find_opt : t -> K.t -> V.t option
+
   (** [length q] is the number of bindings held by [q]. *)
   val length : t -> int
 

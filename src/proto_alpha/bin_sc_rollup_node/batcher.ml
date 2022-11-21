@@ -28,7 +28,15 @@ open Alpha_context
 open Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
+module L2_batched_message = struct
+  type t = {content : string; l1_hash : L1_operation.hash}
+end
+
+module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
+
 module type S = sig
+  type status = Pending_batch | Batched of L1_operation.hash
+
   val init :
     Configuration.batcher ->
     signer:public_key_hash ->
@@ -48,16 +56,21 @@ module type S = sig
   val new_head : Layer1.head -> unit tzresult Lwt.t
 
   val shutdown : unit -> unit Lwt.t
+
+  val message_status : L2_message.hash -> (status * string) option tzresult
 end
 
 module Make (Simulation : Simulation.S) : S = struct
   module PVM = Simulation.PVM
+
+  type status = Pending_batch | Batched of L1_operation.hash
 
   type state = {
     node_ctxt : Node_context.ro;
     signer : Tezos_crypto.Signature.public_key_hash;
     conf : Configuration.batcher;
     messages : Message_queue.t;
+    batched : Batched_messages.t;
     mutable simulation_ctxt : Simulation.t option;
   }
 
@@ -65,10 +78,19 @@ module Make (Simulation : Simulation.S) : S = struct
     (* Encoded as length of s on 4 bytes + s *)
     4 + String.length s
 
-  let inject_batch state (messages : L2_message.t list) =
-    let messages = List.map L2_message.content messages in
+  let inject_batch state (l2_messages : L2_message.t list) =
+    let open Lwt_result_syntax in
+    let messages = List.map L2_message.content l2_messages in
     let operation = Sc_rollup_add_messages {messages} in
-    Injector.add_pending_operation ~source:state.signer operation
+    let+ l1_hash =
+      Injector.add_pending_operation ~source:state.signer operation
+    in
+    List.iter
+      (fun msg ->
+        let content = L2_message.content msg in
+        let hash = L2_message.hash msg in
+        Batched_messages.replace state.batched hash {content; l1_hash})
+      l2_messages
 
   let inject_batches state = List.iter_es (inject_batch state)
 
@@ -229,6 +251,7 @@ module Make (Simulation : Simulation.S) : S = struct
         signer;
         conf;
         messages = Message_queue.create 100_000 (* ~ 400MB *);
+        batched = Batched_messages.create 100_000 (* ~ 400MB *);
         simulation_ctxt = None;
       }
 
@@ -380,4 +403,18 @@ module Make (Simulation : Simulation.S) : S = struct
         (* There is no batcher, nothing to do *)
         Lwt.return_unit
     | Ok w -> Worker.shutdown w
+
+  let message_status state msg_hash =
+    match Message_queue.find_opt state.messages msg_hash with
+    | Some msg -> Some (Pending_batch, L2_message.content msg)
+    | None -> (
+        match Batched_messages.find_opt state.batched msg_hash with
+        | Some {content; l1_hash} -> Some (Batched l1_hash, content)
+        | None -> None)
+
+  let message_status msg_hash =
+    let open Result_syntax in
+    let+ w = Lazy.force worker in
+    let state = Worker.state w in
+    message_status state msg_hash
 end

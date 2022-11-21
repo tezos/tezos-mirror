@@ -81,6 +81,7 @@ type t = {
   dal_node_addr : string;
   dal_node_port : int;
   batcher : batcher;
+  injector_retention_period : int;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -134,6 +135,14 @@ val default_dal_node_port : int
 
 (** [default_batcher] is the default configuration parameters for the batcher. *)
 val default_batcher : batcher
+
+(** [default_injector_retention_period] is the default number of blocks the
+    injector will keep in memory. *)
+val default_injector_retention_period : int
+
+(** [max_injector_retention_period] is the maximum allowed value for
+    [injector_retention_period]. *)
+val max_injector_retention_period : int
 
 (** This is the list of available modes. *)
 val modes : mode list

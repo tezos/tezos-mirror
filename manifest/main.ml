@@ -4756,6 +4756,7 @@ module Protocol = Protocol
             plugin |> if_some |> open_;
             parameters |> if_some |> open_;
             octez_rpc;
+            injector |> if_some |> open_;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true

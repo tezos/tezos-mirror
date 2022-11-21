@@ -930,26 +930,48 @@ let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
     ~msg:(rex "Maximum number of messages reached for commitment period")
     sim_result
 
+let bake_levels ?hook n client =
+  fold n () @@ fun i () ->
+  let* () = match hook with None -> unit | Some hook -> hook i in
+  Client.bake_for_and_wait client
+
 (* Rollup node batcher *)
-let sc_rollup_node_batcher sc_rollup_node sc_rollup_client _sc_rollup node
-    client =
+let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
+    =
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   Log.info "Sending one message to the batcher" ;
   let msg1 = "3 3 + out" in
   let*! hashes = Sc_rollup_client.inject sc_rollup_client [msg1] in
   let msg1_hash = match hashes with [h] -> h | _ -> assert false in
-  let*! retrieved_msg1 =
+  let*! retrieved_msg1, status_msg1 =
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
   in
+  let check_status response status =
+    Check.((JSON.(response |-> "status" |> as_string) = status) string)
+      ~error_msg:"Status of message  is %L but expected %R."
+  in
+  check_status status_msg1 "pending_batch" ;
   Check.((retrieved_msg1 = msg1) string)
     ~error_msg:"Message in queue is %L but injected %R." ;
   let*! queue = Sc_rollup_client.batcher_queue sc_rollup_client in
   Check.((queue = [(msg1_hash, msg1)]) (list (tuple2 string string)))
     ~error_msg:"Queue is %L but should be %R." ;
   (* This block triggers injection in the injector. *)
+  let injected =
+    wait_for_injecting_event ~tags:["add_messages"] sc_rollup_node
+  in
   let* () = Client.bake_for_and_wait client in
+  let* _ = injected in
+  let*! _msg1, status_msg1 =
+    Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
+  in
+  check_status status_msg1 "injected" ;
   (* We bake so that msg1 is included. *)
   let* () = Client.bake_for_and_wait client in
+  let*! _msg1, status_msg1 =
+    Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
+  in
+  check_status status_msg1 "included" ;
   let* _ =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
@@ -1007,6 +1029,30 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client _sc_rollup node
   in
   Check.((incl_count = List.length hashes1 + List.length hashes2) int)
     ~error_msg:"Only %L messages are included instead of %R." ;
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_period_in_blocks client
+  in
+  let levels =
+    levels_to_commitment + init_level - Node.get_level node
+    + block_finality_time + 1
+  in
+  Log.info "Baking %d blocks for commitment of first message" levels ;
+  let* () = bake_levels levels client in
+  let* _ =
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      (Node.get_level node)
+  in
+  let*! _msg1, status_msg1 =
+    Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
+  in
+  check_status status_msg1 "committed" ;
   unit
 
 (* One can retrieve the list of originated SCORUs.
@@ -1254,11 +1300,6 @@ let test_rollup_node_advances_pvm_state ~kind ?boot_sector ~internal =
    reorganisations, only finalized block are processed when
    trying to publish a commitment.
 *)
-
-let bake_levels ?hook n client =
-  fold n () @@ fun i () ->
-  let* () = match hook with None -> unit | Some hook -> hook i in
-  Client.bake_for_and_wait client
 
 let eq_commitment_typ =
   Check.equalable

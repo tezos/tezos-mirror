@@ -42,6 +42,9 @@ type 'a t = {
       (** Addresses of the rollup node operators by purposes. *)
   genesis_info : Sc_rollup.Commitment.genesis_info;
       (** Origination information of the smart contract rollup. *)
+  injector_retention_period : int;
+      (** Number of blocks the injector will keep information about included
+          operations. *)
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)

@@ -69,15 +69,6 @@ module Make (Rollup : PARAMETERS) = struct
       (L1_operation.Hash)
       (L1_operation)
 
-  (** Information stored about an L1 operation that was injected on a Tezos
-      node. *)
-  type injected_info = {
-    op : L1_operation.t;  (** The L1 manager operation. *)
-    oph : Tezos_crypto.Operation_hash.t;
-        (** The hash of the operation which contains [op] (this can be an L1 batch of
-          several manager operations). *)
-  }
-
   module Injected_operations = Disk_persistence.Make_table (struct
     include L1_operation.Hash.Table
 
@@ -89,12 +80,7 @@ module Make (Rollup : PARAMETERS) = struct
 
     let key_of_string = L1_operation.Hash.of_b58check_opt
 
-    let value_encoding =
-      let open Data_encoding in
-      conv (fun {op; oph} -> (oph, op)) (fun (oph, op) -> {op; oph})
-      @@ merge_objs
-           (obj1 (req "oph" Tezos_crypto.Operation_hash.encoding))
-           L1_operation.encoding
+    let value_encoding = injected_info_encoding
   end)
 
   module Injected_ophs = Disk_persistence.Make_table (struct
@@ -122,18 +108,6 @@ module Make (Rollup : PARAMETERS) = struct
           operation). *)
   }
 
-  (** Information stored about an L1 operation that was included in a Tezos
-    block. *)
-  type included_info = {
-    op : L1_operation.t;  (** The L1 manager operation. *)
-    oph : Tezos_crypto.Operation_hash.t;
-        (** The hash of the operation which contains [op] (this can be an L1 batch of
-          several manager operations). *)
-    l1_block : Tezos_crypto.Block_hash.t;
-        (** The hash of the L1 block in which the operation was included. *)
-    l1_level : int32;  (** The level of [l1_block]. *)
-  }
-
   module Included_operations = Disk_persistence.Make_table (struct
     include L1_operation.Hash.Table
 
@@ -145,17 +119,7 @@ module Make (Rollup : PARAMETERS) = struct
 
     let key_of_string = L1_operation.Hash.of_b58check_opt
 
-    let value_encoding =
-      let open Data_encoding in
-      conv
-        (fun {op; oph; l1_block; l1_level} -> (op, (oph, l1_block, l1_level)))
-        (fun (op, (oph, l1_block, l1_level)) -> {op; oph; l1_block; l1_level})
-      @@ merge_objs
-           L1_operation.encoding
-           (obj3
-              (req "oph" Tezos_crypto.Operation_hash.encoding)
-              (req "l1_block" Tezos_crypto.Block_hash.encoding)
-              (req "l1_level" int32))
+    let value_encoding = included_info_encoding
   end)
 
   module Included_in_blocks = Disk_persistence.Make_table (struct
@@ -203,6 +167,9 @@ module Make (Rollup : PARAMETERS) = struct
           anymore. *)
     rollup_node_state : Rollup.rollup_node_state;
         (** The state of the rollup node. *)
+    retention_period : int;
+        (** Number of blocks for which the injector keeps the included
+            information. *)
   }
 
   module Event = struct
@@ -215,8 +182,8 @@ module Make (Rollup : PARAMETERS) = struct
     let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
-  let init_injector cctxt constants ~data_dir rollup_node_state ~signer strategy
-      tags =
+  let init_injector cctxt constants ~data_dir rollup_node_state
+      ~retention_period ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
@@ -265,7 +232,7 @@ module Make (Rollup : PARAMETERS) = struct
     let* included_operations =
       Included_operations.load_from_disk
         ~warn_unreadable
-        ~initial_size:(confirmations * n)
+        ~initial_size:((confirmations + retention_period) * n)
         ~data_dir
         ~filter:(filter (fun (i : included_info) -> i.op))
     in
@@ -286,7 +253,7 @@ module Make (Rollup : PARAMETERS) = struct
     let* included_in_blocks =
       Included_in_blocks.load_from_disk
         ~warn_unreadable
-        ~initial_size:(confirmations * n)
+        ~initial_size:((confirmations + retention_period) * n)
         ~data_dir
         ~filter:(fun (_, ops) ->
           List.exists (Included_operations.mem included_operations) ops)
@@ -308,6 +275,7 @@ module Make (Rollup : PARAMETERS) = struct
         injected = {injected_operations; injected_ophs};
         included = {included_operations; included_in_blocks};
         rollup_node_state;
+        retention_period;
       }
 
   (** Add an operation to the pending queue corresponding to the signer for this
@@ -389,10 +357,11 @@ module Make (Rollup : PARAMETERS) = struct
         in
         List.rev removed
 
-  (** [remove state block] removes the included operations that correspond to all
-    the L1 batches included in [block]. This function is used when [block] is on
-    an alternative chain in the case of a reorganization. *)
-  let remove_included_operation state block =
+  (** [forget_block state block] removes the included operations that correspond
+      to all the L1 batches included in [block]. This function is used,
+      e.g. when [block] is on an alternative chain in the case of a
+      reorganization. *)
+  let forget_block state block =
     let open Lwt_result_syntax in
     match Included_in_blocks.find state.included.included_in_blocks block with
     | None ->
@@ -863,11 +832,11 @@ module Make (Rollup : PARAMETERS) = struct
     chain. The operations are put back in the pending queue. *)
   let revert_included_operations state block =
     let open Lwt_result_syntax in
-    let* included_infos = remove_included_operation state block in
+    let* revert_infos = forget_block state block in
     let*! () =
       Event.(emit1 revert_operations)
         state
-        (List.map (fun o -> o.op.hash) included_infos)
+        (List.map (fun o -> o.op.hash) revert_infos)
     in
     (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2814
        maybe put at the front of the queue for re-injection. *)
@@ -883,7 +852,7 @@ module Make (Rollup : PARAMETERS) = struct
         match requeue with
         | Retry -> add_pending_operation ~retry:true state op
         | _ -> return_unit)
-      included_infos
+      revert_infos
 
   (** [register_confirmed_level state confirmed_level] is called when the level
     [confirmed_level] is known as confirmed. In this case, the operations of
@@ -898,14 +867,11 @@ module Make (Rollup : PARAMETERS) = struct
     in
     Included_in_blocks.iter_es
       (fun block (level, _operations) ->
-        if level <= confirmed_level then
-          let* confirmed_ops = remove_included_operation state block in
-          let*! () =
-            Event.(emit2 confirmed_operations)
-              state
-              level
-              (List.map (fun o -> o.op.hash) confirmed_ops)
-          in
+        if
+          level
+          <= Int32.sub confirmed_level (Int32.of_int state.retention_period)
+        then
+          let* _removed_ops = forget_block state block in
           return_unit
         else return_unit)
       state.included.included_in_blocks
@@ -954,6 +920,7 @@ module Make (Rollup : PARAMETERS) = struct
       constants : Constants.t;
       data_dir : string;
       rollup_node_state : Rollup.rollup_node_state;
+      retention_period : int;
       strategy : injection_strategy;
       tags : Tags.t;
     }
@@ -991,13 +958,23 @@ module Make (Rollup : PARAMETERS) = struct
     type launch_error = error trace
 
     let on_launch _w signer
-        Types.{cctxt; constants; data_dir; rollup_node_state; strategy; tags} =
+        Types.
+          {
+            cctxt;
+            constants;
+            data_dir;
+            rollup_node_state;
+            retention_period;
+            strategy;
+            tags;
+          } =
       trace (Step_failed "initialization")
       @@ init_injector
            cctxt
            constants
            ~data_dir
            rollup_node_state
+           ~retention_period
            ~signer
            strategy
            tags
@@ -1035,9 +1012,10 @@ module Make (Rollup : PARAMETERS) = struct
 
   (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
-  let init (cctxt : #Protocol_client_context.full) ~data_dir rollup_node_state
-      ~signers =
+  let init (cctxt : #Protocol_client_context.full) ~data_dir
+      ?(retention_period = 0) rollup_node_state ~signers =
     let open Lwt_result_syntax in
+    assert (retention_period >= 0) ;
     let signers_map =
       List.fold_left
         (fun acc (signer, strategy, tags) ->
@@ -1080,6 +1058,7 @@ module Make (Rollup : PARAMETERS) = struct
               constants;
               data_dir;
               rollup_node_state;
+              retention_period;
               strategy;
               tags;
             }
@@ -1120,7 +1099,7 @@ module Make (Rollup : PARAMETERS) = struct
     let*! (_pushed : bool) =
       Worker.Queue.push_request w (Request.Add_pending l1_operation)
     in
-    return_unit
+    return l1_operation.hash
 
   let new_tezos_head h reorg =
     let open Lwt_syntax in
@@ -1213,4 +1192,27 @@ module Make (Rollup : PARAMETERS) = struct
   let shutdown () =
     let workers = Worker.list table in
     List.iter_p (fun (_signer, w) -> Worker.shutdown w) workers
+
+  let op_status_in_worker state l1_hash =
+    match Op_queue.find_opt state.queue l1_hash with
+    | Some op -> Some (Pending op)
+    | None -> (
+        match
+          Injected_operations.find state.injected.injected_operations l1_hash
+        with
+        | Some info -> Some (Injected info)
+        | None -> (
+            match
+              Included_operations.find
+                state.included.included_operations
+                l1_hash
+            with
+            | Some info -> Some (Included info)
+            | None -> None))
+
+  let operation_status l1_hash =
+    let workers = Worker.list table in
+    List.find_map
+      (fun (_signer, w) -> op_status_in_worker (Worker.state w) l1_hash)
+      workers
 end

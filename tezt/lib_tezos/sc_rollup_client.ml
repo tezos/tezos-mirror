@@ -301,7 +301,7 @@ let get_batcher_msg ?hooks sc_client msg_hash =
   |> Runnable.map @@ fun obj ->
      if JSON.is_null obj then failwith "Message is not in the queue" ;
      let hex_msg = JSON.(obj |> get "content" |> as_string) in
-     Hex.to_string (`Hex hex_msg)
+     (Hex.to_string (`Hex hex_msg), obj)
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command

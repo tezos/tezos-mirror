@@ -518,17 +518,23 @@ let queue_gc_operations state =
     match state.State.signers.finalize_commitment with
     | None -> return_unit
     | Some source ->
-        Injector.add_pending_operation
-          ~source
-          (Tx_rollup_finalize_commitment {tx_rollup})
+        let* _hash =
+          Injector.add_pending_operation
+            ~source
+            (Tx_rollup_finalize_commitment {tx_rollup})
+        in
+        return_unit
   in
   let queue_remove_commitment state =
     match state.State.signers.remove_commitment with
     | None -> return_unit
     | Some source ->
-        Injector.add_pending_operation
-          ~source
-          (Tx_rollup_remove_commitment {tx_rollup})
+        let* _hash =
+          Injector.add_pending_operation
+            ~source
+            (Tx_rollup_remove_commitment {tx_rollup})
+        in
+        return_unit
   in
   let* () = queue_finalize_commitment state in
   queue_remove_commitment state

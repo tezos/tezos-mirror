@@ -197,6 +197,28 @@ let filename_arg =
     ~default:"import.in"
     Client_proto_args.string_parameter
 
+let injector_retention_period_arg =
+  let default =
+    Configuration.default_injector_retention_period |> string_of_int
+  in
+  Tezos_clic.default_arg
+    ~long:"injector-retention-period"
+    ~placeholder:"blocks"
+    ~doc:
+      (Format.sprintf
+         "The number of blocks the injector keeps in memory. Decrease to free \
+          memory, and increase to be able to query information about included \
+          messages for longer. Default value is %s"
+         default)
+    ~default
+  @@ Tezos_clic.map_parameter Client_proto_args.int_parameter ~f:(fun p ->
+         if p > Configuration.max_injector_retention_period then
+           Format.ksprintf
+             Stdlib.failwith
+             "injector-retention-period should be smaller than %d"
+             Configuration.max_injector_retention_period ;
+         p)
+
 let pvm_name_arg =
   Tezos_clic.default_arg
     ~long:"pvm-name"
@@ -223,14 +245,15 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
-    (args7
+    (args8
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
        loser_mode
        reconnection_delay_arg
        dal_node_addr_arg
-       dal_node_port_arg)
+       dal_node_port_arg
+       injector_retention_period_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -242,7 +265,8 @@ let config_init_command =
            loser_mode,
            reconnection_delay,
            dal_node_addr,
-           dal_node_port )
+           dal_node_port,
+           injector_retention_period )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -283,6 +307,7 @@ let config_init_command =
           mode;
           loser_mode;
           batcher = Configuration.default_batcher;
+          injector_retention_period;
         }
       in
       let*? config = check_mode config in

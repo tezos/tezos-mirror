@@ -56,7 +56,10 @@ let inject_batches state batches =
             burn_limit = state.batch_burn_limit;
           }
       in
-      Injector.add_pending_operation ~source:state.signer batch_operation)
+      let* _hash =
+        Injector.add_pending_operation ~source:state.signer batch_operation
+      in
+      return_unit)
     batches
 
 (** [is_batch_valid] returns whether the batch is valid or not based on two

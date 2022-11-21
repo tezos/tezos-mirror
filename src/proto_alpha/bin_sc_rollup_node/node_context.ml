@@ -34,6 +34,7 @@ type 'a t = {
   rollup_address : Sc_rollup.t;
   operators : Configuration.operators;
   genesis_info : Sc_rollup.Commitment.genesis_info;
+  injector_retention_period : int;
   block_finality_time : int;
   kind : Sc_rollup.Kind.t;
   fee_parameters : Configuration.fee_parameters;
@@ -81,6 +82,7 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
     operators;
     genesis_info = l1_ctxt.Layer1.genesis_info;
     kind;
+    injector_retention_period = 0;
     block_finality_time = 2;
     fee_parameters;
     protocol_constants;

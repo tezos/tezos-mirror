@@ -78,10 +78,12 @@ module Make (Interpreter : Interpreter.S) :
       game. *)
   let inject_next_move (node_ctxt : _ Node_context.t) source ~refutation
       ~opponent =
+    let open Lwt_result_syntax in
     let refute_operation =
       Sc_rollup_refute {rollup = node_ctxt.rollup_address; refutation; opponent}
     in
-    Injector.add_pending_operation ~source refute_operation
+    let* _hash = Injector.add_pending_operation ~source refute_operation in
+    return_unit
 
   (** This function computes the inclusion/membership proof of the page
       identified by [page_id] in the slot whose data are provided in
@@ -377,6 +379,7 @@ module Make (Interpreter : Interpreter.S) :
     inject_next_move node_ctxt self ~refutation:(Some refutation) ~opponent
 
   let play_timeout (node_ctxt : _ Node_context.t) self stakers =
+    let open Lwt_result_syntax in
     let timeout_operation =
       Sc_rollup_timeout {rollup = node_ctxt.rollup_address; stakers}
     in
@@ -384,7 +387,8 @@ module Make (Interpreter : Interpreter.S) :
       Node_context.get_operator node_ctxt Timeout |> Option.value ~default:self
       (* We fallback on the [Refute] operator if none is provided for [Timeout] *)
     in
-    Injector.add_pending_operation ~source timeout_operation
+    let* _hash = Injector.add_pending_operation ~source timeout_operation in
+    return_unit
 
   let timeout_reached ~self head_block node_ctxt players =
     let open Lwt_result_syntax in
