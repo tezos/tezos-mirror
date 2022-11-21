@@ -26,8 +26,8 @@
 open Error_monad
 include Cryptobox_intf
 module Base58 = Tezos_crypto.Base58
-module Srs_g1 = Bls12_381_polynomial.Polynomial.Srs_g1
-module Srs_g2 = Bls12_381_polynomial.Polynomial.Srs_g2
+module Srs_g1 = Bls12_381_polynomial.Srs.Srs_g1
+module Srs_g2 = Bls12_381_polynomial.Srs.Srs_g2
 
 type error += Failed_to_load_trusted_setup of string
 
@@ -111,14 +111,13 @@ type srs = {
 module Inner = struct
   (* Scalars are elements of the prime field Fr from BLS. *)
   module Scalar = Bls12_381.Fr
-  module Polynomial = Bls12_381_polynomial.Polynomial
+  module Polynomials = Bls12_381_polynomial.Polynomial
 
   (* Operations on vector of scalars *)
-  module Evaluations = Polynomial.Evaluations
+  module Evaluations = Bls12_381_polynomial.Evaluations
 
   (* Domains for the Fast Fourier Transform (FTT). *)
-  module Domains = Polynomial.Domain
-  module Polynomials = Polynomial.Polynomial
+  module Domains = Bls12_381_polynomial.Domain
   module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
 
   type slot = bytes
@@ -283,7 +282,7 @@ module Inner = struct
   let scalar_bytes_amount = Scalar.size_in_bytes - 1
 
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
-  let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
+  let make_domain n = Domains.build_power_of_two Z.(log2up (of_int n))
 
   type t = {
     redundancy_factor : int;
@@ -488,7 +487,9 @@ module Inner = struct
   (* The pages are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_to_bytes t p =
-    let eval = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
+    let eval =
+      Evaluations.evaluation_fft t.domain_k p |> Evaluations.to_array
+    in
     let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
     for page = 0 to t.pages_per_slot - 1 do
@@ -496,7 +497,8 @@ module Inner = struct
     done ;
     slot
 
-  let encode t p = Evaluations.(evaluation_fft t.domain_n p |> to_array)
+  let encode t p =
+    Evaluations.evaluation_fft t.domain_n p |> Evaluations.to_array
 
   (* The shards are arranged in cosets to evaluate in batch with Kate
      amortized. *)
@@ -700,7 +702,7 @@ module Inner = struct
       let log_inf = Z.log2 (Z.of_int ratio) in
       if 1 lsl log_inf < ratio then log_inf else log_inf + 1
     in
-    let domain = Domains.build ~log:k |> Domains.inverse |> inverse in
+    let domain = Domains.build_power_of_two k |> Domains.inverse |> inverse in
     let precompute_srsj j =
       let quotient = (degree - j) / l in
       let padding = diff_next_power_of_two (2 * quotient) in
@@ -767,7 +769,7 @@ module Inner = struct
     G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
     let hl = Array.sub sum 0 (Array.length domain2m / 2) in
 
-    let phidomain = Domains.build ~log:chunk_count in
+    let phidomain = Domains.build_power_of_two chunk_count in
     let phidomain = inverse (Domains.inverse phidomain) in
     (* Kate amortized FFT *)
     G1.fft ~domain:phidomain ~points:hl
@@ -833,8 +835,8 @@ module Inner = struct
       (Polynomials.to_dense_coefficients p)
 
   let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
-    let d_n = Domains.build ~log:t.evaluations_log in
-    let domain = Domains.build ~log:t.evaluations_per_proof_log in
+    let d_n = Domains.build_power_of_two t.evaluations_log in
+    let domain = Domains.build_power_of_two t.evaluations_per_proof_log in
     verify
       t
       cm
@@ -882,7 +884,9 @@ module Inner = struct
       if expected_page_length <> got_page_length then
         Error `Page_length_mismatch
       else
-        let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
+        let domain =
+          Domains.build_power_of_two Z.(log2up (of_int t.page_length))
+        in
         let slot_page_evaluations =
           Array.init
             (1 lsl Z.(log2up (of_int t.page_length)))
