@@ -635,71 +635,16 @@ result of ``COMPARE`` is ``0`` if the top two elements of the stack are
 equal, negative if the first element in the stack is less than the
 second, and positive otherwise.
 
--  ``EQ``: Checks that the top element of the stack is equal to zero.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > EQ / 0 : S  =>  True : S
-    > EQ / v : S  =>  False : S
-        iff v <> 0
-
--  ``NEQ``: Checks that the top element of the stack is not equal to zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > NEQ / 0 : S  =>  False : S
-    > NEQ / v : S  =>  True : S
-        iff v <> 0
-
--  ``LT``: Checks that the top element of the stack is less than zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > LT / v : S  =>  True : S
-        iff  v < 0
-    > LT / v : S  =>  False : S
-        iff v >= 0
-
--  ``GT``: Checks that the top element of the stack is greater than zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > GT / v : S  =>  C / True : S
-        iff  v > 0
-    > GT / v : S  =>  C / False : S
-        iff v <= 0
-
+-  ``EQ``: Checks that the top element of the stack is equal to zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EQ>`__).
+-  ``NEQ``: Checks that the top element of the stack is not equal to zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEQ>`__).
+-  ``LT``: Checks that the top element of the stack is less than zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LT>`__).
+-  ``GT``: Checks that the top element of the stack is greater than zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GT>`__).
 -  ``LE``: Checks that the top element of the stack is less than or equal to
-   zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > LE / v : S  =>  True : S
-        iff  v <= 0
-    > LE / v : S  =>  False : S
-        iff v > 0
-
+   zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LE>`__).
 -  ``GE``: Checks that the top of the stack is greater than or equal to
-   zero.
-
-::
-
-    :: int : 'S   ->   bool : 'S
-
-    > GE / v : S  =>  True : S
-        iff  v >= 0
-    > GE / v : S  =>  False : S
-        iff v < 0
+   zero (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-GE>`__).
 
 Operations
 ----------
