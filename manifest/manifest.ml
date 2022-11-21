@@ -801,6 +801,7 @@ module Ctypes = struct
     function_description : description;
     generated_types : string;
     generated_entry_point : string;
+    c_flags : string list;
     c_library_flags : string list;
   }
 
@@ -813,12 +814,14 @@ module Ctypes = struct
           S "build_flags_resolver";
           [
             S "vendored";
-            [
-              S "c_flags";
-              S ":standard";
-              S "-Wno-discarded-qualifiers";
-              S ("-I" ^ desc.extra_search_dir);
-            ];
+            of_atom_list
+              ([
+                 "c_flags";
+                 ":standard";
+                 "-Wno-discarded-qualifiers";
+                 "-I" ^ desc.extra_search_dir;
+               ]
+              @ desc.c_flags);
             of_atom_list
               (["c_library_flags"; ":standard"]
               @ desc.c_library_flags
