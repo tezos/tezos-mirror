@@ -275,9 +275,14 @@ module Make (Interpreter : Interpreter.S) :
       return (Option.map snd r)
     in
     let start_hash, start_tick = ok in
-    let start_chunk = {state_hash = Some start_hash; tick = start_tick} in
+    let start_chunk =
+      Sc_rollup.Dissection_chunk.
+        {state_hash = Some start_hash; tick = start_tick}
+    in
     let start_hash, start_tick = our_view in
-    let our_stop_chunk = {state_hash = start_hash; tick = start_tick} in
+    let our_stop_chunk =
+      Sc_rollup.Dissection_chunk.{state_hash = start_hash; tick = start_tick}
+    in
     Game_helpers.new_dissection
       ~start_chunk
       ~our_stop_chunk
@@ -300,7 +305,8 @@ module Make (Interpreter : Interpreter.S) :
           tzfail
             Sc_rollup_node_errors
             .Unreliable_tezos_node_returning_inconsistent_game
-      | {state_hash = their_hash; tick} :: dissection -> (
+      | Sc_rollup.Dissection_chunk.{state_hash = their_hash; tick} :: dissection
+        -> (
           let open Lwt_result_syntax in
           let* our =
             Interpreter.state_of_tick node_ctxt tick game.inbox_level
@@ -318,7 +324,7 @@ module Make (Interpreter : Interpreter.S) :
               else return (ok, (Some our_hash, tick)))
     in
     match dissection with
-    | {state_hash = Some hash; tick} :: dissection ->
+    | Sc_rollup.Dissection_chunk.{state_hash = Some hash; tick} :: dissection ->
         let* ok, ko = traverse (hash, tick) dissection in
         let choice = snd ok in
         let* dissection =

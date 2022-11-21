@@ -37,6 +37,7 @@ open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 module T = Test_sc_rollup_storage
 module R = Sc_rollup_refutation_storage
+module D = Sc_rollup_dissection_chunk_repr
 module G = Sc_rollup_game_repr
 module Tick = Sc_rollup_tick_repr
 
@@ -56,7 +57,7 @@ let hash_string s =
 
 let hash_int n = hash_string (Format.sprintf "%d" n)
 
-let mk_dissection_chunk (state_hash, tick) = G.{state_hash; tick}
+let mk_dissection_chunk (state_hash, tick) = D.{state_hash; tick}
 
 let init_dissection ~size ?init_tick start_hash =
   let default_init_tick i =
@@ -156,7 +157,7 @@ let test_poorly_distributed_dissection () =
   assert_fails_with
     ~__LOC__
     (T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move)
-    Sc_rollup_game_repr.Dissection_invalid_distribution
+    D.Dissection_invalid_distribution
 
 let test_single_valid_game_move () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in

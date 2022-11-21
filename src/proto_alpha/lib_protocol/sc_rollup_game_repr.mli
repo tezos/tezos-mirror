@@ -126,38 +126,6 @@ type error +=
   | Dissection_choice_not_found of Sc_rollup_tick_repr.t
         (** The given choice in a refutation is not a starting tick of any of
           the sections in the current dissection. *)
-  | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
-        (** There are more or less than the expected number of sections in the
-          given dissection. *)
-  | Dissection_invalid_number_of_sections of Z.t
-        (** There are less than two sections in the given dissection, which is
-          not valid. *)
-  | Dissection_start_hash_mismatch of {
-      expected : Sc_rollup_repr.State_hash.t option;
-      given : Sc_rollup_repr.State_hash.t option;
-    }
-        (** The given start hash in a dissection is [None] or doesn't match the
-          expected one.*)
-  | Dissection_stop_hash_mismatch of Sc_rollup_repr.State_hash.t option
-        (** The given stop state hash in a dissection should not match the last
-          hash of the section being refuted. *)
-  | Dissection_edge_ticks_mismatch of {
-      dissection_start_tick : Sc_rollup_tick_repr.t;
-      dissection_stop_tick : Sc_rollup_tick_repr.t;
-      chunk_start_tick : Sc_rollup_tick_repr.t;
-      chunk_stop_tick : Sc_rollup_tick_repr.t;
-    }
-        (** The given dissection's edge ticks don't match the edge ticks of the
-          section being refuted. *)
-  | Dissection_ticks_not_increasing
-        (** Invalid provided dissection because ticks are not increasing between
-          two successive sections. *)
-  | Dissection_invalid_distribution
-        (** Invalid provided dissection because ticks split is not well balanced
-          across sections *)
-  | Dissection_invalid_successive_states_shape
-        (** A dissection cannot have a section with no state hash after another
-          section with some state hash. *)
   | Proof_unexpected_section_size of Z.t
         (** Invalid proof step because there is more than one tick. *)
   | Proof_start_state_hash_mismatch of {
@@ -187,16 +155,7 @@ type error +=
 type player = Alice | Bob
 
 module V1 : sig
-  (** A dissection chunk is made of a state hash (that could be [None], see
-    invariants below), and a tick count. *)
-  type dissection_chunk = {
-    state_hash : State_hash.t option;
-    tick : Sc_rollup_tick_repr.t;
-  }
-
-  val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
-
-  val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+  type dissection_chunk = Sc_rollup_dissection_chunk_repr.t
 
   (** Describes the current state of a game. *)
   type game_state =
@@ -461,23 +420,7 @@ module Internal_for_tests : sig
     Sc_rollup_tick_repr.t ->
     (dissection_chunk * dissection_chunk) tzresult
 
-  (** We check firstly that [dissection] is the correct length. It must be
-    [default_number_of_sections] values long, unless the distance between
-    [start_tick] and [stop_tick] is too small to make this possible, in which
-    case it should be as long as possible. (If the distance is one we fail
-    immediately as there is no possible legal dissection).
-
-    Then we check that [dissection] starts at the correct tick and state,
-    and that it ends at the correct tick and with a different state to
-    the current dissection.
-
-    Finally, we check that [dissection] is well formed: it has correctly
-    ordered the ticks, and it begins with a real hash of the form [Some
-    s] not a [None] state. Note that we have to allow the possibility of
-    multiple [None] states because the restrictions on dissection shape
-    (which are necessary to prevent a 'linear-time game' attack) will
-    mean that sometimes the honest play is a dissection with multiple
-    [None] states. *)
+  (** See {!Sc_rollup_dissection_chunk_repr.default_check} *)
   val check_dissection :
     default_number_of_sections:int ->
     start_chunk:dissection_chunk ->

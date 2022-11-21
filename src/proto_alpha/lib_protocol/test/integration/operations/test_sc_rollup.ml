@@ -1641,7 +1641,7 @@ let test_timeout () =
       Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
     in
     let first_chunk =
-      Sc_rollup.Game.{state_hash = Some compressed_state; tick}
+      Sc_rollup.Dissection_chunk.{state_hash = Some compressed_state; tick}
     in
     let* rest =
       List.init_es ~when_negative_length:[] 4 (fun i ->
@@ -1651,7 +1651,7 @@ let test_timeout () =
               ~loc:__LOC__
               (Sc_rollup.Tick.of_int (i + 1))
           in
-          return Sc_rollup.Game.{state_hash; tick})
+          return Sc_rollup.Dissection_chunk.{state_hash; tick})
     in
     let step = Sc_rollup.Game.Dissection (first_chunk :: rest) in
     let move = Sc_rollup.Game.{choice = tick; step} in

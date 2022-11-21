@@ -79,7 +79,7 @@ let game_status_of_refute_op_result = function
 
 let list_assoc (key : Tick.t) list = List.assoc ~equal:( = ) key list
 
-let print_dissection_chunk = Format.asprintf "%a" Game.pp_dissection_chunk
+let print_dissection_chunk = Format.asprintf "%a" Dissection_chunk.pp
 
 let print_dissection = Format.asprintf "%a" Game.pp_dissection
 
@@ -138,13 +138,13 @@ let valid_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     It uses [our_states], an assoc list between tick and state hashes to
     compare opponent's claims against our point of view. *)
 let disputed_sections ~our_states dissection =
-  let open Game in
   let agree_on_state tick their_state =
     let our_state = list_assoc tick our_states in
     Option.equal State_hash.equal our_state their_state
   in
   let rec traverse acc = function
-    | ({state_hash = their_start_state; tick = start_tick} as a)
+    | Dissection_chunk.(
+        {state_hash = their_start_state; tick = start_tick} as a)
       :: ({state_hash = their_stop_state; tick = stop_tick} as b)
       :: dissection ->
         let rst = b :: dissection in
@@ -166,7 +166,9 @@ let pick_disputed_sections disputed_sections =
 let single_tick_disputed_sections disputed_sections =
   List.filter_map
     (fun disputed_section ->
-      let Game.({tick = a_tick; _}, {tick = b_tick; _}) = disputed_section in
+      let Dissection_chunk.({tick = a_tick; _}, {tick = b_tick; _}) =
+        disputed_section
+      in
       let distance = Tick.distance a_tick b_tick in
       if Z.Compare.(distance = Z.one) then Some disputed_section else None)
     disputed_sections
@@ -184,7 +186,8 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
   let open Lwt_result_syntax in
   let state_hash_from_tick tick = return @@ list_assoc tick our_states in
   let our_stop_chunk =
-    Game.{stop_chunk with state_hash = list_assoc stop_chunk.tick our_states}
+    Dissection_chunk.
+      {stop_chunk with state_hash = list_assoc stop_chunk.tick our_states}
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3491
 
@@ -345,16 +348,16 @@ module Dissection = struct
     if Z.Compare.(ticks = Z.zero) then
       pure
         [
-          Game.{state_hash = Some child_state; tick = initial_tick};
-          Game.{state_hash = None; tick = Tick.next initial_tick};
+          Dissection_chunk.{state_hash = Some child_state; tick = initial_tick};
+          Dissection_chunk.{state_hash = None; tick = Tick.next initial_tick};
         ]
     else
       let tick = Tick.jump initial_tick ticks in
       pure
         [
-          Game.{state_hash = Some parent_state; tick = initial_tick};
-          Game.{state_hash = Some child_state; tick};
-          Game.{state_hash = None; tick = Tick.next tick};
+          Dissection_chunk.{state_hash = Some parent_state; tick = initial_tick};
+          Dissection_chunk.{state_hash = Some child_state; tick};
+          Dissection_chunk.{state_hash = None; tick = Tick.next tick};
         ]
 
   (** Generate a *valid* dissection.
@@ -382,7 +385,8 @@ module Dissection = struct
       you disagree with some sections. *)
   let gen_our_states start_chunk ticks =
     let open QCheck2.Gen in
-    let Game.{tick = initial_tick; state_hash = initial_state_hash} =
+    let Dissection_chunk.{tick = initial_tick; state_hash = initial_state_hash}
+        =
       start_chunk
     in
     let initial_state_hash =
@@ -474,7 +478,7 @@ module Dissection = struct
     in
     let expected_len = Z.of_int expected_number_of_sections in
     let expected_reason =
-      Game.Dissection_number_of_sections_mismatch
+      Dissection_chunk.Dissection_number_of_sections_mismatch
         {expected = expected_len; given = Z.pred expected_len}
     in
     assert_fails_with
@@ -581,7 +585,8 @@ module Dissection = struct
         (* Check that we can not change the start hash. *)
         let dissection_with_different_start =
           modify_start
-            (fun chunk -> Game.{chunk with state_hash = Some new_state_hash})
+            (fun chunk ->
+              Dissection_chunk.{chunk with state_hash = Some new_state_hash})
             dissection
         in
         assert_fails_with
@@ -591,7 +596,7 @@ module Dissection = struct
              ~start_chunk
              ~stop_chunk
              dissection_with_different_start)
-          (Game.Dissection_start_hash_mismatch
+          (Dissection_chunk.Dissection_start_hash_mismatch
              {expected = start_chunk.state_hash; given = Some new_state_hash}))
 
   (** Test that we can not produce a dissection that agrees with the stop hash.
@@ -618,10 +623,13 @@ module Dissection = struct
         let check_failure_on_same_stop_hash stop_hash =
           let invalid_dissection =
             modify_stop
-              (fun chunk -> Game.{chunk with state_hash = stop_hash})
+              (fun chunk ->
+                Dissection_chunk.{chunk with state_hash = stop_hash})
               dissection
           in
-          let stop_chunk = Game.{stop_chunk with state_hash = stop_hash} in
+          let stop_chunk =
+            Dissection_chunk.{stop_chunk with state_hash = stop_hash}
+          in
           assert_fails_with
             ~__LOC__
             (Game.Internal_for_tests.check_dissection
@@ -629,7 +637,7 @@ module Dissection = struct
                ~start_chunk
                ~stop_chunk
                invalid_dissection)
-            (Game.Dissection_stop_hash_mismatch stop_hash)
+            (Dissection_chunk.Dissection_stop_hash_mismatch stop_hash)
         in
         let* b1 = check_failure_on_same_stop_hash None in
         let* b2 = check_failure_on_same_stop_hash stop_chunk.state_hash in
@@ -659,8 +667,8 @@ module Dissection = struct
         let open Lwt_syntax in
         let expected_error dissection =
           match (List.hd dissection, List.last_opt dissection) with
-          | Some Game.{tick = a_tick; _}, Some {tick = b_tick; _} ->
-              Game.Dissection_edge_ticks_mismatch
+          | Some Dissection_chunk.{tick = a_tick; _}, Some {tick = b_tick; _} ->
+              Dissection_chunk.Dissection_edge_ticks_mismatch
                 {
                   dissection_start_tick = a_tick;
                   dissection_stop_tick = b_tick;
@@ -672,7 +680,8 @@ module Dissection = struct
         let modify_tick modify_X dissection =
           let invalid_dissection =
             modify_X
-              (fun chunk -> Game.{chunk with tick = Tick.next chunk.tick})
+              (fun chunk ->
+                Dissection_chunk.{chunk with tick = Tick.next chunk.tick})
               dissection
           in
           let expected_error = expected_error invalid_dissection in
@@ -747,10 +756,10 @@ module Dissection = struct
               let b, tick =
                 if k = 0 then
                   let tick = Tick.jump tick max_section_length in
-                  (Game.{b with tick}, tick)
+                  (Dissection_chunk.{b with tick}, tick)
                 else
                   let tick = Tick.jump tick section_length in
-                  (Game.{b with tick}, tick)
+                  (Dissection_chunk.{b with tick}, tick)
               in
               a :: replace_distances tick (k - 1) (b :: xs)
           | xs -> xs
@@ -765,7 +774,7 @@ module Dissection = struct
              ~start_chunk
              ~stop_chunk
              invalid_dissection)
-          Game.Dissection_invalid_distribution)
+          Dissection_chunk.Dissection_invalid_distribution)
 
   let tests =
     ( "Dissection",
