@@ -611,11 +611,9 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n =
   let max_index =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index head_cell
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
-     We could check that index = snapshot_max_index + 1 *)
-  if Compare.Z.(n > max_index) then
-    (* [n] is superior to the index of [head_cell] then the provided [payload]
-       must be empty (,and [payload_cell = head_cell]) *)
+  if Compare.Z.(n = Z.succ max_index) then
+    (* [n] is equal to the index of [head_cell] then the provided [payload] must
+       be empty (,and [payload_cell = head_cell]) *)
     let* () =
       error_unless
         (Option.is_none payload)
@@ -629,7 +627,7 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n =
         (Inbox_proof_error "Provided proof is about a unexpected payload")
     in
     return_none
-  else
+  else if Compare.Z.(n <= max_index) then
     (* [0 < n < max_index head_cell] then the provided [payload] must exists and
        [payload_hash] must equal the content of the [payload_cell]. *)
     let* payload =
@@ -666,6 +664,11 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n =
            (Format.sprintf "found index in message_proof is incorrect"))
     in
     return_some payload
+  else
+    tzfail
+      (Inbox_proof_error
+         "Provided message counter is out of the valid range [0 -- (max_index \
+          + 1)] ")
 
 (** [produce_level_tree_proof get_level_tree_history head_cell_hash ~index]
 
@@ -770,9 +773,6 @@ let verify_proof (l, n) inbox_snapshot {inclusion_proof; message_proof} =
   | None ->
       if equal_history_proof inbox_snapshot history_proof then return_none
       else
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
-           We could prove that the last message to read is SOL, and is
-           before [n]. *)
         let* payload =
           Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
         in
