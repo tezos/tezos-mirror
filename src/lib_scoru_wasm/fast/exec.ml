@@ -28,8 +28,7 @@ module Wasmer = Tezos_wasmer
 module Lazy_containers = Tezos_lazy_containers
 
 let store =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4121
-     Making this global is potentially not a great idea. Maybe lazy? *)
+  Lazy.from_fun @@ fun () ->
   let engine = Wasmer.Engine.create Wasmer.Config.{compiler = SINGLEPASS} in
   Wasmer.Store.create engine
 
@@ -37,6 +36,7 @@ let load_kernel durable =
   let open Lwt.Syntax in
   let* kernel = Durable.find_value_exn durable Constants.kernel_key in
   let+ kernel = Lazy_containers.Chunked_byte_vector.to_string kernel in
+  let store = Lazy.force store in
   Wasmer.Module.(create store Binary kernel)
 
 let compute builtins durable buffers =
@@ -55,6 +55,7 @@ let compute builtins durable buffers =
     let+ durable = f host_state.durable in
     host_state.durable <- durable
   in
+  let store = Lazy.force store in
   let* instance = Wasmer.Instance.create store module_ host_funcs in
 
   let* () =
