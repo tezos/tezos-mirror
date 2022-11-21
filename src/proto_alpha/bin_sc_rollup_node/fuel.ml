@@ -74,7 +74,7 @@ module Accounted : S = struct
   type t = int64
 
   let of_ticks i =
-    assert (Int64.compare i 0L > 0) ;
+    assert (Int64.compare i 0L >= 0) ;
     i
 
   let one_tick_consumption = 1L
