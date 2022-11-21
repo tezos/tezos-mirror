@@ -7,9 +7,8 @@ _`Block`
     Blocks conceptually contain a header and a list of Operations_,
     which are specific to the `economic protocol`_.
 
-    The header itself decomposes into a shell header (common to all protocols) and a protocol-specific header.
-    The shell header contains `protocol`-agnostic data such as the
-    block predecessor's hash and the block's timestamp.
+    The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
+    The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
 _`Context`
     The state of the blockchain. The context is defined by the
@@ -38,8 +37,8 @@ _`Fitness` (a.k.a. score, a.k.a. weight)
 _`Height`
     See level_.
 
-_`Level` (a.k.a. height)
-    The position of a block in the chain, that is, the number of blocks
+_`Level` (a.k.a. block height)
+    The position of a block in the blockchain, that is, the number of blocks
     since the genesis block, where the genesis block is at level 0.
 
 _`Mempool`

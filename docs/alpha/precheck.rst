@@ -1,6 +1,13 @@
 Prechecking of manager operations
 =================================
 
+.. FIXME tezos/tezos#3938:
+
+   This section doesn't make much sense after the pipelining project
+   has plugged validate into the plugin for Lima. Parts of this
+   section be integrated into plugin.rst, and the relevant definitions
+   should point to the validation entry.
+
 The prevalidator of Octez prevents the propagation of non-valid
 operations by trying to apply (or execute) them.
 However, executing

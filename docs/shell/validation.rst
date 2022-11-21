@@ -103,8 +103,10 @@ difference between the current head and the examined proposal is
 more than one block, mostly during the initial bootstrap phase, the
 peer worker launches a *bootstrap pipeline* task.
 
+.. _multi_pass_validation:
+
 A third scheme is planned (but not yet implemented) for validating
-alternative chains: the *multipass validator*. This method is quite
+alternative chains: the *multi-pass validator*. This method is quite
 more complex, its goal is to detect erroneous blocks as soon as
 possible, without having to download all the chain data. This process
 will work by first validating the block headers, then the operations
@@ -123,7 +125,7 @@ signatures. For that to be sound, the fork limit is set to not allow
 rewinding before the baking and endorsing slots are set.
 
 Each of these three peer validator tasks (head increment, bootstrap
-pipeline, or multipass) will interact with the distributed DB to get
+pipeline, or multi-pass) will interact with the distributed DB to get
 the data they need (block headers and operations). When they have
 everything needed for a block, they will call the *block validator*.
 

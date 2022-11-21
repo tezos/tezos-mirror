@@ -2,22 +2,21 @@ Prechecking of manager operations
 =================================
 
 The prevalidator of Octez prevents the propagation of non-valid
-operations by trying to apply (or execute) them.
-However, executing
-manager operations (like complex smart contract calls) can be
-time-consuming.
-To ensure a high throughput of the Tezos protocol, the
-propagation of operations should be as fast as possible. This calls
-for a lighter approach.
+operations by trying to :ref:`apply<operation_validity_kathmandu>`
+them. However, executing :ref:`manager
+operations<manager_operations_kathmandu>` can be time-consuming. To
+ensure a high throughput of the Tezos protocol, the propagation of
+operations should be as fast as possible. This calls for a lighter
+approach.
 
 Prechecking manager operations implements such a lighter approach, by
 discarding most invalid operations, without executing any of them.
-This is possible because the validity of an operation (in the sense,
-being able to include it in a block)
-depends on its solvability (see below :ref:`solvability_kathmandu`).
+This is possible because the :ref:`validity of a manager
+operation<manager_operations_validity_kathmandu>` depends on its
+*solvability* -- :ref:`defined further below<solvability_kathmandu>`.
 
-Fortunately, it turns out that deciding whether an operation is solvable can be achieved without
-applying it.
+Fortunately, it turns out that deciding whether an operation is
+solvable can be achieved without applying it.
 
 However, restricting the propagation to solvable operations is not enough to
 ensure resilience against DDoS attacks.
@@ -33,23 +32,21 @@ block.
 Note however that one can still inject successive operations with the
 same counter using the ``replace-by-fee`` feature.
 
-
 .. _solvability:
 .. _solvability_kathmandu:
 
 Solvable operations
 -------------------
 
-The solvability of an operation depends on the content of the Tezos
-context in which it is applied.
-
+The solvability of a manager operation depends on the content of the
+Tezos context in which it is applied.
 
 In the following, we consider the context kept by the prevalidator
 (see :doc:`../shell/prevalidation`).
 Checking operation solvability with this context is lighter than with
 the contexts for block validation or block construction: it can be
 decided without checking whether the gas announced by the operation
-is below the remaining gas for the whole block.
+is below the remaining gas for the whole block -- .
 Checking solvability consists in verifying that the
 operation is well-formed and that fees can be paid: no execution
 of operations (especially of smart-contract code) is done to determine
@@ -68,7 +65,6 @@ Roughly, a manager operation is solvable when the following conditions hold:
   operation; and
 - the signature of the operation is valid.
 
-
 Co-precheckable operations
 --------------------------
 
@@ -86,7 +82,7 @@ In this case, the operations could be included in the next block in
 any order, modulo block limits (eg. maximum gas, block size limit,
 etc).
 
-The precheck of a manger operation, with respect to a context and a
+The precheck of a manager operation, with respect to a context and a
 set of co-precheckable operations, consists in checking whether adding
 the operation to the set preserves the operations of the set being
 co-precheckable.

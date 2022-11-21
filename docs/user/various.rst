@@ -63,6 +63,8 @@ indicates a recommended course of action.
 | 255         | like 127 but an error and an error occurred during exit (e.g., ``kill -9``)      | check output/logs, clean-up leftover files                       |
 +-------------+----------------------------------------------------------------------------------+------------------------------------------------------------------+
 
+.. _failing_noop:
+
 Failing_noop operation
 ----------------------
 
