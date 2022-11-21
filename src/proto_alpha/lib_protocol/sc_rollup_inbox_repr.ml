@@ -352,9 +352,9 @@ let key_of_message ix =
 
 let number_of_messages_key = ["number_of_messages"]
 
-type serialized_proof = bytes
+type serialized_proof = string
 
-let serialized_proof_encoding = Data_encoding.bytes
+let serialized_proof_encoding = Data_encoding.(string' Hex)
 
 module type Merkelized_operations = sig
   type inbox_context
@@ -758,9 +758,9 @@ struct
             Next_level {lower_message_proof; inc});
       ]
 
-  let of_serialized_proof = Data_encoding.Binary.of_bytes_opt proof_encoding
+  let of_serialized_proof = Data_encoding.Binary.of_string_opt proof_encoding
 
-  let to_serialized_proof = Data_encoding.Binary.to_bytes_exn proof_encoding
+  let to_serialized_proof = Data_encoding.Binary.to_string_exn proof_encoding
 
   let proof_error reason =
     let open Lwt_result_syntax in
@@ -935,7 +935,7 @@ struct
       |> Option.map (lift_ptr_path deref)
       |> Option.join |> return
 
-    let serialized_proof_of_string x = Bytes.of_string x
+    let serialized_proof_of_string x = x
 
     let inbox_message_counter = inbox_message_counter
   end

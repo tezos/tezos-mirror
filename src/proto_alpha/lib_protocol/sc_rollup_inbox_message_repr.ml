@@ -98,9 +98,6 @@ let internal_inbox_message_encoding =
         (fun () -> End_of_level);
     ]
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4027
-   We should change the payload of [External] from [bytes] to [string]. *)
-
 type t = Internal of internal_inbox_message | External of string
 
 let encoding =
@@ -120,7 +117,7 @@ let encoding =
          case
            (Tag 1)
            ~title:"External"
-           Variable.string
+           Variable.(string' Hex)
            (function External msg -> Some msg | Internal _ -> None)
            (fun msg -> External msg);
        ])

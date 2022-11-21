@@ -102,7 +102,7 @@ let inbox_message_encoding =
     (obj3
        (req "inbox_level" Raw_level_repr.encoding)
        (req "message_counter" n)
-       (req "payload" string))
+       (req "payload" (string' Hex)))
 
 let reveal_data_encoding =
   let open Data_encoding in
@@ -114,9 +114,11 @@ let reveal_data_encoding =
          (req "reveal_data_kind" (constant "raw_data"))
          (req
             "raw_data"
-            (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
-      (function Raw_data m -> Some ((), Bytes.of_string m) | _ -> None)
-      (fun ((), m) -> Raw_data (Bytes.to_string m))
+            (check_size
+               Constants_repr.sc_rollup_message_size_limit
+               (string' Hex))))
+      (function Raw_data m -> Some ((), m) | _ -> None)
+      (fun ((), m) -> Raw_data m)
   and case_metadata =
     case
       ~title:"metadata"
