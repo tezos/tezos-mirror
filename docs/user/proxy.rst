@@ -27,12 +27,6 @@ It is expected that, at any given time, the proxy mode supports ``Alpha``,
 the current protocol of Mainnet and the current protocol proposal on Mainnet
 at the time of release.
 
-If ``--protocol`` is omitted when calling the proxy client, it
-tries to match the node's protocol. On the one hand, this is handy when
-testing. On the other hand, in a production environment, it is recommended
-to specify ``--protocol`` if the protocol is known, to avoid an extra
-RPC at **every** call ``octez-client --mode proxy ...``
-
 Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
