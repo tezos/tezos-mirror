@@ -518,11 +518,7 @@ let add_messages_no_history inbox level payloads level_tree =
 (* An [inclusion_proof] is a path in the Merkelized skip list
    showing that a given inbox history is a prefix of another one.
    This path has a size logarithmic in the difference between the
-   levels of the two inboxes.
-
-   [Irmin.Proof.{tree_proof, stream_proof}] could not be reused here
-   because there is no obvious encoding of sequences in these data
-   structures with the same guarantee about the size of proofs. *)
+   levels of the two inboxes. *)
 type inclusion_proof = history_proof list
 
 let inclusion_proof_encoding =
@@ -852,11 +848,11 @@ let verify_proof (l, n) inbox_snapshot proof =
       | Some _ ->
           tzfail (Inbox_proof_error "more messages to read in current level"))
 
-let produce_proof ~get_level_tree_history history inbox (l, n) =
+let produce_proof ~get_level_tree_history history inbox_snapshot (l, n) =
   let open Lwt_result_syntax in
   let deref ptr = History.find ptr history in
   let compare {hash = _; level} = Raw_level_repr.compare level l in
-  let result = Skip_list.search ~deref ~compare ~cell:inbox in
+  let result = Skip_list.search ~deref ~compare ~cell:inbox_snapshot in
   let* inc, history_proof =
     match result with
     | Skip_list.{rev_path; last_cell = Found history_proof} ->
@@ -864,9 +860,9 @@ let produce_proof ~get_level_tree_history history inbox (l, n) =
     | {last_cell = Nearest _; _}
     | {last_cell = No_exact_or_lower_ptr; _}
     | {last_cell = Deref_returned_none; _} ->
-        (* We are only interested to the result where [search] than a
-           path to the cell we were looking for. All the other cases
-           should be considered as an error. *)
+        (* We are only interested in the result where [search] returns a path to
+           the cell we were looking for. All the other cases should be
+           considered as an error. *)
         tzfail
         @@ Inbox_proof_error
              (Format.asprintf
@@ -892,9 +888,14 @@ let produce_proof ~get_level_tree_history history inbox (l, n) =
           Some Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
         )
   | None ->
-      if equal_history_proof inbox history_proof then
+      (* No payload means that there is no more message to read at the level of
+         [history_proof]. *)
+      if equal_history_proof inbox_snapshot history_proof then
+        (* if [history_proof] is equal to the snapshot then it means that there
+           is no more message to read. *)
         return (Single_level {inc; message_proof}, None)
       else
+        (* Else we must read the [sol] of the next level. *)
         let lower_message_proof = message_proof in
         let* input_given =
           let inbox_level = Raw_level_repr.succ l in

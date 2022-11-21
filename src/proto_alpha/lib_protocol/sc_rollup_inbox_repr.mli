@@ -223,8 +223,8 @@ val serialized_proof_encoding : serialized_proof Data_encoding.t
     [inbox], [history] and [level_tree_history].
 
     If the [inbox]'s level is older than [level], the [inbox] is
-    updated so that the level trees of the levels older than [level]
-    are archived. To archive a [level_tree] for a given [level], we
+    updated so that the level tree of the previous level is
+    archived. To archive a [level_tree] for a given [level], we
     push it at the end of the [history] and update the witness of this
     history in the [inbox]. The [inbox]'s level tree for the current
     level is emptied to insert the [payloads] in a fresh [level_tree]
@@ -261,8 +261,7 @@ val add_messages_no_history :
     value for the next level of the inbox. It is also needed if you want to
     produce a fully-up-to-date skip list for proof production. Just taking the
     skip list stored in the inbox at [old_levels_messages] will not include the
-    current level (and that current level could be quite far back in terms of
-    blocks if the inbox hasn't been added to for a while). *)
+    current level. *)
 val form_history_proof : History.t -> t -> (History.t * history_proof) tzresult
 
 (** This is similar to {!form_history_proof} except that it is just to be used
@@ -284,7 +283,7 @@ val take_snapshot : t -> history_proof
     [level_tree]s of [A] are included in the previous levels [level_tree]s of
     [B]. The current [level_tree] of [A] and [B] are not considered.
 
-    The size of this proof is O(log_basis (L' - L)). *)
+    The size of this proof is O(log2 (L' - L)). *)
 type inclusion_proof
 
 val inclusion_proof_encoding : inclusion_proof Data_encoding.t
@@ -316,9 +315,9 @@ val verify_inclusion_proof :
     Usually this is fairly simple because there will actually be a
     message at the location specified by [starting_point]. But in some
     cases [starting_point] is past the last message within a level,
-    and then the inbox proof must prove that and also provide another
-    proof about the message at the beginning of the next non-empty
-    level. *)
+    and then the inbox proof's verification assumes that the next input
+    is the SOL of the next level, if not beyond the snapshot.
+*)
 type proof
 
 val pp_proof : Format.formatter -> proof -> unit
