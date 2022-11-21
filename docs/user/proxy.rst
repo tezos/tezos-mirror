@@ -9,8 +9,9 @@ the proxy client only requests the data it needs from the node, and uses
 this data locally to perform its own computations.
 For an entirely local mode, see the :doc:`mockup mode <mockup>`.
 
-The purpose of the proxy mode is to relieve the node
-from some long computations, necessary for instance when estimating gas or when asking for baking rights.
+Estimating gas required by a smart contract call or asking for baking rights
+are typical examples of potentially long computation the proxy mode relieves
+the node of.
 
 Executing commands in proxy mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -70,7 +71,6 @@ You're now ready to use the proxy client. For example, request baking rights:
 ::
 
     $ octez-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
-    protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
     [ { "level": 3, "delegate": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
         "round": 0, "estimated_time": "2022-11-17T14:20:17Z",
         "consensus_key": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv" },
@@ -99,8 +99,6 @@ is doing differently, you may set up debugging on the following event sections
   This debug section is useful to understand
   if the proxy is performing slowly. It might be because it is performing
   a lot of such RPCs.
-* ``proxy_context`` shows low-level detail implementations of the client,
-  you likely do not need it.
 
 For convenience, let's define an alias before continuing, to save
 keystrokes and the ``protocol of proxy unspecified`` warning:
@@ -145,7 +143,7 @@ In this case, the bulk of the computation is done locally.
 
 If you also want to see the data requests to the node, do the following before running your commands::
 
-    $ export TEZOS_LOG="proxy_rpc_ctxt->debug; alpha.proxy_rpc->debug"
+    $ export TEZOS_LOG="proxy_rpc_ctxt->debug; proxy_rpc->debug"
 
 
 How to deploy to relieve nodes from some RPCs
@@ -182,17 +180,12 @@ for simplicity):
   Intercepting ``../raw/bytes`` is required because proxy clients
   call it a lot, as described above.
 
-  Intercepting ``../protocols`` is recommended, because the
-  proxy client calls this RPC when it starts, to check the protocol
-  it uses matches the node's protocol
-  (recall that proxy clients are protocol-specific).
-
-  Finally, intercepting ``../header`` is recommended, because the proxy client
+  Intercepting ``../header`` is recommended, because the proxy client
   calls this RPC when it starts honoring a request locally, i.e.
   when it starts performing a computation that would happen
   on the node with a regular client.
 
-  Note that it is safe to cache these three RPCs, because the corresponding data
+  Note that it is safe to cache these RPCs, because the corresponding data
   is immutable (if it's there it won't change in the future).
 
 Regarding clients, either:
