@@ -37,48 +37,46 @@ type parameters = {
 type request =
   | Init
   | Validate of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
-      predecessor_block_metadata_hash :
-        Tezos_crypto.Block_metadata_hash.t option;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
-        Tezos_crypto.Operation_metadata_list_list_hash.t option;
+        Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
       should_precheck : bool;
       simulate : bool;
     }
   | Preapply of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       timestamp : Time.Protocol.t;
       protocol_data : bytes;
-      live_blocks : Tezos_crypto.Block_hash.Set.t;
-      live_operations : Tezos_crypto.Operation_hash.Set.t;
+      live_blocks : Block_hash.Set.t;
+      live_operations : Operation_hash.Set.t;
       predecessor_shell_header : Block_header.shell_header;
-      predecessor_hash : Tezos_crypto.Block_hash.t;
+      predecessor_hash : Block_hash.t;
       predecessor_max_operations_ttl : int;
-      predecessor_block_metadata_hash :
-        Tezos_crypto.Block_metadata_hash.t option;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
-        Tezos_crypto.Operation_metadata_list_list_hash.t option;
+        Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
     }
   | Precheck of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
-      predecessor_block_hash : Tezos_crypto.Block_hash.t;
+      predecessor_block_hash : Block_hash.t;
       header : Block_header.t;
       operations : Operation.t list list;
-      hash : Tezos_crypto.Block_hash.t;
+      hash : Block_hash.t;
     }
-  | Commit_genesis of {chain_id : Tezos_crypto.Chain_id.t}
+  | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
-      chain_id : Tezos_crypto.Chain_id.t;
-      context_hash : Tezos_crypto.Context_hash.t;
+      chain_id : Chain_id.t;
+      context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {context_hash : Tezos_crypto.Context_hash.t}
+  | Context_garbage_collection of {context_hash : Context_hash.t}
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t

@@ -2226,6 +2226,7 @@ let octez_validation =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_crypto |> open_;
         octez_rpc;
         octez_context |> open_;
         octez_context_ops |> open_;

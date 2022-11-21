@@ -39,7 +39,7 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
   let module Proto = (val proto) in
   let* {context; _} =
     Proto.init
-      (Tezos_crypto.Chain_id.of_block_hash genesis.block)
+      (Chain_id.of_block_hash genesis.block)
       ctxt
       {
         level = 0l;
@@ -47,9 +47,9 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
         predecessor = genesis.block;
         timestamp = genesis.time;
         validation_passes = 0;
-        operations_hash = Tezos_crypto.Operation_list_list_hash.empty;
+        operations_hash = Operation_list_list_hash.empty;
         fitness = [];
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
   in
   return context
