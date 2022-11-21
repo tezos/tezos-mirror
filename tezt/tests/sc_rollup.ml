@@ -3613,15 +3613,6 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_reinject_failed_commitment protocols ~kind ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4020
-     When looking at the logs of these tests, it appears that they do
-     not come with enough inspection of the state of the rollup to
-     ensure the property they are trying to exhibit.  For instance,
-     just checking that the dishonest player has no stack at the end
-     of the scenario does not prove they have been slashed, and it
-     appeared that in some instances, they haven’t been able to
-     publish a commitment to begin with. *)
-  (* test_refutation protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message ~regression:true ~earliness:0 protocols ~kind ;
@@ -3689,6 +3680,9 @@ let register ~protocols =
   (* DAC tests, not supported yet by the Wasm PVM *)
   test_rollup_arith_uses_reveals protocols ~kind:"arith" ;
   test_reveals_fails_on_wrong_hash protocols ~kind:"arith" ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3653
+     Loser mode does not work for the wasm PVM. *)
+  test_refutation protocols ~kind:"arith" ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
