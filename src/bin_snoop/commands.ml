@@ -861,6 +861,29 @@ module List_cmd = struct
       (Registration.all_registered_parameters ()) ;
     Lwt_result_syntax.return_unit
 
+  let params_all_models = Tezos_clic.fixed ["list"; "all"; "models"]
+
+  let print_model : type a. a Model.model -> string =
+   fun model ->
+    let module M = (val model) in
+    let module M = M.Def (Costlang.Pp) in
+    M.model
+
+  let handler_all_models () () =
+    List.iter
+      (fun (name, (model, _)) ->
+        let printed =
+          match model with Model.Model model -> print_model model
+        in
+        Format.fprintf
+          Format.std_formatter
+          "%a\n\t%s\n"
+          Namespace.pp
+          name
+          printed)
+      (Registration.all_registered_models ()) ;
+    Lwt_result_syntax.return_unit
+
   let group =
     {Tezos_clic.name = "list"; title = "Commands for displaying lists"}
 
@@ -920,6 +943,14 @@ module List_cmd = struct
       params_all_param
       handler_all_param
 
+  let command_all_models =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all models"
+      Tezos_clic.no_options
+      params_all_models
+      handler_all_models
+
   let commands =
     [
       command_all_bench;
@@ -929,6 +960,7 @@ module List_cmd = struct
       command_bench_tags_exact;
       command_bench_match;
       command_all_param;
+      command_all_models;
     ]
 end
 
