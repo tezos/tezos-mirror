@@ -171,9 +171,9 @@ module List_key_values_benchmark_boilerplate = struct
         Model.make
           ~conv:(fun {size} -> (size, ()))
           ~model:
-            (Model.affine_split_const
-               ~intercept1:Builtin_benchmarks.timer_variable
-               ~intercept2:(fv "list_key_values_intercept")
+            (Model.affine
+               ~name
+               ~intercept:(fv "list_key_values_intercept")
                ~coeff:(fv "list_key_values_step")) );
     ]
 end

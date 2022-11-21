@@ -31,6 +31,20 @@ let ns = Namespace.make Shell_namespace.ns "io"
 
 let fv s = Free_variable.of_namespace (ns s)
 
+let read_model =
+  Model.bilinear_affine
+    ~name:(ns "read_model")
+    ~intercept:(fv "read_latency")
+    ~coeff1:(fv "depth")
+    ~coeff2:(fv "storage_bytes")
+
+let write_model =
+  Model.bilinear_affine
+    ~name:(ns "write_model")
+    ~intercept:(fv "write_latency")
+    ~coeff1:(fv "keys_written")
+    ~coeff2:(fv "storage_bytes")
+
 module Helpers = struct
   (* Samples keys in an alphabet of [card] elements. *)
   let sample_key ~card =
@@ -232,11 +246,7 @@ module Context_size_dependent_shared = struct
       ~conv:(function
         | Random_context_random_access {depth; storage_bytes; _} ->
             (depth, (storage_bytes, ())))
-      ~model:
-        (Model.bilinear_affine
-           ~intercept:(fv "read_latency")
-           ~coeff1:(fv "depth")
-           ~coeff2:(fv "storage_bytes"))
+      ~model:read_model
 
   let models = [("io_read", read_access)]
 end
@@ -585,11 +595,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
       ~conv:(function
         | Irmin_pack_read {depth; storage_bytes; _} ->
             (depth, (storage_bytes, ())))
-      ~model:
-        (Model.bilinear_affine
-           ~intercept:(fv "read_latency")
-           ~coeff1:(fv "depth")
-           ~coeff2:(fv "storage_bytes"))
+      ~model:read_model
 
   let models = [("io_read", read_access)]
 
@@ -766,11 +772,7 @@ module Irmin_pack_write_bench : Benchmark.S = struct
       ~conv:(function
         | Irmin_pack_write {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
-      ~model:
-        (Model.bilinear_affine
-           ~intercept:(fv "write_latency")
-           ~coeff1:(fv "keys_written")
-           ~coeff2:(fv "storage_bytes"))
+      ~model:write_model
 
   let models = [("io_write", write_access)]
 
@@ -917,11 +919,7 @@ module Read_random_key_bench : Benchmark.S = struct
     Model.make
       ~conv:(function
         | Read_random_key {depth; storage_bytes} -> (depth, (storage_bytes, ())))
-      ~model:
-        (Model.bilinear_affine
-           ~intercept:(fv "read_latency")
-           ~coeff1:(fv "depth")
-           ~coeff2:(fv "storage_bytes"))
+      ~model:read_model
 
   let models = [("io_read", read_access)]
 
@@ -1068,11 +1066,7 @@ module Write_random_keys_bench : Benchmark.S = struct
       ~conv:(function
         | Write_random_keys {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
-      ~model:
-        (Model.bilinear_affine
-           ~intercept:(fv "write_latency")
-           ~coeff1:(fv "keys_written")
-           ~coeff2:(fv "storage_bytes"))
+      ~model:write_model
 
   let models = [("io_write", write_access)]
 

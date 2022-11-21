@@ -82,6 +82,7 @@ module Blake2b_bench : Benchmark.S = struct
           ~conv:(fun {nbytes} -> (nbytes, ()))
           ~model:
             (Model.affine
+               ~name
                ~intercept:(fv "blake2b_const")
                ~coeff:(fv "blake2b_ns_p_byte")) );
     ]
@@ -103,11 +104,3 @@ module Blake2b_bench : Benchmark.S = struct
 end
 
 let () = Registration.register (module Blake2b_bench)
-
-(* Also register the model for code generation *)
-let () =
-  Registration.register_for_codegen
-    "blake2b_codegen"
-    (Model.For_codegen
-       (WithExceptions.Option.get ~loc:__LOC__
-       @@ List.assoc ~equal:String.equal "blake2b" Blake2b_bench.models))
