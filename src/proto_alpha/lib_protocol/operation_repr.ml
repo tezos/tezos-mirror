@@ -1580,7 +1580,7 @@ module Encoding = struct
       {
         tag = 17;
         name = "failing_noop";
-        encoding = obj1 (req "arbitrary" string);
+        encoding = obj1 (req "arbitrary" (string' Hex));
         select =
           (function Contents (Failing_noop _ as op) -> Some op | _ -> None);
         proj = (function Failing_noop message -> message);
