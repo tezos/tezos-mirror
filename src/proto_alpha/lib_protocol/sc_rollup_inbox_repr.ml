@@ -537,84 +537,43 @@ let lift_ptr_path deref ptr_path =
   in
   aux [] ptr_path
 
-type proof =
-  (* See the main docstring for this type (in the mli file) for
-     definitions of the three proof parameters [starting_point],
-     [message] and [snapshot]. In the below we deconstruct
-     [starting_point] into [(l, n)] where [l] is a level and [n] is a
-     message index.
+(* See the main docstring for this type (in the mli file) for
+   definitions of the three proof parameters [starting_point],
+   [message] and [snapshot]. In the below we deconstruct
+   [starting_point] into [(l, n)] where [l] is a level and [n] is a
+   message index.
 
-     In a [Single_level] proof, [history_proof] is the skip list cell for the
-     level [l], [inc] is an inclusion proof of [history_proof] into [snapshot]
-     and [message_proof] is an inclusion proof of [payload_level_tree] into
-     [history_proof.content]:
+   In a proof, [inclusion_proof] is an inclusion proof of [history_proof] into
+   [snapshot] where [history_proof] is the skip list cell for the level [l],
+   and [message_proof] is a tree proof showing that
 
-       [exists level_tree, payload_level_tree .
-            (hash_level_tree level_tree = history_proof.content.hash)
-        AND (get_messages_payload message_proof = (payload_level_tree, message_opt))
-        AND ((
-              (message_opt = Some message)
-           AND (Inbox_message.hash_payload message = payload_level_tree.content))
-          OR (
-               (message_opt = None)
-           AND (payload_level_tree = level_tree))]
+   [exists level_tree .
+   (hash_level_tree level_tree = history_proof.content.hash)
+   AND (get_messages_payload n level_tree = (_, message))]
 
-     Note: in the case that [message] is [None] this shows that there's no
-     value at the index [n]; in this case we also must check that
-     [history_proof] equals [snapshot] (otherwise, we'd need a [Next_level]
-     proof instead). *)
-  | Single_level of {inc : inclusion_proof; message_proof : level_tree_proof}
-  (* See the main docstring for this type (in the mli file) for
-     definitions of the three proof parameters [starting_point],
-     [message] and [snapshot]. In the below we deconstruct
-     [starting_point] as [(l, n)] where [l] is a level and [n] is a
-     message index.
+   Note: in the case that [message] is [None] this shows that there's no
+   value at the index [n]; in this case we also must check that
+   [history_proof] equals [snapshot]. *)
+type proof = {
+  inclusion_proof : inclusion_proof;
+  message_proof : level_tree_proof;
+}
 
-     In a [Next_level] proof, [lower_history_proof] is the skip list cell for
-     the level [l], [inc] is an inclusion proof of [lower_history_proof] into
-     [snapshot] and [lower_message_proof] is a tree proof showing that there
-     is no message at [(l, n)] with [lower_message_proof].
-
-     The first message to read at the next level of [l] is the first input
-     [Start_of_level]. *)
-  | Next_level of {
-      lower_message_proof : level_tree_proof;
-      inc : inclusion_proof;
-    }
-
-let pp_proof fmt proof =
-  match proof with
-  | Single_level _ -> Format.fprintf fmt "Single_level inbox proof"
-  | Next_level _ -> Format.fprintf fmt "Next_level inbox proof"
+let pp_proof fmt {inclusion_proof; message_proof = _} =
+  Format.fprintf
+    fmt
+    "inclusion proof: %a@"
+    (Format.pp_print_list pp_history_proof)
+    inclusion_proof
 
 let proof_encoding =
   let open Data_encoding in
-  union
-    ~tag_size:`Uint8
-    [
-      case
-        ~title:"Single_level"
-        (Tag 0)
-        (obj2
-           (req "inclusion_proof" inclusion_proof_encoding)
-           (req "message_proof" level_tree_proof_encoding))
-        (function
-          | Single_level {inc; message_proof} -> Some (inc, message_proof)
-          | _ -> None)
-        (fun (inc, message_proof) -> Single_level {inc; message_proof});
-      case
-        ~title:"Next_level"
-        (Tag 1)
-        (obj2
-           (req "lower_message_proof" level_tree_proof_encoding)
-           (req "inclusion_proof" inclusion_proof_encoding))
-        (function
-          | Next_level {lower_message_proof; inc} ->
-              Some (lower_message_proof, inc)
-          | _ -> None)
-        (fun (lower_message_proof, inc) ->
-          Next_level {lower_message_proof; inc});
-    ]
+  conv
+    (fun {inclusion_proof; message_proof} -> (inclusion_proof, message_proof))
+    (fun (inclusion_proof, message_proof) -> {inclusion_proof; message_proof})
+    (obj2
+       (req "inclusion_proof" inclusion_proof_encoding)
+       (req "message_proof" level_tree_proof_encoding))
 
 let of_serialized_proof = Data_encoding.Binary.of_string_opt proof_encoding
 
@@ -635,7 +594,7 @@ let to_serialized_proof = Data_encoding.Binary.to_string_exn proof_encoding
     - or [0 < n < max_index head_cell] then the provided payload must exist and
     the payload hash must equal the content of the [payload_cell].
 *)
-let verify_level_tree_proof {proof; payload} head_cell_hash n label =
+let verify_level_tree_proof {proof; payload} head_cell_hash n =
   let open Result_syntax in
   let* payload_cell, head_cell =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.verify_proof proof
@@ -647,8 +606,7 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n label =
       (Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.equal
          head_cell_hash
          (Sc_rollup_inbox_merkelized_payload_hashes_repr.hash head_cell))
-      (Inbox_proof_error
-         (Format.sprintf "message_proof (%s) does not match history" label))
+      (Inbox_proof_error (Format.sprintf "message_proof does not match history"))
   in
   let max_index =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index head_cell
@@ -705,9 +663,7 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n label =
       error_unless
         (Compare.Z.equal n payload_index)
         (Inbox_proof_error
-           (Format.sprintf
-              "found index in message_proof (%s) is incorrect"
-              label))
+           (Format.sprintf "found index in message_proof is incorrect"))
     in
     return_some payload
 
@@ -801,55 +757,35 @@ let verify_inclusion_proof inclusion_proof snapshot_history_proof =
   in
   return target
 
-let verify_proof (l, n) inbox_snapshot proof =
+let verify_proof (l, n) inbox_snapshot {inclusion_proof; message_proof} =
   assert (Z.(geq n zero)) ;
   let open Result_syntax in
-  match proof with
-  | Single_level {inc; message_proof} -> (
-      let* history_proof = verify_inclusion_proof inc inbox_snapshot in
-      let level_proof = Skip_list.content history_proof in
-      let* payload_opt =
-        verify_level_tree_proof message_proof level_proof.hash n "single level"
-      in
-      match payload_opt with
-      | None ->
-          if equal_history_proof inbox_snapshot history_proof then return_none
-          else
-            tzfail
-            @@ Inbox_proof_error "payload is None but proof.level not top level"
-      | Some payload ->
-          return_some
-            Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload})
-  | Next_level {inc; lower_message_proof} -> (
-      let* lower_history_proof = verify_inclusion_proof inc inbox_snapshot in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
-         We could prove that the last message to read is SOL, and is
-         before [n]. *)
-      let lower_level_proof = Skip_list.content lower_history_proof in
-      let* should_be_none =
-        verify_level_tree_proof
-          lower_message_proof
-          lower_level_proof.hash
-          n
-          "lower"
-      in
-      match should_be_none with
-      | None ->
-          let* payload =
-            Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
-          in
-          let inbox_level = Raw_level_repr.succ l in
-          let message_counter = Z.zero in
-          return_some Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
-      | Some _ ->
-          tzfail (Inbox_proof_error "more messages to read in current level"))
+  let* history_proof = verify_inclusion_proof inclusion_proof inbox_snapshot in
+  let level_proof = Skip_list.content history_proof in
+  let* payload_opt = verify_level_tree_proof message_proof level_proof.hash n in
+  match payload_opt with
+  | Some payload ->
+      return_some
+        Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
+  | None ->
+      if equal_history_proof inbox_snapshot history_proof then return_none
+      else
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
+           We could prove that the last message to read is SOL, and is
+           before [n]. *)
+        let* payload =
+          Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
+        in
+        let inbox_level = Raw_level_repr.succ l in
+        let message_counter = Z.zero in
+        return_some Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
 
 let produce_proof ~get_level_tree_history history inbox_snapshot (l, n) =
   let open Lwt_result_syntax in
   let deref ptr = History.find ptr history in
   let compare {hash = _; level} = Raw_level_repr.compare level l in
   let result = Skip_list.search ~deref ~compare ~cell:inbox_snapshot in
-  let* inc, history_proof =
+  let* inclusion_proof, history_proof =
     match result with
     | Skip_list.{rev_path; last_cell = Found history_proof} ->
         return (List.rev rev_path, history_proof)
@@ -870,31 +806,30 @@ let produce_proof ~get_level_tree_history history inbox_snapshot (l, n) =
   let* ({payload; proof = _} as message_proof) =
     produce_level_tree_proof get_level_tree_history level_proof.hash ~index:n
   in
-  match payload with
-  | Some payload ->
-      return
-        ( Single_level {inc; message_proof},
-          Some Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
-        )
-  | None ->
-      (* No payload means that there is no more message to read at the level of
-         [history_proof]. *)
-      if equal_history_proof inbox_snapshot history_proof then
-        (* if [history_proof] is equal to the snapshot then it means that there
-           is no more message to read. *)
-        return (Single_level {inc; message_proof}, None)
-      else
-        (* Else we must read the [sol] of the next level. *)
-        let lower_message_proof = message_proof in
-        let* input_given =
+  let proof = {inclusion_proof; message_proof} in
+  let*? input =
+    let open Result_syntax in
+    match payload with
+    | Some payload ->
+        return_some
+          Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
+    | None ->
+        (* No payload means that there is no more message to read at the level of
+           [history_proof]. *)
+        if equal_history_proof inbox_snapshot history_proof then
+          (* if [history_proof] is equal to the snapshot then it means that there
+             is no more message to read. *)
+          return_none
+        else
+          (* Else we must read the [sol] of the next level. *)
           let inbox_level = Raw_level_repr.succ l in
           let message_counter = Z.zero in
-          let*? payload =
+          let* payload =
             Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
           in
           return_some Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
-        in
-        return (Next_level {inc; lower_message_proof}, input_given)
+  in
+  return (proof, input)
 
 let empty level =
   let pre_genesis_level = Raw_level_repr.root in
