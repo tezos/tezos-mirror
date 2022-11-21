@@ -27,7 +27,15 @@ Smart Contract Optimistic Rollups (ongoing)
 Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6252`, :gl:`!6396`, :gl:`!6364`, :gl:`!6413`, :gl:`!6545`, :gl:`!6543`,
 :gl:`!6590`, :gl:`!6623`, :gl:`!6641`, :gl:`!6549`, :gl:`!6672`, :gl:`!6500`,
-:gl:`!6718`, :gl:`!6699`, :gl:`!6630`, :gl:`!6794`, :gl:`!6823`, :gl:`!6828`)
+:gl:`!6718`, :gl:`!6699`, :gl:`!6630`, :gl:`!6794`, :gl:`!6823`, :gl:`!6828`,
+:gl:`!6676`, :gl:`!6698`, :gl:`!6507`, :gl:`!6879`, :gl:`!6860`, :gl:`!6716`,
+:gl:`!6468`)
+
+Zero Knowledge Rollups (ongoing)
+--------------------------------
+
+Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!6047`,
+:gl:`!6884`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
@@ -35,7 +43,7 @@ Data Availability Layer (ongoing)
 Distribution of rollup operations data off-chain. (MRs :gl:`!6174`, :gl:`!6388`,
 :gl:`!6527`, :gl:`!6505`, :gl:`!6553`, :gl:`!6685`, :gl:`!6470`, :gl:`!6643`,
 :gl:`!6704`, :gl:`!6683`, :gl:`!6702`, :gl:`!6728`, :gl:`!5905`, :gl:`!6762`,
-:gl:`!6703`, :gl:`!6796`)
+:gl:`!6703`, :gl:`!6796`, :gl:`!6821`, :gl:`!6852`, :gl:`!6811`)
 
 Breaking Changes
 ----------------
@@ -59,6 +67,8 @@ Minor Changes
 -------------
 
 - Give a positive gas cost to the ``BALANCE`` instruction. (MR :gl:`!6564`)
+
+- Enable transferring tickets between implicit accounts. (MR :gl:`!6108`)
 
 Internal
 --------
@@ -98,3 +108,5 @@ Internal
 - Move interpreter logging to the plugin. (MR :gl:`!5778`)
 
 - Use let-bindings in ticket-accounting module. (MR :gl:`!6770`)
+
+- Use condensed syntax modules in protocol. (MR :gl:`!6844`)
