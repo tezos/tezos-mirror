@@ -229,12 +229,12 @@ let make_problem :
     List.map (fun {Measure.workload; measures} -> (workload, measures)) data
   in
   match model with
-  | Model.Packaged {conv; model} ->
+  | Model.Abstract {conv; model} ->
       let module M = (val model) in
       let module M = Model.Instantiate (Eval_to_vector) (M) in
       make_problem_from_workloads ~data ~overrides ~evaluate:(fun workload ->
           M.model (conv workload))
-  | Model.Preapplied {model} ->
+  | Model.Aggregate {model; _} ->
       make_problem_from_workloads ~data ~overrides ~evaluate:(fun workload ->
           let module A = (val model workload) in
           let module I = A (Eval_to_vector) in

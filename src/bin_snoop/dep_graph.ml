@@ -373,6 +373,8 @@ let to_graph (solved : string Solver.solved list) =
     solved ;
   g
 
+(* Generic models, named "*", are models used to infer generic parameters used in
+   many other benchmarks, namely the timer overhead, and the Lwt_main.run call *)
 let find_model_or_generic model_name model_list =
   match List.assoc_opt ~equal:String.equal model_name model_list with
   | None -> List.assoc_opt ~equal:String.equal "*" model_list

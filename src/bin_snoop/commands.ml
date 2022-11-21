@@ -521,7 +521,8 @@ module Infer_cmd = struct
       ~desc:"Name of the model for which to infer parameter"
       (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
-           Lwt.return_ok (Registration.all_model_names ()))
+           Lwt.return_ok
+             (Registration.all_model_names () |> List.map Namespace.to_string))
          (fun _ str -> Lwt.return_ok str))
 
   let regression_param =
@@ -592,6 +593,7 @@ module Codegen_cmd = struct
       | None -> No_transform
       | Some json_file -> load_fixed_point_parameters json_file
     in
+    let model_name = Namespace.of_string model_name in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
     Lwt.return_ok ()
@@ -612,7 +614,7 @@ module Codegen_cmd = struct
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (name, _) -> name)
+               (fun (name, _) -> Namespace.to_string name)
                (Registration.all_registered_models ())
            in
            Lwt.return_ok res)
@@ -854,7 +856,7 @@ module List_cmd = struct
           param
           (Format.pp_print_list
              ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
-             Format.pp_print_string)
+             Namespace.pp)
           models)
       (Registration.all_registered_parameters ()) ;
     Lwt_result_syntax.return_unit

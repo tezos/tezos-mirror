@@ -57,7 +57,7 @@ module Hashtbl = Stdlib.Hashtbl
 
 let list_all_models formatter =
   List.iter
-    (fun name -> Format.fprintf formatter "%s@." name)
+    (fun name -> Format.fprintf formatter "%a@." Namespace.pp name)
     (Registration.all_model_names ())
 
 let list_solvers formatter =
@@ -393,9 +393,9 @@ let codegen_cmd solution model_name codegen_options =
   let sol = Codegen.load_solution solution in
   match Registration.find_model model_name with
   | None ->
-      Format.eprintf "Model %s not found, exiting@." model_name ;
+      Format.eprintf "Model %a not found, exiting@." Namespace.pp model_name ;
       exit 1
-  | Some model ->
+  | Some (model, _) ->
       let transform =
         match codegen_options with
         | Cmdline.No_transform ->
@@ -407,12 +407,13 @@ let codegen_cmd solution model_name codegen_options =
             let module Transform = Fixed_point_transform.Apply (P) in
             ((module Transform) : Costlang.transform)
       in
-      let name = Printf.sprintf "model_%s" model_name in
+      let name = Format.asprintf "model_%a" Namespace.pp model_name in
       let code =
         match Codegen.codegen model sol transform name with
         | exception e ->
             Format.eprintf
-              "Error in code generation for model %s, exiting@."
+              "Error in code generation for model %a, exiting@."
+              Namespace.pp
               model_name ;
             Format.eprintf "Exception caught: %s@." (Printexc.to_string e) ;
             exit 1
@@ -439,20 +440,17 @@ let generate_code_for_models sol models codegen_options =
 let codegen_all_cmd solution regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
   let regexp = Str.regexp regexp in
-  let ok (name, _) = Str.string_match regexp name 0 in
+  let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution in
   let models = List.filter ok (Registration.all_registered_models ()) in
   let result = generate_code_for_models sol models codegen_options in
   Codegen.pp_module Format.std_formatter result
 
 let fvs_of_codegen_model model =
-  let (Model.For_codegen model) = model in
-  match model with
-  | Model.Packaged {model; _} ->
-      let module Model = (val model) in
-      let module FV = Model.Def (Costlang.Free_variables) in
-      FV.model
-  | Model.Preapplied _ -> Free_variable.Set.empty
+  let (Model.Model model) = model in
+  let module Model = (val model) in
+  let module FV = Model.Def (Costlang.Free_variables) in
+  FV.model
 
 let codegen_infer_cmd solution codegen_options =
   let solution = Codegen.load_solution solution in
@@ -477,10 +475,8 @@ let codegen_infer_cmd solution codegen_options =
       let codegen_name = Namespace.basename bench_name in
       let codegen_name_alpha = codegen_name ^ "__alpha" in
       let find_codegen name =
-        let* model =
-          Registration.String_table.find_opt Registration.codegen_table name
-        in
-        Some (name, model)
+        let* model = Registration.find_model (Namespace.of_string name) in
+        Some (Namespace.of_string name, model)
       in
       or_else (find_codegen codegen_name) (fun () ->
           find_codegen codegen_name_alpha)
@@ -497,9 +493,10 @@ let codegen_infer_cmd solution codegen_options =
         fvs
     in
     Seq.filter
-      (fun (model_name, model) ->
+      (fun (model_name, (model, _)) ->
         let ok = model_fvs_included_in_sol model in
-        if not ok then Format.eprintf "Skipping model %s@." model_name ;
+        if not ok then
+          Format.eprintf "Skipping model %a@." Namespace.pp model_name ;
         ok)
       found_codegen_models
   in

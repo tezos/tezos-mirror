@@ -88,7 +88,7 @@ type command =
     }
   | Codegen of {
       solution : string;
-      model_name : string;
+      model_name : Namespace.t;
       codegen_options : codegen_options;
     }
   | Codegen_all of {

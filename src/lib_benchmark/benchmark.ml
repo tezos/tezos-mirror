@@ -55,7 +55,7 @@ module type S = sig
   (** Optional conversion to vector, for report generation purposes *)
   val workload_to_vector : workload -> Sparse_vec.String.t
 
-  (** Cost models *)
+  (** Cost models, with a given local name (string) for reference *)
   val models : (string * workload Model.t) list
 
   (** Benchmark generator *)
