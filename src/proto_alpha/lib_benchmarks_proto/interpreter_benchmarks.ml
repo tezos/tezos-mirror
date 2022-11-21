@@ -1618,6 +1618,79 @@ module Registration_section = struct
         ~stack_type:(bytes @$ bot)
         ~kinstr:(IBytes_size (dummy_loc, halt))
         ()
+
+    let () =
+      simple_benchmark
+        ~name:Interpreter_workload.N_IAnd_bytes
+        ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
+        ~stack_type:(bytes @$ bytes @$ bot)
+        ~kinstr:(IAnd_bytes (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_benchmark
+        ~name:Interpreter_workload.N_IOr_bytes
+        ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
+        ~stack_type:(bytes @$ bytes @$ bot)
+        ~kinstr:(IOr_bytes (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_benchmark
+        ~name:Interpreter_workload.N_IXor_bytes
+        ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
+        ~stack_type:(bytes @$ bytes @$ bot)
+        ~kinstr:(IXor_bytes (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_benchmark
+        ~name:Interpreter_workload.N_INot_bytes
+        ~intercept_stack:(Bytes.empty, eos)
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(INot_bytes (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_ILsl_bytes
+        ~intercept_stack:(Bytes.empty, (Script_int.zero_n, eos))
+        ~stack_type:(bytes @$ nat @$ bot)
+        ~kinstr:(ILsl_bytes (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            let shift =
+              Script_int.(abs (of_int (Random.State.int rng_state 64000)))
+            in
+            (bytes, (shift, eos)))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_ILsr_bytes
+        ~intercept_stack:(Bytes.empty, (Script_int.zero_n, eos))
+        ~stack_type:(bytes @$ nat @$ bot)
+        ~kinstr:(ILsr_bytes (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            let shift =
+              (* No need of samples of shift > bytes * 8 which are equivalent with
+                 the case of shift = bytes * 8 where LSR returns empty bytes immediately *)
+              Script_int.(
+                abs
+                  (of_int
+                     (Random.State.int rng_state ((Bytes.length bytes * 8) + 1))))
+            in
+            (bytes, (shift, eos)))
+        ()
   end
 
   module Timestamps = struct

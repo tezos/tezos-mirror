@@ -2138,6 +2138,63 @@ the wild and untyped outside world.
     > COMPARE / s : t : S  =>  1 : S
         iff s > t
 
+Bitwise logical operators are also available on bytes.
+
+-  ``OR``
+
+::
+
+    :: bytes : bytes : 'S   ->   bytes : 'S
+
+    > OR / x : y : S  =>  (x | y) : S
+
+-  ``AND``
+
+::
+
+    :: bytes : bytes : 'S   ->   bytes : 'S
+
+    > AND / x : y : S  =>  (x & y) : S
+
+-  ``XOR``
+
+::
+
+    :: bytes : bytes : 'S   ->   bytes : 'S
+
+    > XOR / x : y : S  =>  (x ^ y) : S
+
+-  ``NOT``
+
+::
+
+    :: bytes : 'S   ->   bytes : 'S
+
+    > NOT / x : S  =>  ~x : S
+
+Logical shifts are also available on bytes.
+
+-  ``LSL``
+
+::
+
+    :: bytes : nat : 'S   ->   bytes : 'S
+
+    > LSL / x : s : S  =>  (x << s) : S
+        iff   s <= 64000
+    > LSL / x : s : S  =>  [FAILED]
+        iff   s > 64000
+
+-  ``LSR``
+
+::
+
+    :: bytes : nat : 'S   ->   bytes : 'S
+
+    > LSR / x : s : S  =>  (x >> s) : S
+        iff   s <= 256
+    > LSR / x : s : S  =>  [FAILED]
+        iff   s > 256
 
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~

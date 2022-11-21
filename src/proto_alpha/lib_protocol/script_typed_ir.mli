@@ -649,6 +649,24 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IBytes_size :
       Script.location * (n num, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
+  | ILsl_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, n num * 's, 'r, 'f) kinstr
+  | ILsr_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, n num * 's, 'r, 'f) kinstr
+  | IOr_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, bytes * 's, 'r, 'f) kinstr
+  | IAnd_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, bytes * 's, 'r, 'f) kinstr
+  | IXor_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, bytes * 's, 'r, 'f) kinstr
+  | INot_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, 's, 'r, 'f) kinstr
   (*
      Timestamps
      ----------

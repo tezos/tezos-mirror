@@ -669,6 +669,24 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IBytes_size :
       Script.location * (n num, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
+  | ILsl_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, n num * 's, 'r, 'f) kinstr
+  | ILsr_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, n num * 's, 'r, 'f) kinstr
+  | IOr_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, bytes * 's, 'r, 'f) kinstr
+  | IAnd_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, bytes * 's, 'r, 'f) kinstr
+  | IXor_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, bytes * 's, 'r, 'f) kinstr
+  | INot_bytes :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (bytes, 's, 'r, 'f) kinstr
   (*
      Timestamps
      ----------
@@ -1566,6 +1584,12 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | IConcat_bytes_pair (loc, _) -> loc
   | ISlice_bytes (loc, _) -> loc
   | IBytes_size (loc, _) -> loc
+  | ILsl_bytes (loc, _) -> loc
+  | ILsr_bytes (loc, _) -> loc
+  | IOr_bytes (loc, _) -> loc
+  | IAnd_bytes (loc, _) -> loc
+  | IXor_bytes (loc, _) -> loc
+  | INot_bytes (loc, _) -> loc
   | IAdd_seconds_to_timestamp (loc, _) -> loc
   | IAdd_timestamp_to_seconds (loc, _) -> loc
   | ISub_timestamp_seconds (loc, _) -> loc
@@ -1964,6 +1988,12 @@ let kinstr_traverse i init f =
     | IConcat_bytes_pair (_, k) -> (next [@ocaml.tailcall]) k
     | ISlice_bytes (_, k) -> (next [@ocaml.tailcall]) k
     | IBytes_size (_, k) -> (next [@ocaml.tailcall]) k
+    | ILsl_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | ILsr_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IOr_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IAnd_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IXor_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | INot_bytes (_, k) -> (next [@ocaml.tailcall]) k
     | IAdd_seconds_to_timestamp (_, k) -> (next [@ocaml.tailcall]) k
     | IAdd_timestamp_to_seconds (_, k) -> (next [@ocaml.tailcall]) k
     | ISub_timestamp_seconds (_, k) -> (next [@ocaml.tailcall]) k

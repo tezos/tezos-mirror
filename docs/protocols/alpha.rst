@@ -15,6 +15,12 @@ New Environment Version (V8)
 This protocol requires a different protocol environment version than Lima.
 It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
 
+Michelson opcodes for logical operations on bytes
+-------------------------------------------------
+
+Michelson opcodes ``AND``, ``OR``, ``XOR``, ``NOT``, ``LSL`` and ``LSR``
+now support ``bytes``. (MR :gl:`!6055`)
+
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 

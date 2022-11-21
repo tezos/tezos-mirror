@@ -50,6 +50,11 @@ module String = struct
   module Set = Tezos_error_monad.TzLwtreslib.Set.Make (String)
 end
 
+module Bytes = struct
+  include Bytes
+  include Tezos_stdlib.TzBytes
+end
+
 module Time = Time
 module Fitness = Fitness
 module User_activated = User_activated

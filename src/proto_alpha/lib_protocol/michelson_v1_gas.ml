@@ -168,6 +168,30 @@ module Cost_of = struct
 
     let bytes_size = atomic_step_cost cost_N_IBytes_size
 
+    let lsl_bytes input nbits =
+      match Script_int.to_int nbits with
+      | None -> Saturation_repr.saturated
+      | Some nbits ->
+          atomic_step_cost (cost_N_ILsl_bytes (Bytes.length input) nbits)
+
+    let lsr_bytes input nbits =
+      let input_nbytes = Bytes.length input in
+      let nbits =
+        Option.value (Script_int.to_int nbits) ~default:(input_nbytes * 8)
+      in
+      atomic_step_cost (cost_N_ILsr_bytes input_nbytes nbits)
+
+    let or_bytes b1 b2 =
+      atomic_step_cost (cost_N_IOr_bytes (Bytes.length b1) (Bytes.length b2))
+
+    let and_bytes b1 b2 =
+      atomic_step_cost (cost_N_IAnd_bytes (Bytes.length b1) (Bytes.length b2))
+
+    let xor_bytes b1 b2 =
+      atomic_step_cost (cost_N_IXor_bytes (Bytes.length b1) (Bytes.length b2))
+
+    let not_bytes b = atomic_step_cost (cost_N_INot_bytes (Bytes.length b))
+
     let add_tez = atomic_step_cost cost_N_IAdd_tez
 
     let sub_tez = atomic_step_cost cost_N_ISub_tez

@@ -591,6 +591,57 @@ module Stack_utils = struct
                continuation = k;
                reconstruct = (fun k -> IBytes_size (loc, k));
              }
+    | ILsl_bytes (loc, k), Item_t (_, Item_t (_, s)) ->
+        let s = Item_t (bytes_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> ILsl_bytes (loc, k));
+             }
+    | ILsr_bytes (loc, k), Item_t (_, Item_t (_, s)) ->
+        let s = Item_t (bytes_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> ILsr_bytes (loc, k));
+             }
+    | IOr_bytes (loc, k), Item_t (_, s) ->
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IOr_bytes (loc, k));
+             }
+    | IAnd_bytes (loc, k), Item_t (_, s) ->
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IAnd_bytes (loc, k));
+             }
+    | IXor_bytes (loc, k), Item_t (_, s) ->
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IXor_bytes (loc, k));
+             }
+    | INot_bytes (loc, k), Item_t (_, s) ->
+        let s = Item_t (bytes_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> INot_bytes (loc, k));
+             }
     | IAdd_seconds_to_timestamp (loc, k), Item_t (_, s) ->
         ok
         @@ Ex_split_kinstr
@@ -1905,29 +1956,29 @@ module Logger (Base : Logger_base) = struct
         ok cont
 
   (*
-  
+
     Zero-cost logging
     =================
-  
+
   *)
 
   (*
-  
+
      The following functions insert a logging instruction to continue
      the logging process in the next execution steps.
-  
+
      There is a special treatment of instructions that generate fresh
      continuations: we pass a constructor as argument to their
      evaluation rules so that they can instrument these fresh
      continuations by themselves. Instructions that create continuations
      without calling specialized functions have their branches from [step]
      function duplicated and adjusted here.
-  
+
      This on-the-fly instrumentation of the execution allows zero-cost
      logging since logging instructions are only introduced if an
      initial logging continuation is pushed in the initial continuation
      that starts the evaluation.
-  
+
   *)
   let ilog :
       type a s b t r f.

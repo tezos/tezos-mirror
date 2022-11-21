@@ -186,16 +186,28 @@ module Cost_of : sig
 
     val lsr_nat : 'a Script_int.num -> Gas.cost
 
+    val lsl_bytes : bytes -> Script_int.n Script_int.num -> Gas.cost
+
+    val lsr_bytes : bytes -> Script_int.n Script_int.num -> Gas.cost
+
     val or_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
+
+    val or_bytes : bytes -> bytes -> Gas.cost
 
     val and_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
     val and_int_nat :
       Script_int.z Script_int.num -> Script_int.n Script_int.num -> Gas.cost
 
+    val and_bytes : bytes -> bytes -> Gas.cost
+
     val xor_nat : 'a Script_int.num -> 'b Script_int.num -> Gas.cost
 
+    val xor_bytes : bytes -> bytes -> Gas.cost
+
     val not_int : 'a Script_int.num -> Gas.cost
+
+    val not_bytes : bytes -> Gas.cost
 
     val if_ : Gas.cost
 

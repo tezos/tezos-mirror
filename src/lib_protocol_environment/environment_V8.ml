@@ -204,7 +204,7 @@ struct
   module List = Tezos_error_monad.TzLwtreslib.List
   module Array = Tezos_protocol_environment_structs.V8.Array
   module Char = Char
-  module Bytes = Bytes
+  module Bytes = Tezos_base.TzPervasives.Bytes
   module Hex = Tezos_stdlib.Hex
   module String = String
   module Bits = Bits

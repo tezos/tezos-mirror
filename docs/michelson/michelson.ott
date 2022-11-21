@@ -120,6 +120,10 @@ bytes_lit, byt :: 'byt_' ::= {{ coq String.string }} {{ phantom }}
      | hash_sha3 byt :: M :: HashSha3 {{ tex \ottkw{hash\_sha3}  }}
      % string as bytes
      | pack d :: M :: Pack
+     % bitwise ops
+     | byt bitop byt' :: M :: Bitop {{ coq ( bytes_apply_bitop [[bitop]] [[byt]] [[byt']] ) }}
+     | byt << n :: M :: BytesLSL {{ coq ( bytes_lsl [[byt]] [[byt']] ) }}
+     | byt >> n :: M :: BytesLSR {{ coq ( bytes_lsr [[byt]] [[byt']] ) }}
 
 bool_lit, b :: 'b_' ::= {{ coq bool }} {{ phantom }}
      | True :: M :: True {{ coq true }}
@@ -655,6 +659,9 @@ Typing :: 't_' ::=
        --------------------------- :: NOT__int
        ctx :- NOT :: int : A => int : A
 
+       --------------------------- :: NOT__bytes
+       ctx :- NOT :: bytes : A => bytes : A
+
        --------------------------- :: NEG__nat
        ctx :- NEG :: nat : A => int : A
 
@@ -754,6 +761,9 @@ Typing :: 't_' ::=
        -------------------------------------------- :: OR__nat
        ctx :- OR :: nat : nat : A => nat : A
 
+       ----------------------------------------------- :: OR__bytes
+       ctx :- OR :: bytes : bytes : A => bytes : A
+
        ----------------------------------------------- :: AND__bool
        ctx :- AND :: bool : bool : A => bool : A
 
@@ -763,11 +773,17 @@ Typing :: 't_' ::=
        -------------------------------------------- :: AND__int_nat
        ctx :- AND :: int : nat : A => nat : A
 
+       -------------------------------------------- :: AND__bytes
+       ctx :- AND :: bytes : bytes : A => bytes : A
+
        ----------------------------------------------- :: XOR__bool
        ctx :- XOR :: bool : bool : A => bool : A
 
        -------------------------------------------- :: XOR__nat
        ctx :- XOR :: nat : nat : A => nat : A
+
+       ----------------------------------------------- :: XOR__bytes
+       ctx :- XOR :: bytes : bytes : A => bytes : A
 
        --------------------------------------------- :: EXEC
        ctx :- EXEC :: ty1 : lambda ty1 ty2 : A => ty2 : A
@@ -775,11 +791,17 @@ Typing :: 't_' ::=
        --------------------------------------------- :: APPLY
        ctx :- APPLY :: ty1 : lambda (pair ty1 ty2) ty3 : A => lambda ty2 ty3 : A
 
-       --------------------------------- :: LSL
+       --------------------------------- :: LSL__nat
        ctx :- LSL :: nat : nat : A => nat : A
 
-       --------------------------------- :: LSR
+       --------------------------------- :: LSL__bytes
+       ctx :- LSL :: bytes : nat : A => bytes : A
+
+       --------------------------------- :: LSR__nat
        ctx :- LSR :: nat : nat : A => nat : A
+
+       --------------------------------- :: LSR__bytes
+       ctx :- LSR :: bytes : nat : A => bytes : A
 
        --------------------------------- :: COMPARE
        ctx :- COMPARE :: cty : cty : A => int : A
@@ -1506,6 +1528,55 @@ LSL / z1 : z2 : S  =>  [FAILED]
 ----- :: LSR
 LSR / z1 : z2 : S  =>  ( z1 >> z2 ) : S
 
+% Bitwise logical operators are also available on bytes.
+
+%     OR
+
+% :: bytes : bytes : 'S   ->   bytes : 'S
+
+----- :: OR__bytes
+OR / bs1 : bs2 : S  =>  ( bs1 | bs2 ) : S
+
+%     AND
+
+% :: bytes : bytes : 'S   ->   bytes : 'S
+
+----- :: AND__bytes
+AND / bs1 : bs2 : S  =>  ( bs1 & bs2 ) : S
+
+%     XOR
+
+% :: bytes : bytes : 'S   ->   bytes : 'S
+
+----- :: XOR__bytes
+XOR / bs1 : bs2 : S  =>  ( bs1 ^ bs2 ) : S
+
+%     NOT
+
+% :: bytes : 'S   ->  bytes : 'S
+
+----- :: NOT__bytes
+NOT / bs : S  =>  ~ bs : S
+
+%     LSL
+
+% :: bytes : nat : 'S   ->   bytes : 'S
+
+n <= 64000
+----- :: LSL__bytes
+LSL / bs1 : n : S  =>  ( bs1 << n ) : S
+
+n > 64000
+----- :: LSL__bytes_fail
+LSL / bs1 : n : S  =>  [FAILED]
+
+%     LSR
+
+% :: bytes : nat : 'S   ->   bytes : 'S
+
+----- :: LSR__bytes
+LSR / bs : n : S  =>  ( bs >> n ) : S
+
 %     COMPARE: Integer/natural comparison
 
 % :: int : int : 'S   ->   int : 'S
@@ -1601,7 +1672,6 @@ SLICE / offset : len : byt : S => Some ( slice byt offset len ) : S
 offset + len >= length byt
 ----- :: SLICE__bytes_fail
 SLICE / offset : len : byt : S => None : S
-
 
 %     COMPARE: Lexicographic comparison.
 
