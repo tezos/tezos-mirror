@@ -30,6 +30,23 @@ open Api
 
 exception Failed_to_create
 
+let make_features () =
+  let open Functions.Wasmer.Features in
+  let features = new_ () in
+  (* These features map to proposals in the WebAssembly spec. They must be kept
+     in sync with the features available through Octez' WebAssembly interpreter
+     (tezos-webassembly-interpreter). *)
+  ignore (bulk_memory features false : bool) ;
+  ignore (memory64 features false : bool) ;
+  ignore (module_linking features false : bool) ;
+  ignore (multi_memory features false : bool) ;
+  ignore (multi_value features false : bool) ;
+  ignore (reference_types features true : bool) ;
+  ignore (simd features true : bool) ;
+  ignore (tail_call features false : bool) ;
+  ignore (threads features false : bool) ;
+  features
+
 type compiler = Types.Wasmer.Compiler.t = CRANELIFT | LLVM | SINGLEPASS
 
 let is_compiler_available = Functions.Wasmer.Compiler.is_available
@@ -46,4 +63,5 @@ let to_owned desc =
   let has_compiler = is_compiler_available desc.compiler in
   if not has_compiler then raise (Compiler_unavailable desc.compiler) ;
   Functions.Config.set_compiler conf desc.compiler ;
+  Functions.Config.set_features conf (make_features ()) ;
   conf
