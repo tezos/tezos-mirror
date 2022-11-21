@@ -658,7 +658,7 @@ struct
         ~description:"Exception safely wrapped in an error"
         ~pp:(fun ppf s ->
           Format.fprintf ppf "@[<h 0>%a@]" Format.pp_print_text s)
-        Data_encoding.(obj1 (req "msg" string))
+        Data_encoding.(obj1 (req "msg" @@ string Plain))
         (function
           | Exn (Failure msg) -> Some msg
           | Exn exn -> Some (Printexc.to_string exn)
