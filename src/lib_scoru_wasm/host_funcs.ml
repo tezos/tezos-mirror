@@ -121,11 +121,10 @@ module Aux = struct
   module type S = sig
     type memory
 
-    (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
-     ~num_bytes] reads num_bytes from the memory of module_inst starting at
-     src and writes this to the output_buffer. It also checks that
-     the input payload is no larger than `max_output`. It returns 0 for Ok and
-    1 for `output too large`.*)
+    (** [write_output ~output_buffer ~memory ~src ~num_bytes] reads
+     num_bytes from the memory of module_inst starting at src and writes
+     this to the output_buffer. It also checks that the input payload is
+     no larger than `max_output`. It returns 0 for Ok. *)
     val write_output :
       output_buffer:Output_buffer.t ->
       memory:memory ->
@@ -442,7 +441,7 @@ module Aux = struct
         ~num_bytes =
       let open Lwt_result_syntax in
       let*! res =
-        if num_bytes > chunk_max_size then return (durable, 1l)
+        if num_bytes > chunk_max_size then fail Error.Input_output_too_large
         else
           let* key = load_key_from_memory key_offset key_length memory in
           let*! value_size_err = store_value_size_aux ~durable ~key in
