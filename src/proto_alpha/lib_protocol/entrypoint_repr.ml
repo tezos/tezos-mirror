@@ -53,7 +53,7 @@ let () =
     ~title:"Entrypoint name too long (type error)"
     ~description:
       "An entrypoint name exceeds the maximum length of 31 characters."
-    Data_encoding.(obj1 (req "name" string))
+    Data_encoding.(obj1 (req "name" @@ string Plain))
     (function Name_too_long entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> Name_too_long entrypoint)
 
@@ -181,13 +181,13 @@ let simple_encoding =
   Data_encoding.conv_with_guard
     (fun (name : t) -> (name :> string))
     of_string_lax'
-    Data_encoding.string
+    Data_encoding.(string Plain)
 
 let value_encoding =
   Data_encoding.conv_with_guard
     (fun name -> if is_default name then "" else (name :> string))
     of_string_strict'
-    Data_encoding.Variable.string
+    Data_encoding.Variable.(string Plain)
 
 let smart_encoding =
   let open Data_encoding in
@@ -215,7 +215,7 @@ let smart_encoding =
       case
         (Tag 255)
         ~title:"named"
-        (Bounded.string 31)
+        (Bounded.string Plain 31)
         (fun (name : Pre_entrypoint.t) -> Some (name :> string))
         of_string_lax_exn;
     ]

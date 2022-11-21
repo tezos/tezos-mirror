@@ -82,7 +82,7 @@ let circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t
         Compare.List_length_with.(l <> SMap.cardinal m)
       then Error "Zk_rollup_origination: circuits_info has duplicated keys"
       else Ok m)
-    (list (tup2 string variant_encoding))
+    (list (tup2 (string Plain) variant_encoding))
 
 let encoding =
   let open Data_encoding in

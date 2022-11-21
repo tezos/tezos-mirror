@@ -50,7 +50,7 @@ let vdf_setup_encoding =
         Option.to_result
           ~none:"VDF discriminant could not be deserialised"
           (Vdf.discriminant_of_bytes_opt b))
-      (Fixed.bytes Vdf.discriminant_size_bytes)
+      (Fixed.(bytes Hex) Vdf.discriminant_size_bytes)
   in
   let vdf_challenge_encoding =
     conv_with_guard
@@ -59,7 +59,7 @@ let vdf_setup_encoding =
         Option.to_result
           ~none:"VDF challenge could not be deserialised"
           (Vdf.challenge_of_bytes_opt b))
-      (Fixed.bytes Vdf.form_size_bytes)
+      (Fixed.(bytes Hex) Vdf.form_size_bytes)
   in
   tup2 vdf_discriminant_encoding vdf_challenge_encoding
 
@@ -72,7 +72,7 @@ let vdf_solution_encoding =
         Option.to_result
           ~none:"VDF result could not be deserialised"
           (Vdf.result_of_bytes_opt b))
-      (Fixed.bytes Vdf.form_size_bytes)
+      (Fixed.(bytes Hex) Vdf.form_size_bytes)
   in
   let vdf_proof_encoding =
     conv_with_guard
@@ -81,7 +81,7 @@ let vdf_solution_encoding =
         Option.to_result
           ~none:"VDF proof could not be deserialised"
           (Vdf.proof_of_bytes_opt b))
-      (Fixed.bytes Vdf.form_size_bytes)
+      (Fixed.(bytes Hex) Vdf.form_size_bytes)
   in
   tup2 vdf_result_encoding vdf_proof_encoding
 
@@ -99,13 +99,16 @@ let pp_solution ppf solution =
     (Hex.of_bytes (Vdf.proof_to_bytes proof)) ;
   Format.fprintf ppf "@]"
 
-let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
+let nonce_encoding = Data_encoding.Fixed.(bytes Hex) Constants_repr.nonce_length
 
 let zero_bytes = Bytes.make Nonce_hash.size '\000'
 
 let state_hash_encoding =
   let open Data_encoding in
-  conv State_hash.to_bytes State_hash.of_bytes_exn (Fixed.bytes Nonce_hash.size)
+  conv
+    State_hash.to_bytes
+    State_hash.of_bytes_exn
+    (Fixed.(bytes Hex) Nonce_hash.size)
 
 let seed_encoding =
   let open Data_encoding in

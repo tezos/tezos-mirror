@@ -102,7 +102,7 @@ let inbox_message_encoding =
     (obj3
        (req "inbox_level" Raw_level_repr.encoding)
        (req "message_counter" n)
-       (req "payload" (string' Hex)))
+       (req "payload" (string Hex)))
 
 let reveal_data_encoding =
   let open Data_encoding in
@@ -116,7 +116,7 @@ let reveal_data_encoding =
             "raw_data"
             (check_size
                Constants_repr.sc_rollup_message_size_limit
-               (string' Hex))))
+               (string Hex))))
       (function Raw_data m -> Some ((), m) | _ -> None)
       (fun ((), m) -> Raw_data m)
   and case_metadata =
@@ -135,7 +135,7 @@ let reveal_data_encoding =
       (Tag 2)
       (obj2
          (req "reveal_data_kind" (constant "dal_page"))
-         (req "dal_page_content" (option bytes)))
+         (req "dal_page_content" (option (bytes Hex))))
       (function Dal_page p -> Some ((), p) | _ -> None)
       (fun ((), p) -> Dal_page p)
   in

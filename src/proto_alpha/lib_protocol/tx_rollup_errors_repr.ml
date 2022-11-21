@@ -376,7 +376,7 @@ let () =
     ~id:"tx_rollup_internal_error"
     ~title:"An internal error occurred"
     ~description:"An internal error occurred"
-    (obj1 (req "description" string))
+    (obj1 (req "description" (string Plain)))
     (function Internal_error str -> Some str | _ -> None)
     (fun str -> Internal_error str) ;
   (* Wrong_message_position *)

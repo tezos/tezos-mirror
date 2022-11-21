@@ -557,7 +557,7 @@ module Make (Context : P) :
               case
                 ~title:"store"
                 (Tag 2)
-                Data_encoding.string
+                Data_encoding.(string Plain)
                 (function IStore x -> Some x | _ -> None)
                 (fun x -> IStore x);
             ])
@@ -570,7 +570,7 @@ module Make (Context : P) :
 
       let initial = ""
 
-      let encoding = Data_encoding.string
+      let encoding = Data_encoding.(string Plain)
 
       let pp fmt s = Format.fprintf fmt "%s" s
     end)
@@ -685,7 +685,7 @@ module Make (Context : P) :
 
       let initial = None
 
-      let encoding = Data_encoding.(option string)
+      let encoding = Data_encoding.(option (string Plain))
 
       let name = "next_message"
 

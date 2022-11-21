@@ -36,7 +36,7 @@ let () =
     ~pp:(fun ppf x -> Format.fprintf ppf "Invalid tx rollup notation %S" x)
     ~description:
       "A malformed tx rollup notation was given to an RPC or in a script."
-    (obj1 (req "notation" string))
+    (obj1 (req "notation" (string Plain)))
     (function Invalid_rollup_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_rollup_notation loc)
 
@@ -108,7 +108,7 @@ let encoding =
               match of_b58check s with
               | Ok s -> s
               | Error _ -> Json.cannot_destruct "Invalid tx rollup notation.")
-            string)
+            (string Plain))
 
 let originated_tx_rollup nonce =
   let data =

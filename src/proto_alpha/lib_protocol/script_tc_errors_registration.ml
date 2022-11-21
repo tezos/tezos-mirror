@@ -509,7 +509,7 @@ let () =
     ~id:"michelson_v1.view_name_too_long"
     ~title:"View name too long (type error)"
     ~description:"A view name exceeds the maximum length of 31 characters."
-    (obj1 (req "name" string))
+    (obj1 (req "name" (string Plain)))
     (function View_name_too_long name -> Some name | _ -> None)
     (fun name -> View_name_too_long name) ;
   (* Duplicated view name *)
@@ -529,7 +529,7 @@ let () =
     ~description:"A compile-time constant was invalid for its expected form."
     (located
        (obj2
-          (req "expected_form" string)
+          (req "expected_form" (string Plain))
           (req "wrong_expression" Script.expr_encoding)))
     (function
       | Invalid_syntactic_constant (loc, expr, expected) ->
@@ -724,7 +724,7 @@ let () =
       "The toplevel error thrown when trying to typecheck a data expression \
        against a given type (always followed by more precise errors)."
     (obj3
-       (opt "identifier" string)
+       (opt "identifier" (string Plain))
        (req "expected_type" Script.expr_encoding)
        (req "ill_typed_expression" Script.expr_encoding))
     (function
@@ -739,7 +739,7 @@ let () =
       "The toplevel error thrown when trying to parse a type expression \
        (always followed by more precise errors)."
     (obj3
-       (opt "identifier" string)
+       (opt "identifier" (string Plain))
        (req "ill_formed_expression" Script.expr_encoding)
        (req "location" Script.location_encoding))
     (function

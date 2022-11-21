@@ -812,7 +812,7 @@ module Encoding = struct
           encoding =
             obj3
               (req "rollup" Tx_rollup_repr.encoding)
-              (req "content" (string' Hex))
+              (req "content" (string Hex))
               (opt "burn_limit" Tez_repr.encoding);
           select =
             (function
@@ -1128,8 +1128,8 @@ module Encoding = struct
           encoding =
             obj4
               (req "pvm_kind" Sc_rollups.Kind.encoding)
-              (req "boot_sector" (string' Hex))
-              (req "origination_proof" (string' Hex))
+              (req "boot_sector" (string Hex))
+              (req "origination_proof" (string Hex))
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function
@@ -1164,7 +1164,7 @@ module Encoding = struct
         {
           tag = sc_rollup_operation_add_message_tag;
           name = "sc_rollup_add_messages";
-          encoding = obj1 (req "message" (list (string' Hex)));
+          encoding = obj1 (req "message" (list (string Hex)));
           select =
             (function
             | Manager (Sc_rollup_add_messages _ as op) -> Some op | _ -> None);
@@ -1261,7 +1261,7 @@ module Encoding = struct
               (req
                  "cemented_commitment"
                  Sc_rollup_commitment_repr.Hash.encoding)
-              (req "output_proof" (string' Hex));
+              (req "output_proof" (string Hex));
           select =
             (function
             | Manager (Sc_rollup_execute_outbox_message _ as op) -> Some op
@@ -1580,7 +1580,7 @@ module Encoding = struct
       {
         tag = 17;
         name = "failing_noop";
-        encoding = obj1 (req "arbitrary" (string' Hex));
+        encoding = obj1 (req "arbitrary" (string Hex));
         select =
           (function Contents (Failing_noop _ as op) -> Some op | _ -> None);
         proj = (function Failing_noop message -> message);
@@ -1939,7 +1939,7 @@ let () =
         ppf
         "An operation contents list has an unexpected shape: %s"
         s)
-    Data_encoding.(obj1 (req "message" (string' Hex)))
+    Data_encoding.(obj1 (req "message" (string Hex)))
     (function Contents_list_error s -> Some s | _ -> None)
     (fun s -> Contents_list_error s)
 

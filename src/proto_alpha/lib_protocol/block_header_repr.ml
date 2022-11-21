@@ -101,7 +101,7 @@ let contents_encoding =
           (req "payload_round" Round_repr.encoding)
           (req
              "proof_of_work_nonce"
-             (Fixed.bytes Constants_repr.proof_of_work_nonce_size))
+             (Fixed.bytes Hex Constants_repr.proof_of_work_nonce_size))
           (opt "seed_nonce_hash" Nonce_hash.encoding)
           (req
              "liquidity_baking_toggle_vote"

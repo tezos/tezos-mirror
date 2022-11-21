@@ -154,7 +154,8 @@ let check_comparable :
 
 let pack_node unparsed ctxt =
   let bytes =
-    Data_encoding.(Binary.to_bytes_exn (tup2 (Fixed.string 1) expr_encoding))
+    Data_encoding.(
+      Binary.to_bytes_exn (tup2 (Fixed.string Plain 1) expr_encoding))
       ("\x05", unparsed)
   in
   (bytes, ctxt)

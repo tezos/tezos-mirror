@@ -159,7 +159,7 @@ let () =
     ~description:"The provided protocol constants are not coherent."
     ~pp:(fun ppf reason ->
       Format.fprintf ppf "Invalid protocol constants: %s" reason)
-    Data_encoding.(obj1 (req "reason" string))
+    Data_encoding.(obj1 (req "reason" @@ string Plain))
     (function Invalid_protocol_constants reason -> Some reason | _ -> None)
     (fun reason -> Invalid_protocol_constants reason)
 

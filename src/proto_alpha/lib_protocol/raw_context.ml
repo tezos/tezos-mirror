@@ -435,7 +435,7 @@ let () =
       Format.fprintf
         ppf
         "The stake distribution for the current cycle is not set.")
-    Data_encoding.(empty)
+    empty
     (function Stake_distribution_not_set -> Some () | _ -> None)
     (fun () -> Stake_distribution_not_set) ;
   register_error_kind
@@ -577,14 +577,14 @@ let storage_error_encoding =
       case
         (Tag 0)
         ~title:"Incompatible_protocol_version"
-        (obj1 (req "incompatible_protocol_version" string))
+        (obj1 (req "incompatible_protocol_version" @@ string Plain))
         (function Incompatible_protocol_version arg -> Some arg | _ -> None)
         (fun arg -> Incompatible_protocol_version arg);
       case
         (Tag 1)
         ~title:"Missing_key"
         (obj2
-           (req "missing_key" (list string))
+           (req "missing_key" (list @@ string Plain))
            (req
               "function"
               (string_enum
@@ -594,13 +594,13 @@ let storage_error_encoding =
       case
         (Tag 2)
         ~title:"Existing_key"
-        (obj1 (req "existing_key" (list string)))
+        (obj1 (req "existing_key" (list @@ string Plain)))
         (function Existing_key key -> Some key | _ -> None)
         (fun key -> Existing_key key);
       case
         (Tag 3)
         ~title:"Corrupted_data"
-        (obj1 (req "corrupted_data" (list string)))
+        (obj1 (req "corrupted_data" (list @@ string Plain)))
         (function Corrupted_data key -> Some key | _ -> None)
         (fun key -> Corrupted_data key);
     ]
@@ -705,7 +705,7 @@ let () =
         ppf
         "@[<v 2>Cannot parse the protocol parameter:@ %s@]"
         (Bytes.to_string bytes))
-    Data_encoding.(obj1 (req "contents" bytes))
+    Data_encoding.(obj1 (req "contents" @@ bytes Hex))
     (function Failed_to_parse_parameter data -> Some data | _ -> None)
     (fun data -> Failed_to_parse_parameter data) ;
   register_error_kind
@@ -720,7 +720,7 @@ let () =
         msg
         Data_encoding.Json.pp
         json)
-    Data_encoding.(obj2 (req "contents" json) (req "error" string))
+    Data_encoding.(obj2 (req "contents" json) (req "error" @@ string Plain))
     (function
       | Failed_to_decode_parameter (json, msg) -> Some (json, msg) | _ -> None)
     (fun (json, msg) -> Failed_to_decode_parameter (json, msg))

@@ -78,7 +78,9 @@ let encoding : t Data_encoding.t =
       (fun (pending_pis, private_pis, fee_pi, proof) ->
         {pending_pis; private_pis; fee_pi; proof})
       (obj4
-         (req "pending_pis" (list @@ tup2 string op_pi_encoding))
-         (req "private_pis" (list @@ tup2 string private_inner_pi_encoding))
+         (req "pending_pis" (list @@ tup2 (string Plain) op_pi_encoding))
+         (req
+            "private_pis"
+            (list @@ tup2 (string Plain) private_inner_pi_encoding))
          (req "fee_pi" fee_pi_encoding)
          (req "proof" Plonk.proof_encoding)))

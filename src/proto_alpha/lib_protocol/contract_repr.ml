@@ -131,7 +131,7 @@ let encoding_gen ~id_extra ~title_extra ~can_be ~cases ~to_b58check ~of_b58data
               match of_b58check_gen ~of_b58data s with
               | Ok s -> s
               | Error _ -> Json.cannot_destruct "Invalid contract notation.")
-            string)
+            (string Plain))
 
 let encoding =
   encoding_gen
@@ -169,7 +169,7 @@ let () =
     ~pp:(fun ppf x -> Format.fprintf ppf "Invalid contract notation %S" x)
     ~description:
       "A malformed contract notation was given to an RPC or in a script."
-    (obj1 (req "notation" string))
+    (obj1 (req "notation" (string Plain)))
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
 

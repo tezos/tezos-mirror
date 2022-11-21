@@ -32,7 +32,7 @@ type serialized = string
 
 let length = String.length
 
-let serialized_encoding = Data_encoding.(string' Hex)
+let serialized_encoding = Data_encoding.(string Hex)
 
 let proof_of_serialized_opt = Data_encoding.Binary.of_string_opt encoding
 

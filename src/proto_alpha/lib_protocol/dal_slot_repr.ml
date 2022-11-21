@@ -172,7 +172,7 @@ module Page = struct
 
   let proof_encoding = Dal.page_proof_encoding
 
-  let content_encoding = Data_encoding.bytes
+  let content_encoding = Data_encoding.(bytes Hex)
 
   let pp fmt {slot_id = {published_level; index}; page_index} =
     Format.fprintf
@@ -541,7 +541,7 @@ module History = struct
              (req "kind" (constant "confirmed"))
              (req "target_cell" history_encoding)
              (req "inc_proof" (list history_encoding))
-             (req "page_data" bytes)
+             (req "page_data" (bytes Hex))
              (req "page_proof" Page.proof_encoding))
           (function
             | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
@@ -577,7 +577,7 @@ module History = struct
 
     (** DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4084
         DAL proof's encoding should be bounded *)
-    let proof_encoding = Data_encoding.bytes
+    let proof_encoding = Data_encoding.(bytes Hex)
 
     type error += Dal_invalid_proof_serialization
 
@@ -662,7 +662,7 @@ module History = struct
         ~title:"Dal proof error"
         ~description:"Error occurred during Dal proof production or validation"
         ~pp:(fun ppf e -> Format.fprintf ppf "Dal proof error: %s" e)
-        (obj1 (req "error" string))
+        (obj1 (req "error" (string Plain)))
         (function Dal_proof_error e -> Some e | _ -> None)
         (fun e -> Dal_proof_error e)
 
