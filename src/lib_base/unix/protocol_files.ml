@@ -49,7 +49,7 @@ let create_files dir units =
   let* files =
     Lwt_list.map_s
       (fun {name; interface; implementation} ->
-        let name = String.lowercase_ascii name in
+        let name = String.uncapitalize_ascii name in
         let ml = dir // (name ^ ".ml") in
         let mli = dir // (name ^ ".mli") in
         let+ () = Lwt_utils_unix.create_file ml implementation
