@@ -66,8 +66,8 @@ else {
     {found=0; print }
   else
     { if (!found){print}}
-}}' src/lib_node_config/node_config_file.ml > tmp_file
-    mv tmp_file src/lib_node_config/node_config_file.ml
+}}' src/lib_node_config/config_file.ml > tmp_file
+    mv tmp_file src/lib_node_config/config_file.ml
 
     echo "The sandbox will now switch to $full_hash at level $level."
 else # we are in sandbox
@@ -84,8 +84,8 @@ else {
     {found=0; print }
   else
     { if (!found){print}}
-}}' src/lib_node_config/node_config_file.ml > tmp_file
-    mv tmp_file src/lib_node_config/node_config_file.ml
+}}' src/lib_node_config/config_file.ml > tmp_file
+    mv tmp_file src/lib_node_config/config_file.ml
 
     sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/octez-init-sandboxed-client.sh
     sed -i.old "s/activate_alpha()/activate_${pred}_${pred_short_hash}()/" src/bin_client/octez-init-sandboxed-client.sh

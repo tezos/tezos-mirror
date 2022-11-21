@@ -32,34 +32,31 @@ let get_config data_dir config_file expected_pow =
     match (data_dir, config_file) with
     | None, None ->
         let default_config =
-          Node_config_file.default_data_dir
-          // Node_data_version.default_config_file_name
+          Config_file.default_data_dir // Data_version.default_config_file_name
         in
         let*! config_file_exists = Lwt_unix.file_exists default_config in
-        if config_file_exists then Node_config_file.read default_config
-        else return Node_config_file.default_config
-    | None, Some config_file -> Node_config_file.read config_file
+        if config_file_exists then Config_file.read default_config
+        else return Config_file.default_config
+    | None, Some config_file -> Config_file.read config_file
     | Some data_dir, None ->
         let* cfg =
-          Node_config_file.read
-            (data_dir // Node_data_version.default_config_file_name)
+          Config_file.read (data_dir // Data_version.default_config_file_name)
         in
         return {cfg with data_dir}
     | Some data_dir, Some config_file ->
-        let* cfg = Node_config_file.read config_file in
+        let* cfg = Config_file.read config_file in
         return {cfg with data_dir}
   in
-  Node_config_file.update ?expected_pow cfg
+  Config_file.update ?expected_pow cfg
 
 (** Commands *)
 
-let identity_file data_dir =
-  data_dir // Node_data_version.default_identity_file_name
+let identity_file data_dir = data_dir // Data_version.default_identity_file_name
 
 let show data_dir config_file expected_pow =
-  Node_shared_arg.process_command
+  Shared_arg.process_command
     (let open Lwt_result_syntax in
-    let* {Node_config_file.data_dir; _} =
+    let* {Config_file.data_dir; _} =
       get_config data_dir config_file expected_pow
     in
     let* id = Node_identity_file.read (identity_file data_dir) in
@@ -67,9 +64,9 @@ let show data_dir config_file expected_pow =
     return_unit)
 
 let check data_dir config_file expected_pow =
-  Node_shared_arg.process_command
+  Shared_arg.process_command
     (let open Lwt_result_syntax in
-    let* {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
+    let* {Config_file.data_dir; p2p = {expected_pow; _}; _} =
       get_config data_dir config_file expected_pow
     in
     let* id = Node_identity_file.read ~expected_pow (identity_file data_dir) in
@@ -81,9 +78,9 @@ let check data_dir config_file expected_pow =
     return_unit)
 
 let generate data_dir config_file expected_pow =
-  Node_shared_arg.process_command
+  Shared_arg.process_command
     (let open Lwt_result_syntax in
-    let* {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
+    let* {Config_file.data_dir; p2p = {expected_pow; _}; _} =
       get_config data_dir config_file expected_pow
     in
     let* _id =
@@ -114,8 +111,8 @@ module Term = struct
            "show")
         Cmdliner.Term.(
           ret
-            (const show $ Node_shared_arg.Term.data_dir
-           $ Node_shared_arg.Term.config_file $ expected_pow));
+            (const show $ Shared_arg.Term.data_dir $ Shared_arg.Term.config_file
+           $ expected_pow));
       Cmdliner.Cmd.v
         (Cmdliner.Cmd.info
            ~doc:
@@ -129,8 +126,8 @@ module Term = struct
            "generate")
         Cmdliner.Term.(
           ret
-            (const generate $ Node_shared_arg.Term.data_dir
-           $ Node_shared_arg.Term.config_file $ expected_pow));
+            (const generate $ Shared_arg.Term.data_dir
+           $ Shared_arg.Term.config_file $ expected_pow));
       Cmdliner.Cmd.v
         (Cmdliner.Cmd.info
            ~doc:
@@ -139,8 +136,8 @@ module Term = struct
            "check")
         Cmdliner.Term.(
           ret
-            (const check $ Node_shared_arg.Term.data_dir
-           $ Node_shared_arg.Term.config_file $ expected_pow));
+            (const check $ Shared_arg.Term.data_dir
+           $ Shared_arg.Term.config_file $ expected_pow));
     ]
 end
 
@@ -156,7 +153,7 @@ module Manpage = struct
 
   let man =
     (* [ `S misc_docs ] @ *)
-    Node_shared_arg.Manpage.bugs
+    Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Manage node identities" ~man "identity"
 end

@@ -26,7 +26,7 @@ Simple events are record-like structures which are constructed directly
 programmatically). The API is less generic than the “Heavy” Events'.
 
 See for instance
-:src:`src/lib_node_config/node_config_file.ml` (search for the string `declare_`):
+:src:`src/lib_node_config/config_file.ml` (search for the string `declare_`):
 
 -  one declares typed-record events with
    ``Internal_event.Simple.declare_<number-of-fields>``,

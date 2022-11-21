@@ -64,7 +64,7 @@ type t = {
   enable_testchain : bool;
   cors_origins : string list;
   cors_headers : string list;
-  rpc_tls : Node_config_file.tls option;
+  rpc_tls : Config_file.tls option;
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
@@ -90,23 +90,23 @@ module Term : sig
   val config_file : string option Cmdliner.Term.t
 end
 
-val read_config_file : t -> Node_config_file.t tzresult Lwt.t
+val read_config_file : t -> Config_file.t tzresult Lwt.t
 
 val read_data_dir : t -> string tzresult Lwt.t
 
 (** Modify a node's network configuration.
 
     This returns [cfg] modified according to the [network] argument.
-    Default value for [cfg] is [Node_config_file.default_config]. *)
+    Default value for [cfg] is [Config_file.default_config]. *)
 val patch_network :
-  ?cfg:Node_config_file.t ->
-  Node_config_file.blockchain_network ->
-  (Node_config_file.t, tztrace) result Lwt.t
+  ?cfg:Config_file.t ->
+  Config_file.blockchain_network ->
+  (Config_file.t, tztrace) result Lwt.t
 
 (** Modify a node configuration.
 
     This returns [cfg] modified according to command-line arguments.
-    Default value for [cfg] is [Node_config_file.default_config].
+    Default value for [cfg] is [Config_file.default_config].
 
     [may_override_network] specifies whether the network parameter is overridden,
     if already configured.
@@ -120,9 +120,9 @@ val patch_config :
   ?may_override_network:bool ->
   ?emit:(unit Internal_event.Simple.t -> unit -> unit Lwt.t) ->
   ?ignore_bootstrap_peers:bool ->
-  ?cfg:Node_config_file.t ->
+  ?cfg:Config_file.t ->
   t ->
-  (Node_config_file.t, tztrace) result Lwt.t
+  (Config_file.t, tztrace) result Lwt.t
 
 (** [read_and_patch_config_file ~may_override_network ~ignore_bootstrap_peers args]
     Read the current config file and modify it accordingly to [args].
@@ -137,7 +137,7 @@ val read_and_patch_config_file :
   ?emit:(unit Internal_event.Simple.t -> unit -> unit Lwt.t) ->
   ?ignore_bootstrap_peers:bool ->
   t ->
-  Node_config_file.t tzresult Lwt.t
+  Config_file.t tzresult Lwt.t
 
 module Manpage : sig
   val misc_section : string

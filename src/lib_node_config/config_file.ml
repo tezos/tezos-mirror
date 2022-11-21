@@ -782,7 +782,7 @@ type error += Invalid_content of string option * string
 let () =
   register_error_kind
     `Permanent
-    ~id:"node_config_file.invalid_content"
+    ~id:"config_file.invalid_content"
     ~title:"Invalid config file"
     ~description:"Invalid content in node config file"
     ~pp:(fun ppf (path, exn) ->
@@ -851,9 +851,7 @@ let read fp =
 
 let write fp cfg =
   let open Lwt_result_syntax in
-  let* () =
-    Node_data_version.ensure_data_dir ~mode:Exists (Filename.dirname fp)
-  in
+  let* () = Data_version.ensure_data_dir ~mode:Exists (Filename.dirname fp) in
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =
@@ -881,7 +879,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       Event.(emit all_rpc_allowed allow_all_rpc)
     else Lwt.return_unit
   in
-  let* () = Node_data_version.ensure_data_dir ~mode:Exists data_dir in
+  let* () = Data_version.ensure_data_dir ~mode:Exists data_dir in
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : Tezos_p2p_services.P2p_limits.t =
@@ -1004,7 +1002,7 @@ let () =
   (* Parsing of an address failed with an explanation *)
   Error_monad.register_error_kind
     `Permanent
-    ~id:"node_config_file.parsing_address_failed"
+    ~id:"config_file.parsing_address_failed"
     ~title:"Parsing of an address failed"
     ~description:"Parsing an address failed with an explanation."
     ~pp:(fun ppf (addr, explanation) ->

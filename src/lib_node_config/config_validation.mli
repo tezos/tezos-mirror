@@ -35,4 +35,4 @@ type error += Invalid_node_configuration
     and [check config] returns unit. *)
 
 val check :
-  ?ignore_testchain_warning:bool -> Node_config_file.t -> unit tzresult Lwt.t
+  ?ignore_testchain_warning:bool -> Config_file.t -> unit tzresult Lwt.t
