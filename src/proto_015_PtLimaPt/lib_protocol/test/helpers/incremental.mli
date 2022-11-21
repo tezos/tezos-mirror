@@ -100,12 +100,16 @@ val validate_operation :
     application of [op] does not fail and [expect_apply_failure] is
     provided, [add_operation] fails.}
 
+   {ul {li [?allow_manager_failure] marks that manager operation
+    failures after fee taken are ignored.}}
+
     {li [?check_size:bool]: enable the check that an operation size
     should not exceed [Constants_repr.max_operation_data_length].
     Enabled (set to [true]) by default. }} *)
 val add_operation :
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
+  ?allow_manager_failure:bool ->
   ?check_size:bool ->
   incremental ->
   Operation.packed ->

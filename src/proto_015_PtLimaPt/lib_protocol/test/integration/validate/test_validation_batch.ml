@@ -417,8 +417,8 @@ let batch_empty_at_end infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [reveal; op_case2; op2_case2]
   in
-  let* _ = validate_diagnostic infos [case2] in
-  let* _ = validate_diagnostic infos [case3] in
+  let* _ = validate_diagnostic ~deallocated:true infos [case2] in
+  let* _ = validate_diagnostic ~deallocated:true infos [case3] in
   return_unit
 
 (** Simple reveal followed by a transaction. *)
