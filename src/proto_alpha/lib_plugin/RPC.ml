@@ -3464,7 +3464,7 @@ let register () =
   Dal.register () ;
   Tx_rollup.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
-      if q.offset < 0l then fail Negative_level_offset
+      if q.offset < 0l then tzfail Negative_level_offset
       else
         Lwt.return
           (Level.from_raw_with_offset

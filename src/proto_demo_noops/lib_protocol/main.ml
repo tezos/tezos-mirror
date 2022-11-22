@@ -125,9 +125,9 @@ let () =
     (function No_error -> Some () | _ -> None)
     (fun () -> No_error)
 
-let validate_operation ?check_signature:_ _state _oph _op = fail No_error
+let validate_operation ?check_signature:_ _state _oph _op = tzfail No_error
 
-let apply_operation _state _oph _op = fail No_error
+let apply_operation _state _oph _op = tzfail No_error
 
 let finalize_validation _state = return_unit
 
@@ -157,7 +157,7 @@ let init _chain_id context block_header =
 
 let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
     ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
-  return (fun _ -> fail No_error)
+  return (fun _ -> tzfail No_error)
 
 let rpc_services = RPC_directory.empty
 

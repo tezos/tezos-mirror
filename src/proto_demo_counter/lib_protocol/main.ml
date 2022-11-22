@@ -163,7 +163,7 @@ let apply_operation_aux application_state operation =
   let {context; fitness} = application_state in
   State.get_state context >>= fun state ->
   match Apply.apply state operation.protocol_data with
-  | None -> Error_monad.fail Error.Invalid_operation
+  | None -> Error_monad.tzfail Error.Invalid_operation
   | Some state ->
       State.update_state context state >>= fun context ->
       return {context; fitness}
@@ -209,7 +209,7 @@ let finalize_application application_state _shell_header =
 let decode_json json =
   match Proto_params.from_json json with
   | exception _ ->
-    fail Error.Invalid_protocol_parameters
+    tzfail Error.Invalid_protocol_parameters
   | proto_params ->
     return proto_params
 
@@ -222,14 +222,14 @@ let get_init_state context : State.t tzresult Lwt.t =
       | Some bytes -> (
           match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
           | None ->
-            fail (Error.Failed_to_parse_parameter bytes)
+            tzfail (Error.Failed_to_parse_parameter bytes)
           | Some json ->
             decode_json json ))
   >>=? function
   | Proto_params.{init_a; init_b} -> (
       match State.create init_a init_b with
       | None ->
-        fail Error.Invalid_protocol_parameters
+        tzfail Error.Invalid_protocol_parameters
       | Some state ->
         return state )
 

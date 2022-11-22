@@ -393,7 +393,7 @@ end
 let check_delegate_registered ctxt pkh =
   Delegate.registered ctxt pkh >>= function
   | true -> return_unit
-  | false -> fail (Not_registered pkh)
+  | false -> tzfail (Not_registered pkh)
 
 let register () =
   let open Services_registration in

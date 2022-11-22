@@ -326,7 +326,7 @@ module Raw = struct
       (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
    fun ((ctxt, _) as g) gas ks0 accu stack ->
     match consume_control gas ks0 with
-    | None -> fail Gas.Operation_quota_exceeded
+    | None -> tzfail Gas.Operation_quota_exceeded
     | Some gas -> (
         match ks0 with
         | KLog (ks, sty, logger) ->
@@ -458,7 +458,7 @@ module Raw = struct
     let x = accu in
     let y, stack = stack in
     match Script_int.to_int64 y with
-    | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
+    | None -> get_log logger >>=? fun log -> tzfail (Overflow (loc, log))
     | Some y ->
         Tez.(x *? y) >>?= fun res ->
         (step [@ocaml.tailcall]) g gas k ks res stack
@@ -468,7 +468,7 @@ module Raw = struct
     let y = accu in
     let x, stack = stack in
     match Script_int.to_int64 y with
-    | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
+    | None -> get_log logger >>=? fun log -> tzfail (Overflow (loc, log))
     | Some y ->
         Tez.(x *? y) >>?= fun res ->
         (step [@ocaml.tailcall]) g gas k ks res stack
@@ -477,21 +477,21 @@ module Raw = struct
    fun logger g gas loc k ks accu stack ->
     let x = accu and y, stack = stack in
     match Script_int.shift_left_n x y with
-    | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
+    | None -> get_log logger >>=? fun log -> tzfail (Overflow (loc, log))
     | Some x -> (step [@ocaml.tailcall]) g gas k ks x stack
 
   and ilsr_nat : type a b c d e f. (a, b, c, d, e, f) ilsr_nat_type =
    fun logger g gas loc k ks accu stack ->
     let x = accu and y, stack = stack in
     match Script_int.shift_right_n x y with
-    | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
+    | None -> get_log logger >>=? fun log -> tzfail (Overflow (loc, log))
     | Some r -> (step [@ocaml.tailcall]) g gas k ks r stack
 
   and ilsl_bytes : type a b c d e f. (a, b, c, d, e, f) ilsl_bytes_type =
    fun logger g gas loc k ks accu stack ->
     let x = accu and y, stack = stack in
     match Script_bytes.bytes_lsl x y with
-    | None -> get_log logger >>=? fun log -> fail (Overflow (loc, log))
+    | None -> get_log logger >>=? fun log -> tzfail (Overflow (loc, log))
     | Some res -> (step [@ocaml.tailcall]) g gas k ks res stack
 
   and ifailwith : ifailwith_type =
@@ -502,7 +502,7 @@ module Raw = struct
           let ctxt = update_context gas ctxt in
           trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
           >>=? fun (v, _ctxt) ->
-          get_log logger >>=? fun log -> fail (Reject (kloc, v, log)));
+          get_log logger >>=? fun log -> tzfail (Reject (kloc, v, log)));
     }
 
   and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
@@ -629,7 +629,7 @@ module Raw = struct
   and step : type a s b t r f. (a, s, b, t, r, f) step_type =
    fun ((ctxt, sc) as g) gas i ks accu stack ->
     match consume_instr gas i accu stack with
-    | None -> fail Gas.Operation_quota_exceeded
+    | None -> tzfail Gas.Operation_quota_exceeded
     | Some gas -> (
         match i with
         | ILog (_, sty, event, logger, k) ->
@@ -1548,7 +1548,7 @@ module Raw = struct
                 let ticketer = Contract.Originated sc.self in
                 let accu = {ticketer; contents; amount} in
                 (step [@ocaml.tailcall]) g gas k ks accu stack
-            | None -> fail Script_tc_errors.Forbidden_zero_ticket_quantity)
+            | None -> tzfail Script_tc_errors.Forbidden_zero_ticket_quantity)
         | ITicket (_, _, k) -> (
             let contents = accu and amount, stack = stack in
             match Ticket_amount.of_n amount with

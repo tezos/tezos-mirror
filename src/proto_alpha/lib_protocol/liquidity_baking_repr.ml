@@ -72,7 +72,7 @@ end = struct
 
   let of_int32 x =
     if check_bounds x then return x
-    else fail @@ Liquidity_baking_toggle_ema_out_of_bound x
+    else tzfail @@ Liquidity_baking_toggle_ema_out_of_bound x
 
   let zero = Int32.zero
 

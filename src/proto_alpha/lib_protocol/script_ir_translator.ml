@@ -1707,11 +1707,11 @@ let parse_pair (type r) parse_l parse_r ctxt ~legacy
       (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () -> parse_comb loc l rs
   | Prim (loc, D_Pair, l, _) ->
-      fail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
+      tzfail @@ Invalid_arity (loc, D_Pair, 2, List.length l)
   (* Unfold [{x1; ...; xn}] as [Pair x1 x2 ... xn-1 xn] for n >= 2 *)
   | Seq (loc, l :: (_ :: _ as rs)) -> parse_comb loc l rs
-  | Seq (loc, l) -> fail @@ Invalid_seq_arity (loc, 2, List.length l)
-  | expr -> fail @@ unexpected expr [] Constant_namespace [D_Pair]
+  | Seq (loc, l) -> tzfail @@ Invalid_seq_arity (loc, 2, List.length l)
+  | expr -> tzfail @@ unexpected expr [] Constant_namespace [D_Pair]
 
 let parse_union parse_l parse_r ctxt ~legacy = function
   | Prim (loc, D_Left, [v], annot) ->
@@ -1719,14 +1719,14 @@ let parse_union parse_l parse_r ctxt ~legacy = function
       >>?= fun () ->
       parse_l ctxt v >|=? fun (v, ctxt) -> (L v, ctxt)
   | Prim (loc, D_Left, l, _) ->
-      fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
+      tzfail @@ Invalid_arity (loc, D_Left, 1, List.length l)
   | Prim (loc, D_Right, [v], annot) ->
       (if legacy then Result.return_unit else error_unexpected_annot loc annot)
       >>?= fun () ->
       parse_r ctxt v >|=? fun (v, ctxt) -> (R v, ctxt)
   | Prim (loc, D_Right, l, _) ->
-      fail @@ Invalid_arity (loc, D_Right, 1, List.length l)
-  | expr -> fail @@ unexpected expr [] Constant_namespace [D_Left; D_Right]
+      tzfail @@ Invalid_arity (loc, D_Right, 1, List.length l)
+  | expr -> tzfail @@ unexpected expr [] Constant_namespace [D_Left; D_Right]
 
 let parse_option parse_v ctxt ~legacy = function
   | Prim (loc, D_Some, [v], annot) ->
@@ -1734,15 +1734,15 @@ let parse_option parse_v ctxt ~legacy = function
       >>?= fun () ->
       parse_v ctxt v >|=? fun (v, ctxt) -> (Some v, ctxt)
   | Prim (loc, D_Some, l, _) ->
-      fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
+      tzfail @@ Invalid_arity (loc, D_Some, 1, List.length l)
   | Prim (loc, D_None, [], annot) ->
       Lwt.return
         ( (if legacy then Result.return_unit
           else error_unexpected_annot loc annot)
         >|? fun () -> (None, ctxt) )
   | Prim (loc, D_None, l, _) ->
-      fail @@ Invalid_arity (loc, D_None, 0, List.length l)
-  | expr -> fail @@ unexpected expr [] Constant_namespace [D_Some; D_None]
+      tzfail @@ Invalid_arity (loc, D_None, 0, List.length l)
+  | expr -> tzfail @@ unexpected expr [] Constant_namespace [D_Some; D_None]
 
 let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
   function
@@ -1891,7 +1891,7 @@ let rec parse_data :
   Gas.consume ctxt Typecheck_costs.parse_data_cycle >>?= fun ctxt ->
   let non_terminal_recursion ctxt ty script_data =
     if Compare.Int.(stack_depth > 10_000) then
-      fail Typechecking_too_many_recursive_calls
+      tzfail Typechecking_too_many_recursive_calls
     else
       parse_data
         ~elab_conf
@@ -1905,7 +1905,7 @@ let rec parse_data :
     let ty = serialize_ty_for_error ty in
     Invalid_constant (location script_data, strip_locations script_data, ty)
   in
-  let fail_parse_data () = fail (parse_data_error ()) in
+  let fail_parse_data () = tzfail (parse_data_error ()) in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
   let traced body = trace_eval parse_data_error body in
   let traced_fail err = Lwt.return @@ traced_no_lwt (error err) in
@@ -1947,9 +1947,9 @@ let rec parse_data :
                 (Some k, Script_map.update k (Some (item_wrapper v)) map, ctxt)
               )
         | Prim (loc, D_Elt, l, _) ->
-            fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
+            tzfail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
-            fail @@ Invalid_primitive (loc, [D_Elt], name)
+            tzfail @@ Invalid_primitive (loc, [D_Elt], name)
         | Int _ | String _ | Bytes _ | Seq _ -> fail_parse_data ())
       (None, Script_map.empty key_type, ctxt)
       items
@@ -2006,9 +2006,9 @@ let rec parse_data :
                       },
                       ctxt ) )
         | Prim (loc, D_Elt, l, _) ->
-            fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
+            tzfail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
         | Prim (loc, name, _, _) ->
-            fail @@ Invalid_primitive (loc, [D_Elt], name)
+            tzfail @@ Invalid_primitive (loc, [D_Elt], name)
         | Int _ | String _ | Bytes _ | Seq _ -> fail_parse_data ())
       (None, {map = Big_map_overlay.empty; size = 0}, ctxt)
       items
@@ -2116,7 +2116,7 @@ let rec parse_data :
             match destination with
             | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
             | Tx_rollup _ | Sc_rollup _ | Zk_rollup _ ->
-                fail (Unexpected_ticket_owner destination))
+                tzfail (Unexpected_ticket_owner destination))
         | None -> traced_fail Forbidden_zero_ticket_quantity
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
@@ -2433,7 +2433,7 @@ and parse_kdescr :
   | Typed {loc; aft = stack_ty; _}, ctxt ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
-      fail @@ Bad_return (loc, stack_ty, ret)
+      tzfail @@ Bad_return (loc, stack_ty, ret)
   | Failed {descr}, ctxt ->
       return
         ( (close_descr (descr (Item_t (ret, Bot_t)))
@@ -2475,7 +2475,7 @@ and parse_lam_rec :
   | Typed {loc; aft = stack_ty; _}, ctxt ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
-      fail @@ Bad_return (loc, stack_ty, ret)
+      tzfail @@ Bad_return (loc, stack_ty, ret)
   | Failed {descr}, ctxt ->
       return
         ( (LamRec (close_descr (descr (Item_t (ret, Bot_t))), script_instr)
@@ -2527,7 +2527,7 @@ and parse_instr :
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
   let non_terminal_recursion tc_context ctxt script_instr stack_ty =
     if Compare.Int.(stack_depth > 10000) then
-      fail Typechecking_too_many_recursive_calls
+      tzfail Typechecking_too_many_recursive_calls
     else
       parse_instr
         ~elab_conf
@@ -2573,7 +2573,7 @@ and parse_instr :
   | Prim (loc, I_DROP, (_ :: _ :: _ as l), _), _ ->
       (* Technically, the arities 0 and 1 are allowed but the error only mentions 1.
             However, DROP is equivalent to DROP 1 so hinting at an arity of 1 makes sense. *)
-      fail (Invalid_arity (loc, I_DROP, 1, List.length l))
+      tzfail (Invalid_arity (loc, I_DROP, 1, List.length l))
   | Prim (loc, I_DUP, [], annot), (Item_t (v, _) as stack) ->
       check_var_annot loc annot >>?= fun () ->
       record_trace_eval
@@ -2635,7 +2635,7 @@ and parse_instr :
       let dig = {apply = (fun k -> IDig (loc, n, n', k))} in
       typed ctxt loc dig (Item_t (x, aft))
   | Prim (loc, I_DIG, (([] | _ :: _ :: _) as l), _), _ ->
-      fail (Invalid_arity (loc, I_DIG, 1, List.length l))
+      tzfail (Invalid_arity (loc, I_DIG, 1, List.length l))
   | Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack) -> (
       parse_uint10 n >>?= fun whole_n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument whole_n) >>?= fun ctxt ->
@@ -2643,7 +2643,7 @@ and parse_instr :
       match make_dug_proof_argument loc whole_n x whole_stack with
       | None ->
           let whole_stack = serialize_stack_for_error ctxt whole_stack in
-          fail (Bad_stack (loc, I_DUG, whole_n, whole_stack))
+          tzfail (Bad_stack (loc, I_DUG, whole_n, whole_stack))
       | Some (Dug_proof_argument (n', aft)) ->
           let dug = {apply = (fun k -> IDug (loc, whole_n, n', k))} in
           typed ctxt loc dug aft)
@@ -2653,7 +2653,7 @@ and parse_instr :
           let stack = serialize_stack_for_error ctxt stack in
           error (Bad_stack (loc, I_DUG, 1, stack)) )
   | Prim (loc, I_DUG, (([] | _ :: _ :: _) as l), _), _ ->
-      fail (Invalid_arity (loc, I_DUG, 1, List.length l))
+      tzfail (Invalid_arity (loc, I_DUG, 1, List.length l))
   | Prim (loc, I_SWAP, [], annot), Item_t (v, Item_t (w, rest)) ->
       error_unexpected_annot loc annot >>?= fun () ->
       let swap = {apply = (fun k -> ISwap (loc, k))} in
@@ -2800,7 +2800,7 @@ and parse_instr :
       match make_comb_get_proof_argument n comb_ty with
       | None ->
           let whole_stack = serialize_stack_for_error ctxt stack_ty in
-          fail (Bad_stack (loc, I_GET, 1, whole_stack))
+          tzfail (Bad_stack (loc, I_GET, 1, whole_stack))
       | Some (Comb_get_proof_argument (witness, ty')) ->
           let after_stack_ty = Item_t (ty', rest_ty) in
           let comb_get = {apply = (fun k -> IComb_get (loc, n, witness, k))} in
@@ -3210,7 +3210,7 @@ and parse_instr :
         option_t loc pair_ty >>?= fun ty ->
         let stack = Item_t (ty, rest) in
         typed ctxt loc instr stack
-      else fail (Deprecated_instruction T_sapling_transaction_deprecated)
+      else tzfail (Deprecated_instruction T_sapling_transaction_deprecated)
   | ( Prim (loc, I_SAPLING_VERIFY_UPDATE, [], _),
       Item_t
         ( Sapling_transaction_t transaction_memo_size,
@@ -3236,7 +3236,7 @@ and parse_instr :
       non_terminal_recursion tc_context ctxt hd stack
       >>=? fun (judgement, ctxt) ->
       match judgement with
-      | Failed _ -> fail (Fail_not_in_tail_position (Micheline.location hd))
+      | Failed _ -> tzfail (Fail_not_in_tail_position (Micheline.location hd))
       | Typed ({aft = middle; _} as ihd) ->
           non_terminal_recursion
             tc_context
@@ -3413,7 +3413,7 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> IApply (loc, capture_ty, k))} in
       lambda_t loc arg_ty ret
-      (* This cannot fail because the type [lambda 'arg 'ret] is always smaller than
+      (* This cannot tzfail because the type [lambda 'arg 'ret] is always smaller than
          the input type [lambda (pair 'arg 'capture) 'ret]. In an ideal world, there
          would be a smart deconstructor to ensure this statically. *)
       >>?=
@@ -3437,7 +3437,7 @@ and parse_instr :
           in
           let stack = Item_t (v, descr.aft) in
           typed ctxt loc instr stack
-      | Failed _ -> fail (Fail_not_in_tail_position loc))
+      | Failed _ -> tzfail (Fail_not_in_tail_position loc))
   | Prim (loc, I_DIP, [n; code], result_annot), stack ->
       parse_uint10 n >>?= fun n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
@@ -3476,7 +3476,7 @@ and parse_instr :
   | Prim (loc, I_DIP, (([] | _ :: _ :: _ :: _) as l), _), _ ->
       (* Technically, the arities 1 and 2 are allowed but the error only mentions 2.
             However, DIP {code} is equivalent to DIP 1 {code} so hinting at an arity of 2 makes sense. *)
-      fail (Invalid_arity (loc, I_DIP, 2, List.length l))
+      tzfail (Invalid_arity (loc, I_DIP, 2, List.length l))
   | Prim (loc, I_FAILWITH, [], annot), Item_t (v, _rest) ->
       Lwt.return
         ( error_unexpected_annot loc annot >>? fun () ->
@@ -3570,7 +3570,7 @@ and parse_instr :
         check_var_annot loc annot >>?= fun () ->
         let instr = {apply = (fun k -> ISub_tez_legacy (loc, k))} in
         typed ctxt loc instr stack
-      else fail (Deprecated_instruction I_SUB)
+      else tzfail (Deprecated_instruction I_SUB)
   | Prim (loc, I_SUB_MUTEZ, [], annot), Item_t (Mutez_t, Item_t (Mutez_t, rest))
     ->
       check_var_annot loc annot >>?= fun () ->
@@ -3917,7 +3917,7 @@ and parse_instr :
       let stack = Item_t (operation_t, rest) in
       typed ctxt loc instr stack
   | Prim (_, I_CREATE_ACCOUNT, _, _), _ ->
-      fail (Deprecated_instruction I_CREATE_ACCOUNT)
+      tzfail (Deprecated_instruction I_CREATE_ACCOUNT)
   | Prim (loc, I_IMPLICIT_ACCOUNT, [], annot), Item_t (Key_hash_t, rest) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> IImplicit_account (loc, k))} in
@@ -4030,7 +4030,7 @@ and parse_instr :
       let stack = Item_t (nat_t, stack) in
       typed ctxt loc instr stack
   | Prim (_, I_STEPS_TO_QUOTA, _, _), _ ->
-      fail (Deprecated_instruction I_STEPS_TO_QUOTA)
+      tzfail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | Prim (loc, I_SOURCE, [], annot), stack ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> ISource (loc, k))} in
@@ -4206,7 +4206,7 @@ and parse_instr :
         in
         let stack = Item_t (res_ty, rest) in
         typed ctxt loc instr stack
-      else fail (Deprecated_instruction I_TICKET_DEPRECATED)
+      else tzfail (Deprecated_instruction I_TICKET_DEPRECATED)
   | ( Prim (loc, I_READ_TICKET, [], annot),
       (Item_t (Ticket_t (t, _), _) as full_stack) ) ->
       check_var_annot loc annot >>?= fun () ->
@@ -4251,7 +4251,7 @@ and parse_instr :
       if legacy then
         let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
         typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
-      else fail (Deprecated_instruction I_OPEN_CHEST)
+      else tzfail (Deprecated_instruction I_OPEN_CHEST)
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
       check_packable ~legacy loc data >>?= fun () ->
@@ -4294,7 +4294,7 @@ and parse_instr :
           (_ :: _ as l),
           _ ),
       _ ) ->
-      fail (Invalid_arity (loc, name, 0, List.length l))
+      tzfail (Invalid_arity (loc, name, 0, List.length l))
   | ( Prim
         ( loc,
           (( I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER | I_EMPTY_SET
@@ -4303,7 +4303,7 @@ and parse_instr :
           (([] | _ :: _ :: _) as l),
           _ ),
       _ ) ->
-      fail (Invalid_arity (loc, name, 1, List.length l))
+      tzfail (Invalid_arity (loc, name, 1, List.length l))
   | ( Prim
         ( loc,
           (( I_PUSH | I_VIEW | I_IF_NONE | I_IF_LEFT | I_IF_CONS | I_EMPTY_MAP
@@ -4311,10 +4311,10 @@ and parse_instr :
           (([] | [_] | _ :: _ :: _ :: _) as l),
           _ ),
       _ ) ->
-      fail (Invalid_arity (loc, name, 2, List.length l))
+      tzfail (Invalid_arity (loc, name, 2, List.length l))
   | ( Prim (loc, I_LAMBDA, (([] | [_] | [_; _] | _ :: _ :: _ :: _ :: _) as l), _),
       _ ) ->
-      fail (Invalid_arity (loc, I_LAMBDA, 3, List.length l))
+      tzfail (Invalid_arity (loc, I_LAMBDA, 3, List.length l))
   (* Stack errors *)
   | ( Prim
         ( loc,
@@ -4325,7 +4325,7 @@ and parse_instr :
       Item_t (ta, Item_t (tb, _)) ) ->
       let ta = serialize_ty_for_error ta in
       let tb = serialize_ty_for_error tb in
-      fail (Undefined_binop (loc, name, ta, tb))
+      tzfail (Undefined_binop (loc, name, ta, tb))
   | ( Prim
         ( loc,
           (( I_NEG | I_ABS | I_NOT | I_SIZE | I_EQ | I_NEQ | I_LT | I_GT | I_LE
@@ -4337,14 +4337,14 @@ and parse_instr :
           _ ),
       Item_t (t, _) ) ->
       let t = serialize_ty_for_error t in
-      fail (Undefined_unop (loc, name, t))
+      tzfail (Undefined_unop (loc, name, t))
   | Prim (loc, ((I_UPDATE | I_SLICE | I_OPEN_CHEST) as name), [], _), stack ->
       Lwt.return
         (let stack = serialize_stack_for_error ctxt stack in
          error (Bad_stack (loc, name, 3, stack)))
   | Prim (loc, I_CREATE_CONTRACT, _, _), stack ->
       let stack = serialize_stack_for_error ctxt stack in
-      fail (Bad_stack (loc, I_CREATE_CONTRACT, 7, stack))
+      tzfail (Bad_stack (loc, I_CREATE_CONTRACT, 7, stack))
   | Prim (loc, I_TRANSFER_TOKENS, [], _), stack ->
       Lwt.return
         (let stack = serialize_stack_for_error ctxt stack in
@@ -4379,7 +4379,7 @@ and parse_instr :
          error (Bad_stack (loc, name, 2, stack)))
   (* Generic parsing errors *)
   | expr, _ ->
-      fail
+      tzfail
       @@ unexpected
            expr
            [Seq_kind]

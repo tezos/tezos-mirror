@@ -52,7 +52,7 @@ let get :
   find ctxt tx_rollup >>=? fun (ctxt, state) ->
   match state with
   | Some state -> return (ctxt, state)
-  | None -> fail (Tx_rollup_does_not_exist tx_rollup)
+  | None -> tzfail (Tx_rollup_does_not_exist tx_rollup)
 
 let assert_exist :
     Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t =

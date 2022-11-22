@@ -175,7 +175,7 @@ let compute_proof_after_hash ~proof_length ~max_proof_size ctxt parameters
       hash_message_result ctxt tree_hash withdrawals >>?= fun res -> return res
   | Error _ ->
       (* Finally, the proof verification leads to an internal Irmin error *)
-      fail Proof_failed_to_reject
+      tzfail Proof_failed_to_reject
 
 let verify_proof ctxt parameters message proof ~proof_length
     ~(agreed : Tx_rollup_message_result.t) ~rejected ~max_proof_size =
@@ -190,7 +190,7 @@ let verify_proof ctxt parameters message proof ~proof_length
   >>=? fun (ctxt, computed_result) ->
   if Alpha_context.Tx_rollup_message_result_hash.(computed_result <> rejected)
   then return ctxt
-  else fail Proof_produced_rejected_state
+  else tzfail Proof_produced_rejected_state
 
 module Internal_for_tests = struct
   let verify_l2_proof = verify_l2_proof

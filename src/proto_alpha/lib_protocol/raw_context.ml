@@ -729,7 +729,7 @@ let get_proto_param ctxt =
   | None -> failwith "Missing protocol parameters."
   | Some bytes -> (
       match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
-      | None -> fail (Failed_to_parse_parameter bytes)
+      | None -> tzfail (Failed_to_parse_parameter bytes)
       | Some json -> (
           Context.remove ctxt protocol_param_key >|= fun ctxt ->
           match Data_encoding.Json.destruct Parameters_repr.encoding json with

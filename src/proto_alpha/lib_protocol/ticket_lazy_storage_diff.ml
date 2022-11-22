@@ -220,7 +220,7 @@ let collect_token_diffs_of_big_map ctxt ~get_token_and_amount big_map_id acc =
             acc)
         (acc, ctxt)
         exprs
-  | None -> fail (Failed_to_load_big_map_value_type big_map_id)
+  | None -> tzfail (Failed_to_load_big_map_value_type big_map_id)
 
 (** Collects ticket-token diffs from a big-map and a list of updates, and
     prepends them to the given accumulator [acc]. *)
@@ -236,7 +236,7 @@ let collect_token_diffs_of_big_map_and_updates ctxt big_map_id updates acc =
         ~value_type
         updates
         acc
-  | None -> fail (Failed_to_load_big_map_value_type big_map_id)
+  | None -> tzfail (Failed_to_load_big_map_value_type big_map_id)
 
 (** Inspects the given [Lazy_storage.diffs_item] and prepends all ticket-token
     diffs, resulting from the updates, to the given accumulator [acc]. *)

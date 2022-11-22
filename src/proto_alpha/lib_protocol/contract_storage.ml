@@ -223,7 +223,7 @@ let () =
       | Frozen_bonds_must_be_spent_at_once (c, b) -> Some (c, b) | _ -> None)
     (fun (c, b) -> Frozen_bonds_must_be_spent_at_once (c, b))
 
-let failwith msg = fail (Failure msg)
+let failwith msg = tzfail (Failure msg)
 
 module Legacy_big_map_diff = struct
   (*
@@ -477,15 +477,15 @@ let exists c contract =
 let must_exist c contract =
   exists c contract >>= function
   | true -> return_unit
-  | false -> fail (Non_existing_contract contract)
+  | false -> tzfail (Non_existing_contract contract)
 
 let must_be_allocated c contract =
   allocated c contract >>= function
   | true -> return_unit
   | false -> (
       match contract with
-      | Implicit pkh -> fail (Empty_implicit_contract pkh)
-      | Originated _ -> fail (Non_existing_contract contract))
+      | Implicit pkh -> tzfail (Empty_implicit_contract pkh)
+      | Originated _ -> tzfail (Non_existing_contract contract))
 
 let list c = Storage.Contract.list c
 
@@ -507,8 +507,8 @@ let check_counter_increment c manager counter =
   let expected = Manager_counter_repr.succ contract_counter in
   if Manager_counter_repr.(expected = counter) then return_unit
   else if Manager_counter_repr.(expected > counter) then
-    fail (Counter_in_the_past {contract; expected; found = counter})
-  else fail (Counter_in_the_future {contract; expected; found = counter})
+    tzfail (Counter_in_the_past {contract; expected; found = counter})
+  else tzfail (Counter_in_the_future {contract; expected; found = counter})
 
 let increment_counter c manager =
   let contract = Contract_repr.Implicit manager in
@@ -632,7 +632,7 @@ let credit_only_call_from_token c contract amount =
   Storage.Contract.Spendable_balance.find c contract >>=? function
   | None -> (
       match contract with
-      | Originated _ -> fail (Non_existing_contract contract)
+      | Originated _ -> tzfail (Non_existing_contract contract)
       | Implicit manager -> create_implicit c manager ~balance:amount)
   | Some balance ->
       Tez_repr.(amount +? balance) >>?= fun balance ->

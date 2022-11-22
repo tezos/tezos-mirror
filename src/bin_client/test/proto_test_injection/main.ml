@@ -81,7 +81,7 @@ module Fitness = struct
     b
 
   let int64_of_bytes b =
-    if Compare.Int.(Bytes.length b <> 8) then fail Invalid_fitness2
+    if Compare.Int.(Bytes.length b <> 8) then tzfail Invalid_fitness2
     else return (TzEndian.get_int64 b 0)
 
   let from_int64 fitness = [int64_to_bytes fitness]
@@ -89,7 +89,7 @@ module Fitness = struct
   let to_int64 = function
     | [fitness] -> int64_of_bytes fitness
     | [] -> return 0L
-    | _ -> fail Invalid_fitness
+    | _ -> tzfail Invalid_fitness
 
   let get {fitness; _} = fitness
 end
@@ -160,7 +160,7 @@ type error += Missing_value_in_cache
 
 let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
     ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
-  return (fun _ -> fail Missing_value_in_cache)
+  return (fun _ -> tzfail Missing_value_in_cache)
 
 (* Fake mempool *)
 module Mempool = struct

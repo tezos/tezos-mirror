@@ -96,7 +96,7 @@ let source_must_exist c src =
 let burn_storage_fees ?(origin = Receipt_repr.Block_application) c
     ~storage_limit ~payer consumed =
   let remaining = Z.sub storage_limit consumed in
-  if Compare.Z.(remaining < Z.zero) then fail Operation_quota_exceeded
+  if Compare.Z.(remaining < Z.zero) then tzfail Operation_quota_exceeded
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
     Tez_repr.(cost_per_byte *? Z.to_int64 consumed) >>?= fun to_burn ->
@@ -115,7 +115,7 @@ let burn_storage_fees ?(origin = Receipt_repr.Block_application) c
 
 let burn_storage_increase_fees ?(origin = Receipt_repr.Block_application) c
     ~payer amount_in_bytes =
-  if Compare.Z.(amount_in_bytes <= Z.zero) then fail Negative_storage_input
+  if Compare.Z.(amount_in_bytes <= Z.zero) then tzfail Negative_storage_input
   else
     let cost_per_byte = Constants_storage.cost_per_byte c in
     Tez_repr.(cost_per_byte *? Z.to_int64 amount_in_bytes) >>?= fun to_burn ->

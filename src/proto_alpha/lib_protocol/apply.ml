@@ -329,7 +329,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
   >>=? fun (ctxt, balance_updates) ->
   Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
   match script with
-  | None -> fail (Contract.Non_existing_contract contract)
+  | None -> tzfail (Contract.Non_existing_contract contract)
   | Some (script, script_ir) ->
       (* Token.transfer which is being called before already loads this value into
          the Irmin cache, so no need to burn gas for it. *)
@@ -1304,7 +1304,7 @@ let apply_manager_operation :
               }
           in
           return (ctxt, result, [])
-      | None -> fail Tx_rollup_errors.Proof_undecodable)
+      | None -> tzfail Tx_rollup_errors.Proof_undecodable)
   | Dal_publish_slot_header {slot_header} ->
       Dal_apply.apply_publish_slot_header ctxt slot_header >>?= fun ctxt ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
@@ -1443,7 +1443,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
          let op_res = Apply_internal_results.internal_operation op in
-         fail (Internal_operation_replay (Internal_operation op_res))
+         tzfail (Internal_operation_replay (Internal_operation op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_operation_contents
@@ -2259,7 +2259,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Failing_noop _) ->
       (* This operation always fails. It should already have been
          rejected by {!Validate.validate_operation}. *)
-      fail Validate_errors.Failing_noop_error
+      tzfail Validate_errors.Failing_noop_error
   | Single (Manager_operation _) ->
       apply_manager_operations
         ctxt
@@ -2356,7 +2356,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
        Script_cache.find ctxt liquidity_baking_cpmm_contract_hash
        >>=? fun (ctxt, cache_key, script) ->
        match script with
-       | None -> fail (Script_tc_errors.No_such_entrypoint Entrypoint.default)
+       | None -> tzfail (Script_tc_errors.No_such_entrypoint Entrypoint.default)
        | Some (script, script_ir) -> (
            (* Token.transfer which is being called above already loads this
               value into the Irmin cache, so no need to burn gas for it. *)

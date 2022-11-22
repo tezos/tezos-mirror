@@ -98,7 +98,7 @@ val error : 'err -> ('a, 'err trace) result
 
 val trace_of_error : 'err -> 'err trace
 
-val fail : 'err -> ('a, 'err trace) result Lwt.t
+val tzfail : 'err -> ('a, 'err trace) result Lwt.t
 
 val ( >>= ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 

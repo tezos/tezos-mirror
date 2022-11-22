@@ -480,7 +480,7 @@ module Ticket_collection = struct
        k ->
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     (* Require empty overlay *)
-    if Compare.Int.(size > 0) then fail Unsupported_non_empty_overlay
+    if Compare.Int.(size > 0) then tzfail Unsupported_non_empty_overlay
     else
       (* Traverse the keys for tickets, although currently keys should never
          contain any tickets. *)
