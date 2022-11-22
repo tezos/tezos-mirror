@@ -88,7 +88,7 @@ let secrets () =
         let sk : Tezos_crypto.Signature.V0.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn
-               Tezos_crypto.Ed25519.Secret_key.encoding
+               Tezos_crypto.Signature.Ed25519.Secret_key.encoding
                sk)
         in
         let pk = Tezos_crypto.Signature.V0.Secret_key.to_public_key sk in

@@ -333,7 +333,8 @@ module Ledger_commands = struct
     match curve with
     | Ed25519 | Bip32_ed25519 ->
         let signature =
-          Tezos_crypto.Ed25519.of_bytes_exn (Cstruct.to_bytes signature)
+          Tezos_crypto.Signature.Ed25519.of_bytes_exn
+            (Cstruct.to_bytes signature)
         in
         return (Tezos_crypto.Signature.of_ed25519 signature)
     | Secp256k1 ->
@@ -344,7 +345,8 @@ module Ledger_commands = struct
         let signature = Sign.read_der_exn secp256k1_ctx signature in
         let bytes = Sign.to_bytes secp256k1_ctx signature in
         let signature =
-          Tezos_crypto.Secp256k1.of_bytes_exn (Bigstring.to_bytes bytes)
+          Tezos_crypto.Signature.Secp256k1.of_bytes_exn
+            (Bigstring.to_bytes bytes)
         in
         return (Tezos_crypto.Signature.of_secp256k1 signature)
     | Secp256r1 ->
@@ -356,7 +358,7 @@ module Ledger_commands = struct
         let signature = Sign.read_der_exn secp256k1_ctx signature in
         let buf = Sign.to_bytes secp256k1_ctx signature in
         let signature =
-          Tezos_crypto.P256.of_bytes_exn (Bigstring.to_bytes buf)
+          Tezos_crypto.Signature.P256.of_bytes_exn (Bigstring.to_bytes buf)
         in
         return (Tezos_crypto.Signature.of_p256 signature)
 

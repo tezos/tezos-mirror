@@ -100,7 +100,9 @@ let gen_l1_address ?seed () =
   Tezos_crypto.Signature.V0.generate_key ~algo:Ed25519 ?seed ()
 
 let gen_l2_address () =
-  let pkh, public_key, secret_key = Tezos_crypto.Bls.generate_key () in
+  let pkh, public_key, secret_key =
+    Tezos_crypto.Signature.Bls.generate_key ()
+  in
   (secret_key, public_key, pkh)
 
 (** [make_unit_ticket_key ctxt ticketer l2_address] computes the key hash of
@@ -154,7 +156,7 @@ let gen_n_ticket_hash n =
   | Error _ -> raise (Invalid_argument "Failed to forge tickets")
 
 let sign_transaction :
-    Tezos_crypto.Bls.Secret_key.t list ->
+    Tezos_crypto.Signature.Bls.Secret_key.t list ->
     ('signer, 'content) Tx_rollup_l2_batch.V1.transaction ->
     Tx_rollup_l2_batch.V1.signature list =
  fun sks transaction ->
@@ -166,7 +168,7 @@ let sign_transaction :
       Tx_rollup_l2_batch.V1.transaction_encoding
       transaction
   in
-  List.map (fun sk -> Tezos_crypto.Bls.sign sk buf) sks
+  List.map (fun sk -> Tezos_crypto.Signature.Bls.sign sk buf) sks
 
 type Environment.Error_monad.error += Test_error of string
 

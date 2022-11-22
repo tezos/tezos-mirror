@@ -42,11 +42,11 @@ let test_hash_matches (module X : Intfs.SIGNATURE) () =
     Alcotest.failf
       "the hash of deterministic_nonce is NOT deterministic_nonce_hash"
 
-let ed25519 = (module Ed25519 : Intfs.SIGNATURE)
+let ed25519 = (module Signature.Ed25519 : Intfs.SIGNATURE)
 
-let p256 = (module P256 : Intfs.SIGNATURE)
+let p256 = (module Signature.P256 : Intfs.SIGNATURE)
 
-let secp256k1 = (module Secp256k1 : Intfs.SIGNATURE)
+let secp256k1 = (module Signature.Secp256k1 : Intfs.SIGNATURE)
 
 let tests =
   [

@@ -327,7 +327,9 @@ let gen_l2_account ?rng_state () =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255))
       rng_state
   in
-  let pkh, public_key, secret_key = Tezos_crypto.Bls.generate_key ?seed () in
+  let pkh, public_key, secret_key =
+    Tezos_crypto.Signature.Bls.generate_key ?seed ()
+  in
   (secret_key, public_key, pkh)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
@@ -2501,7 +2503,8 @@ module Rejection = struct
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
     let signature =
-      assert_some @@ Tezos_crypto.Bls.aggregate_signature_opt signatures
+      assert_some
+      @@ Tezos_crypto.Signature.Bls.aggregate_signature_opt signatures
     in
     let batch =
       Tx_rollup_l2_batch.V1.

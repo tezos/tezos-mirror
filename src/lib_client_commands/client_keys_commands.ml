@@ -228,7 +228,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       let sk : Tezos_crypto.Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn
-             Tezos_crypto.Ed25519.Secret_key.encoding
+             Tezos_crypto.Signature.Ed25519.Secret_key.encoding
              sk)
       in
       let pk = Tezos_crypto.Signature.Secret_key.to_public_key sk in
@@ -937,7 +937,7 @@ let commands network : Client_context.full Tezos_clic.command list =
               let sk : Tezos_crypto.Signature.Secret_key.t =
                 Ed25519
                   (Data_encoding.Binary.of_bytes_exn
-                     Tezos_crypto.Ed25519.Secret_key.encoding
+                     Tezos_crypto.Signature.Ed25519.Secret_key.encoding
                      sk)
               in
               let*? unencrypted_sk_uri =

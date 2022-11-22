@@ -88,7 +88,7 @@ let protos =
 
 type secret_account = {
   blinded_public_key_hash : Blinded_public_key_hash.t;
-  account : Tezos_crypto.Ed25519.Public_key_hash.t;
+  account : Tezos_crypto.Signature.Ed25519.Public_key_hash.t;
   activation_code : Blinded_public_key_hash.activation_code;
   amount : Tez.t;
 }
@@ -106,7 +106,7 @@ let secrets =
         let sk : Tezos_crypto.Signature.V0.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn
-               Tezos_crypto.Ed25519.Secret_key.encoding
+               Tezos_crypto.Signature.Ed25519.Secret_key.encoding
                sk)
         in
         let pk = Tezos_crypto.Signature.V0.Secret_key.to_public_key sk in
@@ -116,7 +116,9 @@ let secrets =
   List.map
     (fun (mnemonic, secret, amount, pkh, password, email) ->
       let pkh', pk, sk = read_key mnemonic email password in
-      let pkh = Tezos_crypto.Ed25519.Public_key_hash.of_b58check_exn pkh in
+      let pkh =
+        Tezos_crypto.Signature.Ed25519.Public_key_hash.of_b58check_exn pkh
+      in
       assert (Tezos_crypto.Signature.V0.Public_key_hash.equal (Ed25519 pkh) pkh') ;
       let activation_code =
         Stdlib.Option.get

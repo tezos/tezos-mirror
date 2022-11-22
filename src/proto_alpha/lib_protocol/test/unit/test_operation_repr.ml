@@ -94,7 +94,8 @@ module Test_operation_repr = struct
 
   let zero_bls =
     match
-      Tezos_crypto.Signature.(split_signature (Bls Tezos_crypto.Bls.zero))
+      Tezos_crypto.Signature.(
+        split_signature (Bls Tezos_crypto.Signature.Bls.zero))
     with
     | {prefix = None; _} -> assert false
     | {prefix = Some prefix; suffix} ->

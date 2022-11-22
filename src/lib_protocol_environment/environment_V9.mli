@@ -63,19 +63,23 @@ module type T = sig
        and type Block_header.t = Block_header.t
        and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
        and type Ed25519.Public_key_hash.t =
-        Tezos_crypto.Ed25519.Public_key_hash.t
-       and type Ed25519.Public_key.t = Tezos_crypto.Ed25519.Public_key.t
-       and type Ed25519.t = Tezos_crypto.Ed25519.t
+        Tezos_crypto.Signature.Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t =
+        Tezos_crypto.Signature.Ed25519.Public_key.t
+       and type Ed25519.t = Tezos_crypto.Signature.Ed25519.t
        and type Secp256k1.Public_key_hash.t =
-        Tezos_crypto.Secp256k1.Public_key_hash.t
-       and type Secp256k1.Public_key.t = Tezos_crypto.Secp256k1.Public_key.t
-       and type Secp256k1.t = Tezos_crypto.Secp256k1.t
-       and type P256.Public_key_hash.t = Tezos_crypto.P256.Public_key_hash.t
-       and type P256.Public_key.t = Tezos_crypto.P256.Public_key.t
-       and type P256.t = Tezos_crypto.P256.t
-       and type Bls.Public_key_hash.t = Tezos_crypto.Bls.Public_key_hash.t
-       and type Bls.Public_key.t = Tezos_crypto.Bls.Public_key.t
-       and type Bls.t = Tezos_crypto.Bls.t
+        Tezos_crypto.Signature.Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t =
+        Tezos_crypto.Signature.Secp256k1.Public_key.t
+       and type Secp256k1.t = Tezos_crypto.Signature.Secp256k1.t
+       and type P256.Public_key_hash.t =
+        Tezos_crypto.Signature.P256.Public_key_hash.t
+       and type P256.Public_key.t = Tezos_crypto.Signature.P256.Public_key.t
+       and type P256.t = Tezos_crypto.Signature.P256.t
+       and type Bls.Public_key_hash.t =
+        Tezos_crypto.Signature.Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls.Public_key.t
+       and type Bls.t = Tezos_crypto.Signature.Bls.t
        and type Signature.public_key_hash =
         Tezos_crypto.Signature.V1.public_key_hash
        and type Signature.public_key = Tezos_crypto.Signature.V1.public_key

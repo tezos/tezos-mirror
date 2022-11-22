@@ -66,8 +66,8 @@ let alias_or_literal ~from_alias ~from_key =
 
 type wallet_entry = {
   alias : string;
-  public_key_hash : Tezos_crypto.Bls.Public_key_hash.t;
-  public_key : Tezos_crypto.Bls.Public_key.t option;
+  public_key_hash : Tezos_crypto.Signature.Bls.Public_key_hash.t;
+  public_key : Tezos_crypto.Signature.Bls.Public_key.t option;
   secret_key_uri : Client_keys_v0.aggregate_sk_uri option;
 }
 
@@ -107,12 +107,12 @@ let bls_pkh_parameter () =
         return pkh
       in
       let from_key s =
-        Tezos_crypto.Bls.Public_key_hash.of_b58check s |> Lwt.return
+        Tezos_crypto.Signature.Bls.Public_key_hash.of_b58check s |> Lwt.return
       in
       alias_or_literal ~from_alias ~from_key s)
 
 let conv_bls_pkh_to_l2_addr pkh =
-  Tezos_crypto.Bls.Public_key_hash.to_b58check pkh
+  Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh
   |> Tx_rollup_l2_address.of_b58check_exn
 
 let bls_pkh_param ?(name = "public key hash")
@@ -146,7 +146,7 @@ let bls_sk_uri_param ?(name = "secret key") ?(desc = "Bls secret key to use.") =
 
 let signature_parameter () =
   Tezos_clic.parameter (fun _cctxt s ->
-      Tezos_crypto.Bls.of_b58check s |> Lwt.return)
+      Tezos_crypto.Signature.Bls.of_b58check s |> Lwt.return)
 
 let signature_arg =
   Tezos_clic.arg
@@ -342,7 +342,7 @@ let craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty =
 
 let aggregate_signature signatures =
   let open Result_syntax in
-  match Tezos_crypto.Bls.aggregate_signature_opt signatures with
+  match Tezos_crypto.Signature.Bls.aggregate_signature_opt signatures with
   | Some res -> return res
   | None -> error_with "aggregate_signature"
 
@@ -369,7 +369,7 @@ let conv_counter =
 
 let signer_to_address : Tx_rollup_l2_batch.signer -> Tx_rollup_l2_address.t =
   function
-  | Bls_pk pk -> Tezos_crypto.Bls.Public_key.hash pk
+  | Bls_pk pk -> Tezos_crypto.Signature.Bls.Public_key.hash pk
   | L2_addr addr -> addr
 
 let wait_for_synchronized ?(quiet = false)
@@ -443,7 +443,7 @@ let signer_parameter =
       match Tx_rollup_l2_address.of_b58check_opt s with
       | Some pkh -> return @@ Tx_rollup_l2_batch.L2_addr pkh
       | None -> (
-          match Tezos_crypto.Bls.Public_key.of_b58check_opt s with
+          match Tezos_crypto.Signature.Bls.Public_key.of_b58check_opt s with
           | Some pk -> return @@ Tx_rollup_l2_batch.Bls_pk pk
           | None -> failwith "cannot parse %s to get a valid signer" s))
 
@@ -687,7 +687,7 @@ let prepare_operation_parameters cctxt signer counter =
     | Some pk -> ok pk
     | None -> error_with "missing signer public key in the wallet"
   in
-  let signer_addr = Tezos_crypto.Bls.Public_key.hash signer_pk in
+  let signer_addr = Tezos_crypto.Signature.Bls.Public_key.hash signer_pk in
   let* () = wait_for_synchronized cctxt in
   let* counter =
     match counter with
@@ -825,7 +825,10 @@ let sign_transaction () =
         let*? aggregated_signature = aggregate_signature signatures in
 
         let*! () =
-          cctxt#message "@[%a@]" Tezos_crypto.Bls.pp aggregated_signature
+          cctxt#message
+            "@[%a@]"
+            Tezos_crypto.Signature.Bls.pp
+            aggregated_signature
         in
         return_unit
       else
@@ -834,7 +837,7 @@ let sign_transaction () =
             "@[%a@]"
             (Format.pp_print_list
                ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";")
-               Tezos_crypto.Bls.pp)
+               Tezos_crypto.Signature.Bls.pp)
             signatures
         in
         return_unit)

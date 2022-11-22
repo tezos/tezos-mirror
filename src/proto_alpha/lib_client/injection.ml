@@ -632,13 +632,13 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
   fun {contents} -> detect_script_failure contents
 
 let signature_size_of_algo : Tezos_crypto.Signature.algo -> int = function
-  | Ed25519 -> Tezos_crypto.Ed25519.size
-  | Secp256k1 -> Tezos_crypto.Secp256k1.size
-  | P256 -> Tezos_crypto.P256.size
+  | Ed25519 -> Tezos_crypto.Signature.Ed25519.size
+  | Secp256k1 -> Tezos_crypto.Signature.Secp256k1.size
+  | P256 -> Tezos_crypto.Signature.P256.size
   | Bls ->
       (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
          prefix and a tag [03]. *)
-      Tezos_crypto.Bls.size + 2
+      Tezos_crypto.Signature.Bls.size + 2
 
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)

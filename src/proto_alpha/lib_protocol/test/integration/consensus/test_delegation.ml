@@ -1390,7 +1390,7 @@ let test_bls_account_cannot_self_delegate () =
         Environment.Ecoproto_error
           (Contract_delegate_storage.Forbidden_tz4_delegate pkh);
       ]
-      when Tezos_crypto.Bls.Public_key_hash.(pkh = tz4_pkh) ->
+      when Tezos_crypto.Signature.Bls.Public_key_hash.(pkh = tz4_pkh) ->
         return_unit
     | err ->
         failwith

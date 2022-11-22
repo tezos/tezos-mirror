@@ -81,19 +81,19 @@ end) : S = struct
     let i = Random.State.int rng_state 5 in
     match i with
     | 0 -> (
-        let open Tezos_crypto.Ed25519 in
+        let open Tezos_crypto.Signature.Ed25519 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
         | Some s -> Tezos_crypto.Signature.of_ed25519 s)
     | 1 -> (
-        let open Tezos_crypto.Secp256k1 in
+        let open Tezos_crypto.Signature.Secp256k1 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
         | Some s -> Tezos_crypto.Signature.of_secp256k1 s)
     | 2 -> (
-        let open Tezos_crypto.P256 in
+        let open Tezos_crypto.Signature.P256 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
@@ -101,7 +101,7 @@ end) : S = struct
     | 3 ->
         (* BLS checks that signatures are on the curve so we need to generate real
            ones by signing a message. *)
-        let open Tezos_crypto.Bls in
+        let open Tezos_crypto.Signature.Bls in
         let msg = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
         let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
         let _, _, sk = generate_key ~seed () in
@@ -109,7 +109,7 @@ end) : S = struct
     | _ ->
         let bytes =
           Base_samplers.uniform_bytes
-            ~nbytes:Tezos_crypto.Ed25519.size
+            ~nbytes:Tezos_crypto.Signature.Ed25519.size
             rng_state
         in
         Unknown bytes

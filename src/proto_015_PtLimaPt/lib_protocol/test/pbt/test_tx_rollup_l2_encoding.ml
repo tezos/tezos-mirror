@@ -48,7 +48,7 @@ let l2_address, bls_pk =
     |> Hex.to_bytes_exn
   in
   let pkh, public_key, _secret_key =
-    Tezos_crypto.Bls.generate_key ~seed:ikm ()
+    Tezos_crypto.Signature.Bls.generate_key ~seed:ikm ()
   in
   (pkh, public_key)
 

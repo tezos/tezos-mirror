@@ -507,7 +507,7 @@ let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
       return (oph, op, result)
 
 type activation_key = {
-  pkh : Tezos_crypto.Ed25519.Public_key_hash.t;
+  pkh : Tezos_crypto.Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -518,7 +518,7 @@ type activation_key = {
 let raw_activation_key_encoding =
   let open Data_encoding in
   obj6
-    (req "pkh" Tezos_crypto.Ed25519.Public_key_hash.encoding)
+    (req "pkh" Tezos_crypto.Signature.Ed25519.Public_key_hash.encoding)
     (req "amount" Tez.encoding)
     (req "activation_code" Blinded_public_key_hash.activation_code_encoding)
     (req "mnemonic" (list string))
@@ -548,7 +548,9 @@ let activation_key_encoding =
                 ~title:"Deprecated_activation"
                 Json_only
                 (obj6
-                   (req "pkh" Tezos_crypto.Ed25519.Public_key_hash.encoding)
+                   (req
+                      "pkh"
+                      Tezos_crypto.Signature.Ed25519.Public_key_hash.encoding)
                    (req "amount" Tez.encoding)
                    (req
                       "secret"
@@ -599,7 +601,7 @@ let read_key key =
       let sk : Tezos_crypto.Signature.V0.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn
-             Tezos_crypto.Ed25519.Secret_key.encoding
+             Tezos_crypto.Signature.Ed25519.Secret_key.encoding
              sk)
       in
       let pk = Tezos_crypto.Signature.V0.Secret_key.to_public_key sk in
@@ -628,7 +630,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
       cctxt#message
         "Account %s (%a) activated with %s%a."
         alias
-        Tezos_crypto.Ed25519.Public_key_hash.pp
+        Tezos_crypto.Signature.Ed25519.Public_key_hash.pp
         pkh
         Operation_result.tez_sym
         Tez.pp
@@ -649,7 +651,7 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
         %a @]"
        Tezos_crypto.Signature.V0.Public_key_hash.pp
        pkh
-       Tezos_crypto.Ed25519.Public_key_hash.pp
+       Tezos_crypto.Signature.Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
   let pk = Tezos_crypto.Signature.Of_V0.public_key pk in

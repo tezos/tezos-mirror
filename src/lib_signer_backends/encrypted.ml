@@ -71,19 +71,19 @@ module Raw = struct
       match (sk : decrypted_sk) with
       | Decrypted_sk (Ed25519 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Ed25519.Secret_key.encoding
+            Tezos_crypto.Signature.Ed25519.Secret_key.encoding
             sk
       | Decrypted_sk (Secp256k1 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Secp256k1.Secret_key.encoding
+            Tezos_crypto.Signature.Secp256k1.Secret_key.encoding
             sk
       | Decrypted_sk (P256 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.P256.Secret_key.encoding
+            Tezos_crypto.Signature.P256.Secret_key.encoding
             sk
       | Decrypted_sk (Bls sk) | Decrypted_aggregate_sk (Bls12_381 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Bls.Secret_key.encoding
+            Tezos_crypto.Signature.Bls.Secret_key.encoding
             sk
     in
     Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
@@ -103,7 +103,7 @@ module Raw = struct
     | Some bytes, Encrypted_sk Tezos_crypto.Signature.Ed25519 -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.Ed25519.Secret_key.encoding
+            Tezos_crypto.Signature.Ed25519.Secret_key.encoding
             bytes
         with
         | Some sk ->
@@ -116,7 +116,7 @@ module Raw = struct
     | Some bytes, Encrypted_sk Tezos_crypto.Signature.Secp256k1 -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.Secp256k1.Secret_key.encoding
+            Tezos_crypto.Signature.Secp256k1.Secret_key.encoding
             bytes
         with
         | Some sk ->
@@ -129,7 +129,7 @@ module Raw = struct
     | Some bytes, Encrypted_sk Tezos_crypto.Signature.P256 -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.P256.Secret_key.encoding
+            Tezos_crypto.Signature.P256.Secret_key.encoding
             bytes
         with
         | Some sk ->
@@ -144,7 +144,7 @@ module Raw = struct
       -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.Bls.Secret_key.encoding
+            Tezos_crypto.Signature.Bls.Secret_key.encoding
             bytes
         with
         | Some sk ->

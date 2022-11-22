@@ -159,7 +159,7 @@ let () =
         let name = "Bls12_381"
       end)
       (struct
-        include Bls
+        include Signature.Bls
 
         let watermark_of_bytes b = b
       end)

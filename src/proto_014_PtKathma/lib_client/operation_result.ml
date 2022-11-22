@@ -1008,7 +1008,7 @@ let pp_contents_and_result :
          Account: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Ed25519.Public_key_hash.pp
+        Tezos_crypto.Signature.Ed25519.Public_key_hash.pp
         id
         pp_balance_updates
         bus

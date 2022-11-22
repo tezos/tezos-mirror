@@ -102,7 +102,7 @@ let signer_value ctxt signer =
       | Left _ -> assert false)
   | Right Tx_rollup_l2_batch.(L2_addr _) -> return signer
   | Right Tx_rollup_l2_batch.(Bls_pk pk) ->
-      let addr = Tezos_crypto.Bls.Public_key.hash pk in
+      let addr = Tezos_crypto.Signature.Bls.Public_key.hash pk in
       return (value (Tx_rollup_l2_batch.L2_addr addr) |> forget)
 
 let transaction_replace_indexes ctxt transaction =
@@ -280,7 +280,7 @@ let l2_message_encoding =
                     (req "result" transaction_result_encoding))))
            (req "withdrawals" (list Tx_rollup_withdraw.encoding))
            (req "indexes" indexes_encoding)
-           (req "aggregated_signature" Tezos_crypto.Bls.encoding))
+           (req "aggregated_signature" Tezos_crypto.Signature.Bls.encoding))
         (function
           | Ok_batch
               {
@@ -314,7 +314,7 @@ let l2_message_encoding =
               "transactions"
               (list Tx_rollup_l2_batch.V1.transaction_encoding))
            (req "errors" Error_monad.trace_encoding)
-           (req "aggregated_signature" Tezos_crypto.Bls.encoding))
+           (req "aggregated_signature" Tezos_crypto.Signature.Bls.encoding))
         (function
           | Failing_batch {transactions; reasons; aggregated_signature} ->
               Some (transactions, reasons, aggregated_signature)

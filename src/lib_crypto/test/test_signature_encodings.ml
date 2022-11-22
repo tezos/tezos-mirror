@@ -139,7 +139,7 @@ end
 
 module Test_Ed25519 =
   Make_tests
-    (Ed25519)
+    (Signature.Ed25519)
     (struct
       let name = "ed25519"
 
@@ -150,7 +150,7 @@ module Test_Ed25519 =
 
 module Test_Secp256k1 =
   Make_tests
-    (Secp256k1)
+    (Signature.Secp256k1)
     (struct
       let name = "secp256k1"
 
@@ -161,7 +161,7 @@ module Test_Secp256k1 =
 
 module Test_P256 =
   Make_tests
-    (P256)
+    (Signature.P256)
     (struct
       let name = "p256"
 
@@ -172,7 +172,7 @@ module Test_P256 =
 
 module Test_Bls =
   Make_tests
-    (Bls)
+    (Signature.Bls)
     (struct
       let name = "bls12_381"
 

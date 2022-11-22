@@ -413,7 +413,7 @@ module Context_RPC = struct
   type address_metadata = {
     index : Tx_rollup_l2_context_sig.address_index;
     counter : int64;
-    public_key : Tezos_crypto.Bls.Public_key.t;
+    public_key : Tezos_crypto.Signature.Bls.Public_key.t;
   }
 
   let address_metadata_encoding =
@@ -424,7 +424,7 @@ module Context_RPC = struct
       @@ obj3
            (req "index" Tx_rollup_l2_address.Indexable.index_encoding)
            (req "counter" int64)
-           (req "public_key" Tezos_crypto.Bls.Public_key.encoding))
+           (req "public_key" Tezos_crypto.Signature.Bls.Public_key.encoding))
 
   let balance =
     Tezos_rpc.Service.get_service
@@ -496,7 +496,8 @@ module Context_RPC = struct
         "Get the BLS public key associated to the given address, or null if \
          the address has not performed any transfer or withdraw on the rollup."
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Tezos_crypto.Bls.Public_key.encoding)
+      ~output:
+        (Data_encoding.option Tezos_crypto.Signature.Bls.Public_key.encoding)
       Tezos_rpc.Path.(
         path / "addresses" /: Arg.address_indexable / "public_key")
 

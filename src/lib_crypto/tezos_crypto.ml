@@ -38,17 +38,20 @@ module Hashed = struct
   module Protocol_hash = Protocol_hash
 end
 
+module Signature = struct
+  module Bls = Bls
+  module Ed25519 = Ed25519
+  module P256 = P256
+  module Secp256k1 = Secp256k1
+  include Signature
+end
+
 module Aggregate_signature = Aggregate_signature
 module Base58 = Base58
 module Blake2B = Blake2B
-module Bls = Bls
 module Chain_id = Chain_id
 module Crypto_box = Crypto_box
-module Ed25519 = Ed25519
 module Hacl = Hacl
 module Helpers = Helpers
-module P256 = P256
 module Rand = Rand
-module Secp256k1 = Secp256k1
-module Signature = Signature
 module Timelock = Timelock

@@ -158,7 +158,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
   let*? aggregated_signature =
-    match Tezos_crypto.Bls.aggregate_signature_opt tr.signatures with
+    match Tezos_crypto.Signature.Bls.aggregate_signature_opt tr.signatures with
     | Some s -> ok s
     | None -> error_with "could not aggregate signatures of transaction"
   in
