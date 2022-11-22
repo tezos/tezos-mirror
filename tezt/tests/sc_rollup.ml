@@ -2657,7 +2657,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   test_full_scenario
     ?commitment_period
     ~kind
-    ~timeout:10
+    ~timeout:60
     ?challenge_window
     {
       tags = ["refutation"];
@@ -2751,31 +2751,53 @@ let inputs_for n =
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
   let commitment_period = 10 in
-  [
-    ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
-    ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 80, [], []));
-    ("inbox_proof", ("5 0 0", inputs_for 10, 80, [], []));
-    ("inbox_proof_with_new_content", ("5 0 0", inputs_for 30, 80, [], []));
-    (* In "inbox_proof_with_new_content" we add messages after the commitment
-       period so the current inbox is not equal to the inbox snapshot-ted at the
-       game creation. *)
-    ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
-    ( "inbox_proof_many_empty_levels",
-      ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
-    ("pvm_proof_0", ("5 1 1", inputs_for 10, 80, [], []));
-    ("pvm_proof_1", ("7 1 2", inputs_for 10, 80, [], []));
-    ("pvm_proof_2", ("7 2 5", inputs_for 7, 80, [], []));
-    ("pvm_proof_3", ("9 2 5", inputs_for 7, 80, [4; 5], []));
-    ("timeout", ("5 1 1", inputs_for 10, 80, [], [35]));
-  ]
-  |> List.iter (fun (variant, inputs) ->
-         test_refutation_scenario
-           ~kind
-           ~challenge_window
-           ~commitment_period
-           ~variant
-           inputs
-           protocols)
+  let tests =
+    match kind with
+    | "arith" ->
+        [
+          ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
+          ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 80, [], []));
+          ("inbox_proof", ("5 0 0", inputs_for 10, 80, [], []));
+          ("inbox_proof_with_new_content", ("5 0 0", inputs_for 30, 80, [], []));
+          (* In "inbox_proof_with_new_content" we add messages after the commitment
+             period so the current inbox is not equal to the inbox snapshot-ted at the
+             game creation. *)
+          ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
+          ( "inbox_proof_many_empty_levels",
+            ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
+          ("pvm_proof_0", ("5 1 1", inputs_for 10, 80, [], []));
+          ("pvm_proof_1", ("7 1 2", inputs_for 10, 80, [], []));
+          ("pvm_proof_2", ("7 2 5", inputs_for 7, 80, [], []));
+          ("pvm_proof_3", ("9 2 5", inputs_for 7, 80, [4; 5], []));
+          ("timeout", ("5 1 1", inputs_for 10, 80, [], [35]));
+        ]
+    | "wasm_2_0_0" ->
+        [
+          (* First message of an inbox (level 3) *)
+          ("inbox_proof_0", ("3 0 0", inputs_for 10, 80, [], []));
+          (* Fourth message of an inbox (level 3) *)
+          ("inbox_proof_1", ("3 4 0", inputs_for 10, 80, [], []));
+          (* Echo kernel takes around 2,100 ticks to execute *)
+          (* Second tick of decoding *)
+          ("pvm_proof_0", ("5 6 11_000_000_001", inputs_for 10, 80, [], []));
+          ("pvm_proof_1", ("7 6 11_000_001_000", inputs_for 10, 80, [], []));
+          (* End of evaluation *)
+          ("pvm_proof_2", ("7 6 22_000_002_000", inputs_for 10, 80, [], []));
+          (* During padding *)
+          ("pvm_proof_3", ("7 6 22_010_000_000", inputs_for 10, 80, [], []));
+        ]
+    | _ -> assert false
+  in
+  List.iter
+    (fun (variant, inputs) ->
+      test_refutation_scenario
+        ~kind
+        ~challenge_window
+        ~commitment_period
+        ~variant
+        inputs
+        protocols)
+    tests
 
 (** Helper to check that the operation whose hash is given is successfully
     included (applied) in the current head block. *)
@@ -3819,6 +3841,8 @@ let register ~protocols =
   test_no_cementation_if_parent_not_lcc_or_if_disputed_commit
     ~kind:"arith"
     protocols ;
+  test_refutation protocols ~kind:"arith" ;
+  test_refutation protocols ~kind:"wasm_2_0_0" ;
   (* Specific Arith PVM tezts *)
   test_rollup_origination_boot_sector
     ~boot_sector:"10 10 10 + +"
@@ -3850,9 +3874,6 @@ let register ~protocols =
   (* DAC tests, not supported yet by the Wasm PVM *)
   test_rollup_arith_uses_reveals protocols ~kind:"arith" ;
   test_reveals_fails_on_wrong_hash protocols ~kind:"arith" ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3653
-     Loser mode does not work for the wasm PVM. *)
-  test_refutation protocols ~kind:"arith" ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
