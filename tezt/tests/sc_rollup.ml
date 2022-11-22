@@ -3341,6 +3341,10 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
   let originate_source_contract () =
+    (* A script that receives bytes as a parameter and transfers them
+       to the rollup as is. The transfer will appear as an internal
+       message targetting this specific rollup in the rollups'
+       inbox. *)
     let prg =
       Format.asprintf
         {|
