@@ -94,7 +94,7 @@ module Make : functor
   (P : sig
      val parameters : parameters
    end)
-  (Crypto_samplers : Crypto_samplers.Finite_key_pool_S)
+  (Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S)
   -> S
 
 module Internal_for_tests : sig

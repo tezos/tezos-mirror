@@ -99,7 +99,7 @@ let dont_show _fmt _ = ()
 let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32}
 
 module Crypto_samplers =
-Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
+Tezos_benchmark.Crypto_samplers.V0.Make_finite_key_pool (struct
   let size = 10
 
   let algo = `Default

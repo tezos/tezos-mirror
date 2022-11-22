@@ -156,7 +156,7 @@ end
 
 module Make
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) =
+    (Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S) =
 struct
   (* Generates minimally sized random data of specified type.
      Used in autocompletion. *)

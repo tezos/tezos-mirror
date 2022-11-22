@@ -145,8 +145,9 @@ module Default_config = struct
 end
 
 let make_default_samplers ?(algo = `Default) cfg :
-    (module Crypto_samplers.Finite_key_pool_S) * (module Michelson_samplers.S) =
-  let module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+    (module Crypto_samplers.V0.Finite_key_pool_S)
+    * (module Michelson_samplers.S) =
+  let module Crypto_samplers = Crypto_samplers.V0.Make_finite_key_pool (struct
     let size = 16
 
     let algo = algo

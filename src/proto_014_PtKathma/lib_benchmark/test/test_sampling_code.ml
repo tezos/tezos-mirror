@@ -39,7 +39,7 @@ let verbose =
 
 let state = Random.State.make [|42; 987897; 54120|]
 
-module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+module Crypto_samplers = Crypto_samplers.V0.Make_finite_key_pool (struct
   let algo = `Default
 
   let size = 16

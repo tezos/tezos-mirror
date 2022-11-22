@@ -95,7 +95,7 @@ let rec tnames_of_type :
   | Script_typed_ir.Chest_key_t -> assert false
   | Script_typed_ir.Chest_t -> assert false
 
-module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+module Crypto_samplers = Crypto_samplers.V0.Make_finite_key_pool (struct
   let algo = `Default
 
   let size = 16
