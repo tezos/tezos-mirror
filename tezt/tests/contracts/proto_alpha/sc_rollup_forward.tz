@@ -1,9 +1,9 @@
-parameter (pair address string) ;
+parameter (pair address bytes) ;
 storage unit ;
 code { UNPAIR ;
        DIP { NIL operation };
        UNPAIR ;
-       CONTRACT string ;
+       CONTRACT bytes ;
        ASSERT_SOME;
        SWAP;
        DIP { PUSH mutez 0 };

@@ -1164,6 +1164,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       description = title;
     }
     ?boot_sector
+    ~parameters_ty:"bytes"
     ~kind
   @@ fun sc_rollup_node sc_rollup_client sc_rollup _tezos_node client ->
   let* genesis_info =
@@ -1212,17 +1213,18 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
           send_message client (sf "[%S]" message)
       | Some forwarder ->
           (* Internal message through forwarder *)
+          let message = hex_encode message in
           let* () =
             Client.transfer
               client
               ~amount:Tez.zero
               ~giver:Constant.bootstrap1.alias
               ~receiver:forwarder
-              ~arg:(sf "Pair %S %S" sc_rollup message)
+              ~arg:(sf "Pair %S 0x%s" sc_rollup message)
           in
           Client.bake_for_and_wait client
     in
-    let* _ =
+    let* (_ : int) =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + i)
     in
 
