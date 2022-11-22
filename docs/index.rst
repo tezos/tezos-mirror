@@ -12,53 +12,58 @@ Welcome to the Tezos Developer Documentation!
 To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
 
 .. image:: images/what_is_tezos_1.png
-      :width: 100%
-      :alt: What is Tezos
+    :alt: Getting started
 
 .. raw:: html
 
     <details>
-    <summary><a>Tezos is a distributed consensus platform with meta-consensus
-    capability. (See more) </a></summary>
+    <summary><a>Never heard of Tezos? Let's meet! (See more) </a></summary><div style="max-width:1000px">
 
-Tezos is a blockchain.
+Tezos is a distributed consensus platform (a blockchain) with meta-consensus
+capability.
 
-But unlike other blockains like Bitcoin or Ethereum, Tezos comes to consensus not only about the state of its ledger, but also about how the protocol and the nodes should adapt and upgrade.
+This means that, unlike other blockchains like Bitcoin or Ethereum, Tezos comes to consensus not only about the state of its ledger, but also about how the protocol and the nodes should adapt and upgrade.
 
 This is a fundamental design choice, allowing Tezos to be seamlessly upgradable and continuosly evolving.
 Due to this feature, Tezos is built to last, and always stay at the leading edge of blockchain technology.
 
-To learn more about Tezos and its ecosystem, see :doc:`introduction/tezos`.
+To learn more about Tezos, its implementation, and its ecosystem, see :doc:`introduction/tezos`.
 
 .. raw:: html
 
-    </details><br/>
+    </div></details><br/>
 
 .. image:: images/getting_started_2.png
-      :width: 100%
-      :alt: Getting started
+    :alt: Getting started
 
 .. raw:: html
 
     <details>
 
-    <summary><a>Start exploring by following the <var>Introduction</var> section in the documentation menu. (See more) </a> </summary>
+    <summary><a>Newcomer to Tezos? Come and participate! (See more) </a> </summary><div style="max-width:1000px">
 
-These tutorials explain how to :doc:`get the latest implementation of Octez <introduction/howtoget>` in various forms, how to :doc:`start using Octez to join Tezos <introduction/howtouse>`, different :doc:`ways to participate to the network <introduction/howtorun>`, and more.
+Start participating to Tezos by following the `Introduction` section in the documentation menu.
+
+These tutorials explain:
+
+- how to :doc:`get the latest release of Octez <introduction/howtoget>` (a complete, open-source implementation of Tezos) in various forms,
+- how to :doc:`start using Octez to join Tezos <introduction/howtouse>`,
+- different :doc:`ways to participate to the network <introduction/howtorun>`,
+
+and more.
 
 .. raw:: html
 
-    </details><br/>
+    </div></details><br/>
 
 .. image:: images/using_octez_3.png
-      :width: 100%
-      :alt: Using Octez
+    :alt: Using Octez
 
 .. raw:: html
 
     <details>
 
-    <summary><a>Using Tezos/Octez (See more)</a></summary>
+    <summary><a>Already a user? Here is everything you need to know. (See more)</a></summary><div style="max-width:1000px">
 
 If you already installed Octez and can participate in the Tezos blockchain, the most useful resources are grouped in the ``User`` section in the documentation menu.
 These pages:
@@ -70,19 +75,17 @@ If you intend to participate to Tezos not just as a mere user, but also as a bak
 
 .. raw:: html
 
-    </details><br/>
+    </div></details><br/>
 
 
 .. image:: images/understanding_octez_4.png
-      :width: 100%
-      :alt: Understanding
+    :alt: Understanding
 
 .. raw:: html
 
     <details>
 
-    <summary><a>Understanding Tezos/Octez (See more)</a></summary>
-
+    <summary><a>Want to know how it works? No secret, let us explain! (See more)</a></summary><div style="max-width:1000px">
 
 If you want to know more about the Tezos *technology*, there are several sections in the documentation presenting the main design principles of Tezos, and some high-level implementation principles of Octez:
 
@@ -93,18 +96,17 @@ If you want to know more about the Tezos *technology*, there are several section
 
 .. raw:: html
 
-    </details><br/>
+    </div></details><br/>
 
 
 .. image:: images/building_on_tezos_5.png
-      :width: 100%
-      :alt: Building on Tezos
+    :alt: Building on Tezos
 
 .. raw:: html
 
     <details>
 
-    <summary><a>Building on Tezos (See more)</a></summary>
+    <summary><a>Are you an application developer? Find how to program. (See more)</a></summary><div style="max-width:1000px">
 
 Tezos is an open platform. As any programmable blockchain, its value lies in the increasing base of smart contracts and distributed applications covering various domains, but also in the tools that make the ecosystem easier to use and more efficient, such as wallets, indexers, and many others.
 
@@ -119,18 +121,17 @@ If you are looking for a more accessible and pedagogical exposition on how to wr
 
 .. raw:: html
 
-    </details><br/>
+    </div></details><br/>
 
 
 .. image:: images/contributing_to_octez_6.png
-      :width: 100%
-      :alt: Contributing
+    :alt: Contributing
 
 .. raw:: html
 
     <details>
 
-    <summary><a>Contributing to Octez (See more)</a></summary>
+    <summary><a>Are you a core developer? Here are the nuts and bolts! (See more)</a></summary><div style="max-width:1000px">
 
 The main focus of this technical documentation website is on resources for core developers, that is, contributors to the Tezos platform, and in particular to its Octez implementation.
 
@@ -150,7 +151,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. raw:: html
 
-    </details><br/>
+    </div></details><br/>
 
 
 .. toctree::
