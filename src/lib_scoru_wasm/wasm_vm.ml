@@ -445,14 +445,19 @@ let set_input_step input_info message pvm_state =
 
 let reveal_step payload pvm_state =
   let open Lwt_syntax in
-  let open Tezos_webassembly_interpreter in
   let return tick_state =
     Lwt.return
       {pvm_state with current_tick = Z.succ pvm_state.current_tick; tick_state}
   in
   match pvm_state.tick_state with
   | Eval {config; module_reg} ->
-      let* config = Eval.reveal_step module_reg payload config in
+      let* config =
+        Tezos_webassembly_interpreter.Eval.reveal_step
+          Host_funcs.Aux.reveal
+          module_reg
+          payload
+          config
+      in
       return (Eval {config; module_reg})
   | Snapshot ->
       return

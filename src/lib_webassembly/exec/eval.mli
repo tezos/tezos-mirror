@@ -287,15 +287,25 @@ exception Reveal_error of reveal_error
     otherwise. *)
 val is_reveal_tick : config -> Reveal.reveal option
 
-(** [reveal_step module_reg payload config] loads [payload] in the
-    memory of the module whose function is being evaluated with [config].
+(** [reveal_step reveal module_reg payload config] loads [payload] in
+    the memory of the module whose function is being evaluated with
+    [config].
 
     This function can only be used when [is_reveal_tick] returns
     something ({i i.e.}, not [None]).
 
     @raise Reveal_error
 *)
-val reveal_step : module_reg -> bytes -> config -> config Lwt.t
+val reveal_step :
+  (memory:memory_inst ->
+  dst:int32 ->
+  max_bytes:int32 ->
+  payload:bytes ->
+  int32 Lwt.t) ->
+  module_reg ->
+  bytes ->
+  config ->
+  config Lwt.t
 
 val config :
   Host_funcs.registry ->

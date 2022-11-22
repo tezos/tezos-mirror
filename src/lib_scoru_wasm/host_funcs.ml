@@ -96,16 +96,6 @@ let extract_error durable = function
   | Error error -> Lwt.return (durable, Error.code error)
   | Ok res -> Lwt.return res
 
-let raise_on_error (result : ('a, Error.t) result Lwt.t) : 'a Lwt.t =
-  let open Lwt.Syntax in
-  let* r = result in
-  match r with
-  | Ok r -> Lwt.return r
-  | Error err ->
-      let code = Error.code err in
-      let msg = Printf.sprintf "Failed with error code %ld" code in
-      Stdlib.failwith msg
-
 let retrieve_memory memories =
   let crash_with msg = raise (Eval.Crash (Source.no_region, msg)) in
   match memories with
@@ -223,6 +213,13 @@ module Aux = struct
       index:int64 ->
       dst:int32 ->
       max_size:int32 ->
+      int32 Lwt.t
+
+    val reveal :
+      memory:memory ->
+      dst:int32 ->
+      max_bytes:int32 ->
+      payload:bytes ->
       int32 Lwt.t
 
     val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
@@ -486,6 +483,18 @@ module Aux = struct
           if result <> "" then M.store_bytes memory dst result else return_unit
         in
         Int32.of_int @@ String.length result
+      in
+      extract_error_code res
+
+    let reveal ~memory ~dst ~max_bytes ~payload =
+      let open Lwt_syntax in
+      let* res =
+        let open Lwt_result_syntax in
+        let payload_size = Bytes.length payload in
+        let revealed_bytes = min payload_size (Int32.to_int max_bytes) in
+        let payload = Bytes.sub payload 0 revealed_bytes in
+        let+ () = M.store_bytes memory dst (Bytes.to_string payload) in
+        Int32.of_int revealed_bytes
       in
       extract_error_code res
 
@@ -893,8 +902,6 @@ let reveal_preimage_type =
   Types.FuncType (input_types, output_types)
 
 let reveal_preimage_parse_args memories args =
-  raise_on_error
-  @@
   match args with
   | Values.[Num (I32 hash_addr); Num (I32 base); Num (I32 max_bytes)] ->
       let open Lwt_result_syntax in
@@ -922,7 +929,8 @@ let reveal_metadata_parse_args _memories args =
   match args with
   | Values.[Num (I32 base)] ->
       Lwt.return
-        (Reveal.Reveal_metadata, Host_funcs.{base; max_bytes = metadata_size})
+        (Ok
+           (Reveal.Reveal_metadata, Host_funcs.{base; max_bytes = metadata_size}))
   | _ -> raise Bad_input
 
 let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args
