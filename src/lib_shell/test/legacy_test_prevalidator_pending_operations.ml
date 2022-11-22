@@ -51,7 +51,7 @@ let pending_of_list =
   List.fold_left
     (fun pendings (op, priority) ->
       if
-        Tezos_crypto.Operation_hash.Set.mem
+        Operation_hash.Set.mem
           (Prevalidation.Internal_for_tests.hash_of op)
           (Pending_ops.hashes pendings)
       then (* no duplicate hashes *)

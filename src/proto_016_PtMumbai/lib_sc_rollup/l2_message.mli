@@ -34,7 +34,7 @@ val make : string -> t
 val content : t -> string
 
 (** Hash with b58check encoding scmsg(55), for hashes of L2 messages. *)
-module Hash : Tezos_crypto.S.HASH
+module Hash : Tezos_crypto.Intfs.HASH
 
 (** Alias for message hash *)
 type hash = Hash.t

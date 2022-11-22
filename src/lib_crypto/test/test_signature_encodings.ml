@@ -35,11 +35,11 @@ module type B58CHECK = sig
 
   val pp : Format.formatter -> t -> unit
 
-  include S.B58_DATA with type t := t
+  include Intfs.B58_DATA with type t := t
 end
 
 module Make_tests
-    (P : S.SIGNATURE) (T : sig
+    (P : Intfs.SIGNATURE) (T : sig
       val name : string
 
       val pkh_vectors : (string * string) list

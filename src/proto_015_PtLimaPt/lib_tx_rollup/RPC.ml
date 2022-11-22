@@ -31,7 +31,7 @@ open Alpha_context
 type block_id =
   [ `Head
   | `L2_block of L2block.hash
-  | `Tezos_block of Tezos_crypto.Block_hash.t
+  | `Tezos_block of Block_hash.t
   | `Level of L2block.level ]
 
 type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
@@ -62,7 +62,7 @@ let context_of_id state context_id =
 let construct_block_id = function
   | `Head -> "head"
   | `L2_block h -> L2block.Hash.to_b58check h
-  | `Tezos_block h -> Tezos_crypto.Block_hash.to_b58check h
+  | `Tezos_block h -> Block_hash.to_b58check h
   | `Level l -> L2block.level_to_string l
 
 let destruct_block_id h =
@@ -76,7 +76,7 @@ let destruct_block_id h =
           | Error _ -> Error "Invalid rollup level"
           | Ok l -> Ok (`Level l))
       | None -> (
-          match Tezos_crypto.Block_hash.of_b58check_opt h with
+          match Block_hash.of_b58check_opt h with
           | Some b -> Ok (`Tezos_block b)
           | None -> (
               match L2block.Hash.of_b58check_opt h with
@@ -344,8 +344,7 @@ module Block = struct
     | None -> return_none
     | Some block -> (
         match block_id with
-        | `Tezos_block b
-          when Tezos_crypto.Block_hash.(block.header.tezos_block <> b) ->
+        | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
             (* Tezos block has no l2 inbox *)
             return_none
         | _ -> return_some block.inbox)
@@ -358,13 +357,9 @@ module Block = struct
     | Some block ->
         let*? () =
           match block_id with
-          | `Tezos_block b
-            when Tezos_crypto.Block_hash.(block.header.tezos_block <> b) ->
+          | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
               (* Tezos block has no l2 inbox *)
-              error_with
-                "The tezos block (%a) has not L2 inbox"
-                Tezos_crypto.Block_hash.pp
-                b
+              error_with "The tezos block (%a) has not L2 inbox" Block_hash.pp b
           | _ -> ok ()
         in
         let*? () =

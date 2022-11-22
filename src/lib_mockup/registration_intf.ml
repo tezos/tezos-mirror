@@ -33,7 +33,7 @@ type t = {
 type mockup_context = t
 
 module type PROTOCOL = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   include Tezos_protocol_environment.PROTOCOL
 end
@@ -60,7 +60,7 @@ module type MOCKUP = sig
   val default_bootstrap_accounts :
     Tezos_client_base.Client_context.full -> string tzresult Lwt.t
 
-  val protocol_hash : Tezos_crypto.Protocol_hash.t
+  val protocol_hash : Protocol_hash.t
 
   module Protocol : PROTOCOL
 

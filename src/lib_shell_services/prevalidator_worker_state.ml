@@ -27,17 +27,17 @@
 module Request = struct
   type ('a, 'b) t =
     | Flush :
-        Tezos_crypto.Block_hash.t
+        Block_hash.t
         * Chain_validator_worker_state.update
-        * Tezos_crypto.Block_hash.Set.t
-        * Tezos_crypto.Operation_hash.Set.t
+        * Block_hash.Set.t
+        * Operation_hash.Set.t
         -> (unit, error trace) t
     | Notify : P2p_peer.Id.t * Mempool.t -> (unit, Empty.t) t
     | Leftover : (unit, Empty.t) t
     | Inject : {op : Operation.t; force : bool} -> (unit, error trace) t
-    | Arrived : Tezos_crypto.Operation_hash.t * Operation.t -> (unit, Empty.t) t
+    | Arrived : Operation_hash.t * Operation.t -> (unit, Empty.t) t
     | Advertise : (unit, Empty.t) t
-    | Ban : Tezos_crypto.Operation_hash.t -> (unit, error trace) t
+    | Ban : Operation_hash.t -> (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -52,7 +52,7 @@ module Request = struct
           ~title:"Flush"
           (obj3
              (req "request" (constant "flush"))
-             (req "block" Tezos_crypto.Block_hash.encoding)
+             (req "block" Block_hash.encoding)
              (req "event" Chain_validator_worker_state.update_encoding))
           (function
             | View (Flush (hash, event, _, _)) -> Some ((), hash, event)
@@ -60,10 +60,7 @@ module Request = struct
           (fun ((), hash, event) ->
             View
               (Flush
-                 ( hash,
-                   event,
-                   Tezos_crypto.Block_hash.Set.empty,
-                   Tezos_crypto.Operation_hash.Set.empty )));
+                 (hash, event, Block_hash.Set.empty, Operation_hash.Set.empty)));
         case
           (Tag 1)
           ~title:"Notify"
@@ -90,7 +87,7 @@ module Request = struct
           ~title:"Arrived"
           (obj3
              (req "request" (constant "arrived"))
-             (req "operation_hash" Tezos_crypto.Operation_hash.encoding)
+             (req "operation_hash" Operation_hash.encoding)
              (req "operation" Operation.encoding))
           (function
             | View (Arrived (oph, op)) -> Some ((), oph, op) | _ -> None)
@@ -112,7 +109,7 @@ module Request = struct
           ~title:"Ban"
           (obj2
              (req "request" (constant "ban"))
-             (req "operation_hash" Tezos_crypto.Operation_hash.encoding))
+             (req "operation_hash" Operation_hash.encoding))
           (function View (Ban oph) -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> View (Ban oph));
       ]
@@ -120,11 +117,7 @@ module Request = struct
   let pp ppf (View r) =
     match r with
     | Flush (hash, _, _, _) ->
-        Format.fprintf
-          ppf
-          "switching to new head %a"
-          Tezos_crypto.Block_hash.pp
-          hash
+        Format.fprintf ppf "switching to new head %a" Block_hash.pp hash
     | Notify (id, {Mempool.known_valid; pending}) ->
         Format.fprintf
           ppf
@@ -132,43 +125,24 @@ module Request = struct
           P2p_peer.Id.pp
           id ;
         List.iter
-          (fun oph ->
-            Format.fprintf
-              ppf
-              "@,%a (applied)"
-              Tezos_crypto.Operation_hash.pp
-              oph)
+          (fun oph -> Format.fprintf ppf "@,%a (applied)" Operation_hash.pp oph)
           known_valid ;
         List.iter
-          (fun oph ->
-            Format.fprintf
-              ppf
-              "@,%a (pending)"
-              Tezos_crypto.Operation_hash.pp
-              oph)
-          (Tezos_crypto.Operation_hash.Set.elements pending) ;
+          (fun oph -> Format.fprintf ppf "@,%a (pending)" Operation_hash.pp oph)
+          (Operation_hash.Set.elements pending) ;
         Format.fprintf ppf "@]"
     | Leftover -> Format.fprintf ppf "process next batch of operation"
     | Inject {op; force} ->
         Format.fprintf
           ppf
           "injecting operation %a (force:%b)"
-          Tezos_crypto.Operation_hash.pp
+          Operation_hash.pp
           (Operation.hash op)
           force
     | Arrived (oph, _) ->
-        Format.fprintf
-          ppf
-          "operation %a arrived"
-          Tezos_crypto.Operation_hash.pp
-          oph
+        Format.fprintf ppf "operation %a arrived" Operation_hash.pp oph
     | Advertise -> Format.fprintf ppf "advertising pending operations"
-    | Ban oph ->
-        Format.fprintf
-          ppf
-          "banning operation %a"
-          Tezos_crypto.Operation_hash.pp
-          oph
+    | Ban oph -> Format.fprintf ppf "banning operation %a" Operation_hash.pp oph
 end
 
 module Operation_encountered = struct
@@ -178,7 +152,7 @@ module Operation_encountered = struct
     | Notified of P2p_peer_id.t option
     | Other
 
-  type t = situation * Tezos_crypto.Operation_hash.t
+  type t = situation * Operation_hash.t
 
   let encoding =
     let open Data_encoding in
@@ -190,7 +164,7 @@ module Operation_encountered = struct
           ~title:"injected"
           (obj2
              (req "situation" (constant "injected"))
-             (req "operation" Tezos_crypto.Operation_hash.encoding))
+             (req "operation" Operation_hash.encoding))
           (function Injected, oph -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> (Injected, oph));
         case
@@ -198,7 +172,7 @@ module Operation_encountered = struct
           ~title:"arrived"
           (obj2
              (req "situation" (constant "arrived"))
-             (req "operation" Tezos_crypto.Operation_hash.encoding))
+             (req "operation" Operation_hash.encoding))
           (function Arrived, oph -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> (Arrived, oph));
         case
@@ -206,7 +180,7 @@ module Operation_encountered = struct
           ~title:"notified"
           (obj3
              (req "situation" (constant "notified"))
-             (req "operation" Tezos_crypto.Operation_hash.encoding)
+             (req "operation" Operation_hash.encoding)
              (req "peer" (option P2p_peer_id.encoding)))
           (function Notified peer, oph -> Some ((), oph, peer) | _ -> None)
           (fun ((), oph, peer) -> (Notified peer, oph));
@@ -215,7 +189,7 @@ module Operation_encountered = struct
           ~title:"other"
           (obj2
              (req "situation" (constant "other"))
-             (req "operation" Tezos_crypto.Operation_hash.encoding))
+             (req "operation" Operation_hash.encoding))
           (function Other, hash -> Some ((), hash) | _ -> None)
           (fun ((), oph) -> (Other, oph));
       ]
@@ -234,6 +208,6 @@ module Operation_encountered = struct
       "operation %a: %a"
       situation_pp
       situation
-      Tezos_crypto.Operation_hash.pp
+      Operation_hash.pp
       oph
 end

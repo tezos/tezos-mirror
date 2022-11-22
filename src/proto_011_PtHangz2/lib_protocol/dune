@@ -155,7 +155,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx\"\nlet name = Tezos_protocol_environment_011_PtHangz2.Name.name\ninclude Tezos_raw_protocol_011_PtHangz2\ninclude Tezos_raw_protocol_011_PtHangz2.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx\"\nlet name = Tezos_protocol_environment_011_PtHangz2.Name.name\ninclude Tezos_raw_protocol_011_PtHangz2\ninclude Tezos_raw_protocol_011_PtHangz2.Main\n")))
 
 (rule
  (targets tezos_protocol_011_PtHangz2.ml)

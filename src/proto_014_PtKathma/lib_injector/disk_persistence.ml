@@ -276,7 +276,7 @@ end
 module Make_queue (N : sig
   val name : string
 end)
-(K : Tezos_crypto.S.HASH) (V : sig
+(K : Tezos_crypto.Intfs.HASH) (V : sig
   type t
 
   val encoding : t Data_encoding.t

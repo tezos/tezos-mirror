@@ -111,7 +111,7 @@ val precheck_block :
   Store.chain_store ->
   predecessor:Store.Block.t ->
   Block_header.t ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Operation.t trace trace ->
   unit tzresult Lwt.t
 
@@ -121,7 +121,7 @@ val precheck_block :
 val context_garbage_collection :
   t ->
   Context_ops.index ->
-  Tezos_crypto.Context_hash.t ->
+  Context_hash.t ->
   gc_lockfile_path:string ->
   unit tzresult Lwt.t
 
@@ -130,9 +130,7 @@ val context_garbage_collection :
 val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
 val commit_genesis :
-  t ->
-  chain_id:Tezos_crypto.Chain_id.t ->
-  Tezos_crypto.Context_hash.t tzresult Lwt.t
+  t -> chain_id:Tezos_crypto.Chain_id.t -> Context_hash.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)
 val init_test_chain :

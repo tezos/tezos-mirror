@@ -174,12 +174,12 @@ let set_sol_input level tree =
   Wasm.set_input_step (input_info level Z.zero) sol_input tree
 
 let set_info_per_level_input level tree =
-  let block_hash = Tezos_crypto.Block_hash.zero in
+  let block_hash = Block_hash.zero in
   let timestamp = Time.Protocol.epoch in
   let info_res =
     Data_encoding.(
       Binary.to_string
-        (tup2 Time.Protocol.encoding Tezos_crypto.Block_hash.encoding)
+        (tup2 Time.Protocol.encoding Block_hash.encoding)
         (timestamp, block_hash))
   in
   match info_res with

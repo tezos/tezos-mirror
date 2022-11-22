@@ -88,12 +88,10 @@ end
 include Protocol.Tx_rollup_l2_context.Make (Irmin_storage)
 
 let context_hash_to_l2 hash =
-  Tezos_crypto.Context_hash.to_bytes hash
-  |> Protocol.Tx_rollup_l2_context_hash.of_bytes_exn
+  Context_hash.to_bytes hash |> Protocol.Tx_rollup_l2_context_hash.of_bytes_exn
 
 let l2_to_context_hash hash =
-  Protocol.Tx_rollup_l2_context_hash.to_bytes hash
-  |> Tezos_crypto.Context_hash.of_bytes_exn
+  Protocol.Tx_rollup_l2_context_hash.to_bytes hash |> Context_hash.of_bytes_exn
 
 let exists index hash = Raw.exists index (l2_to_context_hash hash)
 
@@ -225,7 +223,7 @@ let init_context index =
   let* tree = Prover_context.Ticket_index.init_counter tree in
   let tree_hash = hash_tree tree in
   assert (
-    Tezos_crypto.Context_hash.(
+    Context_hash.(
       tree_hash = Protocol.Tx_rollup_message_result_repr.empty_l2_context_hash)) ;
   let* ctxt, _ = add_tree ctxt tree in
   return ctxt

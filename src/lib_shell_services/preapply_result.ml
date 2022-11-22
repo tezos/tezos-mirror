@@ -24,43 +24,42 @@
 (*****************************************************************************)
 
 type 'error t = {
-  applied : (Tezos_crypto.Operation_hash.t * Operation.t) list;
-  refused : (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
-  outdated : (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
-  branch_refused :
-    (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
-  branch_delayed : (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
+  applied : (Operation_hash.t * Operation.t) list;
+  refused : (Operation.t * 'error list) Operation_hash.Map.t;
+  outdated : (Operation.t * 'error list) Operation_hash.Map.t;
+  branch_refused : (Operation.t * 'error list) Operation_hash.Map.t;
+  branch_delayed : (Operation.t * 'error list) Operation_hash.Map.t;
 }
 
 let empty =
   {
     applied = [];
-    refused = Tezos_crypto.Operation_hash.Map.empty;
-    outdated = Tezos_crypto.Operation_hash.Map.empty;
-    branch_refused = Tezos_crypto.Operation_hash.Map.empty;
-    branch_delayed = Tezos_crypto.Operation_hash.Map.empty;
+    refused = Operation_hash.Map.empty;
+    outdated = Operation_hash.Map.empty;
+    branch_refused = Operation_hash.Map.empty;
+    branch_delayed = Operation_hash.Map.empty;
   }
 
 let encoding error_encoding =
   let open Data_encoding in
   let operation_encoding =
     merge_objs
-      (obj1 (req "hash" Tezos_crypto.Operation_hash.encoding))
+      (obj1 (req "hash" Operation_hash.encoding))
       (dynamic_size Operation.encoding)
   in
   let refused_encoding =
     merge_objs
-      (obj1 (req "hash" Tezos_crypto.Operation_hash.encoding))
+      (obj1 (req "hash" Operation_hash.encoding))
       (merge_objs
          (dynamic_size Operation.encoding)
          (obj1 (req "error" error_encoding)))
   in
-  let build_list map = Tezos_crypto.Operation_hash.Map.bindings map in
+  let build_list map = Operation_hash.Map.bindings map in
   let build_map list =
     List.fold_right
-      (fun (k, e) m -> Tezos_crypto.Operation_hash.Map.add k e m)
+      (fun (k, e) m -> Operation_hash.Map.add k e m)
       list
-      Tezos_crypto.Operation_hash.Map.empty
+      Operation_hash.Map.empty
   in
   conv
     (fun {applied; refused; outdated; branch_refused; branch_delayed} ->

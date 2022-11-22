@@ -27,9 +27,9 @@ open Protocol
 open Alpha_context
 
 type header = {
-  block_hash : Tezos_crypto.Block_hash.t;
+  block_hash : Block_hash.t;
   level : Raw_level.t;
-  predecessor : Tezos_crypto.Block_hash.t;
+  predecessor : Block_hash.t;
   commitment_hash : Sc_rollup.Commitment.Hash.t option;
   previous_commitment_hash : Sc_rollup.Commitment.Hash.t;
   context : Sc_rollup_context_hash.t;
@@ -105,10 +105,7 @@ let header_encoding =
         inbox_hash;
       })
   @@ obj8
-       (req
-          "block_hash"
-          Tezos_crypto.Block_hash.encoding
-          ~description:"Tezos block hash.")
+       (req "block_hash" Block_hash.encoding ~description:"Tezos block hash.")
        (req
           "level"
           Raw_level.encoding
@@ -116,7 +113,7 @@ let header_encoding =
             "Level of the block, corresponds to the level of the tezos block.")
        (req
           "predecessor"
-          Tezos_crypto.Block_hash.encoding
+          Block_hash.encoding
           ~description:"Predecessor hash of the Tezos block.")
        (req
           "commitment_hash"

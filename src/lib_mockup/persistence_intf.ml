@@ -25,7 +25,7 @@
 
 module type S = sig
   val get_registered_mockup :
-    Tezos_crypto.Protocol_hash.t option ->
+    Protocol_hash.t option ->
     #Tezos_client_base.Client_context.printer ->
     Registration.mockup_environment tzresult Lwt.t
 
@@ -39,7 +39,7 @@ module type S = sig
   (**  Returns a mockup environment for the specified protocol hash. *)
   val init_mockup_context_by_protocol_hash :
     cctxt:Tezos_client_base.Client_context.printer ->
-    protocol_hash:Tezos_crypto.Protocol_hash.t ->
+    protocol_hash:Protocol_hash.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     (Registration.mockup_environment * Registration.mockup_context) tzresult
@@ -50,7 +50,7 @@ module type S = sig
     loaded environment agrees with it. *)
   val get_mockup_context_from_disk :
     base_dir:string ->
-    protocol_hash:Tezos_crypto.Protocol_hash.t option ->
+    protocol_hash:Protocol_hash.t option ->
     #Tezos_client_base.Client_context.printer ->
     (Registration.mockup_environment * Registration.mockup_context) tzresult
     Lwt.t
@@ -59,7 +59,7 @@ module type S = sig
     protocol. *)
   val create_mockup :
     cctxt:Tezos_client_base.Client_context.full ->
-    protocol_hash:Tezos_crypto.Protocol_hash.t ->
+    protocol_hash:Protocol_hash.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     asynchronous:bool ->
@@ -67,7 +67,7 @@ module type S = sig
 
   (** Overwrites an on-disk mockup environment. *)
   val overwrite_mockup :
-    protocol_hash:Tezos_crypto.Protocol_hash.t ->
+    protocol_hash:Protocol_hash.t ->
     chain_id:Tezos_crypto.Chain_id.t ->
     rpc_context:Tezos_protocol_environment.rpc_context ->
     protocol_data:bytes ->

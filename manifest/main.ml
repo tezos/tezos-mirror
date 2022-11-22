@@ -4061,7 +4061,7 @@ include Tezos_protocol_environment.V%d.Make(Name)()
                       S
                         (sf
                            {|
-let hash = Tezos_crypto.Protocol_hash.of_b58check_exn "%s"
+let hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn "%s"
 let name = Tezos_protocol_environment_%s.Name.name
 include Tezos_raw_protocol_%s
 include Tezos_raw_protocol_%s.Main

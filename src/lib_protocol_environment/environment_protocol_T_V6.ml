@@ -101,7 +101,7 @@ module type T = sig
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
     predecessor_fitness:Fitness.t ->
-    predecessor:Tezos_crypto.Block_hash.t ->
+    predecessor:Tezos_crypto.Hashed.Block_hash.t ->
     timestamp:Time.Protocol.t ->
     ?protocol_data:block_header_data ->
     unit ->
@@ -135,7 +135,7 @@ module type T = sig
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
     predecessor_fitness:Fitness.t ->
-    predecessor:Tezos_crypto.Block_hash.t ->
+    predecessor:Tezos_crypto.Hashed.Block_hash.t ->
     timestamp:Time.Protocol.t ->
     (cache_key -> cache_value tzresult Lwt.t) tzresult Lwt.t
 end

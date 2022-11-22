@@ -35,11 +35,11 @@ open Filename.Infix
 (** Basic blocks *)
 
 let genesis_block_hash =
-  Tezos_crypto.Block_hash.of_b58check_exn
+  Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol_hash =
-  Tezos_crypto.Protocol_hash.of_b58check_exn
+  Protocol_hash.of_b58check_exn
     "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let genesis_time = Time.Protocol.of_seconds 0L

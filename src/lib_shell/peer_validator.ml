@@ -53,9 +53,7 @@ module Request = struct
   include Request
 
   type (_, _) t =
-    | New_head :
-        Tezos_crypto.Block_hash.t * Block_header.t
-        -> (unit, error trace) t
+    | New_head : Block_hash.t * Block_header.t -> (unit, error trace) t
     | New_branch : Block_locator.t * Block_locator.seed -> (unit, error trace) t
 
   let view (type a b) (req : (a, b) t) : view =
@@ -404,7 +402,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
                 ( pv.peer_id,
                   Format.asprintf
                     "missing protocol: %a"
-                    Tezos_crypto.Protocol_hash.pp
+                    Protocol_hash.pp
                     protocol )
             in
             let* () = Events.(emit request_error) (request_view, st, err) in

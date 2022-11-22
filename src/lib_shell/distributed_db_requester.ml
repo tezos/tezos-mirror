@@ -43,7 +43,7 @@ end
 module type EXTENDED_REQUESTER_2 = sig
   include EXTENDED_REQUESTER
 
-  val clear_all : t -> Tezos_crypto.Block_hash.t -> int -> unit
+  val clear_all : t -> Block_hash.t -> int -> unit
 end
 
 module type REQUEST_MESSAGE = sig
@@ -174,12 +174,12 @@ end
 module Raw_operation =
   Make_raw
     (struct
-      include Tezos_crypto.Operation_hash
+      include Operation_hash
 
       let name = "operation"
     end)
     (Fake_operation_storage)
-    (Tezos_crypto.Operation_hash.Table)
+    (Operation_hash.Table)
     (struct
       type param = unit
 
@@ -233,12 +233,12 @@ end
 module Raw_block_header =
   Make_raw
     (struct
-      include Tezos_crypto.Block_hash
+      include Block_hash
 
       let name = "block_header"
     end)
     (Block_header_storage)
-    (Tezos_crypto.Block_hash.Table)
+    (Block_hash.Table)
     (struct
       type param = unit
 
@@ -257,7 +257,7 @@ module Raw_block_header =
     end)
 
 module Operations_table = Hashtbl.MakeSeeded (struct
-  type t = Tezos_crypto.Block_hash.t * int
+  type t = Block_hash.t * int
 
   (* See [src/lib_base/tzPervasives.ml] for an explanation *)
   [@@@ocaml.warning "-32"]
@@ -268,7 +268,7 @@ module Operations_table = Hashtbl.MakeSeeded (struct
 
   [@@@ocaml.warning "+32"]
 
-  let equal (b1, i1) (b2, i2) = Tezos_crypto.Block_hash.equal b1 b2 && i1 = i2
+  let equal (b1, i1) (b2, i2) = Block_hash.equal b1 b2 && i1 = i2
 end)
 
 module Operations_storage = struct
@@ -299,18 +299,15 @@ module Raw_operations = struct
   include
     Make_raw
       (struct
-        type t = Tezos_crypto.Block_hash.t * int
+        type t = Block_hash.t * int
 
         let name = "operations"
 
-        let pp ppf (h, n) =
-          Format.fprintf ppf "%a:%d" Tezos_crypto.Block_hash.pp h n
+        let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
 
         let encoding =
           let open Data_encoding in
-          obj2
-            (req "block" Tezos_crypto.Block_hash.encoding)
-            (req "index" uint16)
+          obj2 (req "block" Block_hash.encoding) (req "index" uint16)
       end)
       (Operations_storage)
       (Operations_table)
@@ -324,24 +321,19 @@ module Raw_operations = struct
         let forge () keys = Message.Get_operations_for_blocks keys
       end)
       (struct
-        type param = Tezos_crypto.Operation_list_list_hash.t
+        type param = Operation_list_list_hash.t
 
-        type notified_value =
-          Operation.t list * Tezos_crypto.Operation_list_list_hash.path
+        type notified_value = Operation.t list * Operation_list_list_hash.path
 
         let probe (_block, expected_ofs) expected_hash (ops, path) =
           let received_hash, received_ofs =
-            Tezos_crypto.Operation_list_list_hash.check_path
+            Operation_list_list_hash.check_path
               path
-              (Tezos_crypto.Operation_list_hash.compute
-                 (List.map Operation.hash ops))
+              (Operation_list_hash.compute (List.map Operation.hash ops))
           in
           if
             received_ofs = expected_ofs
-            && Tezos_crypto.Operation_list_list_hash.compare
-                 expected_hash
-                 received_hash
-               = 0
+            && Operation_list_list_hash.compare expected_hash received_hash = 0
           then Some ops
           else None
       end)
@@ -368,12 +360,12 @@ end
 module Raw_protocol =
   Make_raw
     (struct
-      include Tezos_crypto.Protocol_hash
+      include Protocol_hash
 
       let name = "protocol"
     end)
     (Protocol_storage)
-    (Tezos_crypto.Protocol_hash.Table)
+    (Protocol_hash.Table)
     (struct
       type param = unit
 

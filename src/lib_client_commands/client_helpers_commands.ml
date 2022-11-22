@@ -72,9 +72,7 @@ let commands () =
            ~desc:"the block hash from which to compute the chain id"
       @@ stop)
       (fun () block_hash_str (cctxt : #Client_context.full) ->
-        let* block_hash =
-          Lwt.return (Tezos_crypto.Block_hash.of_b58check block_hash_str)
-        in
+        let* block_hash = Lwt.return (Block_hash.of_b58check block_hash_str) in
         let chain_id = Tezos_crypto.Chain_id.of_block_hash block_hash in
         let*! () = cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id in
         return_unit);

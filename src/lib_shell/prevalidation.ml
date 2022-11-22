@@ -39,10 +39,10 @@ open Shell_operation
 
 type error +=
   | Operation_replacement of {
-      old_hash : Tezos_crypto.Operation_hash.t;
-      new_hash : Tezos_crypto.Operation_hash.t;
+      old_hash : Operation_hash.t;
+      new_hash : Operation_hash.t;
     }
-  | Operation_conflict of {new_hash : Tezos_crypto.Operation_hash.t}
+  | Operation_conflict of {new_hash : Operation_hash.t}
 
 let () =
   register_error_kind
@@ -54,13 +54,13 @@ let () =
       Format.fprintf
         ppf
         "The operation %a has been replaced with %a."
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         old_hash
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         new_hash)
     (Data_encoding.obj2
-       (Data_encoding.req "old_hash" Tezos_crypto.Operation_hash.encoding)
-       (Data_encoding.req "new_hash" Tezos_crypto.Operation_hash.encoding))
+       (Data_encoding.req "old_hash" Operation_hash.encoding)
+       (Data_encoding.req "new_hash" Operation_hash.encoding))
     (function
       | Operation_replacement {old_hash; new_hash} -> Some (old_hash, new_hash)
       | _ -> None)
@@ -78,10 +78,9 @@ let () =
         "The operation %a cannot be added because the mempool already contains \
          a conflicting operation that should not be replaced (e.g. an \
          operation from the same manager with better fees)."
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         new_hash)
-    (Data_encoding.obj1
-       (Data_encoding.req "new_hash" Tezos_crypto.Operation_hash.encoding))
+    (Data_encoding.obj1 (Data_encoding.req "new_hash" Operation_hash.encoding))
     (function Operation_conflict {new_hash} -> Some new_hash | _ -> None)
     (fun new_hash -> Operation_conflict {new_hash})
 
@@ -131,9 +130,7 @@ module type T = sig
     Lwt.t
 
   type replacement =
-    (Tezos_crypto.Operation_hash.t
-    * Prevalidator_classification.error_classification)
-    option
+    (Operation_hash.t * Prevalidator_classification.error_classification) option
 
   type add_result =
     t
@@ -144,11 +141,10 @@ module type T = sig
   val add_operation :
     t -> filter_config -> protocol_operation operation -> add_result Lwt.t
 
-  val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
+  val remove_operation : t -> Operation_hash.t -> t
 
   module Internal_for_tests : sig
-    val get_valid_operations :
-      t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+    val get_valid_operations : t -> protocol_operation Operation_hash.Map.t
 
     val get_filter_state : t -> filter_state
 
@@ -237,8 +233,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
 
   type classification = Prevalidator_classification.classification
 
-  type replacement =
-    (Tezos_crypto.Operation_hash.t * error_classification) option
+  type replacement = (Operation_hash.t * error_classification) option
 
   type add_result = t * operation * classification * replacement
 

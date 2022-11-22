@@ -691,7 +691,7 @@ type period_info = {
   current_period_kind : Voting_period.kind;
   position : Int32.t;
   remaining : Int32.t;
-  current_proposal : Tezos_crypto.Protocol_hash.t option;
+  current_proposal : Protocol_hash.t option;
 }
 
 type ballots_info = {
@@ -799,7 +799,7 @@ let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash
   | Some (block, i, j) ->
       cctxt#message
         "Operation found in block: %a (pass: %d, offset: %d)"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block
         i
         j

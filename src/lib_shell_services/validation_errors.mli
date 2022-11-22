@@ -34,7 +34,7 @@ type error += Oversized_operation of {size : int; max : int}
 
 type error +=
   | Future_block_header of {
-      block : Tezos_crypto.Block_hash.t;
+      block : Block_hash.t;
       block_time : Time.Protocol.t;
       time : Time.System.t;
     }
@@ -47,17 +47,15 @@ type error += Unknown_chain of Tezos_crypto.Chain_id.t
 
 type error += Bad_data_dir
 
-type error += Block_not_invalid of Tezos_crypto.Block_hash.t
+type error += Block_not_invalid of Block_hash.t
 
 (* Block database error *)
 
-type error +=
-  | Inconsistent_hash of
-      Tezos_crypto.Context_hash.t * Tezos_crypto.Context_hash.t
+type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
-type error += Missing_block_metadata_hash of Tezos_crypto.Block_hash.t
+type error += Missing_block_metadata_hash of Block_hash.t
 
-type error += Missing_operation_metadata_hashes of Tezos_crypto.Block_hash.t
+type error += Missing_operation_metadata_hashes of Block_hash.t
 
 (******************* Bootstrap pipeline errors ****************************)
 
@@ -70,12 +68,9 @@ type error += Too_short_locator of P2p_peer.Id.t * Block_locator.t
 type protocol_error = Compilation_failed | Dynlinking_failed
 
 type error +=
-  | Invalid_protocol of {
-      hash : Tezos_crypto.Protocol_hash.t;
-      error : protocol_error;
-    }
+  | Invalid_protocol of {hash : Protocol_hash.t; error : protocol_error}
 
-type error += Cannot_load_protocol of Tezos_crypto.Protocol_hash.t
+type error += Cannot_load_protocol of Protocol_hash.t
 
 (********************* Peer validator errors ******************************)
 
@@ -85,5 +80,4 @@ type error += Unknown_ancestor | Known_invalid
 
 type error += Inactive_chain of Tezos_crypto.Chain_id.t
 
-type error +=
-  | Checkpoint_error of Tezos_crypto.Block_hash.t * P2p_peer.Id.t option
+type error += Checkpoint_error of Block_hash.t * P2p_peer.Id.t option

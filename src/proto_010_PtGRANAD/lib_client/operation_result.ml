@@ -412,9 +412,9 @@ let rec pp_contents_and_result_list :
          Exhibit B: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         (Block_header.hash bh1)
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         (Block_header.hash bh2)
         pp_balance_updates
         bus
@@ -428,9 +428,9 @@ let rec pp_contents_and_result_list :
          Exhibit B: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         (Operation.hash op1)
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         (Operation.hash op2)
         pp_balance_updates
         bus
@@ -480,7 +480,7 @@ let rec pp_contents_and_result_list :
         Tezos_crypto.Signature.V0.Public_key_hash.pp
         source
         period
-        (Format.pp_print_list Tezos_crypto.Protocol_hash.pp)
+        (Format.pp_print_list Protocol_hash.pp)
         proposals
   | Single_and_result (Ballot {source; period; proposal; ballot}, Ballot_result)
     ->
@@ -490,7 +490,7 @@ let rec pp_contents_and_result_list :
         Tezos_crypto.Signature.V0.Public_key_hash.pp
         source
         period
-        Tezos_crypto.Protocol_hash.pp
+        Protocol_hash.pp
         proposal
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Vote.ballot_encoding ballot)

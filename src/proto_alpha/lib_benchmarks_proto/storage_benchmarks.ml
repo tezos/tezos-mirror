@@ -72,7 +72,7 @@ let default_raw_context () =
       context
       ~level:0l
       ~timestamp:(Time.Protocol.of_seconds 1643125688L)
-      ~predecessor:Tezos_crypto.Block_hash.zero
+      ~predecessor:Block_hash.zero
       ~typecheck
   in
   Lwt.return @@ Environment.wrap_tzresult e

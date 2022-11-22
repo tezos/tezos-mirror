@@ -125,7 +125,7 @@ type proxy_m = (module M)
 type proxy_builder =
   | Of_rpc of (Proxy_proto.proto_rpc -> proxy_m Lwt.t)
   | Of_data_dir of
-      (Tezos_crypto.Context_hash.t ->
+      (Context_hash.t ->
       Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
 
 type rpc_context_args = {
@@ -140,8 +140,7 @@ type rpc_context_args = {
 module StringMap = String.Map
 
 let make_delegate (ctx : rpc_context_args)
-    (proto_rpc : (module Proxy_proto.PROTO_RPC))
-    (hash : Tezos_crypto.Context_hash.t) :
+    (proto_rpc : (module Proxy_proto.PROTO_RPC)) (hash : Context_hash.t) :
     Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t =
   match ctx.proxy_builder with
   | Of_rpc f ->

@@ -72,7 +72,7 @@ module State = struct
           (* Invariant broken, the inbox for this level should exist. *)
           failwith
             "The inbox for block hash %a (level = %ld) is missing."
-            Tezos_crypto.Block_hash.pp
+            Block_hash.pp
             block_hash
             block_level
         else

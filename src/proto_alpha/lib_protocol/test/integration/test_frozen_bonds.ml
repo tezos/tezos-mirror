@@ -54,7 +54,7 @@ let very_small_random_amount () =
   | Some x -> x
 
 let nonce_zero =
-  Origination_nonce.Internal_for_tests.initial Tezos_crypto.Operation_hash.zero
+  Origination_nonce.Internal_for_tests.initial Operation_hash.zero
 
 let mk_sc_rollup ?(nonce = nonce_zero) () =
   ( Sc_rollup.Internal_for_tests.originated_sc_rollup nonce,

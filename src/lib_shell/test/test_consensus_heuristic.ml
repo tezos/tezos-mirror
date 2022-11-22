@@ -35,8 +35,7 @@ module Assert = Assert
 open Consensus_heuristic
 
 let pp ppf = function
-  | Consensus hash ->
-      Format.fprintf ppf "Consensus with %a" Tezos_crypto.Block_hash.pp hash
+  | Consensus hash -> Format.fprintf ppf "Consensus with %a" Block_hash.pp hash
   | No_consensus _ -> Format.fprintf ppf "No consensus"
   | Need_more_candidates -> Format.fprintf ppf "Synchronised (not stuck)"
 
@@ -45,8 +44,7 @@ let forge_peer_id () =
   identity.peer_id
 
 let forge_hash () =
-  Tezos_crypto.Block_hash.hash_bytes
-    [Bytes.init 32 (fun _ -> Char.chr (Random.int 256))]
+  Block_hash.hash_bytes [Bytes.init 32 (fun _ -> Char.chr (Random.int 256))]
 
 let create_state_init_1 () =
   let h = create ~expected:1 ~threshold:1 () in
@@ -67,7 +65,7 @@ let create_state_bad_expected () =
 let create_consensus () =
   let h = create ~expected:1 ~threshold:1 () in
   let peer_id = forge_peer_id () in
-  let zero = Tezos_crypto.Block_hash.zero in
+  let zero = Block_hash.zero in
   update h (peer_id, zero) ;
   Assert.equal ~pp (get_state h) (Consensus zero)
 
@@ -76,7 +74,7 @@ let create_no_consensus () =
   let peer_1 = forge_peer_id () in
   let peer_2 = forge_peer_id () in
   let peer_3 = forge_peer_id () in
-  let hash_1 = Tezos_crypto.Block_hash.zero in
+  let hash_1 = Block_hash.zero in
   let hash_2 = forge_hash () in
   update h (peer_1, hash_1) ;
   update h (peer_2, hash_2) ;
@@ -122,13 +120,10 @@ let job_return_hash () =
     Worker.create
       ~expire_time:Ptime.Span.zero
       ~restart_delay:Ptime.Span.zero
-      ~job:(fun () -> Lwt.return (Consensus Tezos_crypto.Block_hash.zero))
+      ~job:(fun () -> Lwt.return (Consensus Block_hash.zero))
   in
   let p = Worker.wait worker in
-  Assert.equal
-    ~pp
-    (Lwt.state p)
-    (Lwt.state (Lwt.return Tezos_crypto.Block_hash.zero))
+  Assert.equal ~pp (Lwt.state p) (Lwt.state (Lwt.return Block_hash.zero))
 
 let job_sleep () =
   let worker =
@@ -153,12 +148,9 @@ let job_protected () =
   let p = Worker.wait worker in
   Assert.equal ~pp (Lwt.state p) Lwt.Sleep ;
   Lwt.cancel p ;
-  Lwt.wakeup u (Consensus Tezos_crypto.Block_hash.zero) ;
+  Lwt.wakeup u (Consensus Block_hash.zero) ;
   let p' = Worker.wait worker in
-  Assert.equal
-    ~pp
-    (Lwt.state p')
-    (Lwt.state (Lwt.return Tezos_crypto.Block_hash.zero))
+  Assert.equal ~pp (Lwt.state p') (Lwt.state (Lwt.return Block_hash.zero))
 
 let worker_canceled () =
   let t, _ = Lwt.task () in
@@ -186,7 +178,7 @@ let tests_worker_raw : (string * (unit -> unit)) list =
 let job_return_no_consensus () =
   let open Lwt_syntax in
   let counter = ref 0 in
-  let hash_1 = Tezos_crypto.Block_hash.zero in
+  let hash_1 = Block_hash.zero in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero
@@ -206,7 +198,7 @@ let job_return_no_consensus () =
 let job_return_need_more_candidates () =
   let open Lwt_syntax in
   let counter = ref 0 in
-  let hash_1 = Tezos_crypto.Block_hash.zero in
+  let hash_1 = Block_hash.zero in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero

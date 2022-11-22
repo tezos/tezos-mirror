@@ -53,8 +53,7 @@ val process_head :
 (** [inbox_of_hash node_ctxt block_hash] returns the rollup inbox at the end of
     the given validation of [block_hash]. NOTE: It requires the L2 block for
     [block_hash] to have been saved. *)
-val inbox_of_hash :
-  _ Node_context.t -> Tezos_crypto.Block_hash.t -> Inbox.t tzresult Lwt.t
+val inbox_of_hash : _ Node_context.t -> Block_hash.t -> Inbox.t tzresult Lwt.t
 
 (** [inbox_of_head node_ctxt block_head] returns the rollup inbox at the end of
     the given validation of [block_head]. NOTE: It requires the L2 block for
@@ -68,7 +67,7 @@ val start : unit -> unit Lwt.t
     [messages] to the [inbox] using {!Inbox.add_all_messages}. *)
 val add_messages :
   predecessor_timestamp:Timestamp.time ->
-  predecessor:Tezos_crypto.Block_hash.t ->
+  predecessor:Block_hash.t ->
   Inbox.t ->
   Inbox_message.t list ->
   (Inbox_merkelized_payload_hashes.History.t
@@ -84,7 +83,7 @@ val add_messages :
     store payloads histories (which contain merkelized skip lists) but simply
     messages. *)
 val payloads_history_of_messages :
-  predecessor:Tezos_crypto.Block_hash.t ->
+  predecessor:Block_hash.t ->
   predecessor_timestamp:Timestamp.time ->
   Sc_rollup.Inbox_message.t list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult

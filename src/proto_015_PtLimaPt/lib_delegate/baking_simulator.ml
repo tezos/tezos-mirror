@@ -94,9 +94,9 @@ let begin_construction ~timestamp ~protocol_data
                 fitness = pred_shell.fitness;
                 timestamp;
                 level = pred_shell.level;
-                context = Tezos_crypto.Context_hash.zero (* fake context hash *);
+                context = Context_hash.zero (* fake context hash *);
                 operations_hash =
-                  Tezos_crypto.Operation_list_list_hash.zero (* fake op hash *);
+                  Operation_list_list_hash.zero (* fake op hash *);
               }
           in
           let mode =

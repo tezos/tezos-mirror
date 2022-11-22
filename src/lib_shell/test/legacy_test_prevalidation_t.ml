@@ -67,7 +67,7 @@ module Internal_for_tests = Prevalidation.Internal_for_tests
 
 module Init = struct
   let genesis_protocol =
-    Tezos_crypto.Protocol_hash.of_b58check_exn
+    Protocol_hash.of_b58check_exn
       "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
   let chain_id = Tezos_crypto.Chain_id.zero
@@ -97,11 +97,8 @@ module Init = struct
         let v = Tezos_shell_context.Shell_context.wrap_disk_context v in
         f v)
 
-  let genesis_block (context_hash : Tezos_crypto.Context_hash.t) : Store.Block.t
-      =
-    let block_hash : Tezos_crypto.Block_hash.t =
-      Tezos_crypto.Block_hash.hash_string ["genesis"]
-    in
+  let genesis_block (context_hash : Context_hash.t) : Store.Block.t =
+    let block_hash : Block_hash.t = Block_hash.hash_string ["genesis"] in
     let genesis : Genesis.t =
       {time = genesis_time; block = block_hash; protocol = genesis_protocol}
     in
@@ -142,7 +139,7 @@ let chain_store = ()
 (** Test that [create] returns [Ok] in a pristine context. *)
 let test_create ctxt =
   let open Lwt_result_syntax in
-  let live_operations = Tezos_crypto.Operation_hash.Set.empty in
+  let live_operations = Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let (module Prevalidation) =
     create_prevalidation (module Mock_protocol) ctxt
@@ -174,10 +171,10 @@ let prevalidation_operations_gen (type a)
      empty string, otherwise the call to [P.parse] will fail with the
      bytes being too long (hereby looking like an attack). *)
   let proto_gen : string QCheck2.Gen.t = QCheck2.Gen.return "" in
-  let+ (ops : Operation.t Tezos_crypto.Operation_hash.Map.t) =
+  let+ (ops : Operation.t Operation_hash.Map.t) =
     Generators.raw_op_map_gen_n ~proto_gen ?block_hash_t:None n
   in
-  List.map mk_operation (Tezos_crypto.Operation_hash.Map.bindings ops)
+  List.map mk_operation (Operation_hash.Map.bindings ops)
 
 (** The number of operations used by tests that follow *)
 let nb_ops = 100
@@ -195,7 +192,7 @@ let mk_ops (type a)
     when the protocol's [apply_operation] crashes. *)
 let test_apply_operation_crash ctxt =
   let open Lwt_result_syntax in
-  let live_operations = Tezos_crypto.Operation_hash.Set.empty in
+  let live_operations = Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let (module P) = create_prevalidation (module Mock_protocol) ctxt in
   let ops : P.protocol_operation Prevalidation.operation list =
@@ -236,11 +233,11 @@ let mk_live_operations (type a) rand (ops : a Prevalidation.operation list) =
   List.fold_left
     (fun acc (op : _ Prevalidation.operation) ->
       if Random.State.bool rand then
-        Tezos_crypto.Operation_hash.Set.add
+        Operation_hash.Set.add
           (Internal_for_tests.to_raw op |> Operation.hash)
           acc
       else acc)
-    Tezos_crypto.Operation_hash.Set.empty
+    Operation_hash.Set.empty
     ops
 
 (** Test that [Prevalidation.apply_operations] returns [Outdated]
@@ -267,15 +264,13 @@ let test_apply_operation_live_operations ctxt =
   let ops : P.protocol_operation Prevalidation.operation list =
     mk_ops (module P)
   in
-  let live_operations : Tezos_crypto.Operation_hash.Set.t =
-    mk_live_operations rand ops
-  in
+  let live_operations : Operation_hash.Set.t = mk_live_operations rand ops in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
   let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let op_in_live_operations op =
-    Tezos_crypto.Operation_hash.Set.mem
+    Operation_hash.Set.mem
       (Internal_for_tests.to_raw op |> Operation.hash)
       live_operations
   in
@@ -318,9 +313,7 @@ let test_apply_operation_applied ctxt =
   let ops : P.protocol_operation Prevalidation.operation list =
     mk_ops (module P)
   in
-  let live_operations : Tezos_crypto.Operation_hash.Set.t =
-    mk_live_operations rand ops
-  in
+  let live_operations : Operation_hash.Set.t = mk_live_operations rand ops in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in

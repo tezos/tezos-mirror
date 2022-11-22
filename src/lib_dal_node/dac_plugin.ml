@@ -37,11 +37,10 @@ module type T = sig
   end
 end
 
-let table : (module T) Tezos_crypto.Protocol_hash.Table.t =
-  Tezos_crypto.Protocol_hash.Table.create 5
+let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
 
 let register (module Plugin : T) =
-  assert (not (Tezos_crypto.Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
-  Tezos_crypto.Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
+  assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
+  Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
 
-let get hash = Tezos_crypto.Protocol_hash.Table.find table hash
+let get hash = Protocol_hash.Table.find table hash

@@ -388,7 +388,7 @@ let case_context_gc tag =
     tag
     ~title:"context_gc"
     (obj2
-       (req "context_hash" Tezos_crypto.Context_hash.encoding)
+       (req "context_hash" Context_hash.encoding)
        (req "gc_lockfile_path" string))
     (function
       | Context_garbage_collection {context_hash; gc_lockfile_path} ->

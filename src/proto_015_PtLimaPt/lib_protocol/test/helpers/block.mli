@@ -29,7 +29,7 @@ open Protocol
 open Alpha_context
 
 type t = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;  (** Resulting context *)
@@ -292,9 +292,7 @@ val prepare_initial_context_params :
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option) list ->
-  ( Constants.Parametric.t
-    * Block_header.shell_header
-    * Tezos_crypto.Block_hash.t,
+  ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
   result
   Lwt.t

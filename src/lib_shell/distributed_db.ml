@@ -260,7 +260,7 @@ let clear_block chain_db hash n =
 
 let commit_block chain_db hash block_header operations result =
   let open Lwt_result_syntax in
-  assert (Tezos_crypto.Block_hash.equal hash (Block_header.hash block_header)) ;
+  assert (Block_hash.equal hash (Block_header.hash block_header)) ;
   assert (
     Compare.List_length_with.(operations = block_header.shell.validation_passes)) ;
   let* res =
@@ -275,7 +275,7 @@ let commit_block chain_db hash block_header operations result =
 
 let commit_invalid_block chain_db hash header errors =
   let open Lwt_result_syntax in
-  assert (Tezos_crypto.Block_hash.equal hash (Block_header.hash header)) ;
+  assert (Block_hash.equal hash (Block_header.hash header)) ;
   let* () =
     Store.Block.mark_invalid
       chain_db.reader_chain_db.chain_store
@@ -287,7 +287,7 @@ let commit_invalid_block chain_db hash header errors =
   return_unit
 
 let inject_operation chain_db h op =
-  assert (Tezos_crypto.Operation_hash.equal h (Operation.hash op)) ;
+  assert (Operation_hash.equal h (Operation.hash op)) ;
   Distributed_db_requester.Raw_operation.inject
     chain_db.reader_chain_db.operation_db
     h
@@ -355,7 +355,7 @@ module Block_header = struct
       end) :
         Requester.REQUESTER
           with type t := chain_db
-           and type key := Tezos_crypto.Block_hash.t
+           and type key := Block_hash.t
            and type value := Block_header.t
            and type param := unit)
 end
@@ -382,7 +382,7 @@ module Operation = struct
       end) :
         Requester.REQUESTER
           with type t := chain_db
-           and type key := Tezos_crypto.Operation_hash.t
+           and type key := Operation_hash.t
            and type value := Operation.t
            and type param := unit)
 end
@@ -400,7 +400,7 @@ module Protocol = struct
       end) :
         Requester.REQUESTER
           with type t := db
-           and type key := Tezos_crypto.Protocol_hash.t
+           and type key := Protocol_hash.t
            and type value := Protocol.t
            and type param := unit)
 end

@@ -31,8 +31,8 @@ module type TEZOS_CONTEXT_MEMORY = sig
     Tezos_context_sigs.Context.TEZOS_CONTEXT
       with type memory_context_tree := tree
        and type tree := tree
-       and type value_key = Tezos_crypto.Context_hash.t
-       and type node_key = Tezos_crypto.Context_hash.t
+       and type value_key = Context_hash.t
+       and type node_key = Context_hash.t
 
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
     trees. It is exposed so that it can be catched by the proxy where such

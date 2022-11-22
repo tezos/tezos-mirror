@@ -73,7 +73,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let missing_boot_sector () =
       failwith
         "Boot sector not found in Tezos block %a"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block_hash
     in
     Lwt.catch

@@ -126,7 +126,7 @@ end
 (** {3 Selection in hashes list} *)
 
 let gen_block_hash =
-  let module G = Gen_hash (Tezos_crypto.Block_hash) in
+  let module G = Gen_hash (Block_hash) in
   G.gen
 
 let random_payload_hash =
@@ -248,7 +248,7 @@ let random_sc_rollup =
   G.gen
 
 let random_proto =
-  let module G = Gen_hash (Tezos_crypto.Protocol_hash) in
+  let module G = Gen_hash (Protocol_hash) in
   G.gen
 
 let random_code =

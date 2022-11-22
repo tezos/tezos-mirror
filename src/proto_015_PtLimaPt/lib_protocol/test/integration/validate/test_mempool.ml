@@ -84,16 +84,14 @@ let assert_operation_present_in_mempool ~__LOC__ mempool ophl =
   let resulting_mempool_operations =
     Environment.Operation_hash.Map.bindings operations
     |> List.map fst
-    |> List.sort Tezos_crypto.Operation_hash.compare
+    |> List.sort Operation_hash.compare
   in
-  let expected_operations =
-    List.sort Tezos_crypto.Operation_hash.compare ophl
-  in
+  let expected_operations = List.sort Operation_hash.compare ophl in
   Assert.assert_equal_list
     ~loc:__LOC__
-    Tezos_crypto.Operation_hash.equal
+    Operation_hash.equal
     "operations present in mempool"
-    Tezos_crypto.Operation_hash.pp
+    Operation_hash.pp
     resulting_mempool_operations
     expected_operations
 

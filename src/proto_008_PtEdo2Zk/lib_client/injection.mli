@@ -68,7 +68,7 @@ val manager_to_list :
   packed_annotated_manager_operation list
 
 type 'kind preapply_result =
-  Tezos_crypto.Operation_hash.t * 'kind operation * 'kind operation_metadata
+  Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type fee_parameter = {
   minimal_fees : Tez.t;
@@ -93,9 +93,7 @@ val preapply :
   'kind preapply_result tzresult Lwt.t
 
 type 'kind result_list =
-  Tezos_crypto.Operation_hash.t
-  * 'kind contents_list
-  * 'kind contents_result_list
+  Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
 val inject_operation :
   #Protocol_client_context.full ->
@@ -112,8 +110,7 @@ val inject_operation :
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
-type 'kind result =
-  Tezos_crypto.Operation_hash.t * 'kind contents * 'kind contents_result
+type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
 val prepare_manager_operation :
   ?fee:Tez.t ->

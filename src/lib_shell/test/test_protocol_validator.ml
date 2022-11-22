@@ -53,11 +53,11 @@ module Alcotest_protocol_validator = struct
     let eq (p1 : t) (p2 : t) : bool =
       let (module P1) = p1 in
       let (module P2) = p2 in
-      Tezos_crypto.Protocol_hash.equal P1.hash P2.hash
+      Protocol_hash.equal P1.hash P2.hash
     in
     let pp fmt (p : t) =
       let (module P) = p in
-      Tezos_crypto.Protocol_hash.pp fmt P.hash
+      Protocol_hash.pp fmt P.hash
     in
     Alcotest.testable pp eq
 end
@@ -97,9 +97,7 @@ let test_pushing_validator_protocol vl _switch () =
   (* Let's validate a phony protocol *)
   let open Lwt_syntax in
   let pt = Protocol.{expected_env = V0; components = []} in
-  let* res =
-    Protocol_validator.validate vl Tezos_crypto.Protocol_hash.zero pt
-  in
+  let* res = Protocol_validator.validate vl Protocol_hash.zero pt in
   Alcotest.(
     check (Tztestable.tzresults Alcotest_protocol_validator.registered_protocol))
     "Compilation should fail."
@@ -107,7 +105,7 @@ let test_pushing_validator_protocol vl _switch () =
     (Error
        [
          Validation_errors.Invalid_protocol
-           {hash = Tezos_crypto.Protocol_hash.zero; error = Compilation_failed};
+           {hash = Protocol_hash.zero; error = Compilation_failed};
        ]) ;
   Mock_sink.(
     assert_has_event
@@ -156,7 +154,7 @@ let test_fetching_protocol vl _switch () =
       ~peer:P2p_peer.Id.zero
       ~timeout:Ptime.Span.zero
       vl
-      Tezos_crypto.Protocol_hash.zero
+      Protocol_hash.zero
   in
   Mock_sink.(
     assert_has_event

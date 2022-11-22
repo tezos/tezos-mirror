@@ -33,9 +33,9 @@ let validation_success =
     ~name:"validation_success"
     ~msg:"block {block} validated {worker_status}"
     ~level:Notice
-    ~pp1:Tezos_crypto.Block_hash.pp
+    ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
-    ("block", Tezos_crypto.Block_hash.encoding)
+    ("block", Block_hash.encoding)
     ("worker_status", Worker_types.request_status_encoding)
 
 let validation_failure =
@@ -44,10 +44,10 @@ let validation_failure =
     ~name:"validation_failed"
     ~msg:"validation of block {block} failed, {worker_status}: {errors}"
     ~level:Notice
-    ~pp1:Tezos_crypto.Block_hash.pp
+    ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
     ~pp3:pp_print_top_error_of_trace
-    ("block", Tezos_crypto.Block_hash.encoding)
+    ("block", Block_hash.encoding)
     ("worker_status", Worker_types.request_status_encoding)
     ("errors", Error_monad.trace_encoding)
 
@@ -57,8 +57,8 @@ let previously_validated =
     ~name:"previously_validated"
     ~msg:"previously validated block {hash} (after pipe)"
     ~level:Debug
-    ~pp1:Tezos_crypto.Block_hash.pp
-    ("hash", Tezos_crypto.Block_hash.encoding)
+    ~pp1:Block_hash.pp
+    ("hash", Block_hash.encoding)
 
 let validating_block =
   declare_1
@@ -66,8 +66,8 @@ let validating_block =
     ~name:"validating_block"
     ~msg:"validating block {hash}"
     ~level:Debug
-    ~pp1:Tezos_crypto.Block_hash.pp
-    ("hash", Tezos_crypto.Block_hash.encoding)
+    ~pp1:Block_hash.pp
+    ("hash", Block_hash.encoding)
 
 let preapplication_success =
   declare_2
@@ -103,10 +103,10 @@ let validation_failure_after_precheck =
     ~msg:
       "validation of block {block} failed but precheck succeeded, \
        {worker_status}: {errors}"
-    ~pp1:Tezos_crypto.Block_hash.pp
+    ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
     ~pp3:pp_print_top_error_of_trace
-    ("block", Tezos_crypto.Block_hash.encoding)
+    ("block", Block_hash.encoding)
     ("worker_status", Worker_types.request_status_encoding)
     ("errors", Tezos_rpc.Error.encoding)
 
@@ -116,10 +116,10 @@ let precheck_failure =
     ~name:"precheck_failure"
     ~level:Notice
     ~msg:"precheck of block {block} failed, {worker_status}: {errors}"
-    ~pp1:Tezos_crypto.Block_hash.pp
+    ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
     ~pp3:pp_print_top_error_of_trace
-    ("block", Tezos_crypto.Block_hash.encoding)
+    ("block", Block_hash.encoding)
     ("worker_status", Worker_types.request_status_encoding)
     ("errors", Tezos_rpc.Error.encoding)
 
@@ -129,8 +129,8 @@ let prechecked_block =
     ~name:"prechecked_block"
     ~level:Notice
     ~msg:"prechecked block {hash}"
-    ~pp1:Tezos_crypto.Block_hash.pp
-    ("hash", Tezos_crypto.Block_hash.encoding)
+    ~pp1:Block_hash.pp
+    ("hash", Block_hash.encoding)
 
 let prechecking_block =
   declare_1
@@ -138,8 +138,8 @@ let prechecking_block =
     ~name:"prechecking_block"
     ~level:Debug
     ~msg:"prechecking block {hash}"
-    ~pp1:Tezos_crypto.Block_hash.pp
-    ("hash", Tezos_crypto.Block_hash.encoding)
+    ~pp1:Block_hash.pp
+    ("hash", Block_hash.encoding)
 
 let could_not_find_context =
   declare_1
@@ -147,5 +147,5 @@ let could_not_find_context =
     ~name:"could_not_find_context"
     ~level:Debug
     ~msg:"could not find context for block {hash}"
-    ~pp1:Tezos_crypto.Block_hash.pp
-    ("hash", Tezos_crypto.Block_hash.encoding)
+    ~pp1:Block_hash.pp
+    ("hash", Block_hash.encoding)

@@ -81,7 +81,7 @@ let report_michelson_errors ?(no_print_source = false) ~msg
 
 let block_hash_param =
   Tezos_clic.parameter (fun _ s ->
-      try Lwt_result_syntax.return (Tezos_crypto.Block_hash.of_b58check_exn s)
+      try Lwt_result_syntax.return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
 let group =
@@ -529,7 +529,7 @@ let commands_ro () =
            ~name:"operation"
            ~desc:"Operation to be looked up"
            (parameter (fun _ x ->
-                match Tezos_crypto.Operation_hash.of_b58check_opt x with
+                match Operation_hash.of_b58check_opt x with
                 | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ stop)
@@ -573,10 +573,7 @@ let commands_ro () =
              also on the last block of the exploration and promotion
              periods when the proposal is not approved *)
           | Some proposal ->
-              cctxt#message
-                "Current proposal: %a"
-                Tezos_crypto.Protocol_hash.pp
-                proposal
+              cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
         in
         match info.current_period_kind with
         | Proposal ->
@@ -595,16 +592,13 @@ let commands_ro () =
                           fprintf
                             ppf
                             "* %a %a %s (%sknown by the node)@."
-                            Tezos_crypto.Protocol_hash.pp
+                            Protocol_hash.pp
                             p
                             Tez.pp
                             (Tez.of_mutez_exn w)
                             Operation_result.tez_sym
                             (if
-                             List.mem
-                               ~equal:Tezos_crypto.Protocol_hash.equal
-                               p
-                               known_protos
+                             List.mem ~equal:Protocol_hash.equal p known_protos
                             then ""
                             else "not "))
                         ranks ;
@@ -1050,7 +1044,7 @@ let commands_rw () =
                 (Some delegate)
             in
             let*! (_ :
-                    (Tezos_crypto.Operation_hash.t
+                    (Operation_hash.t
                     * _ contents
                     * _ Apply_results.contents_result)
                     option) =
@@ -1345,7 +1339,7 @@ let commands_rw () =
                 contents
             in
             let*! (_ :
-                    (Tezos_crypto.Operation_hash.t
+                    (Operation_hash.t
                     * packed_operation
                     * _ contents_list
                     * _ Apply_results.contents_result_list)
@@ -1810,7 +1804,7 @@ let commands_rw () =
            ~name:"operation"
            ~desc:"Operation to be included"
            (parameter (fun _ x ->
-                match Tezos_crypto.Operation_hash.of_b58check_opt x with
+                match Operation_hash.of_b58check_opt x with
                 | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ prefixes ["to"; "be"; "included"]
@@ -1819,7 +1813,7 @@ let commands_rw () =
            operation_hash
            (ctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* (_ : Tezos_crypto.Block_hash.t * int * int) =
+        let* (_ : Block_hash.t * int * int) =
           Client_confirmations.wait_for_operation_inclusion
             ctxt
             ~chain:ctxt#chain
@@ -1850,7 +1844,7 @@ let commands_rw () =
               ~name:"proposal"
               ~desc:"the protocol hash proposal to be submitted"
               (parameter (fun _ x ->
-                   match Tezos_crypto.Protocol_hash.of_b58check_opt x with
+                   match Protocol_hash.of_b58check_opt x with
                    | None ->
                        Error_monad.failwith "Invalid proposal hash: '%s'" x
                    | Some hash -> Lwt_result_syntax.return hash))))
@@ -1914,9 +1908,7 @@ let commands_rw () =
               (List.length proposals)
               Constants.max_proposals_per_delegate ;
           (match
-             Base.List.find_all_dups
-               ~compare:Tezos_crypto.Protocol_hash.compare
-               proposals
+             Base.List.find_all_dups ~compare:Protocol_hash.compare proposals
            with
           | [] -> ()
           | dups ->
@@ -1928,19 +1920,16 @@ let commands_rw () =
                 Format.(
                   pp_print_list
                     ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
-                    Tezos_crypto.Protocol_hash.pp)
+                    Protocol_hash.pp)
                 dups) ;
           List.iter
-            (fun (p : Tezos_crypto.Protocol_hash.t) ->
+            (fun (p : Protocol_hash.t) ->
               if
-                List.mem ~equal:Tezos_crypto.Protocol_hash.equal p known_protos
+                List.mem ~equal:Protocol_hash.equal p known_protos
                 || Environment.Protocol_hash.Map.mem p known_proposals
               then ()
               else
-                error
-                  "Protocol %a is not a known proposal."
-                  Tezos_crypto.Protocol_hash.pp
-                  p)
+                error "Protocol %a is not a known proposal." Protocol_hash.pp p)
             proposals ;
           if not has_voting_power then
             error
@@ -2030,7 +2019,7 @@ let commands_rw () =
            ~name:"proposal"
            ~desc:"the protocol hash proposal to vote for"
            (parameter (fun _ x ->
-                match Tezos_crypto.Protocol_hash.of_b58check_opt x with
+                match Protocol_hash.of_b58check_opt x with
                 | None -> failwith "Invalid proposal hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ param
@@ -2070,13 +2059,12 @@ let commands_rw () =
         let* () =
           match (info.current_period_kind, current_proposal) with
           | (Exploration | Promotion), Some current_proposal ->
-              if Tezos_crypto.Protocol_hash.equal proposal current_proposal then
-                return_unit
+              if Protocol_hash.equal proposal current_proposal then return_unit
               else
                 let*! () =
                   (if force then cctxt#warning else cctxt#error)
                     "Unexpected proposal, expected: %a"
-                    Tezos_crypto.Protocol_hash.pp
+                    Protocol_hash.pp
                     current_proposal
                 in
                 return_unit

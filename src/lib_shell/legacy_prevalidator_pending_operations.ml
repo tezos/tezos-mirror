@@ -62,9 +62,8 @@ module Priority_map : Map.S with type key = priority = Map.Make (struct
     | `Medium, `Low _ -> -1
 end)
 
-module Map = Tezos_crypto.Operation_hash.Map
-module Sized_set =
-  Tezos_base.Sized.MakeSizedSet (Tezos_crypto.Operation_hash.Set)
+module Map = Operation_hash.Map
+module Sized_set = Tezos_base.Sized.MakeSizedSet (Operation_hash.Set)
 
 (*
    The type below is used for representing pending operations data of the

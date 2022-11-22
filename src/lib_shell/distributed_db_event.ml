@@ -56,6 +56,6 @@ module P2p_reader_event = struct
       ~name:"received_future_block"
       ~msg:"received future block {block_hash} from peer {peer_id}"
       ~level:Notice
-      ("block_hash", Tezos_crypto.Block_hash.encoding)
+      ("block_hash", Block_hash.encoding)
       ("peer_id", P2p_peer.Id.encoding)
 end

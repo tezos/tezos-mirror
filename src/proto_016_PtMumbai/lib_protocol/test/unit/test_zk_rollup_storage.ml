@@ -103,7 +103,7 @@ module Raw_context_tests = struct
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
     in
-    let nonce = Tezos_crypto.Operation_hash.hash_string ["nonce_hash"] in
+    let nonce = Operation_hash.hash_string ["nonce_hash"] in
     return (Raw_context.init_origination_nonce ctx nonce, contract)
 
   (* Context with an originated ZKRU *)

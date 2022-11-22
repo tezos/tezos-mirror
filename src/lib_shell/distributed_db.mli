@@ -170,7 +170,7 @@ module Block_header : sig
   include
     Requester.REQUESTER
       with type t := chain_db
-       and type key := Tezos_crypto.Block_hash.t
+       and type key := Block_hash.t
        and type value := Block_header.t
        and type param := unit
 end
@@ -185,14 +185,14 @@ end
 module Operations :
   Requester.REQUESTER
     with type t := chain_db
-     and type key = Tezos_crypto.Block_hash.t * int
+     and type key = Block_hash.t * int
      and type value = Operation.t list
-     and type param := Tezos_crypto.Operation_list_list_hash.t
+     and type param := Operation_list_list_hash.t
 
 (** Store on disk all the data associated to a valid block. *)
 val commit_block :
   chain_db ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
   Block_validation.result ->
@@ -201,7 +201,7 @@ val commit_block :
 (** Store on disk all the data associated to an invalid block. *)
 val commit_invalid_block :
   chain_db ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Block_header.t ->
   Error_monad.error list ->
   unit tzresult Lwt.t
@@ -209,8 +209,7 @@ val commit_invalid_block :
 (** {2 Operations index} *)
 
 (** Inject a new operation in the local index (memory only). *)
-val inject_operation :
-  chain_db -> Tezos_crypto.Operation_hash.t -> Operation.t -> bool Lwt.t
+val inject_operation : chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
 
 (** Inject a prechecked block in the [precheck_blocks] memory table.
    This is to ensure the data availability of the operations once the
@@ -220,7 +219,7 @@ val inject_operation :
    memory table. The table is handled as an LRU cache. *)
 val inject_prechecked_block :
   chain_db ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Block_header.t ->
   Operation.t trace trace ->
   unit tzresult Lwt.t
@@ -229,7 +228,7 @@ val inject_prechecked_block :
 module Operation :
   Requester.REQUESTER
     with type t := chain_db
-     and type key := Tezos_crypto.Operation_hash.t
+     and type key := Operation_hash.t
      and type value := Operation.t
      and type param := unit
 
@@ -242,11 +241,10 @@ module Protocol : sig
   include
     Requester.REQUESTER
       with type t := db
-       and type key := Tezos_crypto.Protocol_hash.t
+       and type key := Protocol_hash.t
        and type value := Protocol.t
        and type param := unit
 end
 
 (** Store on disk protocol sources. *)
-val commit_protocol :
-  db -> Tezos_crypto.Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t
+val commit_protocol : db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t

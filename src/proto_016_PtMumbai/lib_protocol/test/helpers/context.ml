@@ -276,7 +276,7 @@ module Vote = struct
   type delegate_info = Alpha_context.Vote.delegate_info = {
     voting_power : Int64.t option;
     current_ballot : Alpha_context.Vote.ballot option;
-    current_proposals : Tezos_crypto.Protocol_hash.t list;
+    current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
 
@@ -603,6 +603,6 @@ let default_raw_context () =
     context
     ~level:0l
     ~timestamp:(Time.Protocol.of_seconds 1643125688L)
-    ~predecessor:Tezos_crypto.Block_hash.zero
+    ~predecessor:Block_hash.zero
     ~typecheck
   >>= fun e -> Lwt.return @@ Environment.wrap_tzresult e

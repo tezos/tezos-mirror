@@ -32,12 +32,11 @@ open Alpha_context
 (** [head_processing hash level ~finalized] emits the event that the
     block of the given [hash] and at the given [level] is being processed, and
     whether it is [finalized]. *)
-val head_processing :
-  Tezos_crypto.Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
+val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
 
 (** [new_head_processed hash level] emits the event that the daemon has finished
     processing the head of the given [hash] and at the given [level]. *)
-val new_head_processed : Tezos_crypto.Block_hash.t -> int32 -> unit Lwt.t
+val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
 
 (** [processing_heads_iteration heads] emits the event that the [heads] are
     going to be processed. *)

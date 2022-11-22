@@ -26,7 +26,7 @@
 module Request : sig
   type validation_view = {
     chain_id : Tezos_crypto.Chain_id.t;
-    block : Tezos_crypto.Block_hash.t;
+    block : Block_hash.t;
     peer : P2p_peer.Id.t option;
   }
 

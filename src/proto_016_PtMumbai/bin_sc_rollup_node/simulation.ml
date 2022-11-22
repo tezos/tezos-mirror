@@ -36,7 +36,7 @@ module type S = sig
 
   type info_per_level = {
     predecessor_timestamp : Timestamp.time;
-    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor : Block_hash.t;
   }
 
   type t = {
@@ -74,7 +74,7 @@ module Make (Interpreter : Interpreter.S) :
 
   type info_per_level = {
     predecessor_timestamp : Timestamp.time;
-    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor : Block_hash.t;
   }
 
   type t = {

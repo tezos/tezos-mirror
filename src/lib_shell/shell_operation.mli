@@ -31,7 +31,7 @@
 
 (** Representation of a parsed operation, used only in the shell. *)
 type 'protocol_operation operation = private {
-  hash : Tezos_crypto.Operation_hash.t;  (** Hash of an operation. *)
+  hash : Operation_hash.t;  (** Hash of an operation. *)
   raw : Operation.t;
       (** Raw representation of an operation (from the point view of the
           shell). *)
@@ -71,9 +71,7 @@ module type PARSER = sig
         data within [op] is too large (to protect against DoS attacks), and
       - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
   val parse :
-    Tezos_crypto.Operation_hash.t ->
-    Operation.t ->
-    protocol_operation operation tzresult
+    Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
 end
 
 (** Create a {!PARSER} tailored to a given protocol. *)
@@ -87,12 +85,11 @@ module Internal_for_tests : sig
   val to_raw : _ operation -> Operation.t
 
   (** The hash of an {!operation} *)
-  val hash_of : _ operation -> Tezos_crypto.Operation_hash.t
+  val hash_of : _ operation -> Operation_hash.t
 
   (** A constructor for the [operation] datatype. It by-passes the
       checks done by the [parse] function. *)
-  val make_operation :
-    Operation.t -> Tezos_crypto.Operation_hash.t -> 'a -> 'a operation
+  val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
 
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
       Any error happening during parsing becomes {!Parse_error}.

@@ -59,19 +59,18 @@ module Internal_for_tests : sig
     chain_tools : Store.Block.t Legacy_prevalidator_classification.chain_tools;
     create :
       predecessor:Store.Block.t ->
-      live_operations:Tezos_crypto.Operation_hash.Set.t ->
+      live_operations:Operation_hash.Set.t ->
       timestamp:Time.Protocol.t ->
       unit ->
       'prevalidation_t tzresult Lwt.t;
     fetch :
       ?peer:P2p_peer.Id.t ->
       ?timeout:Time.System.Span.t ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       Operation.t tzresult Lwt.t;
-    read_block : Tezos_crypto.Block_hash.t -> Store.Block.t tzresult Lwt.t;
+    read_block : Block_hash.t -> Store.Block.t tzresult Lwt.t;
     send_get_current_head : ?peer:P2p_peer_id.t -> unit -> unit;
-    set_mempool :
-      head:Tezos_crypto.Block_hash.t -> Mempool.t -> unit tzresult Lwt.t;
+    set_mempool : head:Block_hash.t -> Mempool.t -> unit tzresult Lwt.t;
   }
 
   (** Documented in the ml file, because this is only exported for tests. *)
@@ -128,19 +127,18 @@ module Internal_for_tests : sig
 
       val on_arrived :
         types_state ->
-        Tezos_crypto.Operation_hash.t ->
+        Operation_hash.t ->
         Operation.t ->
         (unit, Empty.t) result Lwt.t
 
-      val on_ban :
-        types_state -> Tezos_crypto.Operation_hash.t -> unit tzresult Lwt.t
+      val on_ban : types_state -> Operation_hash.t -> unit tzresult Lwt.t
 
       val on_flush :
         handle_branch_refused:bool ->
         types_state ->
         Store.Block.t ->
-        Tezos_crypto.Block_hash.Set.t ->
-        Tezos_crypto.Operation_hash.Set.t ->
+        Block_hash.Set.t ->
+        Operation_hash.Set.t ->
         unit tzresult Lwt.t
 
       val on_inject :

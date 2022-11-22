@@ -134,7 +134,7 @@ end
 (** {3 Selection in hashes list} *)
 
 let gen_block_hash =
-  let module G = Gen_hash (Tezos_crypto.Block_hash) in
+  let module G = Gen_hash (Block_hash) in
   G.gen
 
 let random_payload_hash =
@@ -253,7 +253,7 @@ let random_block_header = QCheck2.Gen.oneofl block_headers
 
 let random_tx_rollup =
   let open QCheck2.Gen in
-  let module G = Gen_hash (Tezos_crypto.Operation_hash) in
+  let module G = Gen_hash (Operation_hash) in
   let+ oph = G.gen in
   let nonce = Origination_nonce.Internal_for_tests.initial oph in
   Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
@@ -263,7 +263,7 @@ let random_sc_rollup =
   G.gen
 
 let random_proto =
-  let module G = Gen_hash (Tezos_crypto.Protocol_hash) in
+  let module G = Gen_hash (Protocol_hash) in
   G.gen
 
 let random_code =
@@ -581,7 +581,7 @@ let generate_tx_rollup_rejection =
     {
       version = 1;
       before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-      after = `Value Tezos_crypto.Context_hash.zero;
+      after = `Value Context_hash.zero;
       state = Seq.empty;
     }
   in
@@ -619,7 +619,7 @@ let generate_tx_dispatch_tickets =
   let level = Tx_rollup_level.root in
   let message_index = 0 in
   let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-  let context_hash = Tezos_crypto.Context_hash.zero in
+  let context_hash = Context_hash.zero in
   let reveal =
     Tx_rollup_reveal.
       {

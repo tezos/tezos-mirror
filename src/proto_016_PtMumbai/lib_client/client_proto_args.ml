@@ -674,7 +674,7 @@ module Tx_rollup = struct
 
   let context_hash_parameter =
     Tezos_clic.parameter (fun _ s ->
-        match Tezos_crypto.Context_hash.of_b58check_opt s with
+        match Context_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None ->
             failwith

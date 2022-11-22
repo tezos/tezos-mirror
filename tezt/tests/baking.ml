@@ -34,6 +34,7 @@
 (* Typedefs *)
 
 open Tezos_crypto
+open Tezos_crypto.Hashed
 
 type operation = {shell_header : branch; protocol_data : protocol_data}
 
@@ -57,12 +58,12 @@ and operation_content = {
 
 type mempool_operation =
   | Mempool_operation of {
-      protocol : Tezos_crypto.Protocol_hash.t;
+      protocol : Protocol_hash.t;
       shell_header : branch;
       protocol_data : protocol_data;
     }
 
-type mempool = (Tezos_crypto.Operation_hash.t * mempool_operation) list
+type mempool = (Operation_hash.t * mempool_operation) list
 
 (* ------------------------------------------------------------------------- *)
 (* Operation-related encodings *)
@@ -161,7 +162,7 @@ let unsigned_operation_to_json op =
 (* ------------------------------------------------------------------------- *)
 
 type state = {
-  protocol : Tezos_crypto.Protocol_hash.t;
+  protocol : Protocol_hash.t;
   sandbox_client : Tezt_tezos.Client.t;
   sandbox_node : Tezt_tezos.Node.t;
   counters : (Account.key, int) Hashtbl.t;
@@ -216,7 +217,7 @@ let mempool_operation_from_op client protocol signer op :
     (mempool_operation * bytes) Lwt.t =
   let* bin = encode_unsigned_operation_to_binary client op in
   let signature = Operation.sign_manager_op_bytes ~signer bin in
-  let signature = Tezos_crypto.Signature.to_b58check signature in
+  let signature = Signature.to_b58check signature in
   return
     ( Mempool_operation
         {

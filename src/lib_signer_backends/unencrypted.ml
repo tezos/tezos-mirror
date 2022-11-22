@@ -45,7 +45,7 @@ let make_sapling_key sk =
   Client_keys.make_sapling_uri (Uri.make ~scheme ~path ())
 
 module Make_common (S : sig
-  include Tezos_crypto.S.COMMON_SIGNATURE
+  include Tezos_crypto.Intfs.COMMON_SIGNATURE
 
   type public_key_hash = Public_key_hash.t
 

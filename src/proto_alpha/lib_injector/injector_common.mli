@@ -63,11 +63,11 @@ type shell_header := Block_header.shell_header
     {!Aches_lwt.Lache.MAP_RESULT}. *)
 val fetch_tezos_shell_header :
   find_in_cache:
-    (Tezos_crypto.Block_hash.t ->
-    (Tezos_crypto.Block_hash.t -> shell_header option Lwt.t) ->
+    (Block_hash.t ->
+    (Block_hash.t -> shell_header option Lwt.t) ->
     shell_header option Lwt.t) ->
   #full ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   shell_header tzresult Lwt.t
 
 (** [fetch_tezos_block ~find_in_cache cctxt hash] returns [Some block_info]
@@ -77,18 +77,18 @@ val fetch_tezos_shell_header :
     {!Aches_lwt.Lache.MAP_RESULT}. *)
 val fetch_tezos_block :
   find_in_cache:
-    (Tezos_crypto.Block_hash.t ->
-    (Tezos_crypto.Block_hash.t -> block_info option Lwt.t) ->
+    (Block_hash.t ->
+    (Block_hash.t -> block_info option Lwt.t) ->
     block_info option Lwt.t) ->
   #full ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   block_info tzresult Lwt.t
 
 (** [tezos_reorg fetch ~old_head_hash ~new_head_hash] computes the
     reorganization of L1 blocks from the chain whose head is [old_head_hash] and
     the chain whose head [new_head_hash]. *)
 val tezos_reorg :
-  (Tezos_crypto.Block_hash.t -> block_info tzresult Lwt.t) ->
-  old_head_hash:Tezos_crypto.Block_hash.t ->
-  new_head_hash:Tezos_crypto.Block_hash.t ->
+  (Block_hash.t -> block_info tzresult Lwt.t) ->
+  old_head_hash:Block_hash.t ->
+  new_head_hash:Block_hash.t ->
   block_info reorg tzresult Lwt.t

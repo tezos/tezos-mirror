@@ -51,15 +51,12 @@ let get_branch (rpc_config : #Protocol_client_context.full) ~chain
   return (chain_id, hash)
 
 type 'kind preapply_result =
-  Tezos_crypto.Operation_hash.t * 'kind operation * 'kind operation_metadata
+  Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type 'kind result_list =
-  Tezos_crypto.Operation_hash.t
-  * 'kind contents_list
-  * 'kind contents_result_list
+  Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
-type 'kind result =
-  Tezos_crypto.Operation_hash.t * 'kind contents * 'kind contents_result
+type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
@@ -192,7 +189,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
   in
   item (fun ppf () ->
       pp_print_text ppf "Branch: " ;
-      Tezos_crypto.Block_hash.pp ppf branch) ;
+      Block_hash.pp ppf branch) ;
   item (fun ppf () ->
       fprintf
         ppf
@@ -821,12 +818,12 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
   if dry_run || simulation then
-    let oph = Tezos_crypto.Operation_hash.hash_bytes [bytes] in
+    let oph = Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
       Hex.pp
       (Hex.of_bytes bytes)
-      Tezos_crypto.Operation_hash.pp
+      Operation_hash.pp
       oph
     >>= fun () ->
     cctxt#message
@@ -837,8 +834,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
-    cctxt#message "Operation hash is '%a'" Tezos_crypto.Operation_hash.pp oph
-    >>= fun () ->
+    cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
     (match confirmations with
     | None ->
         cctxt#message
@@ -848,10 +844,10 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
            --branch %a@,\
            and/or an external block explorer to make sure that it has been \
            included.@]"
-          Tezos_crypto.Operation_hash.pp
+          Operation_hash.pp
           oph
           num_confirmation_blocks
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           op.shell.branch
         >>= fun () -> return result
     | Some confirmations -> (
@@ -909,10 +905,10 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
              --branch %a@,\
              and/or an external block explorer.@]"
             number
-            Tezos_crypto.Operation_hash.pp
+            Operation_hash.pp
             oph
             num_confirmation_blocks
-            Tezos_crypto.Block_hash.pp
+            Block_hash.pp
             op.shell.branch)
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
 
@@ -957,7 +953,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ?simulation ?force ~source ~src_pk ~src_sk ~fee ~gas_limit
     ~storage_limit ?counter ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
-    (Tezos_crypto.Operation_hash.t
+    (Operation_hash.t
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)
     tzresult

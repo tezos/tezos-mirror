@@ -32,4 +32,4 @@ val stopping : unit -> unit Lwt.t
 
 (** [get_messages hash level n] emits the event that [n] messages are being
     fetched from the block of the given [hash] at the given [level]. *)
-val get_messages : Tezos_crypto.Block_hash.t -> int32 -> int -> unit Lwt.t
+val get_messages : Block_hash.t -> int32 -> int -> unit Lwt.t

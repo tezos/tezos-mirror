@@ -53,9 +53,7 @@ let mk_block_payload_hash pred_hash payload_round (b : Block.t) =
     List.concat (match List.tl ops with None -> [] | Some l -> l)
   in
   let hashes = List.map Operation.hash_packed non_consensus_operations in
-  let non_consensus_operations_hash =
-    Tezos_crypto.Operation_list_hash.compute hashes
-  in
+  let non_consensus_operations_hash = Operation_list_hash.compute hashes in
   Block_payload.hash
     ~predecessor:pred_hash
     payload_round
@@ -201,7 +199,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
-        Tezos_crypto.Block_hash.(branch = b))
+        Block_hash.(branch = b))
       packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =

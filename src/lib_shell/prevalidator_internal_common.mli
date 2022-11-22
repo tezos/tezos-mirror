@@ -35,7 +35,7 @@ val advertisement_delay : float
     the prevalidator worker. *)
 module Name :
   Tezos_base.Worker_intf.NAME
-    with type t = Tezos_crypto.Chain_id.t * Tezos_crypto.Protocol_hash.t
+    with type t = Tezos_crypto.Chain_id.t * Protocol_hash.t
 
 open Prevalidator_worker_state
 

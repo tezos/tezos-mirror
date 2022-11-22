@@ -45,16 +45,12 @@ let compiler_name = "octez-protocol-compiler"
 let do_compile hash p =
   let open Lwt_syntax in
   let* datadir = get_datadir () in
-  let source_dir =
-    datadir // Tezos_crypto.Protocol_hash.to_short_b58check hash // "src"
-  in
-  let log_file =
-    datadir // Tezos_crypto.Protocol_hash.to_short_b58check hash // "LOG"
-  in
+  let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
+  let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
   let plugin_file =
     datadir
-    // Tezos_crypto.Protocol_hash.to_short_b58check hash
-    // Format.asprintf "protocol_%a" Tezos_crypto.Protocol_hash.pp hash
+    // Protocol_hash.to_short_b58check hash
+    // Format.asprintf "protocol_%a" Protocol_hash.pp hash
   in
   try
     Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;

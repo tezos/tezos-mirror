@@ -1570,7 +1570,7 @@ let test_timeout () =
       number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string ["first"]);
+          (Context_hash.hash_string ["first"]);
     }
   in
   let commitment2 =
@@ -1579,7 +1579,7 @@ let test_timeout () =
       number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string ["second"]);
+          (Context_hash.hash_string ["second"]);
     }
   in
 
@@ -1677,14 +1677,14 @@ let init_with_conflict () =
   let* block, rollup = sc_originate block account1 "unit" in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Tezos_crypto.Context_hash.hash_string ["first"])
+      (Context_hash.hash_string ["first"])
   in
   let* commitment1 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
   in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Tezos_crypto.Context_hash.hash_string ["second"])
+      (Context_hash.hash_string ["second"])
   in
   let* commitment2 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup

@@ -34,7 +34,7 @@ type message_result =
 
 type l2_context_hash = {
   irmin_hash : Tx_rollup_l2_context_hash.t;
-  tree_hash : Tezos_crypto.Context_hash.t;
+  tree_hash : Context_hash.t;
 }
 
 type message = {
@@ -71,7 +71,7 @@ let l2_context_hash_encoding =
     (fun (irmin_hash, tree_hash) -> {irmin_hash; tree_hash})
     (obj2
        (req "irmin_hash" Tx_rollup_l2_context_hash.encoding)
-       (req "tree_hash" Tezos_crypto.Context_hash.encoding))
+       (req "tree_hash" Context_hash.encoding))
 
 let message_encoding =
   let open Data_encoding in

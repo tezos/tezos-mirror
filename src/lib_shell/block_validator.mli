@@ -31,7 +31,7 @@ type t
 (** Type of a validated block *)
 type new_block = {
   block : Store.Block.t;  (** The block itself. *)
-  resulting_context_hash : Tezos_crypto.Context_hash.t;
+  resulting_context_hash : Context_hash.t;
       (** The context hash resulting of [block]'s application.
 
           It may be the same one as contained in its header depending
@@ -108,7 +108,7 @@ val validate :
   ?notify_new_block:(new_block -> unit) ->
   ?precheck_and_notify:bool ->
   Distributed_db.chain_db ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
   block_validity Lwt.t
@@ -139,7 +139,7 @@ val fetch_and_compile_protocol :
   t ->
   ?peer:P2p_peer.Id.t ->
   ?timeout:Time.System.Span.t ->
-  Tezos_crypto.Protocol_hash.t ->
+  Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
 (** [context_garbage_collection bv index chain_store context_hash
@@ -152,7 +152,7 @@ val fetch_and_compile_protocol :
 val context_garbage_collection :
   t ->
   Context_ops.index ->
-  Tezos_crypto.Context_hash.t ->
+  Context_hash.t ->
   gc_lockfile_path:string ->
   unit tzresult Lwt.t
 

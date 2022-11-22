@@ -89,8 +89,7 @@ let test_encodings () =
   test_encodings Initial_commitments >>=? fun () ->
   test_encodings Minted >>=? fun () ->
   let nonce =
-    Origination_nonce.Internal_for_tests.initial
-      Tezos_crypto.Operation_hash.zero
+    Origination_nonce.Internal_for_tests.initial Operation_hash.zero
   in
   let tx_rollup = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in

@@ -272,7 +272,7 @@ module Vote = struct
   type delegate_info = Alpha_context.Vote.delegate_info = {
     voting_power : Int64.t option;
     current_ballot : Alpha_context.Vote.ballot option;
-    current_proposals : Tezos_crypto.Protocol_hash.t list;
+    current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
 

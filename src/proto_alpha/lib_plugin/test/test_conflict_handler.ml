@@ -38,7 +38,7 @@ let check_answer ?__LOC__ expected actual =
   assert
     (Qcheck2_helpers.qcheck_eq ~pp:pp_answer ?__LOC__ expected actual : bool)
 
-let is_manager_op ((_ : Tezos_crypto.Operation_hash.t), op) =
+let is_manager_op ((_ : Operation_hash.t), op) =
   (* This is implemented differently from
      [Plugin.Mempool.is_manager_operation] (which relies on
      [Alpha_context.Operation.acceptable_pass]), used in

@@ -35,18 +35,12 @@ type connection =
 type callback = {
   notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
   notify_head :
-    P2p_peer.Id.t ->
-    Tezos_crypto.Block_hash.t ->
-    Block_header.t ->
-    Mempool.t ->
-    unit;
+    P2p_peer.Id.t -> Block_hash.t -> Block_header.t -> Mempool.t -> unit;
   disconnection : P2p_peer.Id.t -> unit;
 }
 
-module Block_hash_cache :
-  Aches.Vache.MAP with type key = Tezos_crypto.Block_hash.t =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (Tezos_crypto.Block_hash)
+module Block_hash_cache : Aches.Vache.MAP with type key = Block_hash.t =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Block_hash)
 
 type chain_db = {
   chain_store : Store.Chain.t;

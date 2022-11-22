@@ -48,8 +48,7 @@ let random_amount () =
   | None -> assert false
   | Some x -> x
 
-let nonce =
-  Origination_nonce.Internal_for_tests.initial Tezos_crypto.Operation_hash.zero
+let nonce = Origination_nonce.Internal_for_tests.initial Operation_hash.zero
 
 let sc_rollup () = Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 

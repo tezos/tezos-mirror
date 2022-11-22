@@ -41,7 +41,7 @@ let compare_op op1 op2 =
     (* FIXME some operations (e.g. tx_rollup_rejection) pack
        functional values which could raise an exception. In this
        specific case, we default to comparing their hashes. *)
-    Tezos_crypto.Operation_hash.compare
+    Operation_hash.compare
       (Alpha_context.Operation.hash_packed op1)
       (Alpha_context.Operation.hash_packed op2)
 

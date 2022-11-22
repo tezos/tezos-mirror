@@ -314,7 +314,7 @@ module Gen = struct
 
   let block_hash_gen : string t =
     let open QCheck2.Gen in
-    let open Tezos_crypto in
+    let open Tezos_crypto.Hashed in
     let non_alias =
       list string >|= Block_hash.hash_string >|= Block_hash.to_string
     in
@@ -322,7 +322,7 @@ module Gen = struct
 
   let protocol_hash_gen : string t =
     let open QCheck2.Gen in
-    let open Tezos_crypto in
+    let open Tezos_crypto.Hashed in
     list string >|= Protocol_hash.hash_string >|= Protocol_hash.to_string
 
   let path_int_gen : string t = QCheck2.Gen.(map Int.to_string small_nat)

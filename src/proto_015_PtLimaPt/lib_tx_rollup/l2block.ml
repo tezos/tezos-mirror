@@ -48,7 +48,7 @@ type level = Tx_rollup_level.t
 
 type header = {
   level : level;
-  tezos_block : Tezos_crypto.Block_hash.t;
+  tezos_block : Block_hash.t;
   predecessor : hash option;
   context : Tx_rollup_l2_context_hash.t;
   commitment : Tx_rollup_commitment_hash.t;
@@ -64,8 +64,8 @@ type 'inbox block = {
 type t = Inbox.t block
 
 type commitment_included_info = {
-  block : Tezos_crypto.Block_hash.t;
-  operation : Tezos_crypto.Operation_hash.t;
+  block : Block_hash.t;
+  operation : Operation_hash.t;
 }
 
 type metadata = {
@@ -86,7 +86,7 @@ let header_encoding =
       {level; tezos_block; predecessor; context; commitment})
     (obj5
        (req "level" Tx_rollup_level.encoding)
-       (req "tezos_block" Tezos_crypto.Block_hash.encoding)
+       (req "tezos_block" Block_hash.encoding)
        (opt "predecessor" Hash.encoding)
        (req "context" Tx_rollup_l2_context_hash.encoding)
        (req "commitment" Tx_rollup_commitment_hash.encoding))
@@ -110,8 +110,8 @@ let commitment_included_info_encoding =
     (fun {block; operation} -> (block, operation))
     (fun (block, operation) -> {block; operation})
     (obj2
-       (req "block" Tezos_crypto.Block_hash.encoding)
-       (req "operation" Tezos_crypto.Operation_hash.encoding))
+       (req "block" Block_hash.encoding)
+       (req "operation" Operation_hash.encoding))
 
 let metadata_encoding =
   let open Data_encoding in

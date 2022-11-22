@@ -27,7 +27,7 @@ type chain_status =
   | Active_main of Tezos_crypto.Chain_id.t
   | Active_test of {
       chain : Tezos_crypto.Chain_id.t;
-      protocol : Tezos_crypto.Protocol_hash.t;
+      protocol : Protocol_hash.t;
       expiration_date : Time.Protocol.t;
     }
   | Stopping of Tezos_crypto.Chain_id.t
@@ -48,7 +48,7 @@ let chain_status_encoding =
         ~title:"Test"
         (obj3
            (req "chain_id" Tezos_crypto.Chain_id.encoding)
-           (req "test_protocol" Tezos_crypto.Protocol_hash.encoding)
+           (req "test_protocol" Protocol_hash.encoding)
            (req "expiration_date" Time.Protocol.encoding))
         (function
           | Active_test {chain; protocol; expiration_date} ->
@@ -80,7 +80,7 @@ module S = struct
       ~query:Tezos_rpc.Query.empty
       ~output:
         (obj2
-           (req "block" Tezos_crypto.Block_hash.encoding)
+           (req "block" Block_hash.encoding)
            (req "timestamp" Time.Protocol.encoding))
       Tezos_rpc.Path.(path / "bootstrapped")
 
@@ -94,9 +94,8 @@ module S = struct
 
           method chains = chains
         end)
-    |+ multi_field "protocol" Tezos_crypto.Protocol_hash.rpc_arg (fun t ->
-           t#protocols)
-    |+ multi_field "next_protocol" Tezos_crypto.Protocol_hash.rpc_arg (fun t ->
+    |+ multi_field "protocol" Protocol_hash.rpc_arg (fun t -> t#protocols)
+    |+ multi_field "next_protocol" Protocol_hash.rpc_arg (fun t ->
            t#next_protocols)
     |+ multi_field "chain" Chain_services.chain_arg (fun t -> t#chains)
     |> seal
@@ -111,7 +110,7 @@ module S = struct
         (merge_objs
            (obj2
               (req "chain_id" Tezos_crypto.Chain_id.encoding)
-              (req "hash" Tezos_crypto.Block_hash.encoding))
+              (req "hash" Block_hash.encoding))
            Block_header.encoding)
       Tezos_rpc.Path.(path / "valid_blocks")
 
@@ -121,7 +120,7 @@ module S = struct
         object
           method next_protocols = next_protocols
         end)
-    |+ multi_field "next_protocol" Tezos_crypto.Protocol_hash.rpc_arg (fun t ->
+    |+ multi_field "next_protocol" Protocol_hash.rpc_arg (fun t ->
            t#next_protocols)
     |> seal
 
@@ -133,7 +132,7 @@ module S = struct
       ~query:heads_query
       ~output:
         (merge_objs
-           (obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
+           (obj1 (req "hash" Block_hash.encoding))
            Block_header.encoding)
       Tezos_rpc.Path.(path / "heads" /: Chain_services.chain_arg)
 
@@ -143,7 +142,7 @@ module S = struct
         "Monitor all economic protocols that are retrieved and successfully \
          loaded and compiled by the node."
       ~query:Tezos_rpc.Query.empty
-      ~output:Tezos_crypto.Protocol_hash.encoding
+      ~output:Protocol_hash.encoding
       Tezos_rpc.Path.(path / "protocols")
 
   (* DEPRECATED: use [version] from "version_services" instead. *)

@@ -31,7 +31,7 @@ open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
 type t = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
@@ -185,7 +185,7 @@ module Forge = struct
         (* We don't care of the following values, only the shell validates them. *)
         proto_level = 0;
         validation_passes = 0;
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
 
   let set_seed_nonce_hash seed_nonce_hash
@@ -247,8 +247,7 @@ module Forge = struct
     >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
-      Tezos_crypto.Operation_list_list_hash.compute
-        [Tezos_crypto.Operation_list_hash.compute hashes]
+      Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
     in
     let shell =
       make_shell
@@ -263,9 +262,7 @@ module Forge = struct
       List.concat (match List.tl operations with None -> [] | Some l -> l)
     in
     let hashes = List.map Operation.hash_packed non_consensus_operations in
-    let non_consensus_operations_hash =
-      Tezos_crypto.Operation_list_hash.compute hashes
-    in
+    let non_consensus_operations_hash = Operation_list_hash.compute hashes in
     let payload_round =
       match payload_round with None -> round | Some r -> r
     in
@@ -413,7 +410,7 @@ let initial_alpha_context ?(commitments = []) constants
 
 let genesis_with_parameters parameters =
   let hash =
-    Tezos_crypto.Block_hash.of_b58check_exn
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let fitness =
@@ -429,7 +426,7 @@ let genesis_with_parameters parameters =
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   let contents =
     Forge.make_contents
@@ -620,7 +617,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
   let hash =
-    Tezos_crypto.Block_hash.of_b58check_exn
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let level = Option.value ~default:0l level in
@@ -637,7 +634,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   validate_initial_accounts initial_accounts constants.minimal_stake
   (* Perhaps this could return a new type  signifying its name *)

@@ -76,15 +76,15 @@ val inject_operation : t -> force:bool -> Operation.t -> unit tzresult Lwt.t
 val flush :
   t ->
   Chain_validator_worker_state.update ->
-  Tezos_crypto.Block_hash.t ->
-  Tezos_crypto.Block_hash.Set.t ->
-  Tezos_crypto.Operation_hash.Set.t ->
+  Block_hash.t ->
+  Block_hash.Set.t ->
+  Operation_hash.Set.t ->
   unit tzresult Lwt.t
 
 (** Returns the list of prevalidation contexts running and their associated
     chain *)
 val running_workers :
-  unit -> (Tezos_crypto.Chain_id.t * Tezos_crypto.Protocol_hash.t * t) list
+  unit -> (Tezos_crypto.Chain_id.t * Protocol_hash.t * t) list
 
 (** Worker status and events *)
 

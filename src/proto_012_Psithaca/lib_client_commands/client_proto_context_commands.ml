@@ -403,7 +403,7 @@ let commands_ro () =
            ~name:"operation"
            ~desc:"Operation to be looked up"
            (parameter (fun _ x ->
-                match Tezos_crypto.Operation_hash.of_b58check_opt x with
+                match Operation_hash.of_b58check_opt x with
                 | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                 | Some hash -> return hash))
       @@ stop)
@@ -444,10 +444,7 @@ let commands_ro () =
              also on the last block of the exploration and promotion
              periods when the proposal is not approved *)
           | Some proposal ->
-              cctxt#message
-                "Current proposal: %a"
-                Tezos_crypto.Protocol_hash.pp
-                proposal
+              cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
         in
         match info.current_period_kind with
         | Proposal ->
@@ -465,14 +462,10 @@ let commands_ro () =
                         fprintf
                           ppf
                           "* %a %ld (%sknown by the node)@."
-                          Tezos_crypto.Protocol_hash.pp
+                          Protocol_hash.pp
                           p
                           w
-                          (if
-                           List.mem
-                             ~equal:Tezos_crypto.Protocol_hash.equal
-                             p
-                             known_protos
+                          (if List.mem ~equal:Protocol_hash.equal p known_protos
                           then ""
                           else "not "))
                       ranks ;

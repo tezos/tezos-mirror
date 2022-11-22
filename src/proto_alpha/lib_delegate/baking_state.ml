@@ -110,18 +110,18 @@ type prequorum = {
 }
 
 type block_info = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Tezos_crypto.Context_hash.t;
+  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Tezos_crypto.Protocol_hash.t;
-  next_protocol : Tezos_crypto.Protocol_hash.t;
+  protocol : Protocol_hash.t;
+  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Tezos_crypto.Block_hash.Set.t;
+  live_blocks : Block_hash.Set.t;
 }
 
 type cache = {
@@ -225,19 +225,19 @@ let block_info_encoding =
       })
     (merge_objs
        (obj10
-          (req "hash" Tezos_crypto.Block_hash.encoding)
+          (req "hash" Block_hash.encoding)
           (req "shell" Block_header.shell_header_encoding)
-          (req "resulting_context_hash" Tezos_crypto.Context_hash.encoding)
+          (req "resulting_context_hash" Context_hash.encoding)
           (req "payload_hash" Block_payload_hash.encoding)
           (req "payload_round" Round.encoding)
           (req "round" Round.encoding)
-          (req "protocol" Tezos_crypto.Protocol_hash.encoding)
-          (req "next_protocol" Tezos_crypto.Protocol_hash.encoding)
+          (req "protocol" Protocol_hash.encoding)
+          (req "next_protocol" Protocol_hash.encoding)
           (req "prequorum" (option prequorum_encoding))
           (req "quorum" (list (dynamic_size Operation.encoding))))
        (obj2
           (req "payload" Operation_pool.payload_encoding)
-          (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
+          (req "live_blocks" Block_hash.Set.encoding)))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult
@@ -450,17 +450,17 @@ let event_encoding =
    happen once. *)
 
 type legacy_block_info = {
-  legacy_hash : Tezos_crypto.Block_hash.t;
+  legacy_hash : Block_hash.t;
   legacy_shell : Block_header.shell_header;
   legacy_payload_hash : Block_payload_hash.t;
   legacy_payload_round : Round.t;
   legacy_round : Round.t;
-  legacy_protocol : Tezos_crypto.Protocol_hash.t;
-  legacy_next_protocol : Tezos_crypto.Protocol_hash.t;
+  legacy_protocol : Protocol_hash.t;
+  legacy_next_protocol : Protocol_hash.t;
   legacy_prequorum : prequorum option;
   legacy_quorum : Kind.endorsement operation list;
   legacy_payload : Operation_pool.payload;
-  legacy_live_blocks : Tezos_crypto.Block_hash.Set.t;
+  legacy_live_blocks : Block_hash.Set.t;
 }
 
 let legacy_block_info_encoding : legacy_block_info Data_encoding.t =
@@ -518,17 +518,17 @@ let legacy_block_info_encoding : legacy_block_info Data_encoding.t =
       })
     (merge_objs
        (obj10
-          (req "hash" Tezos_crypto.Block_hash.encoding)
+          (req "hash" Block_hash.encoding)
           (req "shell" Block_header.shell_header_encoding)
           (req "payload_hash" Block_payload_hash.encoding)
           (req "payload_round" Round.encoding)
           (req "round" Round.encoding)
-          (req "protocol" Tezos_crypto.Protocol_hash.encoding)
-          (req "next_protocol" Tezos_crypto.Protocol_hash.encoding)
+          (req "protocol" Protocol_hash.encoding)
+          (req "next_protocol" Protocol_hash.encoding)
           (req "prequorum" (option prequorum_encoding))
           (req "quorum" (list (dynamic_size Operation.encoding)))
           (req "payload" Operation_pool.payload_encoding))
-       (obj1 (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
+       (obj1 (req "live_blocks" Block_hash.Set.encoding)))
 
 type legacy_proposal = {
   legacy_block : legacy_block_info;
@@ -880,16 +880,16 @@ let pp_block_info fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
      protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d endorsements@ \
      payload: %a@]"
-    Tezos_crypto.Block_hash.pp
+    Block_hash.pp
     hash
     Block_payload_hash.pp_short
     payload_hash
     shell.level
     Round.pp
     round
-    Tezos_crypto.Protocol_hash.pp_short
+    Protocol_hash.pp_short
     protocol
-    Tezos_crypto.Protocol_hash.pp_short
+    Protocol_hash.pp_short
     next_protocol
     (pp_option pp_prequorum)
     prequorum
@@ -912,7 +912,7 @@ let pp_endorsable_payload fmt {proposal; prequorum} =
   Format.fprintf
     fmt
     "proposal: %a, prequorum: %a"
-    Tezos_crypto.Block_hash.pp
+    Block_hash.pp
     proposal.block.hash
     pp_prequorum
     prequorum
@@ -1029,7 +1029,7 @@ let pp_event fmt = function
          round %a"
         (List.length preendos)
         voting_power
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
@@ -1039,7 +1039,7 @@ let pp_event fmt = function
         "quorum reached with %d endorsements (power: %d) for %a at round %a"
         (List.length endos)
         voting_power
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched

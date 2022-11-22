@@ -185,7 +185,7 @@ let protocol_max_batch_size =
     let open Alpha_context in
     let open Operation in
     {
-      shell = {branch = Tezos_crypto.Block_hash.zero};
+      shell = {branch = Block_hash.zero};
       protocol_data =
         {
           signature = Some Tezos_crypto.Signature.zero;

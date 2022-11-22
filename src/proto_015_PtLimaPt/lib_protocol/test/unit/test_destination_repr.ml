@@ -36,7 +36,7 @@ open Protocol
 open Tztest
 
 let dummy_operation_hash =
-  Tezos_crypto.Operation_hash.of_bytes_exn
+  Operation_hash.of_bytes_exn
     (Bytes.of_string "test-operation-hash-of-length-32")
 
 let dummy_origination_nonce = Origination_nonce.initial dummy_operation_hash

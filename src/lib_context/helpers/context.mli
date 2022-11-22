@@ -111,8 +111,7 @@ module Make_config (Conf : Irmin_pack.Conf.S) : sig
   val config : 'a -> Tezos_context_sigs.Config.t
 end
 
-type error +=
-  | Unsupported_context_hash_version of Tezos_crypto.Context_hash.Version.t
+type error += Unsupported_context_hash_version of Context_hash.Version.t
 
 (** See [Tezos_context_sigs.Context.Proof_types.t] *)
 type proof_version_expanded = {is_stream : bool; is_binary : bool}

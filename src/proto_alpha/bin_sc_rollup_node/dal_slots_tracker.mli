@@ -42,14 +42,14 @@ val is_slot_confirmed :
     that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
 *)
 val save_unconfirmed_slot :
-  Node_context.rw -> Tezos_crypto.Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
+  Node_context.rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
 
 (** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
     that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
     The contents of the slot are set to [pages] in [node_ctxt.store]. *)
 val save_confirmed_slot :
   Node_context.rw ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Dal.Slot_index.t ->
   Dal.Page.content list ->
   unit Lwt.t

@@ -96,7 +96,7 @@ module type T = sig
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
   val attested_slot_headers :
-    Tezos_crypto.Block_hash.t ->
+    Block_hash.t ->
     block_info ->
     number_of_slots:int ->
     slot_index list tzresult
@@ -104,4 +104,4 @@ end
 
 val register : (module T) -> unit
 
-val get : Tezos_crypto.Protocol_hash.Table.key -> (module T) option
+val get : Protocol_hash.Table.key -> (module T) option

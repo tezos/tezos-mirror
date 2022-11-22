@@ -70,17 +70,16 @@ module type T = sig
     (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   val attested_slot_headers :
-    Tezos_crypto.Block_hash.t ->
+    Block_hash.t ->
     block_info ->
     number_of_slots:int ->
     slot_index list tzresult
 end
 
-let table : (module T) Tezos_crypto.Protocol_hash.Table.t =
-  Tezos_crypto.Protocol_hash.Table.create 5
+let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
 
 let register (module Plugin : T) =
-  assert (not (Tezos_crypto.Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
-  Tezos_crypto.Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
+  assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
+  Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
 
-let get hash = Tezos_crypto.Protocol_hash.Table.find table hash
+let get hash = Protocol_hash.Table.find table hash

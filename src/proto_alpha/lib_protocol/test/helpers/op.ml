@@ -241,7 +241,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
-        Tezos_crypto.Block_hash.(branch = b))
+        Block_hash.(branch = b))
       packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =

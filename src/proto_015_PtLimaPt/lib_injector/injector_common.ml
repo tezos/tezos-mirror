@@ -76,7 +76,7 @@ let fetch_tezos_block ~find_in_cache (cctxt : #full) hash :
          i.e. calls {!fetch} for cache misses. *)
       error_with
         "Fetching Tezos block %a failed unexpectedly"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         hash
   | None, Some errs -> Error errs
   | Some block, _ -> Ok block
@@ -87,7 +87,7 @@ let tezos_reorg fetch_tezos_block ~old_head_hash ~new_head_hash =
   let open Alpha_block_services in
   let open Lwt_result_syntax in
   let rec loop old_chain new_chain old_head_hash new_head_hash =
-    if Tezos_crypto.Block_hash.(old_head_hash = new_head_hash) then
+    if Block_hash.(old_head_hash = new_head_hash) then
       return {old_chain = List.rev old_chain; new_chain = List.rev new_chain}
     else
       let* new_head = fetch_tezos_block new_head_hash in

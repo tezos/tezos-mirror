@@ -46,12 +46,12 @@ module Request = struct
         peer : P2p_peer_id.t option;
         (* The peer who sent the block if it was not injected locally. *)
         block : Store.Block.t;
-        resulting_context_hash : Tezos_crypto.Context_hash.t;
+        resulting_context_hash : Context_hash.t;
       }
         -> (update, error trace) t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
     | Notify_head :
-        P2p_peer.Id.t * Tezos_crypto.Block_hash.t * Block_header.t * Mempool.t
+        P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
         -> (unit, Empty.t) t
     | Disconnection : P2p_peer.Id.t -> (unit, Empty.t) t
 
@@ -241,8 +241,7 @@ let may_switch_test_chain w active_chains spawn_child block =
       | Some (child, _) ->
           let child_chain_store = child.parameters.chain_store in
           let child_genesis = Store.Chain.genesis child_chain_store in
-          Lwt.return
-            (Tezos_crypto.Block_hash.equal child_genesis.block genesis_hash)
+          Lwt.return (Block_hash.equal child_genesis.block genesis_hash)
     in
     let expired = expiration < block_header.shell.timestamp in
     if expired && activated then
@@ -380,7 +379,7 @@ let safe_get_prevalidator_filter hash =
           (* This should not happen: it should be handled in the validator. *)
           failwith
             "chain_validator: missing protocol '%a' for the current block."
-            Tezos_crypto.Protocol_hash.pp_short
+            Protocol_hash.pp_short
             hash
       | Some protocol ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
@@ -545,7 +544,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
     in
     Lwt_watcher.notify nv.new_head_input block ;
     let is_head_increment =
-      Tezos_crypto.Block_hash.equal head_hash block_header.shell.predecessor
+      Block_hash.equal head_hash block_header.shell.predecessor
     in
     let event = if is_head_increment then Head_increment else Branch_switch in
     let* () =

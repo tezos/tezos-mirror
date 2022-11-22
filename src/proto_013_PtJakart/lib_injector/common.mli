@@ -59,18 +59,18 @@ type block_info := Alpha_block_services.block_info
     it from the L1 node otherwise. *)
 val fetch_tezos_block :
   find_in_cache:
-    (Tezos_crypto.Block_hash.t ->
-    (Tezos_crypto.Block_hash.t -> block_info tzresult Lwt.t) ->
+    (Block_hash.t ->
+    (Block_hash.t -> block_info tzresult Lwt.t) ->
     block_info tzresult Lwt.t) ->
   #full ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   block_info tzresult Lwt.t
 
 (** [tezos_reorg fetch ~old_head_hash ~new_head_hash] computes the
     reorganization of L1 blocks from the chain whose head is [old_head_hash] and
     the chain whose head [new_head_hash]. *)
 val tezos_reorg :
-  (Tezos_crypto.Block_hash.t -> block_info tzresult Lwt.t) ->
-  old_head_hash:Tezos_crypto.Block_hash.t ->
-  new_head_hash:Tezos_crypto.Block_hash.t ->
+  (Block_hash.t -> block_info tzresult Lwt.t) ->
+  old_head_hash:Block_hash.t ->
+  new_head_hash:Block_hash.t ->
   block_info reorg tzresult Lwt.t

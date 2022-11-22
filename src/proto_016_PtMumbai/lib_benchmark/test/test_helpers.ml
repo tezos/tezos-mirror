@@ -71,7 +71,7 @@ let typecheck_by_tezos =
     return
     @@ Protocol.Alpha_context.Origination_nonce.init
          ctxt
-         Tezos_crypto.Operation_hash.zero
+         Tezos_crypto.Hashed.Operation_hash.zero
   in
   fun bef node ->
     Stdlib.Result.get_ok

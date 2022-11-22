@@ -32,11 +32,7 @@ val to_string : chain -> string
 
 val chain_arg : chain Tezos_rpc.Arg.t
 
-type invalid_block = {
-  hash : Tezos_crypto.Block_hash.t;
-  level : Int32.t;
-  errors : error list;
-}
+type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = unit * chain
 
@@ -57,39 +53,30 @@ module Mempool = Block_services.Empty.Mempool
 
 module Levels : sig
   val checkpoint :
-    #simple ->
-    ?chain:chain ->
-    unit ->
-    (Tezos_crypto.Block_hash.t * int32) tzresult Lwt.t
+    #simple -> ?chain:chain -> unit -> (Block_hash.t * int32) tzresult Lwt.t
 
   val savepoint :
-    #simple ->
-    ?chain:chain ->
-    unit ->
-    (Tezos_crypto.Block_hash.t * int32) tzresult Lwt.t
+    #simple -> ?chain:chain -> unit -> (Block_hash.t * int32) tzresult Lwt.t
 
   val caboose :
-    #simple ->
-    ?chain:chain ->
-    unit ->
-    (Tezos_crypto.Block_hash.t * int32) tzresult Lwt.t
+    #simple -> ?chain:chain -> unit -> (Block_hash.t * int32) tzresult Lwt.t
 end
 
 module Blocks : sig
   val list :
     #simple ->
     ?chain:chain ->
-    ?heads:Tezos_crypto.Block_hash.t list ->
+    ?heads:Block_hash.t list ->
     ?length:int ->
     ?min_date:Time.Protocol.t ->
     unit ->
-    Tezos_crypto.Block_hash.t list list tzresult Lwt.t
+    Block_hash.t list list tzresult Lwt.t
 
   include module type of Block_services.Empty
 
   type protocols = {
-    current_protocol : Tezos_crypto.Protocol_hash.t;
-    next_protocol : Tezos_crypto.Protocol_hash.t;
+    current_protocol : Protocol_hash.t;
+    next_protocol : Protocol_hash.t;
   }
 
   val protocols :
@@ -105,13 +92,9 @@ module Invalid_blocks : sig
     #simple -> ?chain:chain -> unit -> invalid_block list tzresult Lwt.t
 
   val get :
-    #simple ->
-    ?chain:chain ->
-    Tezos_crypto.Block_hash.t ->
-    invalid_block tzresult Lwt.t
+    #simple -> ?chain:chain -> Block_hash.t -> invalid_block tzresult Lwt.t
 
-  val delete :
-    #simple -> ?chain:chain -> Tezos_crypto.Block_hash.t -> unit tzresult Lwt.t
+  val delete : #simple -> ?chain:chain -> Block_hash.t -> unit tzresult Lwt.t
 end
 
 module S : sig
@@ -152,7 +135,7 @@ module S : sig
         prefix,
         unit,
         unit,
-        Tezos_crypto.Block_hash.t * int32 )
+        Block_hash.t * int32 )
       Tezos_rpc.Service.t
 
     val savepoint :
@@ -161,7 +144,7 @@ module S : sig
         prefix,
         unit,
         unit,
-        Tezos_crypto.Block_hash.t * int32 )
+        Block_hash.t * int32 )
       Tezos_rpc.Service.t
 
     val caboose :
@@ -170,7 +153,7 @@ module S : sig
         prefix,
         unit,
         unit,
-        Tezos_crypto.Block_hash.t * int32 )
+        Block_hash.t * int32 )
       Tezos_rpc.Service.t
   end
 
@@ -181,11 +164,11 @@ module S : sig
       ( [`GET],
         prefix,
         prefix,
-        < heads : Tezos_crypto.Block_hash.t list
+        < heads : Block_hash.t list
         ; length : int option
         ; min_date : Time.Protocol.t option >,
         unit,
-        Tezos_crypto.Block_hash.t list list )
+        Block_hash.t list list )
       Tezos_rpc.Service.t
   end
 
@@ -202,7 +185,7 @@ module S : sig
     val get :
       ( [`GET],
         prefix,
-        prefix * Tezos_crypto.Block_hash.t,
+        prefix * Block_hash.t,
         unit,
         unit,
         invalid_block )
@@ -211,7 +194,7 @@ module S : sig
     val delete :
       ( [`DELETE],
         prefix,
-        prefix * Tezos_crypto.Block_hash.t,
+        prefix * Block_hash.t,
         unit,
         unit,
         unit )

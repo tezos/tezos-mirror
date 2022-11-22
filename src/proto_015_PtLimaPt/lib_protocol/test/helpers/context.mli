@@ -30,7 +30,7 @@ open Environment
 
 type t = B of Block.t | I of Incremental.t
 
-val branch : t -> Tezos_crypto.Block_hash.t
+val branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
@@ -128,10 +128,9 @@ module Vote : sig
 
   val get_proposals : t -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
-  val get_current_proposal :
-    t -> Tezos_crypto.Protocol_hash.t option tzresult Lwt.t
+  val get_current_proposal : t -> Protocol_hash.t option tzresult Lwt.t
 
-  val get_protocol : Block.t -> Tezos_crypto.Protocol_hash.t Lwt.t
+  val get_protocol : Block.t -> Protocol_hash.t Lwt.t
 
   val set_participation_ema : Block.t -> int32 -> Block.t Lwt.t
 

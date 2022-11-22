@@ -58,14 +58,14 @@ val readonly : _ t -> ro
 
 module L2_blocks :
   Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
+    with type key := Block_hash.t
      and type value := Sc_rollup_block.t
      and type 'a store := 'a store
 
 (** Storage for persisting messages downloaded from the L1 node. *)
 module Messages : sig
   type info = {
-    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor : Block_hash.t;
     predecessor_timestamp : Timestamp.t;
     messages : Sc_rollup.Inbox_message.t list;
   }
@@ -114,14 +114,14 @@ module Commitments_published_at_level :
     list into a [Dal.Slot_index.t]-indexed map. *)
 module Dal_slots_headers :
   Store_sigs.Nested_map
-    with type primary_key := Tezos_crypto.Block_hash.t
+    with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
      and type value := Dal.Slot.Header.t
      and type 'a store := 'a store
 
 module Dal_confirmed_slots_history :
   Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
+    with type key := Block_hash.t
      and type value := Dal.Slots_history.t
      and type 'a store := 'a store
 
@@ -129,7 +129,7 @@ module Dal_confirmed_slots_history :
     {Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
+    with type key := Block_hash.t
      and type value := Dal.Slots_history.History_cache.t
      and type 'a store := 'a store
 
@@ -141,7 +141,7 @@ module Dal_confirmed_slots_histories :
 *)
 module Dal_slot_pages :
   Store_sigs.Nested_map
-    with type primary_key := Tezos_crypto.Block_hash.t
+    with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t * Dal.Page.Index.t
      and type value := Dal.Page.content
      and type 'a store := 'a store
@@ -155,7 +155,7 @@ module Dal_slot_pages :
 *)
 module Dal_processed_slots :
   Store_sigs.Nested_map
-    with type primary_key := Tezos_crypto.Block_hash.t
+    with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
      and type value := [`Confirmed | `Unconfirmed]
      and type 'a store := 'a store

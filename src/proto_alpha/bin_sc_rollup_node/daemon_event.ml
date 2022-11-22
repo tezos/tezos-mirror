@@ -37,7 +37,7 @@ module Simple = struct
       ~name:"sc_rollup_daemon_process_head"
       ~msg:"Processing {finalized} head {hash} at level {level}"
       ~level:Notice
-      ("hash", Tezos_crypto.Block_hash.encoding)
+      ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("finalized", Data_encoding.bool)
       ~pp3:(fun fmt finalized ->
@@ -49,7 +49,7 @@ module Simple = struct
       ~name:"sc_rollup_node_layer_1_new_head_processed"
       ~msg:"Finished processing layer 1 head {hash} at level {level}"
       ~level:Notice
-      ("hash", Tezos_crypto.Block_hash.encoding)
+      ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
   let processing_heads_iteration =

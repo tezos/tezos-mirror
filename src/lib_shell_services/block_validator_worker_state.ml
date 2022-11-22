@@ -26,7 +26,7 @@
 module Request = struct
   type validation_view = {
     chain_id : Tezos_crypto.Chain_id.t;
-    block : Tezos_crypto.Block_hash.t;
+    block : Block_hash.t;
     peer : P2p_peer.Id.t option;
   }
 
@@ -36,7 +36,7 @@ module Request = struct
       (fun {block; chain_id; peer} -> (block, chain_id, peer))
       (fun (block, chain_id, peer) -> {block; chain_id; peer})
       (obj3
-         (req "block" Tezos_crypto.Block_hash.encoding)
+         (req "block" Block_hash.encoding)
          (req "chain_id" Tezos_crypto.Chain_id.encoding)
          (opt "peer" P2p_peer.Id.encoding))
 
@@ -80,7 +80,7 @@ module Request = struct
         Format.fprintf
           ppf
           "Validation of %a (chain: %a)"
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           block
           Tezos_crypto.Chain_id.pp_short
           chain_id ;

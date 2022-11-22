@@ -60,7 +60,7 @@ val validate_block :
   ?chain_id:Tezos_crypto.Chain_id.t ->
   Bytes.t ->
   Operation.t list list ->
-  (Tezos_crypto.Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
+  (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
 
 (** Monitor all the valid block (for all activate chains). *)
 val watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper

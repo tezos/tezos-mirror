@@ -37,9 +37,8 @@ type error +=
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
     }
-  | Missing_PVM_state of Tezos_crypto.Block_hash.t * Int32.t
-  | Cannot_checkout_context of
-      Tezos_crypto.Block_hash.t * Sc_rollup_context_hash.t option
+  | Missing_PVM_state of Block_hash.t * Int32.t
+  | Cannot_checkout_context of Block_hash.t * Sc_rollup_context_hash.t option
   | No_batcher
 
 type error +=
@@ -170,11 +169,10 @@ let () =
       Format.fprintf
         ppf
         "Cannot retrieve PVM state for block %a at level %ld"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block
         level)
-    Data_encoding.(
-      obj2 (req "block" Tezos_crypto.Block_hash.encoding) (req "level" int32))
+    Data_encoding.(obj2 (req "block" Block_hash.encoding) (req "level" int32))
     (function
       | Missing_PVM_state (block, level) -> Some (block, level) | _ -> None)
     (fun (block, level) -> Missing_PVM_state (block, level)) ;
@@ -193,11 +191,11 @@ let () =
            ~none:""
            ~some:Sc_rollup_context_hash.to_b58check
            context_hash)
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block)
     Data_encoding.(
       obj2
-        (req "block" Tezos_crypto.Block_hash.encoding)
+        (req "block" Block_hash.encoding)
         (opt "context" Sc_rollup_context_hash.encoding))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)

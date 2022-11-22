@@ -772,7 +772,7 @@ let lib_parameters_json_encoding =
 (* Blocks *)
 
 type block = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Environment.Context.t;
@@ -792,7 +792,7 @@ module Forge = struct
         operations_hash;
         proto_level = 0;
         validation_passes = 0;
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
 end
 
@@ -871,7 +871,7 @@ let mem_init :
     Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
  fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
-    Tezos_crypto.Block_hash.of_b58check_exn
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   (* Need to read this Json file before since timestamp modification may be in
@@ -899,7 +899,7 @@ let mem_init :
       ~predecessor:hash
       ~timestamp
       ~fitness:(Fitness.from_int64 0L)
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   Protocol_constants_overrides.apply_overrides
     cctxt

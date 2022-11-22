@@ -84,15 +84,15 @@ module Make (Rollup : PARAMETERS) = struct
   end)
 
   module Injected_ophs = Disk_persistence.Make_table (struct
-    include Tezos_crypto.Operation_hash.Table
+    include Operation_hash.Table
 
     type value = L1_operation.Hash.t list
 
     let name = "injected_ophs"
 
-    let string_of_key = Tezos_crypto.Operation_hash.to_b58check
+    let string_of_key = Operation_hash.to_b58check
 
-    let key_of_string = Tezos_crypto.Operation_hash.of_b58check_opt
+    let key_of_string = Operation_hash.of_b58check_opt
 
     let value_encoding = Data_encoding.list L1_operation.Hash.encoding
   end)
@@ -123,15 +123,15 @@ module Make (Rollup : PARAMETERS) = struct
   end)
 
   module Included_in_blocks = Disk_persistence.Make_table (struct
-    include Tezos_crypto.Block_hash.Table
+    include Block_hash.Table
 
     type value = int32 * L1_operation.Hash.t list
 
     let name = "included_in_blocks"
 
-    let string_of_key = Tezos_crypto.Block_hash.to_b58check
+    let string_of_key = Block_hash.to_b58check
 
-    let key_of_string = Tezos_crypto.Block_hash.of_b58check_opt
+    let key_of_string = Block_hash.of_b58check_opt
 
     let value_encoding =
       let open Data_encoding in
@@ -635,7 +635,7 @@ module Make (Rollup : PARAMETERS) = struct
       | Ok packed_contents_list -> packed_contents_list
     in
     let signature = Tezos_crypto.Signature.zero in
-    let branch = Tezos_crypto.Block_hash.zero in
+    let branch = Block_hash.zero in
     let operation =
       {
         shell = {branch};

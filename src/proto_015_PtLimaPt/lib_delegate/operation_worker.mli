@@ -34,7 +34,7 @@ open Alpha_context
 type t
 
 type candidate = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   round_watched : Round.t;
   payload_hash_watched : Block_payload_hash.t;
 }

@@ -236,16 +236,13 @@ module Mempool = struct
        (modulo replace_by_fee_factor)
   *)
   type manager_op_info = {
-    operation_hash : Tezos_crypto.Operation_hash.t;
+    operation_hash : Operation_hash.t;
     gas_limit : manager_gas_witness Gas.Arith.t;
     fee : Tez.t;
     weight : Q.t;
   }
 
-  type manager_op_weight = {
-    operation_hash : Tezos_crypto.Operation_hash.t;
-    weight : Q.t;
-  }
+  type manager_op_weight = {operation_hash : Operation_hash.t; weight : Q.t}
 
   let op_weight_of_info (info : manager_op_info) : manager_op_weight =
     {operation_hash = info.operation_hash; weight = info.weight}
@@ -257,10 +254,7 @@ module Mempool = struct
     let compare op1 op2 =
       let c = Q.compare op1.weight op2.weight in
       if c <> 0 then c
-      else
-        Tezos_crypto.Operation_hash.compare
-          op1.operation_hash
-          op2.operation_hash
+      else Operation_hash.compare op1.operation_hash op2.operation_hash
   end)
 
   type state = {
@@ -274,15 +268,14 @@ module Mempool = struct
             Each manager in the map should be accessible
             with an operation hash in [operation_hash_to_manager]. *)
     operation_hash_to_manager :
-      Tezos_crypto.Signature.V0.Public_key_hash.t
-      Tezos_crypto.Operation_hash.Map.t;
+      Tezos_crypto.Signature.V0.Public_key_hash.t Operation_hash.Map.t;
         (** Map of operation hash to manager used to remove a manager from
             [op_prechecked_managers] with an operation hash. Each manager in the
             map should also be in [op_prechecked_managers]. *)
     prechecked_operations_count : int;
         (** Number of prechecked manager operations.
             Invariants:
-            - [Tezos_crypto.Operation_hash.Map.cardinal operation_hash_to_manager =
+            - [Operation_hash.Map.cardinal operation_hash_to_manager =
                prechecked_operations_count]
             - [prechecked_operations_count <= max_prechecked_manager_operations] *)
     ops_prechecked : ManagerOpWeightSet.t;
@@ -299,7 +292,7 @@ module Mempool = struct
       round_zero_duration = None;
       op_prechecked_managers =
         Tezos_crypto.Signature.V0.Public_key_hash.Map.empty;
-      operation_hash_to_manager = Tezos_crypto.Operation_hash.Map.empty;
+      operation_hash_to_manager = Operation_hash.Map.empty;
       prechecked_operations_count = 0;
       ops_prechecked = ManagerOpWeightSet.empty;
       min_prechecked_op_weight = None;
@@ -358,7 +351,7 @@ module Mempool = struct
   let remove ~(filter_state : state) oph =
     let removed_oph_source = ref None in
     let operation_hash_to_manager =
-      Tezos_crypto.Operation_hash.Map.update
+      Operation_hash.Map.update
         oph
         (function
           | None -> None
@@ -399,7 +392,7 @@ module Mempool = struct
           match filter_state.min_prechecked_op_weight with
           | None -> None
           | Some op ->
-              if Tezos_crypto.Operation_hash.equal op.operation_hash oph then
+              if Operation_hash.equal op.operation_hash oph then
                 ManagerOpWeightSet.min_elt ops_prechecked
               else Some op
         in
@@ -443,7 +436,7 @@ module Mempool = struct
       (fun () -> Fees_too_low)
 
   type Environment.Error_monad.error +=
-    | Manager_restriction of {oph : Tezos_crypto.Operation_hash.t; fee : Tez.t}
+    | Manager_restriction of {oph : Operation_hash.t; fee : Tez.t}
 
   let () =
     Environment.Error_monad.register_error_kind
@@ -457,21 +450,21 @@ module Mempool = struct
           "Only one manager operation per manager per block allowed (found %a \
            with %atez fee. You may want to use --replace to provide adequate \
            fee and replace it)."
-          Tezos_crypto.Operation_hash.pp
+          Operation_hash.pp
           oph
           Tez.pp
           fee)
       Data_encoding.(
         obj2
-          (req "operation_hash" Tezos_crypto.Operation_hash.encoding)
+          (req "operation_hash" Operation_hash.encoding)
           (req "operation_fee" Tez.encoding))
       (function Manager_restriction {oph; fee} -> Some (oph, fee) | _ -> None)
       (fun (oph, fee) -> Manager_restriction {oph; fee})
 
   type Environment.Error_monad.error +=
     | Manager_operation_replaced of {
-        old_hash : Tezos_crypto.Operation_hash.t;
-        new_hash : Tezos_crypto.Operation_hash.t;
+        old_hash : Operation_hash.t;
+        new_hash : Operation_hash.t;
       }
 
   let () =
@@ -484,13 +477,13 @@ module Mempool = struct
         Format.fprintf
           ppf
           "The manager operation %a has been replaced with %a"
-          Tezos_crypto.Operation_hash.pp
+          Operation_hash.pp
           old_hash
-          Tezos_crypto.Operation_hash.pp
+          Operation_hash.pp
           new_hash)
       (Data_encoding.obj2
-         (Data_encoding.req "old_hash" Tezos_crypto.Operation_hash.encoding)
-         (Data_encoding.req "new_hash" Tezos_crypto.Operation_hash.encoding))
+         (Data_encoding.req "old_hash" Operation_hash.encoding)
+         (Data_encoding.req "new_hash" Operation_hash.encoding))
       (function
         | Manager_operation_replaced {old_hash; new_hash} ->
             Some (old_hash, new_hash)
@@ -1042,7 +1035,7 @@ module Mempool = struct
       config ->
       state ->
       validation_state ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
       nb_successful_prechecks:int ->
@@ -1050,8 +1043,7 @@ module Mempool = struct
       gas_limit:manager_gas_witness Gas.Arith.t ->
       public_key_hash ->
       [> `Prechecked_manager of
-         [ `No_replace
-         | `Replace of Tezos_crypto.Operation_hash.t * error_classification ]
+         [`No_replace | `Replace of Operation_hash.t * error_classification]
       | error_classification ]
       Lwt.t =
    fun config
@@ -1148,11 +1140,8 @@ module Mempool = struct
       | `Replace (oph, _class) -> remove ~filter_state oph
     in
     let prechecked_operations_count =
-      if
-        Tezos_crypto.Operation_hash.Map.mem
-          oph
-          filter_state.operation_hash_to_manager
-      then filter_state.prechecked_operations_count
+      if Operation_hash.Map.mem oph filter_state.operation_hash_to_manager then
+        filter_state.prechecked_operations_count
       else filter_state.prechecked_operations_count + 1
     in
     let op_weight = op_weight_of_info info in
@@ -1170,10 +1159,7 @@ module Mempool = struct
           info
           filter_state.op_prechecked_managers;
       operation_hash_to_manager =
-        Tezos_crypto.Operation_hash.Map.add
-          oph
-          source
-          filter_state.operation_hash_to_manager
+        Operation_hash.Map.add oph source filter_state.operation_hash_to_manager
         (* Record which manager is used for the operation hash. *);
       ops_prechecked =
         ManagerOpWeightSet.add op_weight filter_state.ops_prechecked;
@@ -1185,14 +1171,13 @@ module Mempool = struct
       config ->
       filter_state:state ->
       validation_state:validation_state ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       Main.operation ->
       nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
         * validation_state
-        * [ `No_replace
-          | `Replace of Tezos_crypto.Operation_hash.t * error_classification ]
+        * [`No_replace | `Replace of Operation_hash.t * error_classification]
       | error_classification
       | `Undecided ]
       Lwt.t =
@@ -2264,9 +2249,7 @@ module RPC = struct
 
     let register () =
       let originate_dummy_contract ctxt script balance =
-        let ctxt =
-          Contract.init_origination_nonce ctxt Tezos_crypto.Operation_hash.zero
-        in
+        let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
         Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
         >>=? fun (ctxt, dummy_contract) ->
         Contract.raw_originate

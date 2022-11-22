@@ -37,13 +37,13 @@ val inject_block :
   chain:Shell_services.chain ->
   Block_header.t ->
   Tezos_base.Operation.t list list ->
-  Tezos_crypto.Block_hash.t tzresult Lwt.t
+  Block_hash.t tzresult Lwt.t
 
 (** Preapply a block using the node validation mechanism.*)
 val preapply_block :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
-  head:Tezos_crypto.Block_hash.t ->
+  head:Block_hash.t ->
   timestamp:Time.Protocol.t ->
   protocol_data:Protocol.block_header_data ->
   packed_operation list list ->
@@ -58,7 +58,7 @@ val proposal :
   #Tezos_rpc.Context.simple ->
   ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
   chain:Shell_services.chain ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Baking_state.proposal tzresult Lwt.t
 
 (** Monitor proposals from the node.*)

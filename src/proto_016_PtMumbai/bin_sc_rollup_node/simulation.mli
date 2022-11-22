@@ -36,7 +36,7 @@ module type S = sig
 
   type info_per_level = {
     predecessor_timestamp : Timestamp.time;
-    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor : Block_hash.t;
   }
 
   (** Type of the state for a simulation. *)

@@ -57,7 +57,7 @@ class unix_mockup :
 
 class unix_proxy :
   base_dir:string
-  -> ?protocol:Tezos_crypto.Protocol_hash.t
+  -> ?protocol:Protocol_hash.t
   -> chain:Shell_services.chain
   -> block:Shell_services.block
   -> confirmations:int option

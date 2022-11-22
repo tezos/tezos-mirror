@@ -127,7 +127,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU\"\nlet name = Tezos_protocol_environment_005_PsBABY5H.Name.name\ninclude Tezos_raw_protocol_005_PsBABY5H\ninclude Tezos_raw_protocol_005_PsBABY5H.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsBABY5HQTSkA4297zNHfsZNKtxULfL18y95qb3m53QJiXGmrbU\"\nlet name = Tezos_protocol_environment_005_PsBABY5H.Name.name\ninclude Tezos_raw_protocol_005_PsBABY5H\ninclude Tezos_raw_protocol_005_PsBABY5H.Main\n")))
 
 (rule
  (targets tezos_protocol_005_PsBABY5H.ml)

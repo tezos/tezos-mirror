@@ -29,7 +29,7 @@ open Alpha_context
 (**  {2 Types for L2 block and header} *)
 
 (** Hash with b58check encoding BTx(53), for hashes of L2 block headers *)
-module Hash : Tezos_crypto.S.HASH
+module Hash : Tezos_crypto.Intfs.HASH
 
 (** Alias for block (header) hashes *)
 type hash = Hash.t
@@ -40,7 +40,7 @@ type level = Tx_rollup_level.t
 (** Type of L2 block headers *)
 type header = {
   level : level;  (** The level of the L2 block *)
-  tezos_block : Tezos_crypto.Block_hash.t;
+  tezos_block : Block_hash.t;
       (** The Tezos block on which this L2 block in anchored, i.e. the Tezos block
       in which the inbox was sent *)
   predecessor : hash option;  (** The hash predecessor L2 block *)
@@ -63,8 +63,8 @@ type 'inbox block = {
 type t = Inbox.t block
 
 type commitment_included_info = {
-  block : Tezos_crypto.Block_hash.t;
-  operation : Tezos_crypto.Operation_hash.t;
+  block : Block_hash.t;
+  operation : Operation_hash.t;
 }
 
 (** Metadata for the block  *)

@@ -120,7 +120,7 @@ let dump oc version hash files =
   Printf.fprintf
     oc
     "let hash = Protocol_hash.of_b58check_exn %S;;\n"
-    (Tezos_crypto.Protocol_hash.to_b58check hash) ;
+    (Protocol_hash.to_b58check hash) ;
   for i = 0 to Array.length files - 1 do
     include_ml oc files.(i)
   done ;

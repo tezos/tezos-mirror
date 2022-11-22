@@ -107,7 +107,6 @@ end) : S = struct
         let _, _, sk = generate_key ~seed () in
         Tezos_crypto.Signature.of_bls (sign sk msg)
     | _ ->
-        let open Tezos_crypto.Signature in
         let bytes =
           Base_samplers.uniform_bytes
             ~nbytes:Tezos_crypto.Ed25519.size

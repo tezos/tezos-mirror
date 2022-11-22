@@ -25,16 +25,16 @@
 (*****************************************************************************)
 
 type block_error =
-  | Cannot_parse_operation of Tezos_crypto.Operation_hash.t
+  | Cannot_parse_operation of Operation_hash.t
   | Invalid_fitness of {expected : Fitness.t; found : Fitness.t}
   | Non_increasing_timestamp
   | Non_increasing_fitness
   | Invalid_level of {expected : Int32.t; found : Int32.t}
   | Invalid_proto_level of {expected : int; found : int}
-  | Replayed_operation of Tezos_crypto.Operation_hash.t
+  | Replayed_operation of Operation_hash.t
   | Outdated_operation of {
-      operation : Tezos_crypto.Operation_hash.t;
-      originating_block : Tezos_crypto.Block_hash.t;
+      operation : Operation_hash.t;
+      originating_block : Block_hash.t;
     }
   | Expired_chain of {
       chain_id : Tezos_crypto.Chain_id.t;
@@ -43,13 +43,9 @@ type block_error =
     }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of {pass : int; found : int; max : int}
-  | Oversized_operation of {
-      operation : Tezos_crypto.Operation_hash.t;
-      size : int;
-      max : int;
-    }
+  | Oversized_operation of {operation : Operation_hash.t; size : int; max : int}
   | Unallowed_pass of {
-      operation : Tezos_crypto.Operation_hash.t;
+      operation : Operation_hash.t;
       pass : int;
       allowed_pass : int option;
     }
@@ -67,7 +63,7 @@ let block_error_encoding =
         ~title:"Cannot_parse_operation"
         (obj2
            (req "error" (constant "cannot_parse_operation"))
-           (req "operation" Tezos_crypto.Operation_hash.encoding))
+           (req "operation" Operation_hash.encoding))
         (function
           | Cannot_parse_operation operation -> Some ((), operation) | _ -> None)
         (fun ((), operation) -> Cannot_parse_operation operation);
@@ -121,7 +117,7 @@ let block_error_encoding =
         ~title:"Replayed_operation"
         (obj2
            (req "error" (constant "replayed_operation"))
-           (req "operation" Tezos_crypto.Operation_hash.encoding))
+           (req "operation" Operation_hash.encoding))
         (function
           | Replayed_operation operation -> Some ((), operation) | _ -> None)
         (fun ((), operation) -> Replayed_operation operation);
@@ -130,8 +126,8 @@ let block_error_encoding =
         ~title:"Outdated_operation"
         (obj3
            (req "error" (constant "outdated_operation"))
-           (req "operation" Tezos_crypto.Operation_hash.encoding)
-           (req "originating_block" Tezos_crypto.Block_hash.encoding))
+           (req "operation" Operation_hash.encoding)
+           (req "originating_block" Block_hash.encoding))
         (function
           | Outdated_operation {operation; originating_block} ->
               Some ((), operation, originating_block)
@@ -178,7 +174,7 @@ let block_error_encoding =
         ~title:"Oversized_operation"
         (obj4
            (req "error" (constant "oversized_operation"))
-           (req "operation" Tezos_crypto.Operation_hash.encoding)
+           (req "operation" Operation_hash.encoding)
            (req "found" int31)
            (req "max" int31))
         (function
@@ -192,7 +188,7 @@ let block_error_encoding =
         ~title:"Unallowed_pass"
         (obj4
            (req "error" (constant "invalid_pass"))
-           (req "operation" Tezos_crypto.Operation_hash.encoding)
+           (req "operation" Operation_hash.encoding)
            (req "pass" uint8)
            (req "allowed_pass" (option uint8)))
         (function
@@ -233,7 +229,7 @@ let pp_block_error ppf = function
       Format.fprintf
         ppf
         "Failed to parse the operation %a."
-        Tezos_crypto.Operation_hash.pp_short
+        Operation_hash.pp_short
         oph
   | Invalid_fitness {expected; found} ->
       Format.fprintf
@@ -261,15 +257,15 @@ let pp_block_error ppf = function
       Format.fprintf
         ppf
         "The operation %a was previously included in the chain."
-        Tezos_crypto.Operation_hash.pp_short
+        Operation_hash.pp_short
         oph
   | Outdated_operation {operation; originating_block} ->
       Format.fprintf
         ppf
         "The operation %a is outdated (originated in block: %a)"
-        Tezos_crypto.Operation_hash.pp_short
+        Operation_hash.pp_short
         operation
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         originating_block
   | Expired_chain {chain_id; expiration; timestamp} ->
       Format.fprintf
@@ -295,7 +291,7 @@ let pp_block_error ppf = function
       Format.fprintf
         ppf
         "Oversized operation %a (size: %d, max: %d)"
-        Tezos_crypto.Operation_hash.pp_short
+        Operation_hash.pp_short
         operation
         size
         max
@@ -304,7 +300,7 @@ let pp_block_error ppf = function
         ppf
         "Operation %a included in validation pass %d,  while only the \
          following passes are allowed: @[<h>%a@]"
-        Tezos_crypto.Operation_hash.pp_short
+        Operation_hash.pp_short
         operation
         pass
         (fun fmt -> function
@@ -402,20 +398,17 @@ let pp_validation_process_error ppf = function
         msg
 
 type error +=
-  | Invalid_block of {block : Tezos_crypto.Block_hash.t; error : block_error}
-  | Unavailable_protocol of {
-      block : Tezos_crypto.Block_hash.t;
-      protocol : Tezos_crypto.Protocol_hash.t;
-    }
+  | Invalid_block of {block : Block_hash.t; error : block_error}
+  | Unavailable_protocol of {block : Block_hash.t; protocol : Protocol_hash.t}
   | Inconsistent_operations_hash of {
-      block : Tezos_crypto.Block_hash.t;
-      expected : Tezos_crypto.Operation_list_list_hash.t;
-      found : Tezos_crypto.Operation_list_list_hash.t;
+      block : Block_hash.t;
+      expected : Operation_list_list_hash.t;
+      found : Operation_list_list_hash.t;
     }
-  | Applying_non_prechecked_block of Tezos_crypto.Block_hash.t
-  | Failed_to_checkout_context of Tezos_crypto.Context_hash.t
+  | Applying_non_prechecked_block of Block_hash.t
+  | Failed_to_checkout_context of Context_hash.t
   | System_error of {errno : string; fn : string; msg : string}
-  | Missing_test_protocol of Tezos_crypto.Protocol_hash.t
+  | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
   | Cannot_validate_while_shutting_down
 
@@ -429,13 +422,13 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Invalid block %a@ %a@]"
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         block
         pp_block_error
         error)
     Data_encoding.(
       obj2
-        (req "invalid_block" Tezos_crypto.Block_hash.encoding)
+        (req "invalid_block" Block_hash.encoding)
         (req "error" block_error_encoding))
     (function Invalid_block {block; error} -> Some (block, error) | _ -> None)
     (fun (block, error) -> Invalid_block {block; error}) ;
@@ -448,14 +441,14 @@ let () =
       Format.fprintf
         ppf
         "Missing protocol (%a) when validating the block %a."
-        Tezos_crypto.Protocol_hash.pp_short
+        Protocol_hash.pp_short
         protocol
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         block)
     Data_encoding.(
       obj2
-        (req "block" Tezos_crypto.Block_hash.encoding)
-        (req "missing_protocol" Tezos_crypto.Protocol_hash.encoding))
+        (req "block" Block_hash.encoding)
+        (req "missing_protocol" Protocol_hash.encoding))
     (function
       | Unavailable_protocol {block; protocol} -> Some (block, protocol)
       | _ -> None)
@@ -471,17 +464,17 @@ let () =
         ppf
         "@[<v 2>The provided list of operations for block %a  is inconsistent \
          with the block header@  expected: %a@  found: %a@]"
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         block
-        Tezos_crypto.Operation_list_list_hash.pp_short
+        Operation_list_list_hash.pp_short
         expected
-        Tezos_crypto.Operation_list_list_hash.pp_short
+        Operation_list_list_hash.pp_short
         found)
     Data_encoding.(
       obj3
-        (req "block" Tezos_crypto.Block_hash.encoding)
-        (req "expected" Tezos_crypto.Operation_list_list_hash.encoding)
-        (req "found" Tezos_crypto.Operation_list_list_hash.encoding))
+        (req "block" Block_hash.encoding)
+        (req "expected" Operation_list_list_hash.encoding)
+        (req "found" Operation_list_list_hash.encoding))
     (function
       | Inconsistent_operations_hash {block; expected; found} ->
           Some (block, expected, found)
@@ -493,13 +486,13 @@ let () =
     ~id:"Block_validator_process.applying_non_prechecked_block"
     ~title:"Applying non prechecked block"
     ~description:"Applying non prechecked block"
-    ~pp:(fun ppf (hash : Tezos_crypto.Block_hash.t) ->
+    ~pp:(fun ppf (hash : Block_hash.t) ->
       Format.fprintf
         ppf
         "Applying non prechecked block %a"
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         hash)
-    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
     (function Applying_non_prechecked_block bh -> Some bh | _ -> None)
     (fun bh -> Applying_non_prechecked_block bh) ;
   Error_monad.register_error_kind
@@ -507,13 +500,13 @@ let () =
     ~id:"Block_validator_process.failed_to_checkout_context"
     ~title:"Fail during checkout context"
     ~description:"The context checkout failed using a given hash"
-    ~pp:(fun ppf (hash : Tezos_crypto.Context_hash.t) ->
+    ~pp:(fun ppf (hash : Context_hash.t) ->
       Format.fprintf
         ppf
         "@[Failed to checkout the context with hash %a@]"
-        Tezos_crypto.Context_hash.pp_short
+        Context_hash.pp_short
         hash)
-    Data_encoding.(obj1 (req "hash" Tezos_crypto.Context_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Context_hash.encoding))
     (function Failed_to_checkout_context h -> Some h | _ -> None)
     (fun h -> Failed_to_checkout_context h) ;
   Error_monad.register_error_kind
@@ -542,10 +535,9 @@ let () =
       Format.fprintf
         ppf
         "Missing test protocol %a when forking the test chain."
-        Tezos_crypto.Protocol_hash.pp
+        Protocol_hash.pp
         protocol)
-    Data_encoding.(
-      obj1 (req "test_protocol" Tezos_crypto.Protocol_hash.encoding))
+    Data_encoding.(obj1 (req "test_protocol" Protocol_hash.encoding))
     (function Missing_test_protocol protocol -> Some protocol | _ -> None)
     (fun protocol -> Missing_test_protocol protocol) ;
   Error_monad.register_error_kind

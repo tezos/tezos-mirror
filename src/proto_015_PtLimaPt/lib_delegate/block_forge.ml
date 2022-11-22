@@ -112,7 +112,7 @@ let finalize_block_header shell_header timestamp validation_result
 let retain_live_operations_only ~live_blocks operation_pool =
   Operation_pool.Prioritized.filter
     (fun ({shell; _} : packed_operation) ->
-      Tezos_crypto.Block_hash.Set.mem shell.branch live_blocks)
+      Block_hash.Set.mem shell.branch live_blocks)
     operation_pool
 
 let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
@@ -136,7 +136,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       | None -> next_protocol
       | Some hash -> hash
     in
-    return Tezos_crypto.Protocol_hash.(Protocol.hash <> next_protocol)
+    return Protocol_hash.(Protocol.hash <> next_protocol)
   in
   let filter_via_node ~operation_pool =
     let filtered_operations =
@@ -168,7 +168,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       let operation_list_hash =
         Stdlib.List.tl operations |> List.flatten
         |> List.map Tezos_base.Operation.hash
-        |> Tezos_crypto.Operation_list_hash.compute
+        |> Operation_list_hash.compute
       in
       Block_payload.hash
         ~predecessor:shell_header.predecessor
@@ -242,7 +242,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         let operation_list_hash =
           Stdlib.List.tl operations |> List.flatten
           |> List.map Tezos_base.Operation.hash
-          |> Tezos_crypto.Operation_list_hash.compute
+          |> Operation_list_hash.compute
         in
         Block_payload.hash
           ~predecessor:shell_header.predecessor
@@ -297,11 +297,10 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     >>=? fun (incremental, ordered_pool) ->
     let operations = Operation_pool.ordered_to_list_list ordered_pool in
     let operations_hash =
-      Tezos_crypto.Operation_list_list_hash.compute
+      Operation_list_list_hash.compute
         (List.map
            (fun sl ->
-             Tezos_crypto.Operation_list_hash.compute
-               (List.map Operation.hash_packed sl))
+             Operation_list_hash.compute (List.map Operation.hash_packed sl))
            operations)
     in
     (* We need to compute the final [operations_hash] before

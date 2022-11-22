@@ -60,9 +60,7 @@ let new_context_with_stakers nb_stakers =
   let+ inc = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt inc in
   (* Necessary to originate rollups. *)
-  let ctxt =
-    Alpha_context.Origination_nonce.init ctxt Tezos_crypto.Operation_hash.zero
-  in
+  let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
   let stakers =
     List.map
@@ -2361,7 +2359,7 @@ let test_zero_tick_commitment_cannot_change_state () =
         number_of_ticks = number_of_ticks_exn 0L;
         compressed_state =
           Sc_rollup_repr.State_hash.context_hash_to_state_hash
-            (Tezos_crypto.Context_hash.hash_string ["wxyz"]);
+            (Context_hash.hash_string ["wxyz"]);
       }
   in
   let* () =

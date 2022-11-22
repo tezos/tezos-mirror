@@ -169,7 +169,7 @@ module type TREE = sig
   val of_value : t -> value -> tree Lwt.t
 
   (** [hash t] is [t]'s Merkle hash. *)
-  val hash : tree -> Tezos_crypto.Context_hash.t
+  val hash : tree -> Context_hash.t
 
   (** [equal x y] is true iff [x] and [y] have the same Merkle hash. *)
   val equal : tree -> tree -> bool
@@ -186,9 +186,9 @@ module type HASH_VERSION = sig
   (** The type for context views. *)
   type t
 
-  val get_hash_version : t -> Tezos_crypto.Context_hash.Version.t
+  val get_hash_version : t -> Context_hash.Version.t
 
-  val set_hash_version : t -> Tezos_crypto.Context_hash.Version.t -> t Lwt.t
+  val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t
 end
 
 (** Tezos-specific proof types, as opposed to proofs provided by Irmin.
@@ -263,7 +263,7 @@ module Proof_types = struct
   type index = int
 
   (** The type for hashes. *)
-  type hash = Tezos_crypto.Context_hash.t
+  type hash = Context_hash.t
 
   (** The type for (internal) inode proofs.
 
@@ -676,11 +676,9 @@ module type TEZOS_CONTEXT = sig
   (** Close the index. Does not fail when the context is already closed. *)
   val close : index -> unit Lwt.t
 
-  val compute_testchain_chain_id :
-    Tezos_crypto.Block_hash.t -> Tezos_crypto.Chain_id.t
+  val compute_testchain_chain_id : Block_hash.t -> Tezos_crypto.Chain_id.t
 
-  val compute_testchain_genesis :
-    Tezos_crypto.Block_hash.t -> Tezos_crypto.Block_hash.t
+  val compute_testchain_genesis : Block_hash.t -> Block_hash.t
 
   (** Build an empty context from an index. The resulting context should not
       be committed. *)
@@ -693,8 +691,8 @@ module type TEZOS_CONTEXT = sig
     index ->
     chain_id:Tezos_crypto.Chain_id.t ->
     time:Time.Protocol.t ->
-    protocol:Tezos_crypto.Protocol_hash.t ->
-    Tezos_crypto.Context_hash.t tzresult Lwt.t
+    protocol:Protocol_hash.t ->
+    Context_hash.t tzresult Lwt.t
 
   val commit_test_chain_genesis :
     context -> Block_header.t -> Block_header.t Lwt.t
@@ -725,20 +723,16 @@ module type TEZOS_CONTEXT = sig
 
   (** {2 Accessing and Updating Versions} *)
 
-  val exists : index -> Tezos_crypto.Context_hash.t -> bool Lwt.t
+  val exists : index -> Context_hash.t -> bool Lwt.t
 
-  val checkout : index -> Tezos_crypto.Context_hash.t -> context option Lwt.t
+  val checkout : index -> Context_hash.t -> context option Lwt.t
 
-  val checkout_exn : index -> Tezos_crypto.Context_hash.t -> context Lwt.t
+  val checkout_exn : index -> Context_hash.t -> context Lwt.t
 
-  val hash :
-    time:Time.Protocol.t -> ?message:string -> t -> Tezos_crypto.Context_hash.t
+  val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
 
   val commit :
-    time:Time.Protocol.t ->
-    ?message:string ->
-    context ->
-    Tezos_crypto.Context_hash.t Lwt.t
+    time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
 
   (** [gc index commit_hash] removes from disk all the data older than
       the [commit_hash]. Operations needing to checkout commits
@@ -750,7 +744,7 @@ module type TEZOS_CONTEXT = sig
       [commit_hash] as a root commit. This prefix file is considered
       as standalone as all the data referenced by that commit is
       contained in that file. *)
-  val gc : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
+  val gc : index -> Context_hash.t -> unit Lwt.t
 
   (** [wait_gc_completion index] will return a blocking thread if an
       Irmin GC is currently ongoing.
@@ -798,33 +792,29 @@ module type TEZOS_CONTEXT = sig
 
       Note: there is no associated [import_snapshot] function as the
       import consist in copying the exported store. *)
-  val export_snapshot :
-    index -> Tezos_crypto.Context_hash.t -> path:string -> unit Lwt.t
+  val export_snapshot : index -> Context_hash.t -> path:string -> unit Lwt.t
 
   val set_head :
-    index ->
-    Tezos_crypto.Chain_id.t ->
-    Tezos_crypto.Context_hash.t ->
-    unit Lwt.t
+    index -> Tezos_crypto.Chain_id.t -> Context_hash.t -> unit Lwt.t
 
-  val set_master : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
+  val set_master : index -> Context_hash.t -> unit Lwt.t
 
   (** {2 Hash version} *)
 
   (** Get the hash version used for the context *)
-  val get_hash_version : context -> Tezos_crypto.Context_hash.Version.t
+  val get_hash_version : context -> Context_hash.Version.t
 
   (** Set the hash version used for the context.  It may recalculate the hashes
     of the whole context, which can be a long process.
     Returns an [Error] if the hash version is unsupported. *)
   val set_hash_version :
-    context -> Tezos_crypto.Context_hash.Version.t -> context tzresult Lwt.t
+    context -> Context_hash.Version.t -> context tzresult Lwt.t
 
   (** {2 Predefined Fields} *)
 
-  val get_protocol : context -> Tezos_crypto.Protocol_hash.t Lwt.t
+  val get_protocol : context -> Protocol_hash.t Lwt.t
 
-  val add_protocol : context -> Tezos_crypto.Protocol_hash.t -> context Lwt.t
+  val add_protocol : context -> Protocol_hash.t -> context Lwt.t
 
   val get_test_chain : context -> Test_chain_status.t Lwt.t
 
@@ -834,23 +824,23 @@ module type TEZOS_CONTEXT = sig
 
   val fork_test_chain :
     context ->
-    protocol:Tezos_crypto.Protocol_hash.t ->
+    protocol:Protocol_hash.t ->
     expiration:Time.Protocol.t ->
     context Lwt.t
 
   val clear_test_chain : index -> Tezos_crypto.Chain_id.t -> unit Lwt.t
 
   val find_predecessor_block_metadata_hash :
-    context -> Tezos_crypto.Block_metadata_hash.t option Lwt.t
+    context -> Block_metadata_hash.t option Lwt.t
 
   val add_predecessor_block_metadata_hash :
-    context -> Tezos_crypto.Block_metadata_hash.t -> context Lwt.t
+    context -> Block_metadata_hash.t -> context Lwt.t
 
   val find_predecessor_ops_metadata_hash :
-    context -> Tezos_crypto.Operation_metadata_list_list_hash.t option Lwt.t
+    context -> Operation_metadata_list_list_hash.t option Lwt.t
 
   val add_predecessor_ops_metadata_hash :
-    context -> Tezos_crypto.Operation_metadata_list_list_hash.t -> context Lwt.t
+    context -> Operation_metadata_list_list_hash.t -> context Lwt.t
 end
 
 (** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.

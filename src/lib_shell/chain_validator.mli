@@ -69,7 +69,7 @@ val reconfigure_event_logging :
 val validate_block :
   t ->
   ?force:bool ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
   unit tzresult Lwt.t

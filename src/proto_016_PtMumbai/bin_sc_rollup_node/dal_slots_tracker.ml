@@ -47,7 +47,7 @@ let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
    the slot has been confirmed after the attestation_lag has passed. *)
 type confirmations_info = {
   (* The hash of the block in which the slots have been published. *)
-  published_block_hash : Tezos_crypto.Block_hash.t;
+  published_block_hash : Block_hash.t;
   (* The indexes of slots that have beenp published in block
      with hash `published_block_hash`, and have later been confirmed. *)
   confirmed_slots_indexes : Bitset.t;
@@ -308,7 +308,7 @@ module Confirmed_slots_history = struct
           "The confirmed DAL %S for block hash %a (level = %a) is not expected \
            to be found in the store, but is exists."
           entry_kind
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           block_hash
           Raw_level.pp
           block_level
@@ -317,7 +317,7 @@ module Confirmed_slots_history = struct
           "The confirmed DAL %S for block hash %a (level = %a) is expected to \
            be found in the store, but is missing."
           entry_kind
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           block_hash
           Raw_level.pp
           block_level

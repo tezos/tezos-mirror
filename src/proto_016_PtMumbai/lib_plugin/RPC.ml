@@ -949,7 +949,7 @@ module Scripts = struct
 
   let register () =
     let originate_dummy_contract ctxt script balance =
-      let ctxt = Origination_nonce.init ctxt Tezos_crypto.Operation_hash.zero in
+      let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, dummy_contract_hash) ->
       let dummy_contract = Contract.Originated dummy_contract_hash in

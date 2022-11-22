@@ -91,7 +91,7 @@ val is_empty : _ t -> bool
 module Proof (Hash : sig
   type t
 
-  val of_context_hash : Tezos_crypto.Context_hash.t -> t
+  val of_context_hash : Context_hash.t -> t
 end) (Proof_encoding : sig
   val proof_encoding :
     Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t

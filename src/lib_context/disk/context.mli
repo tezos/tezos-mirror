@@ -52,7 +52,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   (** Rebuild a context from a given snapshot. *)
   val restore_context :
     index ->
-    expected_context_hash:Tezos_crypto.Context_hash.t ->
+    expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
     fd:Lwt_unix.file_descr ->
     in_memory:bool ->

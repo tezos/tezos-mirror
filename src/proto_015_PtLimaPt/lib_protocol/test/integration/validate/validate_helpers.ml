@@ -61,7 +61,7 @@ let ballots = Vote.[Yay; Nay; Pass]
 
 let protos =
   List.map
-    (fun s -> Tezos_crypto.Protocol_hash.of_b58check_exn s)
+    (fun s -> Protocol_hash.of_b58check_exn s)
     [
       "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
       "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";

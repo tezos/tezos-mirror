@@ -78,8 +78,8 @@ module type T = sig
   val acceptable_pass : operation -> int option
 
   val compare_operations :
-    Tezos_crypto.Operation_hash.t * operation ->
-    Tezos_crypto.Operation_hash.t * operation ->
+    Tezos_crypto.Hashed.Operation_hash.t * operation ->
+    Tezos_crypto.Hashed.Operation_hash.t * operation ->
     int
 
   type validation_state
@@ -90,12 +90,12 @@ module type T = sig
     | Application of block_header
     | Partial_validation of block_header
     | Construction of {
-        predecessor_hash : Tezos_crypto.Block_hash.t;
+        predecessor_hash : Tezos_crypto.Hashed.Block_hash.t;
         timestamp : Time.Protocol.t;
         block_header_data : block_header_data;
       }
     | Partial_construction of {
-        predecessor_hash : Tezos_crypto.Block_hash.t;
+        predecessor_hash : Tezos_crypto.Hashed.Block_hash.t;
         timestamp : Time.Protocol.t;
       }
 
@@ -109,7 +109,7 @@ module type T = sig
   val validate_operation :
     ?check_signature:bool ->
     validation_state ->
-    Tezos_crypto.Operation_hash.t ->
+    Tezos_crypto.Hashed.Operation_hash.t ->
     operation ->
     validation_state tzresult Lwt.t
 
@@ -124,7 +124,7 @@ module type T = sig
 
   val apply_operation :
     application_state ->
-    Tezos_crypto.Operation_hash.t ->
+    Tezos_crypto.Hashed.Operation_hash.t ->
     operation ->
     (application_state * operation_receipt) tzresult Lwt.t
 
@@ -151,7 +151,7 @@ module type T = sig
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
     predecessor_fitness:Fitness.t ->
-    predecessor:Tezos_crypto.Block_hash.t ->
+    predecessor:Tezos_crypto.Hashed.Block_hash.t ->
     timestamp:Time.Protocol.t ->
     (cache_key -> cache_value tzresult Lwt.t) tzresult Lwt.t
 
@@ -161,19 +161,19 @@ module type T = sig
     type validation_info
 
     type conflict_handler =
-      existing_operation:Tezos_crypto.Operation_hash.t * operation ->
-      new_operation:Tezos_crypto.Operation_hash.t * operation ->
+      existing_operation:Tezos_crypto.Hashed.Operation_hash.t * operation ->
+      new_operation:Tezos_crypto.Hashed.Operation_hash.t * operation ->
       [`Keep | `Replace]
 
     type operation_conflict =
       | Operation_conflict of {
-          existing : Tezos_crypto.Operation_hash.t;
-          new_operation : Tezos_crypto.Operation_hash.t;
+          existing : Tezos_crypto.Hashed.Operation_hash.t;
+          new_operation : Tezos_crypto.Hashed.Operation_hash.t;
         }
 
     type add_result =
       | Added
-      | Replaced of {removed : Tezos_crypto.Operation_hash.t}
+      | Replaced of {removed : Tezos_crypto.Hashed.Operation_hash.t}
       | Unchanged
 
     type add_error =
@@ -187,7 +187,7 @@ module type T = sig
     val init :
       context ->
       Tezos_crypto.Chain_id.t ->
-      head_hash:Tezos_crypto.Block_hash.t ->
+      head_hash:Tezos_crypto.Hashed.Block_hash.t ->
       head:Block_header.shell_header ->
       (validation_info * t) tzresult Lwt.t
 
@@ -198,14 +198,14 @@ module type T = sig
       ?conflict_handler:conflict_handler ->
       validation_info ->
       t ->
-      Tezos_crypto.Operation_hash.t * operation ->
+      Tezos_crypto.Hashed.Operation_hash.t * operation ->
       (t * add_result, add_error) result Lwt.t
 
-    val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
+    val remove_operation : t -> Tezos_crypto.Hashed.Operation_hash.t -> t
 
     val merge :
       ?conflict_handler:conflict_handler -> t -> t -> (t, merge_error) result
 
-    val operations : t -> operation Tezos_crypto.Operation_hash.Map.t
+    val operations : t -> operation Tezos_crypto.Hashed.Operation_hash.Map.t
   end
 end

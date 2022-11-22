@@ -56,25 +56,20 @@ module type Hooks = sig
   val on_inject_block :
     level:int32 ->
     round:int32 ->
-    block_hash:Tezos_crypto.Block_hash.t ->
+    block_hash:Block_hash.t ->
     block_header:Block_header.t ->
     operations:Operation.t list list ->
     protocol_data:Alpha_context.Block_header.protocol_data ->
-    (Tezos_crypto.Block_hash.t
-    * Block_header.t
-    * Operation.t list list
-    * propagation_vector)
+    (Block_hash.t * Block_header.t * Operation.t list list * propagation_vector)
     tzresult
     Lwt.t
 
   (** This function is called on injection of an operation. It is similar
       to [on_inject_block], which see. *)
   val on_inject_operation :
-    op_hash:Tezos_crypto.Operation_hash.t ->
+    op_hash:Operation_hash.t ->
     op:Alpha_context.packed_operation ->
-    (Tezos_crypto.Operation_hash.t
-    * Alpha_context.packed_operation
-    * propagation_vector)
+    (Operation_hash.t * Alpha_context.packed_operation * propagation_vector)
     tzresult
     Lwt.t
 
@@ -82,23 +77,22 @@ module type Hooks = sig
      a "monitor heads" RPC call. Returning [None] here terminates the
      process for the baker. *)
   val on_new_head :
-    block_hash:Tezos_crypto.Block_hash.t ->
+    block_hash:Block_hash.t ->
     block_header:Block_header.t ->
-    (Tezos_crypto.Block_hash.t * Block_header.t) option Lwt.t
+    (Block_hash.t * Block_header.t) option Lwt.t
 
   (** This is called when a new operation is going to be sent as the
       response to a "monitor operations" RPC call. Returning [None] here
       indicates that the node has advanced to the next level. *)
   val on_new_operation :
-    Tezos_crypto.Operation_hash.t * Alpha_context.packed_operation ->
-    (Tezos_crypto.Operation_hash.t * Alpha_context.packed_operation) option
-    Lwt.t
+    Operation_hash.t * Alpha_context.packed_operation ->
+    (Operation_hash.t * Alpha_context.packed_operation) option Lwt.t
 
   (** Check a block before processing it in the mockup. *)
   val check_block_before_processing :
     level:int32 ->
     round:int32 ->
-    block_hash:Tezos_crypto.Block_hash.t ->
+    block_hash:Block_hash.t ->
     block_header:Block_header.t ->
     protocol_data:Alpha_context.Block_header.protocol_data ->
     unit tzresult Lwt.t
@@ -109,7 +103,7 @@ module type Hooks = sig
 
   (** Check operations in the mempool after injecting an operation. *)
   val check_mempool_after_processing :
-    mempool:(Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) list ->
+    mempool:(Operation_hash.t * Mockup.M.Protocol.operation) list ->
     unit tzresult Lwt.t
 
   (** This hook is used to decide when the baker is supposed to shut down.
@@ -189,35 +183,33 @@ val bootstrap5 : Tezos_crypto.Signature.V0.public_key
 
 (** Check if a block header is signed by a given delegate. *)
 val check_block_signature :
-  block_hash:Tezos_crypto.Block_hash.t ->
+  block_hash:Block_hash.t ->
   block_header:Block_header.t ->
   public_key:Tezos_crypto.Signature.V0.public_key ->
   unit tzresult Lwt.t
 
 (** A shortcut type for predicates on operations. *)
 type op_predicate =
-  Tezos_crypto.Operation_hash.t ->
-  Alpha_context.packed_operation ->
-  bool tzresult Lwt.t
+  Operation_hash.t -> Alpha_context.packed_operation -> bool tzresult Lwt.t
 
 (** Count the number of operations in the mempool that satisfy the given
     predicate. *)
 val mempool_count_ops :
-  mempool:(Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) list ->
+  mempool:(Operation_hash.t * Mockup.M.Protocol.operation) list ->
   predicate:op_predicate ->
   int tzresult Lwt.t
 
 (** Check if the mempool has at least one operation that satisfies the given
    predicate. *)
 val mempool_has_op :
-  mempool:(Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) list ->
+  mempool:(Operation_hash.t * Mockup.M.Protocol.operation) list ->
   predicate:op_predicate ->
   bool tzresult Lwt.t
 
 (** Similar to [mempool_has_op] but instead of returning a [bool] it sets
     the given [bool ref]. *)
 val mempool_has_op_ref :
-  mempool:(Tezos_crypto.Operation_hash.t * Mockup.M.Protocol.operation) list ->
+  mempool:(Operation_hash.t * Mockup.M.Protocol.operation) list ->
   predicate:op_predicate ->
   var:bool ref ->
   unit tzresult Lwt.t

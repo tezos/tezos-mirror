@@ -97,7 +97,7 @@ type proxy_builder =
   | Of_rpc of (Proxy_proto.proto_rpc -> proxy_m Lwt.t)
       (** Build a proxy that uses network requests for all data. *)
   | Of_data_dir of
-      (Tezos_crypto.Context_hash.t ->
+      (Context_hash.t ->
       Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
       (** Build a proxy that looks up data in a running node's data dir. *)
 
@@ -126,7 +126,7 @@ type rpc_context_args = {
 val make_delegate :
   rpc_context_args ->
   (module Proxy_proto.PROTO_RPC) ->
-  Tezos_crypto.Context_hash.t ->
+  Context_hash.t ->
   Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t
 
 (** Functor to obtain the implementation of [M] for the proxy

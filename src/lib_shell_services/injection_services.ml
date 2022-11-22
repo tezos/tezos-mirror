@@ -25,11 +25,9 @@
 
 type Error_monad.error += Injection_operations_error
 
-type Error_monad.error +=
-  | Injection_operation_succeed_case of Tezos_crypto.Operation_hash.t
+type Error_monad.error += Injection_operation_succeed_case of Operation_hash.t
 
-type Error_monad.error +=
-  | Injection_operation_error_case of Tezos_crypto.Operation_hash.t
+type Error_monad.error += Injection_operation_error_case of Operation_hash.t
 
 let () =
   let open Data_encoding in
@@ -56,12 +54,8 @@ let () =
       "The injection of this operation succeed among a list of injections \
        containing at least one error."
     ~pp:(fun ppf oph ->
-      Format.fprintf
-        ppf
-        "Injection of %a succeeded."
-        Tezos_crypto.Operation_hash.pp
-        oph)
-    (obj1 (req "oph" Tezos_crypto.Operation_hash.encoding))
+      Format.fprintf ppf "Injection of %a succeeded." Operation_hash.pp oph)
+    (obj1 (req "oph" Operation_hash.encoding))
     (function Injection_operation_succeed_case oph -> Some oph | _ -> None)
     (function oph -> Injection_operation_succeed_case oph) ;
   register_error_kind
@@ -75,9 +69,9 @@ let () =
       Format.fprintf
         ppf
         "Injection of %a failed. Error is next."
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         oph)
-    (obj1 (req "oph" Tezos_crypto.Operation_hash.encoding))
+    (obj1 (req "oph" Operation_hash.encoding))
     (function Injection_operation_error_case oph -> Some oph | _ -> None)
     (function oph -> Injection_operation_error_case oph)
 
@@ -123,7 +117,7 @@ module S = struct
          main chain."
       ~query:block_query
       ~input:block_param
-      ~output:Tezos_crypto.Block_hash.encoding
+      ~output:Block_hash.encoding
       Tezos_rpc.Path.(path / "block")
 
   let operation_query =
@@ -173,7 +167,7 @@ module S = struct
          or the main chain."
       ~query:operation_query
       ~input:bytes
-      ~output:Tezos_crypto.Operation_hash.encoding
+      ~output:Operation_hash.encoding
       (if private_ then
        Tezos_rpc.Path.(root / "private" / "injection" / "operation")
       else Tezos_rpc.Path.(path / "operation"))
@@ -198,7 +192,7 @@ module S = struct
          specific to this injection)."
       ~query:operations_query
       ~input:(list (dynamic_size bytes))
-      ~output:(list Tezos_crypto.Operation_hash.encoding)
+      ~output:(list Operation_hash.encoding)
       Tezos_rpc.Path.(root / "private" / "injection" / "operations")
 
   let private_operation = operation ~private_:true
@@ -222,7 +216,7 @@ module S = struct
          will be validated before the result is returned."
       ~query:protocol_query
       ~input:Protocol.encoding
-      ~output:Tezos_crypto.Protocol_hash.encoding
+      ~output:Protocol_hash.encoding
       Tezos_rpc.Path.(path / "protocol")
 end
 

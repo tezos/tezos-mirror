@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module type T = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   include Tezos_protocol_environment.PROTOCOL
 
@@ -40,7 +40,7 @@ let build hash =
   | Some (V0 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V0.Make (Name) () in
       Some
@@ -60,7 +60,7 @@ let build hash =
   | Some (V1 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V1.Make (Name) () in
       Some
@@ -80,7 +80,7 @@ let build hash =
   | Some (V2 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V2.Make (Name) () in
       Some
@@ -100,7 +100,7 @@ let build hash =
   | Some (V3 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V3.Make (Name) () in
       Some
@@ -120,7 +120,7 @@ let build hash =
   | Some (V4 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V4.Make (Name) () in
       Some
@@ -140,7 +140,7 @@ let build hash =
   | Some (V5 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V5.Make (Name) () in
       Some
@@ -160,7 +160,7 @@ let build hash =
   | Some (V6 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V6.Make (Name) () in
       Some
@@ -180,7 +180,7 @@ let build hash =
   | Some (V7 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V7.Make (Name) () in
       Some
@@ -200,7 +200,7 @@ let build hash =
   | Some (V8 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V8.Make (Name) () in
       Some
@@ -220,7 +220,7 @@ let build hash =
   | Some (V9 protocol) ->
       let (module F) = protocol in
       let module Name = struct
-        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+        let name = Protocol_hash.to_b58check hash
       end in
       let module Env = Tezos_protocol_environment.V9.Make (Name) () in
       Some
@@ -238,7 +238,7 @@ let build hash =
           let complete_b58prefix = Env.Context.complete
         end : T)
 
-module VersionTable = Tezos_crypto.Protocol_hash.Table
+module VersionTable = Protocol_hash.Table
 
 let versions : (module T) VersionTable.t = VersionTable.create 20
 
@@ -265,7 +265,7 @@ let get hash =
           Some proto
       | None -> None)
 
-type error += Unregistered_protocol of Tezos_crypto.Protocol_hash.t
+type error += Unregistered_protocol of Protocol_hash.t
 
 let () =
   register_error_kind
@@ -277,10 +277,9 @@ let () =
       Format.fprintf
         fmt
         "@[<hov>No registered protocol with hash:@ %a@]"
-        Tezos_crypto.Protocol_hash.pp
+        Protocol_hash.pp
         hash)
-    Data_encoding.(
-      obj1 (req "protocol_hash" Tezos_crypto.Protocol_hash.encoding))
+    Data_encoding.(obj1 (req "protocol_hash" Protocol_hash.encoding))
     (function Unregistered_protocol hash -> Some hash | _ -> None)
     (fun hash -> Unregistered_protocol hash)
 
@@ -297,7 +296,7 @@ let seq_embedded () = VersionTable.to_seq_keys sources
 let get_embedded_sources hash = VersionTable.find sources hash
 
 module type Source_sig = sig
-  val hash : Tezos_crypto.Protocol_hash.t option
+  val hash : Protocol_hash.t option
 
   val sources : Protocol.t
 end

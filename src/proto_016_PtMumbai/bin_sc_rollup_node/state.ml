@@ -69,11 +69,11 @@ module Store = struct
         let to_path_representation = Int32.to_string
       end)
       (struct
-        type value = Tezos_crypto.Block_hash.t
+        type value = Block_hash.t
 
         let name = "block_hash"
 
-        let encoding = Tezos_crypto.Block_hash.encoding
+        let encoding = Block_hash.encoding
       end)
 end
 
@@ -136,8 +136,7 @@ let block_before store tick =
       let rec search block_hash =
         let*! block = Raw_store.L2_blocks.find store block_hash in
         match block with
-        | None ->
-            failwith "Missing block %a" Tezos_crypto.Block_hash.pp block_hash
+        | None -> failwith "Missing block %a" Block_hash.pp block_hash
         | Some block ->
             if Sc_rollup.Tick.(block.initial_tick <= tick) then
               return_some block

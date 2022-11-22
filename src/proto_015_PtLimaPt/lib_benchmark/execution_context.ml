@@ -90,6 +90,6 @@ let make ~rng_state =
     (* Required for eg Create_contract *)
     Protocol.Alpha_context.Origination_nonce.init
       ctxt
-      Tezos_crypto.Operation_hash.zero
+      Tezos_crypto.Hashed.Operation_hash.zero
   in
   return (ctxt, step_constants)

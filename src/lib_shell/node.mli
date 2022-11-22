@@ -42,7 +42,7 @@ type config = {
     Tezos_protocol_environment.Context.t tzresult Lwt.t)
     option;
   p2p : (P2p.config * P2p_limits.t) option;
-  target : (Tezos_crypto.Block_hash.t * int32) option;
+  target : (Block_hash.t * int32) option;
   disable_mempool : bool;
       (** If [true], all non-empty mempools will be ignored. *)
   enable_testchain : bool;

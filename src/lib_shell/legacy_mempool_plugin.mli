@@ -63,7 +63,7 @@ module type FILTER = sig
 
     (** [remove ~filter_state oph] removes the operation manager linked to
         [oph] from the state of the filter *)
-    val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
+    val remove : filter_state:state -> Operation_hash.t -> state
 
     (** [precheck config ~filter_state ~validation_state oph op
         ~nb_successful_prechecks]
@@ -89,7 +89,7 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       validation_state:Proto.validation_state ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       Proto.operation ->
       nb_successful_prechecks:int ->
       [ `Passed_precheck of
@@ -97,8 +97,8 @@ module type FILTER = sig
         * Proto.validation_state
         * [ `No_replace
           | `Replace of
-            Tezos_crypto.Operation_hash.t
-            * Prevalidator_classification.error_classification ]
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ]
       | `Undecided
       | Prevalidator_classification.error_classification ]
       Lwt.t

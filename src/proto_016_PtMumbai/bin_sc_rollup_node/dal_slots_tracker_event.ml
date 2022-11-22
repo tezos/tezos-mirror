@@ -41,8 +41,8 @@ module Simple = struct
          {confirmed_hash}. The slot contents will be downloaded."
       ~level:Notice
       ("slot_index", Dal.Slot_index.encoding)
-      ("published_hash", Tezos_crypto.Block_hash.encoding)
-      ("confirmed_hash", Tezos_crypto.Block_hash.encoding)
+      ("published_hash", Block_hash.encoding)
+      ("confirmed_hash", Block_hash.encoding)
 end
 
 let slot_has_been_confirmed slot published_hash confirmed_hash =

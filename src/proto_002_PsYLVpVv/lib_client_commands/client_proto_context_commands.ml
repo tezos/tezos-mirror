@@ -224,7 +224,7 @@ let commands () =
            ~name:"operation"
            ~desc:"Operation to be looked up"
            (parameter (fun _ x ->
-                match Tezos_crypto.Operation_hash.of_b58check_opt x with
+                match Operation_hash.of_b58check_opt x with
                 | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
                 | Some hash -> return hash))
       @@ stop)

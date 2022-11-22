@@ -47,9 +47,8 @@ let is_acceptable_proposal_for_current_level state
     let previous_proposal = state.level_state.latest_proposal in
     if
       Round.(proposal.block.round = previous_proposal.block.round)
-      && Tezos_crypto.Block_hash.(
-           proposal.block.hash <> previous_proposal.block.hash)
-      && Tezos_crypto.Block_hash.(
+      && Block_hash.(proposal.block.hash <> previous_proposal.block.hash)
+      && Block_hash.(
            proposal.predecessor.hash = previous_proposal.predecessor.hash)
     then
       (* An existing proposal was found at the same round: the
@@ -112,9 +111,7 @@ let may_update_proposal state (proposal : proposal) =
   else Lwt.return state
 
 let preendorse state proposal =
-  if
-    Tezos_crypto.Protocol_hash.(
-      proposal.block.protocol <> proposal.block.next_protocol)
+  if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
   then
     (* We do not preendorse the first transition block *)
     let new_state = update_current_phase state Idle in
@@ -198,7 +195,7 @@ let rec handle_new_proposal state (new_proposal : proposal) =
        let's check if it's a valid one for us. *)
     let current_proposal = state.level_state.latest_proposal in
     if
-      Tezos_crypto.Block_hash.(
+      Block_hash.(
         current_proposal.predecessor.hash <> new_proposal.predecessor.hash)
     then
       Events.(
@@ -531,8 +528,7 @@ let end_of_round state current_round =
       do_nothing new_state
   | Some (delegate, _) ->
       let last_proposal = state.level_state.latest_proposal.block in
-      if Tezos_crypto.Protocol_hash.(last_proposal.protocol <> Protocol.hash)
-      then
+      if Protocol_hash.(last_proposal.protocol <> Protocol.hash) then
         (* Do not inject a block for the previous protocol! (Let the
            baker of the previous protocol do it.) *)
         do_nothing new_state
@@ -594,9 +590,7 @@ let make_endorse_action state proposal =
 let prequorum_reached_when_awaiting_preendorsements state candidate
     preendorsements =
   let latest_proposal = state.level_state.latest_proposal in
-  if
-    Tezos_crypto.Block_hash.(
-      candidate.Operation_worker.hash <> latest_proposal.block.hash)
+  if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
     Events.(
       emit
@@ -643,9 +637,7 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
 
 let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
   let latest_proposal = state.level_state.latest_proposal in
-  if
-    Tezos_crypto.Block_hash.(
-      candidate.Operation_worker.hash <> latest_proposal.block.hash)
+  if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
     Events.(
       emit

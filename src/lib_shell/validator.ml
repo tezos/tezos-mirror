@@ -117,7 +117,7 @@ let read_block_header db h =
 
 let validate_block v ?(force = false) ?chain_id bytes operations =
   let open Lwt_result_syntax in
-  let hash = Tezos_crypto.Block_hash.hash_bytes [bytes] in
+  let hash = Block_hash.hash_bytes [bytes] in
   match Block_header.of_bytes bytes with
   | None -> failwith "Cannot parse block header."
   | Some block ->
@@ -132,7 +132,7 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
               | None ->
                   failwith
                     "Unknown predecessor (%a), cannot inject the block."
-                    Tezos_crypto.Block_hash.pp_short
+                    Block_hash.pp_short
                     block.shell.predecessor
               | Some (chain_id, _bh) -> Lwt.return (get v chain_id))
           | Some chain_id -> (
@@ -149,7 +149,7 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
                 | false ->
                     failwith
                       "Unknown predecessor (%a), cannot inject the block."
-                      Tezos_crypto.Block_hash.pp_short
+                      Block_hash.pp_short
                       block.shell.predecessor)
         in
         let validation =
@@ -202,7 +202,7 @@ let inject_operation v ?chain_id ~force op =
           else
             failwith
               "Unknown branch (%a), cannot inject the operation."
-              Tezos_crypto.Block_hash.pp_short
+              Block_hash.pp_short
               op.shell.branch
       | Some (chain_id, _bh) ->
           let*? nv = get v chain_id in

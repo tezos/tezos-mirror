@@ -23,5 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val dump :
-  out_channel -> string -> Tezos_crypto.Protocol_hash.t -> string array -> unit
+val dump : out_channel -> string -> Protocol_hash.t -> string array -> unit

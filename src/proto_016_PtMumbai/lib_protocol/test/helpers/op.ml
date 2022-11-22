@@ -241,7 +241,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
-        Tezos_crypto.Block_hash.(branch = b))
+        Block_hash.(branch = b))
       packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
@@ -555,7 +555,7 @@ let activation ctxt (pkh : Tezos_crypto.Signature.Public_key_hash.t)
   | _ ->
       failwith
         "Wrong public key hash : %a - Commitments must be activated with an \
-         Tezos_crypto.Ed25519 encrypted public key hash"
+         Ed25519 encrypted public key hash"
         Tezos_crypto.Signature.Public_key_hash.pp
         pkh)
   >|=? fun id ->

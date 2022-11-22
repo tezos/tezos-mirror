@@ -69,18 +69,18 @@ type error += Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given
     different from the given rollup genesis. *)
 type error +=
   | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis of {
-      disk_rollup_origination : Tezos_crypto.Block_hash.t;
-      given_rollup_genesis : Tezos_crypto.Block_hash.t;
+      disk_rollup_origination : Block_hash.t;
+      given_rollup_genesis : Block_hash.t;
     }
 
 (** Error when operation metadata is not available. *)
-type error += Tx_rollup_no_operation_metadata of Tezos_crypto.Operation_hash.t
+type error += Tx_rollup_no_operation_metadata of Operation_hash.t
 
 (** Error when rollup stored on disk is different from the expected one. *)
 type error += Tx_rollup_mismatch
 
 (** Error when Tezos block cannot be fetched. *)
-type error += Tx_rollup_cannot_fetch_tezos_block of Tezos_crypto.Block_hash.t
+type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t
 
 (** Error when the tree is not found in the context. *)
 type error += Tx_rollup_tree_not_found
@@ -102,7 +102,7 @@ type error +=
 (** Error when the tezos node does not know the inbox *)
 type error +=
   | Tx_rollup_no_proto_inbox of
-      Protocol.Alpha_context.Tx_rollup_level.t * Tezos_crypto.Block_hash.t
+      Protocol.Alpha_context.Tx_rollup_level.t * Block_hash.t
 
 (** Error when the node reconstructed a different inbox than the one stored on L1 *)
 type error +=
@@ -131,6 +131,6 @@ type error +=
 type error += Tx_rollup_deposit_not_allowed
 
 (** Error (fatal) when we are slashed *)
-type error += Tx_rollup_deposit_slashed of Tezos_crypto.Operation_hash.t
+type error += Tx_rollup_deposit_slashed of Operation_hash.t
 
 type error += Wrong_deposit_parameters

@@ -32,11 +32,10 @@ open Alpha_context
     with respect to a layer 1 block, but without the inbox content of
     messages. *)
 type header = {
-  block_hash : Tezos_crypto.Block_hash.t;  (** Tezos block hash. *)
+  block_hash : Block_hash.t;  (** Tezos block hash. *)
   level : Raw_level.t;
       (** Level of the block, corresponds to the level of the tezos block. *)
-  predecessor : Tezos_crypto.Block_hash.t;
-      (** Predecessor hash of the Tezos block. *)
+  predecessor : Block_hash.t;  (** Predecessor hash of the Tezos block. *)
   commitment_hash : Sc_rollup.Commitment.Hash.t option;
       (** Hash of this block's commitment if any was computed for it. *)
   previous_commitment_hash : Sc_rollup.Commitment.Hash.t;

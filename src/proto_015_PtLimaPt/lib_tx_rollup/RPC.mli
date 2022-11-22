@@ -30,7 +30,7 @@ open Protocol
 type block_id =
   [ `Head
   | `L2_block of L2block.hash
-  | `Tezos_block of Tezos_crypto.Block_hash.t
+  | `Tezos_block of Block_hash.t
   | `Level of L2block.level ]
 
 val destruct_block_id : string -> (block_id, string) result

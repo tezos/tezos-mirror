@@ -206,22 +206,21 @@ let main {compile_ml; pack_objects; link_shared} =
   in
   let computed_hash = Protocol.hash protocol in
   if !hash_only then (
-    Format.printf "%a@." Tezos_crypto.Protocol_hash.pp computed_hash ;
+    Format.printf "%a@." Protocol_hash.pp computed_hash ;
     exit 0) ;
   let hash =
     match stored_hash_opt with
     | None -> computed_hash
     | Some stored_hash
       when !check_protocol_hash
-           && not (Tezos_crypto.Protocol_hash.equal computed_hash stored_hash)
-      ->
+           && not (Protocol_hash.equal computed_hash stored_hash) ->
         Format.eprintf
           "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
            Computed hash: %a@\n\
            Stored in TEZOS_PROTOCOL: %a@."
-          Tezos_crypto.Protocol_hash.pp
+          Protocol_hash.pp
           computed_hash
-          Tezos_crypto.Protocol_hash.pp
+          Protocol_hash.pp
           stored_hash ;
         exit 2
     | Some hash -> hash
@@ -237,7 +236,7 @@ let main {compile_ml; pack_objects; link_shared} =
   let output =
     match !output_file with
     | Some output -> output
-    | None -> Format.asprintf "proto_%a" Tezos_crypto.Protocol_hash.pp hash
+    | None -> Format.asprintf "proto_%a" Protocol_hash.pp hash
   in
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 build_dir) ;
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
@@ -281,7 +280,7 @@ let main {compile_ml; pack_objects; link_shared} =
            "module Name = struct let name = %S end\n\
            \ let () = Tezos_protocol_registerer.register Name.name (%s (module \
             %s.Make))"
-           (Tezos_crypto.Protocol_hash.to_b58check hash)
+           (Protocol_hash.to_b58check hash)
            (Protocol.module_name_of_env_version protocol.expected_env)
            functor_unit) ;
       let register_object = compile_ml ~for_pack register_file in
@@ -304,4 +303,4 @@ let main {compile_ml; pack_objects; link_shared} =
     Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
     Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
     Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)) ;
-  Format.printf "Success: %a.@." Tezos_crypto.Protocol_hash.pp hash
+  Format.printf "Success: %a.@." Protocol_hash.pp hash

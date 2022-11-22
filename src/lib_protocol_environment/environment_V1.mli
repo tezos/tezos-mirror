@@ -36,14 +36,15 @@ module type T = sig
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
        and type Chain_id.t = Tezos_crypto.Chain_id.t
-       and type Block_hash.t = Tezos_crypto.Block_hash.t
-       and type Operation_hash.t = Tezos_crypto.Operation_hash.t
-       and type Operation_list_hash.t = Tezos_crypto.Operation_list_hash.t
+       and type Block_hash.t = Tezos_crypto.Hashed.Block_hash.t
+       and type Operation_hash.t = Tezos_crypto.Hashed.Operation_hash.t
+       and type Operation_list_hash.t =
+        Tezos_crypto.Hashed.Operation_list_hash.t
        and type Operation_list_list_hash.t =
-        Tezos_crypto.Operation_list_list_hash.t
+        Tezos_crypto.Hashed.Operation_list_list_hash.t
        and type Context.t = Context.t
-       and type Context_hash.t = Tezos_crypto.Context_hash.t
-       and type Protocol_hash.t = Tezos_crypto.Protocol_hash.t
+       and type Context_hash.t = Tezos_crypto.Hashed.Context_hash.t
+       and type Protocol_hash.t = Tezos_crypto.Hashed.Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t

@@ -89,9 +89,7 @@ let build_rpc_directory validator mainchain_validator =
                 let* context = Store.Block.context_exn chain_store pred in
                 let* protocol = Context_ops.get_protocol context in
                 Lwt.return
-                  (List.exists
-                     (Tezos_crypto.Protocol_hash.equal protocol)
-                     protocols))
+                  (List.exists (Protocol_hash.equal protocol) protocols))
       in
       let in_next_protocols (chain_store, block) =
         match q#next_protocols with
@@ -100,9 +98,7 @@ let build_rpc_directory validator mainchain_validator =
             let* context = Store.Block.context_exn chain_store block in
             let* next_protocol = Context_ops.get_protocol context in
             Lwt.return
-              (List.exists
-                 (Tezos_crypto.Protocol_hash.equal next_protocol)
-                 protocols)
+              (List.exists (Protocol_hash.equal next_protocol) protocols)
       in
       let stream =
         Lwt_stream.filter_map_s
@@ -138,9 +134,7 @@ let build_rpc_directory validator mainchain_validator =
                 let* context = Store.Block.context_exn chain_store block in
                 let* next_protocol = Context_ops.get_protocol context in
                 Lwt.return
-                  (List.exists
-                     (Tezos_crypto.Protocol_hash.equal next_protocol)
-                     protocols)
+                  (List.exists (Protocol_hash.equal next_protocol) protocols)
           in
           let stream =
             Lwt_stream.filter_map_s

@@ -386,8 +386,7 @@ struct
     Store.Tree.verify_stream proof f
 end
 
-type error +=
-  | Unsupported_context_hash_version of Tezos_crypto.Context_hash.Version.t
+type error += Unsupported_context_hash_version of Context_hash.Version.t
 
 let () =
   register_error_kind
@@ -400,10 +399,9 @@ let () =
         ppf
         "@[Context hash version %a is not supported.@,\
          You might need to update the shell.@]"
-        Tezos_crypto.Context_hash.Version.pp
+        Context_hash.Version.pp
         version)
-    Data_encoding.(
-      obj1 (req "version" Tezos_crypto.Context_hash.Version.encoding))
+    Data_encoding.(obj1 (req "version" Context_hash.Version.encoding))
     (function
       | Unsupported_context_hash_version version -> Some version | _ -> None)
     (fun version -> Unsupported_context_hash_version version)
