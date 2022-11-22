@@ -223,9 +223,15 @@ let number_of_ticks_exn n =
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
-let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
+let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
+    ctxt rollup =
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
-  let predecessor = genesis_info.commitment_hash in
+  let predecessor, pred_level =
+    match predecessor with
+    | Some pred ->
+        (Sc_rollup.Commitment.hash_uncarbonated pred, pred.inbox_level)
+    | None -> (genesis_info.commitment_hash, genesis_info.level)
+  in
   let* compressed_state =
     match compressed_state with
     | None ->
@@ -235,7 +241,6 @@ let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
         return compressed_state
     | Some compressed_state -> return compressed_state
   in
-  let root_level = genesis_info.level in
   let* inbox_level =
     let+ constants = Context.get_constants ctxt in
     let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _}
@@ -243,7 +248,7 @@ let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
       constants.parametric.sc_rollup
     in
     Raw_level.of_int32_exn
-      (Int32.add (Raw_level.to_int32 root_level) (Int32.of_int commitment_freq))
+      (Int32.add (Raw_level.to_int32 pred_level) (Int32.of_int commitment_freq))
   in
   return
     Sc_rollup.Commitment.
@@ -253,6 +258,21 @@ let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
         number_of_ticks = number_of_ticks_exn number_of_ticks;
         compressed_state;
       }
+
+let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
+    block =
+  let compressed_state =
+    Option.map
+      (fun s ->
+        Sc_rollup.State_hash.context_hash_to_state_hash
+          (Tezos_crypto.Context_hash.hash_string [s]))
+      compressed_state
+  in
+  let* commitment =
+    dummy_commitment ?compressed_state ?predecessor (B block) rollup
+  in
+  let* publish = Op.sc_rollup_publish (B block) src rollup commitment in
+  return (publish, commitment)
 
 (* Verify that parameters and unparsed parameters match. *)
 let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
@@ -2178,6 +2198,191 @@ let test_zero_tick_commitment_fails () =
   in
   return_unit
 
+(** [test_curfew] creates a rollup, publishes two conflicting
+    commitments. Branches are expected to continue (commitment are able to be
+    published). Tries to publish another commitment at the same initial
+    `inbox_level` after [challenge_window_in_blocks - 1] and after
+    [challenge_window_in_blocks] blocks. Only the first attempt is expected to
+    succeed. *)
+let test_curfew () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2, account3), rollup =
+    init_and_originate Context.T3 "unit"
+  in
+  let* constants = Context.get_constants (B block) in
+  let challenge_window =
+    constants.parametric.sc_rollup.challenge_window_in_blocks
+  in
+  let commitment_period =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  let* block = Block.bake_n commitment_period block in
+  let* publish1, commitment1 =
+    publish_op_and_dummy_commitment
+      ~src:account1
+      ~compressed_state:"first"
+      rollup
+      block
+  in
+  let* publish2, commitment2 =
+    publish_op_and_dummy_commitment
+      ~src:account2
+      ~compressed_state:"second"
+      rollup
+      block
+  in
+  let* block = Block.bake ~operations:[publish1; publish2] block in
+  let* block = Block.bake_n (challenge_window - 1) block in
+  let* publish11, commitment11 =
+    publish_op_and_dummy_commitment
+      ~src:account1
+      ~predecessor:commitment1
+      rollup
+      block
+  in
+  let* publish21, commitment21 =
+    publish_op_and_dummy_commitment
+      ~src:account2
+      ~predecessor:commitment2
+      rollup
+      block
+  in
+  let* publish3, _commitment3 =
+    publish_op_and_dummy_commitment
+      ~src:account3
+      ~compressed_state:"third"
+      rollup
+      block
+  in
+  let* block = Block.bake ~operations:[publish11; publish21; publish3] block in
+  let* publish111, _commitment111 =
+    publish_op_and_dummy_commitment
+      ~src:account1
+      ~predecessor:commitment11
+      rollup
+      block
+  in
+  let* publish211, _commitment211 =
+    publish_op_and_dummy_commitment
+      ~src:account2
+      ~predecessor:commitment21
+      rollup
+      block
+  in
+  let* publish4, _commitment4 =
+    publish_op_and_dummy_commitment
+      ~src:account3
+      ~compressed_state:"fourth"
+      rollup
+      block
+  in
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr publish111 in
+  let* incr = Incremental.add_operation incr publish211 in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_errors.Sc_rollup_commitment_past_curfew as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ ->
+        failwith "It should have failed with [Sc_rollup_commitment_past_curfew]"
+  in
+  let* _incr = Incremental.add_operation ~expect_apply_failure incr publish4 in
+  return_unit
+
+(** [test_curfew_is_clean] makes sure that the curfew-related storage is cleaned
+    when a commitment is cemented. *)
+let test_curfew_is_clean () =
+  let open Lwt_result_syntax in
+  let* block, account1, rollup = init_and_originate Context.T1 "unit" in
+  let find_first_publication_level block inbox_level =
+    let* alpha_ctxt = Block.to_alpha_ctxt block in
+    let raw_ctxt = Alpha_context.Internal_for_tests.to_raw alpha_ctxt in
+    let rollup =
+      Data_encoding.Binary.(
+        to_bytes_exn Alpha_context.Sc_rollup.Address.encoding rollup
+        |> of_bytes_exn Protocol.Sc_rollup_repr.Address.encoding)
+    in
+    let inbox_level =
+      Data_encoding.Binary.(
+        to_bytes_exn Raw_level.encoding inbox_level
+        |> of_bytes_exn Raw_level_repr.encoding)
+    in
+    let* _raw_ctxt, first_publication_level =
+      Storage.Sc_rollup.Commitment_first_publication_level.find
+        (raw_ctxt, rollup)
+        inbox_level
+      >|= Environment.wrap_tzresult
+    in
+    return first_publication_level
+  in
+  let* constants = Context.get_constants (B block) in
+  let challenge_window =
+    constants.parametric.sc_rollup.challenge_window_in_blocks
+  in
+  let commitment_period =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  let* block = Block.bake_n commitment_period block in
+  let* commitment = dummy_commitment (B block) rollup in
+  let* operation = Op.sc_rollup_publish (B block) account1 rollup commitment in
+  let* first_publication_level =
+    find_first_publication_level block commitment.inbox_level
+  in
+  let* () =
+    match first_publication_level with
+    | Some _x ->
+        failwith "The storage should be empty before the first publication."
+    | None -> return_unit
+  in
+  let* block = Block.bake ~operation block in
+  let* () =
+    let* first_publication_level =
+      find_first_publication_level block commitment.inbox_level
+    in
+    match first_publication_level with
+    | Some x ->
+        assert (
+          Int32.equal block.header.shell.level @@ Raw_level_repr.to_int32 x) ;
+        return_unit
+    | None -> failwith "The level of publication is expected to exist"
+  in
+  let* block = Block.bake_n challenge_window block in
+  let* cement_op =
+    let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+    Op.sc_rollup_cement (B block) account1 rollup hash
+  in
+  let* block = Block.bake block ~operation:cement_op in
+  let* first_publication_level =
+    find_first_publication_level block commitment.inbox_level
+  in
+  match first_publication_level with
+  | Some _x ->
+      failwith
+        "The storage should have been cleaned when commitment is cemented"
+  | None -> return_unit
+
+(** [test_curfew_period_is_started_only_after_first_publication checks that
+    publishing the first commitment of a given [inbox_level] after 
+    [inbox_level + challenge_window] is still possible. *)
+let test_curfew_period_is_started_only_after_first_publication () =
+  let open Lwt_result_syntax in
+  let* block, account1, rollup = init_and_originate Context.T1 "unit" in
+  let* constants = Context.get_constants (B block) in
+  let challenge_window =
+    constants.parametric.sc_rollup.challenge_window_in_blocks
+  in
+  let commitment_period =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  let* block = Block.bake_n commitment_period block in
+  let* block = Block.bake_n challenge_window block in
+  let* commitment = dummy_commitment (B block) rollup in
+  let* operation = Op.sc_rollup_publish (B block) account1 rollup commitment in
+  let* _block = Block.bake ~operation block in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -2295,4 +2500,14 @@ let tests =
       "0-tick commitments are forbidden"
       `Quick
       test_zero_tick_commitment_fails;
+    Tztest.tztest "check the curfew functionality" `Quick test_curfew;
+    Tztest.tztest
+      "check the curfew storage is cleaned after cement"
+      `Quick
+      test_curfew_is_clean;
+    Tztest.tztest
+      "check that a commitment can be published after the inbox_level + \
+       challenge window is passed."
+      `Quick
+      test_curfew_period_is_started_only_after_first_publication;
   ]

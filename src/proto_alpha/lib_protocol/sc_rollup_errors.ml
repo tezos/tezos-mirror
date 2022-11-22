@@ -71,6 +71,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_bad_commitment_serialization
   | (* `Permanent *) Sc_rollup_address_generation
   | (* `Permanent *) Sc_rollup_zero_tick_commitment
+  | (* `Permanent *) Sc_rollup_commitment_past_curfew
 
 let () =
   register_error_kind
@@ -448,6 +449,18 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_bad_commitment_serialization -> Some () | _ -> None)
     (fun () -> Sc_rollup_bad_commitment_serialization) ;
+  let description = "Commitment is past the curfew for this level." in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_commitment_past_curfew"
+    ~title:"Commitment past curfew."
+    ~description:
+      "A commitment exists for this inbox level for longer than the curfew \
+       period."
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Sc_rollup_commitment_past_curfew -> Some () | _ -> None)
+    (fun () -> Sc_rollup_commitment_past_curfew) ;
   let description = "Error while generating rollup address" in
   register_error_kind
     `Permanent

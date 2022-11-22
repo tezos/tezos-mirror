@@ -169,8 +169,40 @@ let assert_commitment_period ctxt rollup commitment =
   in
   return ctxt
 
-(** Check invariants on [inbox_level], enforcing overallocation of storage and
-    regularity of block production.
+(** [assert_commitment_is_not_past_curfew ctxt rollup inbox_level] will look in the
+    storage [Commitment_first_publication_level] for the level of the oldest commit for
+    [inbox_level] and if it is more than [sc_rollup_challenge_window_in_blocks]
+    ago it fails with [Sc_rollup_commitment_past_curfew]. Otherwise it adds the
+    respective storage (if it is not set) and returns the context. *)
+let assert_commitment_is_not_past_curfew ctxt rollup inbox_level =
+  let open Lwt_result_syntax in
+  let refutation_deadline_blocks =
+    Int32.of_int @@ Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let* ctxt, oldest_commit =
+    Store.Commitment_first_publication_level.find (ctxt, rollup) inbox_level
+  in
+  match oldest_commit with
+  | Some oldest_commit ->
+      if
+        Compare.Int32.(
+          Raw_level_repr.diff current_level oldest_commit
+          > refutation_deadline_blocks)
+      then tzfail Sc_rollup_commitment_past_curfew
+      else return ctxt
+  | None ->
+      (* The storage cost is covered by the stake. *)
+      let* ctxt, _diff, _existed =
+        Store.Commitment_first_publication_level.add
+          (ctxt, rollup)
+          inbox_level
+          current_level
+      in
+      return ctxt
+
+(** Check invariants on [inbox_level], enforcing overallocation of storage,
+    regularity of block production and curfew.
 
     The constants used by [assert_refine_conditions_met] must be chosen such
     that the maximum cost of storage allocated by each staker is at most the size
@@ -180,7 +212,10 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let open Lwt_result_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
-  return ctxt
+  assert_commitment_is_not_past_curfew
+    ctxt
+    rollup
+    Commitment.(commitment.inbox_level)
 
 let get_commitment_stake_count ctxt rollup node =
   let open Lwt_result_syntax in
@@ -398,6 +433,11 @@ let cement_commitment ctxt rollup new_lcc =
      [max_number_of_cemented_commitments], if such exist.
   *)
   let* ctxt = deallocate_commitment_metadata ctxt rollup old_lcc in
+  let* ctxt, _freed_size =
+    Store.Commitment_first_publication_level.remove_existing
+      (ctxt, rollup)
+      new_lcc_commitment.inbox_level
+  in
   (* Decrease max_number_of_stored_cemented_commitments by one because
      we start counting commitments from old_lcc, rather than from new_lcc. *)
   let num_commitments_to_keep =
