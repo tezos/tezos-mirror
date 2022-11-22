@@ -33,7 +33,7 @@ type delegate = {
   alias : string option;
   public_key : Tezos_crypto.Signature.V0.Public_key.t;
   public_key_hash : Tezos_crypto.Signature.V0.Public_key_hash.t;
-  secret_key_uri : Client_keys.sk_uri;
+  secret_key_uri : Client_keys_v0.sk_uri;
 }
 
 let delegate_encoding =
@@ -50,7 +50,7 @@ let delegate_encoding =
         public_key;
         public_key_hash;
         secret_key_uri =
-          (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
+          (match Client_keys_v0.make_sk_uri (Uri.of_string secret_key_uri) with
           | Ok sk -> sk
           | Error e -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace e);
       })

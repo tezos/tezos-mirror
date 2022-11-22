@@ -62,7 +62,7 @@ val register_global_constant :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->
   unit ->
@@ -126,7 +126,7 @@ val set_delegate :
   ?fee:Tez.tez ->
   public_key_hash ->
   src_pk:public_key ->
-  manager_sk:Client_keys.sk_uri ->
+  manager_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   public_key_hash option ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
@@ -142,7 +142,7 @@ val set_deposits_limit :
   ?fee:Tez.tez ->
   public_key_hash ->
   src_pk:public_key ->
-  manager_sk:Client_keys.sk_uri ->
+  manager_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   Tez.t option ->
   Kind.set_deposits_limit Kind.manager Injection.result tzresult Lwt.t
@@ -155,7 +155,7 @@ val register_as_delegate :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?fee:Tez.tez ->
-  manager_sk:Client_keys.sk_uri ->
+  manager_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   public_key ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
@@ -183,7 +183,7 @@ val originate_contract :
   balance:Tez.t ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   code:Script.expr ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
@@ -217,7 +217,7 @@ val transfer_with_script :
   ?successor_level:bool ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   destination:Destination.t ->
   ?entrypoint:Entrypoint.t ->
   parameters:Script.lazy_expr ->
@@ -245,7 +245,7 @@ val transfer :
   ?successor_level:bool ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   destination:Destination.t ->
   ?entrypoint:Entrypoint.t ->
   ?arg:string ->
@@ -277,7 +277,7 @@ val reveal :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   ?fee:Tez.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
@@ -368,7 +368,7 @@ val submit_proposals :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   public_key_hash ->
   Tezos_crypto.Protocol_hash.t list ->
   Kind.proposals Injection.result_list tzresult Lwt.t
@@ -380,7 +380,7 @@ val submit_ballot :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?confirmations:int ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   public_key_hash ->
   Tezos_crypto.Protocol_hash.t ->
   Vote.ballot ->
@@ -434,7 +434,7 @@ val originate_tx_rollup :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Tezos_crypto.Operation_hash.t
@@ -458,7 +458,7 @@ val submit_tx_rollup_batch :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   content:string ->
   tx_rollup:Tx_rollup.t ->
@@ -483,7 +483,7 @@ val submit_tx_rollup_commitment :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
   inbox_merkle_root:Tx_rollup_inbox.Merkle.root ->
@@ -511,7 +511,7 @@ val submit_tx_rollup_finalize_commitment :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
   unit ->
@@ -536,7 +536,7 @@ val submit_tx_rollup_remove_commitment :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
   unit ->
@@ -560,7 +560,7 @@ val submit_tx_rollup_rejection :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
   tx_rollup:Tx_rollup.t ->
@@ -594,7 +594,7 @@ val submit_tx_rollup_return_bond :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
   unit ->
@@ -618,7 +618,7 @@ val tx_rollup_dispatch_tickets :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
   context_hash:Tezos_crypto.Context_hash.t ->
@@ -647,7 +647,7 @@ val transfer_ticket :
   ?counter:Z.t ->
   source:Tezos_crypto.Signature.V0.public_key_hash ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   contents:string ->
   ty:string ->
@@ -678,7 +678,7 @@ val sc_rollup_originate :
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   ( Tezos_crypto.Operation_hash.t
@@ -704,7 +704,7 @@ val sc_rollup_add_messages :
   rollup:Alpha_context.Sc_rollup.t ->
   messages:string list ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Tezos_crypto.Operation_hash.t
@@ -729,7 +729,7 @@ val sc_rollup_cement :
   rollup:Alpha_context.Sc_rollup.t ->
   commitment:Alpha_context.Sc_rollup.Commitment_hash.t ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Tezos_crypto.Operation_hash.t
@@ -754,7 +754,7 @@ val sc_rollup_publish :
   rollup:Alpha_context.Sc_rollup.t ->
   commitment:Alpha_context.Sc_rollup.Commitment.t ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Tezos_crypto.Operation_hash.t

@@ -56,7 +56,7 @@ let commands () =
       (prefixes ["sign"; "message"]
       @@ string_param ~name:"message" ~desc:"message to sign"
       @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"src"
            ~desc:"name of the signer contract"
       @@ stop)
@@ -78,7 +78,7 @@ let commands () =
       (prefixes ["check"; "that"; "message"]
       @@ string_param ~name:"message" ~desc:"signed message"
       @@ prefixes ["was"; "signed"; "by"]
-      @@ Client_keys.Public_key.alias_param
+      @@ Client_keys_v0.Public_key.alias_param
            ~name:"signer"
            ~desc:"name of the signer contract"
       @@ prefixes ["to"; "produce"]

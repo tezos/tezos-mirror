@@ -30,7 +30,7 @@ type delegate = {
   alias : string option;
   public_key : Tezos_crypto.Signature.V0.public_key;
   public_key_hash : Tezos_crypto.Signature.V0.public_key_hash;
-  secret_key_uri : Client_keys.sk_uri;
+  secret_key_uri : Client_keys_v0.sk_uri;
 }
 
 val delegate_encoding : delegate Data_encoding.t

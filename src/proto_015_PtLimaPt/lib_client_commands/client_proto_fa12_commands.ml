@@ -66,7 +66,7 @@ let as_arg =
     ()
 
 let payer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"payer"
     ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
     ()
@@ -118,7 +118,7 @@ let get_contract_caller_keys cctxt (caller : Contract.t) =
   | Originated _ ->
       failwith "only implicit accounts can be the source of a contract call"
   | Implicit source ->
-      let* _, caller_pk, caller_sk = Client_keys.get_key cctxt source in
+      let* _, caller_pk, caller_sk = Client_keys_v0.get_key cctxt source in
       return (source, caller_pk, caller_sk)
 
 let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =

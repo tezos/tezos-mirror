@@ -1160,7 +1160,7 @@ module Protocol_constants_overrides = struct
 end
 
 module Parsed_account = struct
-  type t = {name : string; sk_uri : Client_keys.sk_uri; amount : Tez.t}
+  type t = {name : string; sk_uri : Client_keys_v0.sk_uri; amount : Tez.t}
 
   let pp ppf account =
     let open Format in
@@ -1180,12 +1180,12 @@ module Parsed_account = struct
       (fun (name, sk_uri, amount) -> {name; sk_uri; amount})
       (obj3
          (req "name" string)
-         (req "sk_uri" Client_keys.Secret_key.encoding)
+         (req "sk_uri" Client_keys_v0.Secret_key.encoding)
          (req "amount" Tez.encoding))
 
   let to_bootstrap_account repr =
-    Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
-    Client_keys.public_key pk_uri >>=? fun public_key ->
+    Client_keys_v0.neuterize repr.sk_uri >>=? fun pk_uri ->
+    Client_keys_v0.public_key pk_uri >>=? fun public_key ->
     let public_key_hash =
       Tezos_crypto.Signature.V0.Public_key.hash public_key
     in
@@ -1204,7 +1204,7 @@ module Parsed_account = struct
     let wallet = (cctxt :> Client_context.wallet) in
     let parsed_account_reprs = ref [] in
     let errors = ref [] in
-    Client_keys.list_keys wallet >>=? fun all_keys ->
+    Client_keys_v0.list_keys wallet >>=? fun all_keys ->
     List.iter_s
       (function
         | name, pkh, _pk_opt, Some sk_uri -> (

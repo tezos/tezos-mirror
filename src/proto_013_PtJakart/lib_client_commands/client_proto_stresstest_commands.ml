@@ -237,7 +237,7 @@ let normalize_source cctxt =
   let sk_of_sk_uri sk_uri =
     match
       Tezos_crypto.Signature.V0.Secret_key.of_b58check
-        (Uri.path (sk_uri : Client_keys.sk_uri :> Uri.t))
+        (Uri.path (sk_uri : Client_keys_v0.sk_uri :> Uri.t))
     with
     | Ok sk -> Lwt.return_some sk
     | Error _ -> (
@@ -249,7 +249,7 @@ let normalize_source cctxt =
     let warning msg alias =
       cctxt#warning msg alias >>= fun () -> Lwt.return_none
     in
-    (Client_keys.alias_keys cctxt alias >>= function
+    (Client_keys_v0.alias_keys cctxt alias >>= function
      | Error _ | Ok None -> warning "Alias \"%s\" not found in the wallet" alias
      | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
          warning
@@ -275,7 +275,7 @@ let normalize_source cctxt =
       cctxt#warning msg Tezos_crypto.Signature.V0.Public_key_hash.pp pkh
       >>= fun () -> Lwt.return_none
     in
-    (Client_keys.get_key cctxt pkh >>= function
+    (Client_keys_v0.get_key cctxt pkh >>= function
      | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
      | Ok (alias, pk, sk_uri) -> (
          sk_of_sk_uri sk_uri >>= function

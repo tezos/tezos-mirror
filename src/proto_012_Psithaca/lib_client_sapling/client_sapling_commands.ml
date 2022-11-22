@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Client_keys
+open Client_keys_v0
 open Tezos_sapling.Core.Client
 
 let json_switch = Tezos_clic.switch ~long:"json" ~doc:"Use JSON format" ()
@@ -45,7 +45,8 @@ let keys_of_implicit_account cctxt source =
   match Protocol.Alpha_context.Contract.is_implicit source with
   | None -> assert false
   | Some src ->
-      Client_keys.get_key cctxt src >>=? fun (_, pk, sk) -> return (src, pk, sk)
+      Client_keys_v0.get_key cctxt src >>=? fun (_, pk, sk) ->
+      return (src, pk, sk)
 
 let viewing_key_of_string s =
   let exception Unknown_sapling_address in

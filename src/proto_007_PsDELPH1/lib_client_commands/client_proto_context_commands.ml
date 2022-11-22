@@ -29,7 +29,7 @@ open Alpha_context
 open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 open Client_proto_args
 
 let data_parameter =

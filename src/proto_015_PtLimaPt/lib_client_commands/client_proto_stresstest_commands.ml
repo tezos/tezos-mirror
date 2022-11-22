@@ -70,9 +70,9 @@ type source = {
 type source_with_uri = {
   pkh : public_key_hash;
   pk : public_key;
-  pk_uri : Client_keys.pk_uri;
+  pk_uri : Client_keys_v0.pk_uri;
   sk : Tezos_crypto.Signature.V0.secret_key;
-  sk_uri : Client_keys.sk_uri;
+  sk_uri : Client_keys_v0.sk_uri;
 }
 
 type input_source =
@@ -243,7 +243,7 @@ let normalize_source cctxt =
   let sk_of_sk_uri sk_uri =
     match
       Tezos_crypto.Signature.V0.Secret_key.of_b58check
-        (Uri.path (sk_uri : Client_keys.sk_uri :> Uri.t))
+        (Uri.path (sk_uri : Client_keys_v0.sk_uri :> Uri.t))
     with
     | Ok sk -> Lwt.return_some sk
     | Error _ ->
@@ -257,7 +257,7 @@ let normalize_source cctxt =
       return_none
     in
     let* key =
-      let* r = Client_keys.alias_keys cctxt alias in
+      let* r = Client_keys_v0.alias_keys cctxt alias in
       match r with
       | Error _ | Ok None ->
           warning "Alias \"%s\" not found in the wallet" alias
@@ -290,7 +290,7 @@ let normalize_source cctxt =
       return_none
     in
     let* key =
-      let* r = Client_keys.get_key cctxt pkh in
+      let* r = Client_keys_v0.get_key cctxt pkh in
       match r with
       | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
       | Ok (alias, pk, sk_uri) -> (
@@ -1504,7 +1504,7 @@ let generate_account_funding_batches (starter_sources : source_with_uri list)
 (* Loads a wallet by reading directly the files to speed up things. *)
 let load_wallet cctxt ~source_pkh =
   let open Lwt_result_syntax in
-  let* keys = Client_keys.get_keys cctxt in
+  let* keys = Client_keys_v0.get_keys cctxt in
   (* Convert loaded and filter identities. We want to ban activator
      and bootstrap<1-5> in sandbox, as well as the "faucet source" on
      test networks. *)
@@ -1522,7 +1522,7 @@ let load_wallet cctxt ~source_pkh =
            || Tezos_crypto.Signature.V0.Public_key_hash.equal pkh source_pkh ->
         aux acc tl
     | (_, pkh, pk, sk_uri) :: tl ->
-        let* pk_uri = Client_keys.neuterize sk_uri in
+        let* pk_uri = Client_keys_v0.neuterize sk_uri in
         let payload =
           Uri.path (sk_uri : Tezos_signer_backends.Unencrypted.sk_uri :> Uri.t)
         in
@@ -1815,7 +1815,7 @@ let fund_accounts_from_source : Protocol_client_context.full Tezos_clic.command
          (cctxt : Protocol_client_context.full) ->
       let open Lwt_result_syntax in
       let* source_pk, source_sk =
-        let* _, src_pk, src_sk = Client_keys.get_key cctxt source_pkh in
+        let* _, src_pk, src_sk = Client_keys_v0.get_key cctxt source_pkh in
         return (src_pk, src_sk)
       in
       let*! () = log Notice (fun () -> cctxt#message "@.") in

@@ -176,12 +176,12 @@ let get_delegates (cctxt : Protocol_client_context.full)
     }
   in
   (if pkhs = [] then
-   Client_keys.get_keys cctxt >>=? fun keys ->
+   Client_keys_v0.get_keys cctxt >>=? fun keys ->
    List.map proj_delegate keys |> return
   else
     List.map_es
       (fun pkh ->
-        Client_keys.get_key cctxt pkh >>=? function
+        Client_keys_v0.get_key cctxt pkh >>=? function
         | alias, pk, sk_uri -> return (proj_delegate (alias, pkh, pk, sk_uri)))
       pkhs)
   >>=? fun delegates ->
@@ -202,7 +202,7 @@ let get_delegates (cctxt : Protocol_client_context.full)
 
 let sources_param =
   Tezos_clic.seq_of_param
-    (Client_keys.Public_key_hash.source_param
+    (Client_keys_v0.Public_key_hash.source_param
        ~name:"baker"
        ~desc:
          "name of the delegate owning the endorsement/baking right or name of \

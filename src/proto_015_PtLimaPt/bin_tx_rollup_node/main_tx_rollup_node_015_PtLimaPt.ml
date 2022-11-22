@@ -52,42 +52,42 @@ let data_dir_arg =
     Client_proto_args.string_parameter
 
 let operator_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"operator"
     ~placeholder:"operator"
     ~doc:"The operator of the rollup"
     ()
 
 let batch_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"batch-signer"
     ~placeholder:"batch-signer"
     ~doc:"The signer for submission of batches"
     ()
 
 let finalize_commitment_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"finalize-commitment-signer"
     ~placeholder:"finalize-commitment-signer"
     ~doc:"The signer for finalization of commitments"
     ()
 
 let remove_commitment_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"remove-commitment-signer"
     ~placeholder:"remove-commitment-signer"
     ~doc:"The signer for removals of commitments"
     ()
 
 let rejection_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"rejection-signer"
     ~placeholder:"rejection-signer"
     ~doc:"The signer for rejections"
     ()
 
 let dispatch_withdrawals_signer_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"dispatch-withdrawals-signer"
     ~placeholder:"dispatch-withdrawals-signer"
     ~doc:"The signer for dispatch withdrawals"

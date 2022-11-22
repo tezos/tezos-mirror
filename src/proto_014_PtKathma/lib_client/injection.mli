@@ -46,7 +46,7 @@ val preapply :
   ?verbose_signing:bool ->
   ?fee_parameter:fee_parameter ->
   ?branch:int ->
-  ?src_sk:Client_keys.sk_uri ->
+  ?src_sk:Client_keys_v0.sk_uri ->
   'kind contents_list ->
   'kind preapply_result tzresult Lwt.t
 
@@ -79,7 +79,7 @@ val inject_operation :
   ?simulation:bool ->
   ?successor_level:bool ->
   ?branch:int ->
-  ?src_sk:Client_keys.sk_uri ->
+  ?src_sk:Client_keys_v0.sk_uri ->
   ?verbose_signing:bool ->
   ?fee_parameter:fee_parameter ->
   'kind contents_list ->
@@ -108,7 +108,7 @@ val inject_manager_operation :
   ?force:bool ->
   source:Tezos_crypto.Signature.V0.Public_key_hash.t ->
   src_pk:Tezos_crypto.Signature.V0.public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   fee:Tez.t Limit.t ->
   gas_limit:Gas.Arith.integral Limit.t ->
   storage_limit:Z.t Limit.t ->

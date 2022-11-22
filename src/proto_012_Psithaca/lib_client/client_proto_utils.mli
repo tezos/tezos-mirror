@@ -25,7 +25,7 @@
 
 val sign_message :
   #Protocol_client_context.full ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   block:Tezos_crypto.Block_hash.t ->
   message:string ->
   Tezos_crypto.Signature.V0.t tzresult Lwt.t
@@ -33,7 +33,7 @@ val sign_message :
 val check_message :
   #Protocol_client_context.full ->
   block:Tezos_crypto.Block_hash.t ->
-  key_locator:Client_keys.pk_uri ->
+  key_locator:Client_keys_v0.pk_uri ->
   quiet:bool ->
   message:string ->
   signature:Tezos_crypto.Signature.V0.t ->

@@ -68,7 +68,7 @@ type wallet_entry = {
   alias : string;
   public_key_hash : Tezos_crypto.Bls.Public_key_hash.t;
   public_key : Tezos_crypto.Bls.Public_key.t option;
-  secret_key_uri : Client_keys.aggregate_sk_uri option;
+  secret_key_uri : Client_keys_v0.aggregate_sk_uri option;
 }
 
 let wallet_parameter () =
@@ -76,16 +76,16 @@ let wallet_parameter () =
       let open Lwt_result_syntax in
       let open Tezos_crypto.Aggregate_signature in
       let* (Bls12_381 public_key_hash) =
-        Client_keys.Aggregate_alias.Public_key_hash.find cctxt alias
+        Client_keys_v0.Aggregate_alias.Public_key_hash.find cctxt alias
       in
       let* _, pk_opt =
-        Client_keys.Aggregate_alias.Public_key.find cctxt alias
+        Client_keys_v0.Aggregate_alias.Public_key.find cctxt alias
       in
       let public_key =
         Option.map (fun (Bls12_381 pk : public_key) -> pk) pk_opt
       in
       let+ secret_key_uri =
-        Client_keys.Aggregate_alias.Secret_key.find_opt cctxt alias
+        Client_keys_v0.Aggregate_alias.Secret_key.find_opt cctxt alias
       in
       {alias; public_key_hash; public_key; secret_key_uri})
 
@@ -93,16 +93,16 @@ let wallet_param ?(name = "an alias for a tz4 address")
     ?(desc = "an alias for a tz4 address") =
   Tezos_clic.param ~name ~desc @@ wallet_parameter ()
 
-let tezos_pkh_param = Client_keys.Public_key_hash.source_param
+let tezos_pkh_param = Client_keys_v0.Public_key_hash.source_param
 
 let bls_pkh_parameter () =
   Tezos_clic.parameter
-    ~autocomplete:Client_keys.Aggregate_alias.Public_key_hash.autocomplete
+    ~autocomplete:Client_keys_v0.Aggregate_alias.Public_key_hash.autocomplete
     (fun cctxt s ->
       let open Lwt_result_syntax in
       let from_alias s =
         let* (Bls12_381 pkh) =
-          Client_keys.Aggregate_alias.Public_key_hash.find cctxt s
+          Client_keys_v0.Aggregate_alias.Public_key_hash.find cctxt s
         in
         return pkh
       in
@@ -131,8 +131,8 @@ let bls_pkh_param ?(name = "public key hash")
 
 let bls_sk_uri_parameter () =
   Tezos_clic.parameter
-    ~autocomplete:Client_keys.Aggregate_alias.Secret_key.autocomplete
-    Client_keys.Aggregate_alias.Secret_key.find
+    ~autocomplete:Client_keys_v0.Aggregate_alias.Secret_key.autocomplete
+    Client_keys_v0.Aggregate_alias.Secret_key.find
 
 let bls_sk_uri_param ?(name = "secret key") ?(desc = "Bls secret key to use.") =
   let desc =
@@ -327,7 +327,7 @@ let sign_transaction cctxt sks_uri txs =
   in
   List.map_ep
     (fun sk ->
-      let* signature = Client_keys.aggregate_sign cctxt sk buf in
+      let* signature = Client_keys_v0.aggregate_sign cctxt sk buf in
       match signature with
       | Bls12_381 signature -> return signature
       | Unknown _signature -> failwith "failed to sign")

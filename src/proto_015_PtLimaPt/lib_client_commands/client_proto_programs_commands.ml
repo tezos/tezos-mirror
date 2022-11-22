@@ -91,7 +91,7 @@ let commands () =
       ()
   in
   let payer_arg =
-    Client_keys.Public_key_hash.source_arg
+    Client_keys_v0.Public_key_hash.source_arg
       ~long:"payer"
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
@@ -731,10 +731,10 @@ let commands () =
       no_options
       (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
+      @@ prefixes ["for"] @@ Client_keys_v0.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
         let open Lwt_result_syntax in
-        let* signature = Client_keys.sign cctxt sk bytes in
+        let* signature = Client_keys_v0.sign cctxt sk bytes in
         let*! () =
           cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
         in
@@ -748,7 +748,7 @@ let commands () =
       (prefixes ["check"; "that"; "bytes"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
       @@ prefixes ["were"; "signed"; "by"]
-      @@ Client_keys.Public_key.alias_param ~name:"key"
+      @@ Client_keys_v0.Public_key.alias_param ~name:"key"
       @@ prefixes ["to"; "produce"]
       @@ param
            ~name:"signature"
@@ -761,7 +761,7 @@ let commands () =
            signature
            (cctxt : #Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* check = Client_keys.check key_locator signature bytes in
+        let* check = Client_keys_v0.check key_locator signature bytes in
         if check then
           if quiet then return_unit
           else

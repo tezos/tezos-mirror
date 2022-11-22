@@ -30,7 +30,7 @@ type signer = {
   alias : string;
   pkh : Tezos_crypto.Signature.V0.public_key_hash;
   pk : Tezos_crypto.Signature.V0.public_key;
-  sk : Client_keys.sk_uri;
+  sk : Client_keys_v0.sk_uri;
 }
 
 (** Type of chain reorganizations. *)

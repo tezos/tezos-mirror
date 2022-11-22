@@ -42,7 +42,7 @@ let bake cctxt ?timestamp block command sk =
   >>=? fun (shell_header, _) ->
   let blk = Data.Command.forge shell_header command in
   Shell_services.Chain.chain_id cctxt ~chain:`Main () >>=? fun chain_id ->
-  Client_keys.append cctxt sk ~watermark:(Block_header chain_id) blk
+  Client_keys_v0.append cctxt sk ~watermark:(Block_header chain_id) blk
   >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
 
 let int32_parameter =
@@ -148,7 +148,7 @@ let commands () =
            ~desc:"Hardcoded fitness of the first block (integer)"
            int32_parameter
       @@ prefixes ["and"; "key"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"password"
            ~desc:"Activator's key"
       @@ prefixes ["and"; "parameters"]
@@ -190,7 +190,7 @@ let commands () =
              "Hardcoded fitness of the first block of the testchain (integer)"
            int32_parameter
       @@ prefixes ["and"; "key"]
-      @@ Client_keys.Secret_key.source_param
+      @@ Client_keys_v0.Secret_key.source_param
            ~name:"password"
            ~desc:"Activator's key"
       @@ prefixes ["and"; "parameters"]

@@ -51,7 +51,7 @@ val get_manager :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Contract.t ->
-  (string * public_key_hash * public_key * Client_keys.sk_uri) tzresult Lwt.t
+  (string * public_key_hash * public_key * Client_keys_v0.sk_uri) tzresult Lwt.t
 
 val get_balance :
   #Alpha_client_context.rpc_context ->

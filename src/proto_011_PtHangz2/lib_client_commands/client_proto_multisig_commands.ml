@@ -41,12 +41,12 @@ let threshold_param () =
     Client_proto_args.int_parameter
 
 let public_key_param () =
-  Client_keys.Public_key.source_param
+  Client_keys_v0.Public_key.source_param
     ~name:"key"
     ~desc:"Each signer of the multisig contract"
 
 let secret_key_param () =
-  Client_keys.Secret_key.source_param
+  Client_keys_v0.Secret_key.source_param
     ~name:"key"
     ~desc:
       "Secret key corresponding to one of the public keys stored on the \
@@ -175,7 +175,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
            Client_proto_args.gas_limit_arg
            Client_proto_args.storage_limit_arg
            Client_proto_args.delegate_arg
-           (Client_keys.force_switch ())
+           (Client_keys_v0.force_switch ())
            Client_proto_args.no_print_source_flag
            Client_proto_args.minimal_fees_arg
            Client_proto_args.minimal_nanotez_per_byte_arg
@@ -230,7 +230,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of an origination"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -242,7 +243,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
                 }
               in
               List.map_es
-                (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+                (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
                 keys
               >>=? fun keys ->
               Client_proto_multisig.originate_multisig
@@ -362,7 +363,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Client_keys_v0.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ stop)
@@ -423,7 +424,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
              new_keys
              (cctxt : #Protocol_client_context.full) ->
           List.map_es
-            (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+            (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
             new_keys
           >>=? fun keys ->
           Client_proto_multisig.prepare_multisig_transaction
@@ -477,7 +478,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
                  {amount; destination; entrypoint; parameter_type; parameter})
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
           return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
@@ -507,7 +509,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
             ~action:(Lambda lambda)
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
           return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
@@ -518,7 +521,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefixes ["setting"; "delegate"; "to"]
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Client_keys_v0.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["using"; "secret"; "key"]
@@ -536,7 +539,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
             ~action:(Client_proto_multisig.Change_delegate (Some delegate))
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
           return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
@@ -561,7 +565,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
             ~action:(Client_proto_multisig.Change_delegate None)
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
           return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
@@ -585,7 +590,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
              new_keys
              (cctxt : #Protocol_client_context.full) ->
           List.map_es
-            (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+            (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
             new_keys
           >>=? fun keys ->
           Client_proto_multisig.prepare_multisig_transaction
@@ -597,7 +602,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               (Client_proto_multisig.Change_keys (Z.of_int new_threshold, keys))
             ()
           >>=? fun prepared_command ->
-          Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
+          Client_keys_v0.sign cctxt sk prepared_command.bytes
+          >>=? fun signature ->
           return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
@@ -654,7 +660,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -739,7 +746,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -789,7 +797,7 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
              ~name:"multisig"
              ~desc:"name or address of the originated multisig contract"
         @@ prefix "to"
-        @@ Client_keys.Public_key_hash.source_param
+        @@ Client_keys_v0.Public_key_hash.source_param
              ~name:"dlgt"
              ~desc:"new delegate of the new multisig contract"
         @@ prefixes ["on"; "behalf"; "of"]
@@ -821,7 +829,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -895,7 +904,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;
@@ -973,9 +983,10 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               List.map_es
-                (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
+                (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
                 new_keys
               >>=? fun keys ->
               let fee_parameter =
@@ -1065,7 +1076,8 @@ let commands () : #Protocol_client_context.full Tezos_clic.command list =
               failwith
                 "only implicit accounts can be the source of a contract call"
           | Some source -> (
-              Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+              Client_keys_v0.get_key cctxt source
+              >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
                   Injection.minimal_fees;

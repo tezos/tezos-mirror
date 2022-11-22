@@ -184,7 +184,7 @@ let default_arg_arg =
     string_parameter
 
 let delegate_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"delegate"
     ~placeholder:"address"
     ~doc:"delegate of the contract\nMust be a known address."

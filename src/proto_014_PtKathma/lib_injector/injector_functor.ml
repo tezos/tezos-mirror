@@ -507,7 +507,7 @@ module Make (Rollup : PARAMETERS) = struct
       Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
     in
     let* signature =
-      Client_keys.sign
+      Client_keys_v0.sign
         state.cctxt
         ~watermark:Tezos_crypto.Signature.V0.Generic_operation
         state.signer.sk

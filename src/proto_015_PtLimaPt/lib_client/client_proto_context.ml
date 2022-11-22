@@ -28,7 +28,7 @@ open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
@@ -766,7 +766,7 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
    Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
   else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return)
   >>=? fun sk_uri ->
-  Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
+  Client_keys_v0.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->
   inject_activate_operation
     cctxt
@@ -780,7 +780,7 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let activate_existing_account (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run alias activation_code =
-  Client_keys.alias_keys cctxt alias >>=? function
+  Client_keys_v0.alias_keys cctxt alias >>=? function
   | Some (Ed25519 pkh, _, _) ->
       inject_activate_operation
         cctxt

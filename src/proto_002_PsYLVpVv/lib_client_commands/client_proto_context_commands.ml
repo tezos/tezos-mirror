@@ -28,7 +28,7 @@ open Alpha_context
 open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts
-open Client_keys
+open Client_keys_v0
 
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.printer) = function

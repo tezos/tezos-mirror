@@ -179,7 +179,7 @@ let originate_command =
       | None ->
           failwith "only implicit accounts can be the source of an origination"
       | Some source ->
-          Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+          Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
           let originate_one (scontract : smart_contract) =
             let fee_parameter =
               {

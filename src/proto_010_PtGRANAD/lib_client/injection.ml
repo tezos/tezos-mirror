@@ -258,7 +258,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
          (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
       else Lwt.return_unit)
       >>= fun () ->
-      Client_keys.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
+      Client_keys_v0.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
       return_some signature)
   >>=? fun signature ->
   let op : _ Operation.t =

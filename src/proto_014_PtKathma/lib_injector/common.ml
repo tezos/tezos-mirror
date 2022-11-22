@@ -29,12 +29,12 @@ type signer = {
   alias : string;
   pkh : Tezos_crypto.Signature.V0.public_key_hash;
   pk : Tezos_crypto.Signature.V0.public_key;
-  sk : Client_keys.sk_uri;
+  sk : Client_keys_v0.sk_uri;
 }
 
 let get_signer cctxt pkh =
   let open Lwt_result_syntax in
-  let* alias, pk, sk = Client_keys.get_key cctxt pkh in
+  let* alias, pk, sk = Client_keys_v0.get_key cctxt pkh in
   return {alias; pkh; pk; sk}
 
 type 'block reorg = {old_chain : 'block list; new_chain : 'block list}

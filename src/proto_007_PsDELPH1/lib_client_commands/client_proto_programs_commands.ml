@@ -194,7 +194,7 @@ let commands () =
       (prefixes ["check"; "that"]
       @@ bytes_parameter ~name:"bytes" ~desc:"the signed data"
       @@ prefixes ["was"; "signed"; "by"]
-      @@ Client_keys.Public_key.alias_param ~name:"key"
+      @@ Client_keys_v0.Public_key.alias_param ~name:"key"
       @@ prefixes ["to"; "produce"]
       @@ param
            ~name:"signature"
@@ -206,7 +206,7 @@ let commands () =
            (_, (key_locator, _))
            signature
            (cctxt : #Protocol_client_context.full) ->
-        Client_keys.check key_locator signature bytes >>=? function
+        Client_keys_v0.check key_locator signature bytes >>=? function
         | false -> cctxt#error "invalid signature"
         | true ->
             if quiet then return_unit

@@ -127,7 +127,7 @@ let get_contract_caller_keys cctxt caller =
   | None ->
       failwith "only implicit accounts can be the source of a contract call"
   | Some source ->
-      Client_keys.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
       return (source, caller_pk, caller_sk)
 
 let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
