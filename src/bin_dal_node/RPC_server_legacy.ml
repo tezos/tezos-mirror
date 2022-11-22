@@ -30,14 +30,14 @@ let handle_split_slot ctxt () slot =
   let open Lwt_result_syntax in
   let*? {dal_constants; _} = Node_context.get_ready ctxt in
   let store = Node_context.get_store ctxt in
-  let+ commitment =
+  let+ commitment, proof =
     Slot_manager.split_and_store
       store.slots_watcher
       dal_constants
       store.slots_store
       slot
   in
-  Cryptobox.Commitment.to_b58check commitment
+  (Cryptobox.Commitment.to_b58check commitment, proof)
 
 let handle_slot ctxt (_, commitment) () () =
   let open Lwt_result_syntax in

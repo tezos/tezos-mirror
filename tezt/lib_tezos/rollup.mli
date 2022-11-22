@@ -245,8 +245,9 @@ module Dal : sig
   val content_of_slot : slot -> string
 
   module RPC_legacy : sig
-    (** [split_slot data] posts [data] on slot/split *)
-    val split_slot : slot -> (Dal_node.t, string) RPC_core.t
+    (** [split_slot data] posts [data] on slot/split; returns the
+        corresponding commitment and proof *)
+    val split_slot : slot -> (Dal_node.t, string * string) RPC_core.t
 
     (** [slot_content slot_header] gets slot/content of [slot_header] *)
     val slot_content : string -> (Dal_node.t, slot) RPC_core.t
@@ -296,10 +297,10 @@ module Dal : sig
 
   module Commitment : sig
     val dummy_commitment :
-      ?on_error:(string -> Cryptobox.commitment) ->
+      ?on_error:(string -> Cryptobox.commitment * Cryptobox.commitment_proof) ->
       Cryptobox.t ->
       string ->
-      Cryptobox.commitment
+      Cryptobox.commitment * Cryptobox.commitment_proof
 
     val to_string : Cryptobox.commitment -> string
   end

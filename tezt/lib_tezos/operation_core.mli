@@ -283,6 +283,7 @@ module Manager : sig
     level:int ->
     index:int ->
     commitment:Tezos_crypto_dal.Cryptobox.commitment ->
+    proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
     payload
 
   (** [delegation ?(delegate=Constant.bootstrap2) ()] builds a
