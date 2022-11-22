@@ -45,6 +45,7 @@ type commands =
   | Show_memory of int32 * int
   | Step of eval_step
   | Load_inputs
+  | Reveal_preimage of string option
   | Unknown of string
   | Stop
 
@@ -76,6 +77,9 @@ let parse_commands s =
     | ["step"; step] -> (
         match parse_eval_step step with Some s -> Step s | None -> Unknown s)
     | ["load"; "inputs"] -> Load_inputs
+    | ["reveal"; "preimage"] -> Reveal_preimage None
+    | ["reveal"; "preimage"; hex_encoded_preimage] ->
+        Reveal_preimage (Some hex_encoded_preimage)
     | ["stop"] -> Stop
     | _ -> Unknown s
   in
@@ -90,7 +94,7 @@ let build_metadata config =
     }
     |> Data_encoding.Binary.to_string_exn encoding)
 
-let reveal_preimage_manually hash =
+let reveal_preimage_manually retries hash =
   let open Lwt_syntax in
   let* () = Lwt_io.printf "Preimage for hash %s not found.\n%!" hash in
   let rec input_preimage retries : string Lwt.t =
@@ -113,24 +117,27 @@ let reveal_preimage_manually hash =
           in
           input_preimage (pred retries)
   in
-  input_preimage 3
+  input_preimage retries
+
+let reveal_preimage_builtin retries hash =
+  let (`Hex hex) = Hex.of_string hash in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
+     Let the user override this hardcoded value. *)
+  Lwt.catch
+    (fun () ->
+      let path = "preimages/" ^ hex in
+      let ch = open_in path in
+      let s = really_input_string ch (in_channel_length ch) in
+      close_in ch ;
+      Lwt.return s)
+    (fun _ -> reveal_preimage_manually retries hex)
 
 let reveal_builtins config =
   Tezos_scoru_wasm.Builtins.
     {
-      reveal_preimage =
-        (fun hash ->
-          let (`Hex hex) = Hex.of_string hash in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
-             Let the user override this hardcoded value. *)
-          Lwt.catch
-            (fun () ->
-              let path = "preimages/" ^ hex in
-              let ch = open_in path in
-              let s = really_input_string ch (in_channel_length ch) in
-              close_in ch ;
-              Lwt.return s)
-            (fun _ -> reveal_preimage_manually hex));
+      (* We retry 3 times to reveal the preimage manually, this should be
+         configurable at some point. *)
+      reveal_preimage = reveal_preimage_builtin 3;
       reveal_metadata = (fun () -> Lwt.return (build_metadata config));
     }
 
@@ -419,6 +426,29 @@ let show_memory tree address length =
             state
       | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
+(* [reveal_preimage hex tree] checks the current state is waiting for a
+   preimage, parses [hex] as an hexadecimal representation of the data or use
+   the builtin if none is given, and does a reveal step. *)
+let reveal_preimage bytes tree =
+  let open Lwt_syntax in
+  let* info = Wasm.get_info tree in
+  match
+    ( info.Tezos_scoru_wasm.Wasm_pvm_state.input_request,
+      Option.bind bytes (fun bytes -> Hex.to_bytes (`Hex bytes)) )
+  with
+  | ( Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required (Reveal_raw_data _)),
+      Some preimage ) ->
+      Wasm.reveal_step preimage tree
+  | Reveal_required (Reveal_raw_data hash), None ->
+      Lwt.catch
+        (fun () ->
+          let* preimage = reveal_preimage_builtin 1 hash in
+          Wasm.reveal_step (String.to_bytes preimage) tree)
+        (fun _ -> return tree)
+  | _ ->
+      let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
+      tree
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c config tree inboxes level =
@@ -458,6 +488,9 @@ let handle_command c config tree inboxes level =
     | Show_memory (address, length) ->
         let*! () = show_memory tree address length in
         return ()
+    | Reveal_preimage bytes ->
+        let*! tree = reveal_preimage bytes tree in
+        return ~tree ()
     | Unknown s ->
         let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
         return ()
