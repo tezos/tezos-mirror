@@ -118,7 +118,6 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~store_dir
       ~context_dir
       ~chain_name
-      ~on_disk:false
       ~progress_display_mode:Animation.Auto
       genesis
   in
@@ -510,7 +509,6 @@ let test_rolling () =
         ~store_dir
         ~context_dir
         ~chain_name
-        ~on_disk:false
         ~progress_display_mode:Animation.Auto
         genesis
     in
@@ -635,7 +633,6 @@ let test_drag_after_import () =
         ~store_dir
         ~context_dir
         ~chain_name
-        ~on_disk:false
         ~progress_display_mode:Animation.Auto
         genesis
     in

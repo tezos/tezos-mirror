@@ -130,7 +130,7 @@ module Term = struct
         else tzfail (Cannot_locate_file path)
 
   let export data_dir config_file snapshot_path block export_format rolling
-      on_disk_index progress_display_mode =
+      progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -182,7 +182,6 @@ module Term = struct
         ~context_dir
         ~chain_name
         ~block
-        ~on_disk:on_disk_index
         ~progress_display_mode
         genesis
     in
@@ -424,14 +423,6 @@ module Term = struct
     in
     Arg.(value & flag & info ~doc ["in-memory"])
 
-  let on_disk_index =
-    let open Cmdliner in
-    let doc =
-      "Exports a snapshot with on-disk indexes, in order to use less memory. \
-       As a counter part, the export will requires more time."
-    in
-    Arg.(value & flag & info ~doc ["on-disk"])
-
   let sandbox =
     let open Cmdliner in
     let doc =
@@ -485,7 +476,7 @@ module Term = struct
           ret
             (const export $ Shared_arg.Term.data_dir
            $ Shared_arg.Term.config_file $ file_arg $ block $ export_format
-           $ export_rolling $ on_disk_index $ progress_display_mode));
+           $ export_rolling $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"allows to import a snapshot from a given file" "import")
         Term.(

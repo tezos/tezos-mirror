@@ -162,14 +162,12 @@ val read_snapshot_header :
   snapshot_path:string -> snapshot_header tzresult Lwt.t
 
 (** [export ?snapshot_path snapshot_format ?rolling ~block ~store_dir
-   ~context_dir ~chain_name genesis ~on_disk_index] reads from the
-   [store_dir] and [context_dir] the current state of the node and
-   produces a snapshot, of the given [snapshot_format], in
-   [snapshot_file] if it is provided. Otherwise, a snapshot file name
-   is automatically generated using the target block as hint. If
-   [rolling] is set, only the necessary blocks will be exported. If
-   [on_disk] is set, uses an on-disk index to reduce the memory usage of the
-   export.*)
+    ~context_dir ~chain_name genesis ~progress_display_mode] reads
+    from the [store_dir] and [context_dir] the current state of the
+    node and produces a snapshot, of the given [snapshot_format], in
+    [snapshot_file] if it is provided. Otherwise, a snapshot file name
+    is automatically generated using the target block as hint. If
+    [rolling] is set, only the necessary blocks will be exported. *)
 val export :
   ?snapshot_path:string ->
   snapshot_format ->
@@ -178,7 +176,6 @@ val export :
   store_dir:string ->
   context_dir:string ->
   chain_name:Distributed_db_version.Name.t ->
-  on_disk:bool ->
   progress_display_mode:Animation.progress_display_mode ->
   Genesis.t ->
   unit tzresult Lwt.t

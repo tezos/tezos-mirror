@@ -592,7 +592,8 @@ module Version = struct
    * - 2: snapshot exported with storage 0.0.4 to 0.0.6
    * - 3: snapshot exported with storage 0.0.7
    * - 4: snapshot exported with storage 0.0.8 to current
-   * - 5: snapshot exported with new protocol tables *)
+   * - 5: snapshot exported with new protocol tables and "à la GC"
+       context (storage 2.0 to current)*)
 
   let legacy_version = 4
 
@@ -1378,13 +1379,8 @@ module type EXPORTER = sig
     resulting_context_hash:Context_hash.t ->
     unit Lwt.t
 
-  val dump_context :
-    t ->
-    Context.index ->
-    Context_hash.t ->
-    on_disk:bool ->
-    Animation.progress_display_mode ->
-    int tzresult Lwt.t
+  val export_context :
+    t -> Context.index -> Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t
 
   val copy_cemented_block :
     t -> file:string -> start_level:int32 -> end_level:int32 -> unit Lwt.t
@@ -1474,23 +1470,15 @@ module Raw_exporter : EXPORTER = struct
       (fun () -> Lwt_utils_unix.write_bytes fd bytes)
       (fun () -> Lwt_unix.close fd)
 
-  let dump_context t context_index context_hash ~on_disk progress_display_mode =
-    let open Lwt_syntax in
-    let* fd =
-      Lwt_unix.openfile
-        Naming.(snapshot_context_file t.snapshot_tmp_dir |> file_path)
-        Unix.[O_CREAT; O_TRUNC; O_WRONLY]
-        0o444
+  let export_context t context_index context_hash =
+    let open Lwt_result_syntax in
+    let tmp_context_path =
+      Naming.(snapshot_context_file t.snapshot_tmp_dir |> file_path)
     in
-    Lwt.finalize
-      (fun () ->
-        Context.dump_context
-          context_index
-          context_hash
-          ~fd
-          ~on_disk
-          ~progress_display_mode)
-      (fun () -> Lwt_unix.close fd)
+    let*! () =
+      Context.export_snapshot context_index context_hash ~path:tmp_context_path
+    in
+    return_unit
 
   let copy_cemented_block t ~file ~start_level ~end_level =
     let filename =
@@ -1716,17 +1704,22 @@ module Tar_exporter : EXPORTER = struct
       ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
       ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
 
-  let dump_context t context_index context_hash ~on_disk progress_display_mode =
-    Onthefly.add_raw_and_finalize
-      t.tar
-      ~f:(fun context_fd ->
-        Context.dump_context
-          context_index
-          context_hash
-          ~fd:context_fd
-          ~on_disk
-          ~progress_display_mode)
-      ~filename:Naming.(snapshot_context_file t.snapshot_tar |> file_path)
+  let export_context t context_index context_hash =
+    let open Lwt_result_syntax in
+    let tmp_context_path =
+      Naming.(snapshot_context_file t.snapshot_tmp_dir |> file_path)
+    in
+    let*! () =
+      Context.export_snapshot context_index context_hash ~path:tmp_context_path
+    in
+    let*! () =
+      Onthefly.add_directory_and_finalize
+        ~archive_prefix:"" (* /context/ was already added *)
+        t.tar
+        ~dir_path:tmp_context_path
+    in
+    let*! () = Lwt_utils_unix.remove_dir tmp_context_path in
+    return_unit
 
   let copy_cemented_block t ~file ~start_level ~end_level =
     let cemented_filename =
@@ -1912,7 +1905,6 @@ module type Snapshot_exporter = sig
     store_dir:string ->
     context_dir:string ->
     chain_name:Distributed_db_version.Name.t ->
-    on_disk:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     Genesis.t ->
     unit tzresult Lwt.t
@@ -2356,7 +2348,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let export_mode = History_mode.Rolling None in
       let*! () =
         Event.(
-          emit export_info (export_mode, Store.Block.descriptor export_block))
+          emit
+            export_info
+            ( Version.current_version,
+              export_mode,
+              Store.Block.descriptor export_block ))
       in
       (* Blocks *)
       (* Read the store to gather only the necessary blocks *)
@@ -2437,7 +2433,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (return_unit, floating_block_stream) )
 
   let export_full snapshot_exporter ~store_dir ~context_dir ~block ~rolling
-      genesis ~progress_display_mode =
+      ~progress_display_mode genesis =
     let open Lwt_result_syntax in
     let export_full_f chain_store =
       let* () = check_history_mode chain_store ~rolling in
@@ -2449,7 +2445,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let export_mode = History_mode.Full None in
       let*! () =
         Event.(
-          emit export_info (export_mode, Store.Block.descriptor export_block))
+          emit
+            export_info
+            ( Version.current_version,
+              export_mode,
+              Store.Block.descriptor export_block ))
       in
       let store_dir = Naming.store_dir ~dir_path:store_dir in
       let chain_id = Store.Chain.chain_id chain_store in
@@ -2585,7 +2585,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           (Invalid_chain_store_export (chain_id, Naming.dir_path store_dir))
 
   let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~context_dir
-      ~chain_name ~on_disk ~progress_display_mode genesis =
+      ~chain_name ~progress_display_mode genesis =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let* () = ensure_valid_export_chain_dir store_dir chain_id in
@@ -2618,11 +2618,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 ~progress_display_mode
                 genesis
           in
-          (* TODO: when the context's GC is implemented, make sure a context
-             pruning cannot occur while the dump context is being run. For
-             now, it is performed outside the lock to allow the node from
-             getting stuck while waiting a merge. *)
-          let*! context_index = Context.init ~readonly:true context_dir in
           (* Retrieve predecessor block metadata hash and operations
              metadata hash from the context of the exported block *)
           let predecessor_block_metadata_hash =
@@ -2641,12 +2636,22 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               ~resulting_context_hash
           in
           let* written_context_elements =
-            Exporter.dump_context
-              snapshot_exporter
-              context_index
-              pred_resulting_context
-              ~on_disk
-              progress_display_mode
+            (* TODO: when the context's GC is implemented, make sure a context
+               pruning cannot occur while the dump context is being run. For
+               now, it is performed outside the lock to allow the node from
+               getting stuck while waiting a merge. *)
+            let*! context_index = Context.init ~readonly:true context_dir in
+            let* () =
+              Lwt.finalize
+                (fun () ->
+                  Exporter.export_context
+                    snapshot_exporter
+                    context_index
+                    pred_resulting_context)
+                (fun () -> Context.close context_index)
+            in
+            (* FIXME !!! *)
+            return 0
           in
           let* () =
             export_floating_block_stream
@@ -4070,7 +4075,7 @@ let snapshot_file_kind ~snapshot_path =
         return Tar)
 
 let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
-    ~chain_name ~on_disk ~progress_display_mode genesis =
+    ~chain_name ~progress_display_mode genesis =
   let (module Exporter) =
     match export_format with
     | Tar -> (module Make_snapshot_exporter (Tar_exporter) : Snapshot_exporter)
@@ -4083,7 +4088,6 @@ let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
     ~store_dir
     ~context_dir
     ~chain_name
-    ~on_disk
     ~progress_display_mode
     genesis
 

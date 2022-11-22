@@ -212,7 +212,6 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~context_dir
             ~chain_name
             ~snapshot_path
-            ~on_disk:false
             ~progress_display_mode:Animation.Auto
             genesis
         in

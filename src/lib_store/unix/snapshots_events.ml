@@ -33,16 +33,18 @@ module Event = struct
 
   (* Notice *)
   let export_info =
-    declare_2
+    declare_3
       ~section
       ~level:Notice
       ~name:"export_info"
       ~msg:
-        "exporting a snapshot in {history_mode} mode, targeting block hash \
-         {block}"
-      ~pp1:History_mode.pp_short
+        "exporting a snapshot (v{version}) in {history_mode} mode, targeting \
+         block hash {block}"
+      ~pp1:Format.pp_print_int
+      ("version", Data_encoding.int31)
+      ~pp2:History_mode.pp_short
       ("history_mode", History_mode.encoding)
-      ~pp2:pp_block_descriptor
+      ~pp3:pp_block_descriptor
       ("block", block_descriptor_encoding)
 
   let export_success =
