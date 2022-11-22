@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A ZK rollup has an address starting with "zkr1".
+(** A ZK rollup has an address starting with "epx1".
     ZKRU addresses have a length of 20 bytes, which means
     that they have an injective encoding as BLS12-381 scalars.
 *)
