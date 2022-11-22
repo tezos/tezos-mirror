@@ -819,7 +819,6 @@ struct
                 ~expected_context_hash:target_context_hash
                 ~nb_context_elements
                 ~fd:context_fd
-                ~legacy:false
                 ~in_memory:true
                 ~progress_display_mode:Animation.Auto)
             (fun () -> Lwt_unix.close context_fd))

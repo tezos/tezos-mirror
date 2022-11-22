@@ -551,7 +551,7 @@ let () =
       Format.fprintf
         ppf
         "Failed to read snapshot file %s. The provided file is inconsistent or \
-         is from Octez 9.7 (or before) and it cannot be imported anymore."
+         is from Octez 12 (or before) and it cannot be imported anymore."
         filename)
     Data_encoding.(obj1 (req "filename" string))
     (function Wrong_snapshot_file {filename} -> Some filename | _ -> None)
@@ -593,11 +593,14 @@ module Version = struct
    * - 3: snapshot exported with storage 0.0.7
    * - 4: snapshot exported with storage 0.0.8 to current
    * - 5: snapshot exported with new protocol tables *)
+
+  let legacy_version = 4
+
   let current_version = 5
 
   (* List of versions that are supported *)
   let supported_versions =
-    [(2, `Legacy); (3, `Legacy); (4, `Current); (5, `Current)]
+    [(legacy_version, `Legacy); (current_version, `Current)]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
@@ -2761,7 +2764,6 @@ module type IMPORTER = sig
     Context.index ->
     expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
-    legacy:bool ->
     in_memory:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
@@ -2843,7 +2845,7 @@ module Raw_importer : IMPORTER = struct
     | None -> tzfail (Cannot_read {kind = `Block_data; path = file})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~legacy ~in_memory ~progress_display_mode =
+      ~nb_context_elements ~in_memory ~progress_display_mode =
     let open Lwt_result_syntax in
     let context_file_path =
       Naming.(snapshot_context_file t.snapshot_dir |> file_path)
@@ -2872,7 +2874,6 @@ module Raw_importer : IMPORTER = struct
             ~expected_context_hash
             ~fd
             ~nb_context_elements
-            ~legacy
             ~in_memory
             ~progress_display_mode
         in
@@ -3154,7 +3155,7 @@ module Tar_importer : IMPORTER = struct
     | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~legacy ~in_memory ~progress_display_mode =
+      ~nb_context_elements ~in_memory ~progress_display_mode =
     let open Lwt_result_syntax in
     let filename = Naming.(snapshot_context_file t.snapshot_tar |> file_path) in
     let* header =
@@ -3169,7 +3170,6 @@ module Tar_importer : IMPORTER = struct
       ~expected_context_hash
       ~nb_context_elements
       ~fd
-      ~legacy
       ~in_memory
       ~progress_display_mode
 
@@ -3579,7 +3579,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_and_apply_context snapshot_importer protocol_levels
       ?user_expected_block ~context_index ~user_activated_upgrades
-      ~user_activated_protocol_overrides ~operation_metadata_size_limit ~legacy
+      ~user_activated_protocol_overrides ~operation_metadata_size_limit
       ~in_memory ~progress_display_mode snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
     (* Start by committing genesis *)
@@ -3640,7 +3640,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         context_index
         ~expected_context_hash
         ~nb_context_elements:snapshot_metadata.context_elements
-        ~legacy
         ~in_memory
         ~progress_display_mode
     in
@@ -3771,8 +3770,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     let*! () =
       import_log_notice ~snapshot_header snapshot_path user_expected_block
     in
-    let* legacy = Version.is_legacy snapshot_version in
-    let indexing_strategy = if legacy then `Always else `Minimal in
     let patch_context =
       Option.map
         (fun f ctxt ->
@@ -3785,7 +3782,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     let*! context_index =
       Context.init
         ~readonly:false
-        ~indexing_strategy
+        ~indexing_strategy:`Minimal
         ~index_log_size:default_index_log_size
         ?patch_context
         dst_context_dir
@@ -3808,7 +3805,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         snapshot_metadata
         genesis
         chain_id
-        ~legacy
         ~in_memory
     in
     (* Restore store *)
