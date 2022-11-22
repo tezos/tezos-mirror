@@ -918,12 +918,11 @@ module Make (Context : P) :
   let get_outbox outbox_level state =
     let open Lwt_syntax in
     let+ entries = result_of ~default:[] Output.entries state in
-    let entries =
-      List.filter
-        (fun (_, msg) -> Raw_level_repr.(msg.PS.outbox_level = outbox_level))
-        entries
-    in
-    List.map snd entries
+    List.filter_map
+      (fun (_, msg) ->
+        if Raw_level_repr.(msg.PS.outbox_level = outbox_level) then Some msg
+        else None)
+      entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
