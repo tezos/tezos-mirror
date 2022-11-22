@@ -182,6 +182,21 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
     ~outbox_level
     [{destination; entrypoint; parameters}]
 
+let encode_batch ?hooks ?expected_error sc_client batch =
+  let runnable =
+    spawn_command
+      ?hooks
+      sc_client
+      ["encode"; "outbox"; "message"; string_of_batch batch]
+  in
+  match expected_error with
+  | None ->
+      let* answer = Process.check_and_read_stdout runnable.value in
+      return (Some (String.trim answer))
+  | Some msg ->
+      let* () = Process.check_error ~msg runnable.value in
+      return None
+
 let rpc_get ?hooks sc_client path =
   spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
   |> Runnable.map @@ fun output ->
@@ -194,6 +209,18 @@ let rpc_post ?hooks sc_client path data =
     ["rpc"; "post"; Client.string_of_path path; "with"; JSON.encode data]
   |> Runnable.map @@ fun output ->
      JSON.parse ~origin:(Client.string_of_path path ^ " response") output
+
+let rpc_get_rich ?hooks sc_client path parameters =
+  let parameters =
+    if parameters = [] then ""
+    else
+      "?" ^ String.concat "&"
+      @@ List.map (fun (k, v) -> Format.asprintf "%s=%s" k v) parameters
+  in
+  let uri = Client.string_of_path path ^ parameters in
+  let runnable = spawn_command ?hooks sc_client ["rpc"; "get"; uri] in
+  let* output = Process.check_and_read_stdout runnable.value in
+  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
 
 let ticks ?hooks ?(block = "head") sc_client =
   let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
@@ -211,8 +238,11 @@ let status ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "status"]
   |> Runnable.map JSON.as_string
 
-let outbox ?hooks ?(block = "cemented") sc_client =
-  rpc_get ?hooks sc_client ["global"; "block"; block; "outbox"]
+let outbox ?hooks ?(block = "cemented") ~outbox_level sc_client =
+  rpc_get
+    ?hooks
+    sc_client
+    ["global"; "block"; block; "outbox"; string_of_int outbox_level; "messages"]
 
 let last_stored_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]

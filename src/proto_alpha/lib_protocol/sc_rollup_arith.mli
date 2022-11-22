@@ -102,8 +102,10 @@ module type S = sig
   (** [get_status state] returns the machine status in [state]. *)
   val get_status : state -> status Lwt.t
 
-  (** [get_outbox state] returns the outbox in [state]. *)
-  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
+  (** [get_outbox outbox_level state] returns the outbox in [state]
+      for a given [outbox_level]. *)
+  val get_outbox :
+    Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   (** The machine has only three instructions. *)
   type instruction =

@@ -455,12 +455,12 @@ let dummy_internal_transfer address =
       (Tezos_crypto.Signature.Public_key_hash.of_b58check
          "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
   in
-  let*? payload = Environment.wrap_tzresult (Script_string.of_string "foo") in
+  let payload = Bytes.of_string "foo" in
   let* payload, _ctxt =
     Script_ir_translator.unparse_data
       ctxt
       Script_ir_unparser.Optimized
-      String_t
+      Bytes_t
       payload
     >|= Environment.wrap_tzresult
   in

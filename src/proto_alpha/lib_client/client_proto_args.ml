@@ -935,7 +935,18 @@ module Sc_rollup_params = struct
   let messages_parameter =
     let open Lwt_result_syntax in
     let from_json text =
-      try return (`Json (Ezjsonm.from_string text))
+      try
+        match Ezjsonm.from_string text with
+        | `A messages -> return (`Json (`A (`String "raw" :: messages)))
+        | _ -> failwith "Expecting a list of string"
+      with Ezjsonm.Parse_error _ ->
+        failwith "Given text is not valid JSON: '%s'" text
+    in
+    let from_json_hex text =
+      try
+        match Ezjsonm.from_string text with
+        | `A messages -> return (`Json (`A (`String "hex" :: messages)))
+        | _ -> failwith "Expecting a list of hex-encoded string"
       with Ezjsonm.Parse_error _ ->
         failwith "Given text is not valid JSON: '%s'" text
     in
@@ -951,6 +962,7 @@ module Sc_rollup_params = struct
         Client_aliases.parse_alternatives
           [
             ("text", from_json);
+            ("hex", from_json_hex);
             ("file", from_json_file cctxt);
             ("bin", from_bin_file cctxt);
           ]

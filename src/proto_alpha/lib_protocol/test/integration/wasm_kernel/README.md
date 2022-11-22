@@ -41,3 +41,11 @@ cp target/wasm32-unknown-unknown/release/test_kernel.wasm computation_kernel.was
 wasm-strip computation_kernel.wasm
 ```
 
+# echo.wasm
+
+`echo.wasm` is the result of `wat2wasm echo.wast`.
+
+This simple kernel writes the external messages it receives in its outbox.
+
+To achieve that, it needs to take the encoding of the inputs into
+account to extract the payload to push into the outbox.

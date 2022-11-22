@@ -3092,7 +3092,8 @@ let commands_rw () =
            ~name:"messages"
            ~desc:
              "The message(s) to be sent to the rollup (syntax: \
-              bin:<path_to_binary_file>|text:<json list of string \
+              bin:<path_to_binary_file>|text:<json list of raw string \
+              messages>|hex:<json list of hex-encoded \
               messages>|file:<json_file>)."
            Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
@@ -3119,7 +3120,21 @@ let commands_rw () =
               | exception _ ->
                   failwith
                     "Could not read list of messages (expected list of bytes)"
-              | messages -> return messages)
+              | "raw" :: messages -> return messages
+              | "hex" :: messages ->
+                  let* messages =
+                    List.map_es
+                      (fun message ->
+                        match Hex.to_string (`Hex message) with
+                        | None ->
+                            failwith
+                              "'%s' is not a valid hex encoded message"
+                              message
+                        | Some msg -> return [msg])
+                      messages
+                  in
+                  return @@ List.flatten messages
+              | _messages -> assert false)
         in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =

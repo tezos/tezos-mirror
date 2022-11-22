@@ -246,10 +246,15 @@ let wait_for_conflict_detected sc_node =
 
    A rollup node has a configuration file that must be initialized.
 *)
-let setup_rollup ~kind ?boot_sector ?(operator = Constant.bootstrap1.alias)
-    tezos_node tezos_client =
+let setup_rollup ~kind ?boot_sector ?(parameters_ty = "string")
+    ?(operator = Constant.bootstrap1.alias) tezos_node tezos_client =
   let* sc_rollup =
-    originate_sc_rollup ~kind ?boot_sector ~src:operator tezos_client
+    originate_sc_rollup
+      ~kind
+      ?boot_sector
+      ~parameters_ty
+      ~src:operator
+      tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -286,8 +291,9 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
   scenario sc_rollup tezos_node tezos_client
 
 let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
-    ?challenge_window ?timeout ?max_number_of_messages_per_commitment_period
-    {variant; tags; description} scenario =
+    ?(parameters_ty = "string") ?challenge_window ?timeout
+    ?max_number_of_messages_per_commitment_period {variant; tags; description}
+    scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
     ?regression
@@ -311,7 +317,7 @@ let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
       protocol
   in
   let* rollup_node, rollup_client, sc_rollup =
-    setup_rollup ~kind ?boot_sector tezos_node tezos_client
+    setup_rollup ~parameters_ty ~kind ?boot_sector tezos_node tezos_client
   in
   scenario rollup_node rollup_client sc_rollup tezos_node tezos_client
 
@@ -678,8 +684,14 @@ let to_text_messages_arg msgs =
   let json = Ezjsonm.list Ezjsonm.string msgs in
   "text:" ^ Ezjsonm.to_string ~minify:true json
 
-let send_text_messages ?src client msgs =
-  send_message ?src client (to_text_messages_arg msgs)
+let to_hex_messages_arg msgs =
+  let json = Ezjsonm.list Ezjsonm.string msgs in
+  "hex:" ^ Ezjsonm.to_string ~minify:true json
+
+let send_text_messages ?(format = `Raw) ?src client msgs =
+  match format with
+  | `Raw -> send_message ?src client (to_text_messages_arg msgs)
+  | `Hex -> send_message ?src client (to_hex_messages_arg msgs)
 
 let parse_inbox json =
   let go () =
@@ -908,14 +920,16 @@ let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
       [msg1]
   in
   let* () = send_message client (to_text_messages_arg [msg1]) in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
-  in
+  let level = Node.get_level node in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
   let*! real_state_hash = Sc_rollup_client.state_hash sc_rollup_client in
-  let*! real_outbox = Sc_rollup_client.outbox sc_rollup_client ~block:"head" in
+  let* real_outbox =
+    Runnable.run
+    @@ Sc_rollup_client.outbox
+         sc_rollup_client
+         ~outbox_level:level
+         ~block:"head"
+  in
   Check.((sim_result.state_hash = real_state_hash) string)
     ~error_msg:"Simulated resulting state hash is %L but should have been %R" ;
   Check.((JSON.encode sim_result.output = JSON.encode real_outbox) string)
@@ -1152,6 +1166,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
       description = title;
     }
     ?boot_sector
+    ~parameters_ty:"bytes"
     ~kind
   @@ fun sc_rollup_node sc_rollup_client sc_rollup _tezos_node client ->
   let* genesis_info =
@@ -1200,17 +1215,18 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
           send_message client (sf "[%S]" message)
       | Some forwarder ->
           (* Internal message through forwarder *)
+          let message = hex_encode message in
           let* () =
             Client.transfer
               client
               ~amount:Tez.zero
               ~giver:Constant.bootstrap1.alias
               ~receiver:forwarder
-              ~arg:(sf "Pair %S %S" sc_rollup message)
+              ~arg:(sf "Pair %S 0x%s" sc_rollup message)
           in
           Client.bake_for_and_wait client
     in
-    let* _ =
+    let* (_ : int) =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + i)
     in
 
@@ -3261,27 +3277,36 @@ let test_refutation_reward_and_punishment ~kind =
 
    The input depends on the PVM.
 *)
-let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
-    ?entrypoint ~input_message ~expected_storage ~kind =
+let test_outbox_message_generic ?regression ?expected_error ~earliness
+    ?entrypoint ?boot_sector ~input_message ~expected_storage ~kind
+    ~message_kind =
   let commitment_period = 2 and challenge_window = 5 in
+  let message_kind_s =
+    match message_kind with `Internal -> "internal" | `External -> "external"
+  in
+  let entrypoint_s = Option.value ~default:"default" entrypoint in
   test_full_scenario
     ?regression
+    ?boot_sector
+    ~parameters_ty:"bytes"
     ~kind
     ~commitment_period
     ~challenge_window
     {
-      tags = ["outbox"];
+      tags = ["outbox"; message_kind_s; entrypoint_s];
       variant =
         Some
           (Format.sprintf
-             "entrypoint: %%%s, earliness: %d"
-             (Option.value ~default:"default" entrypoint)
-             earliness);
-      description = "an outbox message should be executable";
+             "entrypoint: %%%s, earliness: %d, %s"
+             entrypoint_s
+             earliness
+             message_kind_s);
+      description = "trigger exec output";
     }
   @@ fun rollup_node sc_client sc_rollup _node client ->
   let* () = Sc_rollup_node.run rollup_node [] in
   let src = Constant.bootstrap1.public_key_hash in
+  let src2 = Constant.bootstrap2.public_key_hash in
   let originate_target_contract () =
     let prg =
       {|
@@ -3320,30 +3345,118 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
            string
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
-  let perform_rollup_execution_and_cement address =
-    let* () = send_text_messages client [input_message address] in
+  let originate_source_contract () =
+    (* A script that receives bytes as a parameter and transfers them
+       to the rollup as is. The transfer will appear as an internal
+       message targetting this specific rollup in the rollups'
+       inbox. *)
+    let prg =
+      Format.asprintf
+        {|
+      {
+        parameter (bytes %%default);
+        storage (unit);
+
+        code
+          {
+            CAR;
+            PUSH address "%s";
+            CONTRACT bytes;
+            IF_NONE { PUSH string "Invalid address"; FAILWITH; }
+                    {
+                      PUSH mutez 0;
+                      DIG 2;
+                      TRANSFER_TOKENS;
+                      NIL operation;
+                      SWAP;
+                      CONS;
+                      PUSH unit Unit;
+                      SWAP;
+                      PAIR;
+                    }
+          }
+      } |}
+        sc_rollup
+    in
+    let* address =
+      Client.originate_contract
+        ~alias:"source"
+        ~amount:(Tez.of_int 100)
+        ~burn_cap:(Tez.of_int 100)
+        ~src
+        ~prg
+        ~init:"Unit"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    return address
+  in
+  let perform_rollup_execution_and_cement source_address target_address =
+    let* payload = input_message sc_client target_address in
+    let* () =
+      match payload with
+      | `External payload -> send_text_messages ~format:`Hex client [payload]
+      | `Internal payload ->
+          let payload = "0x" ^ payload in
+          Client.transfer
+            ~amount:Tez.(of_int 100)
+            ~burn_cap:Tez.(of_int 100)
+            ~storage_limit:100000
+            ~giver:"bootstrap1"
+            ~receiver:source_address
+            ~arg:payload
+            client
+    in
     let blocks_to_wait =
       2 + (2 * commitment_period) + challenge_window - earliness
     in
     repeat blocks_to_wait @@ fun () -> Client.bake_for client
   in
   let trigger_outbox_message_execution address =
-    let*! outbox = Sc_rollup_client.outbox sc_client in
-    Log.info "Outbox is %s" (JSON.encode outbox) ;
-    let* answer =
-      let message_index = 0 in
-      let outbox_level = 4 in
-      let destination = address in
-      let parameters = "37" in
-      Sc_rollup_client.outbox_proof_single
-        sc_client
-        ?expected_error
-        ~message_index
-        ~outbox_level
-        ~destination
-        ?entrypoint
-        ~parameters
+    let outbox_level = 5 in
+    let destination = address in
+    let parameters = "37" in
+    let message_index = 0 in
+    let check_expected_outbox () =
+      let* outbox =
+        Runnable.run @@ Sc_rollup_client.outbox ~outbox_level sc_client
+      in
+      Log.info "Outbox is %s" (JSON.encode outbox) ;
+
+      match expected_error with
+      | None ->
+          let expected =
+            JSON.parse ~origin:"trigger_outbox_message_execution"
+            @@ Printf.sprintf
+                 {|
+              [ { "outbox_level": %d, "message_index": "%d",
+                  "message":
+                  { "transactions":
+                    [ { "parameters": { "int": "%s" },
+                    "destination": "%s"%s } ] } } ] |}
+                 outbox_level
+                 message_index
+                 parameters
+                 address
+                 (match entrypoint with
+                 | None -> ""
+                 | Some entrypoint ->
+                     Format.asprintf {| , "entrypoint" : "%s" |} entrypoint)
+          in
+          assert (JSON.encode expected = JSON.encode outbox) ;
+          Sc_rollup_client.outbox_proof_single
+            sc_client
+            ?expected_error
+            ~message_index
+            ~outbox_level
+            ~destination
+            ?entrypoint
+            ~parameters
+      | Some _ ->
+          assert (JSON.encode outbox = "[]") ;
+          return None
     in
+    let* answer = check_expected_outbox () in
     match (answer, expected_error) with
     | Some _, Some _ -> assert false
     | None, None -> failwith "Unexpected error during proof generation"
@@ -3353,43 +3466,64 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
           Client.Sc_rollup.execute_outbox_message
             ~burn_cap:(Tez.of_int 10)
             ~rollup:sc_rollup
-            ~src
+            ~src:src2
             ~commitment_hash
             ~proof
             client
         in
-        Client.bake_for client
+        Client.bake_for_and_wait client
   in
-  if skip then unit
-  else
-    let* target_contract_address = originate_target_contract () in
-    let* () = perform_rollup_execution_and_cement target_contract_address in
-    let* () = trigger_outbox_message_execution target_contract_address in
-    match expected_error with
-    | None ->
-        let* () =
-          check_contract_execution target_contract_address expected_storage
-        in
-        unit
-    | Some _ -> unit
+  let* target_contract_address = originate_target_contract () in
+  let* source_contract_address = originate_source_contract () in
+  let* () =
+    perform_rollup_execution_and_cement
+      source_contract_address
+      target_contract_address
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = trigger_outbox_message_execution target_contract_address in
+  match expected_error with
+  | None ->
+      let* () =
+        check_contract_execution target_contract_address expected_storage
+      in
+      unit
+  | Some _ -> unit
 
 let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
-    =
-  let skip, input_message, expected_storage =
+    ~message_kind =
+  let wrap payload =
+    match message_kind with
+    | `Internal -> `Internal payload
+    | `External -> `External payload
+  in
+  let boot_sector, input_message, expected_storage =
     match kind with
     | "arith" ->
-        ( false,
-          (fun contract_address ->
+        let input_message _client contract_address =
+          let payload =
             Printf.sprintf
               "37 %s%s"
               contract_address
-              (match entrypoint with Some e -> "%" ^ e | None -> "")),
-          "37" )
+              (match entrypoint with Some e -> "%" ^ e | None -> "")
+          in
+          let payload = hex_encode payload in
+          return @@ wrap payload
+        in
+        (None, input_message, "37")
     | "wasm_2_0_0" ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790
-           For the moment, the WASM PVM has no support for
-           output. Hence, the storage is unchanged.*)
-        (true, Fun.const "", "0")
+        let bootsector = read_kernel "echo" in
+        let input_message client contract_address =
+          let transaction =
+            Sc_rollup_client.
+              {destination = contract_address; entrypoint; parameters = "37"}
+          in
+          let* answer = Sc_rollup_client.encode_batch client [transaction] in
+          match answer with
+          | None -> failwith "Encoding of batch should not fail."
+          | Some answer -> return (wrap answer)
+        in
+        (Some bootsector, input_message, "37")
     | _ ->
         (* There is no other PVM in the protocol. *)
         assert false
@@ -3397,11 +3531,12 @@ let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
   test_outbox_message_generic
     ?regression
     ?expected_error
-    ~skip
     ~earliness
     ?entrypoint
+    ?boot_sector
     ~input_message
     ~expected_storage
+    ~message_kind
     ~kind
 
 let test_rpcs ~kind =
@@ -3485,11 +3620,12 @@ let test_rpcs ~kind =
       sc_client
       ["global"; "block"; "head"; "state_hash"]
   in
-  let*! _outbox =
-    Sc_rollup_client.rpc_get
-      ~hooks
-      sc_client
-      ["global"; "block"; "head"; "outbox"]
+  let* _outbox =
+    Runnable.run
+    @@ Sc_rollup_client.outbox
+         ~hooks
+         ~outbox_level:l2_finalied_block_level
+         sc_client
   in
   let*! _head =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]
@@ -3615,22 +3751,56 @@ let register ~kind ~protocols =
   test_reinject_failed_commitment protocols ~kind ;
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
-  test_outbox_message ~regression:true ~earliness:0 protocols ~kind ;
+  test_outbox_message
+    ~regression:true
+    ~earliness:0
+    ~message_kind:`Internal
+    ~kind
+    protocols ;
   test_outbox_message
     ~regression:true
     ~earliness:0
     ~entrypoint:"aux"
+    ~message_kind:`Internal
     protocols
     ~kind ;
   test_outbox_message
     ~expected_error:(Base.rex ".*Invalid claim about outbox")
     ~earliness:5
+    ~message_kind:`Internal
     protocols
     ~kind ;
   test_outbox_message
     ~expected_error:(Base.rex ".*Invalid claim about outbox")
     ~earliness:5
     ~entrypoint:"aux"
+    ~message_kind:`Internal
+    protocols
+    ~kind ;
+  test_outbox_message
+    ~regression:true
+    ~earliness:0
+    ~message_kind:`External
+    protocols
+    ~kind ;
+  test_outbox_message
+    ~regression:true
+    ~earliness:0
+    ~entrypoint:"aux"
+    ~message_kind:`External
+    protocols
+    ~kind ;
+  test_outbox_message
+    ~expected_error:(Base.rex ".*Invalid claim about outbox")
+    ~earliness:5
+    ~message_kind:`External
+    protocols
+    ~kind ;
+  test_outbox_message
+    ~expected_error:(Base.rex ".*Invalid claim about outbox")
+    ~earliness:5
+    ~entrypoint:"aux"
+    ~message_kind:`External
     protocols
     ~kind
 

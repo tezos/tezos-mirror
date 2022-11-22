@@ -252,7 +252,7 @@ This sequence of operations was run:
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/outbox
+./octez-sc-rollup-client-alpha rpc get /global/block/cemented/outbox/16/messages
 []
 
 ./octez-sc-rollup-client-alpha rpc get /global/tezos_head

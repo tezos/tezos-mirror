@@ -196,6 +196,25 @@ module Block_directory = Make_directory (struct
     (Node_context.readonly node_ctxt, block)
 end)
 
+module Outbox_directory = Make_directory (struct
+  include Sc_rollup_services.Global.Block.Outbox
+
+  type context =
+    Node_context.ro * Tezos_crypto.Block_hash.t * Alpha_context.Raw_level.t
+
+  let context_of_prefix node_ctxt (((), block), level) =
+    let open Lwt_result_syntax in
+    let+ block =
+      match block with
+      | `Head -> get_head node_ctxt.Node_context.store
+      | `Hash b -> return b
+      | `Level l -> State.hash_of_level node_ctxt.store l >>= return
+      | `Finalized -> get_finalized node_ctxt.Node_context.store
+      | `Cemented -> get_last_cemented node_ctxt.Node_context.store
+    in
+    (Node_context.readonly node_ctxt, block, level)
+end)
+
 module Common = struct
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
@@ -283,7 +302,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
       Simulation.end_simulation node_ctxt sim
     in
     let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
-    let*! outbox = PVM.get_outbox state in
+    let*! outbox = PVM.get_outbox inbox_level state in
     let output =
       List.filter
         (fun Sc_rollup.{outbox_level; _} -> outbox_level = inbox_level)
@@ -387,11 +406,11 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     get_dal_slot_page node_ctxt.store block index page
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.outbox
-    @@ fun (node_ctxt, block) () () ->
+    Outbox_directory.register0 Sc_rollup_services.Global.Block.Outbox.messages
+    @@ fun (node_ctxt, block, outbox_level) () () ->
     let open Lwt_result_syntax in
     let* state = get_state node_ctxt block in
-    let*! outbox = PVM.get_outbox state in
+    let*! outbox = PVM.get_outbox outbox_level state in
     return outbox
 
   let () =
@@ -534,6 +553,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
         Local_directory.build_directory;
         Block_directory.build_directory;
         Proof_helpers_directory.build_directory;
+        Outbox_directory.build_directory;
       ]
 
   let start node_ctxt configuration =

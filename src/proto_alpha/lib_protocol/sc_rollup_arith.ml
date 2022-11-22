@@ -136,7 +136,8 @@ module type S = sig
 
   val get_status : state -> status Lwt.t
 
-  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
+  val get_outbox :
+    Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   type instruction =
     | IPush : int -> instruction
@@ -914,10 +915,14 @@ module Make (Context : P) :
 
   let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
 
-  let get_outbox state =
+  let get_outbox outbox_level state =
     let open Lwt_syntax in
     let+ entries = result_of ~default:[] Output.entries state in
-    List.map snd entries
+    List.filter_map
+      (fun (_, msg) ->
+        if Raw_level_repr.(msg.PS.outbox_level = outbox_level) then Some msg
+        else None)
+      entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
@@ -952,7 +957,9 @@ module Make (Context : P) :
           match metadata with
           | Some {address; _} when Address.(destination = address) -> (
               match Micheline.root payload with
-              | String (_, payload) -> return (Some payload)
+              | Bytes (_, payload) ->
+                  let payload = Bytes.to_string payload in
+                  return (Some payload)
               | _ -> return None)
           | _ -> return None)
       | Ok (Internal Start_of_level) ->

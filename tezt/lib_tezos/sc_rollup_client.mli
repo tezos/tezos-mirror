@@ -67,6 +67,15 @@ val rpc_get :
 val rpc_post :
   ?hooks:Process.hooks -> t -> Client.path -> JSON.t -> JSON.t Runnable.process
 
+(** [rpc_get_rich client path parameters] issues a GET request for [path]
+    passing [parameters]. *)
+val rpc_get_rich :
+  ?hooks:Process.hooks ->
+  t ->
+  Client.path ->
+  (string * string) list ->
+  JSON.t Lwt.t
+
 (** [total_ticks ?block client] gets the total number of ticks for the PVM. *)
 val total_ticks :
   ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
@@ -94,11 +103,15 @@ val state_value :
 val status :
   ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
 
-(** [outbox ?block client] gets the rollup outbox for the [block] (default
-    ["cemented"] which is the block corresponding to the last cemented
-    level). *)
+(** [outbox ?block outbox_level client] gets the rollup outbox of
+   [outbox_level] as known to the [block] (default ["cemented"] which
+   is the block corresponding to the last cemented level). *)
 val outbox :
-  ?hooks:Process.hooks -> ?block:string -> t -> JSON.t Runnable.process
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  outbox_level:int ->
+  t ->
+  JSON.t Runnable.process
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
@@ -133,6 +146,15 @@ val outbox_proof_batch :
   outbox_level:int ->
   transaction list ->
   outbox_proof option Lwt.t
+
+(** [encode_batch batch] returns the encoding of a [batch] of output
+   transactions. *)
+val encode_batch :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  t ->
+  transaction list ->
+  string option Lwt.t
 
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
