@@ -86,7 +86,7 @@ module Handler = struct
       match tok with
       | None -> return_unit
       | Some element ->
-          let*! r = handle element in
+          let*! r = handle stopper element in
           let*! () =
             match r with
             | Ok () -> Lwt.return_unit
@@ -98,43 +98,57 @@ module Handler = struct
     in
     return (go (), stopper)
 
-  let new_head config ctxt cctxt =
+  let resolve_plugin_and_set_ready config ctxt cctxt =
+    (* Monitor heads and try resolve the DAL protocol plugin corresponding to
+       the protocol of the targeted node. *)
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+       Handle situtation where plugin is not found *)
     let open Lwt_result_syntax in
-    let handler (block_hash, (_block_header : Tezos_base.Block_header.t)) =
-      (* Try to resolve the protocol plugin corresponding to the protocol of the
-         targeted node. *)
+    let handler stopper
+        (_block_hash, (_block_header : Tezos_base.Block_header.t)) =
+      let* plugin = resolve_plugin cctxt in
+      match plugin with
+      | Some plugin ->
+          let (module Plugin : Dal_plugin.T) = plugin in
+          let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
+          let* dal_constants, dal_parameters =
+            init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
+          in
+          Node_context.set_ready
+            ctxt
+            (module Plugin)
+            dal_constants
+            dal_parameters ;
+          let*! () = Event.(emit node_is_ready ()) in
+          stopper () ;
+          return_unit
+      | None -> return_unit
+    in
+    let handler stopper el =
       match Node_context.get_status ctxt with
-      | Starting -> (
-          let* plugin = resolve_plugin cctxt in
-          match plugin with
-          | Some plugin ->
-              let (module Plugin : Dal_plugin.T) = plugin in
-              let*! () =
-                Event.emit_protocol_plugin_resolved Plugin.Proto.hash
-              in
-              let* dal_constants, dal_parameters =
-                init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
-              in
-              Node_context.set_ready
-                ctxt
-                (module Plugin)
-                dal_constants
-                dal_parameters ;
-              let*! () = Event.(emit node_is_ready ()) in
-              return_unit
-          | None -> return_unit)
+      | Starting -> handler stopper el
+      | Ready _ -> return_unit
+    in
+    let*! () = Event.(emit layer1_node_tracking_started ()) in
+    make_stream_daemon
+      handler
+      (Tezos_shell_services.Monitor_services.heads cctxt `Main)
+
+  let new_head ctxt cctxt =
+    (* Monitor heads and store published slot headers indexed by block hash. *)
+    let open Lwt_result_syntax in
+    let handler _stopper
+        (block_hash, (_block_header : Tezos_base.Block_header.t)) =
+      match Node_context.get_status ctxt with
+      | Starting -> return_unit
       | Ready {plugin = (module Plugin); _} ->
           let* slot_headers =
             Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
           in
           let*! () =
-            List.iter_s
-              (fun (slot_index, slot_header) ->
-                Slot_headers_store.add
-                  (Node_context.get_store ctxt).slot_headers_store
-                  ~primary_key:block_hash
-                  ~secondary_key:slot_index
-                  slot_header)
+            Slot_manager.store_slot_headers
+              (Node_context.get_store ctxt).slot_headers_store
+              block_hash
               slot_headers
           in
           return_unit
@@ -147,6 +161,7 @@ module Handler = struct
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
   let new_slot_header ctxt =
+    (* Monitor neighbor DAL nodes and download published slots as shards. *)
     let open Lwt_result_syntax in
     let handler n_cctxt ready_ctxt slot_header =
       let params = ready_ctxt.Node_context.dal_parameters in
@@ -173,7 +188,7 @@ module Handler = struct
       in
       return_unit
     in
-    let handler n_cctxt slot_header =
+    let handler n_cctxt _stopper slot_header =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
       | Ready ready_ctxt -> handler n_cctxt ready_ctxt slot_header
@@ -187,6 +202,8 @@ module Handler = struct
 end
 
 let daemonize handlers =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+     Improve concurrent tasks by using workers *)
   let open Lwt_result_syntax in
   let* handlers = List.map_es (fun x -> x) handlers in
   let (_ : Lwt_exit.clean_up_callback_id) =
@@ -195,16 +212,11 @@ let daemonize handlers =
         List.iter (fun (_, stopper) -> stopper ()) handlers ;
         Lwt.return_unit)
   in
-  (* The no_cancel might not be necessary. Lwt_exit cancels the
-     main promise upon receiving a signal or other form of interruption. The
-     no_cancel renders this cancelation into a no-op.*)
-  Lwt.no_cancel
-    (let* _ = all (List.map fst handlers) in
-     return_unit)
+  (let* _ = all (List.map fst handlers) in
+   return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
-
    Improve general architecture, handle L1 disconnection etc
 *)
 let run ~data_dir cctxt =
@@ -223,4 +235,9 @@ let run ~data_dir cctxt =
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
   in
-  daemonize (Handler.new_head config ctxt cctxt :: Handler.new_slot_header ctxt)
+  (* Start daemon to resolve current protocol plugin *)
+  let* () =
+    daemonize [Handler.resolve_plugin_and_set_ready config ctxt cctxt]
+  in
+  (* Start never-ending monitoring daemons *)
+  daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
