@@ -88,6 +88,9 @@ module Term : sig
   val data_dir : string option Cmdliner.Term.t
 
   val config_file : string option Cmdliner.Term.t
+
+  val operation_metadata_size_limit :
+    Shell_limits.operation_metadata_size_limit option Cmdliner.Term.t
 end
 
 val read_config_file : t -> Config_file.t tzresult Lwt.t

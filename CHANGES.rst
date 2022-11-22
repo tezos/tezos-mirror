@@ -32,7 +32,7 @@ Node
   configuration file, whether it is specified from the command-line or not.
 
 - Fixed a bug that caused the ``snapshot import`` command to fail when
-  used on data directories configured with an explicit number
+  used on data directories configured with an explicit number of
   additional cycles.
 
 - Fixed an issue that could left a temporary directory if a snapshot
@@ -60,6 +60,9 @@ Node
 
 - Removed the ``node_`` prefix in identifiers of the
   ``config_validation`` and ``config_file`` events and errors.
+
+- Introduced a ``--json`` command line argument to the ``snapshot
+  info`` allowing to print snapshot information as JSON.
 
 Client
 ------
