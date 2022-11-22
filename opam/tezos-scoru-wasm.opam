@@ -15,7 +15,7 @@ depends: [
   "tezos-webassembly-interpreter"
   "tezos-context"
   "tezos-lwt-result-stdlib"
-  "data-encoding" { >= "0.6" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

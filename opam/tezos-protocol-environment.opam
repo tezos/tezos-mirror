@@ -14,7 +14,7 @@ depends: [
   "tezos-crypto"
   "tezos-lwt-result-stdlib"
   "tezos-scoru-wasm"
-  "data-encoding" { >= "0.6" & < "0.7" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "bls12-381" { >= "5.0.0" & < "5.1.0" }
   "tezos-plonk" { >= "0.1.2" }
   "zarith" { >= "1.12" & < "1.13" }

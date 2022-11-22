@@ -45,6 +45,8 @@ type 'a t
 
 type 'a encoding = 'a t
 
+type string_json_repr = Hex | Plain
+
 val classify : 'a encoding -> [`Fixed of int | `Dynamic | `Variable]
 
 (** {3 Ground descriptors} *)
@@ -129,6 +131,52 @@ val z : Z.t encoding
 (** Positive big number, see [z]. *)
 val n : Z.t encoding
 
+(** [uint_like_n ()] is an encoding for [int] which uses the same representation
+    as {!n}.
+
+    For compatibility with 32-bit machines, this encoding supports the same
+    range of encodings as [int31], but only the positive ones. I.e., it
+    supports the inclusive range [0] to [(1 lsl 30) - 1].
+
+    The optional parameter [?max_value] can be used to further restrict the
+    range of values. If [max_value] is set and is greater than
+    [(1 lsl 30) - 1] then the function raises [Invalid_argument].
+
+    The encoding is partial: attempting to de/serialise values which are
+    outside of the supported range will fail. In addition, in binary, a
+    maximum size for the serialised representation is computed based on the
+    maximum value in the range, and the de/serialisation process fails before
+    attempting any conversion if the size is exceeded.
+
+    @raise Invalid_argument if [max_value < 0] or
+    [max_value > (1 lsl 30) - 1] *)
+val uint_like_n : ?max_value:int -> unit -> int encoding
+
+(** [int_like_z ()] is an encoding for [int] which uses the same representation
+      as {!z}.
+
+      For compatibility with 32-bit machines, this encoding supports the same
+      range of encodings as [int31]. I.e., it supports the inclusive range
+      [-(1 lsl 30)] to [(1 lsl 30) - 1].
+
+      The optional parameters [?min_value] and [?max_value] can be used to
+      further restrict the
+      range of values. If [min_value] is set and less than [-(1 lsl 30)] or if
+      [max_value] is set and is greater than [(1 lsl 30) - 1] then the function
+      raises [Invalid_argument].
+
+      The encoding is partial: attempting to de/serialise values which are
+      outside of the supported range will fail. In addition, in binary, a
+      maximum size for the serialised representation is computed based on the
+      encoding's range, and the de/serialisation process fails before attempting
+      any conversion if the size is exceeded.
+
+      @raise Invalid_argument if [max_value < min_value]
+
+      @raise Invalid_argument if [max_value > (1 lsl 30) - 1]
+
+      @raise Invalid_argument if [min_value < -(1 lsl 30)] *)
+val int_like_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
 (** {4 Other ground type encodings} *)
 
 (** Encoding of a boolean
@@ -136,13 +184,26 @@ val n : Z.t encoding
 val bool : bool encoding
 
 (** Encoding of a string
-    - encoded as a byte sequence in binary prefixed by the length
-      of the string
-    - encoded as a string in JSON. *)
+    - In binary, encoded as a byte sequence prefixed by the length
+      of the string. The length is represented as specified by the
+      [length_kind] parameter (default [`Uint30]).
+    - in JSON when [string_json_repr = Plain], encoded as a string
+    - in JSON when [string_json_repr = Hex],  encoded via hex. *)
+val string' :
+  ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+  string_json_repr ->
+  string encoding
+
+(** Encoding of arbitrary bytes. See [string'] *)
+val bytes' :
+  ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+  string_json_repr ->
+  Bytes.t encoding
+
+(** same as [string' Plain] *)
 val string : string encoding
 
-(** Encoding of arbitrary bytes
-    (encoded via hex in JSON and directly as a sequence byte in binary). *)
+(** same as [bytes' Hex] *)
 val bytes : Bytes.t encoding
 
 (** {3 Descriptor combinators} *)
@@ -161,19 +222,19 @@ val bytes : Bytes.t encoding
     as [null] in JSON. This includes an encoding of the form [option _],
     [conv _ _ (option _)], [dynamic_size (option _)], etc.
 
-    @raise Invalid_argument if called within the body of a {!mu}. *)
+      @raise Invalid_argument if called within the body of a {!mu}. *)
 val option : 'a encoding -> 'a option encoding
 
 (** Combinator to make a {!result} value
-    represented as a 1-byte tag followed by the data of either type in binary,
+    (represented as a 1-byte tag followed by the data of either type in binary,
     and either unwrapped value in JSON (the caller must ensure that both
-    encodings do not collide). *)
+    encodings do not collide)). *)
 val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
 (** List combinator.
     - encoded as an array in JSON
     - encoded as the concatenation of all the element in binary
-     prefixed its length in bytes
+      prefixed its size in bytes
 
     @param [max_length]
     If [max_length] is passed and the encoding of elements has fixed
@@ -181,6 +242,27 @@ val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
     @raise Invalid_argument if the inner encoding is variable. *)
 val list : ?max_length:int -> 'a encoding -> 'a list encoding
+
+(** List combinator.
+    - encoded as an array in JSON
+    - encoded as the concatenation of its length (number of elements) and all
+      the element in binary
+
+    @param kind ([[`N | `Uint8 | `Uint16 | `Uint30]]) controls the
+    representation of the length: {!uint_like_n}, {!uint8}, {!uint16}, or
+    {!int31} (but only positive values).
+
+
+    @param [max_length]
+    If [max_length] is passed and the encoding of elements has fixed
+    size, a {!check_size} is automatically added for earlier rejection.
+
+    @raise Invalid_argument if the inner encoding is variable. *)
+val list_with_length :
+  ?max_length:int ->
+  [`N | `Uint8 | `Uint16 | `Uint30] ->
+  'a encoding ->
+  'a list encoding
 
 (** Provide a transformer from one encoding to a different one.
 
@@ -350,6 +432,104 @@ val obj10 :
     tuples contains a variable field.. *)
 val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 
+(** [With_field_name_duplicate_checks] is a subset of [Encoding] where all the
+    constructed objects are checked for duplicates.
+
+    Note that the analysis can include false positives: it might fail on
+    encodings which will never serialise a value with duplicate fields.
+    Still, these false positives are uncommon and we recommend you use these
+    combinators when relevant.
+
+    {[
+    let e =
+      let open Data_encoding in
+      let open Data_encoding.With_field_name_duplicate_checks in
+      …
+    ]}
+    *)
+module With_field_name_duplicate_checks : sig
+  val obj1 : 'f1 field -> 'f1 encoding
+
+  val obj2 : 'f1 field -> 'f2 field -> ('f1 * 'f2) encoding
+
+  val obj3 : 'f1 field -> 'f2 field -> 'f3 field -> ('f1 * 'f2 * 'f3) encoding
+
+  val obj4 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    ('f1 * 'f2 * 'f3 * 'f4) encoding
+
+  val obj5 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5) encoding
+
+  val obj6 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6) encoding
+
+  val obj7 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7) encoding
+
+  val obj8 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    'f8 field ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8) encoding
+
+  val obj9 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    'f8 field ->
+    'f9 field ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9) encoding
+
+  val obj10 :
+    'f1 field ->
+    'f2 field ->
+    'f3 field ->
+    'f4 field ->
+    'f5 field ->
+    'f6 field ->
+    'f7 field ->
+    'f8 field ->
+    'f9 field ->
+    'f10 field ->
+    ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
+
+  (** Create a larger object from the encodings of two smaller ones.
+      @raise Invalid_argument if both arguments are not objects  or if both
+      tuples contains a variable field.. *)
+  val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
+end
+
 (** {4 Constructors for tuples with N fields} *)
 
 (** These are serialized to binary by converting each internal
@@ -461,7 +641,7 @@ type case_tag = Tag of int | Json_only
    Note that in general you should use a total function (i.e., one defined
    over the whole of the ['a] type) for the [matching_function]. However, in
    the case where you have a good reason to use a partial function, you should
-   raise {!No_case_matched} in the dead branches. Reasons why you may want to
+   raise [No_case_matched] in the dead branches. Reasons why you may want to
    do so include:
    - ['a] is an open variant and you will complete the matching function
      later, and
@@ -589,6 +769,78 @@ val matching :
     can fit in the [tag_size] *)
 val union : ?tag_size:tag_size -> 't case list -> 't encoding
 
+(** [With_JSON_discriminant] is a subset of [Encoding] where the
+    union/matching combinators (and associated functions) add discriminant for
+    the JSON backend.
+
+    The following restrictions apply:
+    - The case encodings must be objects.
+    - The case encoding objects must not include a "kind" field.
+    - The case encoding objects must not have duplicate field names.
+    - The JSON discriminants must all be distinct.
+
+    {[
+    let e =
+      let open Data_encoding in
+      let open Data_encoding.With_JSON_discriminant in
+      …
+    ]} *)
+module With_JSON_discriminant : sig
+  (** [case_tag]'s only variant [Tag] includes both a numeric tag for the binary
+      encoding and a string tag for the JSON encoding. *)
+  type case_tag = Tag of (int * string)
+
+  type 't case
+
+  (** [case] is similar to [Encoding.case] but it takes a
+      [SaferEncoding.case_tag] parameter. This includes both a numeric tag and a
+      string tag.
+
+      In Binary:
+      This has no impact. The [case_tag] argument of [Encoding] already has a
+      numeric tag.
+
+      In JSON:
+      The [SaferEncoding] adds a field for discriminating the different cases,
+      making these encodings less likely to include accidental bugs. More
+      specifically, when you use [case (Tag (_, s)) e _ _] then the underlying
+      union uses an encoding based on [e] and [s]. Specifically, if [e] is an
+      object encoding, then it adds the field [(req "kind" (constant s))] to
+      [e].
+
+      @raise Invalid_argument if [e] is not an object.
+
+      @raise Invalid_argument if [e] is an object with a ["kind"] field (this
+      field name is reserved for the discriminating field added by [case]). *)
+  val case :
+    title:string ->
+    ?description:string ->
+    case_tag ->
+    'a encoding ->
+    ('t -> 'a option) ->
+    ('a -> 't) ->
+    't case
+
+  (** [union] and [matching] now check that there are no duplicate ["kind"]
+      discriminating values. If there is, they raises [Invalid_argument]. *)
+
+  (** Similarly to [case_tag], [matched] also takes an additional [string]
+      parameter. This parameter is used in the same way as [case] (to add a ["kind"] field
+      to the JSON encoding) and it fails in the same way as [case].
+
+      @raise Invalid_argument if the encoding is not an object.
+
+      @raise Invalid_argument if the encoding is an object with a ["kind"]
+      field. *)
+  val matched :
+    ?tag_size:tag_size -> int * string -> 'a encoding -> 'a -> match_result
+
+  val matching :
+    ?tag_size:tag_size -> 't matching_function -> 't case list -> 't encoding
+
+  val union : ?tag_size:tag_size -> 't case list -> 't encoding
+end
+
 (** {3 Specialized descriptors} *)
 
 (** Encode enumeration via association list
@@ -604,7 +856,13 @@ module Fixed : sig
   val string : int -> string encoding
 
   (** @raise Invalid_argument if the argument is less or equal to zero. *)
-  val bytes : int -> bytes encoding
+  val string' : string_json_repr -> int -> string encoding
+
+  (** @raise Invalid_argument if the argument is less or equal to zero. *)
+  val bytes : int -> Bytes.t encoding
+
+  (** @raise Invalid_argument if the argument is less or equal to zero. *)
+  val bytes' : string_json_repr -> int -> Bytes.t encoding
 
   (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
       there are [n] null bytes ([\000]) added after the value encoded by [e].
@@ -686,7 +944,11 @@ end
 module Variable : sig
   val string : string encoding
 
-  val bytes : bytes encoding
+  val string' : string_json_repr -> string encoding
+
+  val bytes : Bytes.t encoding
+
+  val bytes' : string_json_repr -> Bytes.t encoding
 
   (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
@@ -699,16 +961,40 @@ end
 
 module Bounded : sig
   (** Encoding of a string whose length does not exceed the specified length.
-      The size field uses the smallest integer that can accommodate the
+
+      If [length_kind] is set, then it is used to encode the length of the
+      string in a header. If [length_kind] is omitted then the length field
+      uses the smallest fixed-width integer that can accommodate the
       maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
       longer strings, etc.
 
       Attempting to construct a string with a length that is too long causes
-      an [Invalid_argument] exception. *)
+      an [Invalid_argument] exception.
+
+      @raise Invalid_argument if [length_kind] is set but it cannot accommodate
+      the specified bound. E.g.,
+      [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
+
+      @raise Invalid_argument if [length_kind] is unset and the specified
+      bound is larger than 2^30. *)
+  val string' :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    int ->
+    string encoding
+
+  (** Same as [string' Plain] *)
   val string : int -> string encoding
 
-  (** See {!string} above. *)
-  val bytes : int -> bytes encoding
+  (** See {!string'} above. *)
+  val bytes' :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    int ->
+    Bytes.t encoding
+
+  (** Same as [bytes' Hex] *)
+  val bytes : int -> Bytes.t encoding
 end
 
 (** Mark an encoding as being of dynamic size.
@@ -716,12 +1002,14 @@ end
     Typically used to combine two variable encodings in a same
     objects or tuple, or to use a variable encoding in an array or a list. *)
 val dynamic_size :
-  ?kind:[`Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
+  ?kind:[`N | `Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
 
 (** [check_size size encoding] ensures that the binary encoding
     of a value will not be allowed to exceed [size] bytes. The reader
     and the writer fails otherwise. This function do not modify
-    the JSON encoding. *)
+    the JSON encoding.
+
+    @raise Invalid_argument if [size < 0] *)
 val check_size : int -> 'a encoding -> 'a encoding
 
 (** Define different encodings for JSON and binary serialization. *)
@@ -900,8 +1188,18 @@ module Compact : sig
   (** A compact encoding of the singleton value [unit], which has zero
       memory footprint.
 
-      Uses zero (0) bits of tag. *)
+      Uses zero (0) bits of tag.
+
+      In JSON it is represented as the empty object [{}]. *)
   val unit : unit t
+
+  (** A compact encoding of the singleton value [unit], which has zero
+      memory footprint.
+
+      Uses zero (0) bits of tag.
+
+      In JSON it is represented as [null]. *)
+  val null : unit t
 
   (** Efficient encoding of boolean values. It uses one (1) bit in the
       shared tag, and zero bit in the payload. *)
@@ -1261,7 +1559,7 @@ module Compact : sig
 
   (** [or_int32 ~i32_title ~alt_title ?alt_description c] creates a new
       compact encoding for the disjunction of
-      any type [a] (see {!case}) with [int32]. It uses the same number
+      any type [a] (see {!val-case}) with [int32]. It uses the same number
       of bits as {!int32}, that is 2, and uses the spare tag ([11]) within
       this size for values of type [a].
 
