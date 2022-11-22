@@ -65,3 +65,16 @@ let init config =
   let* slots_store = main repo in
   let* () = Event.(emit store_is_ready ()) in
   Lwt.return {slots_store; slots_watcher; slot_headers_store}
+
+module Legacy_paths = struct
+  let slot_by_commitment commitment = ["slots"; commitment]
+
+  let slot_shards_by_commitment commitment =
+    slot_by_commitment commitment @ ["shards"]
+
+  let slot_shard_by_commitment commitment index =
+    slot_shards_by_commitment commitment @ [string_of_int index]
+
+  let slot_shards_flag_by_commitment commitment =
+    slot_by_commitment commitment @ ["shards_saved_flag"]
+end

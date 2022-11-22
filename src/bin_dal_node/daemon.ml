@@ -169,7 +169,7 @@ module Handler = struct
         0 -- ((params.number_of_shards / params.redundancy_factor) - 1)
       in
       let* shards =
-        RPC_server.shards_rpc n_cctxt slot_header downloaded_shard_ids
+        RPC_server_legacy.shards_rpc n_cctxt slot_header downloaded_shard_ids
       in
       let shards =
         List.fold_left
@@ -197,7 +197,7 @@ module Handler = struct
       (fun n_cctxt ->
         make_stream_daemon
           (handler n_cctxt)
-          (RPC_server.monitor_slot_headers_rpc n_cctxt))
+          (RPC_server_legacy.monitor_slot_headers_rpc n_cctxt))
       (Node_context.get_neighbors_cctxts ctxt)
 end
 
