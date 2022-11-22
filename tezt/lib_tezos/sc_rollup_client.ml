@@ -183,7 +183,7 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
     [{destination; entrypoint; parameters}]
 
 let encode_batch ?hooks ?expected_error sc_client batch =
-  let process =
+  let runnable =
     spawn_command
       ?hooks
       sc_client
@@ -191,10 +191,10 @@ let encode_batch ?hooks ?expected_error sc_client batch =
   in
   match expected_error with
   | None ->
-      let* answer = Process.check_and_read_stdout process in
+      let* answer = Process.check_and_read_stdout runnable.value in
       return (Some (String.trim answer))
   | Some msg ->
-      let* () = Process.check_error ~msg process in
+      let* () = Process.check_error ~msg runnable.value in
       return None
 
 let rpc_get ?hooks sc_client path =
@@ -218,8 +218,8 @@ let rpc_get_rich ?hooks sc_client path parameters =
       @@ List.map (fun (k, v) -> Format.asprintf "%s=%s" k v) parameters
   in
   let uri = Client.string_of_path path ^ parameters in
-  let process = spawn_command ?hooks sc_client ["rpc"; "get"; uri] in
-  let* output = Process.check_and_read_stdout process in
+  let runnable = spawn_command ?hooks sc_client ["rpc"; "get"; uri] in
+  let* output = Process.check_and_read_stdout runnable.value in
   return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
 
 let ticks ?hooks ?(block = "head") sc_client =
@@ -239,7 +239,6 @@ let status ?hooks ?(block = "head") sc_client =
   |> Runnable.map JSON.as_string
 
 let outbox ?hooks ?(block = "cemented") ~outbox_level sc_client =
-  let open Lwt.Syntax in
   rpc_get
     ?hooks
     sc_client

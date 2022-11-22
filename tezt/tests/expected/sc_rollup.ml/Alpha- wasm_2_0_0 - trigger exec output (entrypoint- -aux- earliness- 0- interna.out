@@ -1,8 +1,8 @@
 
 ./octez-client --wait none originate sc rollup from bootstrap1 of kind wasm_2_0_0 of type bytes booting with 0061736d0100000001290760047f7f7f7f017f60027f7f017f60057f7f7f7f7f017f60017f0060017f017f60027f7f00600000025e0310726f6c6c75705f736166655f636f72650a726561645f696e707574000010726f6c6c75705f736166655f636f72650c77726974655f6f7574707574000110726f6c6c75705f736166655f636f72650b73746f72655f77726974650002030504030405060503010001071502036d656d02000b6b65726e656c5f6e65787400060aa001042a01027f41fa002f0100210120002f010021022001200247044041e4004112410041e400410010021a0b0b0800200041c4006b0b4901047f41fc002f0100210241fe002d0000210320002f0100210420011004210520042002460440200041076a200510011a0520042003460440200041016a200141016b10011a0b0b0b2001017f41dc0141f00141840241901c100021004184022000100541840210030b0b38050041e4000b122f6b65726e656c2f656e762f7265626f6f740041f8000b0200010041fa000b0200020041fc000b0200000041fe000b0101 --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 2911.537 units (will add 100 for safety)
-Estimated storage: 6927 bytes added (will add 20 for safety)
+Estimated gas: 2709.909 units (will add 100 for safety)
+Estimated storage: 6520 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,23 +12,23 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001059
+    Fee to the baker: ꜩ0.001038
     Expected counter: 1
-    Gas limit: 3012
-    Storage limit: 6947 bytes
+    Gas limit: 2810
+    Storage limit: 6540 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001059
-      payload fees(the block proposer) ....... +ꜩ0.001059
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001038
+      payload fees(the block proposer) ....... +ꜩ0.001038
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: bytes
       Boot sector Blake2B hash: '88a2a78ca83fb7dc5f9393763b7fcbf0c10e0a12da1fd446835a16dad2dabd86'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 2911.537
-      Storage size: 6927 bytes
+      Consumed gas: 2709.909
+      Storage size: 6520 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.73175
-        storage fees ........................... +ꜩ1.73175
+        [PUBLIC_KEY_HASH] ... -ꜩ1.63
+        storage fees ........................... +ꜩ1.63
 

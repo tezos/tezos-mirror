@@ -107,7 +107,11 @@ val status :
    [outbox_level] as known to the [block] (default ["cemented"] which
    is the block corresponding to the last cemented level). *)
 val outbox :
-  ?hooks:Process.hooks -> ?block:string -> outbox_level:int -> t -> JSON.t Lwt.t
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  outbox_level:int ->
+  t ->
+  JSON.t Runnable.process
 
 type outbox_proof = {commitment_hash : string; proof : string}
 

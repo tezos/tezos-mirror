@@ -920,14 +920,16 @@ let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
       [msg1]
   in
   let* () = send_message client (to_text_messages_arg [msg1]) in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
-  in
+  let level = Node.get_level node in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
   let*! real_state_hash = Sc_rollup_client.state_hash sc_rollup_client in
-  let*! real_outbox = Sc_rollup_client.outbox sc_rollup_client ~block:"head" in
+  let* real_outbox =
+    Runnable.run
+    @@ Sc_rollup_client.outbox
+         sc_rollup_client
+         ~outbox_level:level
+         ~block:"head"
+  in
   Check.((sim_result.state_hash = real_state_hash) string)
     ~error_msg:"Simulated resulting state hash is %L but should have been %R" ;
   Check.((JSON.encode sim_result.output = JSON.encode real_outbox) string)
@@ -3304,6 +3306,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
   @@ fun rollup_node sc_client sc_rollup _node client ->
   let* () = Sc_rollup_node.run rollup_node [] in
   let src = Constant.bootstrap1.public_key_hash in
+  let src2 = Constant.bootstrap2.public_key_hash in
   let originate_target_contract () =
     let prg =
       {|
@@ -3415,14 +3418,16 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
     let parameters = "37" in
     let message_index = 0 in
     let check_expected_outbox () =
-      let* outbox = Sc_rollup_client.outbox ~outbox_level sc_client in
-      Log.info "Outbox is %s" (Ezjsonm.to_string outbox) ;
+      let* outbox =
+        Runnable.run @@ Sc_rollup_client.outbox ~outbox_level sc_client
+      in
+      Log.info "Outbox is %s" (JSON.encode outbox) ;
 
       match expected_error with
       | None ->
           let expected =
-            Ezjsonm.from_string
-              (Printf.sprintf
+            JSON.parse ~origin:"trigger_outbox_message_execution"
+            @@ Printf.sprintf
                  {|
               [ { "outbox_level": %d, "message_index": "%d",
                   "message":
@@ -3436,9 +3441,9 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
                  (match entrypoint with
                  | None -> ""
                  | Some entrypoint ->
-                     Format.asprintf {| , "entrypoint" : "%s" |} entrypoint))
+                     Format.asprintf {| , "entrypoint" : "%s" |} entrypoint)
           in
-          assert (Ezjsonm.to_string expected = Ezjsonm.to_string outbox) ;
+          assert (JSON.encode expected = JSON.encode outbox) ;
           Sc_rollup_client.outbox_proof_single
             sc_client
             ?expected_error
@@ -3448,7 +3453,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
             ?entrypoint
             ~parameters
       | Some _ ->
-          assert (Ezjsonm.to_string outbox = "[]") ;
+          assert (JSON.encode outbox = "[]") ;
           return None
     in
     let* answer = check_expected_outbox () in
@@ -3461,12 +3466,12 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
           Client.Sc_rollup.execute_outbox_message
             ~burn_cap:(Tez.of_int 10)
             ~rollup:sc_rollup
-            ~src
+            ~src:src2
             ~commitment_hash
             ~proof
             client
         in
-        Client.bake_for client
+        Client.bake_for_and_wait client
   in
   let* target_contract_address = originate_target_contract () in
   let* source_contract_address = originate_source_contract () in
@@ -3475,6 +3480,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
       source_contract_address
       target_contract_address
   in
+  let* () = Client.bake_for_and_wait client in
   let* () = trigger_outbox_message_execution target_contract_address in
   match expected_error with
   | None ->
@@ -3615,10 +3621,11 @@ let test_rpcs ~kind =
       ["global"; "block"; "head"; "state_hash"]
   in
   let* _outbox =
-    Sc_rollup_client.outbox
-      ~hooks
-      ~outbox_level:l2_finalied_block_level
-      sc_client
+    Runnable.run
+    @@ Sc_rollup_client.outbox
+         ~hooks
+         ~outbox_level:l2_finalied_block_level
+         sc_client
   in
   let*! _head =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]
