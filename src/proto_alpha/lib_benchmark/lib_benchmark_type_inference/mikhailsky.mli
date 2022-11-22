@@ -309,9 +309,9 @@ module Data : sig
 
   val mutez : Alpha_context.Tez.t -> node
 
-  val key_hash : Signature.Public_key_hash.t -> node
+  val key_hash : Environment.Signature.Public_key_hash.t -> node
 
-  val key : Signature.Public_key.t -> node
+  val key : Environment.Signature.Public_key.t -> node
 
   val integer : int -> node
 
