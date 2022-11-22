@@ -634,14 +634,7 @@ module Make (Rollup : PARAMETERS) = struct
           assert false
       | Ok packed_contents_list -> packed_contents_list
     in
-    let signature =
-      match state.signer.pkh with
-      | Tezos_crypto.Signature.Ed25519 _ ->
-          Tezos_crypto.Signature.of_ed25519 Tezos_crypto.Ed25519.zero
-      | Secp256k1 _ ->
-          Tezos_crypto.Signature.of_secp256k1 Tezos_crypto.Secp256k1.zero
-      | P256 _ -> Tezos_crypto.Signature.of_p256 Tezos_crypto.P256.zero
-    in
+    let signature = Tezos_crypto.Signature.zero in
     let branch = Tezos_crypto.Block_hash.zero in
     let operation =
       {
