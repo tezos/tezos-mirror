@@ -46,6 +46,7 @@ type commands =
   | Step of eval_step
   | Load_inputs
   | Reveal_preimage of string option
+  | Reveal_metadata
   | Unknown of string
   | Stop
 
@@ -80,6 +81,7 @@ let parse_commands s =
     | ["reveal"; "preimage"] -> Reveal_preimage None
     | ["reveal"; "preimage"; hex_encoded_preimage] ->
         Reveal_preimage (Some hex_encoded_preimage)
+    | ["reveal"; "metadata"] -> Reveal_metadata
     | ["stop"] -> Stop
     | _ -> Unknown s
   in
@@ -449,6 +451,17 @@ let reveal_preimage bytes tree =
       let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
       tree
 
+let reveal_metadata config tree =
+  let open Lwt_syntax in
+  let* info = Wasm.get_info tree in
+  match info.Tezos_scoru_wasm.Wasm_pvm_state.input_request with
+  | Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required Reveal_metadata) ->
+      let data = build_metadata config in
+      Wasm.reveal_step (Bytes.of_string data) tree
+  | _ ->
+      let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
+      tree
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
 let handle_command c config tree inboxes level =
@@ -490,6 +503,9 @@ let handle_command c config tree inboxes level =
         return ()
     | Reveal_preimage bytes ->
         let*! tree = reveal_preimage bytes tree in
+        return ~tree ()
+    | Reveal_metadata ->
+        let*! tree = reveal_metadata config tree in
         return ~tree ()
     | Unknown s ->
         let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
