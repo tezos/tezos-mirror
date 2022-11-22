@@ -93,11 +93,7 @@ let get_next_baker_by_account pkh block =
   >>=? fun bakers ->
   (match List.hd bakers with
   | Some b -> return b
-  | None ->
-      failwith
-        "No slots found for %a"
-        Tezos_crypto.Signature.Public_key_hash.pp
-        pkh)
+  | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
   >>=? fun {
              Plugin.RPC.Baking_rights.delegate = pkh;
              consensus_key;
@@ -126,7 +122,7 @@ let get_next_baker_excluding excludes block =
          (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
            not
              (List.mem
-                ~equal:Tezos_crypto.Signature.Public_key_hash.equal
+                ~equal:Signature.Public_key_hash.equal
                 consensus_key
                 excludes))
          bakers
@@ -203,7 +199,7 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Tezos_crypto.Signature.sign
+      Signature.sign
         ~watermark:
           Block_header.(to_watermark (Block_header Tezos_crypto.Chain_id.zero))
         signer_account.sk
@@ -444,11 +440,7 @@ let genesis_with_parameters parameters =
   >|=? fun {context; _} ->
   {
     hash;
-    header =
-      {
-        shell;
-        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
-      };
+    header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
   }
@@ -640,11 +632,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   in
   {
     hash;
-    header =
-      {
-        shell;
-        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
-      };
+    header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
   }

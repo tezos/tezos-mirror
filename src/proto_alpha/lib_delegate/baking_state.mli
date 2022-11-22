@@ -28,8 +28,8 @@ open Alpha_context
 
 type consensus_key = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.public_key;
-  public_key_hash : Tezos_crypto.Signature.public_key_hash;
+  public_key : Signature.public_key;
+  public_key_hash : Signature.public_key_hash;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -37,8 +37,7 @@ val consensus_key_encoding : consensus_key Data_encoding.t
 
 val pp_consensus_key : Format.formatter -> consensus_key -> unit
 
-type consensus_key_and_delegate =
-  consensus_key * Tezos_crypto.Signature.Public_key_hash.t
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
 
 val consensus_key_and_delegate_encoding :
   consensus_key_and_delegate Data_encoding.t

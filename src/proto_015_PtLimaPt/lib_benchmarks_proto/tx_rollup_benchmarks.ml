@@ -254,7 +254,7 @@ let unique_ticket_id =
 
 let gen_l2_account rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  Tezos_crypto.Signature.Bls.generate_key ~seed ()
+  Signature.Bls.generate_key ~seed ()
 
 let hash_key_exn ctxt ~ticketer ~typ ~contents ~owner =
   let ticketer = Micheline.root @@ Expr.from_string ticketer in

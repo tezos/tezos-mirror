@@ -81,8 +81,8 @@ val register_global_constant :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->
@@ -131,7 +131,7 @@ val get_frozen_deposits_limit :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Tezos_crypto.Signature.V0.Public_key_hash.t ->
+  Signature.V0.Public_key_hash.t ->
   Tez.t option tzresult Lwt.t
 
 (** Calls {!Injection.prepare_manager_operation}
@@ -171,10 +171,10 @@ val update_consensus_key :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?fee:Tez.tez ->
-  consensus_pk:Tezos_crypto.Signature.V0.public_key ->
+  consensus_pk:Signature.V0.public_key ->
   manager_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  Tezos_crypto.Signature.V0.public_key ->
+  Signature.V0.public_key ->
   Kind.update_consensus_key Kind.manager Injection.result tzresult Lwt.t
 
 val drain_delegate :
@@ -186,9 +186,9 @@ val drain_delegate :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   consensus_sk:Client_keys_v0.sk_uri ->
-  consensus_pkh:Tezos_crypto.Signature.V0.public_key_hash ->
-  ?destination:Tezos_crypto.Signature.V0.public_key_hash ->
-  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
+  consensus_pkh:Signature.V0.public_key_hash ->
+  ?destination:Signature.V0.public_key_hash ->
+  delegate:Signature.V0.public_key_hash ->
   unit ->
   Kind.drain_delegate Injection.result tzresult Lwt.t
 
@@ -234,7 +234,7 @@ val increase_paid_storage :
   Kind.increase_paid_storage Kind.manager Injection.result tzresult Lwt.t
 
 (** Same as {!set_delegate} but the [~source] argument of {!Injection.inject_manager_operation}
-    is {!Tezos_crypto.Signature.V0.Public_key.hash} [src_pk]. *)
+    is {!Signature.V0.Public_key.hash} [src_pk]. *)
 val register_as_delegate :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -398,7 +398,7 @@ val reveal :
   Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key = {
-  pkh : Tezos_crypto.Signature.Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -572,8 +572,8 @@ val originate_tx_rollup :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
@@ -596,8 +596,8 @@ val submit_tx_rollup_batch :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   content:string ->
@@ -621,8 +621,8 @@ val submit_tx_rollup_commitment :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
@@ -649,8 +649,8 @@ val submit_tx_rollup_finalize_commitment :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
@@ -674,8 +674,8 @@ val submit_tx_rollup_remove_commitment :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
@@ -698,8 +698,8 @@ val submit_tx_rollup_rejection :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
@@ -732,8 +732,8 @@ val submit_tx_rollup_return_bond :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   tx_rollup:Tx_rollup.t ->
@@ -756,8 +756,8 @@ val tx_rollup_dispatch_tickets :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:Tx_rollup_level.t ->
@@ -785,8 +785,8 @@ val transfer_ticket :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   contents:string ->
@@ -944,8 +944,8 @@ val sc_rollup_recover_bond :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   sc_rollup:Sc_rollup.t ->

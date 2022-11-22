@@ -1022,7 +1022,7 @@ let pp_strategy fmt = function
   | Nostalgic -> Format.pp_print_string fmt "Nostalgic"
 
 type player = {
-  pkh : Tezos_crypto.Signature.Public_key_hash.t;
+  pkh : Signature.Public_key_hash.t;
   contract : Contract.t;
   strategy : strategy;
   game_player : Game.player;
@@ -1032,7 +1032,7 @@ let pp_player ppf {pkh; contract = _; strategy; game_player} =
   Format.fprintf
     ppf
     "pkh: %a@,strategy: %a@,game_player: %s"
-    Tezos_crypto.Signature.Public_key_hash.pp_short
+    Signature.Public_key_hash.pp_short
     pkh
     pp_strategy
     strategy
@@ -1442,8 +1442,7 @@ let make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 =
   let pkh2 = Account.pkh_of_contract_exn contract2 in
   let ({alice; bob = _} : Game.Index.t) = Game.Index.make pkh1 pkh2 in
   let player1, player2 =
-    if Tezos_crypto.Signature.Public_key_hash.equal alice pkh1 then
-      Game.(Alice, Bob)
+    if Signature.Public_key_hash.equal alice pkh1 then Game.(Alice, Bob)
     else Game.(Bob, Alice)
   in
   ( {

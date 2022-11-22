@@ -73,18 +73,18 @@ module Assert = struct
   let equal_pkh ~__LOC__ a b =
     Assert.equal
       ~loc:__LOC__
-      Tezos_crypto.Signature.Public_key_hash.equal
+      Signature.Public_key_hash.equal
       "pkh"
-      Tezos_crypto.Signature.Public_key_hash.pp
+      Signature.Public_key_hash.pp
       a
       b
 
   let equal_pk ~__LOC__ a b =
     Assert.equal
       ~loc:__LOC__
-      Tezos_crypto.Signature.Public_key.equal
+      Signature.Public_key.equal
       "pk"
-      Tezos_crypto.Signature.Public_key.pp
+      Signature.Public_key.pp
       a
       b
 

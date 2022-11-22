@@ -27,14 +27,14 @@ open Protocol
 open Alpha_context
 
 type t = {
-  pkh : Tezos_crypto.Signature.Public_key_hash.t;
-  pk : Tezos_crypto.Signature.Public_key.t;
-  sk : Tezos_crypto.Signature.Secret_key.t;
+  pkh : Signature.Public_key_hash.t;
+  pk : Signature.Public_key.t;
+  sk : Signature.Secret_key.t;
 }
 
 type account = t
 
-val known_accounts : t Tezos_crypto.Signature.Public_key_hash.Table.t
+val known_accounts : t Signature.Public_key_hash.Table.t
 
 val activator_account : account
 
@@ -47,15 +47,15 @@ val dummy_account : account
 val new_account :
   ?rng_state:Random.State.t ->
   ?seed:Bytes.t ->
-  ?algo:Tezos_crypto.Signature.algo ->
+  ?algo:Signature.algo ->
   unit ->
   account
 
 val add_account : t -> unit
 
-val find : Tezos_crypto.Signature.Public_key_hash.t -> t tzresult Lwt.t
+val find : Signature.Public_key_hash.t -> t tzresult Lwt.t
 
-val find_alternate : Tezos_crypto.Signature.Public_key_hash.t -> t
+val find_alternate : Signature.Public_key_hash.t -> t
 
 (** 4.000.000.000 tez *)
 val default_initial_balance : Tez.t
@@ -72,7 +72,7 @@ val new_commitment :
   ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
 
 (** Fails if the contract is not an implicit one  *)
-val pkh_of_contract_exn : Contract.t -> Tezos_crypto.Signature.Public_key_hash.t
+val pkh_of_contract_exn : Contract.t -> Signature.Public_key_hash.t
 
 (** [make_bootstrap_account ~initial_balance ~delegate_to account] creates a
     {!Parameters.bootstrap_account} from an account with the default or set
@@ -81,8 +81,8 @@ val pkh_of_contract_exn : Contract.t -> Tezos_crypto.Signature.Public_key_hash.t
 *)
 val make_bootstrap_account :
   ?balance:Tez.t ->
-  ?delegate_to:Tezos_crypto.Signature.public_key_hash option ->
-  ?consensus_key:Tezos_crypto.Signature.public_key option ->
+  ?delegate_to:Signature.public_key_hash option ->
+  ?consensus_key:Signature.public_key option ->
   t ->
   Parameters.bootstrap_account
 
@@ -94,7 +94,7 @@ val make_bootstrap_account :
 *)
 val make_bootstrap_accounts :
   ?bootstrap_balances:int64 list ->
-  ?bootstrap_delegations:Tezos_crypto.Signature.public_key_hash option list ->
-  ?bootstrap_consensus_keys:Tezos_crypto.Signature.public_key option list ->
+  ?bootstrap_delegations:Signature.public_key_hash option list ->
+  ?bootstrap_consensus_keys:Signature.public_key option list ->
   t list ->
   Parameters.bootstrap_account list

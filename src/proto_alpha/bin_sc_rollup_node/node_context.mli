@@ -75,13 +75,11 @@ type ro = [`Read] t
     who has purpose [purpose], if any.
 *)
 val get_operator :
-  _ t ->
-  Configuration.purpose ->
-  Tezos_crypto.Signature.Public_key_hash.t option
+  _ t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
 (** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
     operator for the node (for any purpose). *)
-val is_operator : _ t -> Tezos_crypto.Signature.Public_key_hash.t -> bool
+val is_operator : _ t -> Signature.Public_key_hash.t -> bool
 
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were

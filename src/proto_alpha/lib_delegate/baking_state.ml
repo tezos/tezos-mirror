@@ -31,8 +31,8 @@ open Protocol_client_context
     public key, its public key hash, and its secret key. *)
 type consensus_key = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.Public_key.t;
-  public_key_hash : Tezos_crypto.Signature.Public_key_hash.t;
+  public_key : Signature.Public_key.t;
+  public_key_hash : Signature.Public_key_hash.t;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -56,48 +56,39 @@ let consensus_key_encoding =
       })
     (obj4
        (req "alias" (option string))
-       (req "public_key" Tezos_crypto.Signature.Public_key.encoding)
-       (req "public_key_hash" Tezos_crypto.Signature.Public_key_hash.encoding)
+       (req "public_key" Signature.Public_key.encoding)
+       (req "public_key_hash" Signature.Public_key_hash.encoding)
        (req "secret_key_uri" string))
 
 let pp_consensus_key fmt {alias; public_key_hash; _} =
   match alias with
-  | None ->
-      Format.fprintf
-        fmt
-        "%a"
-        Tezos_crypto.Signature.Public_key_hash.pp
-        public_key_hash
+  | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp public_key_hash
   | Some alias ->
       Format.fprintf
         fmt
         "%s (%a)"
         alias
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         public_key_hash
 
-type consensus_key_and_delegate =
-  consensus_key * Tezos_crypto.Signature.Public_key_hash.t
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
 
 let consensus_key_and_delegate_encoding =
   let open Data_encoding in
   merge_objs
     consensus_key_encoding
-    (obj1 (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding))
+    (obj1 (req "delegate" Signature.Public_key_hash.encoding))
 
 let pp_consensus_key_and_delegate fmt (consensus_key, delegate) =
-  if
-    Tezos_crypto.Signature.Public_key_hash.equal
-      consensus_key.public_key_hash
-      delegate
-  then pp_consensus_key fmt consensus_key
+  if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate then
+    pp_consensus_key fmt consensus_key
   else
     Format.fprintf
       fmt
       "%a@,on behalf of %a"
       pp_consensus_key
       consensus_key
-      Tezos_crypto.Signature.Public_key_hash.pp
+      Signature.Public_key_hash.pp
       delegate
 
 type validation_mode = Node | Local of Abstract_context_index.t
@@ -763,7 +754,7 @@ module DelegateSet = struct
     type t = consensus_key
 
     let compare {public_key_hash = pkh; _} {public_key_hash = pkh'; _} =
-      Tezos_crypto.Signature.Public_key_hash.compare pkh pkh'
+      Signature.Public_key_hash.compare pkh pkh'
   end)
 
   let find_pkh pkh s =
@@ -771,8 +762,8 @@ module DelegateSet = struct
     try
       iter
         (fun ({public_key_hash; _} as delegate) ->
-          if Tezos_crypto.Signature.Public_key_hash.equal pkh public_key_hash
-          then raise (Found delegate)
+          if Signature.Public_key_hash.equal pkh public_key_hash then
+            raise (Found delegate)
           else ())
         s ;
       None

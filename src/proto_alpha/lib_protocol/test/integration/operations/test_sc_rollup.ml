@@ -1929,7 +1929,7 @@ let test_number_of_parallel_games_bounded () =
           xstaker)
       :: _ ->
         assert (
-          Tezos_crypto.Signature.Public_key_hash.(
+          Signature.Public_key_hash.(
             xstaker = Account.pkh_of_contract_exn staker)) ;
         return_unit
     | _ ->
@@ -2036,17 +2036,17 @@ let test_timeout () =
                (%ld, %a)] but got [Sc_rollup_timeout_level_not_reached (%ld, \
                %a)]"
               expected_block_left
-              Tezos_crypto.Signature.Public_key_hash.pp
+              Signature.Public_key_hash.pp
               pkh1
               blocks_left
-              Tezos_crypto.Signature.Public_key_hash.pp
+              Signature.Public_key_hash.pp
               staker
       | _ ->
           failwith
             "It should have failed with [Sc_rollup_timeout_level_not_reached \
              (%ld, %a)]"
             expected_block_left
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             pkh1
     in
     let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in

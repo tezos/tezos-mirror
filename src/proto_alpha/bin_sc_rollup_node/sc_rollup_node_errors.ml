@@ -212,7 +212,7 @@ let () =
         ppf
         "The rollup node lost the refutation game for operator %a and was \
          slashed %s%a, for reason: %a."
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         loser
         tez_sym
         Tez.pp
@@ -221,7 +221,7 @@ let () =
         reason)
     Data_encoding.(
       obj3
-        (req "loser" Tezos_crypto.Signature.Public_key_hash.encoding)
+        (req "loser" Signature.Public_key_hash.encoding)
         (req "reason" Protocol.Alpha_context.Sc_rollup.Game.reason_encoding)
         (req "slashed" Tez.encoding))
     (function

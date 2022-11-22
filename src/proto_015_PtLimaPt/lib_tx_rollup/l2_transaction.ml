@@ -38,13 +38,13 @@ let encoding =
     (fun (transaction, signatures) -> {transaction; signatures})
   @@ obj2
        (req "transaction" Tx_rollup_l2_batch.V1.transaction_encoding)
-       (req "signatures" (list Tezos_crypto.Signature.Bls.encoding))
+       (req "signatures" (list Signature.Bls.encoding))
 
 let batch l =
   let contents = List.map (fun {transaction; _} -> transaction) l in
   let aggregated_signature =
     List.concat_map (fun {signatures; _} -> signatures) l
-    |> Tezos_crypto.Signature.Bls.aggregate_signature_opt
+    |> Signature.Bls.aggregate_signature_opt
   in
   match aggregated_signature with
   | None -> error_with "Cannot aggregate signatures"

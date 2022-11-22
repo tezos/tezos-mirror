@@ -60,8 +60,8 @@ val register_global_constant :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.V0.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.V0.public_key ->
+  source:Signature.V0.public_key_hash ->
+  src_pk:Signature.V0.public_key ->
   src_sk:Client_keys_v0.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->
@@ -227,7 +227,7 @@ val reveal :
   Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key = {
-  pkh : Tezos_crypto.Signature.Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;

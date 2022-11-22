@@ -91,6 +91,7 @@ module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 include Tezos_crypto.Hashed
+module Signature = Tezos_crypto.Signature
 include Utils.Infix
 include Error_monad
 

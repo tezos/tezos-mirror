@@ -520,7 +520,7 @@ module Make (Rollup : PARAMETERS) = struct
     let* signature =
       Client_keys.sign
         state.cctxt
-        ~watermark:Tezos_crypto.Signature.Generic_operation
+        ~watermark:Signature.Generic_operation
         state.signer.sk
         unsigned_op_bytes
     in
@@ -634,7 +634,7 @@ module Make (Rollup : PARAMETERS) = struct
           assert false
       | Ok packed_contents_list -> packed_contents_list
     in
-    let signature = Tezos_crypto.Signature.zero in
+    let signature = Signature.zero in
     let branch = Block_hash.zero in
     let operation =
       {
@@ -1014,9 +1014,7 @@ module Make (Rollup : PARAMETERS) = struct
         (fun acc (signer, strategy, tags) ->
           let tags = Tags.of_list tags in
           let strategy, tags =
-            match
-              Tezos_crypto.Signature.Public_key_hash.Map.find_opt signer acc
-            with
+            match Signature.Public_key_hash.Map.find_opt signer acc with
             | None -> (strategy, tags)
             | Some (other_strategy, other_tags) ->
                 let strategy =
@@ -1030,17 +1028,14 @@ module Make (Rollup : PARAMETERS) = struct
                 in
                 (strategy, Tags.union other_tags tags)
           in
-          Tezos_crypto.Signature.Public_key_hash.Map.add
-            signer
-            (strategy, tags)
-            acc)
-        Tezos_crypto.Signature.Public_key_hash.Map.empty
+          Signature.Public_key_hash.Map.add signer (strategy, tags) acc)
+        Signature.Public_key_hash.Map.empty
         signers
     in
     let* constants =
       Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
     in
-    Tezos_crypto.Signature.Public_key_hash.Map.iter_es
+    Signature.Public_key_hash.Map.iter_es
       (fun signer (strategy, tags) ->
         let+ worker =
           Worker.launch

@@ -67,7 +67,7 @@ let fake_KT1 =
 
 let default_self = fake_KT1
 
-let default_payer = Tezos_crypto.Signature.Public_key_hash.zero
+let default_payer = Signature.Public_key_hash.zero
 
 let default_source = Contract.Implicit default_payer
 

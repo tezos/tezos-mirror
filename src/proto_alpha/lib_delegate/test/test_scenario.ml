@@ -1,14 +1,14 @@
 open Mockup_simulator
 
-let bootstrap1 = Tezos_crypto.Signature.Public_key.hash bootstrap1
+let bootstrap1 = Signature.Public_key.hash bootstrap1
 
-let bootstrap2 = Tezos_crypto.Signature.Public_key.hash bootstrap2
+let bootstrap2 = Signature.Public_key.hash bootstrap2
 
-let bootstrap3 = Tezos_crypto.Signature.Public_key.hash bootstrap3
+let bootstrap3 = Signature.Public_key.hash bootstrap3
 
-let bootstrap4 = Tezos_crypto.Signature.Public_key.hash bootstrap4
+let bootstrap4 = Signature.Public_key.hash bootstrap4
 
-let bootstrap5 = Tezos_crypto.Signature.Public_key.hash bootstrap5
+let bootstrap5 = Signature.Public_key.hash bootstrap5
 
 let some_seed s = Some (Protocol.State_hash.of_b58check_exn s)
 

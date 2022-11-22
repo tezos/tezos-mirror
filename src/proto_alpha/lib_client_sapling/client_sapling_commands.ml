@@ -70,9 +70,7 @@ let bound_data_of_public_key_hash cctxt dst =
   let open Tezos_micheline in
   let open Protocol.Michelson_v1_primitives in
   let pkh_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Tezos_crypto.Signature.Public_key_hash.encoding
-      dst
+    Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding dst
   in
   let micheline_bytes = Micheline.(Bytes (0, pkh_bytes) |> strip_locations) in
   let micheline_pkh_type =

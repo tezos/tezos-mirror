@@ -65,25 +65,20 @@ module type T = sig
        and type Block_header.shell_header = Block_header.shell_header
        and type Block_header.t = Block_header.t
        and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
-       and type Ed25519.Public_key_hash.t =
-        Tezos_crypto.Signature.Ed25519.Public_key_hash.t
-       and type Ed25519.Public_key.t =
-        Tezos_crypto.Signature.Ed25519.Public_key.t
-       and type Ed25519.t = Tezos_crypto.Signature.Ed25519.t
+       and type Ed25519.Public_key_hash.t = Signature.Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t = Signature.Ed25519.Public_key.t
+       and type Ed25519.t = Signature.Ed25519.t
        and type Secp256k1.Public_key_hash.t =
-        Tezos_crypto.Signature.Secp256k1.Public_key_hash.t
-       and type Secp256k1.Public_key.t =
-        Tezos_crypto.Signature.Secp256k1.Public_key.t
-       and type Secp256k1.t = Tezos_crypto.Signature.Secp256k1.t
-       and type P256.Public_key_hash.t =
-        Tezos_crypto.Signature.P256.Public_key_hash.t
-       and type P256.Public_key.t = Tezos_crypto.Signature.P256.Public_key.t
-       and type P256.t = Tezos_crypto.Signature.P256.t
-       and type Signature.public_key_hash =
-        Tezos_crypto.Signature.V0.public_key_hash
-       and type Signature.public_key = Tezos_crypto.Signature.V0.public_key
-       and type Signature.t = Tezos_crypto.Signature.V0.t
-       and type Signature.watermark = Tezos_crypto.Signature.V0.watermark
+        Signature.Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Signature.Secp256k1.Public_key.t
+       and type Secp256k1.t = Signature.Secp256k1.t
+       and type P256.Public_key_hash.t = Signature.P256.Public_key_hash.t
+       and type P256.Public_key.t = Signature.P256.Public_key.t
+       and type P256.t = Signature.P256.t
+       and type Signature.public_key_hash = Signature.V0.public_key_hash
+       and type Signature.public_key = Signature.V0.public_key
+       and type Signature.t = Signature.V0.t
+       and type Signature.watermark = Signature.V0.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
@@ -275,10 +270,10 @@ struct
     let aggregate_verify = Aug.aggregate_verify
   end
 
-  module Ed25519 = Tezos_crypto.Signature.Ed25519
-  module Secp256k1 = Tezos_crypto.Signature.Secp256k1
-  module P256 = Tezos_crypto.Signature.P256
-  module Signature = Tezos_crypto.Signature.V0
+  module Ed25519 = Signature.Ed25519
+  module Secp256k1 = Signature.Secp256k1
+  module P256 = Signature.P256
+  module Signature = Signature.V0
   module Timelock = Tezos_crypto.Timelock
 
   module S = struct

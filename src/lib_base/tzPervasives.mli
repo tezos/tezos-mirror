@@ -104,6 +104,7 @@ module Operation_metadata_list_hash =
 module Operation_metadata_list_list_hash =
   Tezos_crypto.Hashed.Operation_metadata_list_list_hash
 module Protocol_hash = Tezos_crypto.Hashed.Protocol_hash
+module Signature = Tezos_crypto.Signature
 
 include module type of Utils.Infix
 

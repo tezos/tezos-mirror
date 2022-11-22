@@ -2223,7 +2223,7 @@ let commands_rw () =
             error
               "Public-key-hash `%a` from account `%s` does not appear to have \
                voting rights."
-              Tezos_crypto.Signature.Public_key_hash.pp
+              Signature.Public_key_hash.pp
               src_pkh
               src_name ;
           if !errors <> [] then
@@ -2384,7 +2384,7 @@ let commands_rw () =
             (if force then cctxt#warning else cctxt#error)
               "Public-key-hash `%a` from account `%s` does not appear to have \
                voting rights."
-              Tezos_crypto.Signature.Public_key_hash.pp
+              Signature.Public_key_hash.pp
               src_pkh
               src_name
         in
@@ -2984,7 +2984,7 @@ let commands_rw () =
               (fun (_, alice, bob) ->
                 let stakers = Sc_rollup.Game.Index.make staker1 staker2 in
                 return
-                  Tezos_crypto.Signature.Public_key_hash.(
+                  Signature.Public_key_hash.(
                     alice = stakers.alice && bob = stakers.bob))
               games
           in

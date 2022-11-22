@@ -96,13 +96,13 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
           Format.fprintf
             ppf
             "@,Delegate: %a"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate -> Tezos_crypto.Signature.Public_key_hash.pp ppf delegate)
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
   | Event {ty; tag; payload} ->
       Format.fprintf
         ppf
@@ -169,7 +169,7 @@ let pp_manager_operation_content (type kind) source ppf
           Format.fprintf
             ppf
             "@,Delegate: %a"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             delegate)
   | Reveal key ->
       Format.fprintf
@@ -177,13 +177,13 @@ let pp_manager_operation_content (type kind) source ppf
         "Revelation of manager public key:@,Contract: %a@,Key: %a"
         Contract.pp
         source
-        Tezos_crypto.Signature.Public_key.pp
+        Signature.Public_key.pp
         key
   | Delegation delegate_opt -> (
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate -> Tezos_crypto.Signature.Public_key_hash.pp ppf delegate)
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
   | Register_global_constant {value} ->
       Format.fprintf
         ppf
@@ -213,8 +213,8 @@ let pp_manager_operation_content (type kind) source ppf
       Format.fprintf
         ppf
         "Update_consensus_key:@,Public key hash: %a"
-        Tezos_crypto.Signature.Public_key_hash.pp
-        (Tezos_crypto.Signature.Public_key.hash pk)
+        Signature.Public_key_hash.pp
+        (Signature.Public_key.hash pk)
   | Tx_rollup_origination ->
       Format.fprintf
         ppf
@@ -389,7 +389,7 @@ let pp_manager_operation_content (type kind) source ppf
         "Smart rollup bond retrieval:@,Address: %a@,Staker: %a"
         Sc_rollup.Address.pp
         sc_rollup
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         staker
   | Dal_publish_slot_header operation ->
       Format.fprintf
@@ -410,12 +410,9 @@ let pp_balance_updates ppf balance_updates =
      (tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU). Instead of printing this
      key hash, we want to make the result more informative. *)
   let pp_baker ppf baker =
-    if
-      Tezos_crypto.Signature.Public_key_hash.equal
-        baker
-        Tezos_crypto.Signature.Public_key_hash.zero
-    then Format.fprintf ppf "the baker who will include this operation"
-    else Tezos_crypto.Signature.Public_key_hash.pp ppf baker
+    if Signature.Public_key_hash.equal baker Signature.Public_key_hash.zero then
+      Format.fprintf ppf "the baker who will include this operation"
+    else Signature.Public_key_hash.pp ppf baker
   in
   let balance_updates =
     List.map
@@ -974,11 +971,7 @@ let pp_manager_operation_result ppf
       Manager_operation_result
         {balance_updates; operation_result; internal_operation_results} ) =
   Format.fprintf ppf "@[<v 2>Manager signed operations:" ;
-  Format.fprintf
-    ppf
-    "@,From: %a"
-    Tezos_crypto.Signature.Public_key_hash.pp
-    source ;
+  Format.fprintf ppf "@,From: %a" Signature.Public_key_hash.pp source ;
   Format.fprintf ppf "@,Fee to the baker: %s%a" tez_sym Tez.pp fee ;
   Format.fprintf ppf "@,Expected counter: %a" Manager_counter.pp counter ;
   Format.fprintf ppf "@,Gas limit: %a" Gas.Arith.pp_integral gas_limit ;
@@ -1073,7 +1066,7 @@ let pp_contents_and_result :
       Format.fprintf
         ppf
         "@[<v 2>Slot attestation:@,Delegate: %a@]"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         delegate
   | ( Double_endorsement_evidence {op1; op2},
       Double_endorsement_evidence_result bus ) ->
@@ -1112,7 +1105,7 @@ let pp_contents_and_result :
          Account: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Signature.Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         id
         pp_balance_updates
         bus
@@ -1120,7 +1113,7 @@ let pp_contents_and_result :
       Format.fprintf
         ppf
         "@[<v 2>Proposals:@,From: %a@,Period: %ld@,Protocols:@,  @[<v 0>%a@]@]"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         source
         period
         (Format.pp_print_list Protocol_hash.pp)
@@ -1129,7 +1122,7 @@ let pp_contents_and_result :
       Format.fprintf
         ppf
         "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         source
         period
         Protocol_hash.pp
@@ -1145,11 +1138,11 @@ let pp_contents_and_result :
          Consensus key hash: %a@,\
          Delegate: %a@,\
          Destination: %a%s%a@]"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         consensus_key
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         delegate
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Signature.Public_key_hash.pp
         destination
         (if allocated_destination_contract then " (allocated)" else "")
         pp_balance_updates

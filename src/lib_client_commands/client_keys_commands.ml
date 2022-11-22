@@ -37,10 +37,10 @@ let algo_param () =
     ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"; "bls"])
     (fun _ name ->
       match name with
-      | "ed25519" -> return Tezos_crypto.Signature.Ed25519
-      | "secp256k1" -> return Tezos_crypto.Signature.Secp256k1
-      | "p256" -> return Tezos_crypto.Signature.P256
-      | "bls" -> return Tezos_crypto.Signature.Bls
+      | "ed25519" -> return Signature.Ed25519
+      | "secp256k1" -> return Signature.Secp256k1
+      | "p256" -> return Signature.P256
+      | "bls" -> return Signature.Bls
       | name ->
           failwith
             "Unknown signature algorithm (%s). Available: 'ed25519', \
@@ -148,11 +148,11 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false)
             in
             let rec loop attempts =
               let public_key_hash, public_key, secret_key =
-                Tezos_crypto.Signature.generate_key ()
+                Signature.generate_key ()
               in
               let hash =
-                Tezos_crypto.Signature.Public_key_hash.to_b58check
-                @@ Tezos_crypto.Signature.Public_key.hash public_key
+                Signature.Public_key_hash.to_b58check
+                @@ Signature.Public_key.hash public_key
               in
               if matches hash then
                 let*? pk_uri =
@@ -225,18 +225,18 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       let passphrase = Bytes.(cat (of_string email) password) in
       let sk = Bip39.to_seed ~passphrase t in
       let sk = Bytes.sub sk 0 32 in
-      let sk : Tezos_crypto.Signature.Secret_key.t =
+      let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn
-             Tezos_crypto.Signature.Ed25519.Secret_key.encoding
+             Signature.Ed25519.Secret_key.encoding
              sk)
       in
-      let pk = Tezos_crypto.Signature.Secret_key.to_public_key sk in
-      let pkh = Tezos_crypto.Signature.Public_key.hash pk in
+      let pk = Signature.Secret_key.to_public_key sk in
+      let pkh = Signature.Public_key.hash pk in
       let msg =
         Format.asprintf
           "Your public Tezos address is %a is that correct?"
-          Tezos_crypto.Signature.Public_key_hash.pp
+          Signature.Public_key_hash.pp
           pkh
       in
       let* b = get_boolean_answer cctxt ~msg ~default:true in
@@ -270,9 +270,9 @@ let keys_count_param =
 
 (** The kind of info that the [generate_test_keys] command outputs. *)
 type source = {
-  pkh : Tezos_crypto.Signature.public_key_hash;
-  pk : Tezos_crypto.Signature.public_key;
-  sk : Tezos_crypto.Signature.secret_key;
+  pkh : Signature.public_key_hash;
+  pk : Signature.public_key;
+  sk : Signature.secret_key;
 }
 
 let source_encoding =
@@ -281,9 +281,9 @@ let source_encoding =
     (fun {pkh; pk; sk} -> (pkh, pk, sk))
     (fun (pkh, pk, sk) -> {pkh; pk; sk})
     (obj3
-       (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
-       (req "pk" Tezos_crypto.Signature.Public_key.encoding)
-       (req "sk" Tezos_crypto.Signature.Secret_key.encoding))
+       (req "pkh" Signature.Public_key_hash.encoding)
+       (req "pk" Signature.Public_key.encoding)
+       (req "sk" Signature.Secret_key.encoding))
 
 let source_list_encoding = Data_encoding.list source_encoding
 
@@ -344,9 +344,7 @@ let generate_test_keys =
         List.init_es ~when_negative_length:[] n (fun i ->
             let alias = alias_prefix i in
             let pkh, pk, sk =
-              Tezos_crypto.Signature.generate_key
-                ~algo:Tezos_crypto.Signature.Ed25519
-                ()
+              Signature.generate_key ~algo:Signature.Ed25519 ()
             in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
@@ -555,7 +553,7 @@ let commands network : Client_context.full Tezos_clic.command list =
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo) name (cctxt : Client_context.full) ->
             let* name = Secret_key.of_fresh cctxt force name in
-            let pkh, pk, sk = Tezos_crypto.Signature.generate_key ~algo () in
+            let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
               Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -572,7 +570,7 @@ let commands network : Client_context.full Tezos_clic.command list =
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo, encrypted) name (cctxt : Client_context.full) ->
             let* name = Secret_key.of_fresh cctxt force name in
-            let pkh, pk, sk = Tezos_crypto.Signature.generate_key ~algo () in
+            let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
               if encrypted then
@@ -670,8 +668,7 @@ let commands network : Client_context.full Tezos_clic.command list =
                 "This command can only be used with the \"unencrypted\" scheme"
         in
         let* sk =
-          Lwt.return
-            (Tezos_crypto.Signature.Secret_key.of_b58check (Uri.path sk_uri))
+          Lwt.return (Signature.Secret_key.of_b58check (Uri.path sk_uri))
         in
         let* sk_uri =
           Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -699,7 +696,7 @@ let commands network : Client_context.full Tezos_clic.command list =
         let*! () =
           cctxt#message
             "Tezos address added: %a"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             pkh
         in
         register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name);
@@ -740,7 +737,7 @@ let commands network : Client_context.full Tezos_clic.command list =
           let*! () =
             cctxt#message
               "Tezos address added: %a"
-              Tezos_crypto.Signature.Public_key_hash.pp
+              Signature.Public_key_hash.pp
               pkh
           in
           Public_key.add ~force cctxt name (pk_uri, public_key));
@@ -790,19 +787,13 @@ let commands network : Client_context.full Tezos_clic.command list =
               return_unit
           | Some (pkh, pk, skloc) -> (
               let*! () =
-                cctxt#message
-                  "Hash: %a"
-                  Tezos_crypto.Signature.Public_key_hash.pp
-                  pkh
+                cctxt#message "Hash: %a" Signature.Public_key_hash.pp pkh
               in
               match pk with
               | None -> return_unit
               | Some pk ->
                   let*! () =
-                    cctxt#message
-                      "Public Key: %a"
-                      Tezos_crypto.Signature.Public_key.pp
-                      pk
+                    cctxt#message "Public Key: %a" Signature.Public_key.pp pk
                   in
                   if show_private then
                     match skloc with
@@ -934,10 +925,10 @@ let commands network : Client_context.full Tezos_clic.command list =
               in
               let sk = Bip39.to_seed ~passphrase t in
               let sk = Bytes.sub sk 0 32 in
-              let sk : Tezos_crypto.Signature.Secret_key.t =
+              let sk : Signature.Secret_key.t =
                 Ed25519
                   (Data_encoding.Binary.of_bytes_exn
-                     Tezos_crypto.Signature.Ed25519.Secret_key.encoding
+                     Signature.Ed25519.Secret_key.encoding
                      sk)
               in
               let*? unencrypted_sk_uri =
@@ -962,7 +953,7 @@ let commands network : Client_context.full Tezos_clic.command list =
               let*! () =
                 cctxt#message
                   "Tezos address added: %a"
-                  Tezos_crypto.Signature.Public_key_hash.pp
+                  Signature.Public_key_hash.pp
                   pkh
               in
               return_unit);

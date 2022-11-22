@@ -40,7 +40,7 @@ module HLevel = Hashtbl.Make (struct
 end)
 
 (* Blocks are associated to the delegates who baked them *)
-module Delegate_Map = Map.Make (Tezos_crypto.Signature.Public_key_hash)
+module Delegate_Map = Map.Make (Signature.Public_key_hash)
 
 (* (pre)endorsements are associated to the slot they are injected
    with; we rely on the fact that there is a unique canonical slot
@@ -175,9 +175,7 @@ let process_consensus_op (type kind) cctxt
         ~op2
         ()
       >>=? fun bytes ->
-      let bytes =
-        Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero
-      in
+      let bytes = Signature.concat bytes Signature.zero in
       let double_op_detected, double_op_denounced =
         Events.(
           match op_kind with
@@ -303,9 +301,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
             ~bh2
             ()
           >>=? fun bytes ->
-          let bytes =
-            Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero
-          in
+          let bytes = Signature.concat bytes Signature.zero in
           Events.(emit double_baking_detected) () >>= fun () ->
           Shell_services.Injection.operation cctxt ~chain bytes
           >>=? fun op_hash ->

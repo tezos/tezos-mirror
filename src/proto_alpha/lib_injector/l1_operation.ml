@@ -149,7 +149,7 @@ module Manager_operation = struct
             ty
             pp_lazy_expr
             contents
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Signature.Public_key_hash.pp
             claimer
         in
         Format.fprintf

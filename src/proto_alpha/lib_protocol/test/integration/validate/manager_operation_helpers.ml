@@ -1073,7 +1073,7 @@ let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
    increment of the counters aka 1 for a single operation, n for a
    batch of n manager operations. *)
 type probes = {
-  source : Tezos_crypto.Signature.Public_key_hash.t;
+  source : Signature.Public_key_hash.t;
   fee : Tez.tez;
   gas_limit : Gas.Arith.integral;
   nb_counter : int;
@@ -1194,7 +1194,7 @@ let observe ~mode ~deallocated ctxt_pre ctxt_post op =
     | Ok () ->
         failwith
           "%a should have been deallocated@."
-          Tezos_crypto.Signature.Public_key_hash.pp
+          Signature.Public_key_hash.pp
           (Context.Contract.pkh contract)
     | Error
         [

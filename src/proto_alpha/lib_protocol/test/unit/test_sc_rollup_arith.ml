@@ -452,7 +452,7 @@ let dummy_internal_transfer address =
   let source =
     WithExceptions.Result.get_ok
       ~loc:__LOC__
-      (Tezos_crypto.Signature.Public_key_hash.of_b58check
+      (Signature.Public_key_hash.of_b58check
          "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
   in
   let payload = Bytes.of_string "foo" in

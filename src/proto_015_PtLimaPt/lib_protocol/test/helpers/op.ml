@@ -517,7 +517,7 @@ let activation ctxt (pkh : Tezos_crypto.Signature.V0.Public_key_hash.t)
   | _ ->
       failwith
         "Wrong public key hash : %a - Commitments must be activated with an \
-         Tezos_crypto.Ed25519 encrypted public key hash"
+         Ed25519 encrypted public key hash"
         Tezos_crypto.Signature.V0.Public_key_hash.pp
         pkh)
   >|=? fun id ->

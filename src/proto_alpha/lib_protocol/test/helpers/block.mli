@@ -103,7 +103,7 @@ module Forge : sig
   (** Sets the baker that will sign the header to an arbitrary pkh *)
   val set_baker :
     public_key_hash ->
-    ?consensus_key:Tezos_crypto.Signature.public_key_hash ->
+    ?consensus_key:Signature.public_key_hash ->
     header ->
     header
 

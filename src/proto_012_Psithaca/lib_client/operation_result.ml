@@ -95,7 +95,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
           Format.fprintf
             ppf
             "@,Delegate: %a"
-            Tezos_crypto.Signature.V0.Public_key_hash.pp
+            Signature.V0.Public_key_hash.pp
             delegate) ;
       pp_result ppf result ;
       Format.fprintf ppf "@]"
@@ -106,7 +106,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal revelation" else "Revelation")
         Contract.pp
         source
-        Tezos_crypto.Signature.V0.Public_key.pp
+        Signature.V0.Public_key.pp
         key
         pp_result
         result
@@ -126,7 +126,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         (if internal then "Internal Delegation" else "Delegation")
         Contract.pp
         source
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         pp_result
         result
@@ -176,11 +176,11 @@ let pp_balance_updates ppf = function
          key hash, we want to make the result more informative. *)
       let pp_baker ppf baker =
         if
-          Tezos_crypto.Signature.V0.Public_key_hash.equal
+          Signature.V0.Public_key_hash.equal
             baker
-            Tezos_crypto.Signature.V0.Public_key_hash.zero
+            Signature.V0.Public_key_hash.zero
         then Format.fprintf ppf "the baker who will include this operation"
-        else Tezos_crypto.Signature.V0.Public_key_hash.pp ppf baker
+        else Signature.V0.Public_key_hash.pp ppf baker
       in
       let balance_updates =
         List.map
@@ -460,7 +460,7 @@ let pp_manager_operation_contents_and_result ppf
      Expected counter: %s@,\
      Gas limit: %a@,\
      Storage limit: %s bytes"
-    Tezos_crypto.Signature.V0.Public_key_hash.pp
+    Signature.V0.Public_key_hash.pp
     source
     Client_proto_args.tez_sym
     Tez.pp
@@ -550,7 +550,7 @@ let rec pp_contents_and_result_list :
         level
         pp_balance_updates
         balance_updates
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         preendorsement_power
   | Single_and_result
@@ -567,7 +567,7 @@ let rec pp_contents_and_result_list :
         level
         pp_balance_updates
         balance_updates
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         endorsement_power
   | Single_and_result
@@ -609,7 +609,7 @@ let rec pp_contents_and_result_list :
          Account: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Signature.Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         id
         pp_balance_updates
         bus
@@ -618,7 +618,7 @@ let rec pp_contents_and_result_list :
       Format.fprintf
         ppf
         "@[<v 2>Proposals:@,From: %a@,Period: %ld@,Protocols:@,  @[<v 0>%a@]@]"
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         source
         period
         (Format.pp_print_list Protocol_hash.pp)
@@ -628,7 +628,7 @@ let rec pp_contents_and_result_list :
       Format.fprintf
         ppf
         "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         source
         period
         Protocol_hash.pp

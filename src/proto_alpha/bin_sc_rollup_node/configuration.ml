@@ -38,7 +38,7 @@ module Operator_purpose_map = Map.Make (struct
   let compare = Stdlib.compare
 end)
 
-type operators = Tezos_crypto.Signature.Public_key_hash.t Operator_purpose_map.t
+type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 
@@ -188,12 +188,12 @@ let protocol_max_batch_size =
       shell = {branch = Block_hash.zero};
       protocol_data =
         {
-          signature = Some Tezos_crypto.Signature.zero;
+          signature = Some Signature.zero;
           contents =
             Single
               (Manager_operation
                  {
-                   source = Tezos_crypto.Signature.Public_key_hash.zero;
+                   source = Signature.Public_key_hash.zero;
                    fee = Tez.of_mutez_exn Int64.max_int;
                    counter = Manager_counter.Internal_for_tests.of_int max_int;
                    gas_limit =
@@ -318,8 +318,7 @@ let operator_purpose_map_encoding encoding =
     Data_encoding.Json.encoding
 
 let operators_encoding =
-  operator_purpose_map_encoding (fun _ ->
-      Tezos_crypto.Signature.Public_key_hash.encoding)
+  operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
 
 let fee_parameter_encoding purpose =
   let open Data_encoding in

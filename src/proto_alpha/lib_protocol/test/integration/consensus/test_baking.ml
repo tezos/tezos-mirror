@@ -170,7 +170,7 @@ let get_contract_for_pkh contracts pkh =
     | [] -> assert false
     | c :: t ->
         let c_pkh = Context.Contract.pkh c in
-        if Tezos_crypto.Signature.Public_key_hash.equal c_pkh pkh then return c
+        if Signature.Public_key_hash.equal c_pkh pkh then return c
         else find_contract t
   in
   find_contract contracts
@@ -223,7 +223,7 @@ let test_rewards_block_and_payload_producer () =
   >>=? fun frozen_deposit ->
   Context.get_baking_reward_fixed_portion (B b2) >>=? fun baking_reward ->
   Context.get_bonus_reward (B b2) ~endorsing_power >>=? fun bonus_reward ->
-  (if Tezos_crypto.Signature.Public_key_hash.equal baker_b2 baker_b1 then
+  (if Signature.Public_key_hash.equal baker_b2 baker_b1 then
    Context.get_baking_reward_fixed_portion (B b1)
   else return Tez.zero)
   >>=? fun reward_for_b1 ->
@@ -265,8 +265,7 @@ let test_rewards_block_and_payload_producer () =
   Context.Delegate.current_frozen_deposits (B b2') baker_b2
   >>=? fun frozen_deposit ->
   let reward_for_b1 =
-    if Tezos_crypto.Signature.Public_key_hash.equal baker_b2 baker_b1 then
-      baking_reward
+    if Signature.Public_key_hash.equal baker_b2 baker_b1 then baking_reward
     else Tez.zero
   in
   let expected_balance =
@@ -283,8 +282,7 @@ let test_rewards_block_and_payload_producer () =
   >>=? fun frozen_deposits' ->
   Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   let reward_for_b1' =
-    if Tezos_crypto.Signature.Public_key_hash.equal baker_b2' baker_b1 then
-      baking_reward
+    if Signature.Public_key_hash.equal baker_b2' baker_b1 then baking_reward
     else Tez.zero
   in
   let expected_balance' =
@@ -390,7 +388,7 @@ let test_committee_sampling () =
             Format.fprintf
               ppf
               "@[<h>- %a %d%a@]@,"
-              Tezos_crypto.Signature.Public_key_hash.pp
+              Signature.Public_key_hash.pp
               pkh
               n
               (fun ppf failed ->
