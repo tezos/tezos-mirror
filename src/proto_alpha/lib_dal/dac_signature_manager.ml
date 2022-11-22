@@ -142,6 +142,39 @@ module Make (Hashing_scheme : REVEAL_HASH) = struct
         match final_signature with
         | None -> tzfail @@ Cannot_compute_aggregate_signature b58_root_hash
         | Some signature -> return @@ (signature, witnesses))
+
+  let verify ~public_keys_opt root_page_hash signature witnesses =
+    let open Lwt_result_syntax in
+    let hash_as_bytes =
+      Data_encoding.Binary.to_bytes_opt Hashing_scheme.encoding root_page_hash
+    in
+    match hash_as_bytes with
+    | None ->
+        tzfail
+        @@ Cannot_convert_root_page_hash_to_bytes
+             (Hashing_scheme.to_b58check root_page_hash)
+    | Some bytes ->
+        let* pk_msg_list =
+          public_keys_opt
+          |> List.mapi (fun i public_key_opt -> (i, public_key_opt))
+          |> List.filter_map_es (fun (i, public_key_opt) ->
+                 let*? is_witness = Bitset.mem witnesses i in
+
+                 match public_key_opt with
+                 | None ->
+                     if is_witness then
+                       tzfail
+                       @@ Public_key_for_witness_not_available
+                            (i, Hashing_scheme.to_b58check root_page_hash)
+                     else return None
+                 | Some public_key ->
+                     if is_witness then return @@ Some (public_key, None, bytes)
+                     else return None)
+        in
+        return
+        @@ Tezos_crypto.Aggregate_signature.aggregate_check
+             pk_msg_list
+             signature
 end
 
 module Reveal_hash = Make (Sc_rollup_reveal_hash)
