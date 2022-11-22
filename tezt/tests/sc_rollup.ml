@@ -3409,21 +3409,47 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
   in
   let trigger_outbox_message_execution address =
     let outbox_level = 5 in
-    let* outbox = Sc_rollup_client.outbox ~outbox_level sc_client in
-    Log.info "Outbox is %s" (JSON.encode outbox) ;
-    let* answer =
-      let message_index = 0 in
-      let destination = address in
-      let parameters = "37" in
-      Sc_rollup_client.outbox_proof_single
-        sc_client
-        ?expected_error
-        ~message_index
-        ~outbox_level
-        ~destination
-        ?entrypoint
-        ~parameters
+    let destination = address in
+    let parameters = "37" in
+    let message_index = 0 in
+    let check_expected_outbox () =
+      let* outbox = Sc_rollup_client.outbox ~outbox_level sc_client in
+      Log.info "Outbox is %s" (Ezjsonm.to_string outbox) ;
+
+      match expected_error with
+      | None ->
+          let expected =
+            Ezjsonm.from_string
+              (Printf.sprintf
+                 {|
+              [ { "outbox_level": %d, "message_index": "%d",
+                  "message":
+                  { "transactions":
+                    [ { "parameters": { "int": "%s" },
+                    "destination": "%s"%s } ] } } ] |}
+                 outbox_level
+                 message_index
+                 parameters
+                 address
+                 (match entrypoint with
+                 | None -> ""
+                 | Some entrypoint ->
+                     Format.asprintf {| , "entrypoint" : "%s" |} entrypoint))
+          in
+          assert (Ezjsonm.to_string expected = Ezjsonm.to_string outbox) ;
+          Sc_rollup_client.outbox_proof_single
+            sc_client
+            ?expected_error
+            ~message_index
+            ~outbox_level
+            ~destination
+            ?entrypoint
+            ~parameters
+      | Some _ ->
+          assert (Ezjsonm.to_string outbox = "[]") ;
+          return None
     in
+    let* answer = check_expected_outbox () in
     match (answer, expected_error) with
     | Some _, Some _ -> assert false
     | None, None -> failwith "Unexpected error during proof generation"

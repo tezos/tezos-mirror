@@ -200,7 +200,7 @@ module Outbox_directory = Make_directory (struct
   include Sc_rollup_services.Global.Block.Outbox
 
   type context =
-    Node_context.t * Tezos_crypto.Block_hash.t * Alpha_context.Raw_level.t
+    Node_context.ro * Tezos_crypto.Block_hash.t * Alpha_context.Raw_level.t
 
   let context_of_prefix node_ctxt (((), block), level) =
     let open Lwt_result_syntax in
@@ -212,7 +212,7 @@ module Outbox_directory = Make_directory (struct
       | `Finalized -> get_finalized node_ctxt.Node_context.store
       | `Cemented -> get_last_cemented node_ctxt.Node_context.store
     in
-    (node_ctxt, block, level)
+    (Node_context.readonly node_ctxt, block, level)
 end)
 
 module Common = struct
@@ -302,7 +302,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
       Simulation.end_simulation node_ctxt sim
     in
     let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
-    let*! outbox = PVM.get_outbox state in
+    let*! outbox = PVM.get_outbox inbox_level state in
     let output =
       List.filter
         (fun Sc_rollup.{outbox_level; _} -> outbox_level = inbox_level)
