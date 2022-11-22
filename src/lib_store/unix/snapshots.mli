@@ -181,19 +181,18 @@ val export :
   unit tzresult Lwt.t
 
 (** [import ~snapshot_path ?patch_context ?block ?check_consistency
-   ~dst_store_dir ~dst_context_dir chain_name ~user_activated_upgrades
-   ~user_activated_protocol_overrides ~ops_metadata_size_limit
-   ~in_memory genesis] populates [dst_store_dir] and [dst_context_dir]
-   with the data contained in the [snapshot_file]. If
-   [check_consistency] is unset, less security checks will be made and
-   the import process will be more efficient. If [block] is set, the
-   import process will make sure that the block is the correct one we
-   load. [patch_context], [user_activated_upgrades] and
-   [user_activated_protocol_overrides] are passed to the validator in
-   order to validate the target block. [ops_metadata_size_limit]
-   determines the maximal size of the metadata to store while
-   importing a snapshot. [in_memory] states if the import should be
-   all in memory, which is faster but uses more memory. *)
+    ~dst_store_dir ~dst_context_dir chain_name
+    ~user_activated_upgrades ~user_activated_protocol_overrides
+    ~ops_metadata_size_limit genesis] populates [dst_store_dir] and
+    [dst_context_dir] with the data contained in the
+    [snapshot_file]. If [check_consistency] is unset, less security
+    checks will be made and the import process will be more
+    efficient. If [block] is set, the import process will make sure
+    that the block is the correct one we load. [patch_context],
+    [user_activated_upgrades] and [user_activated_protocol_overrides]
+    are passed to the validator in order to validate the target
+    block. [ops_metadata_size_limit] determines the maximal size of
+    the metadata to store while importing a snapshot. *)
 val import :
   snapshot_path:string ->
   ?patch_context:
@@ -208,7 +207,6 @@ val import :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
-  in_memory:bool ->
   progress_display_mode:Animation.progress_display_mode ->
   Genesis.t ->
   unit tzresult Lwt.t

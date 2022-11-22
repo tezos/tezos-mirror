@@ -227,7 +227,6 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
             ~operation_metadata_size_limit:Unlimited
-            ~in_memory:true
             ~progress_display_mode:Animation.Auto
             genesis
         in

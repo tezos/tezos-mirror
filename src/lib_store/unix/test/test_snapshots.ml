@@ -135,7 +135,6 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~user_activated_upgrades:[]
       ~user_activated_protocol_overrides:[]
       ~operation_metadata_size_limit:Unlimited
-      ~in_memory:false
       ~progress_display_mode:Animation.Auto
       genesis
   in
@@ -522,7 +521,6 @@ let test_rolling () =
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
         ~operation_metadata_size_limit:Unlimited
-        ~in_memory:false
         ~progress_display_mode:Animation.Auto
         genesis
     in
@@ -647,7 +645,6 @@ let test_drag_after_import () =
         ~user_activated_protocol_overrides:[]
         ~operation_metadata_size_limit:Unlimited
         ~block:export_block_hash
-        ~in_memory:false
         ~progress_display_mode:Animation.Auto
         genesis
     in

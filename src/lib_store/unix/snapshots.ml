@@ -2840,12 +2840,13 @@ module type IMPORTER = sig
 
   val load_block_data : t -> block_data tzresult Lwt.t
 
-  val restore_context :
+  val restore_context : t -> dst_context_dir:string -> unit tzresult Lwt.t
+
+  val legacy_restore_context :
     t ->
     Context.index ->
     expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
-    in_memory:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
 
@@ -2957,8 +2958,16 @@ module Raw_importer : IMPORTER = struct
         | Some v -> return v
         | None -> tzfail (Cannot_read {kind = `Block_data; path = file}))
 
-  let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~in_memory ~progress_display_mode =
+  let restore_context t ~dst_context_dir =
+    let open Lwt_result_syntax in
+    let context_file_path =
+      Naming.(snapshot_context_file t.snapshot_dir |> file_path)
+    in
+    let*! () = Lwt_utils_unix.copy_dir context_file_path dst_context_dir in
+    return_unit
+
+  let legacy_restore_context t context_index ~expected_context_hash
+      ~nb_context_elements ~progress_display_mode =
     let open Lwt_result_syntax in
     let context_file_path =
       Naming.(snapshot_context_file t.snapshot_dir |> file_path)
@@ -2987,7 +2996,7 @@ module Raw_importer : IMPORTER = struct
             ~expected_context_hash
             ~fd
             ~nb_context_elements
-            ~in_memory
+            ~in_memory:false
             ~progress_display_mode
         in
         let*! current = Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR in
@@ -3295,8 +3304,29 @@ module Tar_importer : IMPORTER = struct
         | None -> tzfail (Cannot_read {kind = `Block_data; path = filename}))
     | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
 
-  let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~in_memory ~progress_display_mode =
+  let restore_context t ~dst_context_dir =
+    let open Lwt_result_syntax in
+    let*! () = Lwt_unix.mkdir dst_context_dir 0o755 in
+    let index = Filename.concat dst_context_dir "index" in
+    let*! () = Lwt_unix.mkdir index 0o755 in
+    let*! context_files =
+      Onthefly.find_files_with_common_path t.tar ~pattern:"context"
+    in
+    let dst_dir = Filename.chop_suffix dst_context_dir "context" in
+    let*! () =
+      List.iter_s
+        (fun file ->
+          let filename = Onthefly.get_filename file in
+          Onthefly.copy_to_file
+            t.tar
+            file
+            ~dst:Filename.(concat dst_dir filename))
+        context_files
+    in
+    return_unit
+
+  let legacy_restore_context t context_index ~expected_context_hash
+      ~nb_context_elements ~progress_display_mode =
     let open Lwt_result_syntax in
     let filename = Naming.(snapshot_context_file t.snapshot_tar |> file_path) in
     let* header =
@@ -3311,7 +3341,7 @@ module Tar_importer : IMPORTER = struct
       ~expected_context_hash
       ~nb_context_elements
       ~fd
-      ~in_memory
+      ~in_memory:false
       ~progress_display_mode
 
   let load_protocol_table t =
@@ -3565,7 +3595,6 @@ module type Snapshot_importer = sig
     user_activated_upgrades:User_activated.upgrades ->
     user_activated_protocol_overrides:User_activated.protocol_overrides ->
     operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
-    in_memory:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     Genesis.t ->
     (unit, error trace) result Lwt.t
@@ -3718,18 +3747,11 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
          })
 
   let restore_and_apply_context snapshot_importer protocol_levels
-      ?user_expected_block ~context_index ~user_activated_upgrades
+      ?user_expected_block ~dst_context_dir ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~in_memory ~progress_display_mode snapshot_metadata genesis chain_id =
+      ~progress_display_mode ~legacy ~patch_context snapshot_metadata genesis
+      chain_id =
     let open Lwt_result_syntax in
-    (* Start by committing genesis *)
-    let* genesis_ctxt_hash =
-      Context.commit_genesis
-        context_index
-        ~chain_id
-        ~time:genesis.Genesis.time
-        ~protocol:genesis.protocol
-    in
     let* ({
             block_header;
             resulting_context_hash;
@@ -3771,14 +3793,50 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             block_header.Block_header.shell.context
           else predecessor_header.Block_header.shell.context
     in
-    let* () =
-      Importer.restore_context
-        snapshot_importer
-        context_index
-        ~expected_context_hash:imported_context_hash
-        ~nb_context_elements:snapshot_metadata.context_elements
-        ~in_memory
-        ~progress_display_mode
+    let* genesis_ctxt_hash, context_index =
+      if legacy then
+        let*! context_index =
+          Context.init
+            ~readonly:false
+            ~indexing_strategy:`Minimal
+            ~index_log_size:default_index_log_size
+            ?patch_context
+            dst_context_dir
+        in
+        let* genesis_ctxt_hash =
+          Context.commit_genesis
+            context_index
+            ~chain_id
+            ~time:genesis.Genesis.time
+            ~protocol:genesis.protocol
+        in
+        let* () =
+          Importer.legacy_restore_context
+            snapshot_importer
+            context_index
+            ~expected_context_hash:imported_context_hash
+            ~nb_context_elements:snapshot_metadata.context_elements
+            ~progress_display_mode
+        in
+        return (genesis_ctxt_hash, context_index)
+      else
+        let* () = Importer.restore_context snapshot_importer ~dst_context_dir in
+        let*! context_index =
+          Context.init
+            ~readonly:false
+            ~indexing_strategy:`Minimal
+            ~index_log_size:default_index_log_size
+            ?patch_context
+            dst_context_dir
+        in
+        let* genesis_ctxt_hash =
+          Context.commit_genesis
+            context_index
+            ~chain_id
+            ~time:genesis.Genesis.time
+            ~protocol:genesis.protocol
+        in
+        return (genesis_ctxt_hash, context_index)
     in
     let* predecessor_context =
       let*! o = Context.checkout context_index imported_context_hash in
@@ -3837,7 +3895,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ?(check_consistency = true) ~dst_store_dir ~dst_context_dir ~chain_name
       ~configured_history_mode ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~in_memory ~progress_display_mode (genesis : Genesis.t) =
+      ~progress_display_mode (genesis : Genesis.t) =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let* snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
@@ -3898,10 +3956,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | None -> return_unit
     in
     let*! () =
-      if not in_memory then Event.(emit import_on_disk_mode) ()
-      else Lwt.return_unit
-    in
-    let*! () =
       import_log_notice ~snapshot_header snapshot_path user_expected_block
     in
     let patch_context =
@@ -3913,33 +3967,27 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           Shell_context.unwrap_disk_context ctxt)
         patch_context
     in
-    let*! context_index =
-      Context.init
-        ~readonly:false
-        ~indexing_strategy:`Minimal
-        ~index_log_size:default_index_log_size
-        ?patch_context
-        dst_context_dir
-    in
     (* Restore protocols *)
     let* protocol_levels =
       restore_protocols snapshot_importer progress_display_mode
     in
+    let* legacy = Version.is_legacy snapshot_version in
     (* Restore context *)
     let* block_data, genesis_context_hash, block_validation_result =
       restore_and_apply_context
         snapshot_importer
         protocol_levels
         ?user_expected_block
-        ~context_index
+        ~dst_context_dir
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         ~operation_metadata_size_limit
         ~progress_display_mode
+        ~legacy
+        ~patch_context
         snapshot_metadata
         genesis
         chain_id
-        ~in_memory
     in
     (* Restore store *)
     (* Restore cemented dir *)
@@ -4026,7 +4074,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~history_mode)
     in
     let* () = reading_thread in
-    let*! () = Context.close context_index in
     let*! () = Event.(emit import_success snapshot_path) in
     let*! () = close snapshot_importer in
     return_unit
@@ -4105,7 +4152,7 @@ let read_snapshot_header ~snapshot_path =
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~configured_history_mode
     ~user_activated_upgrades ~user_activated_protocol_overrides
-    ~operation_metadata_size_limit ~in_memory ~progress_display_mode genesis =
+    ~operation_metadata_size_limit ~progress_display_mode genesis =
   let open Lwt_result_syntax in
   let* kind = snapshot_file_kind ~snapshot_path in
   let (module Importer) =
@@ -4126,6 +4173,5 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~operation_metadata_size_limit
-    ~in_memory
     ~progress_display_mode
     genesis
