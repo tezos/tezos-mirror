@@ -518,7 +518,7 @@ module Test_batch_encodings = struct
         Format.fprintf
           fmt
           "@[<hov 2>Withdraw:@ destination=%a,@ ticket_hash=%a,@ qty:%a@]"
-          Tezos_crypto.Signature.Public_key_hash.pp
+          Tezos_crypto.Signature.V0.Public_key_hash.pp
           destination
           Alpha_context.Ticket_hash.pp
           ticket_hash

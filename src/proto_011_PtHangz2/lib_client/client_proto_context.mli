@@ -60,8 +60,8 @@ val register_global_constant :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.public_key ->
+  source:Tezos_crypto.Signature.V0.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.V0.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->

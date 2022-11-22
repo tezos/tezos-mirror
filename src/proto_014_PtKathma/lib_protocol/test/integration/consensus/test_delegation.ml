@@ -305,11 +305,11 @@ let undelegated_originated_bootstrap_contract () =
 let delegated_implicit_bootstrap_contract () =
   (* These values are fixed because we use a fixed RNG seed. *)
   let from_pkh =
-    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
       "tz1TDZG4vFoA2xutZMYauUnS4HVucnAGQSpZ"
   in
   let to_pkh =
-    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
       "tz1MBWU1WkszFfkEER2pgn4ATKXE9ng7x1sR"
   in
   let bootstrap_delegations = [(from_pkh, to_pkh)] in

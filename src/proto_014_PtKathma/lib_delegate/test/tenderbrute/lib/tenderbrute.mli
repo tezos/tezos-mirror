@@ -30,7 +30,7 @@ open Protocol
     specified level and rounds are not constrained. *)
 type delegate_selection =
   (Raw_level_repr.t
-  * (Round_repr.t * Tezos_crypto.Signature.public_key_hash) list)
+  * (Round_repr.t * Tezos_crypto.Signature.V0.public_key_hash) list)
   list
 
 (** Brute-force an initial seed nonce for the desired delegate selection.

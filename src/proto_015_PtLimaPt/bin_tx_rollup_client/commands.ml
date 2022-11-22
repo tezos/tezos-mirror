@@ -27,7 +27,7 @@ open Tezos_client_base
 
 let l1_destination_parameter =
   Tezos_clic.parameter (fun _ s ->
-      match Tezos_crypto.Signature.Public_key_hash.of_b58check_opt s with
+      match Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_opt s with
       | Some addr -> return addr
       | None -> failwith "cannot parse %s to get a valid destination" s)
 

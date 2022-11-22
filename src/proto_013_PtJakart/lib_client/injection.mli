@@ -108,8 +108,8 @@ val inject_manager_operation :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?force:bool ->
-  source:Tezos_crypto.Signature.Public_key_hash.t ->
-  src_pk:Tezos_crypto.Signature.public_key ->
+  source:Tezos_crypto.Signature.V0.Public_key_hash.t ->
+  src_pk:Tezos_crypto.Signature.V0.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee:Tez.t Limit.t ->
   gas_limit:Gas.Arith.integral Limit.t ->

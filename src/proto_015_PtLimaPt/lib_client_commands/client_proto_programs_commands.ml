@@ -136,7 +136,7 @@ let commands () =
   in
   let signature_parameter =
     parameter (fun _cctxt s ->
-        match Tezos_crypto.Signature.of_b58check_opt s with
+        match Tezos_crypto.Signature.V0.of_b58check_opt s with
         | Some s -> Lwt_result_syntax.return s
         | None -> failwith "Not given a valid signature")
   in
@@ -736,7 +736,7 @@ let commands () =
         let open Lwt_result_syntax in
         let* signature = Client_keys.sign cctxt sk bytes in
         let*! () =
-          cctxt#message "Signature: %a" Tezos_crypto.Signature.pp signature
+          cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
         in
         return_unit);
     command

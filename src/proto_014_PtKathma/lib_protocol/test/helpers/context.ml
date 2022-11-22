@@ -139,7 +139,7 @@ let get_endorsing_power_for_delegate ctxt ?levels pkh =
   let rec find_slots_for_delegate = function
     | [] -> return 0
     | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
-        if Tezos_crypto.Signature.Public_key_hash.equal delegate pkh then
+        if Tezos_crypto.Signature.V0.Public_key_hash.equal delegate pkh then
           return (List.length slots)
         else find_slots_for_delegate t
   in
@@ -163,7 +163,7 @@ let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
        (fun baker' ->
-         Tezos_crypto.Signature.Public_key_hash.( <> ) baker baker')
+         Tezos_crypto.Signature.V0.Public_key_hash.( <> ) baker baker')
        bakers
 
 let get_first_different_bakers ctxt =

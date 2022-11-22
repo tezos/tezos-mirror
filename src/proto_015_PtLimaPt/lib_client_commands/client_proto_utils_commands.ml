@@ -96,7 +96,7 @@ let commands () =
         in
         let* signature = sign_message cctxt ~src_sk ~block ~message in
         let*! () =
-          cctxt#message "Signature: %a" Tezos_crypto.Signature.pp signature
+          cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
         in
         return_unit);
     command
@@ -178,7 +178,7 @@ let commands () =
             unsigned_header
         in
         let*! () =
-          cctxt#message "%a" Hex.pp (Tezos_crypto.Signature.to_hex s)
+          cctxt#message "%a" Hex.pp (Tezos_crypto.Signature.V0.to_hex s)
         in
         return_unit);
   ]

@@ -238,7 +238,7 @@ let test_different_delegates () =
   >>=? fun (endorser_b1c, endorser_b2c) ->
   let endorser_b, b_slots =
     if
-      Tezos_crypto.Signature.Public_key_hash.( = )
+      Tezos_crypto.Signature.V0.Public_key_hash.( = )
         endorser_a
         endorser_b1c.delegate
     then (endorser_b2c.delegate, endorser_b2c.slots)
@@ -278,7 +278,7 @@ let test_wrong_delegate () =
   Context.get_endorser_n (B blk_b) 0 >>=? fun (endorser0, slots0) ->
   Context.get_endorser_n (B blk_b) 1 >>=? fun (endorser1, slots1) ->
   let endorser_b, b_slots =
-    if Tezos_crypto.Signature.Public_key_hash.equal endorser_a endorser0 then
+    if Tezos_crypto.Signature.V0.Public_key_hash.equal endorser_a endorser0 then
       (endorser1, slots1)
     else (endorser0, slots0)
   in
@@ -298,10 +298,11 @@ let test_freeze_more_with_low_balance =
     Context.get_endorsers ctxt >>=? function
     | [d1; d2] ->
         return
-          (if Tezos_crypto.Signature.Public_key_hash.equal account d1.delegate
+          (if
+           Tezos_crypto.Signature.V0.Public_key_hash.equal account d1.delegate
           then d1
           else if
-          Tezos_crypto.Signature.Public_key_hash.equal account d2.delegate
+          Tezos_crypto.Signature.V0.Public_key_hash.equal account d2.delegate
          then d2
           else assert false)
             .slots
@@ -334,7 +335,7 @@ let test_freeze_more_with_low_balance =
   let check_unique_endorser b account2 =
     Context.get_endorsers (B b) >>=? function
     | [{delegate; _}]
-      when Tezos_crypto.Signature.Public_key_hash.equal account2 delegate ->
+      when Tezos_crypto.Signature.V0.Public_key_hash.equal account2 delegate ->
         return_unit
     | _ -> failwith "We are supposed to only have account2 as endorser."
   in

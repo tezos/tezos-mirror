@@ -138,7 +138,7 @@ let prepare_command_display prepared_command bytes_only =
           "@[<2>Public keys of the signers:@ %a@]"
           (Format.pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-             Tezos_crypto.Signature.Public_key.pp))
+             Tezos_crypto.Signature.V0.Public_key.pp))
       prepared_command.Client_proto_multisig.keys
 
 let get_parameter_type (cctxt : #Protocol_client_context.full) ~destination
@@ -351,7 +351,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
             ()
           >>=? fun prepared_command ->
           Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Tezos_crypto.Signature.pp signature);
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Sign a lambda for a generic multisig contract."
@@ -381,7 +381,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
             ()
           >>=? fun prepared_command ->
           Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Tezos_crypto.Signature.pp signature);
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Sign a delegate change for a multisig contract."
@@ -410,7 +410,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
             ()
           >>=? fun prepared_command ->
           Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Tezos_crypto.Signature.pp signature);
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Sign a delegate withdraw for a multisig contract."
@@ -435,7 +435,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
             ()
           >>=? fun prepared_command ->
           Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Tezos_crypto.Signature.pp signature);
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:
@@ -471,7 +471,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
             ()
           >>=? fun prepared_command ->
           Client_keys.sign cctxt sk prepared_command.bytes >>=? fun signature ->
-          return @@ Format.printf "%a@." Tezos_crypto.Signature.pp signature);
+          return @@ Format.printf "%a@." Tezos_crypto.Signature.V0.pp signature);
       command
         ~group
         ~desc:"Transfer tokens using a multisig contract."

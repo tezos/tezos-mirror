@@ -234,7 +234,7 @@ let check_value_size () =
        ===========
     *)
     @ (let show fmt (Script_typed_ir.Script_signature.Signature_tag s) =
-         Tezos_crypto.Signature.pp fmt s
+         Tezos_crypto.Signature.V0.pp fmt s
        in
        exs ~error:8 nsample show Signature_t ": signature")
     (*
@@ -259,13 +259,13 @@ let check_value_size () =
        Key_hash_t
        ==========
     *)
-    @ (let show = Tezos_crypto.Signature.Public_key_hash.pp in
+    @ (let show = Tezos_crypto.Signature.V0.Public_key_hash.pp in
        exs nsample show Key_hash_t ": key_hash")
     (*
        Key_t
        =====
     *)
-    @ (let show = Tezos_crypto.Signature.Public_key.pp in
+    @ (let show = Tezos_crypto.Signature.V0.Public_key.pp in
        exs nsample show Key_t ": key_t")
     (*
        Timestamp_t

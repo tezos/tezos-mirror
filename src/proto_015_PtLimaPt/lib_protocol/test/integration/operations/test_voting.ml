@@ -1263,7 +1263,7 @@ let test_proposals_invalid_signature () =
   let* block, proposer = context_init1 () in
   let* contents = Op.proposals_contents (B block) proposer [protos.(0)] in
   let op =
-    Op.pack_operation (B block) (Some Tezos_crypto.Signature.zero) contents
+    Op.pack_operation (B block) (Some Tezos_crypto.Signature.V0.zero) contents
   in
   Incremental.assert_validate_operation_fails
     (invalid_signature __LOC__)
@@ -1696,7 +1696,7 @@ let test_ballot_invalid_signature () =
   let* block, voter, proposal = context_init_exploration () in
   let* contents = Op.ballot_contents (B block) voter proposal Vote.Yay in
   let op =
-    Op.pack_operation (B block) (Some Tezos_crypto.Signature.zero) contents
+    Op.pack_operation (B block) (Some Tezos_crypto.Signature.V0.zero) contents
   in
   Incremental.assert_validate_operation_fails
     (invalid_signature __LOC__)

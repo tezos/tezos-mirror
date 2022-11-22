@@ -484,7 +484,7 @@ let no_confirmation =
 
 let signature_parameter =
   Tezos_clic.parameter (fun _cctxt s ->
-      match Tezos_crypto.Signature.of_b58check_opt s with
+      match Tezos_crypto.Signature.V0.of_b58check_opt s with
       | Some s -> return s
       | None -> failwith "Not given a valid signature")
 

@@ -28,8 +28,8 @@ open Protocol_client_context
 (** The type of signers for operations injected by the injector *)
 type signer = {
   alias : string;
-  pkh : Tezos_crypto.Signature.public_key_hash;
-  pk : Tezos_crypto.Signature.public_key;
+  pkh : Tezos_crypto.Signature.V0.public_key_hash;
+  pk : Tezos_crypto.Signature.V0.public_key;
   sk : Client_keys.sk_uri;
 }
 
@@ -45,7 +45,7 @@ type 'block reorg = {
 (** Retrieve a signer from the client wallet. *)
 val get_signer :
   #Client_context.wallet ->
-  Tezos_crypto.Signature.public_key_hash ->
+  Tezos_crypto.Signature.V0.public_key_hash ->
   signer tzresult Lwt.t
 
 val no_reorg : 'a reorg

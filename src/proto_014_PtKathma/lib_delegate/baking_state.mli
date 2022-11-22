@@ -28,8 +28,8 @@ open Alpha_context
 
 type delegate = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.public_key;
-  public_key_hash : Tezos_crypto.Signature.public_key_hash;
+  public_key : Tezos_crypto.Signature.V0.public_key;
+  public_key_hash : Tezos_crypto.Signature.V0.public_key_hash;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -88,7 +88,7 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 module SlotMap : Map.S with type key = Slot.t
 
 type endorsing_slot = {
-  delegate : Tezos_crypto.Signature.public_key_hash;
+  delegate : Tezos_crypto.Signature.V0.public_key_hash;
   slots : Slot.t trace;
   endorsing_power : int;
 }

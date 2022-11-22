@@ -45,7 +45,7 @@ val load :
 val may_sign_block :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Tezos_crypto.Signature.public_key_hash ->
+  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
   level:int32 ->
   round:Round.t ->
   bool tzresult Lwt.t
@@ -53,7 +53,7 @@ val may_sign_block :
 val may_sign_preendorsement :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Tezos_crypto.Signature.public_key_hash ->
+  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
   level:int32 ->
   round:Round.t ->
   bool tzresult Lwt.t
@@ -61,7 +61,7 @@ val may_sign_preendorsement :
 val may_sign_endorsement :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Tezos_crypto.Signature.public_key_hash ->
+  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
   level:int32 ->
   round:Round.t ->
   bool tzresult Lwt.t
@@ -69,7 +69,7 @@ val may_sign_endorsement :
 val record_block :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Tezos_crypto.Signature.public_key_hash ->
+  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t
@@ -77,7 +77,7 @@ val record_block :
 val record_preendorsement :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Tezos_crypto.Signature.public_key_hash ->
+  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t
@@ -85,7 +85,7 @@ val record_preendorsement :
 val record_endorsement :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
-  delegate:Tezos_crypto.Signature.public_key_hash ->
+  delegate:Tezos_crypto.Signature.V0.public_key_hash ->
   level:int32 ->
   round:Round.t ->
   unit tzresult Lwt.t

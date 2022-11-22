@@ -247,7 +247,9 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             ()
           >>=? fun bytes ->
           let bytes =
-            Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero
+            Tezos_crypto.Signature.V0.concat
+              bytes
+              Tezos_crypto.Signature.V0.zero
           in
           Shell_services.Injection.operation ~async:true cctxt ~chain bytes
           >>=? fun oph ->

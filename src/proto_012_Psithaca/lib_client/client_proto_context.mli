@@ -60,8 +60,8 @@ val register_global_constant :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->
-  source:Tezos_crypto.Signature.public_key_hash ->
-  src_pk:Tezos_crypto.Signature.public_key ->
+  source:Tezos_crypto.Signature.V0.public_key_hash ->
+  src_pk:Tezos_crypto.Signature.V0.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   constant:string ->
@@ -104,7 +104,7 @@ val get_frozen_deposits_limit :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Tezos_crypto.Signature.Public_key_hash.t ->
+  Tezos_crypto.Signature.V0.Public_key_hash.t ->
   Tez.t option tzresult Lwt.t
 
 val build_delegate_operation :

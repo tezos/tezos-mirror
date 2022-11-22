@@ -142,7 +142,7 @@ let random_payload_hash = QCheck2.Gen.oneofl payload_hashes
 
 let signatures =
   List.map
-    Tezos_crypto.Signature.of_b58check_exn
+    Tezos_crypto.Signature.V0.of_b58check_exn
     [
       "sigaNsiye7D8dJHKSQZBwDbS2aQNXipDP7bw8uQnMgnaXi5pcnoPZRKXrDeFRx4FjWJD2xfyUA9CuBXhwPHhVs7LxkL4vT32";
       "sigvtPBMQvk2DgNtu3AKFU1ZRsagGxsoiZVQyQhJNEojReBY2vE5sDwt3H7Mh8RMe27QHBjemxqhMVVszZqpNsdDux6KAELX";
@@ -153,7 +153,7 @@ let random_signature = QCheck2.Gen.oneofl signatures
 
 let pkhs =
   List.map
-    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
     [
       "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
       "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
@@ -164,7 +164,7 @@ let random_pkh = QCheck2.Gen.oneofl pkhs
 
 let pks =
   List.map
-    Tezos_crypto.Signature.Public_key.of_b58check_exn
+    Tezos_crypto.Signature.V0.Public_key.of_b58check_exn
     [
       "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
       "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
@@ -432,7 +432,7 @@ let generate_activate_account =
   let+ id = random_pkh in
   let id =
     match id with
-    | Tezos_crypto.Signature.Ed25519 pkh -> pkh
+    | Tezos_crypto.Signature.V0.Ed25519 pkh -> pkh
     | _ -> assert false
   in
   Activate_account {id; activation_code}

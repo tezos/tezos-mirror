@@ -28,14 +28,14 @@ module Mempool = Plugin.Mempool
 let string_gen = QCheck2.Gen.small_string ?gen:None
 
 let public_key_hash_gen :
-    (Tezos_crypto.Signature.public_key_hash
-    * Tezos_crypto.Signature.public_key
-    * Tezos_crypto.Signature.secret_key)
+    (Tezos_crypto.Signature.V0.public_key_hash
+    * Tezos_crypto.Signature.V0.public_key
+    * Tezos_crypto.Signature.V0.secret_key)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ seed = string_size (32 -- 64) in
   let seed = Bytes.of_string seed in
-  Tezos_crypto.Signature.generate_key ~seed ()
+  Tezos_crypto.Signature.V0.generate_key ~seed ()
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2407
    move this function to an helper file? *)
@@ -49,7 +49,7 @@ let dummy_manager_op_info =
   let gas_limit = Alpha_context.Gas.Arith.zero in
   let manager_op =
     let open Alpha_context in
-    let source = Tezos_crypto.Signature.Public_key_hash.zero in
+    let source = Tezos_crypto.Signature.V0.Public_key_hash.zero in
     let counter = Z.zero in
     let storage_limit = Z.zero in
     let operation = Set_deposits_limit None in
@@ -59,7 +59,7 @@ let dummy_manager_op_info =
     in
     let contents = Single contents in
     let protocol_data =
-      {contents; signature = Some Tezos_crypto.Signature.zero}
+      {contents; signature = Some Tezos_crypto.Signature.V0.zero}
     in
     let branch = Tezos_crypto.Block_hash.zero in
     Mempool.Manager_op {shell = {branch}; protocol_data}

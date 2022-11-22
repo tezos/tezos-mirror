@@ -103,21 +103,21 @@ let secrets =
         let passphrase = Bytes.(cat (of_string email) (of_string password)) in
         let sk = Tezos_client_base.Bip39.to_seed ~passphrase t in
         let sk = Bytes.sub sk 0 32 in
-        let sk : Tezos_crypto.Signature.Secret_key.t =
+        let sk : Tezos_crypto.Signature.V0.Secret_key.t =
           Ed25519
             (Data_encoding.Binary.of_bytes_exn
                Tezos_crypto.Ed25519.Secret_key.encoding
                sk)
         in
-        let pk = Tezos_crypto.Signature.Secret_key.to_public_key sk in
-        let pkh = Tezos_crypto.Signature.Public_key.hash pk in
+        let pk = Tezos_crypto.Signature.V0.Secret_key.to_public_key sk in
+        let pkh = Tezos_crypto.Signature.V0.Public_key.hash pk in
         (pkh, pk, sk)
   in
   List.map
     (fun (mnemonic, secret, amount, pkh, password, email) ->
       let pkh', pk, sk = read_key mnemonic email password in
       let pkh = Tezos_crypto.Ed25519.Public_key_hash.of_b58check_exn pkh in
-      assert (Tezos_crypto.Signature.Public_key_hash.equal (Ed25519 pkh) pkh') ;
+      assert (Tezos_crypto.Signature.V0.Public_key_hash.equal (Ed25519 pkh) pkh') ;
       let activation_code =
         Stdlib.Option.get
           (Blinded_public_key_hash.activation_code_of_hex secret)

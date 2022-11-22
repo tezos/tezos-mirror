@@ -45,8 +45,8 @@ val pack_operation :
   Context.t -> signature option -> 'a contents_list -> packed_operation
 
 val sign :
-  ?watermark:Tezos_crypto.Signature.watermark ->
-  Tezos_crypto.Signature.secret_key ->
+  ?watermark:Tezos_crypto.Signature.V0.watermark ->
+  Tezos_crypto.Signature.V0.secret_key ->
   Context.t ->
   packed_contents_list ->
   packed_operation
@@ -245,7 +245,7 @@ val originated_contract : Operation.packed -> Contract.t
 val register_global_constant :
   ?force_reveal:bool ->
   ?counter:Z.t ->
-  ?public_key:Tezos_crypto.Signature.public_key ->
+  ?public_key:Tezos_crypto.Signature.V0.public_key ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -276,7 +276,7 @@ val double_baking :
 
 val activation :
   Context.t ->
-  Tezos_crypto.Signature.Public_key_hash.t ->
+  Tezos_crypto.Signature.V0.Public_key_hash.t ->
   Blinded_public_key_hash.activation_code ->
   Operation.packed tzresult Lwt.t
 
@@ -762,9 +762,9 @@ val update_consensus_key :
 
 val drain_delegate :
   Context.t ->
-  consensus_key:Tezos_crypto.Signature.Public_key_hash.t ->
-  delegate:Tezos_crypto.Signature.Public_key_hash.t ->
-  destination:Tezos_crypto.Signature.Public_key_hash.t ->
+  consensus_key:Tezos_crypto.Signature.V0.Public_key_hash.t ->
+  delegate:Tezos_crypto.Signature.V0.Public_key_hash.t ->
+  destination:Tezos_crypto.Signature.V0.Public_key_hash.t ->
   packed_operation tzresult Lwt.t
 
 (** [zk_rollup_publish ctxt source ~zk_rollup ~op] tries to add an operation

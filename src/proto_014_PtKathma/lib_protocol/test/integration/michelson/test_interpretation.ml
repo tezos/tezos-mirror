@@ -202,7 +202,7 @@ let test_json_roundtrip_err name e () =
 
 let error_encoding_tests =
   let contract_zero =
-    Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero
+    Contract.Implicit Tezos_crypto.Signature.V0.Public_key_hash.zero
   in
   let script_expr_int = Micheline.strip_locations (Micheline.Int (0, Z.zero)) in
   List.map

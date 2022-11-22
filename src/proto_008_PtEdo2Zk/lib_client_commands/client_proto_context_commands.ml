@@ -1445,7 +1445,7 @@ let commands network () =
                   not
                     (List.exists
                        (fun (pkh, _) ->
-                         Tezos_crypto.Signature.Public_key_hash.equal
+                         Tezos_crypto.Signature.V0.Public_key_hash.equal
                            pkh
                            src_pkh)
                        listings)
@@ -1453,7 +1453,7 @@ let commands network () =
                   error
                     "Public-key-hash `%a` from account `%s` does not appear to \
                      have voting rights."
-                    Tezos_crypto.Signature.Public_key_hash.pp
+                    Tezos_crypto.Signature.V0.Public_key_hash.pp
                     src_pkh
                     src_name ;
                 if !errors <> [] then

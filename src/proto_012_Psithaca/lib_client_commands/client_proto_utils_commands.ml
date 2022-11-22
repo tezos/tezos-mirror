@@ -88,7 +88,7 @@ let commands () =
         Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:block_head ()
         >>=? fun block ->
         sign_message cctxt ~src_sk ~block ~message >>=? fun signature ->
-        cctxt#message "Signature: %a" Tezos_crypto.Signature.pp signature
+        cctxt#message "Signature: %a" Tezos_crypto.Signature.V0.pp signature
         >>= fun () -> return_unit);
     command
       ~group
@@ -158,5 +158,6 @@ let commands () =
           sk
           unsigned_header
         >>=? fun s ->
-        cctxt#message "%a" Hex.pp (Tezos_crypto.Signature.to_hex s) >>= return);
+        cctxt#message "%a" Hex.pp (Tezos_crypto.Signature.V0.to_hex s)
+        >>= return);
   ]

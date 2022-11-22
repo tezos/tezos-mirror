@@ -166,7 +166,7 @@ let liquidity_baking_toggle_vote_arg =
     liquidity_baking_toggle_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
-    (pkhs : Tezos_crypto.Signature.public_key_hash list) =
+    (pkhs : Tezos_crypto.Signature.V0.public_key_hash list) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
     {
       Baking_state.alias = Some alias;

@@ -27,14 +27,14 @@ open Protocol
 open Alpha_context
 
 type t = {
-  pkh : Tezos_crypto.Signature.Public_key_hash.t;
-  pk : Tezos_crypto.Signature.Public_key.t;
-  sk : Tezos_crypto.Signature.Secret_key.t;
+  pkh : Tezos_crypto.Signature.V0.Public_key_hash.t;
+  pk : Tezos_crypto.Signature.V0.Public_key.t;
+  sk : Tezos_crypto.Signature.V0.Secret_key.t;
 }
 
 type account = t
 
-val known_accounts : t Tezos_crypto.Signature.Public_key_hash.Table.t
+val known_accounts : t Tezos_crypto.Signature.V0.Public_key_hash.Table.t
 
 val activator_account : account
 
@@ -44,9 +44,9 @@ val new_account : ?seed:Bytes.t -> unit -> account
 
 val add_account : t -> unit
 
-val find : Tezos_crypto.Signature.Public_key_hash.t -> t tzresult Lwt.t
+val find : Tezos_crypto.Signature.V0.Public_key_hash.t -> t tzresult Lwt.t
 
-val find_alternate : Tezos_crypto.Signature.Public_key_hash.t -> t
+val find_alternate : Tezos_crypto.Signature.V0.Public_key_hash.t -> t
 
 (** 4.000.000.000 tez *)
 val default_initial_balance : Tez.t
@@ -60,11 +60,11 @@ val generate_accounts :
   ?rng_state:Random.State.t ->
   ?initial_balances:int64 list ->
   ?bootstrap_delegations:
-    (Tezos_crypto.Signature.Public_key_hash.t
-    * Tezos_crypto.Signature.Public_key_hash.t)
+    (Tezos_crypto.Signature.V0.Public_key_hash.t
+    * Tezos_crypto.Signature.V0.Public_key_hash.t)
     list ->
   int ->
-  (t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list
+  (t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option) list
 
 val commitment_secret : Blinded_public_key_hash.activation_code
 

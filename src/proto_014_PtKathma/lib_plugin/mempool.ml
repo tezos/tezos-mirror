@@ -206,14 +206,15 @@ type state = {
   grandparent_level_start : Timestamp.t option;
   round_zero_duration : Period.t option;
   op_prechecked_managers :
-    manager_op_info Tezos_crypto.Signature.Public_key_hash.Map.t;
+    manager_op_info Tezos_crypto.Signature.V0.Public_key_hash.Map.t;
       (** All managers that are the source of manager operations
             prechecked in the mempool. Each manager in the map is associated to
             a record of type [manager_op_info] (See for record details above).
             Each manager in the map should be accessible
             with an operation hash in [operation_hash_to_manager]. *)
   operation_hash_to_manager :
-    Tezos_crypto.Signature.Public_key_hash.t Tezos_crypto.Operation_hash.Map.t;
+    Tezos_crypto.Signature.V0.Public_key_hash.t
+    Tezos_crypto.Operation_hash.Map.t;
       (** Map of operation hash to manager used to remove a manager from
             [op_prechecked_managers] with an operation hash. Each manager in the
             map should also be in [op_prechecked_managers]. *)
@@ -235,7 +236,7 @@ let empty : state =
   {
     grandparent_level_start = None;
     round_zero_duration = None;
-    op_prechecked_managers = Tezos_crypto.Signature.Public_key_hash.Map.empty;
+    op_prechecked_managers = Tezos_crypto.Signature.V0.Public_key_hash.Map.empty;
     operation_hash_to_manager = Tezos_crypto.Operation_hash.Map.empty;
     prechecked_operations_count = 0;
     ops_prechecked = ManagerOpWeightSet.empty;
@@ -313,7 +314,7 @@ let remove ~(filter_state : state) oph =
       in
       let removed_op = ref None in
       let op_prechecked_managers =
-        Tezos_crypto.Signature.Public_key_hash.Map.update
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.update
           source
           (function
             | None -> None
@@ -497,7 +498,7 @@ let better_fees_and_ratio =
 
 let check_manager_restriction config filter_state source ~fee ~gas_limit =
   match
-    Tezos_crypto.Signature.Public_key_hash.Map.find
+    Tezos_crypto.Signature.V0.Public_key_hash.Map.find
       source
       filter_state.op_prechecked_managers
   with
@@ -1075,7 +1076,7 @@ let add_manager_restriction filter_state oph info source replacement =
     filter_state with
     op_prechecked_managers =
       (* Manager not seen yet, record it for next ops *)
-      Tezos_crypto.Signature.Public_key_hash.Map.add
+      Tezos_crypto.Signature.V0.Public_key_hash.Map.add
         source
         info
         filter_state.op_prechecked_managers;

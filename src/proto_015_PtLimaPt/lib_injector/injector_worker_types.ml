@@ -98,11 +98,11 @@ end
 module Name = struct
   type t = public_key_hash
 
-  let encoding = Tezos_crypto.Signature.Public_key_hash.encoding
+  let encoding = Tezos_crypto.Signature.V0.Public_key_hash.encoding
 
   let base = ["tx_rollup_injector"]
 
-  let pp = Tezos_crypto.Signature.Public_key_hash.pp_short
+  let pp = Tezos_crypto.Signature.V0.Public_key_hash.pp_short
 
-  let equal = Tezos_crypto.Signature.Public_key_hash.equal
+  let equal = Tezos_crypto.Signature.V0.Public_key_hash.equal
 end

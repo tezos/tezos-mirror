@@ -48,7 +48,7 @@ open Indexable
 
 (** {3. Various helpers to facilitate the tests. } *)
 
-let pkh = Tezos_crypto.Signature.Public_key_hash.zero
+let pkh = Tezos_crypto.Signature.V0.Public_key_hash.zero
 
 let ((_, pk1, addr1) as l2_addr1) = gen_l2_address ()
 
@@ -154,7 +154,7 @@ let pp_withdrawal fmt = function
       Format.fprintf
         fmt
         "{claimer=%a; ticket_hash=%a; amount=%a}"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         claimer
         Ticket_hash.pp
         ticket_hash

@@ -70,7 +70,7 @@ let fake_KT1 =
 let default_self = fake_KT1
 
 let default_source =
-  Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero
+  Contract.Implicit Tezos_crypto.Signature.V0.Public_key_hash.zero
 
 let default_step_constants =
   Script_interpreter.

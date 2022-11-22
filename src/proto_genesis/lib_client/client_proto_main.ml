@@ -32,7 +32,7 @@ let bake cctxt ?timestamp block command sk =
     | Some t -> t
     | None -> Time.System.(to_protocol (Tezos_base.Time.System.now ()))
   in
-  let protocol_data = {command; signature = Tezos_crypto.Signature.zero} in
+  let protocol_data = {command; signature = Tezos_crypto.Signature.V0.zero} in
   Genesis_block_services.Helpers.Preapply.block
     cctxt
     ~block

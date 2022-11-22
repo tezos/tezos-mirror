@@ -232,7 +232,7 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?fee ~manager_sk ~fee_parameter src_pk =
-  let source = Tezos_crypto.Signature.Public_key.hash src_pk in
+  let source = Tezos_crypto.Signature.V0.Public_key.hash src_pk in
   delegate_contract
     cctxt
     ~chain
@@ -408,14 +408,14 @@ let read_key key =
       in
       let sk = Bip39.to_seed ~passphrase t in
       let sk = Bytes.sub sk 0 32 in
-      let sk : Tezos_crypto.Signature.Secret_key.t =
+      let sk : Tezos_crypto.Signature.V0.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn
              Tezos_crypto.Ed25519.Secret_key.encoding
              sk)
       in
-      let pk = Tezos_crypto.Signature.Secret_key.to_public_key sk in
-      let pkh = Tezos_crypto.Signature.Public_key.hash pk in
+      let pk = Tezos_crypto.Signature.V0.Secret_key.to_public_key sk in
+      let pkh = Tezos_crypto.Signature.V0.Public_key.hash pk in
       return (pkh, pk, sk)
 
 let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
@@ -456,11 +456,11 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?(encrypted = false) ?force key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless
-    (Tezos_crypto.Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
+    (Tezos_crypto.Signature.V0.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (error_of_fmt
        "@[<v 2>Inconsistent activation key:@ Computed pkh: %a@ Embedded pkh: \
         %a @]"
-       Tezos_crypto.Signature.Public_key_hash.pp
+       Tezos_crypto.Signature.V0.Public_key_hash.pp
        pkh
        Tezos_crypto.Ed25519.Public_key_hash.pp
        key.pkh)

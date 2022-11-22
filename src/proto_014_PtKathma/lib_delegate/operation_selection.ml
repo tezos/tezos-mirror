@@ -58,7 +58,7 @@ module PrioritizedManagerSet = Set.Make (struct
       {source = source'; counter = counter'; weight = weight'; op = op'; _} =
     (* Be careful with the [compare] *)
     let cmp_src =
-      Tezos_crypto.Signature.Public_key_hash.compare source source'
+      Tezos_crypto.Signature.V0.Public_key_hash.compare source source'
     in
     if cmp_src = 0 then
       (* we want the smallest counter first *)

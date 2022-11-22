@@ -197,9 +197,9 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       fprintf
         ppf
         "Watermark: `%a` (0x%s)"
-        Tezos_crypto.Signature.pp_watermark
+        Tezos_crypto.Signature.V0.pp_watermark
         watermark
-        (Hex.of_bytes (Tezos_crypto.Signature.bytes_of_watermark watermark)
+        (Hex.of_bytes (Tezos_crypto.Signature.V0.bytes_of_watermark watermark)
         |> Hex.show)) ;
   item (fun ppf () ->
       pp_print_text ppf "Operation bytes: " ;
@@ -223,7 +223,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       pp_print_text
         ppf
         "Blake 2B Hash (ledger-style, with operation watermark): " ;
-      hash_pp [Tezos_crypto.Signature.bytes_of_watermark watermark; bytes]) ;
+      hash_pp [Tezos_crypto.Signature.V0.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
       Operation.unsigned_encoding
@@ -249,8 +249,8 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
       let watermark =
         match contents with
         | Single (Endorsement _) ->
-            Tezos_crypto.Signature.(Endorsement chain_id)
-        | _ -> Tezos_crypto.Signature.Generic_operation
+            Tezos_crypto.Signature.V0.(Endorsement chain_id)
+        | _ -> Tezos_crypto.Signature.V0.Generic_operation
       in
       (if verbose_signing then
        cctxt#message
@@ -265,7 +265,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = Bytes.length bytes + Tezos_crypto.Signature.size in
+  let size = Bytes.length bytes + Tezos_crypto.Signature.V0.size in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -619,7 +619,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
-            + Tezos_crypto.Signature.size
+            + Tezos_crypto.Signature.V0.size
           else
             Data_encoding.Binary.length
               Operation.contents_encoding

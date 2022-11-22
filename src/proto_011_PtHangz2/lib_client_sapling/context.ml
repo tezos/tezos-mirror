@@ -62,7 +62,7 @@ end = struct
 end
 
 module Shielded_tez_contract_input = struct
-  type t = UTXO.transaction * Tezos_crypto.Signature.public_key_hash option
+  type t = UTXO.transaction * Tezos_crypto.Signature.V0.public_key_hash option
 
   let create ?pkh tr = (tr, pkh)
 
@@ -70,7 +70,7 @@ module Shielded_tez_contract_input = struct
     let open Data_encoding in
     obj2
       (req "transaction" UTXO.transaction_encoding)
-      (opt "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
+      (opt "pkh" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
 
   let pp ppf t =
     let open Data_encoding in
@@ -92,7 +92,7 @@ module Shielded_tez_contract_input = struct
             Micheline.Bytes
               ( 0,
                 Data_encoding.Binary.to_bytes_exn
-                  Tezos_crypto.Signature.Public_key_hash.encoding
+                  Tezos_crypto.Signature.V0.Public_key_hash.encoding
                   v )
           in
           Micheline.Prim (0, Script.D_Some, [value], [])

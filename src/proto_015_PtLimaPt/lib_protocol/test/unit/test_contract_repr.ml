@@ -62,7 +62,7 @@ module Test_contract_repr = struct
     Contract_hash.hash_bytes [data]
 
   let dummy_implicit_contract =
-    Implicit Tezos_crypto.Signature.Public_key_hash.zero
+    Implicit Tezos_crypto.Signature.V0.Public_key_hash.zero
 
   let dummy_originated_contract = originated_contract @@ dummy_origination_nonce
 
@@ -73,7 +73,7 @@ module Test_contract_repr = struct
       "%s should have been equal to %"
       Format.pp_print_string
       (to_b58check dummy_implicit_contract)
-      Tezos_crypto.Signature.Public_key_hash.(to_b58check zero)
+      Tezos_crypto.Signature.V0.Public_key_hash.(to_b58check zero)
 
   let test_to_b58check_originated () =
     Assert.equal

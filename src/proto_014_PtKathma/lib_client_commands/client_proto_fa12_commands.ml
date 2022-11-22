@@ -110,7 +110,7 @@ let view_options =
     (unparsing_mode_arg ~default:"Readable")
 
 let dummy_callback =
-  Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero
+  Contract.Implicit Tezos_crypto.Signature.V0.Public_key_hash.zero
 
 let get_contract_caller_keys cctxt (caller : Contract.t) =
   match caller with

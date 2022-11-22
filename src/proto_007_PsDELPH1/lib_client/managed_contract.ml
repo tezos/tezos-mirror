@@ -41,7 +41,7 @@ let get_contract_manager (cctxt : #full) contract =
       | Prim (_, D_Pair, [Bytes (_, bytes); _], _) | Bytes (_, bytes) -> (
           match
             Data_encoding.Binary.of_bytes_opt
-              Tezos_crypto.Signature.Public_key_hash.encoding
+              Tezos_crypto.Signature.V0.Public_key_hash.encoding
               bytes
           with
           | Some k -> return k
@@ -53,7 +53,7 @@ let get_contract_manager (cctxt : #full) contract =
                  for \"manager\" contract.")
       | Prim (_, D_Pair, [String (_, value); _], _) | String (_, value) -> (
           match
-            Tezos_crypto.Signature.Public_key_hash.of_b58check_opt value
+            Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_opt value
           with
           | Some k -> return k
           | None ->
