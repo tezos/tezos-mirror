@@ -26,23 +26,27 @@
 (* Primitives for sampling crypto-related data *)
 
 module type Param_S = sig
+  type algo
+
   val size : int
 
-  val algo : [`Algo of Tezos_crypto.Signature.algo | `Default]
+  val algo : [`Algo of algo | `Default]
 end
 
-module type Finite_key_pool_S = sig
-  val pk : Tezos_crypto.Signature.public_key Base_samplers.sampler
+module type P_Finite_key_pool_S = sig
+  type public_key_hash
 
-  val pkh : Tezos_crypto.Signature.public_key_hash Base_samplers.sampler
+  type public_key
 
-  val sk : Tezos_crypto.Signature.secret_key Base_samplers.sampler
+  type secret_key
 
-  val all :
-    (Tezos_crypto.Signature.public_key_hash
-    * Tezos_crypto.Signature.public_key
-    * Tezos_crypto.Signature.secret_key)
-    Base_samplers.sampler
+  val pk : public_key Base_samplers.sampler
+
+  val pkh : public_key_hash Base_samplers.sampler
+
+  val sk : secret_key Base_samplers.sampler
+
+  val all : (public_key_hash * public_key * secret_key) Base_samplers.sampler
 end
 
 module type Signature_S = sig
@@ -73,12 +77,7 @@ module Make_p_finite_key_pool
 
   let key_pool = Queue.create ()
 
-  let all_algos =
-    [|
-      Tezos_crypto.Signature.Ed25519;
-      Tezos_crypto.Signature.Secp256k1;
-      Tezos_crypto.Signature.P256;
-    |]
+  let all_algos = Array.of_list Signature.algos
 
   let uniform_algo state =
     let i = Random.State.int state (Array.length all_algos) in
