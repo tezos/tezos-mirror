@@ -1,0 +1,24 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# This version of the job builds both released and experimental executables.
+# It is used in the following pipelines:
+# - Before merging: check whether static executables still compile,
+#   i.e. that we do pass the -static flag and that when we do it does compile
+# - Master branch: executables (including experimental ones) are used in some test networks
+# Variants:
+# - an arm64 variant exist, but is only used in the master branch pipeline
+#   (no need to test that we pass the -static flag twice)
+# - released variants exist, that are used in release tag pipelines
+#   (they do not build experimental executables)
+build:static-x86_64-linux-binaries:
+  extends:
+    - .build_static_binaries_template
+    # Even though not many tests depend on static executables, some of those that do
+    # are limiting factors in the total duration of pipelines.
+    # So we start this job as early as possible, without waiting for sanity_ci.
+  needs: [trigger]
+  variables:
+    ARCH: "x86_64"
+    EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
+  tags:
+    - build_dedicated

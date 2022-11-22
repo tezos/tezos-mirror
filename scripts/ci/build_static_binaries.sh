@@ -11,7 +11,15 @@ make static
 dune cache trim --size=250GB
 
 echo "Check executables and move them to the destination directory"
-for executable in $(cat script-inputs/binaries-for-release); do
+# Disable https://www.shellcheck.net/wiki/SC2086 because:
+# - it's meant to prevent word splitting and we actually want to split words
+#   in $EXECUTABLE_FILES and we can't use an array because the variable
+#   comes from the CI
+# - it's meant to prevent globbing but actually we don't mind globbing here
+#   even if we don't use it right now
+# shellcheck disable=SC2086
+cat $EXECUTABLE_FILES |
+while read -r executable; do
     if [ ! -f "$executable" ]; then
         echo "Error: $executable does not exist"
         exit 1

@@ -2824,24 +2824,18 @@ let generate_package_json_file () =
        pp_dep)
     (List.sort compare !l)
 
-let generate_binaries_for_release () =
-  write "script-inputs/binaries-for-release" @@ fun fmt ->
-  !Target.registered
-  |> List.iter (fun (internal : Target.internal) ->
-         match internal.release_status with
-         | Unreleased | Auto_opam -> ()
-         | Experimental ->
-             (* [binaries-for-release] is only used in tag releases. *)
-             ()
-         | Released -> (
-             match internal.kind with
-             | Public_library _ | Private_library _ | Private_executable _
-             | Test_executable _ ->
-                 ()
-             | Public_executable ne_list ->
-                 Ne_list.to_list ne_list
-                 |> List.iter (fun (full_name : Target.full_name) ->
-                        Format.fprintf fmt "%s@." full_name.public_name)))
+let generate_executable_list filename release_status_to_list =
+  write filename @@ fun fmt ->
+  Fun.flip List.iter !Target.registered @@ fun (internal : Target.internal) ->
+  if internal.release_status = release_status_to_list then
+    match internal.kind with
+    | Public_library _ | Private_library _ | Private_executable _
+    | Test_executable _ ->
+        ()
+    | Public_executable ne_list ->
+        Fun.flip List.iter (Ne_list.to_list ne_list)
+        @@ fun (full_name : Target.full_name) ->
+        Format.fprintf fmt "%s@." full_name.public_name
 
 let generate_workspace env dune =
   let pp_dune fmt dune =
@@ -3326,7 +3320,10 @@ let generate ~make_tezt_exe ~default_profile ~add_to_meta_package =
     generate_package_json_file () ;
     let opam_release_graph = compute_opam_release_graph () in
     generate_opam_ci opam_release_graph ;
-    generate_binaries_for_release () ;
+    generate_executable_list "script-inputs/released-executables" Released ;
+    generate_executable_list
+      "script-inputs/experimental-executables"
+      Experimental ;
     generate_profiles ~default_profile ;
     Option.iter
       (generate_opam_files_for_release
