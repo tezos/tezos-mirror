@@ -37,8 +37,19 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
-(* Services' inputs and outputs encodings. *)
-module Services_encodings = struct
+module Types = struct
+  (* Declaration of types used as inputs and/or outputs *)
+  type slot_id = {slot_level : int32; slot_index : int32}
+
+  (* Associated encodings of the types *)
+
+  let slot_id_encoding =
+    let open Data_encoding in
+    conv
+      (fun {slot_level; slot_index} -> (slot_level, slot_index))
+      (fun (slot_level, slot_index) -> {slot_level; slot_index})
+      (obj2 (req "slot_level" int32) (req "slot_index" int32))
+
   let slot_content = Data_encoding.bytes
 end
 
@@ -55,6 +66,21 @@ let post_slots :
       "Add a slot in the node's context if not already present. The \
        corresponding commitment is returned."
     ~query:Tezos_rpc.Query.empty
-    ~input:Services_encodings.slot_content
+    ~input:Types.slot_content
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(open_root / "slots")
+
+let patch_slot :
+    < meth : [`PATCH]
+    ; input : Types.slot_id
+    ; output : unit
+    ; prefix : unit
+    ; params : unit * Cryptobox.commitment
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.patch_service
+    ~description:"Associate a commitment to a level and a slot index."
+    ~query:Tezos_rpc.Query.empty
+    ~input:Types.slot_id_encoding
+    ~output:Data_encoding.unit
+    Tezos_rpc.Path.(open_root / "slots" /: Cryptobox.Commitment.rpc_arg)

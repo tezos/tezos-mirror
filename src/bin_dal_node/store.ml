@@ -69,6 +69,9 @@ let init config =
 module Legacy_paths = struct
   let slot_by_commitment commitment = ["slots"; commitment]
 
+  let slot_ids_by_commitment commitment =
+    slot_by_commitment commitment @ ["slot_ids"]
+
   let slot_shards_by_commitment commitment =
     slot_by_commitment commitment @ ["shards"]
 
@@ -80,6 +83,11 @@ module Legacy_paths = struct
 end
 
 module Legacy = struct
+  let encode enc v =
+    Data_encoding.Binary.to_string enc v
+    |> Result.map_error (fun e ->
+           [Tezos_base.Data_encoding_wrapper.Encoding_error e])
+
   let add_slot_by_commitment node_store slot commitment =
     let open Lwt_syntax in
     let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
@@ -89,4 +97,16 @@ module Legacy = struct
     let* () = Event.(emit stored_slot_content commitment_b58) in
     Lwt_watcher.notify node_store.slots_watcher commitment ;
     return_unit
+
+  let associate_slot_id_with_commitment node_store commitment slot_id =
+    let open Lwt_syntax in
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_id_by_commitment commitment_b58 slot_id in
+    let* () = set ~msg:"Slot id stored" node_store.slots_store path "" in
+    return_unit
+
+  let exists_slot_by_commitment node_store commitment =
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    mem node_store.slots_store path
 end

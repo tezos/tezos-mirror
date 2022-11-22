@@ -42,6 +42,13 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
+module Types : sig
+  (** An ID associated to a slot or to its commitment. *)
+  type slot_id = {slot_level : int32; slot_index : int32}
+
+  val slot_id_encoding : slot_id Data_encoding.t
+end
+
 (** Add the given slot in the node if not already present. The corresponding
     commitment is returned. See {!val:
     Slot_manager.add_slot} for more details. *)
@@ -51,5 +58,16 @@ val post_slots :
   ; output : Cryptobox.commitment
   ; prefix : unit
   ; params : unit
+  ; query : unit >
+  service
+
+(** Associate a commitment to a level and a slot index. See {!val:
+    Slot_manager.add_slot_id} for more details. *)
+val patch_slot :
+  < meth : [`PATCH]
+  ; input : Types.slot_id
+  ; output : unit
+  ; prefix : unit
+  ; params : unit * Cryptobox.commitment
   ; query : unit >
   service

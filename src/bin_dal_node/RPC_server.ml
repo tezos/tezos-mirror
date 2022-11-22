@@ -35,6 +35,14 @@ module Slots_handlers = struct
     handler store cryptobox
 
   let post_slots ctxt () slot = call_handler (Slot_manager.add_slots slot) ctxt
+
+  let patch_slot ctxt commitment () slot_id =
+    call_handler
+      (fun store cryptobox ->
+        let open Lwt_result_syntax in
+        let*! r = Slot_manager.add_slot_id commitment slot_id store cryptobox in
+        match r with Ok () -> return_some () | Error `Not_found -> return_none)
+      ctxt
 end
 
 let add_service registerer service handler directory =
@@ -48,6 +56,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.post_slots
        (Slots_handlers.post_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.patch_slot
+       (Slots_handlers.patch_slot ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in

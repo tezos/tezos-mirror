@@ -69,3 +69,16 @@ let add_slots slot node_store cryptobox =
     else Store.Legacy.add_slot_by_commitment node_store slot commitment
   in
   return commitment
+
+let add_slot_id commitment slot_id node_store _cryptobox =
+  let open Lwt_result_syntax in
+  let*! exists = Store.Legacy.exists_slot_by_commitment node_store commitment in
+  if not exists then fail `Not_found
+  else
+    let*! () =
+      Store.Legacy.associate_slot_id_with_commitment
+        node_store
+        commitment
+        slot_id
+    in
+    return_unit
