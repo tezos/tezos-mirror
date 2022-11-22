@@ -20,8 +20,6 @@ __pycache__
 /octez-node
 /tezos-tx-rollup-*
 /octez-tx-rollup-*
-/tezos-validator
-/octez-validator
 /tezos-protocol-compiler
 /octez-protocol-compiler
 /tezos-client

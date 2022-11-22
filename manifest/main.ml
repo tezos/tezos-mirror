@@ -2205,7 +2205,7 @@ let octez_validation =
   public_lib
     "tezos-validation"
     ~path:"src/lib_validation"
-    ~synopsis:"Tezos: library for blocks validation"
+    ~synopsis:"Tezos: library for block validation"
     ~time_measurement_ppx:true
     ~deps:
       [
@@ -2213,6 +2213,7 @@ let octez_validation =
         octez_rpc;
         octez_context |> open_;
         octez_context_ops |> open_;
+        octez_shell_context |> open_;
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
@@ -2513,27 +2514,6 @@ let _octez_context_merkle_proof_tests =
         octez_test_helpers;
       ]
     ~modules:["test_merkle_proof"]
-
-let octez_validator_lib =
-  public_lib
-    "octez-validator"
-    ~path:"src/bin_validation"
-    ~synopsis:
-      "Tezos: `octez-validator` binary for external validation of blocks"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_context |> open_;
-        octez_context_ops |> open_;
-        octez_stdlib_unix |> open_;
-        octez_protocol_environment;
-        octez_shell |> open_;
-        octez_shell_services |> open_;
-        octez_validation |> open_;
-        octez_protocol_updater |> open_;
-        octez_shell_context |> open_;
-      ]
 
 let octez_client_base =
   public_lib
@@ -5539,25 +5519,6 @@ let _ppinclude =
     ~bisect_ppx:false
     ~deps:[compiler_libs_common]
 
-let _octez_validator_bin =
-  public_exe
-    "octez-validator"
-    ~path:"src/bin_validation/bin"
-    ~opam:"octez-validator"
-    ~internal_name:"main_validator"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_context |> open_;
-        octez_stdlib_unix |> open_;
-        octez_shell |> open_;
-        octez_shell_services |> open_;
-        octez_validation |> open_;
-        octez_protocol_updater |> open_;
-        octez_validator_lib |> open_;
-      ]
-    ~linkall:true
-
 let _octez_node =
   let protocol_deps =
     let deps_for_protocol protocol =
@@ -5606,7 +5567,6 @@ let _octez_node =
          octez_store_unix_reconstruction |> open_;
          octez_store_unix_snapshots |> open_;
          octez_context |> open_;
-         octez_validator_lib |> open_;
          octez_validation |> open_;
          octez_shell_context |> open_;
          octez_workers |> open_;

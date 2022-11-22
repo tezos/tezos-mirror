@@ -15,7 +15,6 @@ docs/api/tezos-admin-client.html
 
 tezos-node
 tezos-tx-rollup-*
-tezos-validator
 tezos-protocol-compiler
 tezos-client
 tezos-admin-client
@@ -28,7 +27,6 @@ tezos-sc-rollup-node-*
 tezos-sc-rollup-client-*
 octez-node
 octez-tx-rollup-*
-octez-validator
 octez-protocol-compiler
 octez-client
 octez-admin-client

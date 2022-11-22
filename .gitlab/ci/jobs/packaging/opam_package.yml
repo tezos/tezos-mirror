@@ -388,13 +388,6 @@ opam:octez-tx-rollup-node-alpha:
   variables:
     package: octez-tx-rollup-node-alpha
 
-opam:octez-validator:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_2
-  variables:
-    package: octez-validator
-
 opam:tezos-014-PtKathma-test-helpers:
   extends:
     - .opam_template
@@ -678,7 +671,7 @@ opam:tezos-client-alpha:
 opam:tezos-client-base:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-client-base
 
@@ -790,7 +783,7 @@ opam:tezos-embedded-protocol-005-PsBABY5H:
 opam:tezos-embedded-protocol-005-PsBabyM1:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-005-PsBabyM1
 
@@ -1259,7 +1252,7 @@ opam:tezos-protocol-plugin-010-PtGRANAD:
 opam:tezos-protocol-plugin-010-PtGRANAD-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-protocol-plugin-010-PtGRANAD-registerer
 
@@ -1357,7 +1350,7 @@ opam:tezos-protocol-updater:
 opam:tezos-proxy:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-proxy
 
@@ -1588,7 +1581,7 @@ opam:tezos-webassembly-interpreter:
 opam:tezos-webassembly-interpreter-extra:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-webassembly-interpreter-extra
 

@@ -64,6 +64,10 @@ Node
 - Introduced a ``--json`` command line argument to the ``snapshot
   info`` allowing to print snapshot information as JSON.
 
+- Removed the ``octez-validator`` executable, which was already part
+  of ``octez-node`` and that was already used internally (and that was
+  not usable on its own).
+
 Client
 ------
 

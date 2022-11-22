@@ -69,7 +69,7 @@ let parse_args () =
 
 let run () =
   let socket_dir, readonly = parse_args () in
-  let main_promise = Validator.main ?socket_dir ~readonly () in
+  let main_promise = External_validator.main ?socket_dir ~readonly () in
   Stdlib.exit
     (Lwt_main.run
        (let open Lwt_syntax in

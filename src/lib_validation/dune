@@ -11,6 +11,7 @@
   tezos-rpc
   tezos-context
   tezos-context-ops
+  tezos-shell-context
   tezos-shell-services
   tezos-protocol-updater
   tezos-stdlib-unix)
@@ -19,6 +20,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_context
   -open Tezos_context_ops
+  -open Tezos_shell_context
   -open Tezos_shell_services
   -open Tezos_protocol_updater
   -open Tezos_stdlib_unix))

@@ -103,7 +103,7 @@ let () =
 
 let () =
   if Filename.basename Sys.argv.(0) = "octez-validator" then
-    Octez_validator.Command_line.run ()
+    Tezos_validation.Command_line.run ()
 
 let term =
   let open Cmdliner.Term in
