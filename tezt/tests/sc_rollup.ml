@@ -735,12 +735,12 @@ let test_rollup_inbox_size ~kind =
   let* _hash, _level, inbox_msg_during_commitment_period =
     get_inbox_from_tezos_node client
   in
-  (* Expect [n] messages per level + SOL/EOL for each level including
-     at inbox's creation. *)
+  (* Expect [n] messages per level + SOL/Info_per_level/EOL for each level
+     including at inbox's creation. *)
   return
   @@ Check.(
        (inbox_msg_during_commitment_period
-       = (n * (n + 1) / 2) + (((n + 1) * 2) + 2))
+       = (n * (n + 1) / 2) + (((n + 1) * 3) + 3))
          int
          ~error_msg:"expected value %R, got %L")
 
@@ -1659,12 +1659,15 @@ let commitments_messages_reset kind sc_rollup_node sc_rollup_client sc_rollup
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
+  Log.info "levels_to_commitment: %d" levels_to_commitment ;
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
    let expected =
      match kind with
-     | "arith" -> 2 * levels_to_commitment
+     | "arith" -> 3 * levels_to_commitment
      | "wasm_2_0_0" ->
-         3 (* one snapshot for collecting, two snapshots for SOL and EOL *)
+         4
+         (* one snapshot for collecting, two snapshots for SOL,
+            Info_per_level and EOL *)
          * 11_000_000_000 (* number of ticks in a snapshots *)
          * levels_to_commitment (* number of inboxes *)
      | _ -> failwith "incorrect kind"
@@ -1879,16 +1882,15 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
    let expected_number_of_ticks =
      match kind with
      | "arith" ->
-         1 (* boot sector *) + 1 (* metadata *) + (2 * levels_to_commitment)
+         1 (* boot sector *) + 1 (* metadata *) + (3 * levels_to_commitment)
          (* input ticks *)
      | "wasm_2_0_0" ->
          (* Number of ticks per snapshot,
             see Lib_scoru_wasm.Constants.wasm_max_tick *)
          let snapshot_ticks = 11_000_000_000 in
-         snapshot_ticks
-         * 3
-           (* 1 snapshot for collecting messages, 2 snapshots for EOL and SOL *)
-         * levels_to_commitment
+         snapshot_ticks * 4
+         (* 1 snapshot for collecting messages, 3 snapshots for SOL,
+            Info_per_level and SOL *) * levels_to_commitment
          (* Number of inbox that are actually processed process *)
      | _ -> assert false
    in
@@ -2765,11 +2767,11 @@ let test_refutation protocols ~kind =
           ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
           ( "inbox_proof_many_empty_levels",
             ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
-          ("pvm_proof_0", ("5 1 1", inputs_for 10, 80, [], []));
-          ("pvm_proof_1", ("7 1 2", inputs_for 10, 80, [], []));
+          ("pvm_proof_0", ("5 2 1", inputs_for 10, 80, [], []));
+          ("pvm_proof_1", ("7 2 0", inputs_for 10, 80, [], []));
           ("pvm_proof_2", ("7 2 5", inputs_for 7, 80, [], []));
           ("pvm_proof_3", ("9 2 5", inputs_for 7, 80, [4; 5], []));
-          ("timeout", ("5 1 1", inputs_for 10, 80, [], [35]));
+          ("timeout", ("5 2 1", inputs_for 10, 80, [], [35]));
         ]
     | "wasm_2_0_0" ->
         [
@@ -2779,12 +2781,12 @@ let test_refutation protocols ~kind =
           ("inbox_proof_1", ("3 4 0", inputs_for 10, 80, [], []));
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
-          ("pvm_proof_0", ("5 6 11_000_000_001", inputs_for 10, 80, [], []));
-          ("pvm_proof_1", ("7 6 11_000_001_000", inputs_for 10, 80, [], []));
+          ("pvm_proof_0", ("5 7 11_000_000_001", inputs_for 10, 80, [], []));
+          ("pvm_proof_1", ("7 7 11_000_001_000", inputs_for 10, 80, [], []));
           (* End of evaluation *)
-          ("pvm_proof_2", ("7 6 22_000_002_000", inputs_for 10, 80, [], []));
+          ("pvm_proof_2", ("7 7 22_000_002_000", inputs_for 10, 80, [], []));
           (* During padding *)
-          ("pvm_proof_3", ("7 6 22_010_000_000", inputs_for 10, 80, [], []));
+          ("pvm_proof_3", ("7 7 22_010_000_000", inputs_for 10, 80, [], []));
         ]
     | _ -> assert false
   in
@@ -3622,7 +3624,7 @@ let test_rpcs ~kind =
       ["global"; "block"; "head"; "num_messages"]
   in
   let l2_num_messages = JSON.as_int l2_num_messages in
-  Check.((l2_num_messages = batch_size + 2) int)
+  Check.((l2_num_messages = batch_size + 3) int)
     ~error_msg:"Number of messages of head is %L but should be %R" ;
   let*! _status =
     Sc_rollup_client.rpc_get

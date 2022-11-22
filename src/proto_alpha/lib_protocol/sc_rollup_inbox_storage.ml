@@ -173,11 +173,17 @@ let add_start_of_level ctxt =
 let add_end_of_level ctxt =
   add_internal_message ctxt Sc_rollup_inbox_message_repr.End_of_level
 
-let init ctxt =
+let add_info_per_level ctxt timestamp predecessor =
+  add_internal_message
+    ctxt
+    (Sc_rollup_inbox_message_repr.Info_per_level {timestamp; predecessor})
+
+let init ~timestamp ~predecessor ctxt =
   let open Lwt_result_syntax in
   let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
   let*! inbox = Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) level in
   let* ctxt = Store.Inbox.init ctxt inbox in
   let* _inbox, _diff, ctxt = add_start_of_level ctxt in
+  let* _inbox, _diff, ctxt = add_info_per_level ctxt timestamp predecessor in
   let* _inbox, _diff, ctxt = add_end_of_level ctxt in
   return ctxt

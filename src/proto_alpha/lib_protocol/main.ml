@@ -299,13 +299,15 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~predecessor_hash
         ~timestamp
         block_header_data.contents
-  | Partial_construction _ ->
+  | Partial_construction {predecessor_hash; _} ->
       Apply.begin_partial_construction
         ctxt
         chain_id
         ~migration_balance_updates
         ~migration_operation_results
         ~predecessor_level:predecessor_raw_level
+        ~predecessor_timestamp
+        ~predecessor_hash
         ~predecessor_fitness
 
 let apply_operation = Apply.apply_operation
@@ -318,6 +320,7 @@ let compare_operations (oph1, op1) (oph2, op2) =
 let init chain_id ctxt block_header =
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
+  let predecessor = block_header.predecessor in
   let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
       =
     let allow_forged_in_storage =
@@ -358,7 +361,13 @@ let init chain_id ctxt block_header =
       ~round:Alpha_context.Round.zero
       ~predecessor_round:Alpha_context.Round.zero
   in
-  Alpha_context.prepare_first_block chain_id ~typecheck ~level ~timestamp ctxt
+  Alpha_context.prepare_first_block
+    chain_id
+    ~typecheck
+    ~level
+    ~timestamp
+    ~predecessor
+    ctxt
   >>=? fun ctxt ->
   let cache_nonce =
     Alpha_context.Cache.cache_nonce_from_block_header

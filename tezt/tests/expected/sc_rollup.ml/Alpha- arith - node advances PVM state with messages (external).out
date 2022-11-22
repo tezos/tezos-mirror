@@ -68,8 +68,8 @@ This sequence of operations was run:
       Consumed gas: 1000.647
       Resulting inbox state: { level = 3
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 3 nb_messages_in_commitment_period = 6
-                               message_counter = 2
+                               level: 3 nb_messages_in_commitment_period = 9
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 2
@@ -87,13 +87,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"22"
+"23"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"22"
+"23"
 
 ./octez-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -120,8 +120,8 @@ This sequence of operations was run:
       Consumed gas: 1000.647
       Resulting inbox state: { level = 4
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 4 nb_messages_in_commitment_period = 9
-                               message_counter = 2
+                               level: 4 nb_messages_in_commitment_period = 13
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 3
@@ -139,13 +139,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"42"
+"44"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"42"
+"44"
 
 ./octez-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -172,8 +172,8 @@ This sequence of operations was run:
       Consumed gas: 1000.664
       Resulting inbox state: { level = 5
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 5 nb_messages_in_commitment_period = 12
-                               message_counter = 2
+                               level: 5 nb_messages_in_commitment_period = 17
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 4
@@ -192,13 +192,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"63"
+"66"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"63"
+"66"
 
 ./octez-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -225,8 +225,8 @@ This sequence of operations was run:
       Consumed gas: 1000.664
       Resulting inbox state: { level = 6
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 6 nb_messages_in_commitment_period = 15
-                               message_counter = 2
+                               level: 6 nb_messages_in_commitment_period = 21
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 5
@@ -245,13 +245,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"84"
+"88"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"84"
+"88"
 
 ./octez-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -278,8 +278,8 @@ This sequence of operations was run:
       Consumed gas: 1000.664
       Resulting inbox state: { level = 7
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 7 nb_messages_in_commitment_period = 18
-                               message_counter = 2
+                               level: 7 nb_messages_in_commitment_period = 25
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 6
@@ -298,13 +298,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"105"
+"110"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"105"
+"110"
 
 ./octez-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -331,8 +331,8 @@ This sequence of operations was run:
       Consumed gas: 1000.664
       Resulting inbox state: { level = 8
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 8 nb_messages_in_commitment_period = 21
-                               message_counter = 2
+                               level: 8 nb_messages_in_commitment_period = 29
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 7
@@ -351,13 +351,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"126"
+"132"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"126"
+"132"
 
 ./octez-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -384,8 +384,8 @@ This sequence of operations was run:
       Consumed gas: 1000.664
       Resulting inbox state: { level = 9
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 9 nb_messages_in_commitment_period = 24
-                               message_counter = 2
+                               level: 9 nb_messages_in_commitment_period = 33
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 8
@@ -405,13 +405,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"147"
+"154"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"147"
+"154"
 
 ./octez-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -439,8 +439,8 @@ This sequence of operations was run:
       Resulting inbox state: { level = 10
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 10
-                               nb_messages_in_commitment_period = 27
-                               message_counter = 2
+                               nb_messages_in_commitment_period = 37
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 9
@@ -460,13 +460,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"168"
+"176"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"168"
+"176"
 
 ./octez-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -494,8 +494,8 @@ This sequence of operations was run:
       Resulting inbox state: { level = 11
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 11
-                               nb_messages_in_commitment_period = 30
-                               message_counter = 2
+                               nb_messages_in_commitment_period = 41
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 10
@@ -515,13 +515,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"189"
+"198"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"189"
+"198"
 
 ./octez-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -549,8 +549,8 @@ This sequence of operations was run:
       Resulting inbox state: { level = 12
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 12
-                               nb_messages_in_commitment_period = 33
-                               message_counter = 2
+                               nb_messages_in_commitment_period = 45
+                               message_counter = 3
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 11
@@ -570,4 +570,4 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"211"
+"221"

@@ -103,7 +103,8 @@ let patch_script (address, hash, patched_code) ctxt =
         address ;
       return ctxt
 
-let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
+let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
+    =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -154,7 +155,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
-      Sc_rollup_inbox_storage.init ctxt >>=? fun ctxt ->
+      Sc_rollup_inbox_storage.init ~predecessor ~timestamp ctxt >>=? fun ctxt ->
       return
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
@@ -167,7 +168,8 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
-      Sc_rollup_inbox_storage.init ctxt >>=? fun ctxt -> return (ctxt, []))
+      Sc_rollup_inbox_storage.init ~predecessor ~timestamp ctxt >>=? fun ctxt ->
+      return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
   >>=? fun ctxt ->

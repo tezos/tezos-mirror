@@ -33,6 +33,11 @@ module type S = sig
 
   type level_position = Start | Middle | End
 
+  type info_per_level = {
+    timestamp : Timestamp.time;
+    predecessor : Tezos_crypto.Block_hash.t;
+  }
+
   (** Type of the state for a simulation. *)
   type t = {
     ctxt : Context.ro;
@@ -42,6 +47,7 @@ module type S = sig
     nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
+    info_per_level : info_per_level;
   }
 
   (** [start_simulation node_ctxt reveal_source block] starts a new simulation

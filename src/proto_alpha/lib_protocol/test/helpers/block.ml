@@ -363,6 +363,7 @@ let initial_alpha_context ?(commitments = []) constants
   >>= fun ctxt ->
   let level = block_header.level in
   let timestamp = block_header.timestamp in
+  let predecessor = block_header.predecessor in
   let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
       =
     let allow_forged_in_storage =
@@ -397,6 +398,7 @@ let initial_alpha_context ?(commitments = []) constants
     ~typecheck
     ~level
     ~timestamp
+    ~predecessor
     Tezos_crypto.Chain_id.zero
     ctxt
   >|= Environment.wrap_tzresult

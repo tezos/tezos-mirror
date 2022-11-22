@@ -125,6 +125,14 @@ let pp_input ppf bytes =
         Data_encoding.Json.pp ppf json
     | Internal Start_of_level -> Format.fprintf ppf "Start_of_level"
     | Internal End_of_level -> Format.fprintf ppf "End_of_level"
+    | Internal (Info_per_level {timestamp; predecessor}) ->
+        Format.fprintf
+          ppf
+          "Info_per_level {timestamp = %a; predecessor = %a}"
+          Timestamp.pp
+          timestamp
+          Tezos_crypto.Block_hash.pp
+          predecessor
     | External msg -> Format.fprintf ppf "%a" Hex.pp (Hex.of_string msg)
   in
   match

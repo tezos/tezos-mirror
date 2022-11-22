@@ -41,43 +41,31 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"33000000000"
+"44000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"77000000000"
+"99000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"77000000000"
+"99000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"121000000000"
+"154000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"121000000000"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"165000000000"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"165000000000"
+"154000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -95,49 +83,37 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"253000000000"
+"264000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"253000000000"
+"264000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"297000000000"
+"319000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"297000000000"
+"319000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"341000000000"
+"374000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"341000000000"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"385000000000"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
-"[SC_ROLLUP_PVM_STATE_HASH]"
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"385000000000"
+"374000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
@@ -155,4 +131,28 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"473000000000"
+"484000000000"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+"484000000000"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+"539000000000"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+"539000000000"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+"594000000000"
