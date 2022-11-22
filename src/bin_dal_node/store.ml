@@ -78,3 +78,15 @@ module Legacy_paths = struct
   let slot_shards_flag_by_commitment commitment =
     slot_by_commitment commitment @ ["shards_saved_flag"]
 end
+
+module Legacy = struct
+  let add_slot_by_commitment node_store slot commitment =
+    let open Lwt_syntax in
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    let encoded_slot = Bytes.to_string slot in
+    let* () = set ~msg:"Slot stored" node_store.slots_store path encoded_slot in
+    let* () = Event.(emit stored_slot_content commitment_b58) in
+    Lwt_watcher.notify node_store.slots_watcher commitment ;
+    return_unit
+end

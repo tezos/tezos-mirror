@@ -23,5 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* We cannot include a raw mli file *)
+(** This module provides different services related to DAL slots. *)
+
+(* We cannot include a raw mli file. But this will be removed once full
+   migration is done. *)
 include module type of Services_legacy
+
+open Tezos_crypto_dal
+
+type 'rpc service =
+  ('meth, 'prefix, 'params, 'query, 'input, 'output) Tezos_rpc.Service.service
+  constraint
+    'rpc =
+    < meth : 'meth
+    ; prefix : 'prefix
+    ; params : 'params
+    ; query : 'query
+    ; input : 'input
+    ; output : 'output >
+
+(** Add the given slot in the node if not already present. The corresponding
+    commitment is returned. See {!val:
+    Slot_manager.add_slot} for more details. *)
+val post_slots :
+  < meth : [`POST]
+  ; input : Cryptobox.slot
+  ; output : Cryptobox.commitment
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service

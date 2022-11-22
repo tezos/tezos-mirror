@@ -24,3 +24,37 @@
 (*****************************************************************************)
 
 include Services_legacy
+open Tezos_crypto_dal
+
+type 'rpc service =
+  ('meth, 'prefix, 'params, 'query, 'input, 'output) Tezos_rpc.Service.service
+  constraint
+    'rpc =
+    < meth : 'meth
+    ; prefix : 'prefix
+    ; params : 'params
+    ; query : 'query
+    ; input : 'input
+    ; output : 'output >
+
+(* Services' inputs and outputs encodings. *)
+module Services_encodings = struct
+  let slot_content = Data_encoding.bytes
+end
+
+let post_slots :
+    < meth : [`POST]
+    ; input : Cryptobox.slot
+    ; output : Cryptobox.commitment
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.post_service
+    ~description:
+      "Add a slot in the node's context if not already present. The \
+       corresponding commitment is returned."
+    ~query:Tezos_rpc.Query.empty
+    ~input:Services_encodings.slot_content
+    ~output:Cryptobox.Commitment.encoding
+    Tezos_rpc.Path.(open_root / "slots")
