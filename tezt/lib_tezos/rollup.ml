@@ -619,7 +619,20 @@ module Dal = struct
              pagination_scheme)
       in
       let data = JSON.unannotate preimage in
-      make ~data PUT ["plugin"; "dac"; "store_preimage"] JSON.as_string
+      make ~data PUT ["plugin"; "dac"; "store_preimage"] @@ fun json ->
+      JSON.
+        ( json |-> "root_hash" |> as_string,
+          json |-> "external_message" |> get_bytes_from_json_string_node )
+
+    let dac_verify_signature external_msg =
+      let query_string =
+        [
+          ( "external_message",
+            match Hex.of_string external_msg with `Hex s -> s );
+        ]
+      in
+      make ~query_string GET ["plugin"; "dac"; "verify_signature"]
+      @@ JSON.as_bool
   end
 
   module RPC = struct
