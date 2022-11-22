@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.of_string
+
 module Inbox_add_message : Benchmark.S = struct
   open Tx_rollup_inbox_repr
 
@@ -80,8 +82,10 @@ module Inbox_add_message : Benchmark.S = struct
       ( "tx_rollup",
         Model.make
           ~conv
-          ~model:(Model.logn ~coeff:(Free_variable.of_string "n_message_coeff"))
-      );
+          ~model:
+            (Model.logn
+               ~name:(ns name)
+               ~coeff:(Free_variable.of_string "n_message_coeff")) );
     ]
 
   let create_benchmarks ~rng_state ~bench_num ({max_messages} : config) =
@@ -145,6 +149,7 @@ module Commitment_full_compact_bench : Benchmark.S = struct
           ~conv
           ~model:
             (Model.affine
+               ~name:(ns name)
                ~intercept:
                  (Free_variable.of_string "full_compact_bench_intercept")
                ~coeff:(Free_variable.of_string "n_messages_coeff")) );
@@ -584,6 +589,7 @@ module Verify_proof_compute_bench : Benchmark.S = struct
           ~conv
           ~model:
             (Model.bilinear
+               ~name:(ns name)
                ~coeff1:(Free_variable.of_string "proof_size_coeff")
                ~coeff2:(Free_variable.of_string "message_size_coeff")) );
     ]

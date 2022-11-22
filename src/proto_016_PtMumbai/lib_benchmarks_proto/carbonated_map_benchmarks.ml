@@ -60,7 +60,7 @@ let register (module BM : Benchmark.S) =
   |> List.iter (fun (_, model) ->
          Registration_helpers.register_for_codegen
            (Namespace.basename BM.name)
-           (Model.For_codegen model))
+           model)
 
 module Alpha_context_gas = struct
   type context = Alpha_context.context
@@ -91,6 +91,7 @@ module Fold_benchmark : Benchmark.S = struct
       ~conv:(fun {size} -> (size, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:(fv "fold_const")
            ~coeff:(fv "fold_cost_per_item"))
 
@@ -175,9 +176,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
           Model.make
             ~conv:(fun () -> ())
             ~model:
-              (Model.unknown_const2
-                 ~const1:Builtin_benchmarks.timer_variable
-                 ~const2:(compare_var CS.type_name)) );
+              (Model.unknown_const1 ~name ~const:(compare_var CS.type_name)) );
       ]
 
     let benchmark rng_state _conf () =
@@ -217,6 +216,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
       let module M = struct
         type arg_type = int * unit
 
+        let name = name
+
         module Def (L : Costlang.S) = struct
           type model_type = L.size -> L.size
 
@@ -229,8 +230,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
               log2 size * free ~name:(compare_var CS.type_name)
             in
             let traversal_overhead = log2 size * free ~name:traverse_overhead in
-            free ~name:Builtin_benchmarks.timer_variable
-            + free ~name:intercept + compare_cost + traversal_overhead
+            free ~name:intercept + compare_cost + traversal_overhead
         end
       end in
       (module M : Model.Model_impl with type arg_type = int * unit)
@@ -311,10 +311,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
         ( "carbonated_map",
           Model.make
             ~conv:(fun () -> ())
-            ~model:
-              (Model.unknown_const2
-                 ~const1:Builtin_benchmarks.timer_variable
-                 ~const2:(fv "intercept")) );
+            ~model:(Model.unknown_const1 ~name ~const:(fv "intercept")) );
       ]
 
     let benchmark rng_state (_config : config) () =

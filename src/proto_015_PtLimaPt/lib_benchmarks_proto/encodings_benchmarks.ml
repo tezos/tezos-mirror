@@ -26,6 +26,8 @@
 open Protocol
 module Size = Gas_input_size
 
+let ns = Namespace.of_string
+
 module Micheline_common = struct
   let make_printable node =
     Micheline_printer.printable
@@ -100,6 +102,7 @@ module Micheline_common = struct
         (traversal, (int_bytes, (string_bytes, ()))))
       ~model:
         (Model.trilinear
+           ~name:(ns name)
            ~coeff1:
              (Free_variable.of_string
                 (Format.asprintf "%s_micheline_traversal" name))
@@ -115,6 +118,7 @@ module Micheline_common = struct
       ~conv:(fun {bytes; _} -> (bytes, ()))
       ~model:
         (Model.linear
+           ~name:(ns name)
            ~coeff:
              (Free_variable.of_string
                 (Format.asprintf "%s_micheline_bytes" name)))

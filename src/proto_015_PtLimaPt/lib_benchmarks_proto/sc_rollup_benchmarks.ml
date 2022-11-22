@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.of_string
+
 (** A benchmark for estimating the gas cost of
     {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This
     value is used to consume the gas cost internally in
@@ -76,9 +78,9 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
     Model.make
       ~conv:(fun () -> ())
       ~model:
-        (Model.unknown_const2
-           ~const1:Builtin_benchmarks.timer_variable
-           ~const2:
+        (Model.unknown_const1
+           ~name:(ns name)
+           ~const:
              (Free_variable.of_string "cost_update_num_and_size_of_messages"))
 
   let models = [("scoru", cost_update_num_and_size_ofmessages_model)]
@@ -120,11 +122,6 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen
-      name
-      (Model.For_codegen cost_update_num_and_size_ofmessages_model)
 
   let name = Namespace.of_string name
 end
@@ -180,6 +177,7 @@ module Sc_rollup_add_external_messages_benchmark = struct
       ~conv:(fun {message_length; level} -> (message_length, (level, ())))
       ~model:
         (Model.n_plus_logm
+           ~name:(ns name)
            ~intercept:(Free_variable.of_string "cost_add_message_intercept")
            ~linear_coeff:(Free_variable.of_string "cost_add_message_per_byte")
            ~log_coeff:(Free_variable.of_string "cost_add_message_per_level"))
@@ -300,9 +298,6 @@ module Sc_rollup_add_external_messages_benchmark = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
-
-  let () =
-    Registration.register_for_codegen name (Model.For_codegen add_message_model)
 
   let name = Namespace.of_string name
 end

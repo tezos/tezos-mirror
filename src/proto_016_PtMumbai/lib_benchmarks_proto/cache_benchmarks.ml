@@ -144,6 +144,8 @@ module Cache_update_benchmark : Benchmark.S = struct
     let affine_logn ~intercept ~coeff =
       let open Model in
       let module M = struct
+        let name = name
+
         type arg_type = int * unit
 
         module Def (X : Costlang.S) = struct

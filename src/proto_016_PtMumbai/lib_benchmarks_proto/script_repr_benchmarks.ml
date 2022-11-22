@@ -85,6 +85,7 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
       ~model:
         (Model.affine
+           ~name
            ~intercept:
              (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
@@ -96,7 +97,7 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
   let () =
     Registration_helpers.register_for_codegen
       (Namespace.basename name)
-      (Model.For_codegen size_based_model)
+      size_based_model
 
   let models = [("size_translator_model", size_based_model)]
 
@@ -127,12 +128,12 @@ module Script_repr_strip_annotations : Benchmark.S = struct
     Model.(
       make
         ~conv:(fun {micheline_nodes} -> (micheline_nodes, ()))
-        ~model:(linear ~coeff:(fv "nodes")))
+        ~model:(linear ~name ~coeff:(fv "nodes")))
 
   let () =
     Registration_helpers.register_for_codegen
       (Namespace.basename name)
-      (Model.For_codegen strip_annotations_model)
+      strip_annotations_model
 
   let models = [("strip_annotations_model", strip_annotations_model)]
 
