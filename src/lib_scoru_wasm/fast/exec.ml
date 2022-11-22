@@ -65,13 +65,13 @@ let compute builtins durable buffers =
   in
 
   let exports = Wasmer.Exports.from_instance instance in
-  let kernel_next =
-    Wasmer.(Exports.fn exports "kernel_next" (producer nothing))
+  let kernel_run =
+    Wasmer.(Exports.fn exports "kernel_run" (producer nothing))
   in
 
   main_mem := Some (fun () -> Wasmer.Exports.mem0 exports) ;
 
-  let* () = kernel_next () in
+  let* () = kernel_run () in
 
   Wasmer.Instance.delete instance ;
   Wasmer.Module.delete module_ ;

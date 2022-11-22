@@ -317,19 +317,21 @@ let make (module Builtins : Builtins.S) state =
         Int32.of_int (String.length payload))
   in
 
-  [
-    ("rollup_safe_core", "read_input", read_input);
-    ("rollup_safe_core", "write_output", write_output);
-    ("rollup_safe_core", "write_debug", write_debug);
-    ("rollup_safe_core", "store_has", store_has);
-    ("rollup_safe_core", "store_list_size", store_list_size);
-    ("rollup_safe_core", "store_value_size", store_value_size);
-    ("rollup_safe_core", "store_delete", store_delete);
-    ("rollup_safe_core", "store_copy", store_copy);
-    ("rollup_safe_core", "store_move", store_move);
-    ("rollup_safe_core", "store_read", store_read);
-    ("rollup_safe_core", "store_write", store_write);
-    ("rollup_safe_core", "store_get_nth_key", store_get_nth_key);
-    ("rollup_safe_core", "reveal_preimage", reveal_preimage);
-    ("rollup_safe_core", "reveal_metadata", reveal_metadata);
-  ]
+  List.map
+    (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))
+    [
+      ("read_input", read_input);
+      ("write_output", write_output);
+      ("write_debug", write_debug);
+      ("store_has", store_has);
+      ("store_list_size", store_list_size);
+      ("store_value_size", store_value_size);
+      ("store_delete", store_delete);
+      ("store_copy", store_copy);
+      ("store_move", store_move);
+      ("store_read", store_read);
+      ("store_write", store_write);
+      ("store_get_nth_key", store_get_nth_key);
+      ("reveal_preimage", reveal_preimage);
+      ("reveal_metadata", reveal_metadata);
+    ]

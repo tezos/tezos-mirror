@@ -50,7 +50,7 @@ let test_memory0_export () =
         (module
           (memory 1)
           (export "mem"(memory 0))
-          (func (export "kernel_next")
+          (func (export "kernel_run")
             (unreachable)
           )
         )
@@ -80,7 +80,7 @@ let test_module_name_size () =
           (func (export "%s")
             (unreachable)
           )
-          (func (export "kernel_next")
+          (func (export "kernel_run")
             (unreachable)
           )
         )|}
@@ -112,7 +112,7 @@ let test_imports () =
             (func $%s (param i32 i32 i32 i32) (result i32)))
           (memory 1)
           (export "mem"(memory 0))
-          (func (export "kernel_next")
+          (func (export "kernel_run")
             (unreachable)
           )
         )
@@ -139,7 +139,7 @@ let test_imports () =
     if stuck = expected_error then return_unit
     else failwith "Unexpected stuck state!"
   in
-  let good_module_name = "rollup_safe_core" in
+  let good_module_name = "smart_rollup_core" in
   let*! bad_host_func_tree =
     initial_tree (build_module good_module_name bad_item_name)
   in
@@ -172,7 +172,7 @@ let test_host_func_start_restriction () =
     initial_tree
       {|
         (module
-          (import "rollup_safe_core" "write_output"
+          (import "smart_rollup_core" "write_output"
             (func $write_output (param i32 i32) (result i32))
           )
           (memory 1)
@@ -181,7 +181,7 @@ let test_host_func_start_restriction () =
             (call $write_output (i32.const 0) (i32.const 0))
           )
           (start $foo)
-          (func (export "kernel_next")
+          (func (export "kernel_run")
             (unreachable)
           )
         )

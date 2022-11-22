@@ -4,9 +4,9 @@
  (type $write_t (func (param i32 i32) (result i32)))
  (type $store_w_t (func (param i32 i32 i32 i32 i32) (result i32)))
 
- (import "rollup_safe_core" "read_input" (func $read_input (type $read_t)))
- (import "rollup_safe_core" "write_output" (func $write_output (type $write_t)))
- (import "rollup_safe_core" "store_write"
+ (import "smart_rollup_core" "read_input" (func $read_input (type $read_t)))
+ (import "smart_rollup_core" "write_output" (func $write_output (type $write_t)))
+ (import "smart_rollup_core" "store_write"
          (func $store_write (type $store_w_t)))
 
  (data (i32.const 100) "/kernel/env/reboot")
@@ -89,7 +89,7 @@
         )
        )
 
- (func (export "kernel_next")
+ (func (export "kernel_run")
        (local $size i32)
        (local.set $size (call $read_input
                               (i32.const 220) ;; level_offset

@@ -150,25 +150,29 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       (* The module instance will be registered as [self] in
          [module_reg] during the initialization. *)
       return (Init {self; ast_module; init_kont = IK_Start externs; module_reg})
-  | Link {ast_module; externs; imports_offset} -> (
+  | Link {ast_module; externs; imports_offset} ->
       let* {it = {module_name; item_name; _}; _} =
         Wasm.Ast.Vector.get imports_offset ast_module.it.imports
       in
-      match (module_name, Host_funcs.lookup_opt item_name) with
-      | "rollup_safe_core", Some extern ->
-          let externs, _ = Wasm.Ast.Vector.append extern externs in
-          return
-            (Link
-               {ast_module; externs; imports_offset = Int32.succ imports_offset})
-      | "rollup_safe_core", None ->
-          return
-            ~status:Failing
-            (Stuck (Wasm_pvm_errors.link_error `Item ~module_name ~item_name))
-      | _, _ ->
-          return
-            ~status:Failing
-            (Stuck (Wasm_pvm_errors.link_error `Module ~module_name ~item_name))
-      )
+      if module_name = Constants.wasm_host_funcs_virual_module then
+        match Host_funcs.lookup_opt item_name with
+        | Some extern ->
+            let externs, _ = Wasm.Ast.Vector.append extern externs in
+            return
+              (Link
+                 {
+                   ast_module;
+                   externs;
+                   imports_offset = Int32.succ imports_offset;
+                 })
+        | None ->
+            return
+              ~status:Failing
+              (Stuck (Wasm_pvm_errors.link_error `Item ~module_name ~item_name))
+      else
+        return
+          ~status:Failing
+          (Stuck (Wasm_pvm_errors.link_error `Module ~module_name ~item_name))
   | Init {self; ast_module = _; init_kont = IK_Stop; module_reg} -> (
       let* module_inst =
         Wasm.Instance.ModuleMap.get Constants.wasm_main_module_name module_reg

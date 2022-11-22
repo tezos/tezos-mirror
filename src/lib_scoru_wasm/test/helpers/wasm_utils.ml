@@ -78,7 +78,7 @@ let eval_until_stuck ?(builtins = builtins) ?(max_steps = 20000L) tree =
 
 (* This function relies on the invariant that `compute_step_many` will always
    stop at a Snapshot or an input request, and never start another
-   `kernel_next`. *)
+   `kernel_run`. *)
 let rec eval_to_snapshot ?(builtins = builtins) ?(max_steps = Int64.max_int)
     tree =
   let open Lwt_syntax in
@@ -313,7 +313,7 @@ let retrieve_memory module_reg =
   else assert false
 
 module Kernels = struct
-  (* Kernel failing at `kernel_next` invocation. *)
+  (* Kernel failing at `kernel_run` invocation. *)
   let unreachable_kernel = "unreachable"
 end
 

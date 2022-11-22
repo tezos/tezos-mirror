@@ -39,7 +39,7 @@ let loop_module =
   (module
     (memory 1)
     (export "mem"(memory 0))
-    (func (export "kernel_next")
+    (func (export "kernel_run")
       (loop $my_loop
         br $my_loop)
     )
@@ -51,7 +51,7 @@ let noop_module =
   (module
     (memory 1)
     (export "mem"(memory 0))
-    (func (export "kernel_next")
+    (func (export "kernel_run")
       nop
     )
   )

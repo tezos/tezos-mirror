@@ -9,7 +9,7 @@ let init_tree_with_empty_input () =
       (module
         (memory 1)
         (export "mem"(memory 0))
-        (func (export "kernel_next")
+        (func (export "kernel_run")
           (nop)
         )
       )
