@@ -240,7 +240,10 @@ module Make (PVM : Pvm.S) = struct
 
     (** [mutate input] corrupts the payload of [input] for testing purposes. *)
     let mutate input =
-      let payload = Sc_rollup.Inbox_message.unsafe_of_string "0xC4C4" in
+      let payload =
+        Sc_rollup.Inbox_message.unsafe_of_string
+          "\001to the cheater we promise pain and misery"
+      in
       {input with Sc_rollup.payload}
 
     (** [feed_input node_ctxt reveal_map level message_index ~fuel
