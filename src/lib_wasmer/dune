@@ -21,10 +21,10 @@
     (c_flags
      :standard
      -Wno-discarded-qualifiers
-     -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs)
+     -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs
+     -Wno-incompatible-pointer-types)
     (c_library_flags
      :standard
-     -Wno-incompatible-pointer-types
      -lwasmer
      -L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs)))
   (headers (include wasmer.h))

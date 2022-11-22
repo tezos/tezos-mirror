@@ -1621,7 +1621,8 @@ let octez_wasmer =
             {instance = "Functions"; functor_ = "Api_funcs_desc"};
           generated_types = "Api_types";
           generated_entry_point = "Api";
-          c_library_flags = ["-Wno-incompatible-pointer-types"];
+          c_flags = ["-Wno-incompatible-pointer-types"];
+          c_library_flags = [];
         }
 
 let octez_scoru_wasm =
