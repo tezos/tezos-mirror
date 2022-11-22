@@ -35,7 +35,7 @@ open Qcheck2_helpers
 open QCheck2
 
 module type SIGNATURE = sig
-  include S.SIGNATURE
+  include Intfs.SIGNATURE
 
   val watermark_of_bytes : bytes -> watermark
 end
@@ -74,7 +74,7 @@ struct
 end
 
 module type AGGREGATE_SIGNATURE = sig
-  include S.AGGREGATE_SIGNATURE
+  include Intfs.AGGREGATE_SIGNATURE
 
   val watermark_of_bytes : bytes -> watermark
 end
