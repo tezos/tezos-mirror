@@ -93,7 +93,7 @@ module Make (PVM : Pvm.S) = struct
     let continue_with_fuel consumption initial_fuel state f =
       let open Delayed_write_monad.Lwt_result_syntax in
       match F.consume consumption initial_fuel with
-      | None -> return (state, 0L)
+      | None -> return (state, initial_fuel, 0L)
       | Some fuel_left -> f fuel_left state
 
     exception Error_wrapper of tztrace
@@ -138,9 +138,9 @@ module Make (PVM : Pvm.S) = struct
                metadata)
       end in
       let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
-      let eval_tick fuel tick failing_ticks state =
+      let eval_tick fuel failing_ticks state =
         let max_steps = F.max_ticks fuel in
-        let normal_eval state =
+        let normal_eval ?(max_steps = max_steps) state =
           Lwt.catch
             (fun () ->
               let*! state, executed_ticks =
@@ -151,7 +151,7 @@ module Make (PVM : Pvm.S) = struct
               | Error_wrapper error -> Lwt.return (Error error)
               | exn -> raise exn)
         in
-        let failure_insertion_eval state failing_ticks' =
+        let failure_insertion_eval state tick failing_ticks' =
           let*! () =
             Interpreter_event.intended_failure
               ~level
@@ -163,8 +163,25 @@ module Make (PVM : Pvm.S) = struct
           return (state, 1L, failing_ticks')
         in
         match failing_ticks with
-        | xtick :: failing_ticks' when xtick = tick ->
-            failure_insertion_eval state failing_ticks'
+        | xtick :: failing_ticks' ->
+            let jump = Int64.(max 0L (pred xtick)) in
+            if Compare.Int64.(jump = 0L) then
+              (* Insert the failure in the first tick. *)
+              failure_insertion_eval state xtick failing_ticks'
+            else
+              (* Jump just before the tick where we'll insert a failure.
+                 Nevertheless, we don't execute more than [max_steps]. *)
+              let max_steps = Int64.max 0L max_steps |> Int64.min max_steps in
+              let open Delayed_write_monad.Lwt_result_syntax in
+              let>* state, executed_ticks, _failing_ticks =
+                normal_eval ~max_steps state
+              in
+              (* Insert the failure. *)
+              let>* state, executed_ticks', failing_ticks' =
+                failure_insertion_eval state xtick failing_ticks'
+              in
+              let executed_ticks = Int64.add executed_ticks executed_ticks' in
+              return (state, executed_ticks, failing_ticks')
         | _ -> normal_eval state
       in
       let rec go (fuel : fuel) current_tick failing_ticks state =
@@ -172,15 +189,19 @@ module Make (PVM : Pvm.S) = struct
         if F.is_empty fuel then return (state, fuel, current_tick, failing_ticks)
         else
           match input_request with
-          | No_input_required ->
+          | No_input_required -> (
               let>* next_state, executed_ticks, failing_ticks =
-                eval_tick fuel current_tick failing_ticks state
+                eval_tick fuel failing_ticks state
               in
-              go
-                fuel
-                (Int64.add current_tick executed_ticks)
-                failing_ticks
-                next_state
+              let fuel_executed = F.of_ticks executed_ticks in
+              match F.consume fuel_executed fuel with
+              | None -> return (state, fuel, current_tick, failing_ticks)
+              | Some fuel ->
+                  go
+                    fuel
+                    (Int64.add current_tick executed_ticks)
+                    failing_ticks
+                    next_state)
           | Needs_reveal (Reveal_raw_data hash) -> (
               let* data =
                 get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
@@ -243,8 +264,7 @@ module Make (PVM : Pvm.S) = struct
           failing_ticks
           state
       in
-      let consumption = F.of_ticks tick in
-      continue_with_fuel consumption fuel state @@ fun fuel state ->
+      continue_with_fuel F.one_tick_consumption fuel state @@ fun fuel state ->
       let>* input, failing_ticks =
         match failing_ticks with
         | xtick :: failing_ticks' ->
@@ -258,10 +278,10 @@ module Make (PVM : Pvm.S) = struct
               in
               return (mutate input, failing_ticks')
             else return (input, failing_ticks)
-        | _ -> return (input, failing_ticks)
+        | [] -> return (input, failing_ticks)
       in
       let*! state = PVM.set_input (Inbox_message input) state in
-      let>* state, _fuel, tick, _failing_ticks =
+      let>* state, fuel, tick, _failing_ticks =
         eval_until_input
           node_ctxt
           reveal_map
@@ -272,7 +292,7 @@ module Make (PVM : Pvm.S) = struct
           failing_ticks
           state
       in
-      return (state, tick)
+      return (state, fuel, tick)
 
     let eval_messages ~reveal_map ~fuel node_ctxt ~message_counter_offset state
         inbox_level messages =
@@ -295,7 +315,7 @@ module Make (PVM : Pvm.S) = struct
               ~level
               ~message_index
           in
-          let>* state, executed_ticks =
+          let>* state, fuel, _executed_ticks =
             feed_input
               node_ctxt
               reveal_map
@@ -306,7 +326,7 @@ module Make (PVM : Pvm.S) = struct
               state
               input
           in
-          return (state, F.of_ticks executed_ticks))
+          return (state, fuel))
         (state, fuel)
         messages
 

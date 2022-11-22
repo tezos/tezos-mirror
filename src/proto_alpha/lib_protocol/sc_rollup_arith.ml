@@ -657,6 +657,26 @@ module Make (Context : P) :
         | Some c -> Format.fprintf fmt "Some %a" Z.pp_print c
     end)
 
+    (** Store an internal message counter. This is used to distinguish
+        an unparsable external message and a internal message, which we both
+        treat as no-ops. *)
+    module Internal_message_counter = Make_var (struct
+      type t = Z.t
+
+      let initial = Z.zero
+
+      let encoding = Data_encoding.n
+
+      let name = "internal_message_counter"
+
+      let pp fmt c = Z.pp_print fmt c
+    end)
+
+    let incr_internal_message_counter =
+      let open Monad.Syntax in
+      let* current_counter = Internal_message_counter.get in
+      Internal_message_counter.set (Z.succ current_counter)
+
     module Next_message = Make_var (struct
       type t = string option
 
@@ -927,6 +947,7 @@ module Make (Context : P) :
       | Error _ -> return None
       | Ok (External payload) -> return (Some payload)
       | Ok (Internal (Transfer {payload; destination; _})) -> (
+          let* () = incr_internal_message_counter in
           let* (metadata : Sc_rollup_metadata_repr.t option) = Metadata.get in
           match metadata with
           | Some {address; _} when Address.(destination = address) -> (
@@ -934,8 +955,12 @@ module Make (Context : P) :
               | String (_, payload) -> return (Some payload)
               | _ -> return None)
           | _ -> return None)
-      | Ok (Internal Start_of_level) -> return None
-      | Ok (Internal End_of_level) -> return None
+      | Ok (Internal Start_of_level) ->
+          let* () = incr_internal_message_counter in
+          return None
+      | Ok (Internal End_of_level) ->
+          let* () = incr_internal_message_counter in
+          return None
     in
     match payload with
     | Some payload ->

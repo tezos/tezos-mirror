@@ -234,6 +234,13 @@ let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
         contents ;
       contents
 
+(** Wait for the rollup node to detect a conflict *)
+let wait_for_conflict_detected sc_node =
+  Sc_rollup_node.wait_for
+    sc_node
+    "sc_rollup_node_conflict_detected.v0"
+    (fun _ -> Some ())
+
 (* Configuration of a rollup node
    ------------------------------
 
@@ -2645,6 +2652,13 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
 
+  let conflict_detected = ref false in
+  let _ =
+    let* () = wait_for_conflict_detected sc_rollup_node in
+    conflict_detected := true ;
+    unit
+  in
+
   let sc_rollup_node2 =
     Sc_rollup_node.create Operator node client ~default_operator:bootstrap2_key
   in
@@ -2654,32 +2668,28 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   let* () = Sc_rollup_node.run sc_rollup_node []
   and* () = Sc_rollup_node.run sc_rollup_node2 [] in
 
-  let start_level = Node.get_level node in
-
   let stop_loser level =
     if List.mem level stop_loser_at then
       Sc_rollup_node.terminate sc_rollup_node2
     else unit
   in
 
-  let rec consume_inputs i = function
+  let rec consume_inputs = function
     | [] -> unit
     | inputs :: next_batches as all ->
-        let level = start_level + i in
+        let* level = Client.level client in
+
         let* () = stop_loser level in
         if List.mem level empty_levels then
           let* () = Client.bake_for_and_wait client in
-          consume_inputs (i + 1) all
+          consume_inputs all
         else
           let* () =
-            Lwt_list.iter_s
-              (send_text_messages ~src:Constant.bootstrap3.alias client)
-              inputs
+            send_text_messages ~src:Constant.bootstrap3.alias client inputs
           in
-          let* () = Client.bake_for_and_wait client in
-          consume_inputs (i + 1) next_batches
+          consume_inputs next_batches
   in
-  let* () = consume_inputs 0 inputs in
+  let* () = consume_inputs inputs in
   let* after_inputs_level = Client.level client in
 
   let hook i =
@@ -2687,6 +2697,9 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
     stop_loser level
   in
   let* () = bake_levels ~hook (final_level - List.length inputs) client in
+
+  if not !conflict_detected then
+    Test.fail "Honest node did not detect the conflict" ;
 
   let* honest_deposit_json =
     RPC.Client.call client
@@ -2716,8 +2729,8 @@ let rec swap i l =
   else match l with [_] | [] -> l | x :: y :: l -> y :: swap (i - 1) (x :: l)
 
 let inputs_for n =
-  List.init n @@ fun i ->
-  [swap i ["3 3 +"; "1"; "1 1 x"; "3 7 8 + * y"; "2 2 out"]]
+  List.concat @@ List.init n
+  @@ fun i -> [swap i ["3 3 +"; "1"; "1 1 x"; "3 7 8 + * y"; "2 2 out"]]
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
@@ -2733,11 +2746,11 @@ let test_refutation protocols ~kind =
     ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
     ( "inbox_proof_many_empty_levels",
       ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
-    ("pvm_proof_0", ("5 0 1", inputs_for 10, 80, [], []));
+    ("pvm_proof_0", ("5 1 1", inputs_for 10, 80, [], []));
     ("pvm_proof_1", ("7 1 2", inputs_for 10, 80, [], []));
     ("pvm_proof_2", ("7 2 5", inputs_for 7, 80, [], []));
     ("pvm_proof_3", ("9 2 5", inputs_for 7, 80, [4; 5], []));
-    ("timeout", ("5 0 1", inputs_for 10, 80, [], [35]));
+    ("timeout", ("5 1 1", inputs_for 10, 80, [], [35]));
   ]
   |> List.iter (fun (variant, inputs) ->
          test_refutation_scenario
@@ -3600,15 +3613,6 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_reinject_failed_commitment protocols ~kind ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4020
-     When looking at the logs of these tests, it appears that they do
-     not come with enough inspection of the state of the rollup to
-     ensure the property they are trying to exhibit.  For instance,
-     just checking that the dishonest player has no stack at the end
-     of the scenario does not prove they have been slashed, and it
-     appeared that in some instances, they haven’t been able to
-     publish a commitment to begin with. *)
-  (* test_refutation protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message ~regression:true ~earliness:0 protocols ~kind ;
@@ -3676,6 +3680,9 @@ let register ~protocols =
   (* DAC tests, not supported yet by the Wasm PVM *)
   test_rollup_arith_uses_reveals protocols ~kind:"arith" ;
   test_reveals_fails_on_wrong_hash protocols ~kind:"arith" ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3653
+     Loser mode does not work for the wasm PVM. *)
+  test_refutation protocols ~kind:"arith" ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
