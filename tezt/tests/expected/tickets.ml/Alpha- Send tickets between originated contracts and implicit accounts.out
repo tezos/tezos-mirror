@@ -215,7 +215,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 2 tickets from bootstrap1 to bootstrap2 with entrypoint default and contents '"Ticket"' and type string and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 2124.312 units (will add 100 for safety)
+Estimated gas: 2124.710 units (will add 100 for safety)
 Estimated storage: 66 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -242,7 +242,14 @@ This sequence of operations was run:
       From: [PUBLIC_KEY_HASH]
       This tickets transfer was successfully applied
       Paid storage size diff: 66 bytes
-      Consumed gas: 2124.312
+      Ticket updates:
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "Ticket"
+        Account updates:
+          [PUBLIC_KEY_HASH] ... -2
+          [PUBLIC_KEY_HASH] ... +2
+      Consumed gas: 2124.710
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0165
         storage fees ........................... +ꜩ0.0165
@@ -256,7 +263,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 tickets from bootstrap2 to '[CONTRACT_HASH]' with entrypoint save and contents '"Ticket"' and type string and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 4936.532 units (will add 100 for safety)
+Estimated gas: 4936.930 units (will add 100 for safety)
 Estimated storage: 110 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -284,7 +291,13 @@ This sequence of operations was run:
       From: [PUBLIC_KEY_HASH]
       This tickets transfer was successfully applied
       Paid storage size diff: 66 bytes
-      Consumed gas: 2125.832
+      Ticket updates:
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "Ticket"
+        Account updates:
+          [PUBLIC_KEY_HASH] ... -1
+      Consumed gas: 2126.230
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0165
         storage fees ........................... +ꜩ0.0165
