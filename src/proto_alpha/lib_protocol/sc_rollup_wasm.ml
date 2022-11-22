@@ -341,10 +341,12 @@ module V2_0_0 = struct
                    We choose to ignore such messages. An alternative choice would be to
                    craft an output with a payload witnessing the illformedness of the
                    output produced by the kernel. *)
-                aux outbox (Z.succ message_index)
+                (aux [@ocaml.tailcall]) outbox (Z.succ message_index)
             | Ok message ->
                 let output = PS.{outbox_level; message_index; message} in
-                aux (output :: outbox) (Z.succ message_index))
+                (aux [@ocaml.tailcall])
+                  (output :: outbox)
+                  (Z.succ message_index))
       in
       aux [] Z.zero
 
