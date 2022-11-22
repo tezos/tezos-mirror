@@ -616,8 +616,8 @@ module Parsed_account = struct
          (req "amount" Tez.encoding))
 
   let to_bootstrap_account repr =
-    Tezos_client_base.Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
-    Tezos_client_base.Client_keys.public_key pk_uri >>=? fun public_key ->
+    Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
+    Client_keys.public_key pk_uri >>=? fun public_key ->
     let public_key_hash = Tezos_crypto.Signature.Public_key.hash public_key in
     return
       Parameters.
