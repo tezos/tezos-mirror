@@ -77,7 +77,7 @@ val add_messages :
   Store.Histories.value ->
   Sc_rollup.Inbox_message.t trace ->
   (Store.Level_tree_histories.value
-  * Store.Level_tree_histories.key option
+  * Store.Level_tree_histories.key
   * Store.Histories.value
   * Sc_rollup.Inbox.t)
   tzresult

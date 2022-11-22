@@ -176,37 +176,34 @@ let add_messages level inbox history messages =
     Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity:10000L
   in
   lift
-  @@
-  if messages = [] then return (messages_history, None, history, inbox)
-  else
-    let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+  @@ let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
+     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
 
-                 The number of messages during commitment period is broken with the
-                 unique inbox. *)
-    (* let commitment_period =
-     *   node_ctxt.protocol_constants.parametric.sc_rollup
-     *     .commitment_period_in_blocks |> Int32.of_int
-     * in
-     * let inbox =
-     *   Sc_rollup.Inbox.refresh_commitment_period
-     *     ~commitment_period
-     *     ~level
-     *     inbox
-     * in *)
-    let*? messages_history, messages_tree, history, inbox =
-      Sc_rollup.Inbox.add_messages
-        messages_history
-        history
-        inbox
-        level
-        messages
-        None
-    in
-    let messages_tree_hash =
-      Sc_rollup.Inbox_merkelized_payload_hashes.hash messages_tree
-    in
-    return (messages_history, Some messages_tree_hash, history, inbox)
+         The number of messages during commitment period is broken with the
+         unique inbox. *)
+     (* let commitment_period =
+      *   node_ctxt.protocol_constants.parametric.sc_rollup
+      *     .commitment_period_in_blocks |> Int32.of_int
+      * in
+      * let inbox =
+      *   Sc_rollup.Inbox.refresh_commitment_period
+      *     ~commitment_period
+      *     ~level
+      *     inbox
+      * in *)
+     let*? messages_history, messages_tree, history, inbox =
+       Sc_rollup.Inbox.add_messages
+         messages_history
+         history
+         inbox
+         level
+         messages
+         None
+     in
+     let messages_tree_hash =
+       Sc_rollup.Inbox_merkelized_payload_hashes.hash messages_tree
+     in
+     return (messages_history, messages_tree_hash, history, inbox)
 
 let process_head (node_ctxt : _ Node_context.t)
     Layer1.({level; hash = head_hash} as head) =
@@ -243,13 +240,7 @@ let process_head (node_ctxt : _ Node_context.t)
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
     let*! () =
-      match messages_hash with
-      | None -> Lwt.return_unit
-      | Some messages_hash ->
-          State.add_messages_history
-            node_ctxt.store
-            messages_hash
-            messages_history
+      State.add_messages_history node_ctxt.store messages_hash messages_history
     in
     let*! () = State.add_inbox node_ctxt.store head_hash inbox in
     let*! () = State.add_history node_ctxt.store head_hash history in
