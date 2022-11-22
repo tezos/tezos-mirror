@@ -43,7 +43,7 @@ let () =
         ppf
         "Cannot convert root hash page to byte sequence: %s"
         b58_hash)
-    Data_encoding.(obj1 (req "hash" string))
+    Data_encoding.(obj1 (req "hash" (string Plain)))
     (function
       | Cannot_convert_root_page_hash_to_bytes b58_hash -> Some b58_hash
       | _ -> None)
@@ -58,7 +58,7 @@ let () =
         ppf
         "Cannot compute aggregate signature of root page hash: %s"
         b58_hash)
-    Data_encoding.(obj1 (req "hash" string))
+    Data_encoding.(obj1 (req "hash" (string Plain)))
     (function
       | Cannot_compute_aggregate_signature b58_hash -> Some b58_hash | _ -> None)
     (fun b58_hash -> Cannot_compute_aggregate_signature b58_hash) ;
@@ -76,7 +76,7 @@ let () =
          root page hash %s"
         witness_index
         b58_hash)
-    Data_encoding.(obj2 (req "witness_index" int31) (req "hash" string))
+    Data_encoding.(obj2 (req "witness_index" int31) (req "hash" (string Plain)))
     (function
       | Public_key_for_witness_not_available (index, hash) -> Some (index, hash)
       | _ -> None)
@@ -93,8 +93,8 @@ module Make (Hashing_scheme : REVEAL_HASH) = struct
     let open Lwt_result_syntax in
     List.rev_mapi_es
       (fun index sk_uri_opt ->
-        (* TODO: <insert issue here>
-           Implement Option.bind_es and revisit this*)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4306
+           Implement Option.bind_es and revisit this. *)
         bind_es
           (fun sk_uri ->
             let*! signature_res =

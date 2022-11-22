@@ -39,7 +39,12 @@ module type T = sig
 
   module RPC : sig
     val rpc_services :
-      reveal_data_dir:string -> unit Tezos_rpc.Directory.directory
+      reveal_data_dir:string ->
+      #Client_context.wallet ->
+      Tezos_crypto.Aggregate_signature.public_key option list ->
+      Client_keys.aggregate_sk_uri option list ->
+      int ->
+      unit Tezos_rpc.Directory.directory
   end
 end
 

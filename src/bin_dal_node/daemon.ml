@@ -226,10 +226,21 @@ let run ~data_dir cctxt =
   let* () =
     Dac_manager.Storage.ensure_reveal_data_dir_exists config.dac.reveal_data_dir
   in
-  let* _dac_list = Dac_manager.Keys.get_keys cctxt config in
+  let* dac_accounts = Dac_manager.Keys.get_keys cctxt config in
+  let dac_pks_opt, dac_sk_uris =
+    dac_accounts
+    |> List.map (fun account_opt ->
+           match account_opt with
+           | None -> (None, None)
+           | Some (_pkh, pk_opt, sk_uri) -> (pk_opt, Some sk_uri))
+    |> List.split
+  in
   let*! store = Store.init config in
   let ctxt = Node_context.init config store in
-  let* rpc_server = RPC_server.(start config ctxt) in
+
+  let* rpc_server =
+    RPC_server.(start config cctxt ctxt dac_pks_opt dac_sk_uris)
+  in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))

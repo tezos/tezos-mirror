@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 module Reveal_hash = struct
-  module Hashing_scheme = Dac_pages_encoding.Merkle_tree.V0
   module Storage = Dac_preimage_data_manager.Reveal_hash
   module Signatures = Dac_signature_manager.Reveal_hash
   module External_message = Dac_external_message_manager.Reveal_hash

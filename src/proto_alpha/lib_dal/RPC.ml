@@ -24,6 +24,21 @@
 (*****************************************************************************)
 
 open Environment
+open Error_monad
+
+type error += Cannot_construct_external_message
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dac_cannot_construct_external_message"
+    ~title:"External rollup message could not be constructed"
+    ~description:"External rollup message could not be constructed"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "External rollup message could not be constructed")
+    Data_encoding.unit
+    (function Cannot_construct_external_message -> Some () | _ -> None)
+    (fun () -> Cannot_construct_external_message)
 
 module Registration = struct
   let register0_noctxt ~chunked s f dir =
@@ -39,7 +54,11 @@ module DAC = struct
         (req "payload" Data_encoding.(bytes Hex))
         (req "pagination_scheme" Dac_pages_encoding.pagination_scheme_encoding))
 
-  let store_preimage_response_encoding = Protocol.Sc_rollup_reveal_hash.encoding
+  let store_preimage_response_encoding =
+    Data_encoding.(
+      obj2
+        (req "root_hash" Protocol.Sc_rollup_reveal_hash.encoding)
+        (req "external_message" (bytes Hex)))
 
   module S = struct
     let dac_store_preimage =
@@ -51,30 +70,62 @@ module DAC = struct
         RPC_path.(open_root / "dac" / "store_preimage")
   end
 
-  let handle_serialize_dac_store_preimage reveal_data_dir input =
+  let handle_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir
+      (data, pagination_scheme) =
+    let open Lwt_result_syntax in
     let open Dac_pages_encoding in
     let for_each_page (hash, page_contents) =
-      Hash_storage.save_bytes reveal_data_dir hash page_contents
+      Dac_manager.Reveal_hash.Storage.save_bytes
+        reveal_data_dir
+        hash
+        page_contents
     in
-    let data, pagination_scheme = input in
-    match pagination_scheme with
-    | Merkle_tree_V0 ->
-        let size =
-          Protocol.Alpha_context.Constants.sc_rollup_message_size_limit
-        in
-        Merkle_tree.V0.serialize_payload ~max_page_size:size data ~for_each_page
-    | Hash_chain_V0 -> Hash_chain.V0.serialize_payload ~for_each_page data
+    let* root_hash =
+      match pagination_scheme with
+      | Merkle_tree_V0 ->
+          let size =
+            Protocol.Alpha_context.Constants.sc_rollup_message_size_limit
+          in
+          Merkle_tree.V0.serialize_payload
+            ~max_page_size:size
+            data
+            ~for_each_page
+      | Hash_chain_V0 -> Hash_chain.V0.serialize_payload ~for_each_page data
+    in
+    let* signature, witnesses =
+      Dac_manager.Reveal_hash.Signatures.sign_root_hash
+        cctxt
+        dac_sk_uris
+        root_hash
+    in
+    let*? external_message =
+      match
+        Dac_manager.Reveal_hash.External_message.make
+          root_hash
+          signature
+          witnesses
+      with
+      | Ok external_message -> Ok external_message
+      | Error _ -> Error_monad.error Cannot_construct_external_message
+    in
+    return (root_hash, external_message)
 
-  let register_serialize_dac_store_preimage reveal_data_dir =
+  let register_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir =
     Registration.register0_noctxt
       ~chunked:false
       S.dac_store_preimage
       (fun () input ->
-        handle_serialize_dac_store_preimage reveal_data_dir input)
+        handle_serialize_dac_store_preimage
+          cctxt
+          dac_sk_uris
+          reveal_data_dir
+          input)
 
-  let register reveal_data_dir =
+  let register reveal_data_dir cctxt _dac_public_keys_opt dac_sk_uris =
     (RPC_directory.empty : unit RPC_directory.t)
-    |> register_serialize_dac_store_preimage reveal_data_dir
+    |> register_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir
 end
 
-let rpc_services ~reveal_data_dir = DAC.register reveal_data_dir
+let rpc_services ~reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
+    _threshold =
+  DAC.register reveal_data_dir cctxt dac_public_keys_opt dac_sk_uris
