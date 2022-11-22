@@ -134,7 +134,7 @@ let lazy_mapping to_key enc_value =
                 tree
                 (prefix [])
                 (Tree.select backend origin)
-          | None -> return tree
+          | None -> Tree.remove backend tree (prefix [])
         in
         List.fold_left_s
           (fun tree (k, v) ->

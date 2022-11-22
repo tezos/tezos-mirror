@@ -246,6 +246,10 @@ module Mutable : sig
 
     val pop : 'a t -> 'a Lwt.t
 
+    (** [reset vec] empties [vec] completely. Contrary to [pop], no
+        values are read from the underlying backend. *)
+    val reset : 'a t -> unit
+
     val snapshot : 'a t -> 'a Vector.t
   end
 

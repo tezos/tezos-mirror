@@ -306,6 +306,8 @@ module Mutable = struct
 
     val pop : 'a t -> 'a Lwt.t
 
+    val reset : 'a t -> unit
+
     val snapshot : 'a t -> 'a Vector.t
   end
 
@@ -345,6 +347,8 @@ module Mutable = struct
       let+ v, map = Vector.pop !map_ref in
       map_ref := map ;
       v
+
+    let reset map_ref = map_ref := Vector.empty ()
 
     let snapshot map_ref = !map_ref
   end

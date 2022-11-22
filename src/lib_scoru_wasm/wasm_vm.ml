@@ -307,6 +307,15 @@ let patch_reboot_flag durable =
       Durable.(write_value_exn durable Constants.reboot_flag_key 0L "")
   | _ -> return durable
 
+(** Every time the kernel yields, we reset the input buffer. *)
+let clean_up_buffers buffers =
+  let open Tezos_webassembly_interpreter in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4188
+     After a certain number of levels, messages posted in the outbox
+     need to be clean-up. *)
+  function
+  | Forcing_yield | Yielding -> Input_buffer.reset buffers.Eval.input | _ -> ()
+
 (** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.
 *)
@@ -319,6 +328,7 @@ let compute_step pvm_state =
   let reboot_counter = next_reboot_counter pvm_state status in
   let* durable = patch_too_many_reboot_flag durable status in
   let* durable = patch_reboot_flag durable status in
+  let () = clean_up_buffers pvm_state.buffers status in
   let pvm_state =
     {
       pvm_state with

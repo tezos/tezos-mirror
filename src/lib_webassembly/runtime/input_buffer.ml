@@ -29,6 +29,8 @@ let alloc () = Vector.create Z.zero
 let get_input index buffer =
   Lwt.catch (fun () -> Vector.get index buffer) reraise
 
+let reset = Vector.reset
+
 let dequeue input =
   let open Lwt.Syntax in
   let num_elems = num_elements input in
