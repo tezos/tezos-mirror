@@ -410,6 +410,21 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let split index = Store.split index.repo
 
+  let export_snapshot index context_hash ~path =
+    let open Lwt_syntax in
+    let* commit_opt =
+      Store.Commit.of_hash index.repo (Hash.of_context_hash context_hash)
+    in
+    match commit_opt with
+    | None ->
+        Fmt.failwith
+          "%a: unknown context hash"
+          Tezos_crypto.Context_hash.pp
+          context_hash
+    | Some commit ->
+        let h = Store.Commit.key commit in
+        Store.create_one_commit_store index.repo h path
+
   (*-- Generic Store Primitives ------------------------------------------------*)
 
   let data_key = Tezos_context_sigs.Context.data_key

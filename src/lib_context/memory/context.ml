@@ -199,6 +199,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let split _ = (* not implemented for in-memory context *) ()
 
+  let export_snapshot _ _ ~path:_ =
+    (* not implemented for in-memory context *) Lwt.return_unit
+
   let sync _ = (* not implemented for in-memory context *) Lwt.return_unit
 
   (*-- Generic Store Primitives ------------------------------------------------*)
