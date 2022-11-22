@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 type t = {
-  known_valid : Tezos_crypto.Operation_hash.t list;
-  pending : Tezos_crypto.Operation_hash.Set.t;
+  known_valid : Tezos_crypto.Hashed.Operation_hash.t list;
+  pending : Tezos_crypto.Hashed.Operation_hash.Set.t;
 }
 
 type mempool = t
@@ -41,31 +41,32 @@ let encoding =
        (fun {known_valid; pending} -> (known_valid, pending))
        (fun (known_valid, pending) -> {known_valid; pending})
        (obj2
-          (req "known_valid" (list Tezos_crypto.Operation_hash.encoding))
+          (req "known_valid" (list Tezos_crypto.Hashed.Operation_hash.encoding))
           (req
              "pending"
-             (dynamic_size Tezos_crypto.Operation_hash.Set.encoding)))
+             (dynamic_size Tezos_crypto.Hashed.Operation_hash.Set.encoding)))
 
 let bounded_encoding ?max_operations () =
   match max_operations with
   | None -> encoding
   | Some max_operations ->
       Data_encoding.check_size
-        (8 + (max_operations * Tezos_crypto.Operation_hash.size))
+        (8 + (max_operations * Tezos_crypto.Hashed.Operation_hash.size))
         encoding
 
-let empty = {known_valid = []; pending = Tezos_crypto.Operation_hash.Set.empty}
+let empty =
+  {known_valid = []; pending = Tezos_crypto.Hashed.Operation_hash.Set.empty}
 
 let is_empty {known_valid; pending} =
-  known_valid = [] && Tezos_crypto.Operation_hash.Set.is_empty pending
+  known_valid = [] && Tezos_crypto.Hashed.Operation_hash.Set.is_empty pending
 
 let remove oph {known_valid; pending} =
   {
     known_valid =
       List.filter
-        (fun x -> not (Tezos_crypto.Operation_hash.equal x oph))
+        (fun x -> not (Tezos_crypto.Hashed.Operation_hash.equal x oph))
         known_valid;
-    pending = Tezos_crypto.Operation_hash.Set.remove oph pending;
+    pending = Tezos_crypto.Hashed.Operation_hash.Set.remove oph pending;
   }
 
 let cons_valid oph t = {t with known_valid = oph :: t.known_valid}
