@@ -33,7 +33,7 @@ type t = {
 let content_encoding =
   let open Data_encoding in
   def "sc_l2_message" ~description:"A hex encoded smart contact rollup message"
-  @@ conv String.to_bytes String.of_bytes bytes
+  @@ string' Hex
 
 let encoding =
   let open Data_encoding in
