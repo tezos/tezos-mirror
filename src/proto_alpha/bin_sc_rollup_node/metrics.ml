@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
 open Prometheus
 
 let sc_rollup_node_registry = CollectorRegistry.create ()
@@ -119,6 +121,28 @@ module Info = struct
       ~help:"General information on the node"
       ~label_names:["version"; "commit_hash"; "commit_date"]
       "node_info"
+
+  let rollup_node_info =
+    let help = "Rollup node info" in
+    v_labels_counter
+      ~help
+      ~label_names:
+        ["rollup_address"; "mode"; "genesis_level"; "genesis_hash"; "pvm_kind"]
+      "rollup_node_info"
+
+  let init_rollup_node_info ~id ~mode ~genesis_level ~genesis_hash ~pvm_kind =
+    let id = Sc_rollup_repr.Address.to_b58check id in
+    let mode = Configuration.string_of_mode mode in
+    let genesis_level = Format.asprintf "%a" Raw_level.pp genesis_level in
+    let genesis_hash =
+      Format.asprintf "%a" Sc_rollup.Commitment.Hash.pp genesis_hash
+    in
+    let pvm_kind = Sc_rollup.Kind.to_string pvm_kind in
+    ignore
+    @@ Counter.labels
+         rollup_node_info
+         [id; mode; genesis_level; genesis_hash; pvm_kind] ;
+    ()
 
   let () =
     let version = Version.to_string Current_git_info.version in
