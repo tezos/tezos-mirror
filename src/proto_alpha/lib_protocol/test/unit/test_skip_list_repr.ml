@@ -94,10 +94,10 @@ struct
     {size = list.size + 1; cells = (list.size, cell) :: list.cells}
 
   let back_path list start stop =
-    back_path ~deref:(deref list) ~cell_ptr:start ~target_index:stop
+    back_path ~deref:(deref list) ~cell_ptr:start ~target_index:(Z.of_int stop)
 
   let find list start stop =
-    find ~deref:(deref list) ~cell_ptr:start ~target_index:stop
+    find ~deref:(deref list) ~cell_ptr:start ~target_index:(Z.of_int stop)
 
   let search list start target_content =
     search
@@ -122,12 +122,13 @@ struct
       match find l i j with
       | None -> error (err (Printf.sprintf "There must be a cell (%d)" i))
       | Some cell ->
+          let index = Z.to_int (index cell) in
           error_unless
-            (index cell = j)
+            (index = j)
             (err
                (Printf.sprintf
                   "Found cell is not the correct one (found %d, expected %d)"
-                  (index cell)
+                  index
                   j))
     in
     let*? path =
@@ -248,7 +249,7 @@ struct
            invariant we want to check is in the opposite direction. *)
         match rev_path with
         | cell_x :: cell_z :: _ -> (
-            let i = index cell_x in
+            let i = Z.to_int (index cell_x) in
             let next_index = i + 1 in
             match
               List.nth history.cells (List.length history.cells - next_index - 1)

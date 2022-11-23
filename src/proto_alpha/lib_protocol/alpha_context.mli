@@ -3200,7 +3200,7 @@ module Sc_rollup : sig
 
     val get_payload_hash : t -> Inbox_message.Hash.t
 
-    val get_index : t -> int
+    val get_index : t -> Z.t
 
     type merkelized_and_payload = {
       merkelized : t;
@@ -3227,12 +3227,12 @@ module Sc_rollup : sig
     val proof_encoding : proof Data_encoding.t
 
     val produce_proof :
-      History.t -> index:int -> t -> (merkelized_and_payload * proof) option
+      History.t -> index:Z.t -> t -> (merkelized_and_payload * proof) option
 
     val verify_proof : proof -> (t * t) tzresult
 
     module Internal_for_tests : sig
-      val find_predecessor_payload : History.t -> index:int -> t -> t option
+      val find_predecessor_payload : History.t -> index:Z.t -> t -> t option
     end
   end
 

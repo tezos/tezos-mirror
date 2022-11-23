@@ -186,7 +186,8 @@ let test_get_message_payload messages =
   List.iteri_es
     (fun i message ->
       let expected_payload = encode_external_message message in
-      get_message_payload level_tree_histories level_tree i |> function
+      get_message_payload level_tree_histories level_tree (Z.of_int i)
+      |> function
       | Some payload ->
           let payload = Sc_rollup_inbox_message_repr.unsafe_to_string payload in
           fail_unless

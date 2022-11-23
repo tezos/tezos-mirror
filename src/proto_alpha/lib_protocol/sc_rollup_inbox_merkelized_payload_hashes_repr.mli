@@ -96,7 +96,7 @@ val pp : Format.formatter -> t -> unit
 val get_payload_hash : t -> Sc_rollup_inbox_message_repr.Hash.t
 
 (** [get_index merkelized] returns the index of [merkelized]. *)
-val get_index : t -> int
+val get_index : t -> Z.t
 
 (** Given two t [(a, b)] and a {!Sc_rollup_inbox_message_repr.serialized}
     [payload], a [proof] guarantees that [payload] hash is equal to [a] and that
@@ -112,7 +112,7 @@ val proof_encoding : proof Data_encoding.t
     [None] if no merkelized payload with [index] is found (either in the
     [history] or [index] is not inferior to [get_index into_]). *)
 val produce_proof :
-  History.t -> index:int -> t -> (merkelized_and_payload * proof) option
+  History.t -> index:Z.t -> t -> (merkelized_and_payload * proof) option
 
 (** [verify_proof proof] returns [(a, b)] where [proof] validates that [a] is an
     ancestor of [b]. Fails when [proof] is not a valid inclusion proof. *)
@@ -121,5 +121,5 @@ val verify_proof : proof -> (t * t) tzresult
 module Internal_for_tests : sig
   (** [find_predecessor_payload history ~index latest_merkelized] looks for the
       {!t} with [index] that is an ancestor of [latest_merkelized]. *)
-  val find_predecessor_payload : History.t -> index:int -> t -> t option
+  val find_predecessor_payload : History.t -> index:Z.t -> t -> t option
 end
