@@ -45,9 +45,9 @@ let make_bool_parameter name = function
   | None -> []
   | Some value -> [(name, `Bool value)]
 
-let test ~__FILE__ ?(tags = []) title f =
+let test ~__FILE__ ?(tags = []) ?supports title f =
   let tags = "dal" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags f
+  Protocol.register_test ~__FILE__ ~title ~tags ?supports f
 
 let regression_test ~__FILE__ ?(tags = []) title f =
   let tags = "dal" :: tags in
@@ -56,7 +56,9 @@ let regression_test ~__FILE__ ?(tags = []) title f =
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
-let setup ?(attestation_lag = 1) ?commitment_period ?challenge_window
+(* Some initialization functions to start needed nodes. *)
+
+let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
     ?dal_enable f ~protocol =
   let parameters =
     make_int_parameter
@@ -107,8 +109,6 @@ let setup ?(attestation_lag = 1) ?commitment_period ?challenge_window
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f parameters cryptobox node client bootstrap1_key
 
-type test = {variant : string; tags : string list; description : string}
-
 let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
     bootstrap1_key =
   let* rollup_address =
@@ -136,10 +136,12 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
     match dal_node with
     | None -> return ()
     | Some dal_node ->
+        let* () = Dal_node.terminate dal_node in
         let reveal_data_dir =
           Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name
         in
-        Dal_node.Dac.set_parameters ~reveal_data_dir dal_node
+        let* () = Dal_node.Dac.set_parameters ~reveal_data_dir dal_node in
+        Dal_node.run dal_node ~wait_ready:true
   in
   let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
@@ -147,17 +149,56 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
 let with_dal_node tezos_node tezos_client f key =
   let dal_node = Dal_node.create ~node:tezos_node ~client:tezos_client () in
   let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
   f key dal_node
 
-let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
-    ?dal_enable {variant; tags; description} ?(pvm_name = "arith") scenario =
-  let tags = tags @ [variant] in
+(* Wrapper scenario functions that should be re-used as much as possible when
+   writing tests. *)
+let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
+    ?commitment_period ?challenge_window ?(dal_enable = true) variant scenario =
+  let description = "Testing DAL L1 integration" in
+  test
+    ~__FILE__
+    ~tags
+    (Printf.sprintf "%s (%s)" description variant)
+    (fun protocol ->
+      with_layer1
+        ?attestation_lag
+        ?commitment_period
+        ?challenge_window
+        ~protocol
+        ~dal_enable
+      @@ fun parameters cryptobox node client ->
+      scenario protocol parameters cryptobox node client)
+
+let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
+    ?attestation_lag ?commitment_period ?challenge_window ?(dal_enable = true)
+    variant scenario =
+  let description = "Testing DAL L1 integration" in
+  test
+    ~__FILE__
+    ~tags
+    (Printf.sprintf "%s (%s)" description variant)
+    (fun protocol ->
+      with_layer1
+        ?attestation_lag
+        ?commitment_period
+        ?challenge_window
+        ~protocol
+        ~dal_enable
+      @@ fun parameters cryptobox node client ->
+      with_dal_node node client @@ fun _key dal_node ->
+      scenario protocol parameters cryptobox node client dal_node)
+
+let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
+    ?(dal_enable = true) ?commitment_period ?challenge_window variant scenario =
+  let description = "Testing rollup and Data availability layer node" in
   regression_test
     ~__FILE__
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
-      setup ?commitment_period ?challenge_window ~protocol ?dal_enable
+      with_layer1 ?commitment_period ?challenge_window ~protocol ~dal_enable
       @@ fun _parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
@@ -173,41 +214,6 @@ let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
         node
         client
         key)
-
-let test_scenario ?commitment_period ?challenge_window ?dal_enable
-    {variant; tags; description} scenario =
-  let tags = tags @ [variant] in
-  regression_test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      setup ?commitment_period ?challenge_window ~protocol ?dal_enable
-      @@ fun _parameters _cryptobox node client ->
-      ( with_fresh_rollup @@ fun sc_rollup_address sc_rollup_node _filename ->
-        scenario protocol sc_rollup_node sc_rollup_address node client )
-        node
-        client)
-
-let test_dal_rollup_scenario ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
-    ?dal_enable variant =
-  test_scenario_rollup_dal_node
-    ?dal_enable
-    ~pvm_name
-    {
-      tags;
-      variant;
-      description = "Testing rollup and Data availability layer node";
-    }
-
-let test_dal_scenario ?dal_enable variant =
-  test_scenario
-    ?dal_enable
-    {
-      tags = ["dal"];
-      variant;
-      description = "Testing data availability layer functionality ";
-    }
 
 let update_neighbors dal_node neighbors =
   let neighbors =
@@ -230,7 +236,8 @@ let wait_for_stored_slot dal_node slot_header =
       if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
       else None)
 
-let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
+let test_feature_flag _protocol _parameters _cryptobox node client
+    _bootstrap_key =
   (* This test ensures the feature flag works:
 
      - 1. It checks the feature flag is not enabled by default
@@ -404,11 +411,8 @@ let check_dal_raw_context node =
       Test.fail "Confirmed slots history mismatch." ;
     unit
 
-let test_slot_management_logic =
-  Protocol.register_test ~__FILE__ ~title:"dal basic logic" ~tags:["dal"]
-  @@ fun protocol ->
-  setup ~dal_enable:true ~protocol
-  @@ fun parameters cryptobox node client _bootstrap ->
+let test_slot_management_logic _protocol parameters cryptobox node client
+    _bootstrap_key =
   let* (`OpHash _) =
     let error =
       rex ~opts:[`Dotall] "Unexpected level in the future in slot header"
@@ -507,7 +511,7 @@ let test_slot_management_logic =
   check_manager_operation_status operations_result fees_error oph4 ;
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
-  let nb_slots = parameters.number_of_slots in
+  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   let* _ =
     dal_attestation ~nb_slots ~signer:Constant.bootstrap1 [1; 0] client
   in
@@ -537,17 +541,10 @@ let test_slot_management_logic =
 (** This test tests various situations related to DAL slots attestation. It's
     many made of two parts (A) and (B). See the step inside the test.
 *)
-let test_slots_attestation_operation_behavior =
-  Protocol.register_test
-    ~__FILE__
-    ~title:(sf "Slots attestation operation behavior")
-    ~tags:["dal"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
-  @@ fun protocol ->
-  setup ~attestation_lag:5 ~dal_enable:true ~protocol
-  @@ fun parameters cryptobox node client _bootstrap ->
+let test_slots_attestation_operation_behavior _protocol parameters cryptobox
+    node client _bootstrap_key =
   (* Some helpers *)
-  let nb_slots = parameters.number_of_slots in
+  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ~level =
@@ -673,28 +670,12 @@ let test_slots_attestation_operation_behavior =
   in
   check_slots_availability ~__LOC__ ~attested:[10]
 
-let init_dal_node protocol =
-  let* node, client =
-    let* parameter_file = Rollup.Dal.Parameters.parameter_file protocol in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    Client.init_with_protocol `Client ~parameter_file ~protocol ~nodes_args ()
-  in
-  let dal_node = Dal_node.create ~node ~client () in
-  let* _dir = Dal_node.init_config dal_node in
-  let* () = Dal_node.run dal_node in
-  return (node, client, dal_node)
-
 let split_slot node client content =
   let* slot = Rollup.Dal.make_slot content client in
   RPC.call node (Rollup.Dal.RPC.split_slot slot)
 
-let test_dal_node_slot_management =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal node slot management"
-    ~tags:["dal"; "dal_node"]
-  @@ fun protocol ->
-  let* _node, client, dal_node = init_dal_node protocol in
+let test_dal_node_slot_management _protocol _parameters _cryptobox _node client
+    dal_node =
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
   let* slot_header = split_slot dal_node client slot_content in
   let* received_slot =
@@ -721,13 +702,8 @@ let publish_and_store_slot node client dal_node source index content =
   let* _ = publish_slot ~source ~fee:1_200 ~index ~commitment node client in
   return (index, slot_header)
 
-let test_dal_node_slots_headers_tracking =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal node slot headers tracking"
-    ~tags:["dal"; "dal_node"]
-  @@ fun protocol ->
-  let* node, client, dal_node = init_dal_node protocol in
+let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
+    client dal_node =
   let publish = publish_and_store_slot node client dal_node in
   let* slot0 = publish Constant.bootstrap1 0 "test0" in
   let* slot1 = publish Constant.bootstrap2 1 "test1" in
@@ -749,7 +725,8 @@ let generate_dummy_slot slot_size =
   String.init slot_size (fun i ->
       match i mod 3 with 0 -> 'a' | 1 -> 'b' | _ -> 'c')
 
-let test_dal_node_rebuild_from_shards =
+let test_dal_node_rebuild_from_shards _protocol _parameters _cryptobox node
+    client dal_node =
   (* Steps in this integration test:
      1. Run a dal node
      2. Generate and publish a full slot, then bake
@@ -757,12 +734,6 @@ let test_dal_node_rebuild_from_shards =
         from this slot (it would work with more)
      4. Ensure we can rebuild the original data using the above shards
   *)
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal node shard fetching and slot reconstruction"
-    ~tags:["dal"; "dal_node"]
-  @@ fun protocol ->
-  let* node, client, dal_node = init_dal_node protocol in
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let crypto_params = parameters.cryptobox in
   let slot_content = generate_dummy_slot crypto_params.slot_size in
@@ -808,13 +779,8 @@ let test_dal_node_rebuild_from_shards =
        expected = %R)" ;
   return ()
 
-let test_dal_node_test_slots_propagation =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal node slots propagation"
-    ~tags:["dal"; "dal_node"]
-  @@ fun protocol ->
-  let* node, client, dal_node1 = init_dal_node protocol in
+let test_dal_node_test_slots_propagation _protocol _parameters _cryptobox node
+    client dal_node1 =
   let dal_node2 = Dal_node.create ~node ~client () in
   let dal_node3 = Dal_node.create ~node ~client () in
   let dal_node4 = Dal_node.create ~node ~client () in
@@ -918,7 +884,6 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   *)
 
   (* 0. run dl node. *)
-  let* () = Dal_node.run dal_node in
 
   (* 1. Send three slots to dal node and obtain corresponding headers. *)
   let slot_contents_0 = " 10 " in
@@ -1167,7 +1132,6 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
 
 let test_dal_node_handles_dac_store_preimage _protocol dal_node sc_rollup_node
     _sc_rollup_address _node _client pvm_name =
-  let* () = Dal_node.run dal_node in
   let preimage = "test" in
   let* actual_rh =
     RPC.call dal_node (Rollup.Dal.RPC.dac_store_preimage preimage)
@@ -1245,29 +1209,53 @@ let test_dal_node_dac_threshold_not_reached =
   Dal_node.terminate dal_node
 
 let register ~protocols =
-  test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
-  test_slot_management_logic protocols ;
-  test_dal_node_slot_management protocols ;
-  test_dal_node_slots_headers_tracking protocols ;
-  test_dal_node_rebuild_from_shards protocols ;
+  (* Tests with Layer1 node only *)
+  scenario_with_layer1_node
+    "dal basic logic"
+    test_slot_management_logic
+    protocols ;
+  scenario_with_layer1_node
+    ~attestation_lag:5
+    "slots attestation operation behavior"
+    test_slots_attestation_operation_behavior
+    protocols ;
+  scenario_with_layer1_node
+    ~dal_enable:false
+    "feature_flag_is_disabled"
+    test_feature_flag
+    protocols ;
+
+  (* Tests with layer1 and dal nodes *)
   test_dal_node_startup protocols ;
-  test_dal_node_test_slots_propagation protocols ;
-  test_dal_rollup_scenario
-    ~dal_enable:true
+  test_dal_node_imports_dac_member protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node slot management"
+    test_dal_node_slot_management
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node slot headers tracking"
+    test_dal_node_slots_headers_tracking
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node shard fetching and slot reconstruction"
+    test_dal_node_rebuild_from_shards
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node slots propagation"
+    test_dal_node_test_slots_propagation
+    protocols ;
+
+  (* Tests with all nodes *)
+  test_dal_node_dac_threshold_not_reached protocols ;
+  scenario_with_all_nodes
     "rollup_node_downloads_slots"
     rollup_node_stores_dal_slots
     protocols ;
-  test_dal_rollup_scenario
-    ~dal_enable:true
+  scenario_with_all_nodes
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
-  test_slots_attestation_operation_behavior protocols ;
-  test_dal_rollup_scenario
-    ~tags:["dac"; "dal_node"]
-    ~dal_enable:true
+  scenario_with_all_nodes
     "dac_handles_reveal_data"
     test_dal_node_handles_dac_store_preimage
-    protocols ;
-  test_dal_node_imports_dac_member protocols ;
-  test_dal_node_dac_threshold_not_reached protocols
+    protocols
