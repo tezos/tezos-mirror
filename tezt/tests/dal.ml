@@ -339,6 +339,45 @@ let publish_dummy_slot ~source ?level ?error ?fee ~index ~message cryptobox =
   in
   publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof
 
+(* We check that publishing a slot header with a proof for a different
+   slot leads to a proof-checking error. *)
+let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?level ?fee
+    ~index cryptobox =
+  let commitment, _proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox "a")
+  in
+  let _commitment, proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox "b")
+  in
+  let error =
+    rex ~opts:[`Dotall] "The slot header's commitment proof does not check"
+  in
+  publish_slot ~source ?level ?fee ~error ~index ~commitment ~proof
+
+(* We check that publishing a slot header with a proof for the "same"
+   slot contents but represented using a different [slot_size] leads
+   to a proof-checking error. *)
+let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?level
+    ?fee ~index parameters cryptobox =
+  let cryptobox_params =
+    {
+      parameters.Rollup.Dal.Parameters.cryptobox with
+      slot_size = 2 * parameters.cryptobox.slot_size;
+    }
+  in
+  let cryptobox' = Rollup.Dal.make cryptobox_params in
+  let msg = "a" in
+  let commitment, _proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox msg)
+  in
+  let _commitment, proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox' msg)
+  in
+  let error =
+    rex ~opts:[`Dotall] "The slot header's commitment proof does not check"
+  in
+  publish_slot ~source ?level ?fee ~error ~index ~commitment ~proof
+
 let publish_slot_header ~source ?(fee = 1200) ~index ~commitment ~proof node
     client =
   let level = 1 + Node.get_level node in
@@ -441,6 +480,7 @@ let check_dal_raw_context node =
 
 let test_slot_management_logic _protocol parameters cryptobox node client
     _bootstrap_key =
+  Log.info "Inject some invalid slot headers" ;
   let* (`OpHash _) =
     let error =
       rex ~opts:[`Dotall] "Unexpected level in the future in slot header"
@@ -471,6 +511,28 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       node
       client
   in
+  let* (`OpHash _) =
+    publish_dummy_slot_with_wrong_proof_for_same_content
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:2
+      ~index:2
+      cryptobox
+      node
+      client
+  in
+  let* (`OpHash _) =
+    publish_dummy_slot_with_wrong_proof_for_different_slot_size
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:2
+      ~index:2
+      parameters
+      cryptobox
+      node
+      client
+  in
+  Log.info "Inject some valid slot headers" ;
   let* (`OpHash oph1) =
     publish_dummy_slot
       ~source:Constant.bootstrap1
@@ -697,14 +759,6 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
   in
   check_slots_availability ~__LOC__ ~attested:[10]
-
-(* let init_dal_node protocol =
- *   let* parameter_file = Rollup.Dal.Parameters.parameter_file protocol in
- *   let* node, client, _dal_parameters = setup_node ~parameter_file ~protocol in
- *   let dal_node = Dal_node.create ~node ~client () in
- *   let* _dir = Dal_node.init_config dal_node in
- *   let* () = Dal_node.run dal_node in
- *   return (node, client, dal_node) *)
 
 let split_slot node client content =
   let* slot = Rollup.Dal.make_slot content client in
