@@ -5733,6 +5733,7 @@ let _octez_dal_node =
     ~path:"src/bin_dal_node"
     ~internal_name:"main_dal"
     ~synopsis:"Tezos: `octez-dal-node` binary"
+    ~release_status:Experimental
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";
