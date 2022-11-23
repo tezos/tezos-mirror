@@ -31,7 +31,7 @@ type block_header = {
 }
 
 let block_header_data_encoding =
-  Data_encoding.(obj1 (req "random_data" Variable.bytes))
+  Data_encoding.(obj1 (req "random_data" (Variable.bytes Hex)))
 
 type block_header_metadata = unit
 
