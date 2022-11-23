@@ -42,16 +42,22 @@ let wat2wasm code =
 
 let default_max_tick = 100000L
 
+let default_outbox_validity_period = 10l
+
 let initial_tree ?(max_tick = default_max_tick)
     ?(max_reboots = Constants.maximum_reboots_per_input) ?(from_binary = false)
-    code =
+    ?(outbox_validity_period = default_outbox_validity_period) code =
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in
   let* tree = empty_tree () in
   let* tree = Wasm.initial_state tree in
   let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
   let* tree =
-    Wasm.install_boot_sector ~ticks_per_snapshot:max_tick_Z boot_sector tree
+    Wasm.install_boot_sector
+      ~ticks_per_snapshot:max_tick_Z
+      ~outbox_validity_period
+      boot_sector
+      tree
   in
   Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
 

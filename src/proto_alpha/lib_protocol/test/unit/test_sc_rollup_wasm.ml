@@ -237,6 +237,7 @@ let test_output () =
   let*! tree =
     Wasm.install_boot_sector
       ~ticks_per_snapshot:Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
+      ~outbox_validity_period:Sc_rollup_wasm.V2_0_0.outbox_validity_period
       boot_sector
       tree
   in

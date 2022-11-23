@@ -119,6 +119,8 @@ module Internal_state = struct
     max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
     maximum_reboots_per_input : Z.t;
         (** Number of reboots between two inputs. *)
+    outbox_validity_period : int32;
+        (** Number of levels an outbox is kept before being cleaned-up. *)
   }
 
   type computation_status =

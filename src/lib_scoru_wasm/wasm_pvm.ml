@@ -120,7 +120,8 @@ let pvm_state_encoding =
            tick_state,
            last_top_level_call,
            max_nb_ticks,
-           maximum_reboots_per_input ) ->
+           maximum_reboots_per_input,
+           outbox_validity_period ) ->
       {
         last_input_info;
         current_tick;
@@ -140,6 +141,7 @@ let pvm_state_encoding =
         last_top_level_call;
         max_nb_ticks;
         maximum_reboots_per_input;
+        outbox_validity_period;
       })
     (fun {
            last_input_info;
@@ -151,6 +153,7 @@ let pvm_state_encoding =
            last_top_level_call;
            max_nb_ticks;
            maximum_reboots_per_input;
+           outbox_validity_period;
          } ->
       ( last_input_info,
         current_tick,
@@ -160,8 +163,9 @@ let pvm_state_encoding =
         tick_state,
         last_top_level_call,
         max_nb_ticks,
-        maximum_reboots_per_input ))
-    (tup9
+        maximum_reboots_per_input,
+        outbox_validity_period ))
+    (tup10
        ~flatten:true
        (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
        (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
@@ -174,7 +178,8 @@ let pvm_state_encoding =
        (value
           ~default:Constants.maximum_reboots_per_input
           ["pvm"; "maximum_reboots_per_input"]
-          Data_encoding.n))
+          Data_encoding.n)
+       (value ["pvm"; "outbox_validity_period"] Data_encoding.int32))
 
 module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.S with type tree = T.tree = struct
@@ -212,7 +217,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       version
       empty_tree
 
-  let install_boot_sector ~ticks_per_snapshot bs tree =
+  let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period bs tree =
     let open Lwt_syntax in
     let open Tezos_tree_encoding in
     let* durable =
@@ -233,6 +238,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
         last_top_level_call = Z.zero;
         max_nb_ticks = ticks_per_snapshot;
         maximum_reboots_per_input = Constants.maximum_reboots_per_input;
+        outbox_validity_period;
       }
     in
     encode pvm tree

@@ -83,6 +83,8 @@ let () =
 module V2_0_0 = struct
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
+  let outbox_validity_period = Int32.of_int 40_320
+
   let well_known_reveal_preimage = ""
 
   let well_known_reveal_hash =
@@ -259,7 +261,11 @@ module V2_0_0 = struct
     let initial_state ~empty = WASM_machine.initial_state empty
 
     let install_boot_sector state boot_sector =
-      WASM_machine.install_boot_sector ~ticks_per_snapshot boot_sector state
+      WASM_machine.install_boot_sector
+        ~ticks_per_snapshot
+        ~outbox_validity_period
+        boot_sector
+        state
 
     let state_hash state =
       let context_hash = Tree.hash state in

@@ -1482,7 +1482,7 @@ let test_outboxes_at_each_level () =
     (* Lets check the outboxes are consistent and all exist. *)
     let* buffer = Wasm.Internal_for_tests.get_output_buffer tree in
     assert (
-      Outboxes.num_elements buffer
+      Outboxes.num_elements buffer.outboxes
       = Int32.succ curr_level (* One for each level, including 0 *)) ;
     let* () = check_outboxes buffer curr_level in
 
