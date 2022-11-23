@@ -166,7 +166,7 @@ let set_sol_input level tree =
 let set_internal_message level counter message tree =
   let encoded_message =
     Pvm_input_kind.(
-      Internal_for_tests.to_binary_input (Internal Deposit) (Some message))
+      Internal_for_tests.to_binary_input (Internal Transfer) (Some message))
   in
   Wasm.set_input_step (input_info level counter) encoded_message tree
 

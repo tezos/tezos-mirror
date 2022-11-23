@@ -25,15 +25,16 @@
 
 (** [internal_message_kind] represent an internal message in a inbox. *)
 type internal_message_kind =
-  | Deposit (* Generic internal message. *)
+  | Transfer (* Generic internal message. *)
   | Start_of_level
       (** Internal message put at the beginning of each inbox's level. *)
   | End_of_level  (** Internal message put at the end of each inbox's level. *)
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from
-    an external manager operation. Other messages shouldn't happen and treated
-    as errors by the PVM, it represents unexpected tags. *)
+    an external manager operation. Other messages represents non decodable tags.
+    It aims to be future-proof and prevent discarding any new type of
+    message.. *)
 type t = Internal of internal_message_kind | External | Other
 
 (** [from_raw_input input] takes a message produced by the L1 protocol and
