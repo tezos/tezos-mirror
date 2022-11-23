@@ -183,7 +183,17 @@ module First_level_of_protocol = struct
 end
 
 module Ratio = Ratio_repr
-module Raw_level = Raw_level_repr
+
+module Raw_level = struct
+  include Raw_level_repr
+
+  module Internal_for_tests = struct
+    let add = add
+
+    let sub = sub
+  end
+end
+
 module Cycle = Cycle_repr
 module Fees = Fees_storage
 
