@@ -676,8 +676,8 @@ let apply_internal_operation_contents :
       {
         destination;
         entrypoint = _;
-        parameters_ty = _;
-        parameters = _;
+        parameters_ty;
+        parameters;
         unparsed_parameters = payload;
       } ->
       assert_sc_rollup_feature_enabled ctxt >>?= fun () ->
@@ -700,10 +700,40 @@ let apply_internal_operation_contents :
         ~payload
         ~sender
         ~source:payer
-      >|=? fun (inbox_after, _size, ctxt) ->
+      >>=? fun (inbox_after, _size, ctxt) ->
+      Ticket_scanner.type_has_tickets ctxt parameters_ty
+      >>?= fun (has_tickets, ctxt) ->
+      Ticket_accounting.ticket_balances_of_value
+        ctxt
+        ~include_lazy:true
+        has_tickets
+        parameters
+      >>=? fun (ticket_token_map, ctxt) ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4354
+         Factor out function for constructing a ticket receipt.
+         There are multiple places where we compute the receipt from a
+         ticket-token-map. We should factor out and reuse this logic. *)
+      Ticket_token_map.fold_es
+        ctxt
+        (fun ctxt acc ex_token amount ->
+          Ticket_token_unparser.unparse ctxt ex_token
+          >>=? fun (ticket_token, ctxt) ->
+          let item =
+            Ticket_receipt.
+              {
+                ticket_token;
+                updates =
+                  [{account = Destination.Sc_rollup destination; amount}];
+              }
+          in
+          return (item :: acc, ctxt))
+        []
+        ticket_token_map
+      >|=? fun (ticket_receipt, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
-        Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
+        Transaction_to_sc_rollup_result
+          {consumed_gas; ticket_receipt; inbox_after}
       in
       (ctxt, ITransaction_result result, [])
   | Event {ty = _; unparsed_data = _; tag = _} ->

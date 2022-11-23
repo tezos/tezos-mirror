@@ -410,16 +410,19 @@ module Manager_result = struct
         case
           ~title:"To_sc_rollup"
           (Tag 2)
-          (obj2
+          (obj3
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+             (req "ticket_updates" Ticket_receipt.encoding)
              (req "inbox_after" Sc_rollup.Inbox.encoding))
           (function
-            | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
-                Some (consumed_gas, inbox_after)
+            | Transaction_to_sc_rollup_result
+                {consumed_gas; ticket_receipt; inbox_after} ->
+                Some (consumed_gas, ticket_receipt, inbox_after)
             | _ -> None)
           (function
-            | consumed_gas, inbox_after ->
-                Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
+            | consumed_gas, ticket_receipt, inbox_after ->
+                Transaction_to_sc_rollup_result
+                  {consumed_gas; ticket_receipt; inbox_after});
       ]
 
   let transaction_case =
