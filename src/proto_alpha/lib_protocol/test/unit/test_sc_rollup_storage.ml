@@ -111,6 +111,10 @@ let new_context_with_rollup () =
 let equal_tez ~loc =
   Assert.equal ~loc Tez_repr.( = ) "Tez aren't equal" Tez_repr.pp
 
+let assert_not_exist ~loc ~pp comp_lwt =
+  let* _ctxt, res_opt = comp_lwt in
+  Assert.is_none ~loc ~pp res_opt
+
 let assert_balance_changed op ctxt ctxt' account amount =
   let* _, balance = lift @@ Token.balance ctxt account in
   let* _, balance' = lift @@ Token.balance ctxt' account in
@@ -860,9 +864,45 @@ let test_cement () =
   let* c1, _level, ctxt =
     lift @@ advance_level_n_refine_stake ctxt rollup staker commitment
   in
+  let* old_lcc_hash, ctxt =
+    lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
+  in
+  let* old_lcc, ctxt =
+    lift
+    @@ Sc_rollup_commitment_storage.get_commitment_unsafe
+         ctxt
+         rollup
+         old_lcc_hash
+  in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _commitment =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  (* Ensures that all the old LCC's metadata cleaned up properly *)
+  let int32_pp fmt i = Format.fprintf fmt "%ld" i in
+  let* () =
+    assert_not_exist ~loc:__LOC__ ~pp:Raw_level_repr.pp
+    @@ lift
+    @@ Storage.Sc_rollup.Commitment_added.find (ctxt, rollup) old_lcc_hash
+  in
+  let* () =
+    assert_not_exist ~loc:__LOC__ ~pp:int32_pp
+    @@ lift
+    @@ Storage.Sc_rollup.Commitment_stake_count.find (ctxt, rollup) old_lcc_hash
+  in
+  let* () =
+    assert_not_exist ~loc:__LOC__ ~pp:Raw_level_repr.pp
+    @@ lift
+    @@ Storage.Sc_rollup.Commitment_first_publication_level.find
+         (ctxt, rollup)
+         old_lcc.inbox_level
+  in
+  let* () =
+    assert_not_exist ~loc:__LOC__ ~pp:int32_pp
+    @@ lift
+    @@ Storage.Sc_rollup.Commitment_count_per_inbox_level.find
+         (ctxt, rollup)
+         old_lcc.inbox_level
   in
   assert_true ctxt
 
@@ -1388,37 +1428,6 @@ let test_no_cement_on_conflict () =
          commitment2
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt 5000 in
-  assert_fails_with
-    ~loc:__LOC__
-    (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-    Sc_rollup_errors.Sc_rollup_disputed
-
-(** Tests that [c1] can not be finalized in the following scenario:
-   staker2     staker1
-     |           |
-     V           V
-    LCC      <- [c1]
- *)
-let test_no_cement_with_one_staker_at_zero_commitment () =
-  let* ctxt, rollup, genesis_hash, staker1, _staker2 =
-    originate_rollup_and_deposit_with_two_stakers ()
-  in
-  let commitment1 =
-    Commitment_repr.
-      {
-        predecessor = genesis_hash;
-        inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909L;
-        compressed_state = Sc_rollup_repr.State_hash.zero;
-      }
-  in
-  let* c1, _level, ctxt =
-    lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
-  in
-  let challenge_window =
-    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
-  in
-  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
@@ -2579,10 +2588,6 @@ let tests =
       test_last_cemented_commitment_hash_with_level;
     Tztest.tztest "cement with two stakers" `Quick test_cement_with_two_stakers;
     Tztest.tztest "no cement on conflict" `Quick test_no_cement_on_conflict;
-    Tztest.tztest
-      "refuse cementing when one staker is at zero commitment"
-      `Quick
-      test_no_cement_with_one_staker_at_zero_commitment;
     Tztest.tztest
       "refuse cementing when parent commitment is not the LCC"
       `Quick

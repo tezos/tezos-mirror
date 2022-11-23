@@ -1802,6 +1802,19 @@ module Sc_rollup = struct
         let encoding = Data_encoding.int32
       end)
 
+  module Commitment_count_per_inbox_level =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_count_per_inbox_level"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+      (struct
+        type t = int32
+
+        let encoding = Data_encoding.int32
+      end)
+
   module Commitment_first_publication_level =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
