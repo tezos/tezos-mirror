@@ -98,7 +98,7 @@ let check_import_invariants ~test_descr ~rolling
       return_unit)
 
 let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
-    ~rolling (store_dir, context_dir) chain_store =
+    ~rolling ~export_mode (store_dir, context_dir) chain_store =
   let open Lwt_result_syntax in
   let* () = check_invariants chain_store in
   let open Filename.Infix in
@@ -112,7 +112,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
   let* () =
     Snapshots.export
       ~snapshot_path
-      Snapshots.Tar
+      export_mode
       ~rolling
       ~block:exported_block
       ~store_dir
@@ -258,7 +258,7 @@ let check_baking_continuity ~test_descr ~exported_chain_store
   return_unit
 
 let test store_path ~test_descr ?exported_block_level
-    ~nb_blocks_to_bake_before_export ~rolling store =
+    ~nb_blocks_to_bake_before_export ~rolling ~export_mode store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
@@ -277,6 +277,7 @@ let test store_path ~test_descr ?exported_block_level
         store_path
         chain_store
         ~rolling
+        ~export_mode
         ?exported_block_hash
         ~previously_baked_blocks
     in
@@ -426,6 +427,7 @@ let make_tests speed genesis_parameters =
         ]
     | `Quick -> [None; Some (Int32.of_int nb_initial_blocks)]
   in
+  let export_mode = Snapshots.[Tar; Raw] in
   let permutations =
     List.(
       product
@@ -434,15 +436,19 @@ let make_tests speed genesis_parameters =
            (map export_blocks_levels nb_initial_blocks_list
            |> flatten
            |> List.sort_uniq Stdlib.compare))
-        (product exporter_history_modes [false; true]))
-    |> List.map (fun ((a, b), (c, d)) -> (a, b, c, d))
+        (product exporter_history_modes (product [false; true] export_mode)))
+    |> List.map (fun ((a, b), (c, (d, e))) -> (a, b, c, d, e))
   in
   List.filter_map
-    (fun (nb_initial_blocks, exported_block_level, history_mode, rolling) ->
+    (fun ( nb_initial_blocks,
+           exported_block_level,
+           history_mode,
+           rolling,
+           export_mode ) ->
       let test_descr =
         Format.asprintf
           "export => import with %d initial blocks from %a to %s (exported \
-           block at %s)"
+           block at %s) using %a format"
           nb_initial_blocks
           History_mode.pp
           history_mode
@@ -450,6 +456,8 @@ let make_tests speed genesis_parameters =
           (match exported_block_level with
           | None -> "checkpoint"
           | Some i -> Format.sprintf "level %ld" i)
+          Snapshots.pp_snapshot_format
+          export_mode
       in
       match history_mode with
       | Rolling _ when rolling = false -> None
@@ -473,11 +481,12 @@ let make_tests speed genesis_parameters =
                          ~nb_blocks_to_bake_before_export:nb_initial_blocks
                          ~rolling
                          ~test_descr
+                         ~export_mode
                          store_path
                          store ))))
     permutations
 
-let test_rolling () =
+let test_rolling export_mode =
   let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
   let test (store_dir, context_dir) store =
     let open Lwt_result_syntax in
@@ -498,11 +507,10 @@ let test_rolling () =
     let dst_dir = store_dir // "imported_store" in
     let dst_store_dir = dst_dir // "store" in
     let dst_context_dir = dst_dir // "context" in
-    (*FIXME test over Raw formats as well *)
     let* () =
       Snapshots.export
         ~snapshot_path
-        Snapshots.Tar
+        export_mode
         ~rolling:true
         ~block:(`Head 0)
         ~store_dir
@@ -558,9 +566,16 @@ let test_rolling () =
     ~history_mode:History_mode.default
     ~patch_context
     ( Format.asprintf
-        "genesis consistency after rolling import (blocks per cycle = %ld)"
-        Alpha_utils.default_genesis_parameters.constants.blocks_per_cycle,
+        "genesis consistency after rolling import (blocks per cycle = %ld) \
+         using %a format"
+        Alpha_utils.default_genesis_parameters.constants.blocks_per_cycle
+        Snapshots.pp_snapshot_format
+        export_mode,
       test )
+
+let make_tests_rolling =
+  let export_mode = Snapshots.[Tar; Raw] in
+  List.map test_rolling export_mode
 
 (* This test aims to check that the caboose and savepoint are well
    dragged when the first merge occurs, after a rolling snapshot
@@ -571,7 +586,7 @@ let test_rolling () =
    In this test, we need to increase the number of blocks per cycle to
    avoid the max_op_ttl to hide this potential issue. The exported
    block must be outside the max_op_ttl of the next checkpoint. *)
-let test_drag_after_import () =
+let test_drag_after_import export_mode =
   let open Lwt_result_syntax in
   let constants =
     Default_parameters.
@@ -612,7 +627,6 @@ let test_drag_after_import () =
     let dst_dir = store_dir // "imported_store" in
     let dst_store_dir = dst_dir // "store" in
     let dst_context_dir = dst_dir // "context" in
-    (*FIXME test over Raw formats as well *)
     (* export distance is higer than the 120 max_op_tt*)
     let export_distance = 130 in
     let* export_block =
@@ -625,7 +639,7 @@ let test_drag_after_import () =
     let* () =
       Snapshots.export
         ~snapshot_path
-        Snapshots.Tar
+        export_mode
         ~rolling:true
         ~block:(`Hash (export_block_hash, 0))
         ~store_dir
@@ -705,9 +719,15 @@ let test_drag_after_import () =
     ~patch_context
     ( Format.asprintf
         "check caboose and savepoint drag after rolling import (blocks per \
-         cycle = %ld)"
-        constants.blocks_per_cycle,
+         cycle = %ld) using %a format"
+        constants.blocks_per_cycle
+        Snapshots.pp_snapshot_format
+        export_mode,
       test )
+
+let make_tests_drag_after_import =
+  let export_mode = Snapshots.[Tar; Raw] in
+  List.map test_drag_after_import export_mode
 
 (* TODO:
    export => import => export => import from full & rolling
@@ -723,6 +743,8 @@ let tests speed =
           parameters_of_constants
             {constants_sandbox with consensus_threshold = 0})
     in
-    test_rolling () :: test_drag_after_import () :: generated_tests
+    let tests_rolling = make_tests_rolling in
+    let tests_drag_after_import = make_tests_drag_after_import in
+    tests_rolling @ tests_drag_after_import @ generated_tests
   in
   ("snapshots", test_cases)
