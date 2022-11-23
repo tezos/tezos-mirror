@@ -160,8 +160,9 @@ main () {
     echo "exec $admin_client \"\$@\""  >> $client_dir/bin/octez-admin-client
     chmod +x $client_dir/bin/octez-admin-client
 
-    for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions_without_number); do
+    for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions); do
         protocol_underscore=$(echo $protocol | tr -- - _)
+        protocol_without_number=$(echo $protocol | tr --delete "\-[0-9]")
         local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
         local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
@@ -179,21 +180,21 @@ main () {
             sc_rollup_client="$local_sc_rollup_client -base-dir $client_dir -endpoint http://$host:$rpc"
         fi
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol
-        echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol
-        chmod +x $client_dir/bin/octez-baker-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol_without_number
+        echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol_without_number
+        chmod +x $client_dir/bin/octez-baker-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-node-$protocol
-        echo "exec $sc_rollup_node \"\$@\""  >> $client_dir/bin/octez-sc-rollup-node-$protocol
-        chmod +x $client_dir/bin/octez-sc-rollup-node-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
+        echo "exec $sc_rollup_node \"\$@\""  >> $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
+        chmod +x $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-client-$protocol
-        echo "exec $sc_rollup_client \"\$@\""  >> $client_dir/bin/octez-sc-rollup-client-$protocol
-        chmod +x $client_dir/bin/octez-sc-rollup-client-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
+        echo "exec $sc_rollup_client \"\$@\""  >> $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
+        chmod +x $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol
-        echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol
-        chmod +x $client_dir/bin/octez-accuser-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol_without_number
+        echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol_without_number
+        chmod +x $client_dir/bin/octez-accuser-$protocol_without_number
     done
 
     echo '#!/bin/sh' > $client_dir/bin/octez-signer
