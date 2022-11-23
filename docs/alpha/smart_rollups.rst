@@ -1020,9 +1020,8 @@ Testing your Kernel
    in `the Octez repository <https://gitlab.com/tezos/tezos>`_.
 
    To get ``octez-wasm-repl``, the easiest way is to build Octez from
-   source. In addition to the `usual instructions
-   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_,
-   the command ``make build-unreleased`` has to be used.
+   source. See the `usual instructions
+   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_.
 
    For now, ``octez-wasm-repl`` is **not** part of Octez, and is only
    provided for developers interested in testing Tezos smart rollup

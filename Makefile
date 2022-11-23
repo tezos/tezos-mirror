@@ -1,9 +1,6 @@
 PACKAGES_SUBPROJECT:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find opam -name \*.opam -print)))
 
-active_protocol_versions_without_number := $(shell cat script-inputs/active_protocol_versions_without_number)
-sc_rollup_protocol_versions_without_number := $(shell cat script-inputs/sc_rollup_protocol_versions_without_number)
-
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
 endef
@@ -33,16 +30,17 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-OCTEZ_BIN=octez-node octez-client octez-admin-client octez-signer octez-codec \
-	octez-protocol-compiler octez-snoop octez-proxy-server \
-    $(foreach p, $(active_protocol_versions_without_number), octez-baker-$(p)) \
-    $(foreach p, $(active_protocol_versions_without_number), octez-accuser-$(p)) \
-    $(foreach p, $(active_protocol_versions_without_number), octez-tx-rollup-node-$(p)) \
-    $(foreach p, $(active_protocol_versions_without_number), octez-tx-rollup-client-$(p)) \
-    $(foreach p, $(sc_rollup_protocol_versions_without_number), octez-sc-rollup-node-$(p)) \
-    $(foreach p, $(sc_rollup_protocol_versions_without_number), octez-sc-rollup-client-$(p))
+# See the documentation of [~release_status] in [manifest/manifest.mli].
+RELEASED_EXECUTABLES := $(shell cat script-inputs/released-executables)
+EXPERIMENTAL_EXECUTABLES := $(shell cat script-inputs/experimental-executables)
 
-UNRELEASED_OCTEZ_BIN=octez-dal-node octez-wasm-repl-alpha
+# Executables that developers need at the root of the repository but that
+# are not useful for users.
+# - scripts/snapshot_alpha.sh expects octez-protocol-compiler to be at the root.
+# - Some tests expect octez-snoop to be at the root.
+DEV_EXECUTABLES := octez-protocol-compiler octez-snoop
+
+ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -55,6 +53,14 @@ ifeq ($(filter ${VALID_PROFILES},${PROFILE}),)
 $(error Unexpected dune profile (got: ${PROFILE}, expecting one of: ${VALID_PROFILES}))
 endif
 
+# This check ensures that the `OCTEZ_EXECUTABLES` variable contains a subset of
+# the `ALL_EXECUTABLE` variable. The `OCTEZ_EXECUTABLES` variable is used
+# internally to select a subset of which executables to build.
+# The reason for the `foreach` is so that we support both newlines and spaces.
+ifneq ($(filter ${ALL_EXECUTABLES},${OCTEZ_EXECUTABLES}),$(foreach executable,${OCTEZ_EXECUTABLES},${executable}))
+$(error Unexpected list of executables to build, make sure environment variable OCTEZ_EXECUTABLES is unset)
+endif
+
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifdef TEZOS_WITHOUT_OPAM
 current_ocaml_version := $(shell ocamlc -version)
@@ -62,36 +68,46 @@ else
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
 endif
 
+# Default target.
+#
+# Note that you can override the list of executables to build on the command-line, e.g.:
+#
+#     make OCTEZ_EXECUTABLES='octez-node octez-client'
+#
+# This is more efficient than 'make octez-node octez-client'
+# because it only calls 'dune' once.
+#
+# Targets 'all', 'release', 'experimental-release' and 'static' define different
+# default lists of executables to build but they all can be overridden from the command-line.
 .PHONY: all
 all:
-	@$(MAKE) build
+	@$(MAKE) build OCTEZ_EXECUTABLES?="$(ALL_EXECUTABLES)"
 
 .PHONY: release
 release:
-	@$(MAKE) build PROFILE=release
+	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES)"
+
+.PHONY: experimental-release
+experimental-release:
+	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
 
 .PHONY: static
 static:
-	@$(MAKE) build build-unreleased PROFILE=static
+	@$(MAKE) build PROFILE=static OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES)"
 
 .PHONY: build-parameters
 build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
-.PHONY: $(OCTEZ_BIN)
-$(OCTEZ_BIN):
+.PHONY: $(ALL_EXECUTABLES)
+$(ALL_EXECUTABLES):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
-
-.PHONY: $(UNRELEASED_OCTEZ_BIN)
-$(UNRELEASED_OCTEZ_BIN):
-	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
-	@cp -f _build/install/default/bin/$@ ./
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
 # the exact list can vary. We just remove all of them.
-# Don't try to generate this list from OCTEZ_BIN: this list should not evolve as
+# Don't try to generate this list from *_EXECUTABLES: this list should not evolve as
 # we add new executables, and this list should contain executables that were built
 # before (e.g. old protocol daemons) but that are no longer built.
 .PHONY: clean-old-names
@@ -145,16 +161,19 @@ clean-old-names:
 	@rm -f octez-tx-rollup-client-015-PtLimaPt
 
 # See comment of clean-old-names for an explanation regarding why we do not try
-# to generate the symbolic links from OCTEZ_BIN.
+# to generate the symbolic links from *_EXECUTABLES.
 .PHONY: build
 build: clean-old-names
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
+ifeq (${OCTEZ_EXECUTABLES},)
+	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
+endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) ./
 	@ln -s octez-node tezos-node
 	@ln -s octez-client tezos-client
 	@ln -s octez-admin-client tezos-admin-client
@@ -405,18 +424,9 @@ build-tps: lift-protocol-limits-patch build build-tezt
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
 
-# Note: this target is an extended copy-paste of the target 'build'
-# and must be kept in sync with it, so that 'build-unreleased' builds
-# a superset of 'build'.
 .PHONY: build-unreleased
-build-unreleased:
-ifneq (${current_ocaml_version},${ocaml_version})
-	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
-endif
-	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) \
-		@copy-parameters
-	@cp -f $(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) ./
+build-unreleased: all
+	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'
 
 .PHONY: docker-image-build
 docker-image-build:
