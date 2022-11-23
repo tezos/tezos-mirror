@@ -311,35 +311,40 @@ module Make (PVM : Pvm.S) = struct
       let open Delayed_write_monad.Lwt_result_syntax in
       let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
       (* Iterate the PVM state with all the messages. *)
-      list_fold_left_i_es
-        (fun message_counter (state, fuel) message ->
-          let*? payload =
-            Sc_rollup.Inbox_message.(
-              message |> serialize |> Environment.wrap_tzresult)
-          in
-          let message_index = message_counter_offset + message_counter in
-          let message_counter = Z.of_int message_index in
-          let input = Sc_rollup.{inbox_level; message_counter; payload} in
-          let failing_ticks =
-            Loser_mode.is_failure
-              node_ctxt.Node_context.loser_mode
-              ~level
-              ~message_index
-          in
-          let>* state, fuel, _executed_ticks =
-            feed_input
-              node_ctxt
-              reveal_map
-              level
-              message_index
-              ~fuel
-              ~failing_ticks
-              state
-              input
-          in
-          return (state, fuel))
-        (state, fuel)
-        messages
+      let rec feed_messages (state, fuel) message_index = function
+        | [] ->
+            (* Fed all messages *)
+            return (state, fuel)
+        | _messages when F.is_empty fuel ->
+            (* Consumed all fuel *)
+            return (state, fuel)
+        | message :: messages ->
+            let*? payload =
+              Sc_rollup.Inbox_message.(
+                message |> serialize |> Environment.wrap_tzresult)
+            in
+            let message_counter = Z.of_int message_index in
+            let input = Sc_rollup.{inbox_level; message_counter; payload} in
+            let failing_ticks =
+              Loser_mode.is_failure
+                node_ctxt.Node_context.loser_mode
+                ~level
+                ~message_index
+            in
+            let>* state, fuel, _executed_ticks =
+              feed_input
+                node_ctxt
+                reveal_map
+                level
+                message_index
+                ~fuel
+                ~failing_ticks
+                state
+                input
+            in
+            feed_messages (state, fuel) (message_index + 1) messages
+      in
+      (feed_messages [@tailcall]) (state, fuel) message_counter_offset messages
 
     let eval_block_inbox ~fuel node_ctxt (inbox, messages) (state : PVM.state) :
         (PVM.state * int * Raw_level.t * fuel) Node_context.delayed_write
