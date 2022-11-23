@@ -265,8 +265,8 @@ module Make (Interpreter : Interpreter.S) :
 
   let new_dissection ~default_number_of_sections node_ctxt last_level ok
       our_view =
+    let open Lwt_result_syntax in
     let state_hash_from_tick tick =
-      let open Lwt_result_syntax in
       let* r = Interpreter.state_of_tick node_ctxt tick last_level in
       return (Option.map snd r)
     in
@@ -279,11 +279,14 @@ module Make (Interpreter : Interpreter.S) :
     let our_stop_chunk =
       Sc_rollup.Dissection_chunk.{state_hash = start_hash; tick = start_tick}
     in
-    Game_helpers.new_dissection
+    Game_helpers.make_dissection
+      ~state_hash_from_tick
       ~start_chunk
       ~our_stop_chunk
-      ~default_number_of_sections
-      ~state_hash_from_tick
+    @@ PVM.new_dissection
+         ~start_chunk
+         ~our_stop_chunk
+         ~default_number_of_sections
 
   (** [generate_from_dissection ~default_number_of_sections node_ctxt game
       dissection] traverses the current [dissection] and returns a move which

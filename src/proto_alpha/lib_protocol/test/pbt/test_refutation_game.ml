@@ -202,11 +202,12 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
      incorrect cases. *)
   Lwt_main.run
   @@ let*! r =
-       Game_helpers.new_dissection
-         ~start_chunk
-         ~our_stop_chunk
-         ~default_number_of_sections:number_of_sections
-         ~state_hash_from_tick
+       Game_helpers.(
+         make_dissection ~state_hash_from_tick ~start_chunk ~our_stop_chunk
+         @@ default_new_dissection
+              ~start_chunk
+              ~our_stop_chunk
+              ~default_number_of_sections:number_of_sections)
      in
      Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
 

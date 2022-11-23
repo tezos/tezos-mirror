@@ -85,8 +85,8 @@ let pp ppf {state_hash; tick} =
     Sc_rollup_tick_repr.pp
     tick
 
-let default_check ~default_number_of_sections ~start_chunk ~stop_chunk
-    dissection =
+let default_check_sections_number ~default_number_of_sections ~start_chunk
+    ~stop_chunk dissection =
   let open Result_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
@@ -94,12 +94,23 @@ let default_check ~default_number_of_sections ~start_chunk ~stop_chunk
     Dissection_number_of_sections_mismatch {expected; given = len}
   in
   let num_sections = Z.of_int @@ default_number_of_sections in
+  if Z.geq dist num_sections then
+    error_unless Z.(equal len num_sections) (should_be_equal_to num_sections)
+  else if Z.(gt dist one) then
+    error_unless Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
+  else tzfail (Dissection_invalid_number_of_sections len)
+
+let default_check ~check_sections_number ~default_number_of_sections
+    ~start_chunk ~stop_chunk dissection =
+  let open Result_syntax in
+  let len = Z.of_int @@ List.length dissection in
+  let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let* () =
-    if Z.geq dist num_sections then
-      error_unless Z.(equal len num_sections) (should_be_equal_to num_sections)
-    else if Z.(gt dist one) then
-      error_unless Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
-    else tzfail (Dissection_invalid_number_of_sections len)
+    check_sections_number
+      ~default_number_of_sections
+      ~start_chunk
+      ~stop_chunk
+      dissection
   in
   let* () =
     match (List.hd dissection, List.last_opt dissection) with
