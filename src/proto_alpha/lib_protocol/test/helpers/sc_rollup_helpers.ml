@@ -529,3 +529,36 @@ let construct_inbox ?(inbox_creation_level = Raw_level.(root))
     history
     level_tree_histories
     level_and_inputs
+
+let inbox_message_of_input input =
+  match input with Sc_rollup.Inbox_message x -> Some x | _ -> None
+
+let payloads_from_messages =
+  List.map (fun {input; _} ->
+      match input with
+      | Inbox_message {payload; _} -> payload
+      | Reveal _ -> assert false)
+
+let first_after ~shift_level list_of_inputs level message_counter =
+  let level_index = Int32.to_int @@ Raw_level.diff level shift_level in
+  let inputs =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth list_of_inputs level_index
+  in
+  match List.nth inputs (Z.to_int message_counter) with
+  | Some input -> inbox_message_of_input input
+  | None -> (
+      (* If no input at (l, n), the next input is (l+1, 0). *)
+      match List.nth list_of_inputs (level_index + 1) with
+      | None -> None
+      | Some inputs ->
+          let input = Stdlib.List.hd inputs in
+          inbox_message_of_input input)
+
+let list_of_inputs_from_list_of_messages (list_of_messages : message list list)
+    =
+  List.map
+    (fun inputs ->
+      let payloads = List.map (fun {input; _} -> input) inputs in
+      payloads)
+    list_of_messages

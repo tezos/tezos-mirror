@@ -360,93 +360,6 @@ let fail_with_proof_error_msg errors fail_msg =
   let msg = Option.(msg |> map (fun s -> ": " ^ s) |> value ~default:"") in
   fail (err (fail_msg ^ msg))
 
-let test_inbox_proof_production (levels_and_messages, l, n) =
-  (* We begin with a Node inbox so we can produce a proof. *)
-  let exp_input = next_inbox_message levels_and_messages l n in
-  let list_of_payloads =
-    List.map
-      (fun (_, messages) -> payloads_from_messages messages)
-      levels_and_messages
-  in
-  setup_node_inbox_with_messages list_of_payloads
-  @@ fun level_tree_histories _current_level_tree history inbox _inboxes ->
-  let open Lwt_result_syntax in
-  let*? history, history_proof =
-    form_history_proof history inbox |> Environment.wrap_tzresult
-  in
-  let*! result =
-    produce_proof
-      ~get_level_tree_history:(get_level_tree_history level_tree_histories)
-      history
-      history_proof
-      (l, n)
-    >|= Environment.wrap_tzresult
-  in
-  match result with
-  | Ok (proof, input) -> (
-      (* We now switch to a protocol inbox built from the same messages
-         for verification. *)
-      (* The snapshot takes the snapshot at the end of the last level,
-         we need to set the level ahead to match the inbox. *)
-      setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
-      @@ fun _ctxt _ _history inbox _inboxes ->
-      let snapshot = take_snapshot inbox in
-      let verification =
-        verify_proof (l, n) snapshot proof |> Environment.wrap_tzresult
-      in
-      match verification with
-      | Ok v_input ->
-          Alcotest.(check (option inbox_message_testable))
-            "input = v_input"
-            input
-            v_input ;
-          Alcotest.(check (option inbox_message_testable))
-            "exp_input = v_input"
-            exp_input
-            v_input ;
-          return_unit
-      | Error errors ->
-          fail_with_proof_error_msg errors "Proof verification failed")
-  | Error errors -> fail_with_proof_error_msg errors "Proof production failed"
-
-let test_inbox_proof_verification (levels_and_messages, l, n) =
-  (* We begin with a Node inbox so we can produce a proof. *)
-  let list_of_payloads =
-    List.map
-      (fun (_, messages) -> payloads_from_messages messages)
-      levels_and_messages
-  in
-  setup_node_inbox_with_messages list_of_payloads
-  @@ fun level_tree_histories _current_level_tree history inbox _inboxes ->
-  let open Lwt_result_syntax in
-  let*? history, history_proof =
-    form_history_proof history inbox |> Environment.wrap_tzresult
-  in
-  let*! result =
-    produce_proof
-      ~get_level_tree_history:(get_level_tree_history level_tree_histories)
-      history
-      history_proof
-      (l, n)
-    >|= Environment.wrap_tzresult
-  in
-  match result with
-  | Ok (proof, _input) -> (
-      (* We now switch to a protocol inbox built from the same messages
-         for verification. *)
-      setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
-      @@ fun _level_tree_histories _ _history _inbox inboxes ->
-      (* Use the incorrect inbox *)
-      match List.hd inboxes with
-      | Some inbox -> (
-          let snapshot = take_snapshot inbox in
-          let verification = verify_proof (l, n) snapshot proof in
-          match verification with
-          | Ok _ -> fail [err "Proof should not be valid"]
-          | Error _ -> return (ok ()))
-      | None -> fail [err "inboxes was empty"])
-  | Error errors -> fail_with_proof_error_msg errors "Proof production failed"
-
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
 let init_inboxes_histories_with_different_capacities
@@ -738,21 +651,6 @@ let tests =
       let* n = 0 -- (List.length l - 2) in
       return (l, n))
   in
-  let gen_proof_inputs =
-    QCheck2.Gen.(
-      let* levels = 2 -- 15 in
-      let* levels_and_messages =
-        Sc_rollup_helpers.gen_message_reprs_for_levels_repr
-          ~start_level:1
-          ~max_level:levels
-          bounded_string
-      in
-      let* l = 1 -- (levels - 1) in
-      let l = level_of_int l in
-      let messages_at_l = Stdlib.List.assoc l levels_and_messages in
-      let* n = 0 -- List.length messages_at_l in
-      return (levels_and_messages, l, Z.of_int n))
-  in
   let gen_history_params =
     QCheck2.Gen.(
       (* We fix the number of levels/ inboxes. *)
@@ -781,16 +679,6 @@ let tests =
       ~name:"Verify inclusion proofs."
       gen_inclusion_proof_inputs
       test_inclusion_proof_verification;
-    Tztest.tztest_qcheck2
-      ~count:10
-      ~name:"Produce inbox proofs"
-      gen_proof_inputs
-      test_inbox_proof_production;
-    Tztest.tztest_qcheck2
-      ~count:10
-      ~name:"Verify inbox proofs"
-      gen_proof_inputs
-      test_inbox_proof_verification;
     Tztest.tztest_qcheck2
       ~count:10
       ~name:"Checking inboxes history length"
