@@ -68,6 +68,7 @@
         "Sc_rollup_inbox_repr",
         "Sc_rollup_commitment_repr",
         "Sc_rollup_proof_repr",
+        "Sc_rollup_costs",
         "Sc_rollup_game_repr",
         "Tx_rollup_level_repr",
         "Tx_rollup_l2_proof",
@@ -162,7 +163,6 @@
         "Liquidity_baking_lqt",
         "Liquidity_baking_migration",
 
-        "Sc_rollup_costs",
         "Sc_rollup_errors",
         "Sc_rollup_inbox_storage",
 
