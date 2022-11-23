@@ -18,14 +18,12 @@ init_sandboxed_client() {
         client="$local_client -base-dir $client_dir -endpoint https://$host:$rpc"
         admin_client="$local_admin_client -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint https://$host:$rpc"
-        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
         compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -endpoint http://$host:$rpc"
         admin_client="$local_admin_client -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint http://$host:$rpc"
-        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
         compiler="$local_compiler"
     fi
@@ -161,26 +159,19 @@ main () {
     for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions_without_number); do
         protocol_underscore=$(echo $protocol | tr -- - _)
         local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
-        local_endorser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_endorser/main_endorser_$protocol_underscore.exe"
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
 
         if [ -n "$USE_TLS" ]; then
             baker="$local_baker -base-dir $client_dir -endpoint https://$host:$rpc"
-            endorser="$local_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
             accuser="$local_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
         else
             baker="$local_baker -base-dir $client_dir -endpoint http://$host:$rpc"
-            endorser="$local_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
             accuser="$local_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
         fi
 
         echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol
         echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol
         chmod +x $client_dir/bin/octez-baker-$protocol
-
-        echo '#!/bin/sh' > $client_dir/bin/octez-endorser-$protocol
-        echo "exec $endorser \"\$@\""  >> $client_dir/bin/octez-endorser-$protocol
-        chmod +x $client_dir/bin/octez-endorser-$protocol
 
         echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol
         echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol
