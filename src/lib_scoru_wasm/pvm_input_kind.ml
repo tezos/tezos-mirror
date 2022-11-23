@@ -29,9 +29,14 @@
 
    - `\000\000` corresponds to a Transfer,
    - `\000\001` a start_of_level,
-   - `\000\002` an end_of_level.
+   - `\000\002` an end_of_level,
+   - `\000\003` an info_per_level input,
    - Any other tag will considered as an `Other message`. *)
-type internal_message_kind = Transfer | Start_of_level | End_of_level
+type internal_message_kind =
+  | Transfer
+  | Start_of_level
+  | End_of_level
+  | Info_per_level
 
 (* This type mimics [Sc_rollup_inbox_repr.t] and produced by reading the first
    bytes from the input:
@@ -49,6 +54,7 @@ let internal_from_raw payload =
     | '\000' -> Some Transfer
     | '\001' when String.length payload = 2 -> Some Start_of_level
     | '\002' when String.length payload = 2 -> Some End_of_level
+    | '\003' -> Some Info_per_level
     | _ -> None
 
 let from_raw_input payload =
@@ -70,6 +76,7 @@ module Internal_for_tests = struct
     | External, Some message -> "\001" ^ message
     | Internal Start_of_level, None -> "\000\001"
     | Internal End_of_level, None -> "\000\002"
+    | Internal Info_per_level, Some info -> "\000\003" ^ info
     | Other, _ ->
         Stdlib.failwith
           "`Other` messages are impossible cases from the PVM perspective."
@@ -77,5 +84,7 @@ module Internal_for_tests = struct
         Stdlib.failwith
           "`Start_of_level` and `End_of_level` do not expect a payload"
     | Internal Transfer, None -> Stdlib.failwith "`Transfer` expects a payload"
+    | Internal Info_per_level, None ->
+        Stdlib.failwith "`Info_per_level` expects a payload"
     | External, None -> Stdlib.failwith "`External` expects a payload"
 end
