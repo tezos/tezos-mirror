@@ -163,6 +163,29 @@ let set_sol_input level tree =
   in
   Wasm.set_input_step (input_info level Z.zero) sol_input tree
 
+let set_info_per_level_input level tree =
+  let block_hash = Tezos_crypto.Block_hash.zero in
+  let timestamp = Time.Protocol.epoch in
+  let info_res =
+    Data_encoding.(
+      Binary.to_string
+        (tup2 Time.Protocol.encoding Tezos_crypto.Block_hash.encoding)
+        (timestamp, block_hash))
+  in
+  match info_res with
+  | Ok info ->
+      let info_per_level_input =
+        Pvm_input_kind.(
+          Internal_for_tests.to_binary_input
+            (Internal Info_per_level)
+            (Some info))
+      in
+      Wasm.set_input_step (input_info level Z.one) info_per_level_input tree
+  | Error _ ->
+      (* There's no reason the encoding has failed, but we return the tree
+         anyway *)
+      Stdlib.failwith "Info_per_level encoding has failed, this is impossible"
+
 let set_internal_message level counter message tree =
   let encoded_message =
     Pvm_input_kind.(
@@ -182,6 +205,8 @@ let set_inputs_step set_internal_message messages level tree =
   let next_message_counter = new_message_counter () in
   let (_ : Z.t) = next_message_counter () in
   let* tree = set_sol_input level tree in
+  let (_ : Z.t) = next_message_counter () in
+  let* tree = set_info_per_level_input level tree in
   let* tree =
     List.fold_left_s
       (fun tree message ->
