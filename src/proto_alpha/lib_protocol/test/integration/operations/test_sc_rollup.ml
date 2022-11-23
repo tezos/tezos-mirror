@@ -2046,17 +2046,14 @@ let full_history_inbox all_inbox_messages =
   let all_inbox_messages =
     List.map
       (fun (inbox_level, info, inbox_messages) ->
-        (inbox_level, wrap_messages info inbox_level inbox_messages))
+        wrap_messages info inbox_level inbox_messages)
       all_inbox_messages
   in
   (* Create a inbox adding the messages from [all_inbox_messages]. *)
   let all_inbox_inputs =
     List.map
-      (fun (level, messages) ->
-        ( level,
-          List.map
-            (fun Sc_rollup_helpers.{input; message = _} -> input)
-            messages ))
+      (fun messages ->
+        List.map (fun Sc_rollup_helpers.{input; message = _} -> input) messages)
       all_inbox_messages
   in
   Sc_rollup_helpers.construct_inbox all_inbox_inputs

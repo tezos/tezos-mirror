@@ -276,7 +276,7 @@ let make_empty_level (timestamp, predecessor) inbox_level =
       message = `EOL;
     }
   in
-  (inbox_level, [sol; info_per_level; eol])
+  [sol; info_per_level; eol]
 
 (** Creates inputs based on string messages. *)
 let strs_to_inputs inbox_level messages =
@@ -323,7 +323,7 @@ let gen_messages_for_levels ~start_level ~max_level gen_message =
               let* inputs = small_list gen_message in
               return (input :: inputs)
             in
-            return (inbox_level, wrap_messages dumb_info inbox_level messages)
+            return (wrap_messages dumb_info inbox_level messages)
         in
         aux (level_messages :: acc) (n - 1)
   in
@@ -478,12 +478,13 @@ let get_level_tree_history level_tree_histories level_tree_hash =
    test/unit/test_sc_rollup_inbox. The main difference is: we use
    [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
    former. *)
-let fill_inbox ~inbox ?origination_level ?(with_level_tree_history = true)
-    history level_tree_histories levels_and_inputs =
+let fill_inbox ~inbox ~shift_level ?origination_level
+    ?(with_level_tree_history = true) history level_tree_histories inputs =
   let open Result_syntax in
-  let rec aux level_tree_histories history inbox = function
+  let rec aux i level_tree_histories history inbox = function
     | [] -> return (level_tree_histories, history, inbox)
-    | ((level, inputs) : Raw_level.t * Sc_rollup.input list) :: rst ->
+    | (inputs : Sc_rollup.input list) :: rst ->
+        let level = Raw_level.Internal_for_tests.add shift_level i in
         assert (
           match origination_level with
           | Some origination_level -> Raw_level.(origination_level < level)
@@ -521,9 +522,9 @@ let fill_inbox ~inbox ?origination_level ?(with_level_tree_history = true)
             level_tree_history
             level_tree_histories
         in
-        aux level_tree_histories history inbox rst
+        aux (i + 1) level_tree_histories history inbox rst
   in
-  aux level_tree_histories history inbox levels_and_inputs
+  aux 0 level_tree_histories history inbox inputs
 
 let construct_inbox ?(inbox_creation_level = Raw_level.(root))
     ?origination_level ?(with_histories = true) level_and_inputs =
@@ -537,6 +538,7 @@ let construct_inbox ?(inbox_creation_level = Raw_level.(root))
     ?origination_level
     ~inbox
     ~with_level_tree_history:with_histories
+    ~shift_level:inbox_creation_level
     history
     level_tree_histories
     level_and_inputs
