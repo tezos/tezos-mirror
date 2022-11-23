@@ -294,6 +294,8 @@ let game_move ctxt rollup ~player ~opponent refutation =
   in
   let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
   let dal = (Constants_storage.parametric ctxt).dal in
+  let play_cost = Sc_rollup_game_repr.cost_play game refutation in
+  let*? ctxt = Raw_context.consume_gas ctxt play_cost in
   let* move_result =
     Sc_rollup_game_repr.play
       kind
