@@ -73,6 +73,17 @@ Node
   and later) where the validation of a block is dissociated from its
   application. (MR :gl:`!7014`)
 
+- **Breaking change**: bumped the node's storage version to
+  ``3.0``. This new version changes the store's representation
+  required by the new protocol's semantics. Upgrading to this new
+  version is automatic and irreversible.
+
+- **Breaking change**: bumped the snapshot version to ``5``. This
+  version changes internal snapshot file representation to include
+  more information required by the new protocol's semantics. Snapshots
+  of version ``4`` exported with previous versions of Octez can still
+  be imported. Snapshots of version ``5`` are not backward compatible.
+
 Client
 ------
 
@@ -84,6 +95,15 @@ Client
 
 Baker
 -----
+
+- **Breaking change**: modified the baker's persistent state. Once the
+  protocol "M" activates, the new baker will automatically overwrite
+  the existing persistent state to the new format. This implies that
+  previous bakers will fail to load this new state from disk unless
+  the user directly removes the file
+  ``<client-dir>/<chain_id>_baker_state``. On mainnet, this will have
+  no effect as when the new protocol activates, previous bakers will
+  be permanently idle.
 
 Accuser
 -------
