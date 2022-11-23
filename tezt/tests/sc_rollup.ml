@@ -949,6 +949,20 @@ let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
     ~msg:(rex "Maximum number of messages reached for commitment period")
     sim_result
 
+let bake_until ?hook cond n client =
+  assert (0 <= n) ;
+  let rec go i =
+    if 0 < i then
+      let* cond = cond client in
+      if cond then
+        let* () = match hook with None -> unit | Some hook -> hook i in
+        let* () = Client.bake_for_and_wait client in
+        go (i - 1)
+      else return ()
+    else return ()
+  in
+  go n
+
 let bake_levels ?hook n client =
   fold n () @@ fun i () ->
   let* () = match hook with None -> unit | Some hook -> hook i in
@@ -2668,6 +2682,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
 
+  let game_started = ref false in
   let conflict_detected = ref false in
   let _ =
     let* () = wait_for_conflict_detected sc_rollup_node in
@@ -2712,7 +2727,23 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
     let level = after_inputs_level + i in
     stop_loser level
   in
-  let* () = bake_levels ~hook (final_level - List.length inputs) client in
+  let keep_going client =
+    let* game =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_game
+           ~staker:bootstrap1_key
+           sc_rollup_address
+           ()
+    in
+    if !game_started then return @@ not (JSON.is_null game)
+    else (
+      game_started := not @@ JSON.is_null game ;
+      return true)
+  in
+
+  let* () =
+    bake_until ~hook keep_going (final_level - List.length inputs) client
+  in
 
   if not !conflict_detected then
     Test.fail "Honest node did not detect the conflict" ;
