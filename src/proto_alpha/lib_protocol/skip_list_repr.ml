@@ -45,7 +45,7 @@ module type S = sig
     'content Data_encoding.t ->
     ('content, 'ptr) cell Data_encoding.t
 
-  val index : (_, _) cell -> int
+  val index : (_, _) cell -> Z.t
 
   val content : ('content, 'ptr) cell -> 'content
 
@@ -64,13 +64,13 @@ module type S = sig
   val find :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     cell_ptr:'ptr ->
-    target_index:int ->
+    target_index:Z.t ->
     ('content, 'ptr) cell option
 
   val back_path :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     cell_ptr:'ptr ->
-    target_index:int ->
+    target_index:Z.t ->
     'ptr list option
 
   val valid_back_path :
@@ -145,7 +145,7 @@ end) : S = struct
   type ('content, 'ptr) cell = {
     content : 'content;
     back_pointers : 'ptr option FallbackArray.t;
-    index : int;
+    index : Z.t;
   }
 
   let equal equal_ptr equal_content cell1 cell2 =
@@ -161,7 +161,7 @@ end) : S = struct
     in
     let {content; back_pointers; index} = cell1 in
     equal_content content cell2.content
-    && Compare.Int.equal index cell2.index
+    && Compare.Z.equal index cell2.index
     && equal_back_pointers back_pointers cell2.back_pointers
 
   let index cell = cell.index
@@ -180,12 +180,12 @@ end) : S = struct
       fmt
       {|
        content = %a
-       index = %d
+       index = %s
        back_pointers = %a
     |}
       pp_content
       content
-      index
+      (Z.to_string index)
       (Format.pp_print_list pp_ptr)
       (back_pointers_to_list back_pointers)
 
@@ -201,7 +201,7 @@ end) : S = struct
       (fun (index, content, back_pointers) ->
         {index; content; back_pointers = of_list back_pointers})
       (obj3
-         (req "index" int31)
+         (req "index" n)
          (req "content" content_encoding)
          (req "back_pointers" (list ptr_encoding)))
 
@@ -210,7 +210,7 @@ end) : S = struct
   let back_pointers cell = back_pointers_to_list cell.back_pointers
 
   let genesis content =
-    {index = 0; content; back_pointers = FallbackArray.make 0 None}
+    {index = Z.zero; content; back_pointers = FallbackArray.make 0 None}
 
   let back_pointer cell i = FallbackArray.get cell.back_pointers i
 
@@ -221,13 +221,13 @@ end) : S = struct
     | None -> (* By precondition and invariants of cells. *) assert false
 
   let next ~prev_cell ~prev_cell_ptr content =
-    let index = prev_cell.index + 1 in
+    let index = Z.succ prev_cell.index in
     let back_pointers =
       let rec aux power accu i =
-        if Compare.Int.(index < power) then List.rev accu
+        if Compare.Z.(index < power) then List.rev accu
         else
           let back_pointer_i =
-            if Compare.Int.(index mod power = 0) then prev_cell_ptr
+            if Compare.Z.(Z.rem index power = Z.zero) then prev_cell_ptr
             else
               (* The following call is valid because of
                  - [i < List.length prev_cell.back_pointer]
@@ -236,9 +236,9 @@ end) : S = struct
               back_pointer_unsafe prev_cell i
           in
           let accu = back_pointer_i :: accu in
-          aux (power * basis) accu (i + 1)
+          aux Z.(mul power (of_int basis)) accu (i + 1)
       in
-      aux 1 [] 0
+      aux Z.one [] 0
     in
     let back_pointers =
       FallbackArray.of_list ~fallback:None ~proj:Option.some back_pointers
@@ -266,20 +266,23 @@ end) : S = struct
   *)
   let best_skip cell target_index powers =
     let open FallbackArray in
-    let pointed_cell_index i = cell.index - (cell.index mod get powers i) - 1 in
+    let pointed_cell_index i =
+      Z.(pred @@ sub cell.index (rem cell.index (of_int (get powers i))))
+    in
+    (* cell.index - (cell.index mod get powers i) - 1 in *)
     let rec binary_search start_idx end_idx =
       if Compare.Int.(start_idx >= end_idx) then Some start_idx
       else
         let mid_idx = start_idx + ((end_idx - start_idx) / 2) in
         let mid_cell_index = pointed_cell_index mid_idx in
-        if Compare.Int.(mid_cell_index = target_index) then Some mid_idx
-        else if Compare.Int.(mid_cell_index < target_index) then
+        if Compare.Z.(mid_cell_index = target_index) then Some mid_idx
+        else if Compare.Z.(mid_cell_index < target_index) then
           binary_search start_idx (mid_idx - 1)
         else
           let prev_mid_cell_index = pointed_cell_index (mid_idx + 1) in
-          if Compare.Int.(prev_mid_cell_index = target_index) then
+          if Compare.Z.(prev_mid_cell_index = target_index) then
             Some (mid_idx + 1)
-          else if Compare.Int.(prev_mid_cell_index < target_index) then
+          else if Compare.Z.(prev_mid_cell_index < target_index) then
             (*
               If (mid_cell_index > target_index) &&
                  (prev_mid_cell_index < target_index)
@@ -299,8 +302,8 @@ end) : S = struct
       let path = ptr :: path in
       let* cell = deref ptr in
       let index = cell.index in
-      if Compare.Int.(target_index = index) then return path
-      else if Compare.Int.(target_index > index) then fail
+      if Compare.Z.(target_index = index) then return path
+      else if Compare.Z.(target_index > index) then fail
       else
         let* best_idx = best_skip cell target_index powers in
         let* ptr = back_pointer cell best_idx in
@@ -342,7 +345,7 @@ end) : S = struct
     let rec valid_path index cell_ptr path =
       match (cell_ptr, path) with
       | final_cell, [] ->
-          equal_ptr target_ptr final_cell && Compare.Int.(index = target_index)
+          equal_ptr target_ptr final_cell && Compare.Z.(index = target_index)
       | cell_ptr, cell_ptr' :: path ->
           assume_some (deref cell_ptr) @@ fun cell ->
           assume_some (deref cell_ptr') @@ fun cell' ->

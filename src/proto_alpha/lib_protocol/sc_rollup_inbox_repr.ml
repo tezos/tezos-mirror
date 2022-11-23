@@ -655,7 +655,7 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n label =
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
      We could check that index = snapshot_max_index + 1 *)
-  if Compare.Int.(Z.to_int n > max_index) then
+  if Compare.Z.(n > max_index) then
     (* [n] is superior to the index of [head_cell] then the provided [payload]
        must be empty (,and [payload_cell = head_cell]) *)
     let* () =
@@ -702,12 +702,8 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n label =
       Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index payload_cell
     in
     let* () =
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4259
-
-         replace the message counter by an int32 so we don't need this
-         conversion *)
       error_unless
-        (Compare.Int.equal (Z.to_int n) payload_index)
+        (Compare.Z.equal n payload_index)
         (Inbox_proof_error
            (Format.sprintf
               "found index in message_proof (%s) is incorrect"
@@ -758,7 +754,7 @@ let produce_level_tree_proof get_level_tree_history head_cell_hash ~index =
   (* if [index <= level_tree_max_index] then the index belongs to this level, we
      prove its existence. Else the index is out of bounds, we prove its
      non-existence. *)
-  let target_index = Compare.Int.(min index head_cell_max_index) in
+  let target_index = Compare.Z.(min index head_cell_max_index) in
   (* We look for the cell at `target_index` starting from `head_cell`. If it
      exists, we return the payload held in this cell. Otherwise, we prove that
      [index] does not exist in this level. *)
@@ -770,7 +766,7 @@ let produce_level_tree_proof get_level_tree_history head_cell_hash ~index =
   in
   match proof with
   | Some ({payload; merkelized = _}, proof) ->
-      if Compare.Int.(target_index = index) then
+      if Compare.Z.(target_index = index) then
         return {proof; payload = Some payload}
       else return {proof; payload = None}
   | None -> tzfail (Inbox_proof_error "could not produce a valid proof.")
@@ -872,14 +868,7 @@ let produce_proof ~get_level_tree_history history inbox_snapshot (l, n) =
   in
   let level_proof = Skip_list.content history_proof in
   let* ({payload; proof = _} as message_proof) =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4259
-
-       replace the message counter by an int32 so we don't need this
-       conversion *)
-    produce_level_tree_proof
-      get_level_tree_history
-      level_proof.hash
-      ~index:(Z.to_int n)
+    produce_level_tree_proof get_level_tree_history level_proof.hash ~index:n
   in
   match payload with
   | Some payload ->

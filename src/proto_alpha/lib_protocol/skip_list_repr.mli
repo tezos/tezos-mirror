@@ -71,7 +71,7 @@ module type S = sig
     ('content, 'ptr) cell Data_encoding.t
 
   (** [index cell] returns the position of [cell] in the sequence. *)
-  val index : (_, _) cell -> int
+  val index : (_, _) cell -> Z.t
 
   (** [content cell] is the content carried by the [cell]. *)
   val content : ('content, 'ptr) cell -> 'content
@@ -102,7 +102,7 @@ module type S = sig
   val find :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     cell_ptr:'ptr ->
-    target_index:int ->
+    target_index:Z.t ->
     ('content, 'ptr) cell option
 
   (** [back_path ~deref ~cell_ptr ~target_index] returns [Some path]
@@ -112,7 +112,7 @@ module type S = sig
   val back_path :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     cell_ptr:'ptr ->
-    target_index:int ->
+    target_index:Z.t ->
     'ptr list option
 
   (** [valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path]

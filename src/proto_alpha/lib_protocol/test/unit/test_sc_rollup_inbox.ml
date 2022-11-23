@@ -62,7 +62,7 @@ let assert_merkelized_payload ~__LOC__ ~payload_hash ~index found =
   let* () =
     assert_equal_payload_hash ~__LOC__ found_payload_hash payload_hash
   in
-  Assert.equal_int ~loc:__LOC__ found_index index
+  Assert.equal_z ~loc:__LOC__ found_index index
 
 let assert_equal_merkelized_payload ~__LOC__ ~found ~expected =
   let payload_hash = Merkelized_payload_hashes.get_payload_hash expected in
@@ -83,8 +83,8 @@ let gen_payloads =
 let gen_index payloads =
   let open QCheck2.Gen in
   let max_index = List.length payloads - 1 in
-  let* index = 0 -- max_index in
-  return index
+  let+ index = 0 -- max_index in
+  Z.of_int index
 
 let gen_payloads_and_index =
   let open QCheck2.Gen in
@@ -125,10 +125,10 @@ let test_merkelized_payload_history payloads =
   let nb_payloads = List.length payloads in
   let* history, merkelized_payloads = construct_merkelized_payload payloads in
   let* () =
-    Assert.equal_int
+    Assert.equal_z
       ~loc:__LOC__
-      nb_payloads
-      (Merkelized_payload_hashes.get_index merkelized_payloads + 1)
+      (Z.of_int nb_payloads)
+      (Z.succ (Merkelized_payload_hashes.get_index merkelized_payloads))
   in
   List.iteri_es
     (fun index (expected_payload : Message.serialized) ->
@@ -139,7 +139,7 @@ let test_merkelized_payload_history payloads =
         WithExceptions.Option.get ~loc:__LOC__
         @@ Merkelized_payload_hashes.Internal_for_tests.find_predecessor_payload
              history
-             ~index
+             ~index:(Z.of_int index)
              merkelized_payloads
       in
       let found_payload_hash =
@@ -161,7 +161,7 @@ let test_merkelized_payload_proof (payloads, index) =
     @@ Merkelized_payload_hashes.produce_proof history ~index merkelized_payload
   in
   let payload : Message.serialized =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth payloads index
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth payloads (Z.to_int index)
   in
   let payload_hash = Message.hash_serialized_message payload in
   let* () = assert_equal_payload ~__LOC__ proof_payload payload in
