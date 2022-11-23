@@ -193,7 +193,7 @@ let check p reason =
 
 let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-  | None -> tzfail Sc_rollup_invalid_serialized_inbox_proof
+  | None -> error Sc_rollup_invalid_serialized_inbox_proof
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
@@ -280,10 +280,11 @@ let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
     match proof.input_proof with
     | None -> return_none
     | Some (Inbox_proof {level; message_counter; proof}) ->
-        let+ inbox_message =
+        let*? inbox_message =
           check_inbox_proof snapshot proof (level, Z.succ message_counter)
         in
-        Option.map (fun i -> Sc_rollup_PVM_sig.Inbox_message i) inbox_message
+        return
+        @@ Option.map (fun i -> Sc_rollup_PVM_sig.Inbox_message i) inbox_message
     | Some First_inbox_message ->
         let*? payload =
           Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
@@ -358,13 +359,13 @@ module type PVM_with_context_and_state = sig
   val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option Lwt.t
 
   module Inbox_with_history : sig
-    include
-      Sc_rollup_inbox_repr.Merkelized_operations
-        with type inbox_context = context
-
     val inbox : Sc_rollup_inbox_repr.history_proof
 
     val history : Sc_rollup_inbox_repr.History.t
+
+    val get_level_tree_history :
+      Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
+      Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t Lwt.t
   end
 
   module Dal_with_history : sig
@@ -410,7 +411,11 @@ let produce ~metadata pvm_and_state commit_level =
     | First_after (level, message_counter) ->
         let* inbox_proof, input =
           Inbox_with_history.(
-            produce_proof context history inbox (level, Z.succ message_counter))
+            Sc_rollup_inbox_repr.produce_proof
+              ~get_level_tree_history
+              history
+              inbox
+              (level, Z.succ message_counter))
         in
         let input =
           Option.map (fun msg -> Sc_rollup_PVM_sig.Inbox_message msg) input
@@ -420,7 +425,7 @@ let produce ~metadata pvm_and_state commit_level =
             {
               level;
               message_counter;
-              proof = Inbox_with_history.to_serialized_proof inbox_proof;
+              proof = Sc_rollup_inbox_repr.to_serialized_proof inbox_proof;
             }
         in
         return (Some inbox_proof, input)

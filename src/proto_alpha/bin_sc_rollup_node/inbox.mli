@@ -67,15 +67,18 @@ val history_of_head :
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
 
-(** [add_messages node_ctxt ctxt inbox_level inbox history messages] adds
+(** [add_messages inbox_level inbox history messages] adds
     [messages] to the [inbox] whose history is [history]. The new inbox level is
-    given as [inbox_level]. It takes a context [ctxt] and returns a new
-    [history], [inbox] and context [ctxt] with an updated message tree. *)
+    given as [inbox_level]. Returns an updated [history] and [inbox], and a new
+    [messages_history] and [messages_hash]. *)
 val add_messages :
-  Node_context.rw ->
-  'a Context.t ->
   Raw_level.t ->
   Sc_rollup.Inbox.t ->
-  Sc_rollup.Inbox.History.t ->
-  Sc_rollup.Inbox_message.t list ->
-  (Sc_rollup.Inbox.History.t * Sc_rollup.Inbox.t * 'a Context.t) tzresult Lwt.t
+  Store.Histories.value ->
+  Sc_rollup.Inbox_message.t trace ->
+  (Store.Level_tree_histories.value
+  * Store.Level_tree_histories.key
+  * Store.Histories.value
+  * Sc_rollup.Inbox.t)
+  tzresult
+  Lwt.t

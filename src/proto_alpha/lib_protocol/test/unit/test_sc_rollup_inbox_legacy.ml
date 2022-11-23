@@ -39,6 +39,8 @@ open Sc_rollup_inbox_repr
 
 exception Sc_rollup_inbox_test_error of string
 
+let lift res = Environment.wrap_tzresult res
+
 let err x = Exn (Sc_rollup_inbox_test_error x)
 
 let rollup = Sc_rollup_repr.Address.hash_string [""]
@@ -50,8 +52,37 @@ let inbox_message_testable =
     Sc_rollup_PVM_sig.pp_inbox_message
     Sc_rollup_PVM_sig.inbox_message_equal
 
-let create_context () =
-  Context.init1 () >>=? fun (block, _contract) -> return block.context
+module Level_tree_histories =
+  Map.Make (Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash)
+
+let get_level_tree_history level_tree_histories level_tree_hash =
+  Level_tree_histories.find level_tree_hash level_tree_histories
+  |> WithExceptions.Option.get ~loc:__LOC__
+  |> Lwt.return
+
+let get_message_payload level_tree_histories level_tree index =
+  let level_tree_hash =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.hash level_tree
+  in
+  let level_tree_history =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Level_tree_histories.find level_tree_hash level_tree_histories
+  in
+  let merkelized =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.Internal_for_tests
+    .find_predecessor_payload
+      level_tree_history
+      ~index
+      level_tree
+  in
+  let merkelized_and_payload =
+    Option.bind merkelized (fun m ->
+        Sc_rollup_inbox_merkelized_payload_hashes_repr.(
+          History.find (hash m) level_tree_history))
+  in
+  Option.map
+    (fun m -> m.Sc_rollup_inbox_merkelized_payload_hashes_repr.payload)
+    merkelized_and_payload
 
 let make_payload message =
   WithExceptions.Result.get_ok ~loc:__LOC__
@@ -63,46 +94,65 @@ let payloads_from_messages =
       | Inbox_message {payload; _} -> payload
       | Reveal _ -> assert false)
 
-let populate_inboxes ctxt level history inbox inboxes level_tree
-    list_of_payloads =
-  let open Lwt_syntax in
-  let rec aux level history inbox inboxes level_tree = function
-    | [] -> return (ok (level_tree, history, inbox, inboxes))
+let populate_inboxes level history inbox inboxes list_of_payloads =
+  let open Result_syntax in
+  let rec aux level history level_tree_histories inbox inboxes level_tree =
+    function
+    | [] -> return (level_tree_histories, level_tree, history, inbox, inboxes)
     | [] :: ps ->
         let level = Raw_level_repr.succ level in
-        aux level history inbox inboxes level_tree ps
+        aux level history level_tree_histories inbox inboxes None ps
     | payloads :: ps ->
-        add_messages ctxt history inbox level payloads level_tree
-        >|= Environment.wrap_tzresult
-        >>=? fun (level_tree, history, inbox') ->
+        let level_tree_history =
+          Sc_rollup_inbox_merkelized_payload_hashes_repr.History.empty
+            ~capacity:1000L
+        in
+        let* level_tree_history, level_tree, history, inbox' =
+          add_messages level_tree_history history inbox level payloads None
+          |> Environment.wrap_tzresult
+        in
+        let level_tree_hash =
+          Sc_rollup_inbox_merkelized_payload_hashes_repr.hash level_tree
+        in
+        let level_tree_histories =
+          Level_tree_histories.add
+            level_tree_hash
+            level_tree_history
+            level_tree_histories
+        in
         let level = Raw_level_repr.succ level in
-        aux level history inbox' (inbox :: inboxes) (Some level_tree) ps
+        aux
+          level
+          history
+          level_tree_histories
+          inbox'
+          (inbox :: inboxes)
+          (Some level_tree)
+          ps
   in
-  aux level history inbox inboxes level_tree list_of_payloads
+  let level_tree_histories = Level_tree_histories.empty in
+  aux level history level_tree_histories inbox inboxes None list_of_payloads
 
 let test_empty () =
-  create_context () >>=? fun ctxt ->
-  empty ctxt (Raw_level_repr.of_int32_exn 42l) >>= fun inbox ->
+  let inbox = empty (Raw_level_repr.of_int32_exn 42l) in
   fail_unless
     Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
     (err "An empty inbox should have no available message.")
 
 let setup_inbox_with_messages list_of_payloads f =
-  let open Lwt_syntax in
-  create_context () >>=? fun ctxt ->
-  let* inbox = empty ctxt first_level in
+  let inbox = empty first_level in
   let history = History.empty ~capacity:10000L in
-  populate_inboxes ctxt first_level history inbox [] None list_of_payloads
-  >>=? fun (level_tree, history, inbox, inboxes) ->
+  populate_inboxes first_level history inbox [] list_of_payloads
+  >>?= fun (level_tree_histories, level_tree, history, inbox, inboxes) ->
   match level_tree with
   | None -> fail (err "setup_inbox_with_messages called with no messages")
-  | Some tree -> f ctxt tree history inbox inboxes
+  | Some tree -> f level_tree_histories tree history inbox inboxes
 
 let test_add_messages messages =
   let payloads = List.map make_payload messages in
   let nb_payloads = List.length payloads in
   setup_inbox_with_messages [payloads]
-  @@ fun _ctxt _messages _history inbox _inboxes ->
+  @@ fun _level_tree_histories _messages _history inbox _inboxes ->
   fail_unless
     Compare.Int64.(
       equal
@@ -132,11 +182,11 @@ let check_payload messages external_message =
 let test_get_message_payload messages =
   let payloads = List.map make_payload messages in
   setup_inbox_with_messages [payloads]
-  @@ fun _ctxt level_tree _history _inbox _inboxes ->
+  @@ fun level_tree_histories level_tree _history _inbox _inboxes ->
   List.iteri_es
     (fun i message ->
       let expected_payload = encode_external_message message in
-      get_message_payload level_tree (Z.of_int i) >>= function
+      get_message_payload level_tree_histories level_tree i |> function
       | Some payload ->
           let payload = Sc_rollup_inbox_message_repr.unsafe_to_string payload in
           fail_unless
@@ -151,7 +201,7 @@ let test_inclusion_proof_production (list_of_messages, n) =
   let open Lwt_result_syntax in
   let list_of_payloads = List.map (List.map make_payload) list_of_messages in
   setup_inbox_with_messages list_of_payloads
-  @@ fun _ctxt _messages history _inbox inboxes ->
+  @@ fun _level_tree_histories _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
   let old_inbox = Stdlib.List.nth inboxes n in
   let*? res =
@@ -184,7 +234,7 @@ let test_inclusion_proof_verification (list_of_messages, n) =
   let open Lwt_result_syntax in
   let list_of_payloads = List.map (List.map make_payload) list_of_messages in
   setup_inbox_with_messages list_of_payloads
-  @@ fun _ctxt _messages history _inbox inboxes ->
+  @@ fun _level_tree_histories _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
   let old_inbox = Stdlib.List.nth inboxes n in
   let*? res =
@@ -218,119 +268,49 @@ let test_inclusion_proof_verification (list_of_messages, n) =
                  different inbox.";
             ])
 
-module Tree = struct
-  open Tezos_context_memory.Context
-
-  type nonrec t = t
-
-  type nonrec tree = tree
-
-  module Tree = struct
-    include Tezos_context_memory.Context.Tree
-
-    type nonrec t = t
-
-    type nonrec tree = tree
-
-    type key = string list
-
-    type value = bytes
-  end
-
-  let commit_tree context key tree =
-    let open Lwt_syntax in
-    let* ctxt = Tezos_context_memory.Context.add_tree context key tree in
-    let* (_ : value_key) = commit ~time:Time.Protocol.epoch ~message:"" ctxt in
-    return ()
-
-  let lookup_tree context hash =
-    let open Lwt_syntax in
-    let* _, tree =
-      produce_tree_proof
-        (index context)
-        (`Node (Hash.to_context_hash hash))
-        (fun x -> Lwt.return (x, x))
-    in
-    return (Some tree)
-
-  type proof = Proof.tree Proof.t
-
-  let verify_proof proof f =
-    Lwt.map Result.to_option (verify_tree_proof proof f)
-
-  let produce_proof context tree f =
-    let open Lwt_syntax in
-    let* proof =
-      produce_tree_proof (index context) (`Node (Tree.hash tree)) f
-    in
-    return (Some proof)
-
-  let kinded_hash_to_inbox_hash = function
-    | `Value hash | `Node hash -> Hash.of_context_hash hash
-
-  let proof_before proof = kinded_hash_to_inbox_hash proof.Proof.before
-
-  let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-    .tree_proof_encoding
-end
-
-(** This is a second instance of the inbox module. It uses the {!Tree}
-    module above for its Irmin interface, which gives it a full context
-    and the ability to generate tree proofs.
-
-    It is intended to resemble (at least well enough for these tests)
-    the rollup node's inbox instance. *)
-module Node = Make_hashing_scheme (Tree)
-
-(** In the tests below we use the {!Node} inbox above to generate proofs,
-    but we need to test that they can be interpreted and validated by
-    the protocol instance of the inbox code. We rely on the two
-    instances having the same encoding, and use this function to
-    convert. *)
-let node_proof_to_protocol_proof p =
-  let open Data_encoding.Binary in
-  let enc = serialized_proof_encoding in
-  let bytes = Node.to_serialized_proof p |> to_bytes_exn enc in
-  of_bytes_exn enc bytes |> of_serialized_proof
-  |> WithExceptions.Option.get ~loc:__LOC__
-
 (** This is basically identical to {!setup_inbox_with_messages}, except
     that it uses the {!Node} instance instead of the protocol instance. *)
 let setup_node_inbox_with_messages list_of_payloads f =
-  let open Node in
   let open Lwt_syntax in
-  let* index = Tezos_context_memory.Context.init "foo" in
-  let ctxt = Tezos_context_memory.Context.empty index in
-  let* inbox = empty ctxt first_level in
+  let inbox = empty first_level in
   let history = History.empty ~capacity:10000L in
-  let rec aux level history inbox inboxes level_tree = function
-    | [] -> return (ok (level_tree, history, inbox, inboxes))
+  let level_tree_histories = Level_tree_histories.empty in
+  let rec aux level history level_tree_histories inbox inboxes level_tree =
+    function
+    | [] ->
+        return (ok (level_tree_histories, level_tree, history, inbox, inboxes))
     | payloads :: ps ->
-        add_messages ctxt history inbox level payloads level_tree
-        >|= Environment.wrap_tzresult
-        >>=? fun (level_tree, history, inbox') ->
+        let level_tree_history =
+          Sc_rollup_inbox_merkelized_payload_hashes_repr.History.empty
+            ~capacity:1000L
+        in
+        add_messages level_tree_history history inbox level payloads None
+        |> Environment.wrap_tzresult
+        >>?= fun (level_tree_history, level_tree, history, inbox') ->
+        let level_tree_hash =
+          Sc_rollup_inbox_merkelized_payload_hashes_repr.hash level_tree
+        in
+        let level_tree_histories =
+          Level_tree_histories.add
+            level_tree_hash
+            level_tree_history
+            level_tree_histories
+        in
         let level = Raw_level_repr.succ level in
-        aux level history inbox' (inbox :: inboxes) (Some level_tree) ps
+        aux
+          level
+          history
+          level_tree_histories
+          inbox'
+          (inbox :: inboxes)
+          (Some level_tree)
+          ps
   in
-  aux first_level history inbox [] None list_of_payloads
-  >>=? fun (level_tree, history, inbox, inboxes) ->
+  aux first_level history level_tree_histories inbox [] None list_of_payloads
+  >>=? fun (level_tree_histories, level_tree, history, inbox, inboxes) ->
   match level_tree with
   | None -> fail (err "setup_inbox_with_messages called with no messages")
-  | Some tree -> f ctxt tree history inbox inboxes
-
-let look_in_tree key tree =
-  let open Lwt_syntax in
-  let* x = Tree.Tree.find tree [key] in
-  match x with
-  | Some x -> return (tree, x)
-  | None -> return (tree, Bytes.of_string "nope")
-
-let key_of_level level =
-  let level_bytes =
-    Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
-  in
-  Bytes.to_string level_bytes
+  | Some tree -> f level_tree_histories tree history inbox inboxes
 
 let level_of_int n = Raw_level_repr.of_int32_exn (Int32.of_int n)
 
@@ -362,6 +342,23 @@ let next_inbox_message levels_and_messages l n =
           in
           inbox_message_of_input input)
 
+let fail_with_proof_error_msg errors fail_msg =
+  let msg =
+    List.find_map
+      (function
+        | Environment.Ecoproto_error
+            (Sc_rollup_inbox_repr.Inbox_proof_error msg) ->
+            Some msg
+        | Environment.Ecoproto_error
+            (Sc_rollup_inbox_merkelized_payload_hashes_repr
+             .Merkelized_payload_hashes_proof_error msg) ->
+            Some msg
+        | _ -> None)
+      errors
+  in
+  let msg = Option.(msg |> map (fun s -> ": " ^ s) |> value ~default:"") in
+  fail (err (fail_msg ^ msg))
+
 let test_inbox_proof_production (levels_and_messages, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
   let exp_input = next_inbox_message levels_and_messages l n in
@@ -371,13 +368,19 @@ let test_inbox_proof_production (levels_and_messages, l, n) =
       levels_and_messages
   in
   setup_node_inbox_with_messages list_of_payloads
-  @@ fun ctxt current_level_tree history inbox _inboxes ->
+  @@ fun level_tree_histories _current_level_tree history inbox _inboxes ->
   let open Lwt_result_syntax in
-  let* history, history_proof =
-    Node.form_history_proof ctxt history inbox (Some current_level_tree)
+  let*? history, history_proof =
+    form_history_proof history inbox |> Environment.wrap_tzresult
+  in
+  let*! result =
+    produce_proof
+      ~get_level_tree_history:(get_level_tree_history level_tree_histories)
+      history
+      history_proof
+      (l, n)
     >|= Environment.wrap_tzresult
   in
-  let*! result = Node.produce_proof ctxt history history_proof (l, n) in
   match result with
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox built from the same messages
@@ -387,8 +390,9 @@ let test_inbox_proof_production (levels_and_messages, l, n) =
       setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
       @@ fun _ctxt _ _history inbox _inboxes ->
       let snapshot = take_snapshot inbox in
-      let proof = node_proof_to_protocol_proof proof in
-      let*! verification = verify_proof (l, n) snapshot proof in
+      let verification =
+        verify_proof (l, n) snapshot proof |> Environment.wrap_tzresult
+      in
       match verification with
       | Ok v_input ->
           Alcotest.(check (option inbox_message_testable))
@@ -400,8 +404,9 @@ let test_inbox_proof_production (levels_and_messages, l, n) =
             exp_input
             v_input ;
           return_unit
-      | Error _ -> fail [err "Proof verification failed"])
-  | Error _ -> fail [err "Proof production failed"]
+      | Error errors ->
+          fail_with_proof_error_msg errors "Proof verification failed")
+  | Error errors -> fail_with_proof_error_msg errors "Proof production failed"
 
 let test_inbox_proof_verification (levels_and_messages, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
@@ -411,30 +416,35 @@ let test_inbox_proof_verification (levels_and_messages, l, n) =
       levels_and_messages
   in
   setup_node_inbox_with_messages list_of_payloads
-  @@ fun ctxt current_level_tree history inbox _inboxes ->
+  @@ fun level_tree_histories _current_level_tree history inbox _inboxes ->
   let open Lwt_result_syntax in
-  let* history, history_proof =
-    Node.form_history_proof ctxt history inbox (Some current_level_tree)
+  let*? history, history_proof =
+    form_history_proof history inbox |> Environment.wrap_tzresult
+  in
+  let*! result =
+    produce_proof
+      ~get_level_tree_history:(get_level_tree_history level_tree_histories)
+      history
+      history_proof
+      (l, n)
     >|= Environment.wrap_tzresult
   in
-  let*! result = Node.produce_proof ctxt history history_proof (l, n) in
   match result with
   | Ok (proof, _input) -> (
       (* We now switch to a protocol inbox built from the same messages
          for verification. *)
       setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
-      @@ fun _ctxt _ _history _inbox inboxes ->
+      @@ fun _level_tree_histories _ _history _inbox inboxes ->
       (* Use the incorrect inbox *)
       match List.hd inboxes with
       | Some inbox -> (
           let snapshot = take_snapshot inbox in
-          let proof = node_proof_to_protocol_proof proof in
-          let*! verification = verify_proof (l, n) snapshot proof in
+          let verification = verify_proof (l, n) snapshot proof in
           match verification with
           | Ok _ -> fail [err "Proof should not be valid"]
           | Error _ -> return (ok ()))
       | None -> fail [err "inboxes was empty"])
-  | Error _ -> fail [err "Proof production failed"]
+  | Error errors -> fail_with_proof_error_msg errors "Proof production failed"
 
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
@@ -465,27 +475,25 @@ let init_inboxes_histories_with_different_capacities
     List.init ~when_negative_length:[] nb_levels (fun i -> [string_of_int i])
   in
   let mk_history ?(next_index = 0L) ~capacity () =
-    let open Lwt_syntax in
-    create_context () >>=? fun ctxt ->
-    let* inbox = empty ctxt first_level in
+    let inbox = empty first_level in
     let history =
       Sc_rollup_inbox_repr.History.Internal_for_tests.empty
         ~capacity
         ~next_index
     in
     let payloads = List.map (List.map make_payload) payloads in
-    populate_inboxes ctxt first_level history inbox [] None payloads
+    populate_inboxes first_level history inbox [] payloads
   in
   (* Here, we have `~capacity:0L`. So no history is kept *)
-  mk_history ~capacity:0L () >>=? fun no_history ->
+  mk_history ~capacity:0L () >>?= fun no_history ->
   (* Here, we set a [default_capacity] supposed to be greater than [nb_levels],
      and keep the default [next_index]. This history will serve as a witeness *)
-  mk_history ~capacity:default_capacity () >>=? fun big_history ->
+  mk_history ~capacity:default_capacity () >>?= fun big_history ->
   (* Here, we choose a small capacity supposed to be smaller than [nb_levels] to
      cover cases where the history is full and older elements should be removed.
      We also set a non-default [next_index] value to cover cases where the
      incremented index may overflow or is negative. *)
-  mk_history ~next_index ~capacity:small_capacity () >>=? fun small_history ->
+  mk_history ~next_index ~capacity:small_capacity () >>?= fun small_history ->
   return (no_history, small_history, big_history)
 
 (** In this test, we mainly check that the number of entries in histories
@@ -506,9 +514,15 @@ let test_history_length
   let* no_history, small_history, big_history =
     init_inboxes_histories_with_different_capacities params
   in
-  let _level_tree0, history0, _inbox0, _inboxes0 = no_history in
-  let _level_tree1, history1, _inbox1, _inboxes1 = small_history in
-  let _level_tree2, history2, _inbox2, _inboxes2 = big_history in
+  let _level_tree_histories0, _level_tree0, history0, _inbox0, _inboxes0 =
+    no_history
+  in
+  let _level_tree_histories1, _level_tree1, history1, _inbox1, _inboxes1 =
+    small_history
+  in
+  let _level_tree_histories2, _level_tree2, history2, _inbox2, _inboxes2 =
+    big_history
+  in
   let hh0 = I.History.Internal_for_tests.keys history0 in
   let hh1 = I.History.Internal_for_tests.keys history1 in
   let hh2 = I.History.Internal_for_tests.keys history2 in
@@ -546,9 +560,15 @@ let test_history_prefix params =
   let* no_history, small_history, big_history =
     init_inboxes_histories_with_different_capacities params
   in
-  let _level_tree0, history0, _inbox0, _inboxes0 = no_history in
-  let _level_tree1, history1, _inbox1, _inboxes1 = small_history in
-  let _level_tree2, history2, _inbox2, _inboxes2 = big_history in
+  let _level_tree_histories0, _level_tree0, history0, _inbox0, _inboxes0 =
+    no_history
+  in
+  let _level_tree_histories1, _level_tree1, history1, _inbox1, _inboxes1 =
+    small_history
+  in
+  let _level_tree_histories2, _level_tree2, history2, _inbox2, _inboxes2 =
+    big_history
+  in
   let hh0 = I.History.Internal_for_tests.keys history0 in
   let hh1 = I.History.Internal_for_tests.keys history1 in
   let hh2 = I.History.Internal_for_tests.keys history2 in
@@ -587,9 +607,15 @@ let test_inclusion_proofs_depending_on_history_capacity
   let* no_history, small_history, big_history =
     init_inboxes_histories_with_different_capacities params
   in
-  let _level_tree0, history0, inbox0, _inboxes0 = no_history in
-  let _level_tree1, history1, inbox1, _inboxes1 = small_history in
-  let _level_tree2, history2, inbox2, _inboxes2 = big_history in
+  let _level_tree_histories0, _level_tree0, history0, inbox0, _inboxes0 =
+    no_history
+  in
+  let _level_tree_histories1, _level_tree1, history1, inbox1, _inboxes1 =
+    small_history
+  in
+  let _level_tree_histories2, _level_tree2, history2, inbox2, _inboxes2 =
+    big_history
+  in
   let hp0 = I.old_levels_messages inbox0 in
   let hp1 = I.old_levels_messages inbox1 in
   let (hp2 as hp) = I.old_levels_messages inbox2 in
@@ -636,17 +662,15 @@ let test_inclusion_proofs_depending_on_history_capacity
 (** In this test, we make sure that the snapshot of an inbox is taken
     at the beginning of a block level. *)
 let test_inbox_snapshot_taking payloads =
-  let open Lwt_result_syntax in
   let payloads = List.map make_payload payloads in
-  create_context () >>=? fun ctxt ->
-  let*! inbox = empty ctxt first_level in
+  let inbox = empty first_level in
   let inbox_level = inbox_level inbox in
   let expected_snapshot = take_snapshot inbox in
   (* Now, if we add messages to the inbox at [current_level], the inbox's
      snapshot for this level should not changed. *)
-  let* _ =
-    add_messages_no_history ctxt inbox inbox_level payloads None
-    >|= Environment.wrap_tzresult
+  let _ =
+    add_messages_no_history inbox inbox_level payloads None
+    |> Environment.wrap_tzresult
   in
   let new_snapshot = take_snapshot inbox in
   fail_unless
@@ -666,9 +690,15 @@ let test_for_successive_add_messages_with_different_histories_capacities
   let* no_history, small_history, big_history =
     init_inboxes_histories_with_different_capacities params
   in
-  let level_tree0, _history0, _inbox0, inboxes0 = no_history in
-  let level_tree1, _history1, _inbox1, inboxes1 = small_history in
-  let level_tree2, _history2, _inbox2, inboxes2 = big_history in
+  let _level_tree_histories0, level_tree0, _history0, _inbox0, inboxes0 =
+    no_history
+  in
+  let _level_tree_histories1, level_tree1, _history1, _inbox1, inboxes1 =
+    small_history
+  in
+  let _level_tree_histories2, level_tree2, _history2, _inbox2, inboxes2 =
+    big_history
+  in
   (* The latest inbox's value shouldn't depend on the value of [bound]. *)
   let eq_inboxes_list = List.for_all2 ~when_different_lengths:false I.equal in
   let* () =

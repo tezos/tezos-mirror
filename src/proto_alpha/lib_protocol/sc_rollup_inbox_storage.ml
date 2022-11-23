@@ -101,9 +101,8 @@ let add_messages ctxt messages =
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
   *)
-  let* current_messages, inbox =
+  let*? current_messages, inbox =
     Sc_rollup_inbox_repr.add_messages_no_history
-      (Raw_context.recover ctxt)
       inbox
       level
       messages
@@ -181,7 +180,7 @@ let add_info_per_level ctxt timestamp predecessor =
 let init ~timestamp ~predecessor ctxt =
   let open Lwt_result_syntax in
   let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
-  let*! inbox = Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) level in
+  let inbox = Sc_rollup_inbox_repr.empty level in
   let* ctxt = Store.Inbox.init ctxt inbox in
   let* _inbox, _diff, ctxt = add_start_of_level ctxt in
   let* _inbox, _diff, ctxt = add_info_per_level ctxt timestamp predecessor in

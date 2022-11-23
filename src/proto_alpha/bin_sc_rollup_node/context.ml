@@ -175,56 +175,9 @@ struct
         return None
 end
 
-(** Aggregated collection of messages from the L1 inbox *)
-module MessageTrees = struct
-  type value = tree
-
-  let key = ["message_tree"]
-
-  let find ctxt = IStore.Tree.find_tree ctxt.tree key
-
-  let set ctxt tree =
-    let open Lwt_syntax in
-    let* tree = IStore.Tree.add_tree ctxt.tree key tree in
-    let ctxt = {ctxt with tree} in
-    return ctxt
-end
-
 module Inbox = struct
   include Sc_rollup.Inbox
   module Message = Sc_rollup.Inbox_message
-
-  include Sc_rollup.Inbox.Make_hashing_scheme (struct
-    include
-      Proof
-        (Hash)
-        (struct
-          let proof_encoding =
-            Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-            .tree_proof_encoding
-        end)
-
-    type t = rw_index
-
-    let commit_tree index _key tree =
-      let open Lwt_syntax in
-      let info () = IStore.Info.v ~author:"Tezos" 0L ~message:"" in
-      let* (_ : IStore.commit) =
-        IStore.Commit.v index.repo ~info:(info ()) ~parents:[] tree
-      in
-      return ()
-
-    let from_inbox_hash inbox_hash =
-      let ctxt_hash = Hash.to_context_hash inbox_hash in
-      let store_hash =
-        IStore.Hash.unsafe_of_raw_string
-          (Tezos_crypto.Context_hash.to_string ctxt_hash)
-      in
-      `Node store_hash
-
-    let lookup_tree index hash =
-      IStore.Tree.of_hash index.repo (from_inbox_hash hash)
-  end)
 end
 
 (** State of the PVM that this rollup node deals with. *)

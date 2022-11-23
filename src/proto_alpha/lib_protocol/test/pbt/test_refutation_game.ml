@@ -51,6 +51,8 @@ let qcheck_make_lwt_res ?print ?count ~name ~gen f =
     ~gen
     (fun a -> Lwt_main.run (f a))
 
+let lift k = Environment.wrap_tzresult k
+
 let tick_to_int_exn ?(__LOC__ = __LOC__) t =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
 
@@ -797,7 +799,6 @@ end
 (** {2. ArithPVM utils} *)
 
 module ArithPVM = Arith_pvm
-module Store_inbox = Sc_rollup_helpers.Store_inbox
 
 module Arith_test_pvm = struct
   include ArithPVM
@@ -1015,12 +1016,13 @@ type player_client = {
   states : (Tick.t * State_hash.t) list;
   final_tick : Tick.t;
   inbox :
-    Store_inbox.inbox_context
-    * Store_inbox.tree option
+    Sc_rollup.Inbox_merkelized_payload_hashes.History.t
+    Sc_rollup_helpers.Level_tree_histories.t
     * Inbox.History.t
     * Inbox.t;
   levels_and_inputs : (Raw_level.t * input list) list;
   metadata : Metadata.t;
+  context : Tezos_context_memory.Context.t;
 }
 
 let pp_levels_and_inputs ~verbose ppf levels_and_inputs =
@@ -1047,8 +1049,15 @@ let pp_levels_and_inputs ~verbose ppf levels_and_inputs =
          levels_and_inputs)
 
 let pp_player_client ~verbose ppf
-    {player; states = _; final_tick; inbox = _; levels_and_inputs; metadata = _}
-    =
+    {
+      player;
+      states = _;
+      final_tick;
+      inbox = _;
+      levels_and_inputs;
+      metadata = _;
+      context = _;
+    } =
   Format.fprintf
     ppf
     "@[<v 2>player:@,%a@]@,final tick: %a@,@[<v 2>levels and inputs:@,%a@]"
@@ -1067,12 +1076,11 @@ module Player_client = struct
        Tezos_context_memory.Context.empty index
 
   (** Construct an inbox based on [levels_and_messages] in the player context. *)
-  let construct_inbox ~inbox ~origination_level ctxt levels_and_messages =
-    Lwt_main.run
+  let construct_inbox ~inbox ~origination_level levels_and_messages =
+    WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Sc_rollup_helpers.construct_inbox
          ~inbox
          ~origination_level
-         ctxt
          levels_and_messages
 
   (** Generate [our_states] for [levels_and_inputs] based on the strategy.
@@ -1222,9 +1230,7 @@ module Player_client = struct
         ~max_level
         levels_and_inputs
     in
-    let inbox =
-      construct_inbox ~inbox ~origination_level ctxt levels_and_inputs
-    in
+    let inbox = construct_inbox ~inbox ~origination_level levels_and_inputs in
     return
       {
         player;
@@ -1233,6 +1239,7 @@ module Player_client = struct
         inbox;
         levels_and_inputs;
         metadata;
+        context = ctxt;
       }
 end
 
@@ -1276,10 +1283,14 @@ let build_proof ~player_client start_tick (game : Game.t) =
   (* No messages are added between [game.start_level] and the current level
      so we can take the existing inbox of players. Otherwise, we should find the
      inbox of [start_level]. *)
-  let inbox_context, messages_tree, history, inbox = player_client.inbox in
-  let* history, history_proof =
-    Lwt.map Environment.wrap_tzresult
-    @@ Store_inbox.form_history_proof inbox_context history inbox messages_tree
+  let level_tree_histories, history, inbox = player_client.inbox in
+  let get_level_tree_history level_messages_hash =
+    Level_tree_histories.find level_messages_hash level_tree_histories
+    |> WithExceptions.Option.get ~loc:__LOC__
+    |> Lwt.return
+  in
+  let*? history, history_proof =
+    lift @@ Inbox.form_history_proof history inbox
   in
   (* We start a game on a commitment that starts at [Tick.initial], the fuel
      is necessarily [start_tick]. *)
@@ -1297,18 +1308,18 @@ let build_proof ~player_client start_tick (game : Game.t) =
 
     let initial_state ~empty:_ = initial_state ()
 
-    let context = inbox_context
+    let context = player_client.context
 
     let state = state
 
     let reveal _ = assert false
 
     module Inbox_with_history = struct
-      include Store_inbox
-
       let history = history
 
       let inbox = history_proof
+
+      let get_level_tree_history = get_level_tree_history
     end
 
     (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992

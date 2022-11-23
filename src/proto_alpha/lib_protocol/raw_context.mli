@@ -387,9 +387,11 @@ module Tx_rollup : sig
 end
 
 module Sc_rollup_in_memory_inbox : sig
-  val current_messages : t -> Context.tree option
+  val current_messages :
+    t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t option
 
-  val set_current_messages : t -> Context.tree -> t
+  val set_current_messages :
+    t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t
 end
 
 module Dal : sig

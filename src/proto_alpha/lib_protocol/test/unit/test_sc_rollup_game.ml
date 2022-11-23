@@ -270,10 +270,9 @@ module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 let test_invalid_serialized_inbox_proof () =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  let* ctxt = Test_sc_rollup_inbox_legacy.create_context () in
   let rollup = Sc_rollup.Address.zero in
   let level = Raw_level.(succ root) in
-  let*! inbox = Sc_rollup.Inbox.empty ctxt level in
+  let inbox = Sc_rollup.Inbox.empty level in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
   let dal_snapshot = Dal.Slots_history.genesis in
   let dal_parameters = Default_parameters.constants_mainnet.dal in
