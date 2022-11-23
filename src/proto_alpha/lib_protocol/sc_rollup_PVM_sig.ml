@@ -202,10 +202,36 @@ module Input_hash =
       let size = Some 20
     end)
 
+module type REVEAL_HASH = sig
+  type t
+
+  module Map : Map.S with type key = t
+
+  val size : int
+
+  val zero : t
+
+  val pp : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
+
+  val compare : t -> t -> int
+
+  val of_b58check_opt : string -> t option
+
+  val encoding : t Data_encoding.t
+
+  val hash_string : ?key:string -> string list -> t
+
+  val hash_bytes : ?key:bytes -> bytes list -> t
+
+  val to_b58check : t -> string
+end
+
 module Reveal_hash = struct
   (* Reserve the first byte in the encoding to support multi-versioning
      in the future. *)
-  module V0 = struct
+  module Blake2B = struct
     include
       Blake2B.Make
         (Base58)
@@ -223,7 +249,23 @@ module Reveal_hash = struct
     let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 54
   end
 
-  include V0
+  type t = Blake2B.t
+
+  module Map = Blake2B.Map
+
+  let zero = Blake2B.zero
+
+  let pp = Blake2B.pp
+
+  let equal = Blake2B.equal
+
+  let compare = Blake2B.compare
+
+  let of_b58check_opt = Blake2B.of_b58check_opt
+
+  (* Size of the hash is the size of the inner Blake2B plus one byte for the
+     tag used to identify the hashing scheme. *)
+  let size = Blake2B.size + 1
 
   let encoding =
     let open Data_encoding in
@@ -233,10 +275,16 @@ module Reveal_hash = struct
         case
           ~title:"Reveal_data_hash_v0"
           (Tag 0)
-          V0.encoding
+          Blake2B.encoding
           (fun s -> Some s)
           (fun s -> s);
       ]
+
+  let hash_string = Blake2B.hash_string
+
+  let hash_bytes = Blake2B.hash_bytes
+
+  let to_b58check = Blake2B.to_b58check
 end
 
 type reveal =

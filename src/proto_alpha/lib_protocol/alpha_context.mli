@@ -3269,7 +3269,33 @@ module Sc_rollup : sig
 
   module Input_hash : S.HASH
 
-  module Reveal_hash : S.HASH
+  module type REVEAL_HASH = sig
+    type t
+
+    module Map : Map.S with type key = t
+
+    val size : int
+
+    val zero : t
+
+    val pp : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+
+    val compare : t -> t -> int
+
+    val of_b58check_opt : string -> t option
+
+    val encoding : t Data_encoding.t
+
+    val hash_string : ?key:string -> string list -> t
+
+    val hash_bytes : ?key:bytes -> bytes list -> t
+
+    val to_b58check : t -> string
+  end
+
+  module Reveal_hash : REVEAL_HASH
 
   type reveal =
     | Reveal_raw_data of Reveal_hash.t

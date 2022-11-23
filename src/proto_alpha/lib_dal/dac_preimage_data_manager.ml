@@ -42,7 +42,7 @@ let () =
       | Cannot_write_dac_page_to_disk b58_hash -> Some b58_hash | _ -> None)
     (fun b58_hash -> Cannot_write_dac_page_to_disk b58_hash)
 
-module Make (Hash : Environment.S.HASH) = struct
+module Make (Hash : Sc_rollup.REVEAL_HASH) = struct
   let path data_dir hash = Filename.(concat data_dir @@ Hash.to_b58check hash)
 
   let save_bytes data_dir hash page_contents =

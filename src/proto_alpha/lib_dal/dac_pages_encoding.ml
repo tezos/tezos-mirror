@@ -158,7 +158,7 @@ module Merkle_tree = struct
     let hashes_version_tag = (2 * V.hashes_version) + 1
   end
 
-  module Make (Hashing_scheme : Environment.S.HASH) (V : VERSION) = struct
+  module Make (Hashing_scheme : Sc_rollup.REVEAL_HASH) (V : VERSION) = struct
     let hash bytes = Hashing_scheme.hash_bytes [bytes]
 
     let hash_encoding = Hashing_scheme.encoding
