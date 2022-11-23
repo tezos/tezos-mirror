@@ -1,5 +1,20 @@
 #!/bin/sh
-set -eu
+set -e
+
+if [ -z "$EXECUTABLE_FILES" ]; then
+    echo "Error: environment variable EXECUTABLE_FILES is empty."
+    echo "Set it to e.g. 'script-inputs/released-executables'"
+    echo "or to 'script-inputs/released-executables script-inputs/experimental-executables'."
+    exit 1
+fi
+
+if [ -z "$ARCH" ]; then
+    echo "Error: environment variable ARCH is empty."
+    echo "Set it to e.g. 'x86_64' or 'amd64'."
+    exit 1
+fi
+
+set -u
 
 echo "Create destination directory"
 mkdir -pv "octez-binaries/$ARCH"
