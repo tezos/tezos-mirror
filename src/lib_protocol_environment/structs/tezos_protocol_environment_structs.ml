@@ -100,7 +100,6 @@ end
 module V6 = struct
   module Data_encoding = V5_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
-  module Plonk = V6_plonk
   module Bounded = V5_bounded
   module RPC_directory = V0_RPC_directory
 end
