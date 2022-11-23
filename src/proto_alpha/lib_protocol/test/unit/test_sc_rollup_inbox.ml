@@ -116,14 +116,16 @@ let fill_merkelized_payload history payloads =
        (history, merkelized_payload)
        payloads
 
-let construct_merkelized_payload payloads =
+let construct_merkelized_payload_hashes payloads =
   let history = Merkelized_payload_hashes.History.empty ~capacity:1000L in
   fill_merkelized_payload history payloads
 
-let test_merkelized_payload_history payloads =
+let test_merkelized_payload_hashes_history payloads =
   let open Lwt_result_syntax in
   let nb_payloads = List.length payloads in
-  let* history, merkelized_payloads = construct_merkelized_payload payloads in
+  let* history, merkelized_payloads =
+    construct_merkelized_payload_hashes payloads
+  in
   let* () =
     Assert.equal_z
       ~loc:__LOC__
@@ -151,9 +153,11 @@ let test_merkelized_payload_history payloads =
         expected_payload_hash)
     payloads
 
-let test_merkelized_payload_proof (payloads, index) =
+let test_merkelized_payload_hashes_proof (payloads, index) =
   let open Lwt_result_syntax in
-  let* history, merkelized_payload = construct_merkelized_payload payloads in
+  let* history, merkelized_payload =
+    construct_merkelized_payload_hashes payloads
+  in
   let ( Merkelized_payload_hashes.
           {merkelized = target_merkelized_payload; payload = proof_payload},
         proof ) =
@@ -189,18 +193,18 @@ let test_merkelized_payload_proof (payloads, index) =
   in
   return_unit
 
-let merkelized_payload_tests =
+let merkelized_payload_hashes_tests =
   [
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"Merkelized messages: Add messages then retrieve them from history."
       gen_payloads
-      test_merkelized_payload_history;
+      test_merkelized_payload_hashes_history;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"Merkelized messages: Produce proof and verify its validity."
       gen_payloads_and_index
-      test_merkelized_payload_proof;
+      test_merkelized_payload_hashes_proof;
   ]
 
-let tests = merkelized_payload_tests @ Test_sc_rollup_inbox_legacy.tests
+let tests = merkelized_payload_hashes_tests @ Test_sc_rollup_inbox_legacy.tests
