@@ -808,14 +808,19 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2926
+   This function is incomplete and needs to account for additional gas. *)
 let cost_play _game refutation =
   match refutation.step with
-  | Dissection _states ->
-      (* TODO: plugin gas cost for dissections. *)
-      Gas_limit_repr.free
-  | Proof _proof ->
-      (* TODO: plugin gas cost for proof. *)
-      Gas_limit_repr.free
+  | Dissection states ->
+      let number_of_states = List.length states in
+      let hash_size = State_hash.size in
+      let tick_size = Sc_rollup_tick_repr.size_in_bytes refutation.choice in
+      Sc_rollup_costs.cost_check_dissection
+        ~number_of_states
+        ~tick_size
+        ~hash_size
+  | Proof _proof -> Gas_limit_repr.free
 
 let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game
     refutation =

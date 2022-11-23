@@ -141,3 +141,17 @@ let cost_hash_bytes ~bytes_len =
   let open S_syntax in
   let v0 = S.safe_int bytes_len in
   S.safe_int 430 + v0 + (v0 lsr 3)
+
+let cost_compare a_size_in_bytes b_size_in_bytes =
+  let open S_syntax in
+  let size_in_bytes = Compare.Int.min a_size_in_bytes b_size_in_bytes in
+  let v0 = S.safe_int size_in_bytes in
+  S.safe_int 35 + ((v0 lsr 6) + (v0 lsr 7))
+
+let cost_search_in_tick_list len tick_size =
+  S_syntax.(S.safe_int len * cost_compare tick_size tick_size)
+
+let cost_check_dissection ~number_of_states ~tick_size ~hash_size =
+  let open S_syntax in
+  cost_search_in_tick_list number_of_states tick_size
+  + (S.safe_int 2 * cost_compare hash_size hash_size)

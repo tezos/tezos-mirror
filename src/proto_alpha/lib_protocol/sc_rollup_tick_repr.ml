@@ -61,4 +61,9 @@ let ( = ) = equal
 
 let ( <> ) x y = not (x = y)
 
+let size_in_bytes tick =
+  (* Same definition as in {!Michelson_v1_gas}. *)
+  let bits = numbits tick in
+  (7 + bits) / 8
+
 module Map = Map.Make (Z)
