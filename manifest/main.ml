@@ -4865,7 +4865,18 @@ module Protocol = Protocol
         ~path:(path // "bin_wasm_repl")
         ~opam:"octez-wasm-repl"
         ~synopsis:"Tezos/Protocol: REPL for the scoru-wasm functionality"
-        ~release_status:Unreleased
+        ~release_status:
+          (match number with
+          | Alpha ->
+              (* It's currently unclear whether it'll be ready for protocol M.
+                 Change this to [Released] if you want the next major version to
+                 come with this executable. *)
+              Experimental
+          | _ ->
+              (* There is no need for more than one octez-wasm-repl executable.
+                 It should in fact be moved outside of proto_alpha,
+                 into its own directory like src/bin_wasm_repl. *)
+              Unreleased)
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives";
@@ -5926,6 +5937,7 @@ let _octez_dal_node =
     ~path:"src/bin_dal_node"
     ~internal_name:"main_dal"
     ~synopsis:"Tezos: `octez-dal-node` binary"
+    ~release_status:Experimental
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";
