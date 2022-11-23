@@ -27,6 +27,10 @@ module Name_table = Namespace.Hashtbl
 
 exception Benchmark_not_found of string
 
+exception Model_not_found of string
+
+exception Parameter_not_found of string
+
 let bench_table : Benchmark.t Name_table.t = Name_table.create 51
 
 let clic_table : unit Tezos_clic.command list ref = ref []
@@ -66,10 +70,7 @@ let register_param_from_model (model : Model.packed_model) =
   match model with
   | Model model ->
       let module M = (val model) in
-      let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
-      let module T1 = Costlang.Beta_normalize (T0) in
-      let module R = M.Def (T1) in
-      let fv_set = T0.prj @@ T1.prj R.model in
+      let fv_set = Model.get_free_variable_set model in
       Free_variable.Set.iter (register_parameter M.name) fv_set
 
 let register_model (type a) bench_name model_local_name (model : a Model.t) :
@@ -221,3 +222,21 @@ let find_benchmark_exn name =
   | Some b -> b
 
 let find_model name = Name_table.find model_table name
+
+let find_model_exn name =
+  let n = Namespace.of_string name in
+  match find_model n with
+  | None ->
+      Format.eprintf "No model named %s found.@." name ;
+      raise (Model_not_found name)
+  | Some m -> m
+
+let find_parameter name = Name_table.find parameter_table name
+
+let find_parameter_exn name =
+  let n = Namespace.of_string name in
+  match find_parameter n with
+  | None ->
+      Format.eprintf "No parameter %s found.@." name ;
+      raise (Parameter_not_found name)
+  | Some m -> m

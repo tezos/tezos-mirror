@@ -180,6 +180,13 @@ let precompose : type a b. (a -> b) -> b t -> a t =
   | Aggregate {model; sub_models} ->
       Aggregate {model = (fun x -> model (f x)); sub_models}
 
+let get_free_variable_set (type a) (model : a model) =
+  let module M = (val model) in
+  let module T0 = Costlang.Fold_constants (Costlang.Free_variables) in
+  let module T1 = Costlang.Beta_normalize (T0) in
+  let module R = M.Def (T1) in
+  T0.prj @@ T1.prj R.model
+
 (* -------------------------------------------------------------------------- *)
 (* Commonly used models *)
 

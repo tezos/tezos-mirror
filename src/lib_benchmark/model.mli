@@ -120,6 +120,9 @@ val add_model : 'a t -> 'b t -> ('a * 'b) t
 (** Transformator for the type of workloads *)
 val precompose : ('a -> 'b) -> 'b t -> 'a t
 
+(** Returns the set of free variables of a model *)
+val get_free_variable_set : 'a model -> Free_variable.Set.t
+
 (* -------------------------------------------------------------------------- *)
 (** Commonly used abstract models
     Except for [zero], they all require a unique name in {!Namespace.t}, and some
