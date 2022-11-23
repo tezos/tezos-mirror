@@ -3033,6 +3033,7 @@ let tezt_core_lib =
     ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
     ~js_compatible:true
+    ~release_status:Unreleased
     ~deps:[re; lwt; unix_js; ezjsonm]
 
 let tezt_lib =
@@ -3045,6 +3046,7 @@ let tezt_lib =
     ~opam_doc:"https://tezos.gitlab.io/api/odoc/_html/tezt/Tezt/index.html"
     ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
+    ~release_status:Unreleased
     ~deps:[re; lwt_unix; ezjsonm; tezt_core_lib |> open_]
 
 let tezt_js_lib =
@@ -3055,6 +3057,7 @@ let tezt_js_lib =
     ~js_compatible:true
     ~bisect_ppx:false
     ~optional:true
+    ~release_status:Unreleased
     ~deps:[re; ezjsonm; js_of_ocaml; js_of_ocaml_lwt; tezt_core_lib |> open_]
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
@@ -4663,6 +4666,12 @@ module Protocol = Protocol
             else "Baking_commands_registration");
           ]
     in
+    let release_status =
+      match number with
+      | V _ -> Released
+      | Alpha -> Experimental
+      | Other -> Unreleased
+    in
     let daemon daemon =
       only_if active @@ fun () ->
       public_exe
@@ -4670,7 +4679,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
         ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)
-        ~release:true
+        ~release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4753,7 +4762,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
         ~synopsis:"Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"
-        ~release:true
+        ~release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4778,7 +4787,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
-        ~release:true
+        ~release_status
         ~deps:
           [
             octez_base |> open_ |> open_ ~m:"TzPervasives"
@@ -4823,7 +4832,7 @@ module Protocol = Protocol
         ~path:(path // "bin_wasm_repl")
         ~opam:"octez-wasm-repl"
         ~synopsis:"Tezos/Protocol: REPL for the scoru-wasm functionality"
-        ~release:false
+        ~release_status:Unreleased
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives";
@@ -4887,7 +4896,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_client")
         ~synopsis:"Tezos/Protocol: `octez-tx-rollup-client-alpha` client binary"
-        ~release:true
+        ~release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4909,7 +4918,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
-        ~release:true
+        ~release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -5550,7 +5559,7 @@ let _octez_node =
     ~path:"src/bin_node"
     ~internal_name:"main"
     ~synopsis:"Tezos: `octez-node` binary"
-    ~release:true
+    ~release_status:Released
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -5620,7 +5629,7 @@ let _octez_client =
     ~internal_names:["main_client"; "main_admin"]
     ~opam:"octez-client"
     ~synopsis:"Tezos: `octez-client` binary"
-    ~release:true
+    ~release_status:Released
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";
@@ -5669,7 +5678,7 @@ let _octez_codec =
     ~path:"src/bin_codec"
     ~internal_name:"codec"
     ~synopsis:"Tezos: `octez-codec` binary to encode and decode values"
-    ~release:true
+    ~release_status:Released
     ~deps:
       ([
          data_encoding |> open_;
@@ -5701,7 +5710,7 @@ let _octez_proxy_server =
     ~path:"src/bin_proxy_server"
     ~internal_name:"main_proxy_server"
     ~synopsis:"Octez: `octez-proxy-server` binary"
-    ~release:true
+    ~release_status:Released
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -5788,7 +5797,7 @@ let _octez_signer =
     ~path:"src/bin_signer"
     ~internal_name:"main_signer"
     ~synopsis:"Tezos: `octez-signer` binary"
-    ~release:true
+    ~release_status:Released
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
