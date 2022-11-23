@@ -163,6 +163,22 @@ val tup9 :
   'i t ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) t
 
+(** [tup10 ~flatten e1 e2 e3 e4 e5 e6 e7 e8 e9 e10] combines the given encoders
+    [e1 .. e10] into an encoder for a tuple of ten elements. *)
+val tup10 :
+  flatten:bool ->
+  'a t ->
+  'b t ->
+  'c t ->
+  'd t ->
+  'e t ->
+  'f t ->
+  'g t ->
+  'h t ->
+  'i t ->
+  'j t ->
+  ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j) t
+
 (** [raw key] is an encoder for bytes under the given [key]. *)
 val raw : key -> bytes t
 
