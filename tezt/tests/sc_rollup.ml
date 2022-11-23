@@ -433,13 +433,11 @@ let test_rollup_node_configuration ~kind =
     {
       variant = None;
       tags = ["configuration"];
-      description =
-        "configuration of a smart rollup node specify the data dir and rpc port";
+      description = "configuration of a smart rollup node specify the rpc port";
     }
     ~kind
   @@ fun rollup_node _rollup_client _sc_rollup _tezos_node _tezos_client ->
   let config = Sc_rollup_node.Config_file.read rollup_node in
-  let _data_dir = JSON.(config |-> "data-dir" |> as_string) in
   let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
   unit
 
