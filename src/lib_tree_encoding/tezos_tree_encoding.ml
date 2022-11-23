@@ -96,6 +96,12 @@ let tup9_ a b c d e f g h i =
     (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, c, d, e, f, g, h, i)))
     (tup2_ a (tup8_ b c d e f g h i))
 
+let tup10_ a b c d e f g h i j =
+  conv
+    (fun (a, (b, c, d, e, f, g, h, i, j)) -> (a, b, c, d, e, f, g, h, i, j))
+    (fun (a, b, c, d, e, f, g, h, i, j) -> (a, (b, c, d, e, f, g, h, i, j)))
+    (tup2_ a (tup9_ b c d e f g h i j))
+
 (* This is to allow for either flat composition of tuples or  where each
    element of the tuple is wrapped under an index node. *)
 let flat_or_wrap ~flatten ix enc =
@@ -166,6 +172,19 @@ let tup9 ~flatten a b c d e f g h i =
     (flat_or_wrap ~flatten 7 g)
     (flat_or_wrap ~flatten 8 h)
     (flat_or_wrap ~flatten 9 i)
+
+let tup10 ~flatten a b c d e f g h i j =
+  tup10_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
+    (flat_or_wrap ~flatten 5 e)
+    (flat_or_wrap ~flatten 6 f)
+    (flat_or_wrap ~flatten 7 g)
+    (flat_or_wrap ~flatten 8 h)
+    (flat_or_wrap ~flatten 9 i)
+    (flat_or_wrap ~flatten 10 j)
 
 let raw key = {encode = E.raw key; decode = D.raw key}
 
