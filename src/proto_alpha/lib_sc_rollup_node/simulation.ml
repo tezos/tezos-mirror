@@ -144,12 +144,11 @@ module Make (Interpreter : Interpreter.S) :
         inbox_level
         messages
     in
-    let Fueled_pvm.{state; num_ticks; _} =
+    let Fueled_pvm.{state; num_ticks; num_messages; _} =
       Delayed_write_monad.ignore eval_result
     in
     let*! ctxt = PVM.State.set ctxt state in
-    let nb_messages = List.length messages in
-    let nb_messages_inbox = nb_messages_inbox + nb_messages in
+    let nb_messages_inbox = nb_messages_inbox + num_messages in
     return ({sim with ctxt; state; nb_messages_inbox}, num_ticks)
 
   let simulate_messages (node_ctxt : Node_context.ro) sim messages =
