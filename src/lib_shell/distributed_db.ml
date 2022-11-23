@@ -405,11 +405,6 @@ module Protocol = struct
            and type param := unit)
 end
 
-let broadcast chain_db msg =
-  P2p_peer.Table.iter
-    (fun _peer_id conn -> ignore (P2p.try_send chain_db.global_db.p2p conn msg))
-    chain_db.reader_chain_db.active_connections
-
 let try_send chain_db peer_id msg =
   match
     P2p_peer.Table.find chain_db.reader_chain_db.active_connections peer_id
@@ -417,14 +412,12 @@ let try_send chain_db peer_id msg =
   | None -> ()
   | Some conn -> ignore (P2p.try_send chain_db.global_db.p2p conn msg : bool)
 
-let send chain_db peer msg = try_send chain_db peer msg
-
 module Request = struct
   let current_head_from_peer chain_db peer =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
     Peer_metadata.incr meta (Sent_request Head) ;
-    send chain_db peer @@ Get_current_head chain_id
+    try_send chain_db peer @@ Get_current_head chain_id
 
   let current_head_from_all chain_db =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
@@ -443,26 +436,20 @@ end
 module Advertise = struct
   let current_head chain_db ?(mempool = Mempool.empty) head =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
-    let msg_mempool =
-      Message.Current_head (chain_id, Store.Block.header head, mempool)
-    in
-    if mempool = Mempool.empty then broadcast chain_db msg_mempool
-    else
-      let msg_disable_mempool =
-        Message.Current_head (chain_id, Store.Block.header head, Mempool.empty)
-      in
-      let send_mempool conn =
-        let {Connection_metadata.disable_mempool; _} =
-          P2p.connection_remote_metadata chain_db.global_db.p2p conn
-        in
-        let msg =
-          if disable_mempool then msg_disable_mempool else msg_mempool
-        in
-        ignore @@ P2p.try_send chain_db.global_db.p2p conn msg
-      in
-      P2p_peer.Table.iter
-        (fun _receiver_id conn -> send_mempool conn)
-        chain_db.reader_chain_db.active_connections
+    P2p.broadcast
+      ~alt:
+        (let if_conn conn =
+           let {Connection_metadata.disable_mempool; _} =
+             P2p.connection_remote_metadata chain_db.global_db.p2p conn
+           in
+           disable_mempool
+         and then_msg =
+           Message.Current_head
+             (chain_id, Store.Block.header head, Mempool.empty)
+         in
+         (if_conn, then_msg))
+      chain_db.reader_chain_db.active_connections
+      (Message.Current_head (chain_id, Store.Block.header head, mempool))
 
   let prechecked_head chain_db ?(mempool = Mempool.empty) header =
     let p2p = chain_db.global_db.p2p in
@@ -477,11 +464,10 @@ module Advertise = struct
     in
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let msg = Message.Current_head (chain_id, header, mempool) in
-    P2p_peer.Table.iter
-      (fun _ conn ->
-        if acceptable_version conn then ignore (P2p.try_send p2p conn msg)
-        else ())
+    P2p.broadcast
+      ~except:(fun conn -> not (acceptable_version conn))
       chain_db.reader_chain_db.active_connections
+      msg
 
   let current_branch chain_db =
     let open Lwt_syntax in
