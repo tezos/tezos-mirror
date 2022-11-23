@@ -1078,10 +1078,14 @@ module Player_client = struct
 
   (** Construct an inbox based on [levels_and_messages] in the player context. *)
   let construct_inbox ~inbox ~origination_level levels_and_messages =
+    let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
+    let level_tree_histories = Level_tree_histories.empty in
     WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Sc_rollup_helpers.construct_inbox
+    @@ Sc_rollup_helpers.fill_inbox
          ~inbox
          ~origination_level
+         history
+         level_tree_histories
          levels_and_messages
 
   (** Generate [our_states] for [levels_and_inputs] based on the strategy.

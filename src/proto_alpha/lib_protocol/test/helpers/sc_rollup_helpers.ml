@@ -463,6 +463,9 @@ let gen_message_reprs_for_levels_repr ~start_level ~max_level gen_message_repr =
 module Level_tree_histories =
   Map.Make (Sc_rollup.Inbox_merkelized_payload_hashes.Hash)
 
+type level_tree_histories =
+  Sc_rollup.Inbox_merkelized_payload_hashes.History.t Level_tree_histories.t
+
 let get_level_tree_history level_tree_histories level_tree_hash =
   Level_tree_histories.find level_tree_hash level_tree_histories
   |> WithExceptions.Option.get ~loc:__LOC__
@@ -475,10 +478,9 @@ let get_level_tree_history level_tree_histories level_tree_hash =
    test/unit/test_sc_rollup_inbox. The main difference is: we use
    [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
    former. *)
-let construct_inbox ~inbox ?origination_level levels_and_inputs =
+let fill_inbox ~inbox ?origination_level ?(with_level_tree_history = true)
+    history level_tree_histories levels_and_inputs =
   let open Result_syntax in
-  let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
-  let level_tree_histories = Level_tree_histories.empty in
   let rec aux level_tree_histories history inbox = function
     | [] -> return (level_tree_histories, history, inbox)
     | ((level, inputs) : Raw_level.t * Sc_rollup.input list) :: rst ->
@@ -494,8 +496,11 @@ let construct_inbox ~inbox ?origination_level levels_and_inputs =
             inputs
         in
         let level_tree_history =
-          Sc_rollup.Inbox_merkelized_payload_hashes.History.empty
-            ~capacity:1000L
+          let capacity =
+            if with_level_tree_history then Int64.of_int @@ List.length payloads
+            else 0L
+          in
+          Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity
         in
         let* level_tree_history, level_tree, history, inbox =
           Sc_rollup.Inbox.add_messages
@@ -519,3 +524,19 @@ let construct_inbox ~inbox ?origination_level levels_and_inputs =
         aux level_tree_histories history inbox rst
   in
   aux level_tree_histories history inbox levels_and_inputs
+
+let construct_inbox ?(inbox_creation_level = Raw_level.(root))
+    ?origination_level ?(with_histories = true) level_and_inputs =
+  let inbox = Sc_rollup.Inbox.empty inbox_creation_level in
+  let history =
+    let capacity = if with_histories then 10000L else 0L in
+    Sc_rollup.Inbox.History.empty ~capacity
+  in
+  let level_tree_histories = Level_tree_histories.empty in
+  fill_inbox
+    ?origination_level
+    ~inbox
+    ~with_level_tree_history:with_histories
+    history
+    level_tree_histories
+    level_and_inputs

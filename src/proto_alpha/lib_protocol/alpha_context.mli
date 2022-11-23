@@ -3251,6 +3251,8 @@ module Sc_rollup : sig
 
   val pp_inbox_message : Format.formatter -> inbox_message -> unit
 
+  val inbox_message_equal : inbox_message -> inbox_message -> bool
+
   val pp_reveal_data : Format.formatter -> reveal_data -> unit
 
   val pp_input : Format.formatter -> input -> unit
