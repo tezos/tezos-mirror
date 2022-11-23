@@ -1019,6 +1019,19 @@ let test_contract_opcodes protocols =
   in
   Fun.flip List.iter parameterization
   @@ fun (contract, storage, input, expected) ->
+  let contract_path protocol contract =
+    sf
+      "./tests_python/contracts_%s/opcodes/%s"
+      (match protocol with
+       | Protocol.Alpha -> "alpha"
+       | _ -> sf "%03d" (Protocol.number protocol))
+      contract
+  in
+  let protocols =
+    List.filter
+      (fun protocol -> Sys.file_exists (contract_path protocol contract))
+      protocols
+  in
   ( Protocol.register_regression_test
       ~__FILE__
       ~title:
@@ -1030,14 +1043,7 @@ let test_contract_opcodes protocols =
       ~tags:["michelson"]
   @@ fun protocol ->
     let client = Client.create_with_mode Mockup in
-    let contract =
-      sf
-        "./tests_python/contracts_%s/opcodes/%s"
-        (match protocol with
-        | Alpha -> "alpha"
-        | _ -> sf "%03d" (Protocol.number protocol))
-        contract
-    in
+    let contract = contract_path protocol contract in
     let* run_script_res_storage =
       Client.run_script
         ~protocol_hash:(Protocol.hash protocol)
