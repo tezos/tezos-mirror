@@ -290,6 +290,13 @@ struct
 
   let mem s i = C.mem s (I.to_path i [])
 
+  let is_empty i =
+    let open Lwt_syntax in
+    let* root = C.find_tree i [] in
+    match root with
+    | None -> return_true
+    | Some root -> return @@ C.Tree.is_empty root
+
   let get s i =
     C.get s (I.to_path i []) >>=? fun b ->
     let key () = C.absolute_key s (I.to_path i []) in
@@ -377,6 +384,13 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   type value = V.t
 
   include Make_encoder (V)
+
+  let is_empty i =
+    let open Lwt_syntax in
+    let* root = C.find_tree i [] in
+    match root with
+    | None -> return_true
+    | Some root -> return @@ C.Tree.is_empty root
 
   let data_key i = I.to_path i [data_name]
 
@@ -683,6 +697,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let clear t = C.remove t [] >|= fun t -> C.project t
 
+  let is_empty i =
+    let open Lwt_syntax in
+    let* root = C.find_tree i [] in
+    match root with
+    | None -> return_true
+    | Some root -> return @@ C.Tree.is_empty root
+
   let fold_keys t ~order ~init ~f =
     C.fold ~depth:(`Eq I.path_length) t [] ~order ~init ~f:(fun path tree acc ->
         match C.Tree.kind tree with
@@ -928,6 +949,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     type nonrec local_context = local_context
 
     include Make_encoder (V)
+
+    let is_empty i =
+      let open Lwt_syntax in
+      let* root = C.find_tree i [] in
+      match root with
+      | None -> return_true
+      | Some root -> return @@ C.Tree.is_empty root
 
     let mem s i = Raw_context.mem (pack s i) N.name
 
@@ -1205,6 +1233,8 @@ module Wrap_indexed_data_storage
   type key = K.t
 
   type value = C.value
+
+  let is_empty ctxt = C.is_empty ctxt
 
   let mem ctxt k = C.mem ctxt (K.wrap k)
 
