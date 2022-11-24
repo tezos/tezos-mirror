@@ -60,7 +60,7 @@ val add_deposit :
   (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** Initialize the inbox in the storage at protocol initialization. *)
-val init :
+val init_inbox :
   timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Raw_context.t ->

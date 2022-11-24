@@ -3401,7 +3401,8 @@ module Sc_rollup : sig
       Raw_level.t * Z.t ->
       (proof * inbox_message option) tzresult Lwt.t
 
-    val empty : Raw_level.t -> t
+    val init :
+      timestamp:Time.t -> predecessor:Block_hash.t -> Raw_level.t -> t tzresult
 
     module Internal_for_tests : sig
       val eq_tree :
@@ -3416,6 +3417,8 @@ module Sc_rollup : sig
         (inclusion_proof * history_proof) tzresult
 
       val serialized_proof_of_string : string -> serialized_proof
+
+      val dumb_init : Raw_level.t -> t
     end
 
     val add_external_messages :

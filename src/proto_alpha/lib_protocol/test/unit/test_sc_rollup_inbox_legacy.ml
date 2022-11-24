@@ -133,14 +133,16 @@ let populate_inboxes level history inbox inboxes list_of_payloads =
   let level_tree_histories = Level_tree_histories.empty in
   aux level history level_tree_histories inbox inboxes None list_of_payloads
 
-let test_empty () =
-  let inbox = empty (Raw_level_repr.of_int32_exn 42l) in
+let inbox = Internal_for_tests.dumb_init
+
+let test_init () =
+  let inbox = inbox (Raw_level_repr.of_int32_exn 42l) in
   fail_unless
-    Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
-    (err "An empty inbox should have no available message.")
+    Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 3L)
+    (err "A new inbox should have 3 messages.")
 
 let setup_inbox_with_messages list_of_payloads f =
-  let inbox = empty first_level in
+  let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
   populate_inboxes first_level history inbox [] list_of_payloads
   >>?= fun (level_tree_histories, level_tree, history, inbox, inboxes) ->
@@ -157,7 +159,7 @@ let test_add_messages messages =
     Compare.Int64.(
       equal
         (number_of_messages_during_commitment_period inbox)
-        (Int64.of_int nb_payloads))
+        (Int64.of_int (nb_payloads + 3)))
     (err "Invalid number of messages during commitment period.")
 
 (* An external message is prefixed with a tag whose length is one byte, and
@@ -202,7 +204,7 @@ let test_get_message_payload messages =
     that it uses the {!Node} instance instead of the protocol instance. *)
 let setup_node_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
-  let inbox = empty first_level in
+  let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
   let level_tree_histories = Level_tree_histories.empty in
   let rec aux level history level_tree_histories inbox inboxes level_tree =
@@ -318,7 +320,7 @@ let init_inboxes_histories_with_different_capacities
     List.init ~when_negative_length:[] nb_levels (fun i -> [string_of_int i])
   in
   let mk_history ?(next_index = 0L) ~capacity () =
-    let inbox = empty first_level in
+    let inbox = inbox first_level in
     let history =
       Sc_rollup_inbox_repr.History.Internal_for_tests.empty
         ~capacity
@@ -545,7 +547,7 @@ let tests =
   let msg_size = QCheck2.Gen.(0 -- 100) in
   let bounded_string = QCheck2.Gen.string_size msg_size in
   [
-    Tztest.tztest "Empty inbox" `Quick test_empty;
+    Tztest.tztest "Init inbox" `Quick test_init;
     Tztest.tztest_qcheck2
       ~name:"Added messages are available."
       QCheck2.Gen.(list_size (1 -- 50) bounded_string)

@@ -350,9 +350,11 @@ val produce_proof :
   Raw_level_repr.t * Z.t ->
   (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
 
-(** [empty level] is an inbox started at some given [level] with no message at
-    all. *)
-val empty : Raw_level_repr.t -> t
+(** [init ~timestamp ~predecessor level] is an inbox started at some
+    given [level] with: SOL, Info_per_level {timestamp; predeessor} and EOL
+    inside. *)
+val init :
+  timestamp:Time.t -> predecessor:Block_hash.t -> Raw_level_repr.t -> t tzresult
 
 module Internal_for_tests : sig
   val eq_tree :
@@ -373,6 +375,9 @@ module Internal_for_tests : sig
   val serialized_proof_of_string : string -> serialized_proof
 
   val get_level_of_history_proof : history_proof -> Raw_level_repr.t
+
+  (** Initialize with dumb values for [timestamp] and [predecessor]. *)
+  val dumb_init : Raw_level_repr.t -> t
 end
 
 type inbox = t

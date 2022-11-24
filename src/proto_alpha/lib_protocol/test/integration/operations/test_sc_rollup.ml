@@ -2223,7 +2223,7 @@ let test_refute_invalid_metadata () =
   in
   assert_refute_result ~game_status:expected_game_status incr
 
-let full_history_inbox all_inbox_messages =
+let full_history_inbox (timestamp, predecessor) all_inbox_messages =
   let open Sc_rollup_helpers in
   (* Add the SOL/Info_per_level/EOL to the list of inbox messages. *)
   let all_inbox_messages =
@@ -2239,7 +2239,7 @@ let full_history_inbox all_inbox_messages =
         List.map (fun Sc_rollup_helpers.{input; message = _} -> input) messages)
       all_inbox_messages
   in
-  Sc_rollup_helpers.construct_inbox all_inbox_inputs
+  Sc_rollup_helpers.construct_inbox ~timestamp ~predecessor all_inbox_inputs
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Sc_rollup_helpers in
@@ -2306,16 +2306,12 @@ let test_automatically_added_internal_messages () =
   let* inbox = Context.Sc_rollup.inbox (B block) in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
 
-  let level_zero = Raw_level.of_int32_exn 0l in
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
   let*? ((_level_tree_histories, history, inbox) as full_history_inbox) =
     full_history_inbox
-      [
-        (level_zero, level_zero_info, []);
-        (level_one, level_one_info, []);
-        (level_two, level_two_info, ["foo"]);
-      ]
+      level_zero_info
+      [(level_one, level_one_info, []); (level_two, level_two_info, ["foo"])]
   in
 
   (* Assert SOL is at position 0. *)

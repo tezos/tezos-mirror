@@ -63,9 +63,7 @@ let () =
     `Permanent
     ~id:"sc_rollup_inbox.invalid_level_add_messages"
     ~title:"Internal error: Trying to add a message to an inbox from the past"
-    ~description:
-      "An inbox can only accept messages for its current level or for the next \
-       levels."
+    ~description:"An inbox can only accept messages for its current level"
     (obj1 (req "level" Raw_level_repr.encoding))
     (function Invalid_level_add_messages level -> Some level | _ -> None)
     (fun level -> Invalid_level_add_messages level) ;
@@ -387,8 +385,8 @@ let initialize_level_tree_when_needed level_tree_history inbox level_tree
     payloads =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4242
 
-     This function is needed because a skip list can't be empty. A level
-     tree is never empty because of `sol` so this corner case can be
+     This function is needed because a skip list can't be init. A level
+     tree is never init because of `sol` so this corner case can be
      removed. *)
   let open Result_syntax in
   match level_tree with
@@ -410,7 +408,7 @@ let initialize_level_tree_when_needed level_tree_history inbox level_tree
       let inbox = {inbox with nb_messages_in_commitment_period} in
       return (inbox, level_tree_history, level_tree, payloads)
 
-(** [no_history] creates an empty history with [capacity] set to
+(** [no_history] creates an init history with [capacity] set to
     zero---this makes the [remember] function a no-op. We want this
     behaviour in the protocol because we don't want to store
     previous levels of the inbox. *)
@@ -435,7 +433,7 @@ let form_history_proof history inbox =
     adding messages, and archive the earlier levels depending on the
     [history] parameter's [capacity]. If [level_tree] is [None] (this
     happens when the inbox is first created) we similarly create a new
-    empty level tree.
+    init level tree.
 
     This function is the only place we begin new level trees. *)
 let archive_if_needed level_tree_history history inbox new_level level_tree
@@ -582,7 +580,7 @@ let to_serialized_proof = Data_encoding.Binary.to_string_exn proof_encoding
     Then there is two cases,
 
     - either [n] is superior to the index of [head_cell] then the provided
-    [payload] must be empty (and [payload_cell = head_cell]);
+    [payload] must be init (and [payload_cell = head_cell]);
 
     - or [0 < n < max_index head_cell] then the provided payload must exist and
     the payload hash must equal the content of the [payload_cell].
@@ -606,7 +604,7 @@ let verify_level_tree_proof {proof; payload} head_cell_hash n =
   in
   if Compare.Z.(n = Z.succ max_index) then
     (* [n] is equal to the index of [head_cell] then the provided [payload] must
-       be empty (,and [payload_cell = head_cell]) *)
+       be init (,and [payload_cell = head_cell]) *)
     let* () =
       error_unless
         (Option.is_none payload)
@@ -726,7 +724,7 @@ let produce_level_tree_proof get_level_tree_history head_cell_hash ~index =
 let verify_inclusion_proof inclusion_proof snapshot_history_proof =
   let open Result_syntax in
   let rec aux (hash_map, ptr_list) = function
-    | [] -> error (Inbox_proof_error "inclusion proof is empty")
+    | [] -> error (Inbox_proof_error "inclusion proof is init")
     | [target] ->
         let target_ptr = hash_history_proof target in
         let hash_map = Hash.Map.add target_ptr target hash_map in
@@ -828,22 +826,55 @@ let produce_proof ~get_level_tree_history history inbox_snapshot (l, n) =
   in
   return (proof, input)
 
-let empty level =
+let init ~timestamp ~predecessor level =
+  let open Result_syntax in
   let pre_genesis_level = Raw_level_repr.root in
-  let initial_level_proof =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4242
+  let sol, eol =
+    Sc_rollup_inbox_message_repr.
+      (start_of_level_serialized, end_of_level_serialized)
+  in
+  let payloads_no_history =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.History.no_history
+  in
+  (* 1. Initialize skip list with SOL. *)
+  let* _history, level_skip_list =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.genesis
+      payloads_no_history
+      sol
+  in
+  let* info_per_level =
+    Sc_rollup_inbox_message_repr.(
+      serialize (Internal (Info_per_level {timestamp; predecessor})))
+  in
+  (* 2. Add [Info_per_level]. *)
+  let* _history, level_skip_list =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload
+      payloads_no_history
+      level_skip_list
+      info_per_level
+  in
+  (* 3. Add [EOL]. *)
+  let* _history, level_skip_list =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload
+      payloads_no_history
+      level_skip_list
+      eol
+  in
 
-       Because there is no empty level with `sol/eol` we don't need the zero
-       hash but instead we could use the real value. *)
-    let hash = Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.zero in
+  let level_proof =
+    let hash =
+      Sc_rollup_inbox_merkelized_payload_hashes_repr.hash level_skip_list
+    in
     {hash; level = pre_genesis_level}
   in
-  {
-    level;
-    nb_messages_in_commitment_period = 0L;
-    current_level_proof = (fun () -> initial_level_proof);
-    old_levels_messages = Skip_list.genesis initial_level_proof;
-  }
+
+  return
+    {
+      level;
+      nb_messages_in_commitment_period = 3L;
+      current_level_proof = (fun () -> level_proof);
+      old_levels_messages = Skip_list.genesis level_proof;
+    }
 
 module Internal_for_tests = struct
   let eq_tree = Sc_rollup_inbox_merkelized_payload_hashes_repr.equal
@@ -855,6 +886,13 @@ module Internal_for_tests = struct
   let get_level_of_history_proof (history_proof : history_proof) =
     let ({level; _} : level_proof) = Skip_list.content history_proof in
     level
+
+  let dumb_init level =
+    match
+      init ~timestamp:(Time.of_seconds 0L) ~predecessor:Block_hash.zero level
+    with
+    | Ok x -> x
+    | Error _ -> assert false
 end
 
 type inbox = t

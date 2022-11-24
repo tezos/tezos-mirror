@@ -184,3 +184,19 @@ end
 
 let hash_serialized_message (payload : serialized) =
   Hash.hash_string [(payload :> string)]
+
+let start_of_level_serialized =
+  match serialize (Internal Start_of_level) with
+  | Ok x -> x
+  | Error _ ->
+      (* If [Start_of_level] can not be serialized, this will be detected at
+         compilation time as we are defining a top-level value. *)
+      assert false
+
+let end_of_level_serialized =
+  match serialize (Internal End_of_level) with
+  | Ok x -> x
+  | Error _ ->
+      (* If [End_of_level] can not be serialized, this will be detected at
+         compilation time as we are defining a top-level value. *)
+      assert false

@@ -93,7 +93,7 @@ let gen_inbox level =
   let payloads = hd :: tail in
   let level_tree_and_inbox =
     let open Result_syntax in
-    let empty_inbox = Sc_rollup_inbox_repr.empty level in
+    let inbox = Sc_rollup_inbox_repr.Internal_for_tests.dumb_init level in
     lift
     @@ let* input_messages =
          List.map_e
@@ -101,7 +101,7 @@ let gen_inbox level =
            payloads
        in
        Sc_rollup_inbox_repr.add_messages_no_history
-         empty_inbox
+         inbox
          level
          input_messages
          None

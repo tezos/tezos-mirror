@@ -500,8 +500,14 @@ let fill_inbox ~inbox ~shift_level ?origination_level
   aux 0 level_tree_histories history inbox inputs
 
 let construct_inbox ?(inbox_creation_level = Raw_level.(root))
-    ?origination_level ?(with_histories = true) level_and_inputs =
-  let inbox = Sc_rollup.Inbox.empty inbox_creation_level in
+    ?origination_level ?(with_histories = true)
+    ?(timestamp = Time.Protocol.epoch)
+    ?(predecessor = Tezos_crypto.Block_hash.zero) level_and_inputs =
+  let inbox =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.init ~timestamp ~predecessor inbox_creation_level
+  in
   let history =
     let capacity = if with_histories then 10000L else 0L in
     Sc_rollup.Inbox.History.empty ~capacity

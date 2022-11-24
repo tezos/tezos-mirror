@@ -175,7 +175,7 @@ module Node_inbox = struct
 
   let new_inbox level =
     {
-      inbox = Inbox.empty level;
+      inbox = Inbox.Internal_for_tests.dumb_init level;
       history = Inbox.History.empty ~capacity:10000L;
       level_tree_histories = Sc_rollup_helpers.Level_tree_histories.empty;
     }
@@ -204,7 +204,7 @@ module Node_inbox = struct
 end
 
 module Protocol_inbox = struct
-  let new_inbox level = Inbox.empty level
+  let new_inbox level = Inbox.Internal_for_tests.dumb_init level
 
   let fill_inbox inbox ~shift_level list_of_inputs =
     let open Result_syntax in
