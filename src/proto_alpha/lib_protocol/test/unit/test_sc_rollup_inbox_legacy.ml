@@ -573,27 +573,6 @@ let test_inclusion_proofs_depending_on_history_capacity
     (hp = hp' && hp = hp'')
     (err "Inclusion proofs are expected to be valid.")
 
-(** In this test, we make sure that the snapshot of an inbox is taken
-    at the beginning of a block level. *)
-let test_inbox_snapshot_taking payloads =
-  let payloads = List.map make_payload payloads in
-  let inbox = empty first_level in
-  let inbox_level = inbox_level inbox in
-  let expected_snapshot = take_snapshot inbox in
-  (* Now, if we add messages to the inbox at [current_level], the inbox's
-     snapshot for this level should not changed. *)
-  let _ =
-    add_messages_no_history inbox inbox_level payloads None
-    |> Environment.wrap_tzresult
-  in
-  let new_snapshot = take_snapshot inbox in
-  fail_unless
-    (equal_history_proof expected_snapshot new_snapshot)
-    (err
-       "Adding messages in an inbox for a level should not modify the snapshot \
-        when the current level is equal to the level where the messages are \
-        added.")
-
 (** This test checks that inboxes of the same levels that are supposed to contain
     the same messages are equal. It also check the level trees obtained from
     the last calls to add_messages are equal. *)
@@ -701,13 +680,4 @@ let tests =
          capacities"
       gen_history_params
       test_for_successive_add_messages_with_different_histories_capacities;
-    Tztest.tztest_qcheck2
-      ~count:10
-      ~name:
-        "Take snapshot is not impacted by messages added during the current \
-         level"
-      (let open QCheck2.Gen in
-      let* payloads = list_size (1 -- 10) bounded_string in
-      return payloads)
-      test_inbox_snapshot_taking;
   ]
