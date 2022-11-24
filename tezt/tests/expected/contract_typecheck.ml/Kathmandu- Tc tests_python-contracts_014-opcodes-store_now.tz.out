@@ -1,0 +1,14 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/opcodes/store_now.tz --details
+Well typed
+Gas remaining: 1039997.443 units remaining
+{ parameter unit ;
+  storage timestamp ;
+  code { DROP
+         /* [] */ ;
+         NOW
+         /* [ timestamp ] */ ;
+         NIL operation
+         /* [ list operation : timestamp ] */ ;
+         PAIR
+         /* [ pair (list operation) timestamp ] */ } }

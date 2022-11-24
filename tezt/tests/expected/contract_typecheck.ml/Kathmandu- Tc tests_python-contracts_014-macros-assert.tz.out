@@ -1,0 +1,15 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/macros/assert.tz --details
+Well typed
+Gas remaining: 1039995.213 units remaining
+{ parameter bool ;
+  storage unit ;
+  code { CAR
+         /* [ bool ] */ ;
+         ASSERT ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

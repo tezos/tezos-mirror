@@ -1,0 +1,14 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/opcodes/sender.tz --details
+Well typed
+Gas remaining: 1039997.443 units remaining
+{ parameter unit ;
+  storage address ;
+  code { DROP
+         /* [] */ ;
+         SENDER
+         /* [ address ] */ ;
+         NIL operation
+         /* [ list operation : address ] */ ;
+         PAIR
+         /* [ pair (list operation) address ] */ } }

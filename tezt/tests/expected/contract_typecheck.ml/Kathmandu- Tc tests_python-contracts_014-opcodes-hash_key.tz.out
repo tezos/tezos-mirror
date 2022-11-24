@@ -1,0 +1,16 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/opcodes/hash_key.tz --details
+Well typed
+Gas remaining: 1039996.837 units remaining
+{ parameter key ;
+  storage (option key_hash) ;
+  code { CAR
+         /* [ key ] */ ;
+         HASH_KEY
+         /* [ key_hash ] */ ;
+         SOME
+         /* [ option key_hash ] */ ;
+         NIL operation
+         /* [ list operation : option key_hash ] */ ;
+         PAIR
+         /* [ pair (list operation) (option key_hash) ] */ } }

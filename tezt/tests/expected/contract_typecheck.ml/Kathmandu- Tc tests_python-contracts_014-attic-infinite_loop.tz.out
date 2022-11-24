@@ -1,0 +1,18 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/attic/infinite_loop.tz --details
+Well typed
+Gas remaining: 1039995.465 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { DROP
+         /* [] */ ;
+         PUSH bool True
+         /* [ bool ] */ ;
+         LOOP { PUSH bool True /* [ bool ] */ }
+         /* [] */ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }
