@@ -863,6 +863,37 @@ let test_dal_node_test_post_slots _protocol parameters cryptobox _node client
        locally (current = %L, expected = %R)" ;
   unit
 
+let test_dal_node_test_patch_slots _protocol parameters cryptobox _node client
+    dal_node =
+  let failing_patch_slot_rpc slot ~slot_level ~slot_index =
+    let* response =
+      RPC.call_raw dal_node
+      @@ Rollup.Dal.RPC.patch_slot slot ~slot_level ~slot_index
+    in
+    return @@ RPC.check_string_response ~code:404 response
+  in
+  let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let* slot = Rollup.Dal.make_slot (generate_dummy_slot size) client in
+  let commitment =
+    Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
+  in
+  let* () = failing_patch_slot_rpc commitment ~slot_level:0 ~slot_index:0 in
+  let* commitment' = RPC.call dal_node (Rollup.Dal.RPC.post_slot slot) in
+  Check.(commitment' = commitment)
+    Check.string
+    ~error_msg:
+      "The commitment of a stored commitment should match the one computed \
+       locally (current = %L, expected = %R)" ;
+  let patch_slot_rpc ~slot_level ~slot_index =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.patch_slot commitment ~slot_level ~slot_index)
+  in
+  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
+  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
+  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:1 in
+  patch_slot_rpc ~slot_level:(-4) ~slot_index:3
+
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -1296,6 +1327,10 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node POST /slots"
     test_dal_node_test_post_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node PATCH /slots"
+    test_dal_node_test_patch_slots
     protocols ;
 
   (* Tests with all nodes *)
