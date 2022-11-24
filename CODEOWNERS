@@ -16,6 +16,7 @@
 # ************************************
 
 /docs/                       @NicVolanschi
+/docs/protocols/alpha.rst
 
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
