@@ -536,6 +536,10 @@ module Reader = struct
   let shutdown st = Error_monad.cancel_with_exceptions st.canceler
 end
 
+type 'msg encoded_message = bytes list
+
+let copy_encoded_message = List.map Bytes.copy
+
 module Writer = struct
   type ('msg, 'meta) t = {
     canceler : Lwt_canceler.t;
@@ -566,7 +570,7 @@ module Writer = struct
     in
     loop buf
 
-  let encode_message st msg =
+  let encode_message (st : ('msg, _) t) msg =
     match Data_encoding.Binary.to_bytes st.encoding msg with
     | Error we ->
         Result_syntax.tzfail
@@ -776,7 +780,8 @@ let write_sync {writer; _} msg =
       in
       waiter)
 
-let encode {writer; _} msg = Writer.encode_message writer msg
+let encode {writer : ('msg, _) Writer.t; _} msg =
+  Writer.encode_message writer msg
 
 let write_encoded_now {writer; _} buf =
   let open Result_syntax in

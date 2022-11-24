@@ -375,14 +375,16 @@ module Real = struct
        Ensure sent messages are actually sent.
     *)
     ignore
-    @@ let* (encoded_msg : bytes list) =
+    @@ let* encoded_msg =
          match alt with
          | None -> broadcast_encode conn buf msg
          | Some (if_conn, then_msg) ->
              if if_conn conn then broadcast_encode conn alt_buf then_msg
              else broadcast_encode conn buf msg
        in
-       P2p_conn.write_encoded_now conn (List.map Bytes.copy encoded_msg)
+       P2p_conn.write_encoded_now
+         conn
+         (P2p_socket.copy_encoded_message encoded_msg)
 
   let broadcast connections ?except ?alt msg =
     let buf = ref None in
