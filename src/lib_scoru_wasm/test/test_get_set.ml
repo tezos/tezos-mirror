@@ -195,8 +195,11 @@ let test_get_output () =
   let* tree = initialise_tree () in
   let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
   let output = Output_buffer.alloc () in
-  Output_buffer.set_level output 0l ;
-  let* () = Output_buffer.set_value output @@ Bytes.of_string "hello" in
+  Output_buffer.ensure_outbox_at_level output 0l ;
+  let* Output_buffer.{outbox_level; message_index} =
+    Output_buffer.push_message output @@ Bytes.of_string "hello"
+  in
+  assert (outbox_level = 0l && Z.equal message_index Z.zero) ;
   let buffers = Eval.{input = Input_buffer.alloc (); output} in
   let* tree =
     Tree_encoding_runner.encode

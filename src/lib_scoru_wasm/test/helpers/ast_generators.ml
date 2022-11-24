@@ -645,17 +645,17 @@ let output_info_gen =
 
 let output_buffer_gen =
   let* l = list_size (int_range 0 10) int in
-  let s =
+  let outboxes =
     List.map
       (fun _ ->
         generate1
         @@ map
              (fun a ->
-               Output_buffer.Index_Vector.(of_immutable @@ Vector.of_list a))
+               Output_buffer.Messages.(of_immutable @@ Vector.of_list a))
              (list (map Bytes.of_string string)))
       l
   in
-  return Output_buffer.Level_Vector.(of_immutable @@ Vector.of_list s)
+  return Output_buffer.Outboxes.(of_immutable @@ Vector.of_list outboxes)
 
 let label_gen ~module_reg =
   let* label_arity = option (Int32.of_int <$> small_nat) in
