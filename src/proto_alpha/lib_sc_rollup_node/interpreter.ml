@@ -253,9 +253,56 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       inbox_level
       remaining_messages
 
-  (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)] for a
-      given [tick] if this [tick] happened before [level].  Otherwise, returns
-      [None].*)
+  let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick
+      =
+    let open Lwt_result_syntax in
+    let* start_state =
+      match start_state with
+      | Some start_state
+        when Raw_level.(
+               start_state.Accounted_pvm.inbox_level = event.header.level) ->
+          return start_state
+      | _ ->
+          (* Recompute start state on level change or if we don't have a
+             starting state on hand. *)
+          start_state_of_block node_ctxt event
+    in
+    (* TODO: #3384
+       We should test that we always have enough blocks to find the tick
+       because [state_of_tick] is a critical function. *)
+    let* result_state = run_to_tick node_ctxt start_state tick in
+    let result_state = Delayed_write_monad.ignore result_state in
+    return result_state
+
+  (* The cache allows cache intermediate states of the PVM in e.g. dissections. *)
+  module Tick_state_cache =
+    Aches_lwt.Lache.Make
+      (Aches.Rache.Transfer
+         (Aches.Rache.LRU)
+         (struct
+           type t = Sc_rollup.Tick.t * Block_hash.t
+
+           let equal (t1, b1) (t2, b2) =
+             Sc_rollup.Tick.(t1 = t2) && Block_hash.(b1 = b2)
+
+           let hash (tick, block) =
+             ((Sc_rollup.Tick.to_z tick |> Z.hash) * 13) + Block_hash.hash block
+         end))
+
+  let tick_state_cache = Tick_state_cache.create 64 (* size of 2 dissections *)
+
+  (* Memoized version of [state_of_tick_aux]. *)
+  let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick
+      =
+    Tick_state_cache.bind_or_put
+      tick_state_cache
+      (tick, event.header.block_hash)
+      (fun (tick, _hash) -> state_of_tick_aux node_ctxt ~start_state event tick)
+      Lwt.return
+
+  (** [state_of_tick node_ctxt ?start_state tick level] returns [Some end_state]
+      for a given [tick] if this [tick] happened before [level]. Otherwise,
+      returns [None].*)
   let state_of_tick node_ctxt ?start_state tick level =
     let open Lwt_result_syntax in
     let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
@@ -263,22 +310,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     | None -> return_none
     | Some event ->
         assert (Raw_level.(event.header.level <= level)) ;
-        let* start_state =
-          match start_state with
-          | Some start_state
-            when Raw_level.(
-                   start_state.Accounted_pvm.inbox_level = event.header.level)
-            ->
-              return start_state
-          | _ ->
-              (* Recompute start state on level change or if we don't have a
-                 starting state on hand. *)
-              start_state_of_block node_ctxt event
+        let* result_state =
+          state_of_tick_aux node_ctxt ~start_state event tick
         in
-        (* TODO: #3384
-           We should test that we always have enough blocks to find the tick
-           because [state_of_tick] is a critical function. *)
-        let* result_state = run_to_tick node_ctxt start_state tick in
-        let result_state = Delayed_write_monad.ignore result_state in
         return_some result_state
 end
