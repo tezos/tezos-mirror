@@ -122,7 +122,9 @@ let get ~data_dir ~pvm_name ~hash =
   let filename = path data_dir pvm_name hash in
   let* contents = file_contents filename in
   let*? () =
-    let contents_hash = Reveal_hash.hash_string [contents] in
+    let contents_hash =
+      Reveal_hash.hash_string ~scheme:Reveal_hash.Blake2B [contents]
+    in
     error_unless
       (Reveal_hash.equal contents_hash hash)
       (Wrong_hash {found = contents_hash; expected = hash})
@@ -215,7 +217,7 @@ module Arith = struct
             | None -> chunk
             | Some h -> Format.asprintf "%s hash:%a" chunk Reveal_hash.pp h
           in
-          let hash = Reveal_hash.hash_string [cell] in
+          let hash = Reveal_hash.hash_string ~scheme:Blake2B [cell] in
           aux (Some hash) ((hash, cell) :: linked_chunks) rev_chunks
     in
     aux None [] rev_chunks

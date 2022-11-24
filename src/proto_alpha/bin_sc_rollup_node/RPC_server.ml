@@ -277,7 +277,9 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
           let map =
             List.fold_left
               (fun map page ->
-                let hash = Sc_rollup.Reveal_hash.hash_string [page] in
+                let hash =
+                  Sc_rollup.Reveal_hash.(hash_string ~scheme:Blake2B [page])
+                in
                 Sc_rollup.Reveal_hash.Map.add hash page map)
               Sc_rollup.Reveal_hash.Map.empty
               pages

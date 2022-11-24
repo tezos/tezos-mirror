@@ -3272,11 +3272,13 @@ module Sc_rollup : sig
   module type REVEAL_HASH = sig
     type t
 
+    type supported_hashes = Blake2B
+
     module Map : Map.S with type key = t
 
-    val size : int
+    val size : scheme:supported_hashes -> int
 
-    val zero : t
+    val zero : scheme:supported_hashes -> t
 
     val pp : Format.formatter -> t -> unit
 
@@ -3288,11 +3290,13 @@ module Sc_rollup : sig
 
     val encoding : t Data_encoding.t
 
-    val hash_string : ?key:string -> string list -> t
+    val hash_string : scheme:supported_hashes -> ?key:string -> string list -> t
 
-    val hash_bytes : ?key:bytes -> bytes list -> t
+    val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> t
 
     val to_b58check : t -> string
+
+    val scheme_of_hash : t -> supported_hashes
   end
 
   module Reveal_hash : REVEAL_HASH

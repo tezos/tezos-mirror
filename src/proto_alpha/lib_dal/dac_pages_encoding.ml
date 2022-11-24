@@ -158,7 +158,13 @@ module Merkle_tree = struct
     let hashes_version_tag = (2 * V.hashes_version) + 1
   end
 
-  module Make (Hashing_scheme : Sc_rollup.REVEAL_HASH) (V : VERSION) = struct
+  module Make (Hashing_scheme : sig
+    include Sc_rollup.REVEAL_HASH
+
+    val scheme : supported_hashes
+  end)
+  (V : VERSION) =
+  struct
     let hash bytes = Hashing_scheme.hash_bytes [bytes]
 
     let hash_encoding = Hashing_scheme.encoding
@@ -172,7 +178,7 @@ module Merkle_tree = struct
        bytes. *)
     let page_preamble_size = 5
 
-    let hash_bytes_size = Hashing_scheme.size
+    let hash_bytes_size = Hashing_scheme.size ~scheme:Hashing_scheme.scheme
 
     (** Payload pages are encoded as follows: the first byte is an integer,
         which is corresponds to either `payload_version` (for payload pages) or
@@ -286,7 +292,9 @@ module Merkle_tree = struct
            reasons. They are reversed again before the recursive tailcall
            is performed.*)
         let hashes_with_serialized_pages =
-          List.rev_map (fun page -> (hash page, page)) serialized_pages
+          List.rev_map
+            (fun page -> (hash ~scheme:Hashing_scheme.scheme page, page))
+            serialized_pages
         in
 
         let* () =
@@ -357,7 +365,11 @@ module Merkle_tree = struct
 
   module V0 =
     Make
-      (Sc_rollup.Reveal_hash)
+      (struct
+        include Sc_rollup.Reveal_hash
+
+        let scheme = Sc_rollup.Reveal_hash.Blake2B
+      end)
       (Make_version (struct
         (* Cntents_version_tag used in contents pages is 0. *)
         let contents_version = 0

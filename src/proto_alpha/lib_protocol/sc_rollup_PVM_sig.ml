@@ -203,29 +203,65 @@ module Input_hash =
     end)
 
 module type REVEAL_HASH = sig
+  (** The type of a reveal hash. *)
   type t
 
+  (** The hashing schemes supported by the reveal hash. *)
+  type supported_hashes = Blake2B
+
+  (** A Map module for storing reveal-hash-indexed values. *)
   module Map : Map.S with type key = t
 
-  val size : int
+  (** [size ~scheme] returns the size of reveal hashes using the [scheme]
+      specified in input. *)
+  val size : scheme:supported_hashes -> int
 
-  val zero : t
+  (** [zero ~scheme] returns the reveal hash corresponding to the zero hash
+      for the [scheme] specified in input. *)
+  val zero : scheme:supported_hashes -> t
 
+  (** Formatting function for reveal-hashes. *)
   val pp : Format.formatter -> t -> unit
 
+  (** [equal hash1 hash2] checks if the two reveal-hashes [hash1] and [hash2]
+      are equal. This function must preserve the equality of individual
+      supported hashing schemes. If [hash1] and [hash2] are hashes obtained
+      from the same supported hashing scheme, then the [equal] function from
+      that hashing scheme is used to determine whether they are equivalent.
+      Otherwise, they are different. *)
   val equal : t -> t -> bool
 
+  (** [compare hash1 hash2] compares the values of the reveal hashes [hash1]
+      and [hash2]. This function must preserve the ordering of individual
+      supported hashing scheme. If [hash1] and [hash2] are reveal-hashes
+      obtained from the same hashing scheme, then [compare hash1 hash2]
+      should return the same result of the compare function exposed
+      by the hash module corresponding to their hashing scheme. *)
   val compare : t -> t -> int
 
+  (* [of_b58check_opt base58_hash] returns the reveal-hash, if any,
+     whose base58 encoding is [base58_hash]. To avoid ambiguity,
+     the [S.HASH] modules supported should avoid using the same prefix
+     for the base58 encoding. *)
   val of_b58check_opt : string -> t option
 
+  (* The encoding of reveal hashes. *)
   val encoding : t Data_encoding.t
 
-  val hash_string : ?key:string -> string list -> t
+  (* [hash_string ~scheme ?key strings] hashes [strings] using the
+     supported hashing [scheme] given in input. *)
+  val hash_string : scheme:supported_hashes -> ?key:string -> string list -> t
 
-  val hash_bytes : ?key:bytes -> bytes list -> t
+  (* [hash_bytes ~scheme ?key strings] hashes [bytes] using the
+     supported hashing [scheme] given in input. *)
+  val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> t
 
+  (* [to_b58check hash] returns the base58 encoded reveal hash. *)
   val to_b58check : t -> string
+
+  (* [scheme_of_hash] hash returns the supported hashing scheme
+     that was used to obtain [hash]. *)
+  val scheme_of_hash : t -> supported_hashes
 end
 
 module Reveal_hash = struct
@@ -236,7 +272,7 @@ module Reveal_hash = struct
       Blake2B.Make
         (Base58)
         (struct
-          let name = "Sc_rollup_reveal_data_hash"
+          let name = "Sc_rollup_reveal_data_blake2b_hash"
 
           let title = "A smart contract rollup reveal hash"
 
@@ -249,23 +285,38 @@ module Reveal_hash = struct
     let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 54
   end
 
-  type t = Blake2B.t
+  type supported_hashes = Blake2B
 
-  module Map = Blake2B.Map
+  type t = Blake2B of Blake2B.t
 
-  let zero = Blake2B.zero
+  let zero ~(scheme : supported_hashes) =
+    match scheme with Blake2B -> Blake2B Blake2B.zero
 
-  let pp = Blake2B.pp
+  let pp ppf hash = match hash with Blake2B hash -> Blake2B.pp ppf hash
 
-  let equal = Blake2B.equal
+  let equal h1 h2 =
+    match (h1, h2) with Blake2B h1, Blake2B h2 -> Blake2B.equal h1 h2
 
-  let compare = Blake2B.compare
+  let compare h1 h2 =
+    match (h1, h2) with Blake2B h1, Blake2B h2 -> Blake2B.compare h1 h2
 
-  let of_b58check_opt = Blake2B.of_b58check_opt
+  module Map = Map.Make (struct
+    type tmp = t
 
-  (* Size of the hash is the size of the inner Blake2B plus one byte for the
+    type t = tmp
+
+    let compare = compare
+  end)
+
+  let of_b58check_opt b58_hash =
+    b58_hash |> Blake2B.of_b58check_opt |> Option.map (fun hash -> Blake2B hash)
+
+  (* Size of the hash is the size of the inner hash plus one byte for the
      tag used to identify the hashing scheme. *)
-  let size = Blake2B.size + 1
+  let size ~(scheme : supported_hashes) =
+    let tag_size = 1 in
+    let size_without_tag = match scheme with Blake2B -> Blake2B.size in
+    tag_size + size_without_tag
 
   let encoding =
     let open Data_encoding in
@@ -276,15 +327,21 @@ module Reveal_hash = struct
           ~title:"Reveal_data_hash_v0"
           (Tag 0)
           Blake2B.encoding
-          (fun s -> Some s)
-          (fun s -> s);
+          (fun (Blake2B s) -> Some s)
+          (fun s -> Blake2B s);
       ]
 
-  let hash_string = Blake2B.hash_string
+  let hash_string ~(scheme : supported_hashes) ?key strings =
+    match scheme with Blake2B -> Blake2B (Blake2B.hash_string ?key strings)
 
-  let hash_bytes = Blake2B.hash_bytes
+  let hash_bytes ~(scheme : supported_hashes) ?key bytes =
+    match scheme with Blake2B -> Blake2B (Blake2B.hash_bytes ?key bytes)
 
-  let to_b58check = Blake2B.to_b58check
+  let to_b58check hash =
+    match hash with Blake2B hash -> Blake2B.to_b58check hash
+
+  let scheme_of_hash hash =
+    match hash with Blake2B _hash -> (Blake2B : supported_hashes)
 end
 
 type reveal =

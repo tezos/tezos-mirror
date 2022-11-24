@@ -288,7 +288,9 @@ module V2_0_0 = struct
           | None ->
               (* In case of an invalid hash, the rollup is
                  blocked. Any commitment will be invalid. *)
-              Waiting_for_reveal (Reveal_raw_data Reveal_hash.zero))
+              Waiting_for_reveal
+                (Reveal_raw_data (Reveal_hash.zero ~scheme:Reveal_hash.Blake2B))
+          )
       | Reveal_required Wasm_2_0_0.Reveal_metadata ->
           Waiting_for_reveal Reveal_metadata
 

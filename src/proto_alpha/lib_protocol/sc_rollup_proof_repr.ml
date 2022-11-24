@@ -328,7 +328,13 @@ let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
            input request."
     | ( Some (Reveal_proof (Raw_data_proof data)),
         Needs_reveal (Reveal_raw_data expected_hash) ) ->
-        let data_hash = Sc_rollup_PVM_sig.Reveal_hash.hash_string [data] in
+        let scheme =
+          Sc_rollup_PVM_sig.Reveal_hash.scheme_of_hash expected_hash
+        in
+
+        let data_hash =
+          Sc_rollup_PVM_sig.Reveal_hash.hash_string ~scheme [data]
+        in
         check
           (Sc_rollup_PVM_sig.Reveal_hash.equal data_hash expected_hash)
           "Invalid reveal"
