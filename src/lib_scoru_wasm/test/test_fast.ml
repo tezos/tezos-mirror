@@ -26,6 +26,7 @@
 open Tztest
 open Tezos_webassembly_interpreter
 module Preimage_map = Map.Make (String)
+open Wasm_utils
 
 let apply_fast ?(images = Preimage_map.empty) counter tree =
   let open Lwt.Syntax in
@@ -299,10 +300,55 @@ let test_tx =
       in
       test_against_both ~from_binary:true ~kernel ~messages ())
 
+let test_compute_step_many_pauses_at_snapshot_when_flag_set =
+  Wasm_utils.test_with_kernel "computation" (fun kernel ->
+      let open Lwt_result_syntax in
+      let module Builtins = struct
+        let reveal_preimage _ =
+          Stdlib.failwith "reveal_preimage is not available"
+
+        let reveal_metadata () =
+          Stdlib.failwith "reveal_metadata is not available"
+      end in
+      let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
+      let*! initial_tree =
+        Wasm_utils.initial_tree ~max_tick:Int64.max_int ~from_binary:true kernel
+      in
+      (* Supply input messages manually in order to have full control over tick_state we are in *)
+      let*! tree = Wasm_utils.set_sol_input 0l initial_tree in
+      let*! tree = Wasm_utils.set_internal_message 0l Z.one "message" tree in
+      let*! tree = Wasm_utils.set_eol_input 0l (Z.of_int 2) tree in
+
+      let*! tick_state = Wasm.Internal_for_tests.get_tick_state tree in
+      (* Check precondition that we are not in Snapshot *)
+      assert (tick_state == Padding) ;
+      let*! fast_tree, _ =
+        Wasm_utils.Wasm_fast.compute_step_many
+          ~builtins
+          ~stop_at_snapshot:true
+          ~max_steps:Int64.max_int
+          tree
+      in
+      let*! slow_tree, _ =
+        Wasm_utils.Wasm.compute_step_many
+          ~builtins
+          ~stop_at_snapshot:true
+          ~max_steps:Int64.max_int
+          tree
+      in
+      let hash_fast = Tezos_context_memory.Context_binary.Tree.hash fast_tree in
+      let hash_slow = Tezos_context_memory.Context_binary.Tree.hash slow_tree in
+      assert (Tezos_crypto.Context_hash.equal hash_fast hash_slow) ;
+      return ())
+
 let tests =
   [
     tztest "Computation kernel" `Quick test_computation;
     tztest "Store read/write kernel" `Quick test_store_read_write;
     tztest "Reveal_preimage kernel" `Quick test_reveal_preimage;
     tztest "TX kernel" `Quick test_tx;
+    tztest
+      "compute_step_many pauses at snapshot"
+      `Quick
+      test_compute_step_many_pauses_at_snapshot_when_flag_set;
   ]
