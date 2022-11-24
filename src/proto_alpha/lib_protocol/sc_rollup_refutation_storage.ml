@@ -287,6 +287,18 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   in
   return ctxt
 
+let check_stakes ctxt rollup (stakers : Sc_rollup_game_repr.Index.t) =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr in
+  let* alice_stake, ctxt = Stake_storage.is_staker ctxt rollup stakers.alice in
+  let* bob_stake, ctxt = Stake_storage.is_staker ctxt rollup stakers.bob in
+  let game_over loser = Loser {loser; reason = Conflict_resolved} in
+  match (alice_stake, bob_stake) with
+  | true, true -> return (None, ctxt)
+  | false, true -> return (Some (game_over stakers.alice), ctxt)
+  | true, false -> return (Some (game_over stakers.bob), ctxt)
+  | false, false -> return (Some Draw, ctxt)
+
 let game_move ctxt rollup ~player ~opponent refutation =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make player opponent in
@@ -301,26 +313,33 @@ let game_move ctxt rollup ~player ~opponent refutation =
   in
   let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
   let dal = (Constants_storage.parametric ctxt).dal in
-  let play_cost = Sc_rollup_game_repr.cost_play game refutation in
-  let*? ctxt = Raw_context.consume_gas ctxt play_cost in
-  let* move_result =
-    Sc_rollup_game_repr.play
-      kind
-      dal.cryptobox_parameters
-      ~dal_attestation_lag:dal.attestation_lag
-      ~stakers
-      metadata
-      game
-      refutation
-  in
-  match move_result with
-  | Either.Left game_result -> return (Some game_result, ctxt)
-  | Either.Right new_game ->
-      let* ctxt, _ =
-        Store.Game.update ((ctxt, rollup), stakers.alice) stakers.bob new_game
+  let* check_result, ctxt = check_stakes ctxt rollup stakers in
+  match check_result with
+  | Some game_result -> return (Some game_result, ctxt)
+  | None -> (
+      let play_cost = Sc_rollup_game_repr.cost_play game refutation in
+      let*? ctxt = Raw_context.consume_gas ctxt play_cost in
+      let* move_result =
+        Sc_rollup_game_repr.play
+          kind
+          dal.cryptobox_parameters
+          ~dal_attestation_lag:dal.attestation_lag
+          ~stakers
+          metadata
+          game
+          refutation
       in
-      let* ctxt = update_timeout ctxt rollup game stakers in
-      return (None, ctxt)
+      match move_result with
+      | Either.Left game_result -> return (Some game_result, ctxt)
+      | Either.Right new_game ->
+          let* ctxt, _ =
+            Store.Game.update
+              ((ctxt, rollup), stakers.alice)
+              stakers.bob
+              new_game
+          in
+          let* ctxt = update_timeout ctxt rollup game stakers in
+          return (None, ctxt))
 
 let get_timeout ctxt rollup stakers =
   let open Lwt_result_syntax in
