@@ -93,16 +93,19 @@ let () =
     (fun (inbox_level, ours, on_l1) ->
       Disagree_with_cemented {inbox_level; ours; on_l1}) ;
 
+  let description =
+    "Internal error: The game invariant states that the dissection from the \
+     opponent must contain a tick we disagree with. If the retrieved game does \
+     not respect this, we cannot trust the Tezos node we are connected to and \
+     prefer to stop here."
+  in
   register_error_kind
     `Permanent
     ~id:"internal.unreliable_tezos_node"
     ~title:"Internal error: Tezos node seems unreliable"
-    ~description:
-      "Internal error: The game invariant states that the dissection from the \
-       opponent must contain a tick we disagree with. If the retrieved game \
-       does not respect this, we cannot trust the Tezos node we are connected \
-       to and prefer to stop here."
-    ~pp:(fun _ppf () -> ())
+    ~description
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Unreliable Tezos node. %s" description)
     Data_encoding.unit
     (function
       | Unreliable_tezos_node_returning_inconsistent_game -> Some () | _ -> None)

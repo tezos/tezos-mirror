@@ -94,6 +94,10 @@ val is_operator : _ t -> Tezos_crypto.Signature.Public_key_hash.t -> bool
     mode.  *)
 val is_accuser : _ t -> bool
 
+(** [is_loser node_ctxt] returns [true] if the rollup node runs has some
+    failures planned. *)
+val is_loser : _ t -> bool
+
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
     configured for this purpose, returns the default fee parameter for this
