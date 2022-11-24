@@ -94,7 +94,7 @@ let bls12_381_signature =
   external_lib ~js_compatible:true "bls12-381-signature" version
 
 let bls12_381_polynomial =
-  let version = V.(at_least "0.1.3" && less_than "1.0.0") in
+  let version = V.(at_least "1.0.1" && less_than "2.0.0") in
   external_lib ~js_compatible:false "tezos-bls12-381-polynomial" version
 
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
@@ -258,9 +258,9 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
 let plompiler =
-  external_lib "tezos-plompiler" V.(at_least "0.1.3" && less_than "1.0.0")
+  external_lib "tezos-plompiler" V.(at_least "1.0.1" && less_than "2.0.0")
 
-let plonk = external_lib "tezos-plonk" V.(at_least "0.1.3" && less_than "1.0.0")
+let plonk = external_lib "tezos-plonk" V.(at_least "1.0.1" && less_than "2.0.0")
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
