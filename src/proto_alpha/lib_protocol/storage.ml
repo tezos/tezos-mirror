@@ -1628,6 +1628,14 @@ module Sc_rollup = struct
           key ->
           value option ->
           (Raw_context.t * int * bool) tzresult Lwt.t
+
+        val is_empty : context -> bool Lwt.t
+
+        val list_key_values :
+          ?offset:int ->
+          ?length:int ->
+          context ->
+          (Raw_context.t * (key * value) list) tzresult Lwt.t
       end) =
   struct
     include Data_storage
@@ -1653,6 +1661,14 @@ module Sc_rollup = struct
 
     let add_or_remove ctxt key value =
       add_or_remove ctxt key (Option.map Versioned_value.to_versioned value)
+
+    let list_key_values ?offset ?length ctxt =
+      let open Lwt_result_syntax in
+      let* ctxt, values = list_key_values ?offset ?length ctxt in
+      let values =
+        List.map (fun (k, v) -> (k, Versioned_value.of_versioned v)) values
+      in
+      return (ctxt, values)
   end
 
   module PVM_kind =
@@ -1837,20 +1853,34 @@ module Sc_rollup = struct
         let encoding = Raw_level_repr.encoding
       end)
 
-  module Game_versioned =
-    Make_indexed_carbonated_data_storage
+  module Games_per_staker =
+    Make_indexed_subcontext
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
            let name = ["game"]
          end))
-         (Make_index (Sc_rollup_game_repr.Index))
+         (Public_key_hash_index)
+
+  module Game_versioned =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Games_per_staker.Raw_context)
+         (struct
+           let name = ["opponents"]
+         end))
+         (Public_key_hash_index)
       (struct
         type t = Sc_rollup_game_repr.versioned
 
         let encoding = Sc_rollup_game_repr.versioned_encoding
       end)
 
-  module Game = struct
+  module Game :
+    Indexed_carbonated_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Sc_rollup_game_repr.t
+       and type t =
+        (Raw_context.t * Sc_rollup_repr.t) * Signature.Public_key_hash.t =
+  struct
     include Game_versioned
     include Make_versioned (Sc_rollup_game_repr) (Game_versioned)
   end
@@ -1866,19 +1896,6 @@ module Sc_rollup = struct
         type t = Sc_rollup_game_repr.timeout
 
         let encoding = Sc_rollup_game_repr.timeout_encoding
-      end)
-
-  module Opponent =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["opponent"]
-         end))
-         (Public_key_hash_index)
-      (struct
-        type t = Sc_rollup_repr.Staker.t
-
-        let encoding = Sc_rollup_repr.Staker.encoding
       end)
 
   (** An index used for a SCORU's outbox levels. An outbox level is mapped to

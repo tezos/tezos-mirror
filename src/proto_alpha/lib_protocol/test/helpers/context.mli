@@ -270,14 +270,14 @@ module Sc_rollup : sig
     * Tezos_crypto.Signature.Public_key_hash.t ->
     Sc_rollup.Game.timeout option tzresult Lwt.t
 
-  val ongoing_game_for_staker :
+  val ongoing_games_for_staker :
     t ->
     Sc_rollup.t ->
     Tezos_crypto.Signature.public_key_hash ->
     (Sc_rollup.Game.t
     * Tezos_crypto.Signature.public_key_hash
     * Tezos_crypto.Signature.public_key_hash)
-    option
+    list
     tzresult
     Lwt.t
 end

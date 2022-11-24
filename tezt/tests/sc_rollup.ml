@@ -2974,13 +2974,14 @@ let test_forking_scenario ~kind ~variant scenario =
 let cement_commitments client sc_rollup ?fail =
   Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
 
-let timeout ?expect_failure ~sc_rollup ~staker client =
+let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 client =
   let*! () =
     Client.Sc_rollup.timeout
       ~hooks
       ~dst:sc_rollup
       ~src:"bootstrap1"
-      ~staker
+      ~staker1
+      ~staker2
       client
       ?expect_failure
   in
@@ -3041,7 +3042,13 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
     repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
   in
   (* He even timeout himself, what a shame. *)
-  let* () = timeout ~sc_rollup ~staker:operator1.public_key_hash client in
+  let* () =
+    timeout
+      ~sc_rollup
+      ~staker1:operator1.public_key_hash
+      ~staker2:operator2.public_key_hash
+      client
+  in
   (* Attempting to cement defeated branch will fail. *)
   let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
   (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
@@ -3148,7 +3155,11 @@ let test_timeout =
   let* () =
     repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
   in
-  timeout ~sc_rollup ~staker:operator1.public_key_hash client
+  timeout
+    ~sc_rollup
+    ~staker1:operator1.public_key_hash
+    ~staker2:operator2.public_key_hash
+    client
 
 (* Testing rollup node catch up mechanism
    --------------------------------------
@@ -3290,7 +3301,13 @@ let test_refutation_reward_and_punishment ~kind =
   let* () =
     repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
   in
-  let* () = timeout ~sc_rollup ~staker:operator2.public_key_hash client in
+  let* () =
+    timeout
+      ~sc_rollup
+      ~staker1:operator2.public_key_hash
+      ~staker2:operator1.public_key_hash
+      client
+  in
 
   (* The game should have now ended. *)
 

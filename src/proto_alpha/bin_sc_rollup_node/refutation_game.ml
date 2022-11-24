@@ -435,9 +435,9 @@ module Make (Interpreter : Interpreter.S) :
         in
         unless timeout_reached @@ fun () -> play_timeout node_ctxt self index
 
-  let ongoing_game head_block node_ctxt self =
+  let ongoing_games head_block node_ctxt self =
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    Plugin.RPC.Sc_rollup.ongoing_refutation_game
+    Plugin.RPC.Sc_rollup.ongoing_refutation_games
       cctxt
       (cctxt#chain, head_block)
       rollup_address
@@ -485,9 +485,16 @@ module Make (Interpreter : Interpreter.S) :
         (* Not injecting refutations, don't play refutation games *)
         return_unit
     | Some self -> (
-        let* res = ongoing_game head_block node_ctxt self in
+        (* FIXME:
+           This is invalid in general because the rollup node
+           needs to continue playing the game it has started. That's
+           valid at this commit level since only one game is allowed
+           to be played. We will come back on this in a further commit
+           of this MR.
+        *)
+        let* res = ongoing_games head_block node_ctxt self in
         match res with
-        | Some (game, staker1, staker2) ->
+        | (game, staker1, staker2) :: _ ->
             play head_block node_ctxt self game staker1 staker2
-        | None -> start_game_if_conflict head_block node_ctxt self)
+        | [] -> start_game_if_conflict head_block node_ctxt self)
 end

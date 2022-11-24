@@ -33,13 +33,14 @@ type point = {
 
 type conflict_point = point * point
 
-(** [get_ongoing_game_for_staker ctxt rollup staker] returns [Some game] if [staker]
-    is currently playing a refutation game in the [rollup]. *)
-val get_ongoing_game_for_staker :
+(** [get_ongoing_games_for_staker ctxt rollup staker] returns [games],
+   the list of refutation games currently played by [staker] in the
+   [rollup]. *)
+val get_ongoing_games_for_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
-  ((Sc_rollup_game_repr.t * Sc_rollup_game_repr.Index.t) option * Raw_context.t)
+  ((Sc_rollup_game_repr.t * Sc_rollup_game_repr.Index.t) list * Raw_context.t)
   tzresult
   Lwt.t
 
