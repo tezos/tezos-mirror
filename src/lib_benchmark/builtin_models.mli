@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,41 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Private module for internal benchmarks *)
+val ns : Namespace.cons
 
-(* A "benchmark" for the timer itself. *)
+val fv : string -> Free_variable.t
 
-let ns = Builtin_models.ns
-
-module Timer_latency_bench : Benchmark.S = struct
-  type config = unit
-
-  let default_config = ()
-
-  let config_encoding = Data_encoding.unit
-
-  let name = ns "TIMER_LATENCY"
-
-  let info = "Measuring timer latency"
-
-  let tags = ["misc"; "builtin"]
-
-  let models = [("*", Model.(make ~conv:(fun () -> ()) ~model:Model.zero))]
-
-  let workload_to_vector () = Sparse_vec.String.of_list [("timer_latency", 1.)]
-
-  type workload = unit
-
-  let workload_encoding = Data_encoding.unit
-
-  let bench () =
-    let closure () = () in
-    let workload = () in
-    Generator.Plain {workload; closure}
-
-  let create_benchmarks ~rng_state ~bench_num () =
-    ignore rng_state ;
-    List.repeat bench_num bench
-end
-
-let () = Registration.register (module Timer_latency_bench)
+val timer_model : unit Model.t

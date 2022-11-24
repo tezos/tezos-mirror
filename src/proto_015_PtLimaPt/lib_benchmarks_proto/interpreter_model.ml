@@ -519,19 +519,15 @@ let interpreter_model ?amplification ?specialization () =
         type t = X.size X.repr
 
         let applied =
-          let (module Timer_applied) =
-            Model.apply Tezos_benchmark.Builtin_models.timer_model ()
-          in
-          let module Timer_result = Timer_applied (X) in
           let initial =
             match amplification with
-            | None -> Timer_result.applied
+            | None -> X.int 0
             | Some amplification_factor ->
                 let (module Amplification_applied) =
                   Model.apply amplification_loop_model amplification_factor
                 in
                 let module Amplification_result = Amplification_applied (X) in
-                X.(Timer_result.applied + Amplification_result.applied)
+                Amplification_result.applied
           in
           List.fold_left
             (fun (acc : X.size X.repr) instr_trace ->

@@ -26,4 +26,5 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix)
+ (private_modules builtin_models builtin_benchmarks)
  (foreign_stubs (language c) (flags (:standard)) (names snoop_stubs)))
