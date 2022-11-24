@@ -88,6 +88,8 @@ module type S = sig
 
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
+  val drop : 'a t -> 'a t
+
   val pop : 'a t -> ('a * 'a t) Lwt.t
 
   val prepend_list : 'a list -> 'a t -> 'a t
@@ -202,17 +204,25 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     in
     (map, num_elements)
 
+  (* This version of drop simply doesn't check for bounds, but is used in
+     functions actually checking the bounds, to prevent doing it twice. *)
+  let unsafe_drop map =
+    let values = Map.remove map.first map.values in
+    {
+      first = Key.succ map.first;
+      num_elements = Key.pred map.num_elements;
+      values;
+    }
+
+  let drop map =
+    if Key.(unsigned_compare zero map.num_elements < 0) then unsafe_drop map
+    else raise Bounds
+
   let pop map =
     let open Lwt.Syntax in
     if Key.(unsigned_compare zero map.num_elements < 0) then
       let+ x = get Key.zero map in
-      let values = Map.remove map.first map.values in
-      ( x,
-        {
-          first = Key.succ map.first;
-          num_elements = Key.pred map.num_elements;
-          values;
-        } )
+      (x, unsafe_drop map)
     else raise Bounds
 
   let append elt map = append_opt (Some elt) map
@@ -304,6 +314,8 @@ module Mutable = struct
 
     val cons : 'a -> 'a t -> unit
 
+    val drop : 'a t -> unit
+
     val pop : 'a t -> 'a Lwt.t
 
     val reset : 'a t -> unit
@@ -341,6 +353,8 @@ module Mutable = struct
       i
 
     let cons a map_ref = map_ref := Vector.cons a !map_ref
+
+    let drop map_ref = map_ref := Vector.drop !map_ref
 
     let pop map_ref =
       let open Lwt.Syntax in

@@ -155,6 +155,12 @@ module type S = sig
       large. *)
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
+  (** [drop vector] removes the head from [vector] without returning it. It
+      doesn't read the value before removing it.
+
+      @raise Bounds when applied on an empty vector. *)
+  val drop : 'a t -> 'a t
+
   (** [pop vector] removes the head from [vector], and returns it.
 
       @raise Bounds when applied on an empty vector. *)
@@ -243,6 +249,8 @@ module Mutable : sig
     val append : 'a -> 'a t -> key
 
     val cons : 'a -> 'a t -> unit
+
+    val drop : 'a t -> unit
 
     val pop : 'a t -> 'a Lwt.t
 
