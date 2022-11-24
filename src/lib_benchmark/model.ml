@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Specifying model arity and eliminator type *)
 type (_, _, _) arity =
   | Zero_arity : ('elt, 'elt, unit) arity
   | Succ_arity : ('elt, 'b, 'a) arity -> ('elt, 'elt -> 'b, int * 'a) arity
@@ -36,20 +35,6 @@ let arity_2 = Succ_arity arity_1
 
 let arity_3 = Succ_arity arity_2
 
-type ('a, 'b) eq = Eq : ('a, 'a) eq
-
-let rec elim_arities :
-    type elt m1 m2 a. (elt, m1, a) arity -> (elt, m2, a) arity -> (m1, m2) eq =
-  fun (type elt m1 m2 a) (ar1 : (elt, m1, a) arity) (ar2 : (elt, m2, a) arity) ->
-   match (ar1, ar2) with
-   | Zero_arity, Zero_arity -> (Eq : (m1, m2) eq)
-   | Succ_arity a1, Succ_arity a2 -> (
-       match elim_arities a1 a2 with Eq -> (Eq : (m1, m2) eq))
-   | _ -> .
-
-(** Models are strongly typed: [Model_impl.arg_type] exposes what a model
-    expects on input. The relation between [arg_type] and [model_type]
-    is encoded through a value of type [arity]. *)
 module type Model_impl = sig
   type arg_type
 
@@ -91,6 +76,8 @@ module type Applied = functor (X : Costlang.S) ->
 
 type applied = (module Applied)
 
+type packed_model = Model : _ model -> packed_model
+
 type _ t =
   | Abstract : {conv : 'workload -> 'arg; model : 'arg model} -> 'workload t
   | Aggregate : {
@@ -98,8 +85,6 @@ type _ t =
       sub_models : packed_model list;
     }
       -> 'workload t
-
-and packed_model = Model : _ model -> packed_model
 
 let apply_model : 'arg -> 'arg model -> applied =
   fun (type e) (elim : e) ((module Impl) : e model) ->
@@ -234,24 +219,6 @@ let unknown_const1 ~name ~const =
   end in
   (module M : Model_impl with type arg_type = unit)
 
-let unknown_const2 ~name ~const1 ~const2 =
-  let module M = struct
-    type arg_type = unit
-
-    let name = name
-
-    module Def (X : Costlang.S) = struct
-      open X
-
-      type model_type = size
-
-      let arity = arity_0
-
-      let model = free ~name:const1 + free ~name:const2
-    end
-  end in
-  (module M : Model_impl with type arg_type = unit)
-
 let linear ~name ~coeff =
   let module M = struct
     type arg_type = int * unit
@@ -286,26 +253,6 @@ let affine ~name ~intercept ~coeff =
       let model =
         lam ~name:"size" @@ fun size ->
         free ~name:intercept + (free ~name:coeff * size)
-    end
-  end in
-  (module M : Model_impl with type arg_type = int * unit)
-
-let affine_split_const ~name ~intercept1 ~intercept2 ~coeff =
-  let module M = struct
-    type arg_type = int * unit
-
-    let name = name
-
-    module Def (X : Costlang.S) = struct
-      open X
-
-      type model_type = size -> size
-
-      let arity = arity_1
-
-      let model =
-        lam ~name:"size" @@ fun size ->
-        free ~name:intercept1 + free ~name:intercept2 + (free ~name:coeff * size)
     end
   end in
   (module M : Model_impl with type arg_type = int * unit)
@@ -365,27 +312,6 @@ let nsqrtn_const ~name ~intercept ~coeff =
       let model =
         lam ~name:"size" @@ fun size ->
         free ~name:intercept + (free ~name:coeff * (size * sqrt size))
-    end
-  end in
-  (module M : Model_impl with type arg_type = int * unit)
-
-let nsqrtn_split_const ~name ~intercept1 ~intercept2 ~coeff =
-  let module M = struct
-    type arg_type = int * unit
-
-    let name = name
-
-    module Def (X : Costlang.S) = struct
-      open X
-
-      type model_type = size -> size
-
-      let arity = arity_1
-
-      let model =
-        lam ~name:"size" @@ fun size ->
-        free ~name:intercept1 + free ~name:intercept2
-        + (free ~name:coeff * (size * sqrt size))
     end
   end in
   (module M : Model_impl with type arg_type = int * unit)
@@ -606,8 +532,6 @@ let trilinear ~name ~coeff1 ~coeff2 ~coeff3 =
   end in
   (module M : Model_impl with type arg_type = int * (int * (int * unit)))
 
-(** A multi-affine model in two parts. The breakpoint [break] indicates the
-    point at which the slope changes coefficient. *)
 let breakdown ~name ~coeff1 ~coeff2 ~break =
   assert (0 <= break) ;
 
@@ -631,9 +555,6 @@ let breakdown ~name ~coeff1 ~coeff2 ~break =
   end in
   (module M : Model_impl with type arg_type = int * unit)
 
-(** A multi-affine model in three parts, with breakpoints [break1] and [break2].
-    Expects [break1] <= [break2]
- *)
 let breakdown2 ~name ~coeff1 ~coeff2 ~coeff3 ~break1 ~break2 =
   assert (0 <= break1 && break1 <= break2) ;
   let module M = struct
@@ -657,7 +578,6 @@ let breakdown2 ~name ~coeff1 ~coeff2 ~coeff3 ~break1 ~break2 =
   end in
   (module M : Model_impl with type arg_type = int * unit)
 
-(** [breakdown2] with a non-zero value at 0 *)
 let breakdown2_const ~name ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2 =
   assert (0 <= break1 && break1 <= break2) ;
   let module M = struct
