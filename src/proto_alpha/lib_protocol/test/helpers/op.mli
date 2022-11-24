@@ -47,39 +47,66 @@ val pack_operation :
 val sign :
   ?watermark:Tezos_crypto.Signature.watermark ->
   Tezos_crypto.Signature.secret_key ->
-  Context.t ->
+  Tezos_crypto.Block_hash.t ->
   packed_contents_list ->
   packed_operation
 
-val endorsement :
-  ?delegate:public_key_hash * Slot.t list ->
+(** Create an unpacked endorsement that is expected for given [Block.t].
+
+    Optional parameters allow to specify the endorsed values: [level],
+    [round] and/or [block_payload_hash].
+
+    They also allow to specify the endorser, [delegate], and/or the
+    [slot].
+
+    Finally, the predecessor branch, [pred_branch] can be specified.*)
+val raw_endorsement :
+  ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  ?signing_context:Context.t ->
-  unit ->
+  ?pred_branch:Tezos_crypto.Block_hash.t ->
+  Block.t ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
-val preendorsement :
-  ?delegate:public_key_hash * Slot.t list ->
+(** Create an unpacked preendorsement that is expected for a given
+    [Block.t].
+
+    Optional parameters are the same than {!raw_endorsement}. *)
+val raw_preendorsement :
+  ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  ?signing_context:Context.t ->
-  unit ->
+  ?pred_branch:Tezos_crypto.Block_hash.t ->
+  Block.t ->
   Kind.preendorsement Operation.t tzresult Lwt.t
 
-val miss_signed_endorsement :
+(** Create a packed endorsement that is expected for a given
+    [Block.t] by packing the result of {!raw_endorsement}. *)
+val endorsement :
+  ?delegate:public_key_hash ->
+  ?slot:Slot.t ->
   ?level:Raw_level.t ->
-  endorsed_block:Block.t ->
-  Context.t ->
-  Kind.endorsement Operation.t tzresult Lwt.t
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?pred_branch:Tezos_crypto.Block_hash.t ->
+  Block.t ->
+  Operation.packed tzresult Lwt.t
+
+(** Create a packed preendorsement that is expected for a given
+    [Block.t] by packing the result of {!raw_preendorsement}. *)
+val preendorsement :
+  ?delegate:public_key_hash ->
+  ?slot:Slot.t ->
+  ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?pred_branch:Tezos_crypto.Block_hash.t ->
+  Block.t ->
+  Operation.packed tzresult Lwt.t
 
 type gas_limit =
   | Max  (** Max corresponds to the [max_gas_limit_per_operation] constant. *)

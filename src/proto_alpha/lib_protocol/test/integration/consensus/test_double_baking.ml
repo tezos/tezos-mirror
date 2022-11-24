@@ -120,13 +120,11 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
     if Tezos_crypto.Signature.Public_key_hash.( = ) e1.delegate baker1 then
-      (e1.delegate, e1.slots)
-    else (e2.delegate, e2.slots)
+      e1.delegate
+    else e2.delegate
   in
-  Op.endorsement ~delegate ~endorsed_block:blk_a (B b) ()
-  >>=? fun endorsement_a ->
-  Op.endorsement ~delegate ~endorsed_block:blk_b (B b) ()
-  >>=? fun endorsement_b ->
+  Op.raw_endorsement ~delegate blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement ~delegate blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   >>=? fun blk_final ->
@@ -169,13 +167,11 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
     if Tezos_crypto.Signature.Public_key_hash.( = ) e1.delegate baker1 then
-      (e1.delegate, e1.slots)
-    else (e2.delegate, e2.slots)
+      e1.delegate
+    else e2.delegate
   in
-  Op.endorsement ~delegate ~endorsed_block:blk_a (B blk_1) ()
-  >>=? fun endorsement_a ->
-  Op.endorsement ~delegate ~endorsed_block:blk_b (B blk_2) ()
-  >>=? fun endorsement_b ->
+  Op.raw_endorsement ~delegate blk_a >>=? fun endorsement_a ->
+  Op.raw_endorsement ~delegate blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_a
   >>=? fun blk_with_de_evidence ->
@@ -233,13 +229,8 @@ let test_payload_producer_gets_evidence_rewards () =
     endorsers
   >>=? fun preendorsers ->
   List.map_ep
-    (fun endorser ->
-      Op.preendorsement
-        ~delegate:endorser
-        ~endorsed_block:b_with_evidence
-        (B b1)
-        ()
-      >|=? Operation.pack)
+    (fun (endorser, _slots) ->
+      Op.preendorsement ~delegate:endorser b_with_evidence)
     preendorsers
   >>=? fun preendos ->
   Block.bake
