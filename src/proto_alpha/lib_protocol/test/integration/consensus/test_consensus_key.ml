@@ -185,8 +185,27 @@ let test_tz4_consensus_key () =
   let consensus_pkh = consensus_account.pkh in
   transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
   >>=? fun blk' ->
-  update_consensus_key blk' delegate consensus_pk >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Consensus key cannot be a tz4"
+  Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
+  >>=? fun operation ->
+  let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
+      ]
+      when Tezos_crypto.Bls.Public_key.(pk = tz4_pk) ->
+        return_unit
+    | err ->
+        failwith
+          "Error trace:@,\
+          \ %a does not match the \
+           [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
+          Error_monad.pp_print_trace
+          err
+  in
+  Incremental.begin_construction blk' >>=? fun inc ->
+  Incremental.validate_operation ~expect_failure inc operation
+  >>=? fun (_i : Incremental.t) -> return_unit
 
 let test_endorsement_with_consensus_key () =
   Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->

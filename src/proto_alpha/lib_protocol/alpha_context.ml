@@ -513,6 +513,8 @@ module Delegate = struct
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 
+  let check_not_tz4 = Contract_delegate_storage.check_not_tz4
+
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
 
   let deactivated = Delegate_activation_storage.is_inactive
