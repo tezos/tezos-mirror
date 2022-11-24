@@ -3669,22 +3669,16 @@ val bool : bool encoding
       [length_kind] parameter (default [`Uint30]).
     - in JSON when [string_json_repr = Plain], encoded as a string
     - in JSON when [string_json_repr = Hex],  encoded via hex. *)
-val string' :
+val string :
   ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
   string_json_repr ->
   string encoding
 
-(** Encoding of arbitrary bytes. See [string'] *)
-val bytes' :
+(** Encoding of arbitrary bytes. See [string] *)
+val bytes :
   ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
   string_json_repr ->
   Bytes.t encoding
-
-(** same as [string' Plain] *)
-val string : string encoding
-
-(** same as [bytes' Hex] *)
-val bytes : Bytes.t encoding
 
 (** {3 Descriptor combinators} *)
 
@@ -4333,16 +4327,10 @@ val string_enum : (string * 'a) list -> 'a encoding
     See the preamble for an explanation. *)
 module Fixed : sig
   (** @raise Invalid_argument if the argument is less or equal to zero. *)
-  val string : int -> string encoding
+  val string : string_json_repr -> int -> string encoding
 
   (** @raise Invalid_argument if the argument is less or equal to zero. *)
-  val string' : string_json_repr -> int -> string encoding
-
-  (** @raise Invalid_argument if the argument is less or equal to zero. *)
-  val bytes : int -> Bytes.t encoding
-
-  (** @raise Invalid_argument if the argument is less or equal to zero. *)
-  val bytes' : string_json_repr -> int -> Bytes.t encoding
+  val bytes : string_json_repr -> int -> Bytes.t encoding
 
   (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
       there are [n] null bytes ([\000]) added after the value encoded by [e].
@@ -4422,13 +4410,9 @@ end
 (** Create encodings that produce data of a variable length when binary encoded.
     See the preamble for an explanation. *)
 module Variable : sig
-  val string : string encoding
+  val string : string_json_repr -> string encoding
 
-  val string' : string_json_repr -> string encoding
-
-  val bytes : Bytes.t encoding
-
-  val bytes' : string_json_repr -> Bytes.t encoding
+  val bytes : string_json_repr -> Bytes.t encoding
 
   (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
@@ -4453,28 +4437,22 @@ module Bounded : sig
 
       @raise Invalid_argument if [length_kind] is set but it cannot accommodate
       the specified bound. E.g.,
-      [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
+      [Bounded.string ~length_kind:`Uint8 Hex 1000] raises.
 
       @raise Invalid_argument if [length_kind] is unset and the specified
       bound is larger than 2^30. *)
-  val string' :
+  val string :
     ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
     string_json_repr ->
     int ->
     string encoding
 
-  (** Same as [string' Plain] *)
-  val string : int -> string encoding
-
-  (** See {!string'} above. *)
-  val bytes' :
+  (** See {!string} above. *)
+  val bytes :
     ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
     string_json_repr ->
     int ->
     Bytes.t encoding
-
-  (** Same as [bytes' Hex] *)
-  val bytes : int -> Bytes.t encoding
 end
 
 (** Mark an encoding as being of dynamic size.

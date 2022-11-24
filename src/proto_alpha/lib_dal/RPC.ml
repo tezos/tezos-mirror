@@ -39,7 +39,7 @@ module DAC = struct
       RPC_service.put_service
         ~description:"Split DAC reveal data"
         ~query:RPC_query.empty
-        ~input:Data_encoding.bytes
+        ~input:Data_encoding.(bytes Hex)
         ~output:Hashing_scheme.hash_encoding
         RPC_path.(open_root / "dac" / "store_preimage")
   end

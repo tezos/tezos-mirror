@@ -41,7 +41,7 @@ let () =
         Z.pp_print
         amount
         ticketer)
-    (obj2 (req "ticketer" string) (req "amount" z))
+    (obj2 (req "ticketer" (string Plain)) (req "amount" z))
     (function
       | Invalid_ticket_transfer {ticketer; amount} -> Some (ticketer, amount)
       | _ -> None)

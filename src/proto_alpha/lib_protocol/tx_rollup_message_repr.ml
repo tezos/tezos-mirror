@@ -55,7 +55,7 @@ let encoding =
       case
         (Tag 0)
         ~title:"Batch"
-        (obj1 (req "batch" (string' Hex)))
+        (obj1 (req "batch" (string Hex)))
         (function Batch batch -> Some batch | _ -> None)
         (fun batch -> Batch batch);
       case

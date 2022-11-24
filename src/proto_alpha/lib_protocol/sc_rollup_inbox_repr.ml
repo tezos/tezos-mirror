@@ -77,7 +77,7 @@ let () =
       "Internal error: error occurred during proof production or validation"
     ~description:"An inbox proof error."
     ~pp:(fun ppf e -> Format.fprintf ppf "Inbox proof error: %s" e)
-    (obj1 (req "error" string))
+    (obj1 (req "error" (string Plain)))
     (function Inbox_proof_error e -> Some e | _ -> None)
     (fun e -> Inbox_proof_error e) ;
 
@@ -343,7 +343,7 @@ let to_versioned inbox = V1 inbox [@@inline]
 
 type serialized_proof = string
 
-let serialized_proof_encoding = Data_encoding.(string' Hex)
+let serialized_proof_encoding = Data_encoding.(string Hex)
 
 type level_tree_proof = {
   proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
@@ -364,7 +364,7 @@ let level_tree_proof_encoding =
        (req
           "proof"
           Sc_rollup_inbox_merkelized_payload_hashes_repr.proof_encoding)
-       (opt "payload" string))
+       (opt "payload" (string Plain)))
 
 let add_message inbox payload level_tree_history level_tree =
   let open Result_syntax in

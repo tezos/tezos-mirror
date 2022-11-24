@@ -128,7 +128,7 @@ let () =
     ~pp:(fun ppf x ->
       Format.fprintf ppf "Invalid smart contract rollup address %S" x)
     ~description:error_description
-    (obj1 (req "address" string))
+    (obj1 (req "address" (string Plain)))
     (function Invalid_sc_rollup_address loc -> Some loc | _ -> None)
     (fun loc -> Invalid_sc_rollup_address loc)
 
@@ -145,7 +145,7 @@ let encoding =
     "rollup_address"
     ~title:"A smart contract rollup address"
     ~description
-    (conv_with_guard Address.to_b58check of_b58check string)
+    (conv_with_guard Address.to_b58check of_b58check (string Plain))
 
 let rpc_arg =
   let construct = Address.to_b58check in

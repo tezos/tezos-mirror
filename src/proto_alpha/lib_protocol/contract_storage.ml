@@ -168,7 +168,7 @@ let () =
     ~title:"Contract storage failure"
     ~description:"Unexpected contract storage error"
     ~pp:(fun ppf s -> Format.fprintf ppf "Contract_storage.Failure %S" s)
-    Data_encoding.(obj1 (req "message" string))
+    Data_encoding.(obj1 (req "message" @@ string Plain))
     (function Failure s -> Some s | _ -> None)
     (fun s -> Failure s) ;
   register_error_kind

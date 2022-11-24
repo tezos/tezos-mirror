@@ -34,7 +34,7 @@ let acceptable_pass _op = None
 type block_header_data = string
 
 let block_header_data_encoding =
-  Data_encoding.(obj1 (req "block_header_data" string))
+  Data_encoding.(obj1 (req "block_header_data" (string Plain)))
 
 type block_header = {
   shell : Block_header.shell_header;

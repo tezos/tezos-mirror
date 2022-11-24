@@ -33,7 +33,7 @@ let () =
       "Internal error: error occurred during proof production or validation"
     ~description:"A merkelized payload hashes proof error."
     ~pp:(fun ppf e -> Format.fprintf ppf "Proof error: %s" e)
-    (obj1 (req "error" string))
+    (obj1 (req "error" (string Plain)))
     (function Merkelized_payload_hashes_proof_error e -> Some e | _ -> None)
     (fun e -> Merkelized_payload_hashes_proof_error e)
 
@@ -116,7 +116,7 @@ let merkelized_and_payload_encoding =
         merkelized;
         payload = Sc_rollup_inbox_message_repr.unsafe_of_string payload;
       })
-    (merge_objs encoding (obj1 (req "payload" string)))
+    (merge_objs encoding (obj1 (req "payload" (string Plain))))
 
 module History = struct
   include

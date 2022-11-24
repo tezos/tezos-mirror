@@ -131,7 +131,7 @@ let encoding =
          case
            (Tag 1)
            ~title:"External"
-           Variable.(string' Hex)
+           Variable.(string Hex)
            (function External msg -> Some msg | Internal _ -> None)
            (fun msg -> External msg);
        ])

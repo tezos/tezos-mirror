@@ -232,7 +232,7 @@ module Scripts = struct
       merge_objs
         (obj10
            (req "contract" Contract.originated_encoding)
-           (req "view" string)
+           (req "view" (string Plain))
            (req "input" Script.expr_encoding)
            (dft "unlimited_gas" bool false)
            (req "chain_id" Tezos_crypto.Chain_id.encoding)
@@ -333,7 +333,7 @@ module Scripts = struct
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
              (opt "gas" Gas.Arith.z_integral_encoding))
-        ~output:(obj2 (req "packed" bytes) (req "gas" Gas.encoding))
+        ~output:(obj2 (req "packed" (bytes Hex)) (req "gas" Gas.encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "pack_data")
 
@@ -1987,7 +1987,7 @@ module Sc_rollup = struct
       RPC_service.get_service
         ~description:"Boot sector of smart-contract rollup"
         ~query:RPC_query.empty
-        ~output:Data_encoding.string
+        ~output:Data_encoding.(string Plain)
         RPC_path.(path_sc_rollup / "boot_sector")
 
     let genesis_info =
@@ -2488,7 +2488,7 @@ module Forge = struct
         ~description:"Forge an operation"
         ~query:RPC_query.empty
         ~input:Operation.unsigned_encoding
-        ~output:bytes
+        ~output:(bytes Hex)
         RPC_path.(path / "operations")
 
     let empty_proof_of_work_nonce =
@@ -2505,14 +2505,16 @@ module Forge = struct
              (opt "nonce_hash" Nonce_hash.encoding)
              (dft
                 "proof_of_work_nonce"
-                (Fixed.bytes Alpha_context.Constants.proof_of_work_nonce_size)
+                (Fixed.bytes
+                   Hex
+                   Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce)
              Liquidity_baking.(
                dft
                  "liquidity_baking_toggle_vote"
                  liquidity_baking_toggle_vote_encoding
                  LB_pass))
-        ~output:(obj1 (req "protocol_data" bytes))
+        ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
 
     module Tx_rollup = struct

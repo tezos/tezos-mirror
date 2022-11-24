@@ -50,7 +50,7 @@ let () =
         s
         pos
         (Char.code s.[pos]))
-    (obj2 (req "position" int31) (req "string" string))
+    (obj2 (req "position" int31) (req "string" (string Plain)))
     (function Non_printable_character (pos, s) -> Some (pos, s) | _ -> None)
     (fun (pos, s) -> Non_printable_character (pos, s))
 

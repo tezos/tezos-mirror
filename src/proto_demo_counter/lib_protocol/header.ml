@@ -26,6 +26,6 @@
 
 type t = string
 
-let encoding = Data_encoding.(obj1 (req "demo_block_header_data" string))
+let encoding = Data_encoding.(obj1 (req "demo_block_header_data" (string Plain)))
 
 let create s = s

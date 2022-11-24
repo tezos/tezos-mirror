@@ -77,7 +77,7 @@ let () =
     ~title:"Destination decoding failed"
     ~description:
       "Failed to read a valid destination from a b58check_encoding data"
-    (obj1 (req "input" string))
+    (obj1 (req "input" (string Plain)))
     (function Invalid_destination_b58check x -> Some x | _ -> None)
     (fun x -> Invalid_destination_b58check x)
 
@@ -145,7 +145,7 @@ let encoding =
               | Error _ ->
                   Data_encoding.Json.cannot_destruct
                     "Invalid destination notation.")
-            string)
+            (string Plain))
 
 let pp : Format.formatter -> t -> unit =
  fun fmt -> function

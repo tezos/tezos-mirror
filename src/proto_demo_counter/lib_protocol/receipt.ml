@@ -30,4 +30,4 @@ let create t = t
 
 let to_string t = t
 
-let encoding = Data_encoding.(obj1 (req "demo_operation_receipt" string))
+let encoding = Data_encoding.(obj1 (req "demo_operation_receipt" (string Plain)))

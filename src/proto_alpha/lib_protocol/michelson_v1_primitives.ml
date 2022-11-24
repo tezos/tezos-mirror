@@ -787,7 +787,7 @@ let () =
     ~title:"Unknown primitive name"
     ~description:"In a script or data expression, a primitive was unknown."
     ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
-    Data_encoding.(obj1 (req "wrong_primitive_name" string))
+    Data_encoding.(obj1 (req "wrong_primitive_name" @@ string Plain))
     (function Unknown_primitive_name got -> Some got | _ -> None)
     (fun got -> Unknown_primitive_name got) ;
   register_error_kind
@@ -798,7 +798,7 @@ let () =
       "In a script or data expression, a primitive name is neither uppercase, \
        lowercase or capitalized."
     ~pp:(fun ppf n -> Format.fprintf ppf "Primitive %s has invalid case." n)
-    Data_encoding.(obj1 (req "wrong_primitive_name" string))
+    Data_encoding.(obj1 (req "wrong_primitive_name" @@ string Plain))
     (function Invalid_case name -> Some name | _ -> None)
     (fun name -> Invalid_case name) ;
   register_error_kind
@@ -813,7 +813,7 @@ let () =
       obj2
         (req
            "expression"
-           (Micheline.canonical_encoding ~variant:"generic" string))
+           (Micheline.canonical_encoding ~variant:"generic" @@ string Plain))
         (req "location" Micheline.canonical_location_encoding))
     (function
       | Invalid_primitive_name (expr, loc) -> Some (expr, loc) | _ -> None)

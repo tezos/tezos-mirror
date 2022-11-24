@@ -28,6 +28,10 @@ include Data_encoding
 module Encoding = struct
   include Encoding
 
+  let string = string'
+
+  let bytes = bytes'
+
   let lazy_encoding encoding =
     let binary = lazy_encoding encoding in
     let json =
@@ -57,6 +61,30 @@ module Encoding = struct
       repr_agnostic_custom {write; read} ~schema:Json_schema.any
     in
     Data_encoding__Encoding.raw_splitted ~json ~binary
+
+  module Bounded = struct
+    include Bounded
+
+    let string = string'
+
+    let bytes = bytes'
+  end
+
+  module Variable = struct
+    include Variable
+
+    let string = string'
+
+    let bytes = bytes'
+  end
+
+  module Fixed = struct
+    include Fixed
+
+    let string = string'
+
+    let bytes = bytes'
+  end
 end
 
 include Encoding

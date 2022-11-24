@@ -35,7 +35,7 @@ let () =
     ~title:"Invalid proof"
     ~description:"An invalid proof has been submitted"
     ~pp:(fun fmt msg -> Format.fprintf fmt "Invalid proof: %s" msg)
-    Data_encoding.(obj1 @@ req "reason" string)
+    Data_encoding.(obj1 @@ req "reason" (string Plain))
     (function Sc_rollup_proof_check msg -> Some msg | _ -> None)
     (fun msg -> Sc_rollup_proof_check msg) ;
 
@@ -69,7 +69,7 @@ let reveal_proof_encoding =
             "raw_data"
             (check_size
                Constants_repr.sc_rollup_message_size_limit
-               (string' Hex))))
+               (string Hex))))
       (function Raw_data_proof s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Raw_data_proof s)
   and case_metadata_proof =
