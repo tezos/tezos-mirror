@@ -41,6 +41,7 @@ type validator_kind =
       protocol_root : string;
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
+      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
     }
       -> validator_kind
 
@@ -556,6 +557,7 @@ module External_validator_process = struct
     mutable validator_process : process_status;
     lock : Lwt_mutex.t;
     sandbox_parameters : Data_encoding.json option;
+    dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   }
 
   (* The shutdown_timeout is used when closing the block validator
@@ -649,6 +651,7 @@ module External_validator_process = struct
         user_activated_upgrades = vp.user_activated_upgrades;
         user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
         operation_metadata_size_limit = vp.operation_metadata_size_limit;
+        dal_config = vp.dal_config;
       }
     in
     vp.validator_process <-
@@ -759,7 +762,7 @@ module External_validator_process = struct
          _;
        } :
         validator_environment) ~genesis ~data_dir ~readonly ~context_root
-      ~protocol_root ~process_path ~sandbox_parameters =
+      ~protocol_root ~process_path ~sandbox_parameters ~dal_config =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
@@ -776,6 +779,7 @@ module External_validator_process = struct
         validator_process = Uninitialized;
         lock = Lwt_mutex.create ();
         sandbox_parameters;
+        dal_config;
       }
     in
     let* () =
@@ -955,6 +959,7 @@ let init validator_environment validator_kind =
         protocol_root;
         process_path;
         sandbox_parameters;
+        dal_config;
       } ->
       let* (validator : 'b) =
         External_validator_process.init
@@ -966,6 +971,7 @@ let init validator_environment validator_kind =
           ~protocol_root
           ~process_path
           ~sandbox_parameters
+          ~dal_config
       in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)

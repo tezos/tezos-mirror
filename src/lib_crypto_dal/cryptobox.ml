@@ -947,3 +947,32 @@ module Internal_for_tests = struct
 
   let load_parameters parameters = initialisation_parameters := Some parameters
 end
+
+module Config = struct
+  type t = {activated : bool; srs_size : int option}
+
+  let encoding : t Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {activated; srs_size} -> (activated, srs_size))
+      (fun (activated, srs_size) -> {activated; srs_size})
+      (obj2 (req "activated" bool) (req "srs_size" (option int31)))
+
+  let default = {activated = false; srs_size = None}
+
+  let init_dal ~find_srs_files dal_config =
+    let open Lwt_result_syntax in
+    if dal_config.activated then
+      let* initialisation_parameters =
+        match dal_config.srs_size with
+        | None ->
+            let*? g1_path, g2_path = find_srs_files () in
+            initialisation_parameters_from_files ~g1_path ~g2_path
+        | Some slot_size ->
+            return
+              (Internal_for_tests.initialisation_parameters_from_slot_size
+                 ~slot_size)
+      in
+      Lwt.return (load_parameters initialisation_parameters)
+    else return_unit
+end
