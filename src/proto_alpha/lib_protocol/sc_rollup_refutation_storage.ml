@@ -245,18 +245,6 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
     Store.Game.mem ((ctxt, rollup), stakers.alice) stakers.bob
   in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
-  let* () =
-    let*! refuter_game_empty = Store.Game.is_empty ((ctxt, rollup), refuter) in
-    let*! defender_game_empty =
-      Store.Game.is_empty ((ctxt, rollup), defender)
-    in
-    match (refuter_game_empty, defender_game_empty) with
-    | false, true -> tzfail (Sc_rollup_staker_in_game (`Refuter refuter))
-    | true, false -> tzfail (Sc_rollup_staker_in_game (`Defender defender))
-    | false, false ->
-        tzfail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
-    | true, true -> return ()
-  in
   let* ( ( {hash = _refuter_commit; commitment = _info},
            {hash = _defender_commit; commitment = child_info} ),
          ctxt ) =

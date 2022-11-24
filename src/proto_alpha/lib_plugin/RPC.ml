@@ -2055,10 +2055,10 @@ module Sc_rollup = struct
                  (req "bob" Staker.encoding))))
       in
       RPC_service.get_service
-        ~description:"Ongoing refufation game for a given staker"
+        ~description:"Ongoing refufation games for a given staker"
         ~query
         ~output
-        RPC_path.(path_sc_rollup / "game")
+        RPC_path.(path_sc_rollup / "games")
 
     let stakers_commitments =
       let output =
