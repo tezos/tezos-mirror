@@ -120,7 +120,7 @@ let write_string ?(pos = 0) ?len descr buf =
 
 let is_directory file_name =
   let open Lwt_syntax in
-  let+ s = Lwt_unix.lstat file_name in
+  let+ s = Lwt_unix.stat file_name in
   s.st_kind = S_DIR
 
 let remove_dir dir =

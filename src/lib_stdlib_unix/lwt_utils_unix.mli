@@ -74,9 +74,9 @@ val write_bytes :
   Bytes.t ->
   unit Lwt.t
 
-(** [is_directory path] tests if the given [path] refers to a
-   directory (file kind is [S_DIR]). Returns [false] if [path] refers
-   to a symbolic link. *)
+(** [is_directory path] tests if the given [path] (or the target of
+    the symbolic link located at [path]) refers to a directory (file
+    kind is [S_DIR]). *)
 val is_directory : string -> bool Lwt.t
 
 val remove_dir : string -> unit Lwt.t
