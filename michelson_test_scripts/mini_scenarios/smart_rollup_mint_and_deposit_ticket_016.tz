@@ -1,0 +1,34 @@
+# A contract for depositing tickets to a rollup. It takes as parameters:
+# - A contract of type ticket string and rollup account pair
+# - A string representing a rollup account
+# - An amount
+# - A ticket content
+# It mints a new ticket with the amount and content and sends it to the
+# contract/rollup along with the given account.
+parameter
+    (pair (pair (contract %rollup (pair string (ticket string))) (string %rollup_account))
+          (pair (nat %ticket_amount) (string %ticket_content))) ;
+storage unit ;
+code { CAR ;
+       DUP ;
+       CAR ;
+       CAR ;
+       PUSH mutez 0 ;
+       DUP 3 ;
+       CDR ;
+       CAR ;
+       DUP 4 ;
+       CDR ;
+       CDR ;
+       TICKET ;
+       ASSERT_SOME ;
+       DIG 3 ;
+       CAR ;
+       CDR ;
+       PAIR ;
+       TRANSFER_TOKENS ;
+       PUSH unit Unit ;
+       NIL operation ;
+       DIG 2 ;
+       CONS ;
+       PAIR }

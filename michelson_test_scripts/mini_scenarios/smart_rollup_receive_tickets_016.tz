@@ -1,0 +1,9 @@
+# A contract that keeps a list of tickets. It provides two entrypoints:
+# - [burn_all_tickets] for emptying the list
+# - [receive_tickets] for adding a given ticket to the list
+parameter (or (unit %burn_all_tickets) (ticket %receive_tickets string)) ;
+storage (list (ticket string)) ;
+code { UNPAIR ;
+       IF_LEFT
+         { DROP 2 ; NIL (ticket string) ; NIL operation ; PAIR }
+         { CONS ; NIL operation ; PAIR } }
