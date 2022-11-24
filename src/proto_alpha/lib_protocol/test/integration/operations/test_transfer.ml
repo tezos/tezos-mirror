@@ -437,24 +437,30 @@ let test_balance_too_low fee () =
   let* balance2 = Context.Contract.balance (B b) contract_2 in
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
   let* op = Op.transaction ~fee (B b) contract_1 contract_2 max_tez in
-  let expect_apply_failure = function
+  let expect_failure = function
     | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as err)
       :: _ ->
         Assert.test_error_encodings err ;
         return_unit
     | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
   in
-  (* the fee is higher than the balance then raise an error "Balance_too_low" *)
   let* i = Incremental.begin_construction b in
   if fee > balance1 then
+    (* The fee is higher than the balance, so the operation validation
+       fails with the [Balance_too_low] error. *)
     let* (_res : Incremental.t) =
-      Incremental.add_operation ~expect_apply_failure i op
+      Incremental.add_operation ~expect_failure i op
     in
     return_unit
-    (* the fee is smaller than the balance, then the transfer is accepted
-       but it is not processed, and fees are taken *)
   else
-    let* i = Incremental.add_operation ~expect_apply_failure i op in
+    (* The fee is smaller than or equal to the balance, so the
+       operation is successfully validated and its fees are
+       taken. However, since the amount to transfer exceeds the
+       balance, the application has no further effects and the
+       operation is marked with the [Balance_too_low] error. *)
+    let* i =
+      Incremental.add_operation ~expect_apply_failure:expect_failure i op
+    in
     (* contract_1 loses the fees *)
     let* () =
       Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
