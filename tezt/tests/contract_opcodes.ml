@@ -1015,6 +1015,13 @@ let test_contract_opcodes protocols =
         ^ "0000000" );
       (* Fr -> Mutez *)
       ("bls12_381_fr_to_mutez.tz", "0", "0x10", "16");
+      (* Bitwise operations on bytes *)
+      ("and_bytes.tz", "Unit", "Unit", "Unit");
+      ("or_bytes.tz", "Unit", "Unit", "Unit");
+      ("xor_bytes.tz", "Unit", "Unit", "Unit");
+      ("not_bytes.tz", "Unit", "Unit", "Unit");
+      ("lsl_bytes.tz", "Unit", "Unit", "Unit");
+      ("lsr_bytes.tz", "Unit", "Unit", "Unit");
     ]
   in
   Fun.flip List.iter parameterization
@@ -1023,8 +1030,8 @@ let test_contract_opcodes protocols =
     sf
       "./tests_python/contracts_%s/opcodes/%s"
       (match protocol with
-       | Protocol.Alpha -> "alpha"
-       | _ -> sf "%03d" (Protocol.number protocol))
+      | Protocol.Alpha -> "alpha"
+      | _ -> sf "%03d" (Protocol.number protocol))
       contract
   in
   let protocols =

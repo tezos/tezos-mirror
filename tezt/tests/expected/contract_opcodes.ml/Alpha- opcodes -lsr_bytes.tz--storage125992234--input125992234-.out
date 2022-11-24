@@ -1,5 +1,5 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_bytes_bitwise[lsr_bytes.tz-Unit-Unit]
 
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_alpha/opcodes/lsr_bytes.tz on storage Unit and input Unit --level 1 --trace-stack
 storage
   Unit
 emitted operations
