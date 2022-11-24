@@ -68,6 +68,20 @@ let get_contract_and_stake ctxt staker =
   let stake = Constants_storage.sc_rollup_stake_amount ctxt in
   (staker_contract, stake)
 
+let is_staked_on_lcc_or_ancestor ctxt rollup ~staked_on ~lcc_inbox_level =
+  let open Lwt_result_syntax in
+  let+ ctxt, commitment_opt = Store.Commitments.find (ctxt, rollup) staked_on in
+  (* If commitment of staked_on is still stored, it means that we can
+     obtain inbox_level for it and compare explicitly with LCC inbox
+     level.  Otherwise, it means that staked_on **existed** in the
+     store and it has to be a cemented predecessor of LCC: if it
+     wasn't a case then staker would be refuted and removed by
+     now. *)
+  match commitment_opt with
+  | None -> (true, ctxt)
+  | Some {inbox_level; _} ->
+      (Raw_level_repr.(inbox_level <= lcc_inbox_level), ctxt)
+
 (** Warning: must be called only if [rollup] exists and [staker] is not to be
     found in {!Store.Stakers.} *)
 let deposit_stake ctxt rollup staker =
@@ -102,30 +116,30 @@ let deposit_stake ctxt rollup staker =
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_result_syntax in
-  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
-  match res with
-  | None -> tzfail Sc_rollup_not_staked
-  | Some staked_on_commitment ->
-      let* () =
-        fail_unless
-          Commitment_hash.(staked_on_commitment = lcc)
-          Sc_rollup_not_staked_on_lcc
-      in
-      let staker_contract, stake = get_contract_and_stake ctxt staker in
-      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-      let* ctxt, balance_updates =
-        Token.transfer
-          ctxt
-          (`Frozen_bonds (staker_contract, bond_id))
-          (`Contract staker_contract)
-          stake
-      in
-      let* ctxt, _size_freed =
-        Store.Stakers.remove_existing (ctxt, rollup) staker
-      in
-      let+ ctxt = modify_staker_count ctxt rollup Int32.pred in
-      (ctxt, balance_updates)
+  let* staked_on, ctxt = find_staker ctxt rollup staker in
+  let* _lcc, lcc_inbox_level, ctxt =
+    Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
+  in
+  let* is_staked_on_cemented, ctxt =
+    is_staked_on_lcc_or_ancestor ctxt rollup ~staked_on ~lcc_inbox_level
+  in
+  let* () =
+    fail_unless is_staked_on_cemented Sc_rollup_not_staked_on_lcc_or_ancestor
+  in
+  let staker_contract, stake = get_contract_and_stake ctxt staker in
+  let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+  let* ctxt, balance_updates =
+    Token.transfer
+      ctxt
+      (`Frozen_bonds (staker_contract, bond_id))
+      (`Contract staker_contract)
+      stake
+  in
+  let* ctxt, _size_freed =
+    Store.Stakers.remove_existing (ctxt, rollup) staker
+  in
+  let+ ctxt = modify_staker_count ctxt rollup Int32.pred in
+  (ctxt, balance_updates)
 
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_result_syntax in
@@ -348,9 +362,14 @@ let commitment_storage_size_in_bytes = 89
 
 let refine_stake ctxt rollup staker staked_on commitment =
   let open Lwt_result_syntax in
-  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
+  let* lcc, lcc_inbox_level, ctxt =
+    Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
+  in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let*? ctxt, new_hash = Sc_rollup_commitment_storage.hash ctxt commitment in
+  let* is_staked_on_cemented, ctxt =
+    is_staked_on_lcc_or_ancestor ctxt rollup ~staked_on ~lcc_inbox_level
+  in
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
      Add a test checking that L2 nodes can catch up after going offline. *)
@@ -373,9 +392,16 @@ let refine_stake ctxt rollup staker staked_on commitment =
          another commit is a valid operation.
 
     *)
-    if Commitment_hash.(node = staked_on) then (
-      (* Previously staked commit found:
-         Insert new commitment if not existing *)
+    if
+      Commitment_hash.(
+        node = staked_on || (is_staked_on_cemented && node = lcc))
+    then (
+      (* Insert new commitment if not existing.
+         Two reasons when we fall into this branch are possible:
+          1. Previously staked commit found
+          2. Traversing ended up in LCC and previous staked_on is LLC or behind it,
+             hence, the commitment is a follow up of the previous staked_on
+      *)
       let* ctxt, commitment_size_diff, commit_existed =
         Store.Commitments.add (ctxt, rollup) new_hash commitment
       in
@@ -541,52 +567,48 @@ let cement_commitment ctxt rollup new_lcc =
 
 let remove_staker ctxt rollup staker =
   let open Lwt_result_syntax in
-  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
-  match res with
-  | None -> tzfail Sc_rollup_not_staked
-  | Some staked_on ->
-      let* () =
-        fail_when Commitment_hash.(staked_on = lcc) Sc_rollup_remove_lcc
-      in
-      let staker_contract, stake = get_contract_and_stake ctxt staker in
-      let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-      let* ctxt, balance_updates =
-        Token.transfer
-          ctxt
-          (`Frozen_bonds (staker_contract, bond_id))
-          `Sc_rollup_refutation_punishments
-          stake
-      in
-      let* ctxt, _size_diff =
-        Store.Stakers.remove_existing (ctxt, rollup) staker
-      in
-      let* ctxt = modify_staker_count ctxt rollup Int32.pred in
+  let* staked_on, ctxt = find_staker ctxt rollup staker in
+  let* lcc, lcc_inbox_level, ctxt =
+    Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
+  in
+  let* is_staked_on_cemented, ctxt =
+    is_staked_on_lcc_or_ancestor ctxt rollup ~staked_on ~lcc_inbox_level
+  in
+  let* () = fail_when is_staked_on_cemented Sc_rollup_remove_lcc_or_ancestor in
+  let staker_contract, stake = get_contract_and_stake ctxt staker in
+  let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+  let* ctxt, balance_updates =
+    Token.transfer
+      ctxt
+      (`Frozen_bonds (staker_contract, bond_id))
+      `Sc_rollup_refutation_punishments
+      stake
+  in
+  let* ctxt, _size_diff = Store.Stakers.remove_existing (ctxt, rollup) staker in
+  let* ctxt = modify_staker_count ctxt rollup Int32.pred in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
-         Check value of [max_lookahead_in_blocks] against gas exhaustion
-         during this function execution. *)
-      let rec go node ctxt =
-        (*
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
+     Check value of [max_lookahead_in_blocks] against gas exhaustion
+     during this function execution. *)
+  let rec go node ctxt =
+    (*
+        The recursive calls of this function are protected from
+        infinite recursion because [Commitment_storage] and
+        [Commitment_stake_count] are using carbonated storage.
 
-           The recursive calls of this function are protected from
-           infinite recursion because [Commitment_storage] and
-           [Commitment_stake_count] are using carbonated storage.
-
-           Hence, at each step of the traversal, the gas strictly
-           decreases.
-
-        *)
-        if Commitment_hash.(node = lcc) then return ctxt
-        else
-          let* pred, ctxt =
-            Commitment_storage.get_predecessor_unsafe ctxt rollup node
-          in
-          let* ctxt = decrease_commitment_stake_count ctxt rollup node in
-          (go [@ocaml.tailcall]) pred ctxt
+        Hence, at each step of the traversal, the gas strictly
+        decreases.
+    *)
+    if Commitment_hash.(node = lcc) then return ctxt
+    else
+      let* pred, ctxt =
+        Commitment_storage.get_predecessor_unsafe ctxt rollup node
       in
-      let+ ctxt = go staked_on ctxt in
-      (ctxt, balance_updates)
+      let* ctxt = decrease_commitment_stake_count ctxt rollup node in
+      (go [@ocaml.tailcall]) pred ctxt
+  in
+  let+ ctxt = go staked_on ctxt in
+  (ctxt, balance_updates)
 
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake

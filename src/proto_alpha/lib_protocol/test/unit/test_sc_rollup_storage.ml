@@ -420,7 +420,7 @@ let test_removing_staker_from_lcc_fails () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
-    Sc_rollup_errors.Sc_rollup_remove_lcc
+    Sc_rollup_errors.Sc_rollup_remove_lcc_or_ancestor
 
 let withdraw_stake_and_check_balances ctxt rollup staker =
   perform_staking_action_and_check
@@ -588,6 +588,29 @@ let test_deposit_then_refine_bad_inbox () =
        staker
        commitment)
     Sc_rollup_errors.Sc_rollup_bad_inbox_level
+
+let test_removing_staker_from_lcc_predecessor_fails () =
+  let* ctxt, rollup, genesis_hash, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let* commitments, ctxt =
+    lift
+    @@ produce_and_refine
+         ~number_of_commitments:2
+         ~predecessor:genesis_hash
+         ctxt
+         staker2
+         rollup
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+  assert_fails_with
+    ~loc:__LOC__
+    (Sc_rollup_stake_storage.remove_staker ctxt rollup staker1)
+    Sc_rollup_errors.Sc_rollup_remove_lcc_or_ancestor
 
 let test_publish () =
   let* ctxt = new_context () in
@@ -842,6 +865,47 @@ let test_deposit_then_publish () =
   in
   assert_true ctxt
 
+(* Two stakers deposit, one of them publishes and cements its comitment.
+   The other one refine on a follow-up commitment of the previously created LCC.
+*)
+let test_refine_from_behind_lcc () =
+  let* ctxt, rollup, genesis_hash, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let level l = valid_inbox_level ctxt l in
+  let commitment1 =
+    Commitment_repr.
+      {
+        predecessor = genesis_hash;
+        inbox_level = level 1l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* c1, _level, ctxt =
+    lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt, _ =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  let commitment2 =
+    Commitment_repr.
+      {
+        predecessor = c1;
+        inbox_level = level 2l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* _c2, _level, ctxt =
+    lift @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
+  in
+  assert_true ctxt
+
 let test_publish_missing_rollup () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -1027,7 +1091,7 @@ let test_cement_then_remove () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
-    Sc_rollup_errors.Sc_rollup_remove_lcc
+    Sc_rollup_errors.Sc_rollup_remove_lcc_or_ancestor
 
 let test_cement_unknown_commitment_fails () =
   let* ctxt = new_context () in
@@ -1216,7 +1280,132 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker)
-    Sc_rollup_errors.Sc_rollup_not_staked_on_lcc
+    Sc_rollup_errors.Sc_rollup_not_staked_on_lcc_or_ancestor
+
+let test_withdrawal_staked_on_lcc_ancestors () =
+  let* ctxt, rollup, genesis_hash, staker1, staker2, staker3 =
+    originate_rollup_and_deposit_with_three_stakers ()
+  in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  let max_num_stored_cemented_commitments =
+    (Raw_context.constants ctxt).sc_rollup
+      .max_number_of_stored_cemented_commitments
+  in
+  (* Produce and stake more commitments than the number of cemented
+     commitments that can be stored. *)
+  let number_of_commitments = max_num_stored_cemented_commitments + 1 in
+  let staker1_commitments_n = 1 in
+  let staker2_commitments_n = 2 in
+  let staker3_commitments_n =
+    number_of_commitments - staker1_commitments_n - staker2_commitments_n
+  in
+  (* Expected stakers distribution: [staker1, staker2, staker2, staker3, staker3, staker3] *)
+  let* commitments_staker1, ctxt =
+    lift
+    @@ produce_and_refine
+         ~start_at_level:1
+         ~number_of_commitments:staker1_commitments_n
+         ~predecessor:genesis_hash
+         ctxt
+         staker1
+         rollup
+  in
+  let expected_staker1_commitment =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt commitments_staker1
+  in
+  let* commitments_staker2, ctxt =
+    lift
+    @@ produce_and_refine
+         ~start_at_level:(staker1_commitments_n + 1)
+         ~number_of_commitments:staker2_commitments_n
+         ~predecessor:expected_staker1_commitment
+         ctxt
+         staker2
+         rollup
+  in
+  let expected_staker2_commitment =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt commitments_staker2
+  in
+  let* commitments_staker3, ctxt =
+    lift
+    @@ produce_and_refine
+         ~start_at_level:(staker1_commitments_n + staker2_commitments_n + 1)
+         ~number_of_commitments:staker3_commitments_n
+         ~predecessor:expected_staker2_commitment
+         ctxt
+         staker3
+         rollup
+  in
+  let commitments =
+    List.concat [commitments_staker1; commitments_staker2; commitments_staker3]
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+  let* lcc, ctxt =
+    lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
+  in
+  let expected_lcc =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt commitments
+  in
+  (* Commitments invariants checks *)
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Commitment_repr.Hash.equal
+      "Prerequirement: verify LCC"
+      Commitment_repr.Hash.pp
+      lcc
+      expected_lcc
+  in
+  let* ctxt, staker1_commitment =
+    lift @@ Storage.Sc_rollup.Stakers.get (ctxt, rollup) staker1
+  in
+  let* ctxt, staker2_commitment =
+    lift @@ Storage.Sc_rollup.Stakers.get (ctxt, rollup) staker2
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Commitment_repr.Hash.equal
+      "Prerequirement: verify staker1's staked_on commitment"
+      Commitment_repr.Hash.pp
+      staker1_commitment
+      expected_staker1_commitment
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Commitment_repr.Hash.equal
+      "Prerequirement: verify staker2's staked_on commitment"
+      Commitment_repr.Hash.pp
+      staker2_commitment
+      expected_staker2_commitment
+  in
+  (* Ensure that staked commitment of staker1 IS NOT in the storage anymore *)
+  let* commitment_opt, ctxt =
+    lift
+    @@ Sc_rollup_commitment_storage.get_commitment_opt_unsafe
+         ctxt
+         rollup
+         staker1_commitment
+  in
+  let* () = Assert.is_none ~loc:__LOC__ ~pp:Commitment_repr.pp commitment_opt in
+  (* Ensure that staked commitment of staker2 IS still in the storage *)
+  let* ctxt, staked_commitment_exists =
+    lift @@ Storage.Sc_rollup.Commitments.mem (ctxt, rollup) staker2_commitment
+  in
+  let* () = Assert.equal_bool ~loc:__LOC__ staked_commitment_exists true in
+
+  (* Make sure both staker1 and staker2 can withdraw*)
+  let* ctxt, _ =
+    lift @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker1
+  in
+  let* ctxt, _ =
+    lift @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker2
+  in
+  assert_true ctxt
 
 let test_genesis_info_of_rollup () =
   let* ctxt = new_context () in
@@ -2567,6 +2756,11 @@ let tests =
        is allowed"
       `Quick
       test_refine_commitment_with_inbox_greater_than_current;
+    Tztest.tztest
+      "Previously staked commitment is behind LCC, but still possible to stake \
+       on next commitment"
+      `Quick
+      test_refine_from_behind_lcc;
     Tztest.tztest "stake then publish" `Quick test_deposit_then_publish;
     Tztest.tztest "publish with no rollup" `Quick test_publish_missing_rollup;
     Tztest.tztest
@@ -2577,6 +2771,10 @@ let tests =
       "withdrawal fails when not staked on LCC"
       `Quick
       test_withdrawal_fails_when_not_staked_on_lcc;
+    Tztest.tztest
+      "withdrawal when staked on LCC ancestor"
+      `Quick
+      test_withdrawal_staked_on_lcc_ancestors;
     Tztest.tztest
       "initial_level returns correct level"
       `Quick
@@ -2661,6 +2859,10 @@ let tests =
       "removing staker from the LCC fails"
       `Quick
       test_removing_staker_from_lcc_fails;
+    Tztest.tztest
+      "removing staker from the LCC predecessor fails"
+      `Quick
+      test_removing_staker_from_lcc_predecessor_fails;
     Tztest.tztest
       "kind of missing rollup is None"
       `Quick
