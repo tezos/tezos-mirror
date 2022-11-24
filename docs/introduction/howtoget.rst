@@ -179,12 +179,11 @@ Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The docker image used throughout the docker-compose files is fetched from upstream, but you can also
-build one locally and reference it. Run the following commands to build the image:
+build one locally and reference it. Run the following command to build the image:
 
 ::
 
-    ./scripts/ci/create_docker_image.build.sh
-    ./scripts/ci/create_docker_image.minimal.sh
+    ./scripts/create_docker_image.sh
 
 
 And then update the docker-compose file (e.g., ``alpha.yml``) with the docker tag::
