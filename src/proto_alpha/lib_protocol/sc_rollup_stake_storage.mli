@@ -117,6 +117,20 @@ val cement_commitment :
   Sc_rollup_commitment_repr.Hash.t ->
   (Raw_context.t * Sc_rollup_commitment_repr.t) tzresult Lwt.t
 
+(** [is_staker ctxt rollup staker] returns [true] iff [staker] has a
+    deposit on the given [rollup].
+
+    May fail with:
+    {ul
+      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+
+*)
+val is_staker :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_repr.Staker.t ->
+  (bool * Raw_context.t) tzresult Lwt.t
+
 (** [find_staker_unsafe ctxt rollup staker] returns the branch on which the stake
     is deposited for the [rollup]'s [staker].
     This function *must* be called only after they have checked for the existence
