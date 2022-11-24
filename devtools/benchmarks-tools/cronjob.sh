@@ -47,8 +47,8 @@ slack() {
 }
 
 anomaly() {
-  date +"[%Y-%m-%d %T] $1. Remember to clean up when you're done: remove current_run_dir, and move cron_res, cron_res_errors, tezos/_snoop/*_results to the corresponding sub-directory of snoop_results." >> anomalies;
-  slack "Something went wrong with \`$TODAY\`'s run :cry:\nThe message below was returned; the referred files can be found at \`163.172.52.82:/data/tezos-benchmarks\`.\n** $1."
+  date +"[%Y-%m-%d %T] $1." >> anomalies;
+  slack "Something went wrong with \`$TODAY\`'s run :cry:\nThe message below was returned; the referred files can be found at \`163.172.52.82:/data/tezos-benchmarks\`. Remember to clean up for the next run when you're done (see the cleaning procedure in the <https://gitlab.com/tezos/tezos/-/blob/master/devtools/benchmarks-tools/README.md#cleaning-up-after-a-failure|README>).\n** $1."
   exit 1
 }
 
