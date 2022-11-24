@@ -1232,7 +1232,10 @@ val spawn_typecheck_data :
 
 (** Run [octez-client typecheck script ..]*)
 val typecheck_script :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   script:string ->
+  ?no_base_dir_warnings:bool ->
   ?details:bool ->
   ?emacs:bool ->
   ?no_print_source:bool ->
@@ -1243,7 +1246,10 @@ val typecheck_script :
 
 (** Same as [typecheck_script], but do not wait for the process to exit. *)
 val spawn_typecheck_script :
+  ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   script:string ->
+  ?no_base_dir_warnings:bool ->
   ?details:bool ->
   ?emacs:bool ->
   ?no_print_source:bool ->
