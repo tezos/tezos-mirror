@@ -83,6 +83,9 @@ end
 (* ------------------------------------------------------------------------- *)
 (* Implementations of the signature above. *)
 
+(* Destroys the model into unit *)
+module Void : S with type 'a repr = unit and type size = unit
+
 (* Pretty-printing implementation *)
 module Pp : S with type 'a repr = string and type size = string
 

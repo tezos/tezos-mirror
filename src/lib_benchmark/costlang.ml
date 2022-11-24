@@ -74,6 +74,54 @@ end
 (* ------------------------------------------------------------------------- *)
 (* Various useful implementations of the signatures above. *)
 
+module Void : S with type 'a repr = unit and type size = unit = struct
+  type 'a repr = unit
+
+  type size = unit
+
+  let true_ = ()
+
+  let false_ = ()
+
+  let float _ = ()
+
+  let int _ = ()
+
+  let ( + ) _ _ = ()
+
+  let sat_sub _ _ = ()
+
+  let ( * ) _ _ = ()
+
+  let ( / ) _ _ = ()
+
+  let max _ _ = ()
+
+  let min _ _ = ()
+
+  let shift_left _ _ = ()
+
+  let shift_right _ _ = ()
+
+  let log2 () = ()
+
+  let sqrt () = ()
+
+  let free ~name = ignore name
+
+  let lt _ _ = ()
+
+  let eq _ _ = ()
+
+  let lam ~name _ = ignore name
+
+  let app _ _ = ()
+
+  let let_ ~name _ _ = ignore name
+
+  let if_ _ _ _ = ()
+end
+
 module Pp : S with type 'a repr = string and type size = string = struct
   type 'a repr = string
 
