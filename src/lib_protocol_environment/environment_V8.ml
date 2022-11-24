@@ -104,7 +104,6 @@ module type T = sig
        and type Plonk.proof = Tezos_protocol_environment_structs.V8.Plonk.proof
        and type Plonk.public_parameters =
         Tezos_protocol_environment_structs.V8.Plonk.verifier_public_parameters
-        * Tezos_protocol_environment_structs.V8.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
        and type Dal.commitment = Tezos_crypto_dal.Cryptobox.Verifier.commitment
        and type Dal.commitment_proof =
