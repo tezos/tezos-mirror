@@ -80,7 +80,8 @@ module Accounted : S = struct
   let one_tick_consumption = 1L
 
   let consume consumption fuel =
-    if Int64.compare fuel consumption > 0 then Some (Int64.sub fuel consumption)
+    if Int64.compare fuel consumption >= 0 then
+      Some (Int64.sub fuel consumption)
     else None
 
   let is_empty fuel = Int64.compare fuel 0L <= 0
