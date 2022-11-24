@@ -174,7 +174,7 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
 let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
     ?attestation_lag ?commitment_period ?challenge_window ?(dal_enable = true)
     variant scenario =
-  let description = "Testing DAL L1 integration" in
+  let description = "Testing DAL node" in
   test
     ~__FILE__
     ~tags
@@ -192,7 +192,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
 
 let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
     ?(dal_enable = true) ?commitment_period ?challenge_window variant scenario =
-  let description = "Testing rollup and Data availability layer node" in
+  let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
     ~tags
