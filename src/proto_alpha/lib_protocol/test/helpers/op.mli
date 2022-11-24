@@ -767,9 +767,7 @@ val zk_rollup_origination :
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  public_parameters:
-    Plonk.Main_protocol.verifier_public_parameters
-    * Plonk.Main_protocol.transcript ->
+  public_parameters:Plonk.Main_protocol.verifier_public_parameters ->
   circuits_info:[`Public | `Private | `Fee] Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->

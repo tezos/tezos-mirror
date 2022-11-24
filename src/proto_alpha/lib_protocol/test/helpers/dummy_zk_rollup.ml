@@ -339,12 +339,10 @@ end) : sig
   val init_state : Zk_rollup.State.t
 
   (** Map associating every circuit identifier to its kind *)
-  val circuits : [`Public | `Private | `Fee] Plonk.Main_protocol.SMap.t
+  val circuits : [`Public | `Private | `Fee] Plonk.SMap.t
 
   (** Commitment to the circuits  *)
-  val public_parameters :
-    Plonk.Main_protocol.verifier_public_parameters
-    * Plonk.Main_protocol.transcript
+  val public_parameters : Plonk.Main_protocol.verifier_public_parameters
 
   (** [craft_update state ~zk_rollup ?private_ops ?exit_validities public_ops]
       will apply first the [public_ops], then the [private_ops]. While doing so,
@@ -371,13 +369,13 @@ end) : sig
   end
 end = struct
   open Protocol.Alpha_context
-  module SMap = Plonk.Main_protocol.SMap
+  module SMap = Plonk.SMap
   module Dummy = Types.P.Dummy
   module T = Types.P
   module VC = V (LibCircuit)
 
   let srs =
-    let open Bls12_381_polynomial.Polynomial in
+    let open Bls12_381_polynomial in
     (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1)
 
   let dummy_l1_dst =
@@ -440,14 +438,11 @@ end = struct
   let circuits =
     SMap.(add "op" `Public @@ add batch_name `Private @@ add "fee" `Fee empty)
 
-  let public_parameters, prover_pp =
-    let (ppp, vpp), t =
-      Plonk.Main_protocol.setup_multi_circuits
-        ~zero_knowledge:false
-        (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
-        ~srs
-    in
-    ((vpp, t), ppp)
+  let prover_pp, public_parameters =
+    Plonk.Main_protocol.setup
+      ~zero_knowledge:false
+      (SMap.map (fun (a, b, _) -> (a, b)) circuit_map)
+      ~srs
 
   let insert s x m =
     match SMap.find_opt s m with
@@ -572,21 +567,16 @@ end = struct
           rev_inputs,
         fee_pi )
     in
-    let (_, t), pp = (public_parameters, prover_pp) in
     let inputs = SMap.map List.rev rev_inputs in
 
-    let proof, _ = Plonk.Main_protocol.prove_multi_circuits (pp, t) ~inputs in
-    let public_inputs =
-      Plonk.Main_protocol.SMap.map
+    let proof = Plonk.Main_protocol.prove prover_pp ~inputs in
+    let verifier_inputs =
+      Plonk.SMap.map
         (List.map (fun Plonk.Main_protocol.{public; witness = _} -> public))
         inputs
     in
     assert (
-      fst
-      @@ Plonk.Main_protocol.verify_multi_circuits
-           public_parameters
-           ~public_inputs
-           proof) ;
+      Plonk.Main_protocol.verify public_parameters ~inputs:verifier_inputs proof) ;
     ( to_proto_state s,
       Zk_rollup.Update.{pending_pis; private_pis; fee_pi; proof} )
 
