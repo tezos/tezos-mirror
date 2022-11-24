@@ -431,12 +431,12 @@ let test_empty_implicit () =
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
-  Context.init2 ~consensus_threshold:0 ()
-  >>=? fun (b, (contract_1, contract_2)) ->
-  Context.Contract.balance (B b) contract_1 >>=? fun balance1 ->
-  Context.Contract.balance (B b) contract_2 >>=? fun balance2 ->
+  let open Lwt_result_syntax in
+  let* b, (contract_1, contract_2) = Context.init2 ~consensus_threshold:0 () in
+  let* balance1 = Context.Contract.balance (B b) contract_1 in
+  let* balance2 = Context.Contract.balance (B b) contract_2 in
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
-  Op.transaction ~fee (B b) contract_1 contract_2 max_tez >>=? fun op ->
+  let* op = Op.transaction ~fee (B b) contract_1 contract_2 max_tez in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as err)
       :: _ ->
@@ -445,17 +445,20 @@ let test_balance_too_low fee () =
     | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
   in
   (* the fee is higher than the balance then raise an error "Balance_too_low" *)
-  Incremental.begin_construction b >>=? fun i ->
+  let* i = Incremental.begin_construction b in
   if fee > balance1 then
-    Incremental.add_operation ~expect_apply_failure i op
-    >>=? fun (_res : Incremental.t) -> return_unit
+    let* (_res : Incremental.t) =
+      Incremental.add_operation ~expect_apply_failure i op
+    in
+    return_unit
     (* the fee is smaller than the balance, then the transfer is accepted
        but it is not processed, and fees are taken *)
   else
-    Incremental.add_operation ~expect_apply_failure i op >>=? fun i ->
+    let* i = Incremental.add_operation ~expect_apply_failure i op in
     (* contract_1 loses the fees *)
-    Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
-    >>=? fun () ->
+    let* () =
+      Assert.balance_was_debited ~loc:__LOC__ (I i) contract_1 balance1 fee
+    in
     (* contract_2 is not credited *)
     Assert.balance_was_credited ~loc:__LOC__ (I i) contract_2 balance2 Tez.zero
 
@@ -659,10 +662,11 @@ let test_bad_parameter () =
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let transfer_to_itself_with_no_such_entrypoint () =
+  let open Lwt_result_syntax in
   let entrypoint = Entrypoint.of_string_strict_exn "bad entrypoint" in
-  Context.init1 () >>=? fun (b, addr) ->
-  Incremental.begin_construction b >>=? fun i ->
-  Op.transaction (B b) addr addr Tez.one ~entrypoint >>=? fun transaction ->
+  let* b, addr = Context.init1 () in
+  let* i = Incremental.begin_construction b in
+  let* transaction = Op.transaction (B b) addr addr Tez.one ~entrypoint in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _ as e)
       :: _ ->
@@ -670,8 +674,10 @@ let transfer_to_itself_with_no_such_entrypoint () =
         return ()
     | _ -> failwith "no such entrypoint should fail"
   in
-  Incremental.add_operation ~expect_apply_failure i transaction
-  >>=? fun (_res : Incremental.t) -> return_unit
+  let* (_res : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure i transaction
+  in
+  return_unit
 
 (** Originates a contract with a [script] and an initial [credit] and
       [storage]. *)
