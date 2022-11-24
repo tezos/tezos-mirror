@@ -322,6 +322,12 @@ module V1 = struct
             Final_move {agreed_start_chunk; refuted_stop_chunk});
       ]
 
+  let restrict_pvm_name_encoding =
+    let restrict_string l =
+      Data_encoding.string_enum @@ List.map (fun x -> (x, x)) l
+    in
+    restrict_string Sc_rollups.Kind.all_names
+
   let encoding =
     let open Data_encoding in
     conv
@@ -363,7 +369,7 @@ module V1 = struct
          (req "dal_snapshot" Dal_slot_repr.History.encoding)
          (req "start_level" Raw_level_repr.encoding)
          (req "inbox_level" Raw_level_repr.encoding)
-         (req "pvm_name" string)
+         (req "pvm_name" restrict_pvm_name_encoding)
          (req "game_state" game_state_encoding))
 
   let pp_dissection ppf d =
@@ -824,31 +830,42 @@ let play dal_parameters ~dal_attestation_lag ~stakers metadata game refutation =
     Either.Left (Loser {loser; reason = Conflict_resolved})
   in
   match (refutation.step, game.game_state) with
-  | Dissection states, Dissecting {dissection; default_number_of_sections} ->
+  | Dissection states, Dissecting {dissection; default_number_of_sections} -> (
       let*? start_chunk, stop_chunk =
         find_choice dissection refutation.choice
       in
-      let*? () =
-        Sc_rollup_dissection_chunk_repr.default_check
-          ~default_number_of_sections
-          ~start_chunk
-          ~stop_chunk
-          states
-      in
-      let new_game_state =
-        Dissecting {dissection = states; default_number_of_sections}
-      in
-      return
-        (Either.Right
-           {
-             turn = opponent game.turn;
-             inbox_snapshot = game.inbox_snapshot;
-             dal_snapshot = game.dal_snapshot;
-             start_level = game.start_level;
-             inbox_level = game.inbox_level;
-             pvm_name = game.pvm_name;
-             game_state = new_game_state;
-           })
+      match Sc_rollups.Kind.pvm_of_name ~name:game.pvm_name with
+      | Some (module PVM) ->
+          let*? () =
+            PVM.check_dissection
+              ~default_number_of_sections
+              ~start_chunk
+              ~stop_chunk
+              states
+          in
+          let new_game_state =
+            Dissecting {dissection = states; default_number_of_sections}
+          in
+          return
+            (Either.Right
+               {
+                 turn = opponent game.turn;
+                 inbox_snapshot = game.inbox_snapshot;
+                 dal_snapshot = game.dal_snapshot;
+                 start_level = game.start_level;
+                 inbox_level = game.inbox_level;
+                 pvm_name = game.pvm_name;
+                 game_state = new_game_state;
+               })
+      | None ->
+          (*
+             Assuming the [pvm_name] registered in the [game]
+             structure is correct, this case cannot happen. This
+             property is enforced by the correctness of the
+             implementation of the rejection game, and is strengthen
+             by the encoding of [game].
+           *)
+          assert false)
   | Dissection _, Final_move _ -> tzfail Dissecting_during_final_move
   | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
       let*? start_chunk, stop_chunk =

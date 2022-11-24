@@ -213,6 +213,8 @@ module Make (Context : P) :
     | IAdd -> Format.fprintf fmt "add"
     | IStore x -> Format.fprintf fmt "store(%s)" x
 
+  let check_dissection = Sc_rollup_dissection_chunk_repr.default_check
+
   (*
 
      The machine state is represented using a Merkle tree.

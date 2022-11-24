@@ -151,7 +151,7 @@ let gen_inbox_history_proof inbox_level =
   let* inbox = gen_inbox inbox_level in
   return (Sc_rollup_inbox_repr.take_snapshot inbox)
 
-let gen_pvm_name = Gen.string_printable
+let gen_pvm_name = Gen.oneofl Sc_rollups.Kind.all_names
 
 let gen_tick =
   let open Gen in

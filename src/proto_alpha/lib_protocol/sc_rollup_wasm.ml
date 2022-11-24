@@ -517,6 +517,8 @@ module V2_0_0 = struct
       | Some (_, false) -> fail WASM_invalid_claim_about_outbox
       | None -> fail WASM_output_proof_production_failed
 
+    let check_dissection = Sc_rollup_dissection_chunk_repr.default_check
+
     module Internal_for_tests = struct
       let insert_failure state =
         let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
