@@ -3538,6 +3538,13 @@ module Sc_rollup : sig
       val produce_output_proof :
         context -> state -> output -> (output_proof, error) result Lwt.t
 
+      val check_dissection :
+        default_number_of_sections:int ->
+        start_chunk:Dissection_chunk.t ->
+        stop_chunk:Dissection_chunk.t ->
+        Dissection_chunk.t list ->
+        unit tzresult
+
       module Internal_for_tests : sig
         val insert_failure : state -> state Lwt.t
       end

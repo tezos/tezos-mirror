@@ -571,6 +571,17 @@ module type S = sig
   val produce_output_proof :
     context -> state -> output -> (output_proof, error) result Lwt.t
 
+  (** [check_dissection ~default_number_of_sections ~start_chunk
+      ~stop_chunk chunks] fails if the dissection encoded by the list
+      [[start_chunk] @ chunks @ [stop_chunk]] does not satisfy the
+      properties expected by the PVM. *)
+  val check_dissection :
+    default_number_of_sections:int ->
+    start_chunk:Sc_rollup_dissection_chunk_repr.t ->
+    stop_chunk:Sc_rollup_dissection_chunk_repr.t ->
+    Sc_rollup_dissection_chunk_repr.t list ->
+    unit tzresult
+
   module Internal_for_tests : sig
     (** [insert_failure state] corrupts the PVM state. This is used in
         the loser mode of the rollup node. *)
