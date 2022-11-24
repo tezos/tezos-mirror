@@ -198,77 +198,6 @@ let test_get_message_payload messages =
             (err (Printf.sprintf "No message payload number %d in messages" i)))
     messages
 
-let test_inclusion_proof_production (list_of_messages, n) =
-  let open Lwt_result_syntax in
-  let list_of_payloads = List.map (List.map make_payload) list_of_messages in
-  setup_inbox_with_messages list_of_payloads
-  @@ fun _level_tree_histories _messages history _inbox inboxes ->
-  let inbox = Stdlib.List.hd inboxes in
-  let old_inbox = Stdlib.List.nth inboxes n in
-  let*? res =
-    Internal_for_tests.produce_inclusion_proof
-      history
-      (old_levels_messages old_inbox)
-      (old_levels_messages inbox)
-    |> Environment.wrap_tzresult
-  in
-  match res with
-  | None ->
-      fail
-        [
-          err
-            "It should be possible to produce an inclusion proof between two \
-             versions of the same inbox.";
-        ]
-  | Some proof ->
-      let*? found_old_levels_messages =
-        verify_inclusion_proof proof (old_levels_messages inbox)
-        |> Environment.wrap_tzresult
-      in
-      fail_unless
-        (Sc_rollup_inbox_repr.equal_history_proof
-           found_old_levels_messages
-           (old_levels_messages old_inbox))
-        (err "The produced inclusion proof is invalid.")
-
-let test_inclusion_proof_verification (list_of_messages, n) =
-  let open Lwt_result_syntax in
-  let list_of_payloads = List.map (List.map make_payload) list_of_messages in
-  setup_inbox_with_messages list_of_payloads
-  @@ fun _level_tree_histories _messages history _inbox inboxes ->
-  let inbox = Stdlib.List.hd inboxes in
-  let old_inbox = Stdlib.List.nth inboxes n in
-  let*? res =
-    Internal_for_tests.produce_inclusion_proof
-      history
-      (old_levels_messages old_inbox)
-      (old_levels_messages inbox)
-    |> Environment.wrap_tzresult
-  in
-  match res with
-  | None ->
-      fail
-        [
-          err
-            "It should be possible to produce an inclusion proof between two \
-             versions of the same inbox.";
-        ]
-  | Some proof -> (
-      let other_inbox = Stdlib.List.nth inboxes 1 in
-      let res =
-        verify_inclusion_proof proof (old_levels_messages other_inbox)
-        |> Environment.wrap_tzresult
-      in
-      match res with
-      | Error _ -> return_unit
-      | Ok _found_old_levels_messages ->
-          fail
-            [
-              err
-                "It should not be possible to verify an inclusion proof with a \
-                 different inbox.";
-            ])
-
 (** This is basically identical to {!setup_inbox_with_messages}, except
     that it uses the {!Node} instance instead of the protocol instance. *)
 let setup_node_inbox_with_messages list_of_payloads f =
@@ -533,6 +462,11 @@ let test_inclusion_proofs_depending_on_history_capacity
   let hp0 = I.old_levels_messages inbox0 in
   let hp1 = I.old_levels_messages inbox1 in
   let (hp2 as hp) = I.old_levels_messages inbox2 in
+  let pred_level_of_hp =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Raw_level_repr.pred
+    @@ I.Internal_for_tests.get_level_of_history_proof hp
+  in
   let* () =
     fail_unless
       (I.equal_history_proof hp0 hp1 && I.equal_history_proof hp1 hp2)
@@ -542,35 +476,37 @@ let test_inclusion_proofs_depending_on_history_capacity
   in
   let proof s v =
     let open Result_syntax in
-    let* v = v |> Environment.wrap_tzresult in
-    Option.to_result ~none:[err (s ^ ": Expecting some inclusion proof.")] v
+    let v = v |> Environment.wrap_tzresult in
+    match v with
+    | Ok v -> return v
+    | Error _ -> fail [err (s ^ ": Expecting some inclusion proof.")]
   in
   (* Producing inclusion proofs using history1 and history2 should succeeed.
      But, we should not be able to produce any proof with history0 as bound
      is 0. *)
-  let*? ip0 =
-    I.Internal_for_tests.produce_inclusion_proof history0 hp hp
+  let ip0 =
+    I.Internal_for_tests.produce_inclusion_proof history0 hp pred_level_of_hp
     |> Environment.wrap_tzresult
   in
-  let*? ip1 =
+  let*? ip1, hp1' =
     proof "history1"
-    @@ I.Internal_for_tests.produce_inclusion_proof history1 hp hp
+    @@ I.Internal_for_tests.produce_inclusion_proof history1 hp pred_level_of_hp
   in
-  let*? ip2 =
+  let*? ip2, hp2' =
     proof "history2"
-    @@ I.Internal_for_tests.produce_inclusion_proof history2 hp hp
+    @@ I.Internal_for_tests.produce_inclusion_proof history2 hp pred_level_of_hp
   in
   let* () =
     fail_unless
-      (Option.is_none ip0)
+      (Result.is_error ip0)
       (err
          "Should not be able to get inbox inclusion proofs without a history \
           (i.e., a history with no capacity). ")
   in
-  let*? hp' = verify_inclusion_proof ip1 hp |> Environment.wrap_tzresult in
-  let*? hp'' = verify_inclusion_proof ip2 hp |> Environment.wrap_tzresult in
+  let*? hp1'' = verify_inclusion_proof ip1 hp1 |> Environment.wrap_tzresult in
+  let*? hp2'' = verify_inclusion_proof ip2 hp2 |> Environment.wrap_tzresult in
   fail_unless
-    (hp = hp' && hp = hp'')
+    (hp1' = hp1'' && hp2' = hp2'' && hp1' = hp2')
     (err "Inclusion proofs are expected to be valid.")
 
 (** This test checks that inboxes of the same levels that are supposed to contain
@@ -620,16 +556,6 @@ let tests =
       test_get_message_payload;
   ]
   @
-  let gen_inclusion_proof_inputs =
-    QCheck2.Gen.(
-      let small = 2 -- 10 in
-      let* a = list_size small bounded_string in
-      let* b = list_size small bounded_string in
-      let* l = list_size small (list_size small bounded_string) in
-      let l = a :: b :: l in
-      let* n = 0 -- (List.length l - 2) in
-      return (l, n))
-  in
   let gen_history_params =
     QCheck2.Gen.(
       (* We fix the number of levels/ inboxes. *)
@@ -650,14 +576,6 @@ let tests =
         (nb_levels, default_capacity, Int64.of_int small_capacity, next_index))
   in
   [
-    Tztest.tztest_qcheck2
-      ~name:"Produce inclusion proof between two related inboxes."
-      gen_inclusion_proof_inputs
-      test_inclusion_proof_production;
-    Tztest.tztest_qcheck2
-      ~name:"Verify inclusion proofs."
-      gen_inclusion_proof_inputs
-      test_inclusion_proof_verification;
     Tztest.tztest_qcheck2
       ~count:10
       ~name:"Checking inboxes history length"

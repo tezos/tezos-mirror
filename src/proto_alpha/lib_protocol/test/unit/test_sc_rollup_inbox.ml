@@ -319,7 +319,67 @@ let test_merkelized_payload_hashes_proof (payloads, index) =
   in
   return_unit
 
-let test_inbox_proof_production (list_of_messages, level, message_counter) =
+let test_inclusion_proof_production (list_of_inputs, level) =
+  let open Lwt_result_syntax in
+  let inbox_creation_level = Raw_level.root in
+  let*? node_inbox =
+    Node_inbox.construct_inbox ~inbox_creation_level list_of_inputs
+  in
+  let*? node_inbox_history, node_inbox_snapshot =
+    lift @@ Inbox.form_history_proof node_inbox.history node_inbox.inbox
+  in
+  let*? proof, node_old_level_messages =
+    lift
+    @@ Inbox.Internal_for_tests.produce_inclusion_proof
+         node_inbox_history
+         node_inbox_snapshot
+         level
+  in
+  let*? proto_inbox =
+    Protocol_inbox.construct_inbox ~inbox_creation_level list_of_inputs
+  in
+  (* we add a level only to archive the latest message *)
+  let*? proto_inbox = Protocol_inbox.add_new_empty_level proto_inbox in
+  let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
+  let*? found_old_levels_messages =
+    lift @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+  in
+  Assert.equal
+    ~loc:__LOC__
+    Inbox.equal_history_proof
+    "snapshot is the same in the proto and node"
+    Inbox.pp_history_proof
+    node_old_level_messages
+    found_old_levels_messages
+
+let test_inclusion_proof_verification (list_of_inputs, level) =
+  let open Lwt_result_syntax in
+  let inbox_creation_level = Raw_level.root in
+  let*? node_inbox =
+    Node_inbox.construct_inbox ~inbox_creation_level list_of_inputs
+  in
+  let*? node_inbox_history, node_inbox_snapshot =
+    lift @@ Inbox.form_history_proof node_inbox.history node_inbox.inbox
+  in
+  let*? proof, _node_old_level_messages =
+    lift
+    @@ Inbox.Internal_for_tests.produce_inclusion_proof
+         node_inbox_history
+         node_inbox_snapshot
+         level
+  in
+  let*? proto_inbox =
+    Protocol_inbox.construct_inbox ~inbox_creation_level list_of_inputs
+  in
+  (* This snapshot is not the same one as node_inbox_snapshot because the
+     node_inbox_snapshot includes the current_level_proof. *)
+  let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
+  let result =
+    lift @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+  in
+  assert_inbox_proof_error "invalid inclusion proof" result
+
+let test_inbox_proof_production (list_of_inputs, level, message_counter) =
   let open Lwt_result_syntax in
   let inbox_creation_level = Raw_level.root in
   (* We begin with a Node inbox so we can produce a proof. *)
@@ -453,6 +513,16 @@ let merkelized_payload_hashes_tests =
 
 let inbox_tests =
   [
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"produce inclusion proof and verifies it."
+      (gen_inclusion_proof_inputs ())
+      test_inclusion_proof_production;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"negative test of inclusion proof."
+      (gen_inclusion_proof_inputs ())
+      test_inclusion_proof_verification;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"produce inbox proof and verifies it."

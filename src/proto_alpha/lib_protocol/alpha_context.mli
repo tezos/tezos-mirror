@@ -3388,8 +3388,8 @@ module Sc_rollup : sig
       val produce_inclusion_proof :
         History.t ->
         history_proof ->
-        history_proof ->
-        inclusion_proof option tzresult
+        Raw_level.t ->
+        (inclusion_proof * history_proof) tzresult
 
       val serialized_proof_of_string : string -> serialized_proof
     end
