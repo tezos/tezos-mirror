@@ -90,10 +90,8 @@ let head_encoding =
          (req "level" Data_encoding.int32)))
 
 module Blocks_cache =
-  Ringo_lwt.Functors.Make_opt
-    ((val Ringo.(
-            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Tezos_crypto.Block_hash))
+  Aches_lwt.Lache.Make_option
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Tezos_crypto.Block_hash))
 
 type blocks_cache =
   Protocol_client_context.Alpha_block_services.block_info Blocks_cache.t
@@ -126,10 +124,10 @@ let predecessors_of_blocks hashes =
     and cached locally. *)
 let get_predecessor =
   let max_cached = 1023 and max_read = 8 in
-  let (module HMF : Ringo.MAP_MAKER) =
-    Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise)
+  let module HM =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (Tezos_crypto.Block_hash)
   in
-  let module HM = HMF (Tezos_crypto.Block_hash) in
   let cache = HM.create max_cached in
   fun cctxt (chain : Tezos_shell_services.Chain_services.chain) ancestor ->
     let open Lwt_result_syntax in
@@ -248,10 +246,8 @@ let shutdown state =
     L1 node otherwise. *)
 let fetch_tezos_block l1_ctxt hash =
   trace (Cannot_find_block hash)
-  @@ fetch_tezos_block
-       l1_ctxt.cctxt
-       hash
-       ~find_in_cache:(Blocks_cache.find_or_replace l1_ctxt.blocks_cache)
+  @@ fetch_tezos_block l1_ctxt.cctxt hash ~find_in_cache:(fun h mk ->
+         Blocks_cache.bind_or_put l1_ctxt.blocks_cache h mk Lwt.return)
 
 let nth_predecessor l1_state n block =
   let open Lwt_result_syntax in

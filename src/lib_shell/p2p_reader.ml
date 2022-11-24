@@ -44,8 +44,8 @@ type callback = {
 }
 
 module Block_hash_cache :
-  Ringo.CACHE_MAP with type key = Tezos_crypto.Block_hash.t =
-  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+  Aches.Vache.MAP with type key = Tezos_crypto.Block_hash.t =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (Tezos_crypto.Block_hash)
 
 type chain_db = {

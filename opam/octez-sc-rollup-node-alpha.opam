@@ -32,8 +32,8 @@ depends: [
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "irmin-pack" { >= "3.4.3" & < "3.5.0" }
   "irmin" { >= "3.4.3" & < "3.5.0" }
-  "ringo" { >= "0.9" & < "1.0.0" }
-  "ringo-lwt" { >= "0.9" }
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
   "tezos-injector-alpha"
   "tezos-scoru-wasm-fast"
   "tezos-crypto-dal"

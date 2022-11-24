@@ -33,8 +33,8 @@
   irmin-pack
   irmin-pack.unix
   irmin
-  ringo
-  ringo-lwt
+  aches
+  aches-lwt
   tezos-injector-alpha
   tezos-scoru-wasm-fast
   tezos-crypto-dal)

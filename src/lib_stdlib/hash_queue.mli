@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Bounded queues combined with hash-tables, based on {!Ringo}.
+(** Bounded queues combined with hash-tables, based on {!Aches}.
 
     A {e hash queue} is a structure where one can add elements to the back of
     the queue, while associating them to keys. This allows for efficiently
@@ -54,9 +54,6 @@ module Make
   (** [find_opt q k] is [Some v] if [k] is bound to [v] in [q]. It is [None]
       otherwise. *)
   val find_opt : t -> K.t -> V.t option
-
-  (** [filter q f] retains only the bindings [(k, v)] such that [f k v = true]. *)
-  val filter : t -> (K.t -> V.t -> bool) -> unit
 
   (** [length q] is the number of bindings held by [q]. *)
   val length : t -> int

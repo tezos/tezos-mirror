@@ -28,12 +28,9 @@
 open Protocol.Alpha_context
 open Protocol_client_context
 open Common
-
 module Tezos_blocks_cache =
-  Ringo_lwt.Functors.Make_opt
-    ((val Ringo.(
-            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Tezos_crypto.Block_hash))
+  Aches_lwt.Lache.Make_option
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Tezos_crypto.Block_hash))
 
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;
@@ -81,7 +78,11 @@ let fetch_tezos_block state hash =
       | Ok block -> return_some block
     in
     let+ block =
-      Tezos_blocks_cache.find_or_replace state.tezos_blocks_cache hash fetch
+      Tezos_blocks_cache.bind_or_put
+        state.tezos_blocks_cache
+        hash
+        fetch
+        Lwt.return
     in
     Result.of_option ~error:!errors block
     |> record_trace (Error.Tx_rollup_cannot_fetch_tezos_block hash)

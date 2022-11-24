@@ -582,13 +582,9 @@ end
 
 module L2_block_store = struct
   open L2_block_info
-
   module Cache =
-    Ringo_lwt.Functors.Make_opt
-      ((val Ringo.(
-              map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-         (L2block.Hash))
-
+    Aches_lwt.Lache.Make_option
+      (Aches.Rache.Transfer (Aches.Rache.LRU) (L2block.Hash))
   module L2_block_index =
     Index_unix.Make (L2_block_key) (L2_block_info) (Index.Cache.Unbounded)
 
@@ -663,7 +659,7 @@ module L2_block_store = struct
       | Some (block, _) -> Lwt.return_some block
       | None -> Lwt.return_none
     in
-    Cache.find_or_replace store.cache hash read_from_disk
+    Cache.bind_or_put store.cache hash read_from_disk Lwt.return
 
   let locked_write_block store ~offset ~block ~hash =
     let open Lwt_result_syntax in
@@ -690,7 +686,7 @@ module L2_block_store = struct
     let open Lwt_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     let hash = block.hash in
-    Cache.replace store.cache hash (return_some block) ;
+    Cache.put store.cache hash (return_some block) ;
     let* offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
     let* _written_len = locked_write_block store ~offset ~block ~hash in
     if flush then L2_block_index.flush store.index ;

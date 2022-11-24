@@ -60,10 +60,8 @@ let invalid_block_encoding =
     (obj2 (req "level" int32) (req "errors" (list Error_monad.error_encoding)))
 
 module Block_lru_cache =
-  Ringo_lwt.Functors.Make_opt
-    ((val Ringo.(
-            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Tezos_crypto.Block_hash))
+  Aches_lwt.Lache.Make_option
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Tezos_crypto.Block_hash))
 
 module Protocol_levels = struct
   include Map.Make (struct

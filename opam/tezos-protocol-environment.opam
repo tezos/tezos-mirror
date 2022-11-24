@@ -21,8 +21,8 @@ depends: [
   "zarith_stubs_js"
   "tezos-crypto-dal"
   "class_group_vdf" { >= "0.0.4" }
-  "ringo" { >= "0.9" & < "1.0.0" }
-  "ringo-lwt" { >= "0.9" }
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
   "tezos-base"
   "tezos-sapling"
   "tezos-micheline"

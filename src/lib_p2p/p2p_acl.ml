@@ -24,10 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module PeerFIFOCache : Ringo.CACHE_SET with type elt = P2p_peer.Id.t =
-  (val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
-     : Ringo.SET_MAKER)
-    (P2p_peer.Id)
+module PeerFIFOCache : Aches.Vache.SET with type elt = P2p_peer.Id.t =
+  Aches.Vache.Set (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (P2p_peer.Id)
 
 module IPV6 = struct
   type t = Ipaddr.V6.t
@@ -43,10 +41,8 @@ end
    PatriciaTree structure below. So we are forced to duplicate this information.
    This is different from the module above that is used to keep the list of
    greylisted peers *)
-module IpFIFOCache : Ringo.CACHE_SET with type elt = IPV6.t =
-  (val Ringo.set_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise
-     : Ringo.SET_MAKER)
-    (IPV6)
+module IpFIFOCache : Aches.Vache.SET with type elt = IPV6.t =
+  Aches.Vache.Set (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (IPV6)
 
 module IpTable = Hashtbl.Make (struct
   type t = Ipaddr.V6.t

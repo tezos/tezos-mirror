@@ -142,16 +142,6 @@ let test_replace_above_capacity () =
     ~loc:__LOC__
     (Queue.find_opt q (mock_key 0))
 
-let test_filter () =
-  let q = init_queue 10 10 in
-  Queue.filter q (fun _ v -> v < 5) ;
-  Assert.Int.equal ~loc:__LOC__ 5 (Queue.length q)
-
-let test_filter_none () =
-  let q = init_queue 10 10 in
-  Queue.filter q (fun _ v -> v < 15) ;
-  Assert.Int.equal ~loc:__LOC__ 10 (Queue.length q)
-
 let test_clear () =
   let q = init_queue 10 10 in
   Queue.clear q ;
@@ -231,8 +221,6 @@ let () =
             `Quick,
             test_take_at_most_above_capacity );
           ("replace_above_capacity", `Quick, test_replace_above_capacity);
-          ("filter", `Quick, test_filter);
-          ("filter_none", `Quick, test_filter_none);
           ("clear", `Quick, test_clear);
           ("fold", `Quick, test_fold);
           ("elements", `Quick, test_elements);

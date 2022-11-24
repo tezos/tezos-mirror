@@ -16,7 +16,7 @@
   secp256k1-internal
   tezos-error-monad
   tezos-rpc
-  ringo
+  aches
   zarith
   zarith_stubs_js
   bls12-381

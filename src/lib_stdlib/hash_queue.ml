@@ -23,24 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module RingoMaker : Ringo.MAP_MAKER =
-  (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
-
 module Make
     (K : Hashtbl.HashedType) (V : sig
       type t
     end) =
 struct
-  module Ring = RingoMaker (K)
-  include Ring
+  module Cache =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (K)
+  include Cache
 
   type nonrec t = V.t t
 
-  let elements q = Ring.fold (fun _ x acc -> x :: acc) q []
+  let elements q = Cache.fold (fun _ x acc -> x :: acc) q []
 
-  let keys q = Ring.fold (fun k _ acc -> k :: acc) q []
+  let keys q = Cache.fold (fun k _ acc -> k :: acc) q []
 
-  let bindings q = Ring.fold (fun k x acc -> (k, x) :: acc) q []
+  let bindings q = Cache.fold (fun k x acc -> (k, x) :: acc) q []
 
   (** [oldest_elements q n f] returns the (at most) [n] oldest elements of the
       queue and calls [f] on the bindings for these elements. The elements are
@@ -49,7 +47,7 @@ struct
     let exception Elements of V.t list in
     let rev_elts =
       try
-        Ring.fold_oldest_first
+        Cache.fold_oldest_first
           (fun k v (count, acc) ->
             if count >= n then raise (Elements acc)
             else (
@@ -63,7 +61,7 @@ struct
     List.rev rev_elts
 
   (* Redefining fold to have elements treated in order of oldest to newest *)
-  let fold f q acc = Ring.fold_oldest_first f q acc
+  let fold f q acc = Cache.fold_oldest_first f q acc
 
   let fold_s f q acc =
     let open Lwt.Syntax in

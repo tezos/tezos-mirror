@@ -197,13 +197,11 @@ module Block = struct
         locked_is_known_invalid chain_state hash)
 
   let is_known_prechecked {chain_state; _} hash =
-    let open Lwt_syntax in
     Shared.use chain_state (fun {prechecked_blocks; _} ->
-        match Block_lru_cache.find_opt prechecked_blocks hash with
-        | None -> Lwt.return_false
-        | Some t -> (
-            let* o = t in
-            match o with None -> Lwt.return_false | Some _ -> Lwt.return_true))
+        Option.value ~default:Lwt.return_false
+        @@ Block_lru_cache.bind prechecked_blocks hash (function
+               | None -> Lwt.return_false
+               | Some _ -> Lwt.return_true))
 
   let is_known chain_store hash =
     let open Lwt_syntax in
@@ -335,9 +333,8 @@ module Block = struct
 
   let read_prechecked_block_opt {chain_state; _} hash =
     Shared.use chain_state (fun {prechecked_blocks; _} ->
-        match Block_lru_cache.find_opt prechecked_blocks hash with
-        | None -> Lwt.return_none
-        | Some t -> t)
+        Option.value ~default:Lwt.return_none
+        @@ Block_lru_cache.bind prechecked_blocks hash Lwt.return)
 
   let read_prechecked_block chain_store hash =
     let open Lwt_result_syntax in
@@ -550,7 +547,7 @@ module Block = struct
     in
     let*! () =
       Shared.use chain_store.chain_state (fun {prechecked_blocks; _} ->
-          Block_lru_cache.replace prechecked_blocks hash (Lwt.return_some block) ;
+          Block_lru_cache.put prechecked_blocks hash (Lwt.return_some block) ;
           Lwt.return_unit)
     in
     let*! () =

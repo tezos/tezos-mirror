@@ -236,7 +236,7 @@ module type INDEXES = sig
   end
 
   module WeakRingTable : sig
-    include Ringo.CACHE_MAP with type key = t
+    include Aches.Vache.MAP with type key = t
 
     val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
   end

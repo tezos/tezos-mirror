@@ -21,7 +21,8 @@
   tezos-stdlib-unix
   tezos-stdlib
   lwt-watcher
-  ringo-lwt
+  aches
+  aches-lwt
   camlzip
   tar
   tar-unix

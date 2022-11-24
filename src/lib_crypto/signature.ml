@@ -667,17 +667,14 @@ let check ?watermark public_key signature message =
 (* The following cache is a hack to work around a quadratic algorithm
    in Tezos Mainnet protocols up to Edo. *)
 
-let make_endorsement_cache =
-  match Sys.getenv_opt "TEZOS_DISABLE_ENDORSEMENT_SIGNATURE_CACHE" with
-  | Some _ ->
-      let module Fake_ring (H : Stdlib.Hashtbl.HashedType) = struct
-        include Ringo.EmptyMap (H)
+module type ENDORSEMENT_CACHE_MAKER = functor (H : Stdlib.Hashtbl.HashedType) ->
+  Aches.Vache.MAP with type key = H.t
 
-        let create (_ : int) = create ()
-      end in
-      (module Fake_ring : Ringo.MAP_MAKER)
+let make_endorsement_cache : (module ENDORSEMENT_CACHE_MAKER) =
+  match Sys.getenv_opt "TEZOS_DISABLE_ENDORSEMENT_SIGNATURE_CACHE" with
+  | Some _ -> (module Aches.Vache.EmptyMap)
   | None ->
-      Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Sloppy)
+      (module Aches.Vache.Map (Aches.Vache.FIFO_Sloppy) (Aches.Vache.Strong))
 
 module Endorsement_cache =
   (val make_endorsement_cache)

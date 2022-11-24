@@ -281,10 +281,11 @@ let read_block ~read_metadata block_store key_kind =
                   | Error _ -> Lwt.return_none)
             in
             let*! block =
-              Block_lru_cache.find_or_replace
+              Block_lru_cache.bind_or_put
                 block_store.block_cache
                 adjusted_hash
                 fetch_block
+                Lwt.return
             in
             return block)
 
@@ -331,7 +332,7 @@ let store_block block_store block =
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       protect (fun () ->
           let*! predecessors = compute_predecessors block_store block in
-          Block_lru_cache.replace
+          Block_lru_cache.put
             block_store.block_cache
             block.hash
             (Lwt.return_some block) ;
