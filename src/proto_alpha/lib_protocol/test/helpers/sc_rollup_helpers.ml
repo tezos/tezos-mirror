@@ -260,24 +260,6 @@ let pp_message fmt {input; message} =
     | `Message msg -> msg
     | `EOL -> "EOL")
 
-(** An empty inbox level is a SOL and EOL. *)
-let make_empty_level (timestamp, predecessor) inbox_level =
-  let sol = {input = make_sol ~inbox_level; message = `SOL} in
-  let info_per_level =
-    {
-      input = make_info_per_level ~inbox_level ~predecessor ~timestamp;
-      message = `Info_per_level (timestamp, predecessor);
-    }
-  in
-
-  let eol =
-    {
-      input = make_eol ~inbox_level ~message_counter:(Z.of_int 2);
-      message = `EOL;
-    }
-  in
-  [sol; info_per_level; eol]
-
 (** Creates inputs based on string messages. *)
 let strs_to_inputs inbox_level messages =
   List.fold_left
@@ -287,8 +269,10 @@ let strs_to_inputs inbox_level messages =
     ([], Z.of_int 2)
     messages
 
-(** Transform messages into inputs and wrap them between SOL and EOL. *)
-let wrap_messages (timestamp, predecessor) inbox_level strs =
+(** Transform messages into inputs and wrap them between [SOL; info_per_level]
+    and EOL. *)
+let wrap_messages ?(timestamp = Timestamp.of_seconds 0L)
+    ?(predecessor = Tezos_crypto.Block_hash.zero) inbox_level strs =
   let sol = {input = make_sol ~inbox_level; message = `SOL} in
   let rev_inputs, message_counter = strs_to_inputs inbox_level strs in
   let inputs = List.rev rev_inputs in
@@ -301,9 +285,12 @@ let wrap_messages (timestamp, predecessor) inbox_level strs =
   let eol = {input = make_eol ~inbox_level ~message_counter; message = `EOL} in
   (sol :: info_per_level :: inputs) @ [eol]
 
+(** An empty inbox level is a SOL, info_per_level and EOL. *)
+let make_empty_level ?timestamp ?predecessor inbox_level =
+  wrap_messages ?timestamp ?predecessor inbox_level []
+
 let gen_messages_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
-  let dumb_info = (Timestamp.of_seconds 0L, Tezos_crypto.Block_hash.zero) in
   let rec aux acc n =
     match n with
     | n when n < 0 ->
@@ -316,14 +303,14 @@ let gen_messages_for_levels ~start_level ~max_level gen_message =
         in
         let* empty_level = bool in
         let* level_messages =
-          if empty_level then return (make_empty_level dumb_info inbox_level)
+          if empty_level then return (make_empty_level inbox_level)
           else
             let* messages =
               let* input = gen_message in
               let* inputs = small_list gen_message in
               return (input :: inputs)
             in
-            return (wrap_messages dumb_info inbox_level messages)
+            return (wrap_messages inbox_level messages)
         in
         aux (level_messages :: acc) (n - 1)
   in

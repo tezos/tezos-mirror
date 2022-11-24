@@ -2045,8 +2045,8 @@ let full_history_inbox all_inbox_messages =
   (* Add the SOL/Info_per_level/EOL to the list of inbox messages. *)
   let all_inbox_messages =
     List.map
-      (fun (inbox_level, info, inbox_messages) ->
-        wrap_messages info inbox_level inbox_messages)
+      (fun (inbox_level, (timestamp, predecessor), inbox_messages) ->
+        wrap_messages ~timestamp ~predecessor inbox_level inbox_messages)
       all_inbox_messages
   in
   (* Create a inbox adding the messages from [all_inbox_messages]. *)
