@@ -25,8 +25,6 @@
 
 open Protocol.Alpha_context
 
-let tez_sym = "\xEA\x9C\xA9"
-
 type error +=
   | Cannot_produce_proof of Sc_rollup.Inbox.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}
@@ -46,9 +44,7 @@ type error +=
   | No_batcher
   | No_publisher
 
-type error +=
-  | Lost_game of
-      public_key_hash * Protocol.Alpha_context.Sc_rollup.Game.reason * Tez.t
+type error += Lost_game of Protocol.Alpha_context.Sc_rollup.Game.game_result
 
 let () =
   register_error_kind
@@ -224,27 +220,19 @@ let () =
     ~id:"sc_rollup.node.lost_game"
     ~title:"Lost refutation game"
     ~description:"The rollup node lost a refutation game."
-    ~pp:(fun ppf (loser, reason, slashed) ->
+    ~pp:(fun ppf result ->
       Format.fprintf
         ppf
-        "The rollup node lost the refutation game for operator %a and was \
-         slashed %s%a, for reason: %a."
-        Signature.Public_key_hash.pp
-        loser
-        tez_sym
-        Tez.pp
-        slashed
-        Protocol.Alpha_context.Sc_rollup.Game.pp_reason
-        reason)
+        "The rollup node lost the refutation game (%a)"
+        Protocol.Alpha_context.Sc_rollup.Game.pp_game_result
+        result)
     Data_encoding.(
-      obj3
-        (req "loser" Signature.Public_key_hash.encoding)
-        (req "reason" Protocol.Alpha_context.Sc_rollup.Game.reason_encoding)
-        (req "slashed" Tez.encoding))
-    (function
-      | Lost_game (loser, reason, slashed) -> Some (loser, reason, slashed)
-      | _ -> None)
-    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed)) ;
+      obj1
+        (req
+           "result"
+           Protocol.Alpha_context.Sc_rollup.Game.game_result_encoding))
+    (function Lost_game result -> Some result | _ -> None)
+    (fun result -> Lost_game result) ;
 
   register_error_kind
     ~id:"sc_rollup.node.no_batcher"
