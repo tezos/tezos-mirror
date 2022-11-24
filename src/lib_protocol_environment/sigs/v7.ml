@@ -11827,30 +11827,6 @@ val proof_encoding : proof Data_encoding.t
 val scalar_encoding : scalar Data_encoding.t
 
 val scalar_array_encoding : scalar array Data_encoding.t
-
-(** Verifier function: checks proof
-   Inputs:
-   - public_parameters: output of setup
-   - public_inputs (scalar array): the first values of private_inputs that are public
-   - proof: output of prove
-   Outputs:
-   - bool
-*)
-val verify : public_parameters -> public_inputs:scalar array -> proof -> bool
-
-(**  Verifier function: checks a bunch of proofs for several circuits
-   Inputs:
-   - public_parameters: output of setup_multi_circuits for the circuits being checked
-   - public_inputs: StringMap where the lists of public inputs are binded with the circuit to which they correspond
-   - proof: the unique proof that correspond to all inputs
-   Outputs:
-   - bool
-*)
-val verify_multi_circuits :
-  public_parameters ->
-  public_inputs:(string * scalar array list) list ->
-  proof ->
-  bool
 end
 # 134 "v7.in.ml"
 
