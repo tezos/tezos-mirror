@@ -3849,7 +3849,7 @@ end = struct
       in
       ()
 
-    let make ~name =
+    let make ~name ~status =
       let name_underscore = Name.name_underscore name in
       let name_dash = Name.name_dash name in
       let number = Name.number name in
@@ -4107,6 +4107,17 @@ module Protocol = Protocol
           ~modules:["Registerer"]
           ~linkall:true
           ~flags:(Flags.standard ~disable_warnings ())
+          ~release_status:
+            (match (number, status) with
+            | V _, (Active | Frozen | Overridden) ->
+                (* Contrary to client libs and protocol plugin registerers,
+                   embedded protocols are useful even when the protocol was overridden. *)
+                Released
+            | V _, Not_mainnet | (Alpha | Other), _ ->
+                (* Ideally we would not release the opam packages but this would require
+                   removing the dependencies when releasing, both from .opam files
+                   and dune files. *)
+                Auto_opam)
           ~deps:[main; octez_protocol_updater; octez_protocol_environment]
           ~dune:
             Dune.
@@ -4136,7 +4147,9 @@ module Protocol = Protocol
 
   let genesis =
     let name = Name.other "genesis" in
-    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
+    let {Lib_protocol.main; embedded} =
+      Lib_protocol.make ~name ~status:Not_mainnet
+    in
     let client =
       public_lib
         (sf "tezos-client-%s" (Name.name_dash name))
@@ -4160,12 +4173,16 @@ module Protocol = Protocol
 
   let demo_noops =
     let name = Name.other "demo-noops" in
-    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
+    let {Lib_protocol.main; embedded} =
+      Lib_protocol.make ~name ~status:Not_mainnet
+    in
     register @@ make ~name ~status:Not_mainnet ~main ~embedded ()
 
   let _demo_counter =
     let name = Name.other "demo-counter" in
-    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
+    let {Lib_protocol.main; embedded} =
+      Lib_protocol.make ~name ~status:Not_mainnet
+    in
     let client =
       public_lib
         (sf "tezos-client-%s" (Name.name_dash name))
@@ -4200,11 +4217,30 @@ module Protocol = Protocol
       | Frozen | Active | Not_mainnet -> true
       | Overridden -> false
     in
+    let executable_release_status =
+      match (number, status) with
+      | V _, (Active | Frozen) -> Released
+      | V _, (Overridden | Not_mainnet) -> Unreleased
+      | Alpha, _ -> Experimental
+      | Other, _ -> Unreleased
+    in
+    let optional_library_release_status =
+      match (number, status) with
+      | V _, (Active | Frozen) ->
+          (* Put explicit dependency in meta-package octez.opam to force the optional
+             dependency to be installed. *)
+          Released
+      | V _, (Overridden | Not_mainnet) | (Alpha | Other), _ ->
+          (* Ideally we would not release the opam packages but this would require
+             removing the dependencies when releasing, both from .opam files
+             and dune files. *)
+          Auto_opam
+    in
     let opt_map l f = Option.map f l in
     let both o1 o2 =
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
     in
-    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
+    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name ~status in
     let parameters =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
@@ -4278,6 +4314,7 @@ module Protocol = Protocol
         (sf "tezos-protocol-plugin-%s-registerer" name_dash)
         ~path:(path // "lib_plugin")
         ~synopsis:"Tezos/Protocol: protocol plugin registerer"
+        ~release_status:optional_library_release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4295,6 +4332,7 @@ module Protocol = Protocol
         (sf "tezos-client-%s" name_dash)
         ~path:(path // "lib_client")
         ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
+        ~release_status:optional_library_release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4667,12 +4705,6 @@ module Protocol = Protocol
             else "Baking_commands_registration");
           ]
     in
-    let release_status =
-      match number with
-      | V _ -> Released
-      | Alpha -> Experimental
-      | Other -> Unreleased
-    in
     let daemon daemon =
       only_if active @@ fun () ->
       public_exe
@@ -4680,7 +4712,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
         ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)
-        ~release_status
+        ~release_status:executable_release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4763,7 +4795,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
         ~synopsis:"Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"
-        ~release_status
+        ~release_status:executable_release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4788,7 +4820,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
-        ~release_status
+        ~release_status:executable_release_status
         ~deps:
           [
             octez_base |> open_ |> open_ ~m:"TzPervasives"
@@ -4833,7 +4865,18 @@ module Protocol = Protocol
         ~path:(path // "bin_wasm_repl")
         ~opam:"octez-wasm-repl"
         ~synopsis:"Tezos/Protocol: REPL for the scoru-wasm functionality"
-        ~release_status:Unreleased
+        ~release_status:
+          (match number with
+          | Alpha ->
+              (* It's currently unclear whether it'll be ready for protocol M.
+                 Change this to [Released] if you want the next major version to
+                 come with this executable. *)
+              Experimental
+          | _ ->
+              (* There is no need for more than one octez-wasm-repl executable.
+                 It should in fact be moved outside of proto_alpha,
+                 into its own directory like src/bin_wasm_repl. *)
+              Unreleased)
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives";
@@ -4897,7 +4940,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_client")
         ~synopsis:"Tezos/Protocol: `octez-tx-rollup-client-alpha` client binary"
-        ~release_status
+        ~release_status:executable_release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4919,7 +4962,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
-        ~release_status
+        ~release_status:executable_release_status
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -5894,6 +5937,7 @@ let _octez_dal_node =
     ~path:"src/bin_dal_node"
     ~internal_name:"main_dal"
     ~synopsis:"Tezos: `octez-dal-node` binary"
+    ~release_status:Experimental
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";
@@ -5984,7 +6028,15 @@ let () =
     in
     test "main" ~alias:"" ~path:"tezt/tests" ~opam:"" ~deps:(deps @ test_libs)
   in
-  generate ~make_tezt_exe ~default_profile:"octez-deps"
+  generate
+    ~make_tezt_exe
+    ~default_profile:"octez-deps"
+    ~add_to_meta_package:
+      [
+        (* [ledgerwallet_tezos] is an optional dependency, but we want
+           [opam install octez] to always install it. *)
+        ledgerwallet_tezos;
+      ]
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
