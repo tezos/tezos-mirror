@@ -109,4 +109,19 @@ module V2_0_0 : sig
       have to agree on (if they do, it means they are using the same
       tree structure). *)
   val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
+
+  (** Number of ticks between snapshotable states, chosen low enough
+      to maintain refutability.
+
+      {b Warning:} This value is used to specialize the dissection
+      predicate of the WASM PVM. Do not change it without a migration
+      plan for already originated smart rollups.
+
+      Depends on
+      - speed (tick/s) of node in slow mode (from benchmark, 6000000 tick/s)
+      - the number of ticks in a commitment ({!Int64.max_int},
+         as per Number_of_ticks.max_value)
+
+      see #3590 for more pointers *)
+  val ticks_per_snapshot : Z.t
 end

@@ -3632,6 +3632,8 @@ module Sc_rollup : sig
   end
 
   module Wasm_2_0_0PVM : sig
+    val ticks_per_snapshot : Z.t
+
     module type P = sig
       module Tree :
         Context.TREE with type key = string list and type value = bytes

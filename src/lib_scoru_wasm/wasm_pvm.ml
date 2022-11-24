@@ -170,10 +170,7 @@ let pvm_state_encoding =
        (option durable_buffers_encoding)
        (scope ["wasm"] tick_state_encoding)
        (value ~default:Z.zero ["pvm"; "last_top_level_call"] Data_encoding.n)
-       (value
-          ~default:Constants.wasm_max_tick
-          ["pvm"; "max_nb_ticks"]
-          Data_encoding.n)
+       (value ["pvm"; "max_nb_ticks"] Data_encoding.n)
        (value
           ~default:Constants.maximum_reboots_per_input
           ["pvm"; "maximum_reboots_per_input"]
@@ -207,7 +204,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* tree = T.remove tree ["wasm"] in
     Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
-  let install_boot_sector bs tree =
+  let install_boot_sector ~ticks_per_snapshot bs tree =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4240
        We cannot manipulate the durable storage at this point, because
        the `durable` directory is empty. *)
@@ -215,7 +212,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let bs = Tezos_lazy_containers.Chunked_byte_vector.of_string bs in
     Tree_encoding_runner.encode
       Tezos_tree_encoding.(
-        tup2
+        tup3
           ~flatten:true
           (* We set the reboot flag in the durable storage to allow a
              reboot to the evaluation phase once the collection of the
@@ -226,8 +223,9 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
           (scope
              ["durable"; "kernel"; "env"; "reboot"; "_"]
              chunked_byte_vector)
-          (scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector))
-      (reboot_flag, bs)
+          (scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector)
+          (value ["pvm"; "max_nb_ticks"] Data_encoding.n))
+      (reboot_flag, bs, ticks_per_snapshot)
       tree
 
   let compute_step_many ?builtins ?stop_at_snapshot ~max_steps tree =

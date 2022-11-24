@@ -46,7 +46,8 @@ type info = {
 
 module Make
     (Tree : Context.TREE with type key = string list and type value = bytes) : sig
-  val install_boot_sector : string -> Tree.tree -> Tree.tree Lwt.t
+  val install_boot_sector :
+    ticks_per_snapshot:Z.t -> string -> Tree.tree -> Tree.tree Lwt.t
 
   val compute_step : Tree.tree -> Tree.tree Lwt.t
 

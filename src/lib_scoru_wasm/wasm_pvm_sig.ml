@@ -60,10 +60,11 @@ module type S = sig
 
   include Wasm_vm_sig.Generic with type state := tree
 
-  (** [install_boot_sector payload tree] installs the [payload] passed
-      as an argument in [tree] so that it is interpreted as the kernel
-      to be used by the PVM. *)
-  val install_boot_sector : string -> tree -> tree Lwt.t
+  (** [install_boot_sector ~ticks_per_snapshot payload tree] installs
+      the [payload] passed as an argument in [tree] so that it is
+      interpreted as the kernel to be used by the PVM. *)
+  val install_boot_sector :
+    ticks_per_snapshot:Z.t -> string -> tree -> tree Lwt.t
 
   (** [get_output output state] returns the payload associated with the given
       output. The result is meant to be deserialized using
