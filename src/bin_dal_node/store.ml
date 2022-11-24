@@ -66,20 +66,85 @@ let init config =
   let* () = Event.(emit store_is_ready ()) in
   Lwt.return {slots_store; slots_watcher; slot_headers_store}
 
-module Legacy_paths = struct
-  let slot_by_commitment commitment = ["slots"; commitment]
+module Legacy_paths : sig
+  val slot_by_commitment : string -> string list
 
-  let slot_ids_by_commitment commitment =
-    slot_by_commitment commitment @ ["slot_ids"]
+  val slot_id_by_commitment : string -> Services.Types.slot_id -> string trace
 
-  let slot_shards_by_commitment commitment =
-    slot_by_commitment commitment @ ["shards"]
+  val slot_shards_by_commitment : string -> string trace
 
-  let slot_shard_by_commitment commitment index =
-    slot_shards_by_commitment commitment @ [string_of_int index]
+  val slot_shard_by_commitment : string -> int -> string trace
+end = struct
+  module Path_internals = struct
+    type internal = [`Internal]
 
-  let slot_shards_flag_by_commitment commitment =
-    slot_by_commitment commitment @ ["shards_saved_flag"]
+    type any = [internal | `Any]
+
+    type _ path =
+      | Root : string -> internal path
+      | Internal : {prefix : internal path; ext : string} -> internal path
+      | Leaf : {
+          prefix : internal path;
+          ext : string list;
+          is_collection : bool;
+        }
+          -> any path
+
+    let root = Root "slots"
+
+    let mk_internal prefix ext = Internal {prefix; ext}
+
+    let mk_leaf ?(is_collection = true) prefix ext =
+      Leaf {prefix; ext; is_collection}
+
+    let slot_by_commitment commitment = mk_internal root commitment
+
+    let slot_ids_by_commitment commitment =
+      mk_internal (slot_by_commitment commitment) "slot_ids"
+
+    let slot_id_by_commitment commitment slot_id =
+      let {Services.Types.slot_level; slot_index} = slot_id in
+      mk_leaf
+        ~is_collection:false
+        (slot_ids_by_commitment commitment)
+        [Int32.to_string slot_level; Int32.to_string slot_index]
+
+    let slot_shards_by_commitment commitment =
+      mk_internal (slot_by_commitment commitment) "shards"
+
+    let slot_shard_by_commitment commitment index =
+      mk_leaf (slot_shards_by_commitment commitment) [string_of_int index]
+
+    let data_path (type a) (p : a path) =
+      let rec path (p : internal path) acc =
+        match p with
+        | Root s -> s :: acc
+        | Internal {prefix; ext} -> path prefix (ext :: acc)
+      in
+      let prefix, is_collection, ext =
+        match p with
+        | (Root _ | Internal _) as p -> ((p : internal path), false, None)
+        | Leaf {prefix; ext; is_collection} -> (prefix, is_collection, Some ext)
+      in
+      let acc =
+        match (ext, is_collection) with
+        | None, _ -> ["data"]
+        | Some ext, true -> "data" :: ext
+        | Some ext, false -> ext @ ["data"]
+      in
+      path prefix acc
+  end
+
+  let slot_by_commitment c = Path_internals.(data_path @@ slot_by_commitment c)
+
+  let slot_id_by_commitment c slot_id =
+    Path_internals.(data_path @@ slot_id_by_commitment c slot_id)
+
+  let slot_shard_by_commitment c index =
+    Path_internals.(data_path @@ slot_shard_by_commitment c index)
+
+  let slot_shards_by_commitment c =
+    Path_internals.(data_path @@ slot_shards_by_commitment c)
 end
 
 module Legacy = struct
