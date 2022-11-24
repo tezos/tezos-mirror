@@ -62,10 +62,11 @@ module type S = sig
       inbox_level messages] evaluates the [messages] for inbox level
       [inbox_level] in the given [state] of the PVM and returns the evaluation
       results containing the new state, the remaining fuel, and the number of
-      ticks for the evaluation of these messages. [message_counter_offset] is
-      used when we evaluate partial inboxes, such as during simulation. When
-      [reveal_map] is provided, it is used as an additional source of data for
-      revelation ticks. *)
+      ticks for the evaluation of these messages. If [messages] is empty, the
+      PVM progresses until the next input request (within the allocated
+      [fuel]). [message_counter_offset] is used when we evaluate partial
+      inboxes, such as during simulation. When [reveal_map] is provided, it is
+      used as an additional source of data for revelation ticks. *)
   val eval_messages :
     ?reveal_map:string Sc_rollup_reveal_hash.Map.t ->
     fuel:fuel ->
@@ -427,14 +428,42 @@ module Make (PVM : Pvm.S) = struct
       let open Delayed_write_monad.Lwt_result_syntax in
       let*! initial_tick = PVM.get_tick state in
       let>* state, remaining_fuel, num_messages, remaining_messages =
-        eval_messages
-          ~reveal_map
-          ~fuel
-          node_ctxt
-          ~message_counter_offset
-          state
-          inbox_level
-          messages
+        match messages with
+        | [] ->
+            let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
+            let message_index = message_counter_offset - 1 in
+            let failing_ticks =
+              Loser_mode.is_failure
+                node_ctxt.Node_context.loser_mode
+                ~level
+                ~message_index
+            in
+            let>* res =
+              eval_until_input
+                node_ctxt
+                reveal_map
+                level
+                message_index
+                ~fuel
+                0L
+                failing_ticks
+                state
+            in
+            let state, remaining_fuel =
+              match res with
+              | Aborted {state; fuel; _} | Completed {state; fuel; _} ->
+                  (state, fuel)
+            in
+            return (state, remaining_fuel, 0, [])
+        | _ ->
+            eval_messages
+              ~reveal_map
+              ~fuel
+              node_ctxt
+              ~message_counter_offset
+              state
+              inbox_level
+              messages
       in
       let*! final_tick = PVM.get_tick state in
       let*! state_hash = PVM.state_hash state in
