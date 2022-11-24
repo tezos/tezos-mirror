@@ -521,8 +521,7 @@ module Infer_cmd = struct
       ~desc:"Name of the model for which to infer parameter"
       (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
-           Lwt.return_ok
-             (Registration.all_model_names () |> List.map Namespace.to_string))
+           Lwt.return_ok (Registration.all_local_model_names ()))
          (fun _ str -> Lwt.return_ok str))
 
   let regression_param =

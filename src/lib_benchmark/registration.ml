@@ -193,6 +193,12 @@ let all_registered_parameters () =
   |> List.of_seq
   |> List.sort (fun (p1, _) (p2, _) -> Namespace.compare p1 p2)
 
+let all_local_model_names () =
+  all_benchmarks ()
+  |> List.map (fun (module B : Benchmark.S) -> List.map fst B.models)
+  |> List.flatten
+  |> List.filter (fun s -> not (String.equal s "*"))
+
 let all_custom_commands () = !clic_table
 
 let find_benchmarks_in_namespace pattern =
