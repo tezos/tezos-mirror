@@ -2470,3 +2470,336 @@ val compute_chain_id_from_seed :
 (** Same as [compute_chain_id_from_seed], but do not wait for the process to exit. *)
 val spawn_compute_chain_id_from_seed :
   ?endpoint:endpoint -> t -> string -> Process.t
+
+(** {2 Commands for managing a multisig smart contract} *)
+
+(** Run [octez-client show supported multisig hashes]. *)
+val show_supported_multisig_hashes : t -> unit Lwt.t
+
+(** Same as [show_supported_multisig_hashes], but do not wait for the
+    process to exit. *)
+val spawn_show_supported_multisig_hashes : t -> Process.t
+
+(** Run [octez-client show multisig script]. *)
+val show_multisig_script : t -> unit Lwt.t
+
+(** Same as [show_multisig_script], but do not wait for the process to
+    exit. *)
+val spawn_show_multisig_script : t -> Process.t
+
+(** Run [octez-client deploy multisig <new_multisig> transferring
+    <qty> from <src> with threshold <threshold> on public keys
+    <key>]. *)
+val deploy_multisig :
+  new_multisig:string ->
+  qty:Tez.t ->
+  src:string ->
+  threshold:int ->
+  keys:string list ->
+  ?delegate:string ->
+  ?force:bool ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [deploy_multisig], but do not wait for the process to exit. *)
+val spawn_deploy_multisig :
+  new_multisig:string ->
+  qty:Tez.t ->
+  src:string ->
+  threshold:int ->
+  keys:string list ->
+  ?delegate:string ->
+  ?force:bool ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig>
+    transferring <qty> to <dst> using secret key <key>]. *)
+val sign_multisig_transaction_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  key:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [sign_multisig_transaction_transfer],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  key:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig> running
+    lambda <lambda> using secret key <key>]. *)
+val sign_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> key:string -> t -> string Lwt.t
+
+(** Same as [sign_multisig_transaction_run_lambda],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> key:string -> t -> Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig> setting
+    delegate to <dlgt> using secret key <key>]. *)
+val sign_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> key:string -> t -> string Lwt.t
+
+(** Same as [sign_multisig_transaction_set_delegate],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> key:string -> t -> Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig>
+    withdrawing delegate using secret key <key>]. *)
+val sign_multisig_transaction_withdraw_delegate :
+  multisig:string -> key:string -> t -> string Lwt.t
+
+(** Same as [sign_multisig_transaction_withdraw_delegate],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_withdraw_delegate :
+  multisig:string -> key:string -> t -> Process.t
+
+(** Run [octez-client sign multisig transaction on <multisig> using
+    secret key <key> setting threshold to <threshold> and public keys
+    to <key>]. *)
+val sign_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  signing_key:string ->
+  threshold:int ->
+  public_keys:string list ->
+  t ->
+  string Lwt.t
+
+(** Same as [sign_multisig_transaction_set_threshold_and_public_keys],
+    but do not wait for the process to exit. *)
+val spawn_sign_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  signing_key:string ->
+  threshold:int ->
+  public_keys:string list ->
+  t ->
+  Process.t
+
+(** Run [octez-client from multisig contract <multisig> transfer <qty>
+    to <dst> on behalf of <src> with signatures <signature>]. *)
+val from_multisig_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  src:string ->
+  signatures:string list ->
+  ?arg:string ->
+  ?burn_cap:Tez.t ->
+  ?entrypoint:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_multisig_transfer],
+    but do not wait for the process to exit. *)
+val spawn_from_multisig_transfer :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  src:string ->
+  signatures:string list ->
+  ?arg:string ->
+  ?burn_cap:Tez.t ->
+  ?entrypoint:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client from multisig contract <multisig> run lambda
+    <lambda> on behalf of <src> with signatures <signature>]. *)
+val from_multisig_run_lambda :
+  multisig:string ->
+  lambda:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_multisig_run_lambda],
+    but do not wait for the process to exit. *)
+val spawn_from_multisig_run_lambda :
+  multisig:string ->
+  lambda:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client set delegate of multisig contract <multisig> to
+    <dlgt> on behalf of <src> with signatures <signature>]. *)
+val set_delegate_of_multisig :
+  multisig:string ->
+  dlgt:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [set_delegate_of_multisig],
+    but do not wait for the process to exit. *)
+val spawn_set_delegate_of_multisig :
+  multisig:string ->
+  dlgt:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client withdraw delegate of multisig contract
+    <multisig> on behalf of <src> with signatures <signature>]. *)
+val withdraw_delegate_of_multisig :
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [withdraw_delegate_of_multisig],
+    but do not wait for the process to exit. *)
+val spawn_withdraw_delegate_of_multisig :
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client set threshold of multisig contract <multisig> to
+    <threshold> and public keys to <public_keys> on behalf of <src> with
+    signatures <signature>]. *)
+val set_threshold_of_multisig :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [set_threshold_of_multisig],
+    but do not wait for the process to exit. *)
+val spawn_set_threshold_of_multisig :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client run transaction <bytes> on multisig contract
+    <multisig> on behalf of <src> with signatures <signature>]. *)
+val run_transaction_on_multisig :
+  bytes:string ->
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  unit Lwt.t
+
+(** Same as [run_transaction_on_multisig],
+    but do not wait for the process to exit. *)
+val spawn_run_transaction_on_multisig :
+  bytes:string ->
+  multisig:string ->
+  src:string ->
+  signatures:string list ->
+  ?burn_cap:Tez.t ->
+  t ->
+  Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    transferring <qty> to <dst>]. *)
+val prepare_multisig_transaction :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  ?bytes_only:bool ->
+  t ->
+  string Lwt.t
+
+(** Same as [prepare_multisig_transaction], but do
+    not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction :
+  multisig:string ->
+  qty:Tez.t ->
+  dst:string ->
+  ?arg:string ->
+  ?entrypoint:string ->
+  ?bytes_only:bool ->
+  t ->
+  Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    running lambda <lambda>]. *)
+val prepare_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> ?bytes_only:bool -> t -> string Lwt.t
+
+(** Same as [prepare_multisig_transaction_run_lambda], but do
+    not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_run_lambda :
+  multisig:string -> lambda:string -> ?bytes_only:bool -> t -> Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    setting delegate to <dlgt>]. *)
+val prepare_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> ?bytes_only:bool -> t -> string Lwt.t
+
+(** Same as [prepare_multisig_transaction_set_delegate], but
+    do not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_set_delegate :
+  multisig:string -> dlgt:string -> ?bytes_only:bool -> t -> Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    withdrawing delegate]. *)
+val prepare_multisig_transaction_withdraw_delegate :
+  multisig:string -> ?bytes_only:bool -> t -> string Lwt.t
+
+(** Same as [prepare_multisig_transaction_withdraw_delegate],
+    but do not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_withdraw_delegate :
+  multisig:string -> ?bytes_only:bool -> t -> Process.t
+
+(** Run [octez-client prepare multisig transaction on <multisig>
+    setting threshold to <threshold> and public keys to <public_keys>]. *)
+val prepare_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  ?bytes_only:bool ->
+  t ->
+  string Lwt.t
+
+(** Same as
+    [prepare_multisig_transaction_set_threshold_and_public_keys],
+    but do not wait for the process to exit. *)
+val spawn_prepare_multisig_transaction_set_threshold_and_public_keys :
+  multisig:string ->
+  threshold:int ->
+  public_keys:string list ->
+  ?bytes_only:bool ->
+  t ->
+  Process.t
