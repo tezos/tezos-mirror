@@ -6096,21 +6096,4 @@ let () =
   write "script-inputs/active_protocol_versions_without_number" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4194
-
-   `sc_rollup_protocol_versions_without_number` can be removed and replace by
-   `active_protocol_versions_without_number` (i.e. `Protocol.active`) when all
-   active protocol support scoru. *)
-(* Generate sc_rollup_protocol_versions_without_number. *)
-let () =
-  let write_protocol fmt protocol =
-    match Protocol.number protocol with
-    | Alpha -> Format.fprintf fmt "%s\n" (Protocol.short_hash protocol)
-    | V v when v >= 16 ->
-        Format.fprintf fmt "%s\n" (Protocol.short_hash protocol)
-    | V _ | Other -> ()
-  in
-  write "script-inputs/sc_rollup_protocol_versions_without_number" @@ fun fmt ->
-  List.iter (write_protocol fmt) Protocol.active
-
 let () = check ~exclude ()

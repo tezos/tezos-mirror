@@ -13,7 +13,6 @@ RUN mkdir -p /home/tezos/tezos/scripts /home/tezos/tezos/script-inputs /home/tez
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
-COPY --chown=tezos:nogroup script-inputs/sc_rollup_protocol_versions_without_number tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/released-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/experimental-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
