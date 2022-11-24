@@ -1669,8 +1669,11 @@ let spawn_hash_script ?hooks ?for_script ~script client =
   @ optional_arg "for-script" show_hash_script_format for_script
 
 let hash_script ?hooks ?for_script ~script client =
-  spawn_hash_script ?hooks ?for_script ~script client
-  |> Process.check_and_read_stdout
+  let* client_output =
+    spawn_hash_script ?hooks ?for_script ~script client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
 
 let spawn_get_contract_hash ?hooks ~contract client =
   spawn_command
@@ -1679,8 +1682,11 @@ let spawn_get_contract_hash ?hooks ~contract client =
     ["get"; "contract"; "script"; "hash"; "for"; contract]
 
 let get_contract_hash ?hooks ~contract client =
-  spawn_get_contract_hash ?hooks ~contract client
-  |> Process.check_and_read_stdout
+  let* client_output =
+    spawn_get_contract_hash ?hooks ~contract client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim client_output)
 
 let spawn_hash_scripts ?hooks ?(display_names = false) ?for_script scripts
     client =
