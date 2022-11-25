@@ -510,7 +510,7 @@ module Aux = struct
           in
           let int_len =
             assert (num_bytes > 0l) ;
-            assert (num_bytes < Int32.of_int Int.max_int) ;
+            assert (num_bytes < Int32.max_int) ;
             Int32.to_int truncated
           in
           M.load_bytes memory src int_len
