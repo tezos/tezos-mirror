@@ -3269,40 +3269,8 @@ module Sc_rollup : sig
 
   module Input_hash : S.HASH
 
-  module type REVEAL_HASH = sig
-    type t
-
-    type supported_hashes = Blake2B
-
-    module Map : Map.S with type key = t
-
-    val size : scheme:supported_hashes -> int
-
-    val zero : scheme:supported_hashes -> t
-
-    val pp : Format.formatter -> t -> unit
-
-    val equal : t -> t -> bool
-
-    val compare : t -> t -> int
-
-    val of_b58check_opt : string -> t option
-
-    val encoding : t Data_encoding.t
-
-    val hash_string : scheme:supported_hashes -> ?key:string -> string list -> t
-
-    val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> t
-
-    val to_b58check : t -> string
-
-    val scheme_of_hash : t -> supported_hashes
-  end
-
-  module Reveal_hash : REVEAL_HASH
-
   type reveal =
-    | Reveal_raw_data of Reveal_hash.t
+    | Reveal_raw_data of Sc_rollup_reveal_hash.t
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
 
@@ -3829,7 +3797,7 @@ module Sc_rollup : sig
 
       val proof_encoding : proof Data_encoding.t
 
-      val reveal : Reveal_hash.t -> string option Lwt.t
+      val reveal : Sc_rollup_reveal_hash.t -> string option Lwt.t
 
       module Inbox_with_history : sig
         val inbox : Inbox.history_proof

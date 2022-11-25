@@ -281,7 +281,7 @@ module V2_0_0 = struct
       | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
           match
             Data_encoding.Binary.of_string_opt
-              Reveal_hash.encoding
+              Sc_rollup_reveal_hash.encoding
               (Wasm_2_0_0.reveal_hash_to_string hash)
           with
           | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
@@ -289,8 +289,9 @@ module V2_0_0 = struct
               (* In case of an invalid hash, the rollup is
                  blocked. Any commitment will be invalid. *)
               Waiting_for_reveal
-                (Reveal_raw_data (Reveal_hash.zero ~scheme:Reveal_hash.Blake2B))
-          )
+                (Reveal_raw_data
+                   (Sc_rollup_reveal_hash.zero
+                      ~scheme:Sc_rollup_reveal_hash.Blake2B)))
       | Reveal_required Wasm_2_0_0.Reveal_metadata ->
           Waiting_for_reveal Reveal_metadata
 

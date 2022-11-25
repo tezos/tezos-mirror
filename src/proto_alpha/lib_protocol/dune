@@ -44,6 +44,7 @@
   Blinded_public_key_hash
   Block_payload_hash
   Tx_rollup_prefixes
+  Sc_rollup_reveal_hash
   Merkle_list
   Bitset
   Bounded_history_repr
@@ -317,6 +318,7 @@
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   tx_rollup_prefixes.ml tx_rollup_prefixes.mli
+  sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
   merkle_list.ml merkle_list.mli
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
@@ -575,6 +577,7 @@
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   tx_rollup_prefixes.ml tx_rollup_prefixes.mli
+  sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
   merkle_list.ml merkle_list.mli
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
@@ -838,6 +841,7 @@
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   tx_rollup_prefixes.ml tx_rollup_prefixes.mli
+  sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
   merkle_list.ml merkle_list.mli
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli

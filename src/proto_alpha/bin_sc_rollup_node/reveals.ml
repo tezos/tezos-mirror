@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Reveal_hash = Protocol.Alpha_context.Sc_rollup.Reveal_hash
+module Reveal_hash = Protocol.Sc_rollup_reveal_hash
 
 type error +=
   | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
@@ -252,7 +252,7 @@ module Arith = struct
     let linked_hashed_chunks = chunkify source in
     let chunks_map =
       linked_hashed_chunks |> List.to_seq
-      |> Protocol.Alpha_context.Sc_rollup.Reveal_hash.Map.of_seq
+      |> Protocol.Sc_rollup_reveal_hash.Map.of_seq
     in
     let+ hash = first_hash linked_hashed_chunks in
     (chunks_map, hash)

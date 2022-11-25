@@ -328,15 +328,11 @@ let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
            input request."
     | ( Some (Reveal_proof (Raw_data_proof data)),
         Needs_reveal (Reveal_raw_data expected_hash) ) ->
-        let scheme =
-          Sc_rollup_PVM_sig.Reveal_hash.scheme_of_hash expected_hash
-        in
+        let scheme = Sc_rollup_reveal_hash.scheme_of_hash expected_hash in
 
-        let data_hash =
-          Sc_rollup_PVM_sig.Reveal_hash.hash_string ~scheme [data]
-        in
+        let data_hash = Sc_rollup_reveal_hash.hash_string ~scheme [data] in
         check
-          (Sc_rollup_PVM_sig.Reveal_hash.equal data_hash expected_hash)
+          (Sc_rollup_reveal_hash.equal data_hash expected_hash)
           "Invalid reveal"
     | Some (Reveal_proof Metadata_proof), Needs_reveal Reveal_metadata ->
         return_unit
@@ -362,7 +358,7 @@ module type PVM_with_context_and_state = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option Lwt.t
+  val reveal : Sc_rollup_reveal_hash.t -> string option Lwt.t
 
   module Inbox_with_history : sig
     val inbox : Sc_rollup_inbox_repr.history_proof

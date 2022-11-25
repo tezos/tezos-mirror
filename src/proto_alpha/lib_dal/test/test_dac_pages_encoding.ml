@@ -35,14 +35,13 @@
     Add tests to check actual (sequences of) bytes in serialized pages. *)
 
 open Protocol
-open Alpha_context
 
 let lift f = Lwt.map Environment.wrap_tzresult f
 
 (* Tests are run against a mock storage backend where a Hash-indexed/Bytes-valued Map
    is used to simulate adding and retrieving files to a directory.
 *)
-module Hashes_map = Sc_rollup.Reveal_hash.Map
+module Hashes_map = Sc_rollup_reveal_hash.Map
 
 type hashes_map = bytes Hashes_map.t
 
@@ -50,8 +49,8 @@ module Make_Merkle_tree_V0_backend () = struct
   open Environment.Error_monad
 
   type error +=
-    | Page_already_saved of Sc_rollup.Reveal_hash.t
-    | Page_is_missing of Sc_rollup.Reveal_hash.t
+    | Page_already_saved of Sc_rollup_reveal_hash.t
+    | Page_is_missing of Sc_rollup_reveal_hash.t
 
   let backend = ref Hashes_map.empty
 

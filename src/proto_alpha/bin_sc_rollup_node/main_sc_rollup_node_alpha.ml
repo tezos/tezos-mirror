@@ -382,9 +382,7 @@ let import_command =
     (fun (data_dir, filename, pvm_kind) cctxt ->
       let open Lwt_result_syntax in
       let*? hash = Reveals.import ~data_dir pvm_kind ~filename in
-      let*! () =
-        cctxt#message "%a" Protocol.Alpha_context.Sc_rollup.Reveal_hash.pp hash
-      in
+      let*! () = cctxt#message "%a" Protocol.Sc_rollup_reveal_hash.pp hash in
       return_unit)
 
 let sc_rollup_commands () =

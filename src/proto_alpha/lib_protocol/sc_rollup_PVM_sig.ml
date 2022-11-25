@@ -202,150 +202,8 @@ module Input_hash =
       let size = Some 20
     end)
 
-module type REVEAL_HASH = sig
-  (** The type of a reveal hash. *)
-  type t
-
-  (** The hashing schemes supported by the reveal hash. *)
-  type supported_hashes = Blake2B
-
-  (** A Map module for storing reveal-hash-indexed values. *)
-  module Map : Map.S with type key = t
-
-  (** [size ~scheme] returns the size of reveal hashes using the [scheme]
-      specified in input. *)
-  val size : scheme:supported_hashes -> int
-
-  (** [zero ~scheme] returns the reveal hash corresponding to the zero hash
-      for the [scheme] specified in input. *)
-  val zero : scheme:supported_hashes -> t
-
-  (** Formatting function for reveal-hashes. *)
-  val pp : Format.formatter -> t -> unit
-
-  (** [equal hash1 hash2] checks if the two reveal-hashes [hash1] and [hash2]
-      are equal. This function must preserve the equality of individual
-      supported hashing schemes. If [hash1] and [hash2] are hashes obtained
-      from the same supported hashing scheme, then the [equal] function from
-      that hashing scheme is used to determine whether they are equivalent.
-      Otherwise, they are different. *)
-  val equal : t -> t -> bool
-
-  (** [compare hash1 hash2] compares the values of the reveal hashes [hash1]
-      and [hash2]. This function must preserve the ordering of individual
-      supported hashing scheme. If [hash1] and [hash2] are reveal-hashes
-      obtained from the same hashing scheme, then [compare hash1 hash2]
-      should return the same result of the compare function exposed
-      by the hash module corresponding to their hashing scheme. *)
-  val compare : t -> t -> int
-
-  (* [of_b58check_opt base58_hash] returns the reveal-hash, if any,
-     whose base58 encoding is [base58_hash]. To avoid ambiguity,
-     the [S.HASH] modules supported should avoid using the same prefix
-     for the base58 encoding. *)
-  val of_b58check_opt : string -> t option
-
-  (* The encoding of reveal hashes. *)
-  val encoding : t Data_encoding.t
-
-  (* [hash_string ~scheme ?key strings] hashes [strings] using the
-     supported hashing [scheme] given in input. *)
-  val hash_string : scheme:supported_hashes -> ?key:string -> string list -> t
-
-  (* [hash_bytes ~scheme ?key strings] hashes [bytes] using the
-     supported hashing [scheme] given in input. *)
-  val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> t
-
-  (* [to_b58check hash] returns the base58 encoded reveal hash. *)
-  val to_b58check : t -> string
-
-  (* [scheme_of_hash] hash returns the supported hashing scheme
-     that was used to obtain [hash]. *)
-  val scheme_of_hash : t -> supported_hashes
-end
-
-module Reveal_hash = struct
-  (* Reserve the first byte in the encoding to support multi-versioning
-     in the future. *)
-  module Blake2B = struct
-    include
-      Blake2B.Make
-        (Base58)
-        (struct
-          let name = "Sc_rollup_reveal_data_blake2b_hash"
-
-          let title = "A smart contract rollup reveal hash"
-
-          let b58check_prefix =
-            "\017\144\121\209\203" (* "scrrh1(54)" decoded from Base58. *)
-
-          let size = Some 31
-        end)
-
-    let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 54
-  end
-
-  type supported_hashes = Blake2B
-
-  type t = Blake2B of Blake2B.t
-
-  let zero ~(scheme : supported_hashes) =
-    match scheme with Blake2B -> Blake2B Blake2B.zero
-
-  let pp ppf hash = match hash with Blake2B hash -> Blake2B.pp ppf hash
-
-  let equal h1 h2 =
-    match (h1, h2) with Blake2B h1, Blake2B h2 -> Blake2B.equal h1 h2
-
-  let compare h1 h2 =
-    match (h1, h2) with Blake2B h1, Blake2B h2 -> Blake2B.compare h1 h2
-
-  module Map = Map.Make (struct
-    type tmp = t
-
-    type t = tmp
-
-    let compare = compare
-  end)
-
-  let of_b58check_opt b58_hash =
-    b58_hash |> Blake2B.of_b58check_opt |> Option.map (fun hash -> Blake2B hash)
-
-  (* Size of the hash is the size of the inner hash plus one byte for the
-     tag used to identify the hashing scheme. *)
-  let size ~(scheme : supported_hashes) =
-    let tag_size = 1 in
-    let size_without_tag = match scheme with Blake2B -> Blake2B.size in
-    tag_size + size_without_tag
-
-  let encoding =
-    let open Data_encoding in
-    union
-      ~tag_size:`Uint8
-      [
-        case
-          ~title:"Reveal_data_hash_v0"
-          (Tag 0)
-          Blake2B.encoding
-          (fun (Blake2B s) -> Some s)
-          (fun s -> Blake2B s);
-      ]
-
-  let hash_string ~(scheme : supported_hashes) ?key strings =
-    match scheme with Blake2B -> Blake2B (Blake2B.hash_string ?key strings)
-
-  let hash_bytes ~(scheme : supported_hashes) ?key bytes =
-    match scheme with Blake2B -> Blake2B (Blake2B.hash_bytes ?key bytes)
-
-  let to_b58check hash =
-    match hash with Blake2B hash -> Blake2B.to_b58check hash
-
-  let scheme_of_hash hash =
-    match hash with Blake2B _hash -> (Blake2B : supported_hashes)
-end
-
 type reveal =
-  | Reveal_raw_data of Reveal_hash.t
+  | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
 
@@ -357,7 +215,7 @@ let reveal_encoding =
       (Tag 0)
       (obj2
          (req "reveal_kind" (constant "reveal_raw_data"))
-         (req "input_hash" Reveal_hash.encoding))
+         (req "input_hash" Sc_rollup_reveal_hash.encoding))
       (function Reveal_raw_data s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_raw_data s)
   and case_metadata =
@@ -438,7 +296,7 @@ let input_request_encoding =
     ]
 
 let pp_reveal fmt = function
-  | Reveal_raw_data hash -> Reveal_hash.pp fmt hash
+  | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
 
@@ -461,7 +319,7 @@ let pp_input_request fmt request =
 
 let reveal_equal p1 p2 =
   match (p1, p2) with
-  | Reveal_raw_data h1, Reveal_raw_data h2 -> Reveal_hash.equal h1 h2
+  | Reveal_raw_data h1, Reveal_raw_data h2 -> Sc_rollup_reveal_hash.equal h1 h2
   | Reveal_metadata, Reveal_metadata -> true
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | (Reveal_raw_data _ | Reveal_metadata | Request_dal_page _), _ -> false
