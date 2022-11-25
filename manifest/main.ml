@@ -4455,7 +4455,8 @@ module Protocol = Protocol
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if (active && N.(number <> 011)) @@ fun () ->
       tests
-        ["test_consensus_filter"; "test_filter_state"; "test_plugin"]
+        (["test_consensus_filter"; "test_filter_state"; "test_plugin"]
+        @ if N.(number >= 015) then ["test_conflict_handler"] else [])
         ~path:(path // "lib_plugin/test")
         ~synopsis:"Tezos/Protocol: protocol plugin tests"
         ~opam:(sf "tezos-protocol-plugin-%s-tests" name_dash)

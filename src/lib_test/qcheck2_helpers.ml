@@ -73,22 +73,25 @@ let qcheck_make_result_lwt ?count ?print ?pp_error ?check ~extract ~name
   in
   QCheck2.Test.make ~name ?print ?count gen (fun x -> extract (f x) |> check)
 
-let qcheck_eq ?pp ?cmp ?eq expected actual =
+let qcheck_eq ?pp ?cmp ?eq ?__LOC__ expected actual =
   let pass =
     match (eq, cmp) with
     | Some eq, _ -> eq expected actual
     | None, Some cmp -> cmp expected actual = 0
     | None, None -> Stdlib.compare expected actual = 0
   in
+  let loc = match __LOC__ with Some s -> s ^ "\n" | None -> "" in
   if pass then true
   else
     match pp with
     | None ->
         QCheck2.Test.fail_reportf
-          "@[<h 0>Values are not equal, but no pretty printer was provided.@]"
+          "@[<h 0>%sValues are not equal, but no pretty printer was provided.@]"
+          loc
     | Some pp ->
         QCheck2.Test.fail_reportf
-          "@[<v 2>Equality check failed!@,expected:@,%a@,actual:@,%a@]"
+          "@[<v 2>%sEquality check failed!@,expected:@,%a@,actual:@,%a@]"
+          loc
           pp
           expected
           pp

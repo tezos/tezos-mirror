@@ -2,7 +2,11 @@
 ; Edit file manifest/main.ml instead.
 
 (executables
- (names test_consensus_filter test_filter_state test_plugin)
+ (names
+  test_consensus_filter
+  test_filter_state
+  test_plugin
+  test_conflict_handler)
  (libraries
   tezos-base
   tezos-base-test-helpers
@@ -42,3 +46,8 @@
  (alias runtest)
  (package tezos-protocol-plugin-016-PtMumbai-tests)
  (action (run %{dep:./test_plugin.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-016-PtMumbai-tests)
+ (action (run %{dep:./test_conflict_handler.exe})))
