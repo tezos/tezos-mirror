@@ -758,6 +758,10 @@ val get_chain_block_context_contract_all_ticket_balances :
 val get_chain_block_context_sc_rollups_all :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/game?staker=[stacker]] *)
+val get_chain_block_context_sc_rollups_sc_rollup_game :
+  ?chain:string -> ?block:string -> staker:string -> string -> unit -> JSON.t t
+
 (** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/all/inbox] *)
 val get_chain_block_context_sc_rollups_all_inbox :
   ?chain:string -> ?block:string -> unit -> JSON.t t
