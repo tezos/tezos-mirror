@@ -424,6 +424,15 @@ module Make (PVM : Pvm.S) = struct
         | Some signer ->
             Components.Batcher.init configuration.batcher ~signer node_ctxt
       in
+      Lwt.dont_wait
+        (fun () ->
+          let*! r = Metrics.metrics_serve configuration.metrics_addr in
+          match r with
+          | Ok () -> Lwt.return_unit
+          | Error err ->
+              Event.(metrics_ended (Format.asprintf "%a" pp_print_trace err)))
+        (fun exn -> Event.(metrics_ended_dont_wait (Printexc.to_string exn))) ;
+
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr

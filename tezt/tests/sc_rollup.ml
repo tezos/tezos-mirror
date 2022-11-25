@@ -456,7 +456,8 @@ let test_rollup_node_running ~kind =
     }
     ~kind
   @@ fun rollup_node rollup_client sc_rollup _tezos_node _tezos_client ->
-  let* () = Sc_rollup_node.run rollup_node [] in
+  let metrics_addr = "localhost:" ^ string_of_int (Port.fresh ()) in
+  let* () = Sc_rollup_node.run rollup_node ["--metrics-addr"; metrics_addr] in
   let* sc_rollup_from_rpc =
     sc_rollup_node_rpc rollup_node "global/sc_rollup_address"
   in

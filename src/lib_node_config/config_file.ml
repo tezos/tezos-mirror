@@ -1101,7 +1101,8 @@ let resolve_rpc_listening_addrs listen_addr =
   in
   List.map fst addrs
 
-let resolve_metrics_addrs metrics_addr =
+let resolve_metrics_addrs ?(default_metrics_port = default_metrics_port)
+    metrics_addr =
   let open Lwt_result_syntax in
   let+ addrs =
     resolve_addr
