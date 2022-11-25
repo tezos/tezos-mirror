@@ -177,7 +177,7 @@ let write_value_exn tree ?(edit_readonly = false) key offset bytes =
   let encoding = E.scope key E.chunked_byte_vector in
   let* value =
     match opt with
-    | None -> Lwt.return @@ Chunked_byte_vector.allocate num_bytes
+    | None -> Lwt.return @@ Chunked_byte_vector.allocate 0L
     | Some _subtree -> Runner.decode encoding tree
   in
   let vec_len = Chunked_byte_vector.length value in
