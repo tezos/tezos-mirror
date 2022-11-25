@@ -25,10 +25,9 @@
 
 open Protocol.Alpha_context.Sc_rollup
 
-let new_dissection ~state_hash_from_tick ~default_number_of_sections
+let default_new_dissection ~default_number_of_sections
     ~(start_chunk : Game.dissection_chunk)
     ~(our_stop_chunk : Game.dissection_chunk) =
-  let open Lwt_result_syntax in
   let max_number_of_sections = Z.of_int default_number_of_sections in
   let trace_length =
     Z.succ (Tick.distance our_stop_chunk.tick start_chunk.tick)
@@ -48,23 +47,22 @@ let new_dissection ~state_hash_from_tick ~default_number_of_sections
       else (section_length, section_length)
   in
   (* [k] is the number of sections in [rev_dissection]. *)
-  let rec make rev_dissection k tick : Game.dissection_chunk list tzresult Lwt.t
-      =
-    if Z.(equal k (pred number_of_sections)) then
-      return
-      @@ List.rev
-           (({
-               state_hash = our_stop_chunk.state_hash;
-               tick = our_stop_chunk.tick;
-             }
-              : Game.dissection_chunk)
-           :: rev_dissection)
+  let rec make rev_dissection k tick =
+    if Z.(equal k (pred number_of_sections)) then List.rev rev_dissection
     else
-      let* state_hash = state_hash_from_tick tick in
       let next_tick = Tick.jump tick section_length in
-      make ({state_hash; tick} :: rev_dissection) (Z.succ k) next_tick
+      make (tick :: rev_dissection) (Z.succ k) next_tick
   in
-  make
-    [{state_hash = start_chunk.state_hash; tick = start_chunk.tick}]
-    Z.one
-    (Tick.jump start_chunk.tick first_section_length)
+  make [] Z.one (Tick.jump start_chunk.tick first_section_length)
+
+let make_dissection ~state_hash_from_tick ~start_chunk ~our_stop_chunk ticks =
+  let rec make_dissection_aux ticks acc =
+    let open Lwt_result_syntax in
+    match ticks with
+    | tick :: rst ->
+        let* state_hash = state_hash_from_tick tick in
+        let chunk = Dissection_chunk.{tick; state_hash} in
+        make_dissection_aux rst (chunk :: acc)
+    | [] -> return @@ List.rev (our_stop_chunk :: acc)
+  in
+  make_dissection_aux ticks [start_chunk]

@@ -213,7 +213,9 @@ module Make (Context : P) :
     | IAdd -> Format.fprintf fmt "add"
     | IStore x -> Format.fprintf fmt "store(%s)" x
 
-  let check_dissection = Sc_rollup_dissection_chunk_repr.default_check
+  let check_dissection =
+    Sc_rollup_dissection_chunk_repr.(
+      default_check ~check_sections_number:default_check_sections_number)
 
   (*
 

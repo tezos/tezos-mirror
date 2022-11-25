@@ -519,7 +519,9 @@ module V2_0_0 = struct
       | Some (_, false) -> fail WASM_invalid_claim_about_outbox
       | None -> fail WASM_output_proof_production_failed
 
-    let check_dissection = Sc_rollup_dissection_chunk_repr.default_check
+    let check_dissection =
+      Sc_rollup_dissection_chunk_repr.(
+        default_check ~check_sections_number:default_check_sections_number)
 
     module Internal_for_tests = struct
       let insert_failure state =

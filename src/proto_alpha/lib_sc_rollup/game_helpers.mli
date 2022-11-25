@@ -25,12 +25,28 @@
 
 open Protocol.Alpha_context.Sc_rollup
 
-(** Create a valid dissection based on the agreed [start_chunk] and our vision
-    of the stop chunk [our_stop_chunk]. We use [state_hash_from_tick] to
-    give our vision of the state hashes for each tick. *)
-val new_dissection :
-  state_hash_from_tick:(Tick.t -> State_hash.t option tzresult Lwt.t) ->
+(** [default_new_dissection ~default_number_of_sections ~start_chunk
+    ~our_stop_chunk] computes a list of intermediary ticks that can
+    later be turned into new dissection from between [start_chunk] and
+    [our_stop_chunk] with [make_dissection]. The algorithm satisfies
+    the default predicate on dissection exported by the protocol. *)
+val default_new_dissection :
   default_number_of_sections:int ->
   start_chunk:Game.dissection_chunk ->
   our_stop_chunk:Game.dissection_chunk ->
-  Game.dissection_chunk list tzresult Lwt.t
+  Tick.t list
+
+(** [make_dissection ~state_hash_from_tick ~start_chunk
+    ~our_stop_chunk intermediary_ticks] computes a new dissection from
+    a list of intermediary ticks between [start_chunk] and
+    [our_stop_chunk].
+
+    This function assumes [intermediary_ticks] encodes a valid
+    dissection from [start_chunk] to [our_stop_chunk], and recomputes
+    the state hash associated to each ticks. *)
+val make_dissection :
+  state_hash_from_tick:(Tick.t -> State_hash.t option tzresult Lwt.t) ->
+  start_chunk:Dissection_chunk.t ->
+  our_stop_chunk:Dissection_chunk.t ->
+  Tick.t trace ->
+  Dissection_chunk.t list tzresult Lwt.t

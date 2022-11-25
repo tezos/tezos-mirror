@@ -920,7 +920,9 @@ let play dal_parameters ~dal_attestation_lag ~stakers metadata game refutation =
 module Internal_for_tests = struct
   let find_choice = find_choice
 
-  let check_dissection = Sc_rollup_dissection_chunk_repr.default_check
+  let check_dissection =
+    Sc_rollup_dissection_chunk_repr.(
+      default_check ~check_sections_number:default_check_sections_number)
 end
 
 type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}

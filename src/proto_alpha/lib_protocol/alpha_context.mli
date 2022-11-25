@@ -3452,13 +3452,6 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val default_check :
-      default_number_of_sections:int ->
-      start_chunk:t ->
-      stop_chunk:t ->
-      t list ->
-      unit tzresult
-
     type error +=
       | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
       | Dissection_invalid_number_of_sections of Z.t

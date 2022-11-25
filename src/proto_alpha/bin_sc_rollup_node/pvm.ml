@@ -62,6 +62,12 @@ module type S = sig
     state ->
     (state * int64) Lwt.t
 
+  val new_dissection :
+    default_number_of_sections:int ->
+    start_chunk:Sc_rollup.Dissection_chunk.t ->
+    our_stop_chunk:Sc_rollup.Dissection_chunk.t ->
+    Sc_rollup.Tick.t list
+
   (** State storage for this PVM. *)
   module State : sig
     (** [empty ()] is the empty state.  *)

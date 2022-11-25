@@ -35,6 +35,13 @@ val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
 
+val default_check_sections_number :
+  default_number_of_sections:int ->
+  start_chunk:t ->
+  stop_chunk:t ->
+  t list ->
+  unit tzresult
+
 (** We check firstly that [dissection] is the correct length. It must
     be [default_number_of_sections] values long, unless the distance
     between [start_tick] and [stop_tick] is too small to make this
@@ -55,6 +62,12 @@ val encoding : t Data_encoding.t
     game' attack) will mean that sometimes the honest play is a
     dissection with multiple [None] states. *)
 val default_check :
+  check_sections_number:
+    (default_number_of_sections:int ->
+    start_chunk:t ->
+    stop_chunk:t ->
+    t list ->
+    unit tzresult) ->
   default_number_of_sections:int ->
   start_chunk:t ->
   stop_chunk:t ->
