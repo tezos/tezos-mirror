@@ -244,6 +244,12 @@ module Raw_level : sig
   module Set : Set.S with type elt = raw_level
 
   module Map : Map.S with type key = raw_level
+
+  module Internal_for_tests : sig
+    val add : raw_level -> int -> raw_level
+
+    val sub : raw_level -> int -> raw_level option
+  end
 end
 
 (** This module re-exports definitions from {!Cycle_repr}. *)
@@ -3251,6 +3257,8 @@ module Sc_rollup : sig
 
   val pp_inbox_message : Format.formatter -> inbox_message -> unit
 
+  val inbox_message_equal : inbox_message -> inbox_message -> bool
+
   val pp_reveal_data : Format.formatter -> reveal_data -> unit
 
   val pp_input : Format.formatter -> input -> unit
@@ -3380,8 +3388,8 @@ module Sc_rollup : sig
       val produce_inclusion_proof :
         History.t ->
         history_proof ->
-        history_proof ->
-        inclusion_proof option tzresult
+        Raw_level.t ->
+        (inclusion_proof * history_proof) tzresult
 
       val serialized_proof_of_string : string -> serialized_proof
     end

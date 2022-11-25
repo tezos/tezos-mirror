@@ -2045,22 +2045,18 @@ let full_history_inbox all_inbox_messages =
   (* Add the SOL/Info_per_level/EOL to the list of inbox messages. *)
   let all_inbox_messages =
     List.map
-      (fun (inbox_level, info, inbox_messages) ->
-        (inbox_level, wrap_messages info inbox_level inbox_messages))
+      (fun (inbox_level, (timestamp, predecessor), inbox_messages) ->
+        wrap_messages ~timestamp ~predecessor inbox_level inbox_messages)
       all_inbox_messages
   in
   (* Create a inbox adding the messages from [all_inbox_messages]. *)
   let all_inbox_inputs =
     List.map
-      (fun (level, messages) ->
-        ( level,
-          List.map
-            (fun Sc_rollup_helpers.{input; message = _} -> input)
-            messages ))
+      (fun messages ->
+        List.map (fun Sc_rollup_helpers.{input; message = _} -> input) messages)
       all_inbox_messages
   in
-  let inbox = Sc_rollup.Inbox.empty Raw_level.root in
-  Sc_rollup_helpers.construct_inbox ~inbox all_inbox_inputs
+  Sc_rollup_helpers.construct_inbox all_inbox_inputs
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Sc_rollup_helpers in
@@ -2390,7 +2386,7 @@ let test_curfew_is_clean () =
   | None -> return_unit
 
 (** [test_curfew_period_is_started_only_after_first_publication checks that
-    publishing the first commitment of a given [inbox_level] after 
+    publishing the first commitment of a given [inbox_level] after
     [inbox_level + challenge_window] is still possible. *)
 let test_curfew_period_is_started_only_after_first_publication () =
   let open Lwt_result_syntax in

@@ -260,24 +260,6 @@ let pp_message fmt {input; message} =
     | `Message msg -> msg
     | `EOL -> "EOL")
 
-(** An empty inbox level is a SOL and EOL. *)
-let make_empty_level (timestamp, predecessor) inbox_level =
-  let sol = {input = make_sol ~inbox_level; message = `SOL} in
-  let info_per_level =
-    {
-      input = make_info_per_level ~inbox_level ~predecessor ~timestamp;
-      message = `Info_per_level (timestamp, predecessor);
-    }
-  in
-
-  let eol =
-    {
-      input = make_eol ~inbox_level ~message_counter:(Z.of_int 2);
-      message = `EOL;
-    }
-  in
-  (inbox_level, [sol; info_per_level; eol])
-
 (** Creates inputs based on string messages. *)
 let strs_to_inputs inbox_level messages =
   List.fold_left
@@ -287,8 +269,10 @@ let strs_to_inputs inbox_level messages =
     ([], Z.of_int 2)
     messages
 
-(** Transform messages into inputs and wrap them between SOL and EOL. *)
-let wrap_messages (timestamp, predecessor) inbox_level strs =
+(** Transform messages into inputs and wrap them between [SOL; info_per_level]
+    and EOL. *)
+let wrap_messages ?(timestamp = Timestamp.of_seconds 0L)
+    ?(predecessor = Tezos_crypto.Block_hash.zero) inbox_level strs =
   let sol = {input = make_sol ~inbox_level; message = `SOL} in
   let rev_inputs, message_counter = strs_to_inputs inbox_level strs in
   let inputs = List.rev rev_inputs in
@@ -301,9 +285,12 @@ let wrap_messages (timestamp, predecessor) inbox_level strs =
   let eol = {input = make_eol ~inbox_level ~message_counter; message = `EOL} in
   (sol :: info_per_level :: inputs) @ [eol]
 
+(** An empty inbox level is a SOL, info_per_level and EOL. *)
+let make_empty_level ?timestamp ?predecessor inbox_level =
+  wrap_messages ?timestamp ?predecessor inbox_level []
+
 let gen_messages_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
-  let dumb_info = (Timestamp.of_seconds 0L, Tezos_crypto.Block_hash.zero) in
   let rec aux acc n =
     match n with
     | n when n < 0 ->
@@ -316,14 +303,14 @@ let gen_messages_for_levels ~start_level ~max_level gen_message =
         in
         let* empty_level = bool in
         let* level_messages =
-          if empty_level then return (make_empty_level dumb_info inbox_level)
+          if empty_level then return (make_empty_level inbox_level)
           else
             let* messages =
               let* input = gen_message in
               let* inputs = small_list gen_message in
               return (input :: inputs)
             in
-            return (inbox_level, wrap_messages dumb_info inbox_level messages)
+            return (wrap_messages inbox_level messages)
         in
         aux (level_messages :: acc) (n - 1)
   in
@@ -463,6 +450,9 @@ let gen_message_reprs_for_levels_repr ~start_level ~max_level gen_message_repr =
 module Level_tree_histories =
   Map.Make (Sc_rollup.Inbox_merkelized_payload_hashes.Hash)
 
+type level_tree_histories =
+  Sc_rollup.Inbox_merkelized_payload_hashes.History.t Level_tree_histories.t
+
 let get_level_tree_history level_tree_histories level_tree_hash =
   Level_tree_histories.find level_tree_hash level_tree_histories
   |> WithExceptions.Option.get ~loc:__LOC__
@@ -475,13 +465,13 @@ let get_level_tree_history level_tree_histories level_tree_hash =
    test/unit/test_sc_rollup_inbox. The main difference is: we use
    [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
    former. *)
-let construct_inbox ~inbox ?origination_level levels_and_inputs =
+let fill_inbox ~inbox ~shift_level ?origination_level
+    ?(with_level_tree_history = true) history level_tree_histories inputs =
   let open Result_syntax in
-  let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
-  let level_tree_histories = Level_tree_histories.empty in
-  let rec aux level_tree_histories history inbox = function
+  let rec aux i level_tree_histories history inbox = function
     | [] -> return (level_tree_histories, history, inbox)
-    | ((level, inputs) : Raw_level.t * Sc_rollup.input list) :: rst ->
+    | (inputs : Sc_rollup.input list) :: rst ->
+        let level = Raw_level.Internal_for_tests.add shift_level i in
         assert (
           match origination_level with
           | Some origination_level -> Raw_level.(origination_level < level)
@@ -494,8 +484,11 @@ let construct_inbox ~inbox ?origination_level levels_and_inputs =
             inputs
         in
         let level_tree_history =
-          Sc_rollup.Inbox_merkelized_payload_hashes.History.empty
-            ~capacity:1000L
+          let capacity =
+            if with_level_tree_history then Int64.of_int @@ List.length payloads
+            else 0L
+          in
+          Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity
         in
         let* level_tree_history, level_tree, history, inbox =
           Sc_rollup.Inbox.add_messages
@@ -516,6 +509,56 @@ let construct_inbox ~inbox ?origination_level levels_and_inputs =
             level_tree_history
             level_tree_histories
         in
-        aux level_tree_histories history inbox rst
+        aux (i + 1) level_tree_histories history inbox rst
   in
-  aux level_tree_histories history inbox levels_and_inputs
+  aux 0 level_tree_histories history inbox inputs
+
+let construct_inbox ?(inbox_creation_level = Raw_level.(root))
+    ?origination_level ?(with_histories = true) level_and_inputs =
+  let inbox = Sc_rollup.Inbox.empty inbox_creation_level in
+  let history =
+    let capacity = if with_histories then 10000L else 0L in
+    Sc_rollup.Inbox.History.empty ~capacity
+  in
+  let level_tree_histories = Level_tree_histories.empty in
+  fill_inbox
+    ?origination_level
+    ~inbox
+    ~with_level_tree_history:with_histories
+    ~shift_level:inbox_creation_level
+    history
+    level_tree_histories
+    level_and_inputs
+
+let inbox_message_of_input input =
+  match input with Sc_rollup.Inbox_message x -> Some x | _ -> None
+
+let payloads_from_messages =
+  List.map (fun {input; _} ->
+      match input with
+      | Inbox_message {payload; _} -> payload
+      | Reveal _ -> assert false)
+
+let first_after ~shift_level list_of_inputs level message_counter =
+  let level_index = Int32.to_int @@ Raw_level.diff level shift_level in
+  let inputs =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.nth list_of_inputs level_index
+  in
+  match List.nth inputs (Z.to_int message_counter) with
+  | Some input -> inbox_message_of_input input
+  | None -> (
+      (* If no input at (l, n), the next input is (l+1, 0). *)
+      match List.nth list_of_inputs (level_index + 1) with
+      | None -> None
+      | Some inputs ->
+          let input = Stdlib.List.hd inputs in
+          inbox_message_of_input input)
+
+let list_of_inputs_from_list_of_messages (list_of_messages : message list list)
+    =
+  List.map
+    (fun inputs ->
+      let payloads = List.map (fun {input; _} -> input) inputs in
+      payloads)
+    list_of_messages

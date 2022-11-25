@@ -365,12 +365,14 @@ module Internal_for_tests : sig
   val produce_inclusion_proof :
     History.t ->
     history_proof ->
-    history_proof ->
-    inclusion_proof option tzresult
+    Raw_level_repr.t ->
+    (inclusion_proof * history_proof) tzresult
 
   (** Allows to create a dumb {!serialized_proof} from a string, instead of
       serializing a proof with {!to_serialized_proof}. *)
   val serialized_proof_of_string : string -> serialized_proof
+
+  val get_level_of_history_proof : history_proof -> Raw_level_repr.t
 end
 
 type inbox = t

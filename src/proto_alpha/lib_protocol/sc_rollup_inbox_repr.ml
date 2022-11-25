@@ -530,13 +530,6 @@ let pp_inclusion_proof fmt proof =
 
 let number_of_proof_steps proof = List.length proof
 
-let lift_ptr_path deref ptr_path =
-  let rec aux accu = function
-    | [] -> Some (List.rev accu)
-    | x :: xs -> Option.bind (deref x) @@ fun c -> aux (c :: accu) xs
-  in
-  aux [] ptr_path
-
 (* See the main docstring for this type (in the mli file) for
    definitions of the three proof parameters [starting_point],
    [message] and [snapshot]. In the below we deconstruct
@@ -760,6 +753,27 @@ let verify_inclusion_proof inclusion_proof snapshot_history_proof =
   in
   return target
 
+let produce_inclusion_proof history inbox_snapshot l =
+  let open Result_syntax in
+  let deref ptr = History.find ptr history in
+  let compare {hash = _; level} = Raw_level_repr.compare level l in
+  let result = Skip_list.search ~deref ~compare ~cell:inbox_snapshot in
+  match result with
+  | Skip_list.{rev_path; last_cell = Found history_proof} ->
+      return (List.rev rev_path, history_proof)
+  | {last_cell = Nearest _; _}
+  | {last_cell = No_exact_or_lower_ptr; _}
+  | {last_cell = Deref_returned_none; _} ->
+      (* We are only interested in the result where [search] returns a path to
+         the cell we were looking for. All the other cases should be
+         considered as an error. *)
+      tzfail
+      @@ Inbox_proof_error
+           (Format.asprintf
+              "Skip_list.search failed to find a valid path: %a"
+              (Skip_list.pp_search_result ~pp_cell:pp_history_proof)
+              result)
+
 let verify_proof (l, n) inbox_snapshot {inclusion_proof; message_proof} =
   assert (Z.(geq n zero)) ;
   let open Result_syntax in
@@ -782,25 +796,8 @@ let verify_proof (l, n) inbox_snapshot {inclusion_proof; message_proof} =
 
 let produce_proof ~get_level_tree_history history inbox_snapshot (l, n) =
   let open Lwt_result_syntax in
-  let deref ptr = History.find ptr history in
-  let compare {hash = _; level} = Raw_level_repr.compare level l in
-  let result = Skip_list.search ~deref ~compare ~cell:inbox_snapshot in
-  let* inclusion_proof, history_proof =
-    match result with
-    | Skip_list.{rev_path; last_cell = Found history_proof} ->
-        return (List.rev rev_path, history_proof)
-    | {last_cell = Nearest _; _}
-    | {last_cell = No_exact_or_lower_ptr; _}
-    | {last_cell = Deref_returned_none; _} ->
-        (* We are only interested in the result where [search] returns a path to
-           the cell we were looking for. All the other cases should be
-           considered as an error. *)
-        tzfail
-        @@ Inbox_proof_error
-             (Format.asprintf
-                "Skip_list.search failed to find a valid path: %a"
-                (Skip_list.pp_search_result ~pp_cell:pp_history_proof)
-                result)
+  let*? inclusion_proof, history_proof =
+    produce_inclusion_proof history inbox_snapshot l
   in
   let level_proof = Skip_list.content history_proof in
   let* ({payload; proof = _} as message_proof) =
@@ -851,17 +848,13 @@ let empty level =
 module Internal_for_tests = struct
   let eq_tree = Sc_rollup_inbox_merkelized_payload_hashes_repr.equal
 
-  let produce_inclusion_proof history a b =
-    let open Result_syntax in
-    let cell_ptr = hash_history_proof b in
-    let target_index = Skip_list.index a in
-    let* history = History.remember cell_ptr b history in
-    let deref ptr = History.find ptr history in
-    Skip_list.back_path ~deref ~cell_ptr ~target_index
-    |> Option.map (lift_ptr_path deref)
-    |> Option.join |> return
+  let produce_inclusion_proof = produce_inclusion_proof
 
   let serialized_proof_of_string x = x
+
+  let get_level_of_history_proof (history_proof : history_proof) =
+    let ({level; _} : level_proof) = Skip_list.content history_proof in
+    level
 end
 
 type inbox = t
