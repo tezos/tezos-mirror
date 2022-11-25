@@ -125,7 +125,6 @@ module Aux : sig
      the level of the output buffer and resets its id to zero. *)
     val read_input :
       input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
-      output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
       memory:memory ->
       level_offset:int32 ->
       id_offset:int32 ->
