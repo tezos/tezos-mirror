@@ -35,18 +35,6 @@ let wasm_entrypoint = "kernel_run"
    WASM kernel. *)
 let wasm_host_funcs_virual_module = "smart_rollup_core"
 
-(* Number of ticks between snapshotable states,
-   should be chosen low enough to maintain refutability.
-
-   Depends on
-   - speed (tick/s) of node in slow mode (from benchmark, 6000000 tick/s)
-   - the number of ticks in a commitment (Int64.max_int,
-      as per Number_of_ticks.max_value)
-
-   see #3590 for more pointers
-*)
-let wasm_max_tick = Z.of_int 11_000_000_000
-
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
    Find an appropriate number of reboots per inputs.
 *)

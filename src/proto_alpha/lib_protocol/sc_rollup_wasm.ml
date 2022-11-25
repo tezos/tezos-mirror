@@ -66,6 +66,8 @@ let () =
     (fun () -> WASM_proof_production_failed)
 
 module V2_0_0 = struct
+  let ticks_per_snapshot = Z.of_int64 11_000_000_000L
+
   (*
     This is the state hash of reference that both the prover of the
     node and the verifier of the protocol {!Protocol_implementation}
@@ -242,7 +244,7 @@ module V2_0_0 = struct
       Lwt.return state
 
     let install_boot_sector state boot_sector =
-      WASM_machine.install_boot_sector boot_sector state
+      WASM_machine.install_boot_sector ~ticks_per_snapshot boot_sector state
 
     let state_hash state =
       let context_hash = Tree.hash state in

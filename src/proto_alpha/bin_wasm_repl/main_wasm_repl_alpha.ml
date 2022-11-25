@@ -57,6 +57,7 @@ let link module_ =
    installation into a tree for the PVM interpreter. *)
 let handle_module binary name module_ =
   let open Lwt_result_syntax in
+  let open Protocol.Alpha_context.Sc_rollup in
   let* ast =
     Repl_helpers.trap_exn (fun () ->
         if binary then parse_binary_module name module_
@@ -67,7 +68,7 @@ let handle_module binary name module_ =
   let* _ = link ast in
   let*! tree =
     initial_tree
-      ~max_tick:(Z.to_int64 Tezos_scoru_wasm.Constants.wasm_max_tick)
+      ~max_tick:(Z.to_int64 Wasm_2_0_0PVM.ticks_per_snapshot)
       ~from_binary:binary
       module_
   in
