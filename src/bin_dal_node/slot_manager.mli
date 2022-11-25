@@ -23,5 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* We cannot include a raw mli file *)
+(** This module provides different handlers related to DAL slots. *)
+
+(* We cannot include a raw mli file. But this will be removed once full
+   migration is done. *)
 include module type of Slot_manager_legacy
+
+type error += Invalid_slot_size of {provided : int; expected : int}
+
+(** [add_slots slot node_Store cryptobox] computes the given [slot]'s commitment
+    and adds the association "commitment -> slot" in the DAL's [node_store] if
+    the commitment is not already bound to some data.
+
+    The function returns an error {!ref:Invalid_slot_size} if the [slot]'s size
+    doesn't match the expected slots' size given in [cryptobox], or the [slot]'s
+    commitment otherwise.
+*)
+val add_slots :
+  Cryptobox.slot ->
+  Store.node_store ->
+  Cryptobox.t ->
+  Cryptobox.commitment tzresult Lwt.t
+
+(** [add_slot_id commitment slot_id node_Store cryptobox] associates a [slot_id]
+    to a [commitment] in [node_store]. The function returns [Error `Not_found]
+    if there is no entry for [commitment] in [node_store]. Otherwise, [Ok ()]
+    is returned.
+*)
+val add_slot_id :
+  Cryptobox.commitment ->
+  Services.Types.slot_id ->
+  Store.node_store ->
+  Cryptobox.t ->
+  (unit, [> `Not_found]) result Lwt.t

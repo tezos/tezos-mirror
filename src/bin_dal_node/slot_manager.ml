@@ -24,3 +24,61 @@
 (*****************************************************************************)
 
 include Slot_manager_legacy
+
+type error += Invalid_slot_size of {provided : int; expected : int}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_slot_size"
+    ~title:"Invalid slot size"
+    ~description:"The size of the given slot is not as expected"
+    ~pp:(fun ppf (provided, expected) ->
+      Format.fprintf
+        ppf
+        "The size (%d) of the given slot is not as expected (%d)"
+        provided
+        expected)
+    Data_encoding.(obj2 (req "provided" int31) (req "expected" int31))
+    (function
+      | Invalid_slot_size {provided; expected} -> Some (provided, expected)
+      | _ -> None)
+    (fun (provided, expected) -> Invalid_slot_size {provided; expected})
+
+(* Used wrapper functions on top of Cryptobox. *)
+
+let polynomial_from_slot cryptobox slot =
+  let open Result_syntax in
+  match Cryptobox.polynomial_from_slot cryptobox slot with
+  | Ok r -> return r
+  | Error (`Slot_wrong_size _) ->
+      let open Cryptobox in
+      let provided = Bytes.length slot in
+      let {slot_size = expected; _} = parameters cryptobox in
+      tzfail @@ Invalid_slot_size {provided; expected}
+
+(* Main functions *)
+
+let add_slots slot node_store cryptobox =
+  let open Lwt_result_syntax in
+  let*? polynomial = polynomial_from_slot cryptobox slot in
+  let commitment = Cryptobox.commit cryptobox polynomial in
+  let*! exists = Store.Legacy.exists_slot_by_commitment node_store commitment in
+  let*! () =
+    if exists then Lwt.return_unit
+    else Store.Legacy.add_slot_by_commitment node_store slot commitment
+  in
+  return commitment
+
+let add_slot_id commitment slot_id node_store _cryptobox =
+  let open Lwt_result_syntax in
+  let*! exists = Store.Legacy.exists_slot_by_commitment node_store commitment in
+  if not exists then fail `Not_found
+  else
+    let*! () =
+      Store.Legacy.associate_slot_id_with_commitment
+        node_store
+        commitment
+        slot_id
+    in
+    return_unit

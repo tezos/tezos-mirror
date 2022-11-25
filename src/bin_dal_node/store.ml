@@ -66,15 +66,112 @@ let init config =
   let* () = Event.(emit store_is_ready ()) in
   Lwt.return {slots_store; slots_watcher; slot_headers_store}
 
-module Legacy_paths = struct
-  let slot_by_commitment commitment = ["slots"; commitment]
+module Legacy_paths : sig
+  val slot_by_commitment : string -> string list
 
-  let slot_shards_by_commitment commitment =
-    slot_by_commitment commitment @ ["shards"]
+  val slot_id_by_commitment : string -> Services.Types.slot_id -> string trace
 
-  let slot_shard_by_commitment commitment index =
-    slot_shards_by_commitment commitment @ [string_of_int index]
+  val slot_shards_by_commitment : string -> string trace
 
-  let slot_shards_flag_by_commitment commitment =
-    slot_by_commitment commitment @ ["shards_saved_flag"]
+  val slot_shard_by_commitment : string -> int -> string trace
+end = struct
+  module Path_internals = struct
+    type internal = [`Internal]
+
+    type any = [internal | `Any]
+
+    type _ path =
+      | Root : string -> internal path
+      | Internal : {prefix : internal path; ext : string} -> internal path
+      | Leaf : {
+          prefix : internal path;
+          ext : string list;
+          is_collection : bool;
+        }
+          -> any path
+
+    let root = Root "slots"
+
+    let mk_internal prefix ext = Internal {prefix; ext}
+
+    let mk_leaf ?(is_collection = true) prefix ext =
+      Leaf {prefix; ext; is_collection}
+
+    let slot_by_commitment commitment = mk_internal root commitment
+
+    let slot_ids_by_commitment commitment =
+      mk_internal (slot_by_commitment commitment) "slot_ids"
+
+    let slot_id_by_commitment commitment slot_id =
+      let {Services.Types.slot_level; slot_index} = slot_id in
+      mk_leaf
+        ~is_collection:false
+        (slot_ids_by_commitment commitment)
+        [Int32.to_string slot_level; Int32.to_string slot_index]
+
+    let slot_shards_by_commitment commitment =
+      mk_internal (slot_by_commitment commitment) "shards"
+
+    let slot_shard_by_commitment commitment index =
+      mk_leaf (slot_shards_by_commitment commitment) [string_of_int index]
+
+    let data_path (type a) (p : a path) =
+      let rec path (p : internal path) acc =
+        match p with
+        | Root s -> s :: acc
+        | Internal {prefix; ext} -> path prefix (ext :: acc)
+      in
+      let prefix, is_collection, ext =
+        match p with
+        | (Root _ | Internal _) as p -> ((p : internal path), false, None)
+        | Leaf {prefix; ext; is_collection} -> (prefix, is_collection, Some ext)
+      in
+      let acc =
+        match (ext, is_collection) with
+        | None, _ -> ["data"]
+        | Some ext, true -> "data" :: ext
+        | Some ext, false -> ext @ ["data"]
+      in
+      path prefix acc
+  end
+
+  let slot_by_commitment c = Path_internals.(data_path @@ slot_by_commitment c)
+
+  let slot_id_by_commitment c slot_id =
+    Path_internals.(data_path @@ slot_id_by_commitment c slot_id)
+
+  let slot_shard_by_commitment c index =
+    Path_internals.(data_path @@ slot_shard_by_commitment c index)
+
+  let slot_shards_by_commitment c =
+    Path_internals.(data_path @@ slot_shards_by_commitment c)
+end
+
+module Legacy = struct
+  let encode enc v =
+    Data_encoding.Binary.to_string enc v
+    |> Result.map_error (fun e ->
+           [Tezos_base.Data_encoding_wrapper.Encoding_error e])
+
+  let add_slot_by_commitment node_store slot commitment =
+    let open Lwt_syntax in
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    let encoded_slot = Bytes.to_string slot in
+    let* () = set ~msg:"Slot stored" node_store.slots_store path encoded_slot in
+    let* () = Event.(emit stored_slot_content commitment_b58) in
+    Lwt_watcher.notify node_store.slots_watcher commitment ;
+    return_unit
+
+  let associate_slot_id_with_commitment node_store commitment slot_id =
+    let open Lwt_syntax in
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_id_by_commitment commitment_b58 slot_id in
+    let* () = set ~msg:"Slot id stored" node_store.slots_store path "" in
+    return_unit
+
+  let exists_slot_by_commitment node_store commitment =
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    mem node_store.slots_store path
 end

@@ -244,7 +244,7 @@ module Dal : sig
      by removing the padding. *)
   val content_of_slot : slot -> string
 
-  module RPC : sig
+  module RPC_legacy : sig
     (** [split_slot data] posts [data] on slot/split *)
     val split_slot : slot -> (Dal_node.t, string) RPC_core.t
 
@@ -271,6 +271,24 @@ module Dal : sig
 
     (** [dac_store_preimage data] posts [data] on dac/store_preimage *)
     val dac_store_preimage : string -> (Dal_node.t, string) RPC_core.t
+  end
+
+  module RPC : sig
+    include module type of RPC_legacy
+
+    type commitment = string
+
+    (** Call RPC "POST /slots" to store a slot and retrun the commitment in case
+       of success. *)
+    val post_slot : slot -> (Dal_node.t, commitment) RPC_core.t
+
+    (** Call RPC "PATCH /slots" to associate the given level and index to the slot
+        whose commitment is given. *)
+    val patch_slot :
+      commitment ->
+      slot_level:int ->
+      slot_index:int ->
+      (Dal_node.t, unit) RPC_core.t
   end
 
   val make :

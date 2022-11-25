@@ -557,7 +557,7 @@ module Dal = struct
     |> List.filter (fun str -> not (str = String.empty))
     |> String.concat "\000"
 
-  module RPC = struct
+  module RPC_legacy = struct
     let make ?data ?query_string =
       RPC.make
         ?data
@@ -616,6 +616,36 @@ module Dal = struct
       in
       let data = JSON.unannotate preimage in
       make ~data PUT ["plugin"; "dac"; "store_preimage"] JSON.as_string
+  end
+
+  module RPC = struct
+    include RPC_legacy
+
+    type commitment = string
+
+    let as_empty_object_or_fail t =
+      match JSON.as_object t with
+      | [] -> ()
+      | _ -> JSON.error t "Not an empty object"
+
+    let post_slot slot =
+      let slot =
+        JSON.parse
+          ~origin:"Rollup.RPC.post_slots"
+          (encode_bytes_to_hex_string slot)
+      in
+      let data = JSON.unannotate slot in
+      make ~data POST ["slots"] JSON.as_string
+
+    let patch_slot commitment ~slot_level ~slot_index =
+      let data =
+        `O
+          [
+            ("slot_level", `Float (float_of_int slot_level));
+            ("slot_index", `Float (float_of_int slot_index));
+          ]
+      in
+      make ~data PATCH ["slots"; commitment] as_empty_object_or_fail
   end
 
   let make

@@ -174,7 +174,7 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
 let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
     ?attestation_lag ?commitment_period ?challenge_window ?(dal_enable = true)
     variant scenario =
-  let description = "Testing DAL L1 integration" in
+  let description = "Testing DAL node" in
   test
     ~__FILE__
     ~tags
@@ -192,7 +192,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
 
 let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
     ?(dal_enable = true) ?commitment_period ?challenge_window variant scenario =
-  let description = "Testing rollup and Data availability layer node" in
+  let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
     ~tags
@@ -814,6 +814,86 @@ let test_dal_node_test_slots_propagation _protocol _parameters _cryptobox node
     (slot_header2_exp = slot_header2) string ~error_msg:"Expected:%L. Got: %R") ;
   Lwt.join [p1; p2; p3; p4]
 
+let commitment_of_slot cryptobox slot =
+  let polynomial =
+    Cryptobox.polynomial_from_slot
+      cryptobox
+      (Rollup.Dal.content_of_slot slot |> Bytes.of_string)
+    |> Result.get_ok
+  in
+  Cryptobox.commit cryptobox polynomial
+
+let test_dal_node_test_post_slots _protocol parameters cryptobox _node client
+    dal_node =
+  let mk_slot size =
+    Rollup.Dal.make_slot ~padding:false (generate_dummy_slot size) client
+  in
+  let failing_post_slot_rpc slot =
+    let* response = RPC.call_raw dal_node @@ Rollup.Dal.RPC.post_slot slot in
+    return
+    @@ RPC.check_string_response
+         ~body_rex:"dal.node.invalid_slot_size"
+         ~code:500
+         response
+  in
+  let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let* slot_big = mk_slot (size + 1) in
+  let* slot_small = mk_slot (size - 1) in
+  let* slot_ok = mk_slot size in
+  let* () = failing_post_slot_rpc slot_big in
+  let* () = failing_post_slot_rpc slot_small in
+  let* commitment1 = RPC.call dal_node (Rollup.Dal.RPC.post_slot slot_ok) in
+  let* commitment2 = RPC.call dal_node (Rollup.Dal.RPC.post_slot slot_ok) in
+  (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4250
+     The second RPC call above succeeeds, but the (untested) returned HTTP status
+     should likely be 200 and 201 in the first similar RPC call.
+  *)
+  Check.(commitment1 = commitment2)
+    Check.string
+    ~error_msg:
+      "Storing a slot twice should return the same commitment (current = %L, \
+       expected = %R)" ;
+  let commitment3 =
+    Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot_ok
+  in
+  Check.(commitment1 = commitment3)
+    Check.string
+    ~error_msg:
+      "The commitment of a stored commitment should match the one computed \
+       locally (current = %L, expected = %R)" ;
+  unit
+
+let test_dal_node_test_patch_slots _protocol parameters cryptobox _node client
+    dal_node =
+  let failing_patch_slot_rpc slot ~slot_level ~slot_index =
+    let* response =
+      RPC.call_raw dal_node
+      @@ Rollup.Dal.RPC.patch_slot slot ~slot_level ~slot_index
+    in
+    return @@ RPC.check_string_response ~code:404 response
+  in
+  let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let* slot = Rollup.Dal.make_slot (generate_dummy_slot size) client in
+  let commitment =
+    Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
+  in
+  let* () = failing_patch_slot_rpc commitment ~slot_level:0 ~slot_index:0 in
+  let* commitment' = RPC.call dal_node (Rollup.Dal.RPC.post_slot slot) in
+  Check.(commitment' = commitment)
+    Check.string
+    ~error_msg:
+      "The commitment of a stored commitment should match the one computed \
+       locally (current = %L, expected = %R)" ;
+  let patch_slot_rpc ~slot_level ~slot_index =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.patch_slot commitment ~slot_level ~slot_index)
+  in
+  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
+  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
+  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:1 in
+  patch_slot_rpc ~slot_level:(-4) ~slot_index:3
+
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -1243,6 +1323,14 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node slots propagation"
     test_dal_node_test_slots_propagation
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node POST /slots"
+    test_dal_node_test_post_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node PATCH /slots"
+    test_dal_node_test_patch_slots
     protocols ;
 
   (* Tests with all nodes *)

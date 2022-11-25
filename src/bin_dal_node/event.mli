@@ -24,3 +24,11 @@
 (*****************************************************************************)
 
 include module type of Event_legacy
+
+(** Storing a slot content event. The given parameter is the slot's commitment
+    hash. *)
+val stored_slot_content : string t
+
+(** Storing a slot's shards event. The given parameters are the slot's
+    commitment hash and the number of its shards. *)
+val stored_slot_shards : (string * int) t

@@ -24,3 +24,11 @@
 (*****************************************************************************)
 
 include Event_legacy
+
+let stored_slot_content =
+  declare_1
+    ~section
+    ~name:"stored_slot_content"
+    ~msg:"Slot stored: commitment {commitment}"
+    ~level:Notice
+    ("commitment", Data_encoding.string)
