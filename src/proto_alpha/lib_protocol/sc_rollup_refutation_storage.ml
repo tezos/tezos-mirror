@@ -245,6 +245,19 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
     Store.Game.mem ((ctxt, rollup), stakers.alice) stakers.bob
   in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
+  let check_staker_availability ctxt staker =
+    let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
+    let* () =
+      fail_when
+        Compare.List_length_with.(
+          entries
+          >= Constants_storage.sc_rollup_max_number_of_parallel_games ctxt)
+        (Sc_rollup_max_number_of_parallel_games_reached staker)
+    in
+    return ctxt
+  in
+  let* ctxt = check_staker_availability ctxt stakers.alice in
+  let* ctxt = check_staker_availability ctxt stakers.bob in
   let* ( ( {hash = _refuter_commit; commitment = _info},
            {hash = _defender_commit; commitment = child_info} ),
          ctxt ) =
