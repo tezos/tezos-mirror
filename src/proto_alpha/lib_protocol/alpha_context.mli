@@ -829,6 +829,7 @@ module Constants : sig
       number_of_sections_in_dissection : int;
       timeout_period_in_blocks : int;
       max_number_of_stored_cemented_commitments : int;
+      max_number_of_parallel_games : int;
     }
 
     type zk_rollup = {

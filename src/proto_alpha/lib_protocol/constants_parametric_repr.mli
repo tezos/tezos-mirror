@@ -120,6 +120,8 @@ type sc_rollup = {
   timeout_period_in_blocks : int;
   (* The maximum number of cemented commitments stored for a sc rollup. *)
   max_number_of_stored_cemented_commitments : int;
+  (* The maximum number of parallel games played by a given staker. *)
+  max_number_of_parallel_games : int;
 }
 
 type zk_rollup = {
