@@ -61,6 +61,14 @@ let decode rpc json = rpc.decode json
 
 type 'a response = {body : 'a; code : int}
 
+let check_string_response ?(body_rex = "") ~code (response : string response) =
+  Check.(
+    (code = response.code)
+      int
+      ~error_msg:"Unexpected HTTP status: expecting %L, got %R.") ;
+  Check.(response.body =~ rex body_rex)
+    ~error_msg:"Unexpected HTTP body: expecting a pattern %R, got a body %L."
+
 let make_uri endpoint rpc =
   Uri.make
     ~scheme:"http"

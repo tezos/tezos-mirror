@@ -82,6 +82,15 @@ type 'a response = {
   code : int;  (** Status code (e.g. 200 for OK, 404 for Not Found). *)
 }
 
+(** [check_string_response ?body_rex ~code response] verifies that the given
+    response's body  and HTTP status match the expected ones using
+    the facilities provided by module {!val:Check}.
+
+    The function checks exact equality for the HTTP status and for regular
+    expression matching for the body (if provided).  *)
+val check_string_response :
+  ?body_rex:string -> code:int -> string response -> unit
+
 (** Call an RPC.
 
     The response body is parsed as JSON, then decoded using the decode function
