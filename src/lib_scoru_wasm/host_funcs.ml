@@ -36,7 +36,6 @@ module Error = struct
     | Input_output_too_large
     | Generic_invalid_access
     | Store_readonly_value
-    | Memory_out_of_bounds
 
   (** [code error] returns the error code associated to the error. *)
   let code = function
@@ -49,7 +48,6 @@ module Error = struct
     | Input_output_too_large -> -7l
     | Generic_invalid_access -> -8l
     | Store_readonly_value -> -9l
-    | Memory_out_of_bounds -> -10l
 end
 
 module type Memory_access = sig
@@ -503,11 +501,6 @@ module Aux = struct
       let open Lwt.Syntax in
       let mem_size = I32.of_int_s @@ I64.to_int_s @@ M.bound memory in
       let get_error_message = function
-        | Error.Memory_out_of_bounds ->
-            Printf.sprintf
-              "DEBUG FAILED: address %s out of bounds (maximum %s)\n"
-              (Int32.to_string src)
-              (Int32.to_string mem_size)
         | err -> Printf.sprintf "Error code: %ld" @@ Error.code err
       in
       let+ result =
@@ -521,7 +514,7 @@ module Aux = struct
             Int32.to_int truncated
           in
           M.load_bytes memory src int_len
-        else Lwt_result.fail @@ Error.Memory_out_of_bounds
+        else Lwt_result.return ""
       in
       Result.fold ~ok:Fun.id ~error:get_error_message result
   end
