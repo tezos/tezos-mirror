@@ -57,7 +57,7 @@ module type S = sig
       [reveal_map] is provided, it is used as an additional source of data for
       revelation ticks. *)
   val eval_messages :
-    ?reveal_map:string Sc_rollup.Reveal_hash.Map.t ->
+    ?reveal_map:string Sc_rollup_reveal_hash.Map.t ->
     fuel:fuel ->
     _ Node_context.t ->
     message_counter_offset:int ->
@@ -84,7 +84,7 @@ module Make (PVM : Pvm.S) = struct
       let found_in_map =
         match reveal_map with
         | None -> None
-        | Some map -> Sc_rollup.Reveal_hash.Map.find_opt hash map
+        | Some map -> Sc_rollup_reveal_hash.Map.find_opt hash map
       in
       match found_in_map with
       | Some data -> return data
@@ -119,7 +119,7 @@ module Make (PVM : Pvm.S) = struct
             (* The 32-byte payload represents the encoded [Reveal_hash.t]. We must
                decode it properly, instead of converting it byte-for-byte. *)
             Tezos_webassembly_interpreter.Reveal.reveal_hash_to_string hash
-            |> Data_encoding.Binary.of_string_exn Sc_rollup.Reveal_hash.encoding
+            |> Data_encoding.Binary.of_string_exn Sc_rollup_reveal_hash.encoding
           in
           let*! data =
             get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash

@@ -35,14 +35,13 @@
     Add tests to check actual (sequences of) bytes in serialized pages. *)
 
 open Protocol
-open Alpha_context
 
 let lift f = Lwt.map Environment.wrap_tzresult f
 
 (* Tests are run against a mock storage backend where a Hash-indexed/Bytes-valued Map
    is used to simulate adding and retrieving files to a directory.
 *)
-module Hashes_map = Sc_rollup.Reveal_hash.Map
+module Hashes_map = Sc_rollup_reveal_hash.Map
 
 type hashes_map = bytes Hashes_map.t
 
@@ -50,8 +49,8 @@ module Make_Merkle_tree_V0_backend () = struct
   open Environment.Error_monad
 
   type error +=
-    | Page_already_saved of Sc_rollup.Reveal_hash.t
-    | Page_is_missing of Sc_rollup.Reveal_hash.t
+    | Page_already_saved of Sc_rollup_reveal_hash.t
+    | Page_is_missing of Sc_rollup_reveal_hash.t
 
   let backend = ref Hashes_map.empty
 
@@ -231,6 +230,52 @@ module Merkle_tree = struct
       in
       let map_size = Backend.number_of_pages () in
       let* () = Assert.equal_int ~loc:__LOC__ map_size 4 in
+      assert_equal_bytes
+        ~loc:__LOC__
+        "Deserialized payload do not match with original"
+        payload
+        retrieved_payload
+
+    let multiple_pages_roundtrip_do_not_exceed_page_size () =
+      (* Check that a bug related to the size of hashes has been fixed.
+         Before the bug was fixed: the `Sc_rollup.Reveal_hash` module borrowed
+         the size function from the underlying hash module, meaning that it
+         would return `31` for the size, rather than the actual hash size
+         which is `32`. For a page that is exactly `98` bytes long, this would
+         mean that the serialization algorithm will compute the number of
+         hashes per page to be `(98-5)/31 = 3`, but the actual hash pages will
+         have size `32 * 3 + 5 = 101` bytes. This will cause the check on a page
+         size to fail, when serializing a page.  With 98 bytes per page, 93
+         bytes will be reserved for the payload in content pages.
+         Before the patch was applied, trying to
+         serialize a payload of `93 * 3 = 279`  bytes with a page size of
+         98 bytes would have caused to try to serialize a page containing
+         3 hashes of 32 bytes each, resulting in a page of `101 bytes` and
+         causing the serialization to fail.
+      *)
+      let open Lwt_result_syntax in
+      let module Backend = Make_Merkle_tree_V0_backend () in
+      let max_page_size = 98 in
+      (* 279 bytes of payload *)
+      let payload =
+        Bytes.of_string
+          "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do \
+           eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim \
+           ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut \
+           aliquip ex ea commodo consequat. Duis aute irure dolor in \
+           reprehenderit in volup"
+      in
+      let* hash =
+        lift
+        @@ serialize_payload
+             ~max_page_size
+             payload
+             ~for_each_page:Backend.save_page
+      in
+      let* retrieved_payload =
+        lift
+        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
+      in
       assert_equal_bytes
         ~loc:__LOC__
         "Deserialized payload do not match with original"
@@ -437,4 +482,8 @@ let tests =
       "Serialization and deserialization of very long contents is correct."
       `Quick
       Merkle_tree.V0.long_content_roundtrip;
+    Tztest.tztest
+      "Hashes pages are not larger than expected"
+      `Quick
+      Merkle_tree.V0.multiple_pages_roundtrip_do_not_exceed_page_size;
   ]

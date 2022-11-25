@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
 open Protocol.Alpha_context
 
 module type S = sig
@@ -43,7 +44,7 @@ module type S = sig
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
     state : PVM.state;
-    reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
+    reveal_map : string Sc_rollup_reveal_hash.Map.t option;
     nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
@@ -54,7 +55,7 @@ module type S = sig
       {e on top} of [block], i.e. for an hypothetical new inbox (level).  *)
   val start_simulation :
     Node_context.ro ->
-    reveal_map:string Sc_rollup.Reveal_hash.Map.t option ->
+    reveal_map:string Sc_rollup_reveal_hash.Map.t option ->
     Layer1.head ->
     t tzresult Lwt.t
 

@@ -3269,10 +3269,8 @@ module Sc_rollup : sig
 
   module Input_hash : S.HASH
 
-  module Reveal_hash : S.HASH
-
   type reveal =
-    | Reveal_raw_data of Reveal_hash.t
+    | Reveal_raw_data of Sc_rollup_reveal_hash.t
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
 
@@ -3799,7 +3797,7 @@ module Sc_rollup : sig
 
       val proof_encoding : proof Data_encoding.t
 
-      val reveal : Reveal_hash.t -> string option Lwt.t
+      val reveal : Sc_rollup_reveal_hash.t -> string option Lwt.t
 
       module Inbox_with_history : sig
         val inbox : Inbox.history_proof

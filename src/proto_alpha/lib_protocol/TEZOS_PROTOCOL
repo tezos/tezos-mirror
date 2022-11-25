@@ -14,6 +14,7 @@
         "Blinded_public_key_hash",
         "Block_payload_hash",
         "Tx_rollup_prefixes",
+        "Sc_rollup_reveal_hash",
         "Merkle_list",
         "Bitset",
         "Bounded_history_repr",

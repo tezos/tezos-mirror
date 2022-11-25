@@ -202,45 +202,8 @@ module Input_hash =
       let size = Some 20
     end)
 
-module Reveal_hash = struct
-  (* Reserve the first byte in the encoding to support multi-versioning
-     in the future. *)
-  module V0 = struct
-    include
-      Blake2B.Make
-        (Base58)
-        (struct
-          let name = "Sc_rollup_reveal_data_hash"
-
-          let title = "A smart contract rollup reveal hash"
-
-          let b58check_prefix =
-            "\017\144\121\209\203" (* "scrrh1(54)" decoded from Base58. *)
-
-          let size = Some 31
-        end)
-
-    let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 54
-  end
-
-  include V0
-
-  let encoding =
-    let open Data_encoding in
-    union
-      ~tag_size:`Uint8
-      [
-        case
-          ~title:"Reveal_data_hash_v0"
-          (Tag 0)
-          V0.encoding
-          (fun s -> Some s)
-          (fun s -> s);
-      ]
-end
-
 type reveal =
-  | Reveal_raw_data of Reveal_hash.t
+  | Reveal_raw_data of Sc_rollup_reveal_hash.t
   | Reveal_metadata
   | Request_dal_page of Dal_slot_repr.Page.t
 
@@ -252,7 +215,7 @@ let reveal_encoding =
       (Tag 0)
       (obj2
          (req "reveal_kind" (constant "reveal_raw_data"))
-         (req "input_hash" Reveal_hash.encoding))
+         (req "input_hash" Sc_rollup_reveal_hash.encoding))
       (function Reveal_raw_data s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_raw_data s)
   and case_metadata =
@@ -333,7 +296,7 @@ let input_request_encoding =
     ]
 
 let pp_reveal fmt = function
-  | Reveal_raw_data hash -> Reveal_hash.pp fmt hash
+  | Reveal_raw_data hash -> Sc_rollup_reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
   | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
 
@@ -356,7 +319,7 @@ let pp_input_request fmt request =
 
 let reveal_equal p1 p2 =
   match (p1, p2) with
-  | Reveal_raw_data h1, Reveal_raw_data h2 -> Reveal_hash.equal h1 h2
+  | Reveal_raw_data h1, Reveal_raw_data h2 -> Sc_rollup_reveal_hash.equal h1 h2
   | Reveal_metadata, Reveal_metadata -> true
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
   | (Reveal_raw_data _ | Reveal_metadata | Request_dal_page _), _ -> false
