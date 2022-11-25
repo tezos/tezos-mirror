@@ -500,7 +500,11 @@ let get_output output_info output =
   let open Wasm_pvm_state in
   let {outbox_level; message_index} = output_info in
   let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
-  let+ payload = Wasm.Output_buffer.get output outbox_level message_index in
+  let+ payload =
+    Wasm.Output_buffer.get_message
+      output
+      Wasm.Output_buffer.{outbox_level; message_index}
+  in
   Bytes.to_string payload
 
 let get_info ({current_tick; last_input_info; _} as pvm_state) =

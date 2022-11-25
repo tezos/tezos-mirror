@@ -1206,17 +1206,17 @@ let step_kont_encoding =
         (fun msg -> SK_Trapped Source.(msg @@ no_region));
     ]
 
-let index_vector_encoding =
+let messages_encoding =
   conv
-    (fun index -> Output_buffer.Index_Vector.of_immutable index)
-    (fun buffer -> Output_buffer.Index_Vector.snapshot buffer)
+    (fun index -> Output_buffer.Messages.of_immutable index)
+    (fun buffer -> Output_buffer.Messages.snapshot buffer)
     (z_lazy_vector (value [] Data_encoding.z) (value [] Data_encoding.bytes))
 
 let output_buffer_encoding =
   conv
-    (fun output -> Output_buffer.Level_Vector.of_immutable output)
-    (fun buffer -> Output_buffer.Level_Vector.snapshot buffer)
-    (int32_lazy_vector (value [] Data_encoding.int32) index_vector_encoding)
+    (fun output -> Output_buffer.Outboxes.of_immutable output)
+    (fun buffer -> Output_buffer.Outboxes.snapshot buffer)
+    (int32_lazy_vector (value [] Data_encoding.int32) messages_encoding)
 
 let config_encoding ~host_funcs =
   conv

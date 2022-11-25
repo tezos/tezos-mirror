@@ -255,15 +255,28 @@ let test_output () =
   let*! tree = set_full_input_step [string_input_message] 0l tree in
   let*! final_tree = eval_until_input_requested tree in
   let*! output = Wasm.Internal_for_tests.get_output_buffer final_tree in
-  let*! level, end_of_level_message_index =
-    Tezos_webassembly_interpreter.Output_buffer.get_id output
+  let* last_outbox_level =
+    match Tezos_webassembly_interpreter.Output_buffer.get_last_level output with
+    | Some level -> return level
+    | None -> failwith "The PVM output buffer does not contain any outbox."
+  in
+  let*! last_outbox =
+    Tezos_webassembly_interpreter.Output_buffer.Outboxes.get
+      last_outbox_level
+      output
+  in
+  let* end_of_level_message_index =
+    match Output_buffer.get_outbox_last_message_index last_outbox with
+    | Some index -> return index
+    | None -> failwith "The PVM output buffer does not contain any outbox."
   in
   (* The last message in the outbox corresponds to EOL, due to the nature of the
      kernel. As such we must take the one preceding it. *)
   let message_index = Z.pred end_of_level_message_index in
 
   let*! bytes_output_message =
-    Tezos_webassembly_interpreter.Output_buffer.get output level message_index
+    Tezos_webassembly_interpreter.Output_buffer.(
+      get_message output {outbox_level = last_outbox_level; message_index})
   in
   assert (string_input_message = Bytes.to_string bytes_output_message) ;
   let message =
@@ -273,7 +286,7 @@ let test_output () =
   in
   assert (message = out) ;
   let*? outbox_level =
-    Environment.wrap_tzresult @@ Raw_level_repr.of_int32 level
+    Environment.wrap_tzresult @@ Raw_level_repr.of_int32 last_outbox_level
   in
   let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
 

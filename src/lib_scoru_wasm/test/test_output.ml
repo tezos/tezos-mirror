@@ -62,19 +62,33 @@ let test_aux_write_output () =
       ~dst:50l
       ~max_bytes:36000l
   in
-  let output_level = Output_buffer.get_level output_buffer in
-  assert (output_level = 2l) ;
+  let output_level = Output_buffer.get_last_level output_buffer in
+  assert (output_level = Some 2l) ;
   let* result =
     Host_funcs.Aux.write_output ~output_buffer ~memory ~src:50l ~num_bytes:5l
   in
-  let* z = Output_buffer.get output_buffer 2l Z.zero in
+
+  let last_outbox_level = Output_buffer.get_last_level output_buffer in
+  let* last_outbox =
+    match last_outbox_level with
+    | Some level -> Output_buffer.Outboxes.get level output_buffer
+    | None -> Stdlib.failwith "No outbox exists"
+  in
+  let last_message_in_last_outbox =
+    Output_buffer.get_outbox_last_message_index last_outbox
+  in
+  assert (last_outbox_level = Some 2l) ;
+  assert (last_message_in_last_outbox = Some Z.zero) ;
+
+  let* z =
+    Output_buffer.get_message
+      output_buffer
+      {outbox_level = 2l; message_index = Z.zero}
+  in
   assert (result = 0l) ;
-  let* level, id = Output_buffer.get_id output_buffer in
-  assert (level = output_level) ;
-  assert (id = Z.zero) ;
   assert (z = Bytes.of_string "hello") ;
 
-  Lwt.return @@ Result.return_unit
+  Lwt.return_ok ()
 
 let test_write_host_fun () =
   let open Lwt.Syntax in
@@ -126,12 +140,24 @@ let test_write_host_fun () =
       Host_funcs.Internal_for_tests.write_output
       values
   in
-  let* z = Output_buffer.get output 2l Z.zero in
-  let* level, id = Output_buffer.get_id output in
+  let last_outbox_level = Output_buffer.get_last_level output in
+  let* last_outbox =
+    match last_outbox_level with
+    | Some level -> Output_buffer.Outboxes.get level output
+    | None -> Stdlib.failwith "No outbox exists"
+  in
+  let last_message_in_last_outbox =
+    Output_buffer.get_outbox_last_message_index last_outbox
+  in
+  assert (last_outbox_level = Some 2l) ;
+  assert (last_message_in_last_outbox = Some Z.zero) ;
+
+  let* z =
+    Output_buffer.get_message output {outbox_level = 2l; message_index = Z.zero}
+  in
   assert (result = Values.[Num (I32 0l)]) ;
   assert (z = Bytes.of_string "hello") ;
-  assert (level = 2l) ;
-  assert (id = Z.zero) ;
+
   let values = Values.[Num (I32 50l); Num (I32 5000l)] in
   let* _, result =
     Eval.invoke
@@ -143,11 +169,20 @@ let test_write_host_fun () =
       Host_funcs.Internal_for_tests.write_output
       values
   in
-  let* level, id = Output_buffer.get_id output in
+  let last_outbox_level = Output_buffer.get_last_level output in
+  let* last_outbox =
+    match last_outbox_level with
+    | Some level -> Output_buffer.Outboxes.get level output
+    | None ->
+        Stdlib.failwith "The PVM output buffer does not contain any outbox."
+  in
+  let last_message_in_last_outbox =
+    Output_buffer.get_outbox_last_message_index last_outbox
+  in
   assert (
     result = Values.[Num (I32 Host_funcs.Error.(code Input_output_too_large))]) ;
-  assert (level = 2l) ;
-  assert (id = Z.zero) ;
+  assert (last_outbox_level = Some 2l) ;
+  assert (last_message_in_last_outbox = Some Z.zero) ;
   Lwt.return @@ Result.return_unit
 
 let tests =

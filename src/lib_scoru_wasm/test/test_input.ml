@@ -101,9 +101,17 @@ let read_input () =
       ~dst:50l
       ~max_bytes:36000l
   in
-  let* output_level, output_id = Output_buffer.get_id output_buffer in
-  assert (output_level = 2l) ;
-  assert (output_id = Z.of_int (-1)) ;
+  let last_outbox_level = Output_buffer.get_last_level output_buffer in
+  let* last_outbox =
+    match last_outbox_level with
+    | Some level -> Output_buffer.Outboxes.get level output_buffer
+    | None -> Stdlib.failwith "No outbox exists"
+  in
+  let last_message_in_last_outbox =
+    Output_buffer.get_outbox_last_message_index last_outbox
+  in
+  assert (last_outbox_level = Some 2l) ;
+  assert (last_message_in_last_outbox = None) ;
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5l) ;
   let* m = Memory.load_bytes memory 4l 1 in

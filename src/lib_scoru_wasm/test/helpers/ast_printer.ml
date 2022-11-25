@@ -627,19 +627,19 @@ let pp_input_buffer out input =
     (pp_vector_z Input_buffer.pp_message)
     (Lazy_vector.Mutable.ZVector.snapshot input)
 
-let pp_index_vector out index_vector =
+let pp_messages out index_vector =
   Format.fprintf
     out
     "@[<v 2>%a@]"
     (pp_vector_z (fun o x -> Format.fprintf o "@[<v 2>%s@]" (Bytes.to_string x)))
-    (Output_buffer.Index_Vector.snapshot index_vector)
+    (Output_buffer.Messages.snapshot index_vector)
 
 let pp_output_buffer out (output : Output_buffer.t) =
   Format.fprintf
     out
     "@[<v 2>%a@]"
-    (pp_vector (fun o -> pp_index_vector o))
-    (Output_buffer.Level_Vector.snapshot output)
+    (pp_vector (fun o -> pp_messages o))
+    (Output_buffer.Outboxes.snapshot output)
 
 let pp_buffers out Eval.{input; output} =
   Format.fprintf

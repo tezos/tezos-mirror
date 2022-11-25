@@ -300,7 +300,7 @@ module Aux = struct
             let* () =
               M.store_num memory id_offset 0l (I64 (Z.to_int64 message_counter))
             in
-            Output_buffer.set_level output_buffer raw_level ;
+            Output_buffer.ensure_outbox_at_level output_buffer raw_level ;
             return (Int32.of_int input_size))
           (fun exn ->
             match exn with
@@ -317,8 +317,8 @@ module Aux = struct
         else
           let num_bytes = Int32.to_int num_bytes in
           let* payload = M.load_bytes memory src num_bytes in
-          let*! () =
-            Output_buffer.set_value output_buffer (Bytes.of_string payload)
+          let*! Output_buffer.{outbox_level = _; message_index = _} =
+            Output_buffer.push_message output_buffer (Bytes.of_string payload)
           in
           return 0l
       in
