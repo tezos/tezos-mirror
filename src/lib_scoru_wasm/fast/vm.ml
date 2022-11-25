@@ -74,7 +74,7 @@ let rec compute_step_many accum_ticks ?builtins
       let goto_snapshot_and_retry () =
         let* pvm_state, ticks = compute_until_snapshot ~max_steps pvm_state in
         match pvm_state.tick_state with
-        | Snapshot ->
+        | Snapshot when not stop_at_snapshot ->
             let max_steps = Int64.sub max_steps ticks in
             let accum_ticks = Int64.add accum_ticks ticks in
             let may_compute_more = Wasm_vm.should_compute pvm_state in
