@@ -631,12 +631,22 @@ let pp_messages out index_vector =
     (pp_vector_z (fun o x -> Format.fprintf o "@[<v 2>%s@]" (Bytes.to_string x)))
     (Output_buffer.Messages.snapshot index_vector)
 
-let pp_output_buffer out (output : Output_buffer.t) =
+let pp_outboxes out map =
+  let pp_key out key = Format.fprintf out "%ld" key in
+  pp_list
+    (pp_pair pp_key (Format.pp_print_option pp_messages))
+    out
+    (Output_buffer.Outboxes.Map.loaded_bindings map)
+
+let pp_output_buffer out
+    ({outboxes; last_level; validity_period} : Output_buffer.t) =
   Format.fprintf
     out
-    "@[<v 2>%a@]"
-    (pp_vector (fun o -> pp_messages o))
-    (Output_buffer.Outboxes.snapshot output)
+    "@[<v 2>{outboxes = %a;@;last_level = %s;@;validity_period = %ld;@;}@]"
+    pp_outboxes
+    (Output_buffer.Outboxes.snapshot outboxes)
+    (match last_level with Some l -> Int32.to_string l | None -> "None")
+    validity_period
 
 let pp_buffers out Eval.{input; output} =
   Format.fprintf

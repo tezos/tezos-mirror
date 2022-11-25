@@ -109,6 +109,16 @@ let tick_state_encoding =
 let durable_buffers_encoding =
   Tezos_tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
 
+let default_buffers validity_period () =
+  Tezos_webassembly_interpreter.Eval.
+    {
+      input = Tezos_webassembly_interpreter.Input_buffer.alloc ();
+      output =
+        Tezos_webassembly_interpreter.Output_buffer.alloc
+          ~validity_period
+          ~last_level:None;
+    }
+
 let pvm_state_encoding =
   let open Tezos_tree_encoding in
   conv
@@ -135,7 +145,7 @@ let pvm_state_encoding =
           (*`Gather_floppies` uses `get_info`, that decodes the state of the
             PVM, which at the start of the rollup doesn't exist. *)
           Option.value_f
-            ~default:Tezos_webassembly_interpreter.Eval.buffers
+            ~default:(default_buffers outbox_validity_period)
             buffers;
         tick_state;
         last_top_level_call;
@@ -233,7 +243,7 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
         current_tick = Z.zero;
         reboot_counter = Z.succ Constants.maximum_reboots_per_input;
         durable;
-        buffers = Tezos_webassembly_interpreter.Eval.buffers ();
+        buffers = default_buffers outbox_validity_period ();
         tick_state = Collect;
         last_top_level_call = Z.zero;
         max_nb_ticks = ticks_per_snapshot;

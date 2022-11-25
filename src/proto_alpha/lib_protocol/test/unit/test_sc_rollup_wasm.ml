@@ -258,14 +258,14 @@ let test_output () =
   let*! final_tree = eval_until_input_requested tree in
   let*! output = Wasm.Internal_for_tests.get_output_buffer final_tree in
   let* last_outbox_level =
-    match Tezos_webassembly_interpreter.Output_buffer.get_last_level output with
+    match output.Tezos_webassembly_interpreter.Output_buffer.last_level with
     | Some level -> return level
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
   let*! last_outbox =
-    Tezos_webassembly_interpreter.Output_buffer.Outboxes.get
-      last_outbox_level
+    Tezos_webassembly_interpreter.Output_buffer.get_outbox
       output
+      last_outbox_level
   in
   let* end_of_level_message_index =
     match Output_buffer.get_outbox_last_message_index last_outbox with

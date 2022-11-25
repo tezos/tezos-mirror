@@ -285,9 +285,7 @@ let show_outbox_gen tree level =
   let open Lwt_syntax in
   let* output_buffer = Wasm.Internal_for_tests.get_output_buffer tree in
   let* level_vector =
-    Tezos_lazy_containers.Lazy_vector.Mutable.Int32Vector.get
-      level
-      output_buffer
+    Tezos_webassembly_interpreter.Output_buffer.get_outbox output_buffer level
   in
   let* messages =
     Tezos_lazy_containers.Lazy_vector.(

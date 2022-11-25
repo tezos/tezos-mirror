@@ -35,6 +35,7 @@ module C = Chunked_byte_vector
 open Tezos_tree_encoding
 module NameMap = Lazy_map_encoding.Make (Instance.NameMap)
 module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
+module Outboxes = Lazy_map_encoding.Make (Output_buffer.Outboxes.Map)
 
 (** Utility function*)
 let string_tag = value [] Data_encoding.string
@@ -1208,11 +1209,24 @@ let messages_encoding =
     (fun buffer -> Output_buffer.Messages.snapshot buffer)
     (z_lazy_vector (value [] Data_encoding.z) (value [] Data_encoding.bytes))
 
-let output_buffer_encoding =
+let outboxes_encoding =
   conv
-    (fun output -> Output_buffer.Outboxes.of_immutable output)
-    (fun buffer -> Output_buffer.Outboxes.snapshot buffer)
-    (int32_lazy_vector (value [] Data_encoding.int32) messages_encoding)
+    Output_buffer.Outboxes.of_immutable
+    Output_buffer.Outboxes.snapshot
+    (Outboxes.lazy_map messages_encoding)
+
+let output_buffer_encoding =
+  let open Output_buffer in
+  conv
+    (fun (outboxes, last_level, validity_period) ->
+      {outboxes; last_level; validity_period})
+    (fun {outboxes; last_level; validity_period} ->
+      (outboxes, last_level, validity_period))
+    (tup3
+       ~flatten:false
+       (scope ["outboxes"] outboxes_encoding)
+       (value_option ["last_level"] Data_encoding.int32)
+       (value ["validity_period"] Data_encoding.int32))
 
 let config_encoding ~host_funcs =
   conv
