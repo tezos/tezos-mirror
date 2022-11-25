@@ -221,6 +221,16 @@ val get_predecessor_unsafe :
   Commitment_hash.t ->
   (Commitment_hash.t * Raw_context.t) tzresult Lwt.t
 
+(** [check_if_commitments_are_related ~descendant ~ancestor] checks whether a
+    commitment with hash [~ancestor] exists as a predecessor of [~descendant],
+    among the list of commitments stored for [rollup] in [ctxt]. *)
+val check_if_commitments_are_related :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  descendant:Commitment_hash.t ->
+  ancestor:Commitment_hash.t ->
+  (bool * Raw_context.t) tzresult Lwt.t
+
 (** Hash a commitment and account for gas spent. *)
 val hash :
   Raw_context.t -> Commitment.t -> (Raw_context.t * Commitment_hash.t) tzresult

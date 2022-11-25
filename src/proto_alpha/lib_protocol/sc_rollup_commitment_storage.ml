@@ -85,6 +85,21 @@ let get_predecessor_unsafe ctxt rollup node =
   let* commitment, ctxt = get_commitment_unsafe ctxt rollup node in
   return (commitment.predecessor, ctxt)
 
+let check_if_commitments_are_related ctxt rollup ~descendant ~ancestor =
+  let open Lwt_result_syntax in
+  let rec aux ctxt current_commitment_hash =
+    if Commitment_hash.(current_commitment_hash = ancestor) then
+      return (true, ctxt)
+    else
+      let* predecessor_commitment_opt, ctxt =
+        get_predecessor_opt_unsafe ctxt rollup current_commitment_hash
+      in
+      match predecessor_commitment_opt with
+      | None -> return (false, ctxt)
+      | Some cch -> (aux [@ocaml.tailcall]) ctxt cch
+  in
+  aux ctxt descendant
+
 let hash ctxt commitment =
   let open Result_syntax in
   let* ctxt =

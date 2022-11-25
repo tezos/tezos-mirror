@@ -3733,6 +3733,13 @@ module Sc_rollup : sig
 
     val last_cemented_commitment_hash_with_level :
       context -> rollup -> (Hash.t * Raw_level.t * context) tzresult Lwt.t
+
+    val check_if_commitments_are_related :
+      context ->
+      rollup ->
+      descendant:Hash.t ->
+      ancestor:Hash.t ->
+      (bool * context) tzresult Lwt.t
   end
 
   module Storage : sig
