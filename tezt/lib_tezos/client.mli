@@ -1594,6 +1594,153 @@ module Sc_rollup : sig
     unit Runnable.process
 end
 
+(** {2 Commands for managing FA1.2-compatible smart contracts} *)
+
+(** Run [octez-client check contract <contract> implements fa1.2]. *)
+val check_contract_implements_fa1_2 : contract:string -> t -> unit Lwt.t
+
+(** Same as [check_contract_implements_fa1_2], but do not wait for the process to exit. *)
+val spawn_check_contract_implements_fa1_2 : contract:string -> t -> Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> get balance for <from>]. *)
+val from_fa1_2_contract_get_balance :
+  contract:string -> from:string -> t -> int Lwt.t
+
+(** Same as [from_fa1_2_contract_get_balance], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_get_balance :
+  contract:string -> from:string -> t -> Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> get allowance on <owner> as <operator>]. *)
+val from_fa1_2_contract_get_allowance :
+  contract:string -> owner:string -> operator:string -> t -> int Lwt.t
+
+(** Same as [from_fa1_2_contract_get_allowance], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_get_allowance :
+  contract:string -> owner:string -> operator:string -> t -> Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> get total supply]. *)
+val from_fa1_2_contract_get_total_supply : contract:string -> t -> int Lwt.t
+
+(** Same as [from_fa1_2_contract_get_total_supply], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_get_total_supply :
+  contract:string -> t -> Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> get balance for <from> callback on <callback>]. *)
+val from_fa1_2_contract_get_balance_callback :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  from:string ->
+  callback:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_fa1_2_contract_get_balance_callback], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_get_balance_callback :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  from:string ->
+  callback:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> get allowance on <from> as <to> callback on <callback>]. *)
+val from_fa1_2_contract_get_allowance_callback :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  from:string ->
+  to_:string ->
+  callback:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_fa1_2_contract_get_allowance_callback], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_get_allowance_callback :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  from:string ->
+  to_:string ->
+  callback:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> get total supply as <from> callback on <callback>]. *)
+val from_fa1_2_contract_get_total_supply_callback :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  from:string ->
+  callback:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_fa1_2_contract_get_total_supply_callback], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_get_total_supply_callback :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  from:string ->
+  callback:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> transfer <amount> from <from> to <to>]. *)
+val from_fa1_2_contract_transfer :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  amount:int ->
+  from:string ->
+  to_:string ->
+  ?as_:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_fa1_2_contract_transfer], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_transfer :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  amount:int ->
+  from:string ->
+  to_:string ->
+  ?as_:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client from fa1.2 contract <contract> as <as> approve <amount> from <from>]. *)
+val from_fa1_2_contract_approve :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  as_:string ->
+  amount:int ->
+  from:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [from_fa1_2_contract_approve], but do not wait for the process to exit. *)
+val spawn_from_fa1_2_contract_approve :
+  ?burn_cap:Tez.t ->
+  contract:string ->
+  as_:string ->
+  amount:int ->
+  from:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client multiple fa1.2 transfers from <src> using <transfers.json>]. *)
+val multiple_fa1_2_transfers :
+  ?burn_cap:Tez.t ->
+  src:string ->
+  transfers_json:string ->
+  ?as_:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [multiple_fa1_2_transfers], but do not wait for the process to exit. *)
+val spawn_multiple_fa1_2_transfers :
+  ?burn_cap:Tez.t ->
+  src:string ->
+  transfers_json:string ->
+  ?as_:string ->
+  t ->
+  Process.t
+
 (** {2 High-Level Functions} *)
 
 (** Create a client with mode [Client] and import all secret keys
