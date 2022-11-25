@@ -34,6 +34,7 @@ type error +=
 
 type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
+  ticket_receipt : Ticket_receipt.t;
   operations : Script_typed_ir.packed_internal_operation list;
 }
 
@@ -446,7 +447,33 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
       (paid_storage_size_diff, ctxt)
       ticket_token_diffs
   in
-  return ({paid_storage_size_diff; operations}, ctxt)
+  let* ctxt, ticket_receipt =
+    List.fold_left_map_es
+      (fun ctxt
+           Ticket_operations_diff.
+             {ticket_token = ex_token; total_amount; destinations = _} ->
+        let+ ticket_token, ctxt = Ticket_token_unparser.unparse ctxt ex_token in
+        (* Here we only show the outgoing (negative) balance wrt to the rollup
+           address. The positive balances for the receiving contracts are
+           contained in the ticket updates for the internal operations. *)
+        let item =
+          Ticket_receipt.
+            {
+              ticket_token;
+              updates =
+                [
+                  {
+                    account = Destination.Sc_rollup rollup;
+                    amount = Z.neg (Script_int.to_zint total_amount);
+                  };
+                ];
+            }
+        in
+        (ctxt, item))
+      ctxt
+      ticket_token_diffs
+  in
+  return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
 
 module Internal_for_tests = struct
   let execute_outbox_message = execute_outbox_message

@@ -268,6 +268,7 @@ and _ successful_manager_operation_result =
       -> Kind.sc_rollup_timeout successful_manager_operation_result
   | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }

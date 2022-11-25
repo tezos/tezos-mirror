@@ -1496,12 +1496,21 @@ let apply_manager_operation :
         ~cemented_commitment
         ~source
         ~output_proof
-      >|=? fun ({Sc_rollup_operations.paid_storage_size_diff; operations}, ctxt)
-        ->
+      >|=? fun ( {
+                   Sc_rollup_operations.paid_storage_size_diff;
+                   ticket_receipt;
+                   operations;
+                 },
+                 ctxt ) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_execute_outbox_message_result
-          {paid_storage_size_diff; balance_updates = []; consumed_gas}
+          {
+            paid_storage_size_diff;
+            ticket_receipt;
+            balance_updates = [];
+            consumed_gas;
+          }
       in
       (ctxt, result, operations)
   | Sc_rollup_recover_bond {sc_rollup} ->
