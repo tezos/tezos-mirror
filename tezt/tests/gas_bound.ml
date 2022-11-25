@@ -75,7 +75,7 @@ let test_originate_first_explosion client () =
   let expected_msg =
     rex "Gas limit exceeded during typechecking or execution"
   in
-  let* _ = Client.typecheck_script ~script:first_explosion client in
+  let* () = Client.typecheck_script ~script:first_explosion client in
   let process =
     Client.spawn_originate_contract
       ~alias:"first_explosion"

@@ -1576,32 +1576,36 @@ let normalize_type ?hooks ~typ client =
 let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
   spawn_typecheck_data ~data ~typ ?gas ~legacy client |> Process.check
 
-let spawn_typecheck_script ~script ?(details = false) ?(emacs = false)
+let spawn_typecheck_script ?hooks ?protocol_hash ~script
+    ?(no_base_dir_warnings = false) ?(details = false) ?(emacs = false)
     ?(no_print_source = false) ?gas ?(legacy = false) client =
   let gas_cmd =
     Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
   in
-  let cmd =
-    ["typecheck"; "script"; script]
-    @ Option.value ~default:[] gas_cmd
-    @ (if details then ["--details"] else [])
-    @ (if emacs then ["--emacs"] else [])
-    @ (if no_print_source then ["--no-print-source"] else [])
-    @ if legacy then ["--legacy"] else []
-  in
-  spawn_command client cmd
+  spawn_command ?hooks ?protocol_hash client
+  @@ optional_switch "no-base-dir-warnings" no_base_dir_warnings
+  @ ["typecheck"; "script"; script]
+  @ Option.value ~default:[] gas_cmd
+  @ (if details then ["--details"] else [])
+  @ (if emacs then ["--emacs"] else [])
+  @ (if no_print_source then ["--no-print-source"] else [])
+  @ if legacy then ["--legacy"] else []
 
-let typecheck_script ~script ?(details = false) ?(emacs = false)
-    ?(no_print_source = false) ?gas ?(legacy = false) client =
+let typecheck_script ?hooks ?protocol_hash ~script ?no_base_dir_warnings
+    ?(details = false) ?(emacs = false) ?(no_print_source = false) ?gas
+    ?(legacy = false) client =
   spawn_typecheck_script
+    ?hooks
+    ?protocol_hash
     ~script
+    ?no_base_dir_warnings
     ~details
     ~emacs
     ~no_print_source
     ?gas
     ~legacy
     client
-  |> Process.check_and_read_stdout
+  |> Process.check
 
 let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
     ~contract ?input ?(unlimited_gas = false) client =

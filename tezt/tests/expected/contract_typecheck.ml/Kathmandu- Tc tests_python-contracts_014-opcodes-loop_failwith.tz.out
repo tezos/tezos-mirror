@@ -1,0 +1,14 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/opcodes/loop_failwith.tz --details
+Well typed
+Gas remaining: 1039996.957 units remaining
+{ parameter bool ;
+  storage unit ;
+  code { UNPAIR
+         /* [ bool : unit ] */ ;
+         LOOP { FAILWITH /* [] */ }
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

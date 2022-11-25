@@ -224,7 +224,7 @@ let test_typechecking_and_normalization_work_with_constants =
   let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
   let script = "file:./tezt/tests/contracts/proto_alpha/constant_unit.tz" in
   let* _ = Client.normalize_script ~script client in
-  let* _ = Client.typecheck_script ~script client in
+  let* () = Client.typecheck_script ~script client in
   return ()
 
 let test_simple_baking_event =

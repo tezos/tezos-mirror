@@ -1,0 +1,14 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_014/opcodes/ticket_store.tz --details
+Well typed
+Gas remaining: 1039997.074 units remaining
+{ parameter (ticket nat) ;
+  storage (option (ticket nat)) ;
+  code { CAR
+         /* [ ticket nat ] */ ;
+         SOME
+         /* [ option (ticket nat) ] */ ;
+         NIL operation
+         /* [ list operation : option (ticket nat) ] */ ;
+         PAIR
+         /* [ pair (list operation) (option (ticket nat)) ] */ } }
