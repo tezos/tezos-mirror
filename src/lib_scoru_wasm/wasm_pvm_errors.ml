@@ -87,7 +87,8 @@ let init_state_to_string exn = init_state_to_string_raw exn |> truncate_message
 
 let durable_exn_explanation_raw = function
   | Durable.Invalid_key path -> Some ("Invalid_key: " ^ path)
-  | Durable.Not_found -> Some "Value not found"
+  | Durable.Value_not_found -> Some "Value not found"
+  | Durable.Tree_not_found -> Some "Tree not found"
   | Durable.Durable_empty | Durable_storage.Durable_empty ->
       Some "Empty durable storage"
   | _ -> None
@@ -156,8 +157,8 @@ let extract_interpreter_error exn =
           raw_exception;
           explanation = Some (truncate_message "Module must export memory 0");
         }
-  | Durable.Invalid_key _ | Durable.Not_found | Durable.Durable_empty
-  | Durable_storage.Durable_empty ->
+  | Durable.Invalid_key _ | Durable.Value_not_found | Durable.Tree_not_found
+  | Durable.Durable_empty | Durable_storage.Durable_empty ->
       `Interpreter {raw_exception; explanation = durable_exn_explanation exn}
   | _ -> `Unknown raw_exception
 

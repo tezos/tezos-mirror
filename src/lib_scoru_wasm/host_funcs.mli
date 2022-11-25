@@ -71,8 +71,9 @@ module Error : sig
         (** Generic error code for unexpected errors. Has code `-8`. *)
     | Store_readonly_value
         (** A value cannot be modified if it is readonly. Has code `-9`. *)
-    | Memory_out_of_bounds
-        (** Attempted access to an address outside the bounds of memory if it is readonly. Has code `-10`. *)
+    | Store_not_a_node
+        (** There is no tree at key. It has no value, nor any subtrees.
+            Has code `-10`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32

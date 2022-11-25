@@ -36,6 +36,7 @@ module Error = struct
     | Input_output_too_large
     | Generic_invalid_access
     | Store_readonly_value
+    | Store_not_a_node
 
   (** [code error] returns the error code associated to the error. *)
   let code = function
@@ -48,6 +49,7 @@ module Error = struct
     | Input_output_too_large -> -7l
     | Generic_invalid_access -> -8l
     | Store_readonly_value -> -9l
+    | Store_not_a_node -> -10l
 end
 
 module type Memory_access = sig
@@ -240,6 +242,8 @@ module Aux = struct
           | Durable.Out_of_bounds _ -> fail Error.Store_invalid_access
           | Durable.Readonly_value -> fail Error.Store_readonly_value
           | Durable.Invalid_key _ -> fail Error.Store_invalid_key
+          | Durable.Value_not_found -> fail Error.Store_not_a_value
+          | Durable.Tree_not_found -> fail Error.Store_not_a_node
           | exn ->
               fail @@ M.exn_to_error ~default:Error.Generic_invalid_access exn)
 
@@ -263,19 +267,6 @@ module Aux = struct
       else
         let* key = M.load_bytes memory key_offset key_length in
         guard (fun () -> Lwt.return (Durable.key_of_string_exn key))
-
-    let guard func =
-      let open Lwt_result_syntax in
-      Lwt.catch
-        (fun () ->
-          let*! res = func () in
-          return res)
-        (function
-          | Durable.Out_of_bounds _ -> fail Error.Store_invalid_access
-          | Durable.Readonly_value -> fail Error.Store_readonly_value
-          | Durable.Invalid_key _ -> fail Error.Store_invalid_key
-          | exn ->
-              fail (M.exn_to_error ~default:Error.Generic_invalid_access exn))
 
     let read_input ~input_buffer ~memory ~level_offset ~id_offset ~dst
         ~max_bytes =

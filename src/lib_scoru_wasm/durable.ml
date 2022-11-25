@@ -34,7 +34,9 @@ exception Invalid_key of string
 
 exception Index_too_large of int
 
-exception Not_found
+exception Value_not_found
+
+exception Tree_not_found
 
 exception Durable_empty = Storage.Durable_empty
 
@@ -111,14 +113,14 @@ let find_value tree key =
 let find_value_exn tree key =
   let open Lwt.Syntax in
   let+ opt = find_value tree key in
-  match opt with None -> raise Not_found | Some value -> value
+  match opt with None -> raise Value_not_found | Some value -> value
 
 (** helper function used in the copy/move *)
 let find_tree_exn tree key =
   let open Lwt.Syntax in
   let key = key_contents key in
   let+ opt = T.find_tree tree key in
-  match opt with None -> raise Not_found | Some subtree -> subtree
+  match opt with None -> raise Tree_not_found | Some subtree -> subtree
 
 let copy_tree_exn tree ?(edit_readonly = false) from_key to_key =
   let open Lwt.Syntax in
@@ -159,7 +161,7 @@ let hash tree key =
 let hash_exn tree key =
   let open Lwt.Syntax in
   let+ opt = hash tree key in
-  match opt with None -> raise Not_found | Some hash -> hash
+  match opt with None -> raise Value_not_found | Some hash -> hash
 
 (* The maximum size of bytes allowed to be read/written at once. *)
 let max_store_io_size = 4096L
