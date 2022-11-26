@@ -707,21 +707,10 @@ Operations
 Operations on unit
 ~~~~~~~~~~~~~~~~~~
 
--  ``UNIT``: Push a unit value onto the stack.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'A   ->   unit : 'A
-
-    > UNIT / S  =>  Unit : S
-
--  ``COMPARE``: Unit comparison
-
-::
-
-    :: unit : unit : 'S   ->   int : 'S
-
-    > COMPARE / Unit : Unit : S  =>  0 : S
+-  ``UNIT``: Push a unit value onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNIT>`__).
+-  ``COMPARE``: Unit comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on type never
 ~~~~~~~~~~~~~~~~~~~~~~~~
