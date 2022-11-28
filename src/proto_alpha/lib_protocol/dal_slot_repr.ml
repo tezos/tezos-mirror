@@ -43,10 +43,17 @@ module Commitment = struct
 
   let encoding = Dal.Commitment.encoding
 
-  let pp ppf commitment =
-    Format.fprintf ppf "%s" (Dal.Commitment.to_b58check commitment)
+  let pp = Dal.Commitment.pp
 
   let zero = Dal.Commitment.zero
+end
+
+module Commitment_proof = struct
+  type t = Dal.commitment_proof
+
+  let encoding = Dal.Commitment_proof.encoding
+
+  let zero = Dal.Commitment_proof.zero
 end
 
 module Index = struct
@@ -77,7 +84,9 @@ module Header = struct
 
   type t = {id : id; commitment : Commitment.t}
 
-  let slot_id_equal ({published_level; index} : id) s2 =
+  type operation = {header : t; proof : Commitment_proof.t}
+
+  let slot_id_equal {published_level; index} s2 =
     Raw_level_repr.equal published_level s2.published_level
     && Index.equal index s2.index
 
@@ -114,6 +123,17 @@ module Header = struct
       (fun (id, commitment) -> {id; commitment})
       (merge_objs id_encoding (obj1 (req "commitment" Commitment.encoding)))
 
+  let operation_encoding =
+    let open Data_encoding in
+    conv
+      (fun {header = {id; commitment}; proof} -> (id, (commitment, proof)))
+      (fun (id, (commitment, proof)) -> {header = {id; commitment}; proof})
+      (merge_objs
+         id_encoding
+         (obj2
+            (req "commitment" Commitment.encoding)
+            (req "commitment_proof" Commitment_proof.encoding)))
+
   let pp_id fmt {published_level; index} =
     Format.fprintf
       fmt
@@ -125,6 +145,29 @@ module Header = struct
 
   let pp fmt {id; commitment = c} =
     Format.fprintf fmt "id:(%a), commitment: %a" pp_id id Commitment.pp c
+
+  type error += Dal_commitment_proof_error of string
+
+  let () =
+    let open Data_encoding in
+    register_error_kind
+      `Permanent
+      ~id:"dal_slot_repr.dal_commitment_proof_error"
+      ~title:"Dal commitment proof error"
+      ~description:"Error occurred during Dal commitment proof validation"
+      ~pp:(fun ppf e -> Format.fprintf ppf "Dal commitment proof error: %s" e)
+      (obj1 (req "error" (string Plain)))
+      (function Dal_commitment_proof_error e -> Some e | _ -> None)
+      (fun e -> Dal_commitment_proof_error e)
+
+  let verify_commitment dal_params {header = {commitment; _}; proof} =
+    let open Result_syntax in
+    let* dal =
+      match Dal.make dal_params with
+      | Ok dal -> return dal
+      | Error (`Fail s) -> error (Dal_commitment_proof_error s)
+    in
+    return @@ Dal.verify_commitment dal commitment proof
 end
 
 module Slot_index = Index

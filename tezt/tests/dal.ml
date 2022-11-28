@@ -58,6 +58,47 @@ let dal_enable_param dal_enable =
 
 (* Some initialization functions to start needed nodes. *)
 
+let setup_node ~parameter_file ~protocol =
+  let* client = Client.init_mockup ~parameter_file ~protocol () in
+  let nodes_args =
+    Node.
+      [
+        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
+      ]
+  in
+  let node = Node.create nodes_args in
+  let* () = Node.config_init node [] in
+  let* dal_parameters = Rollup.Dal.Parameters.from_client client in
+  Node.Config_file.update node (fun json ->
+      let value =
+        JSON.annotate
+          ~origin:"dal_initialisation"
+          (`O
+            [
+              ( "srs_size",
+                `Float (float_of_int dal_parameters.cryptobox.slot_size) );
+              ("activated", `Bool true);
+            ])
+      in
+      let json = JSON.put ("dal", value) json in
+      json) ;
+  let* () =
+    Node.run
+      node
+      [
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4268
+
+           We use [Singleprocess] because the block validation does not yet load the SRS. *)
+        Singleprocess;
+      ]
+  in
+  let* () = Node.wait_for_ready node in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () =
+    Client.activate_protocol_and_wait ~parameter_file ~protocol client
+  in
+  return (node, client, dal_parameters)
+
 let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
     ?dal_enable f ~protocol =
   let parameters =
@@ -77,37 +118,10 @@ let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
-  let nodes_args =
-    Node.
-      [
-        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
-      ]
-  in
-  let* client = Client.init_mockup ~parameter_file ~protocol () in
-  let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox = Rollup.Dal.make parameters.cryptobox in
-  let node = Node.create nodes_args in
-  let* () = Node.config_init node [] in
-  Node.Config_file.update node (fun json ->
-      let value =
-        JSON.annotate
-          ~origin:"dal_initialisation"
-          (`O
-            [
-              ("srs_size", `Float (float_of_int parameters.cryptobox.slot_size));
-              ("activated", `Bool true);
-            ])
-      in
-      let json = JSON.put ("dal", value) json in
-      json) ;
-  let* () = Node.run node [] in
-  let* () = Node.wait_for_ready node in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* () =
-    Client.activate_protocol_and_wait ~parameter_file ~protocol client
-  in
+  let* node, client, dal_parameters = setup_node ~parameter_file ~protocol in
+  let cryptobox = Rollup.Dal.make dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  f parameters cryptobox node client bootstrap1_key
+  f dal_parameters cryptobox node client bootstrap1_key
 
 let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
     bootstrap1_key =
@@ -259,7 +273,9 @@ let test_feature_flag _protocol _parameters _cryptobox node client
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let cryptobox_params = parameters.cryptobox in
   let cryptobox = Rollup.Dal.make cryptobox_params in
-  let commitment = Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou" in
+  let commitment, proof =
+    Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou"
+  in
   Check.(
     (feature_flag = false)
       bool
@@ -285,7 +301,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Operation.Manager.(
       inject
         ~force:true
-        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~commitment]
+        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~commitment ~proof]
         client)
   in
   let* mempool = Mempool.get_mempool client in
@@ -303,33 +319,84 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let publish_slot ~source ?level ?fee ?error ~index ~commitment node client =
+let publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof node
+    client =
   let level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
   Operation.Manager.(
     inject
       ?error
-      [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~commitment]
+      [
+        make ~source ?fee
+        @@ dal_publish_slot_header ~index ~level ~commitment ~proof;
+      ]
       client)
 
 let publish_dummy_slot ~source ?level ?error ?fee ~index ~message cryptobox =
-  let commitment = Rollup.Dal.(Commitment.dummy_commitment cryptobox message) in
-  publish_slot ~source ?level ?fee ?error ~index ~commitment
+  let commitment, proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox message)
+  in
+  publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof
 
-let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
+(* We check that publishing a slot header with a proof for a different
+   slot leads to a proof-checking error. *)
+let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?level ?fee
+    ~index cryptobox =
+  let commitment, _proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox "a")
+  in
+  let _commitment, proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox "b")
+  in
+  let error =
+    rex ~opts:[`Dotall] "The slot header's commitment proof does not check"
+  in
+  publish_slot ~source ?level ?fee ~error ~index ~commitment ~proof
+
+(* We check that publishing a slot header with a proof for the "same"
+   slot contents but represented using a different [slot_size] leads
+   to a proof-checking error. *)
+let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?level
+    ?fee ~index parameters cryptobox =
+  let cryptobox_params =
+    {
+      parameters.Rollup.Dal.Parameters.cryptobox with
+      slot_size = 2 * parameters.cryptobox.slot_size;
+    }
+  in
+  let cryptobox' = Rollup.Dal.make cryptobox_params in
+  let msg = "a" in
+  let commitment, _proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox msg)
+  in
+  let _commitment, proof =
+    Rollup.Dal.(Commitment.dummy_commitment cryptobox' msg)
+  in
+  let error =
+    rex ~opts:[`Dotall] "The slot header's commitment proof does not check"
+  in
+  publish_slot ~source ?level ?fee ~error ~index ~commitment ~proof
+
+let publish_slot_header ~source ?(fee = 1200) ~index ~commitment ~proof node
+    client =
   let level = 1 + Node.get_level node in
   let commitment = Cryptobox.Commitment.of_b58check_opt commitment in
+  let proof =
+    Data_encoding.Json.destruct
+      Cryptobox.Commitment_proof.encoding
+      (`String proof)
+  in
   match commitment with
-  | None -> assert false
   | Some commitment ->
       Operation.Manager.(
         inject
           [
             make ~source ~fee
-            @@ dal_publish_slot_header ~index ~level ~commitment;
+            @@ dal_publish_slot_header ~index ~level ~commitment ~proof;
           ]
           client)
+  | _ -> assert false
 
 let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
     client =
@@ -413,6 +480,7 @@ let check_dal_raw_context node =
 
 let test_slot_management_logic _protocol parameters cryptobox node client
     _bootstrap_key =
+  Log.info "Inject some invalid slot headers" ;
   let* (`OpHash _) =
     let error =
       rex ~opts:[`Dotall] "Unexpected level in the future in slot header"
@@ -443,6 +511,28 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       node
       client
   in
+  let* (`OpHash _) =
+    publish_dummy_slot_with_wrong_proof_for_same_content
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:2
+      ~index:2
+      cryptobox
+      node
+      client
+  in
+  let* (`OpHash _) =
+    publish_dummy_slot_with_wrong_proof_for_different_slot_size
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:2
+      ~index:2
+      parameters
+      cryptobox
+      node
+      client
+  in
+  Log.info "Inject some valid slot headers" ;
   let* (`OpHash oph1) =
     publish_dummy_slot
       ~source:Constant.bootstrap1
@@ -677,9 +767,9 @@ let split_slot node client content =
 let test_dal_node_slot_management _protocol _parameters _cryptobox _node client
     dal_node =
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
-  let* slot_header = split_slot dal_node client slot_content in
+  let* slot_commitment, _proof = split_slot dal_node client slot_content in
   let* received_slot =
-    RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_header)
+    RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_commitment)
   in
   let received_slot_content = Rollup.Dal.content_of_slot received_slot in
   Check.(
@@ -689,18 +779,35 @@ let test_dal_node_slot_management _protocol _parameters _cryptobox _node client
   (* Only check that the function to retrieve pages succeeds, actual
      contents are checked in the test `rollup_node_stores_dal_slots`. *)
   let* _slots_as_pages =
-    RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_header)
+    RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_commitment)
   in
   return ()
 
+let () =
+  Printexc.register_printer @@ function
+  | Data_encoding.Binary.Read_error e ->
+      Some
+        (Format.asprintf
+           "Failed to decode binary: %a@."
+           Data_encoding.Binary.pp_read_error
+           e)
+  | _ -> None
+
 let publish_and_store_slot node client dal_node source index content =
-  let* slot_header = split_slot dal_node client content in
+  let* slot_commitment, proof = split_slot dal_node client content in
   let commitment =
-    Cryptobox.Commitment.of_b58check_opt slot_header
-    |> mandatory "The b58check-encoded slot header is not valid"
+    Cryptobox.Commitment.of_b58check_opt slot_commitment
+    |> mandatory "The b58check-encoded slot commitment is not valid"
   in
-  let* _ = publish_slot ~source ~fee:1_200 ~index ~commitment node client in
-  return (index, slot_header)
+  let proof =
+    Data_encoding.Json.destruct
+      Cryptobox.Commitment_proof.encoding
+      (`String proof)
+  in
+  let* _ =
+    publish_slot ~source ~fee:1_200 ~index ~commitment ~proof node client
+  in
+  return (index, slot_commitment)
 
 let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
     client dal_node =
@@ -794,11 +901,11 @@ let test_dal_node_test_slots_propagation _protocol _parameters _cryptobox node
   let* () = Dal_node.run dal_node4 in
   let* dal = Rollup.Dal.Parameters.from_client client in
   let cryptobox = Rollup.Dal.make dal.cryptobox in
-  let commitment1 =
+  let commitment1, _proof1 =
     Rollup.Dal.Commitment.dummy_commitment cryptobox "content1"
   in
   let slot_header1_exp = Rollup.Dal.Commitment.to_string commitment1 in
-  let commitment2 =
+  let commitment2, _proof2 =
     Rollup.Dal.Commitment.dummy_commitment cryptobox "content2"
   in
   let slot_header2_exp = Rollup.Dal.Commitment.to_string commitment2 in
@@ -806,8 +913,8 @@ let test_dal_node_test_slots_propagation _protocol _parameters _cryptobox node
   let p2 = wait_for_stored_slot dal_node3 slot_header2_exp in
   let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
   let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
-  let* slot_header1 = split_slot dal_node1 client "content1" in
-  let* slot_header2 = split_slot dal_node2 client "content2" in
+  let* slot_header1, _proof1 = split_slot dal_node1 client "content1" in
+  let* slot_header2, _proof2 = split_slot dal_node2 client "content2" in
   Check.(
     (slot_header1_exp = slot_header1) string ~error_msg:"Expected:%L. Got: %R") ;
   Check.(
@@ -967,11 +1074,11 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
 
   (* 1. Send three slots to dal node and obtain corresponding headers. *)
   let slot_contents_0 = " 10 " in
-  let* commitment_0 = split_slot dal_node client slot_contents_0 in
+  let* commitment_0, proof_0 = split_slot dal_node client slot_contents_0 in
   let slot_contents_1 = " 200 " in
-  let* commitment_1 = split_slot dal_node client slot_contents_1 in
+  let* commitment_1, proof_1 = split_slot dal_node client slot_contents_1 in
   let slot_contents_2 = " 400 " in
-  let* commitment_2 = split_slot dal_node client slot_contents_2 in
+  let* commitment_2, proof_2 = split_slot dal_node client slot_contents_2 in
   (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -998,6 +1105,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
       ~source:Constant.bootstrap1
       ~index:0
       ~commitment:commitment_0
+      ~proof:proof_0
       node
       client
   in
@@ -1006,6 +1114,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
       ~source:Constant.bootstrap2
       ~index:1
       ~commitment:commitment_1
+      ~proof:proof_1
       node
       client
   in
@@ -1014,6 +1123,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
       ~source:Constant.bootstrap3
       ~index:2
       ~commitment:commitment_2
+      ~proof:proof_2
       node
       client
   in

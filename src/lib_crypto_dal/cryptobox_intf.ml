@@ -30,11 +30,11 @@ module type COMMITMENT = sig
   (** An encoding for a commitment. *)
   val encoding : t Data_encoding.t
 
-  (** [commitment_to_b58check commitment] returns a b58 representation
+  (** [to_b58check commitment] returns a b58 representation
         of [commitment]. *)
   val to_b58check : t -> string
 
-  (** [commitment_of_b58check_opt bytes] computes a commitment from
+  (** [of_b58check_opt bytes] computes a commitment from
         its b58 representation. Returns [None] if it is not a valid
         representation. *)
   val of_b58check_opt : string -> t option
@@ -42,6 +42,16 @@ module type COMMITMENT = sig
   val pp : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool
+
+  val zero : t
+end
+
+module type COMMITMENT_PROOF = sig
+  (** A commitment proof. *)
+  type t
+
+  (** An encoding for a commitment proof. This encoding is bounded. *)
+  val encoding : t Data_encoding.t
 
   val zero : t
 end
@@ -78,8 +88,7 @@ module type VERIFIER = sig
      bounded by a constant. *)
   type commitment_proof
 
-  (** An encoding for the proof of a commitment. *)
-  val commitment_proof_encoding : commitment_proof Data_encoding.t
+  module Commitment_proof : COMMITMENT_PROOF with type t := commitment_proof
 
   (** [verify_commitment t commitment proof] checks whether
      [commitment] is valid. In particular, it checks

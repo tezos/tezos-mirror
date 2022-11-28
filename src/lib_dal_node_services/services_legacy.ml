@@ -29,8 +29,11 @@ let split_slot =
     ~description:"Split and store a slot"
     ~query:Tezos_rpc.Query.empty
     ~input:Data_encoding.bytes
-    ~output:Data_encoding.string
-      (* see [Slot_manager.Slot_header.to_b58check] *)
+    ~output:
+      Data_encoding.(
+        obj2
+          (req "commitment" string)
+          (req "proof" Cryptobox.Commitment_proof.encoding))
     Tezos_rpc.Path.(open_root / "slot" / "split")
 
 let slot =

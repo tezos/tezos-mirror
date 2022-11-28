@@ -29,7 +29,7 @@ val split_slot :
     unit,
     unit,
     Tezos_crypto_dal.Cryptobox.slot,
-    string )
+    string * Tezos_crypto_dal.Cryptobox.commitment_proof )
   Tezos_rpc.Service.service
 
 val slot :

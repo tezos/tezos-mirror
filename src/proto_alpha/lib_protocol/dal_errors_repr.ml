@@ -44,6 +44,9 @@ type error +=
     }
   | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
+  | Dal_publish_slot_header_invalid_proof of {
+      slot_header : Dal_slot_repr.Header.operation;
+    }
   | Dal_data_availibility_attestor_not_in_committee of {
       attestor : Signature.Public_key_hash.t;
       level : Level_repr.t;
@@ -231,6 +234,18 @@ let () =
       | Dal_publish_slot_header_duplicate {slot_header} -> Some slot_header
       | _ -> None)
     (fun slot_header -> Dal_publish_slot_header_duplicate {slot_header}) ;
+  let description = "The slot header's commitment proof does not check" in
+  register_error_kind
+    `Permanent
+    ~id:"dal_publish_slot_header_invalid_proof"
+    ~title:"DAL publish slot header invalid proof"
+    ~description
+    ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
+    Dal_slot_repr.Header.operation_encoding
+    (function
+      | Dal_publish_slot_header_invalid_proof {slot_header} -> Some slot_header
+      | _ -> None)
+    (fun slot_header -> Dal_publish_slot_header_invalid_proof {slot_header}) ;
   register_error_kind
     `Outdated
     ~id:"Dal_operation_for_old_level"

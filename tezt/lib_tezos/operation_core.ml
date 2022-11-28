@@ -271,6 +271,11 @@ module Manager = struct
       Tezos_crypto_dal.Cryptobox.Commitment.encoding
       commitment
 
+  let json_of_commitment_proof proof =
+    Data_encoding.Json.construct
+      Tezos_crypto_dal.Cryptobox.Commitment_proof.encoding
+      proof
+
   let get_next_counter ?(source = Constant.bootstrap1) client =
     let* counter_json =
       RPC.Client.call client
@@ -343,6 +348,7 @@ module Manager = struct
         level : int;
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
+        proof : Tezos_crypto_dal.Cryptobox.commitment_proof;
       }
     | Delegation of {delegate : Account.key}
     | Sc_rollup_refute of {
@@ -361,8 +367,8 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let dal_publish_slot_header ~level ~index ~commitment =
-    Dal_publish_slot_header {level; index; commitment}
+  let dal_publish_slot_header ~level ~index ~commitment ~proof =
+    Dal_publish_slot_header {level; index; commitment; proof}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
@@ -397,13 +403,14 @@ module Manager = struct
           ("destination", `String dest);
         ]
         @ parameters
-    | Dal_publish_slot_header {level; index; commitment} ->
+    | Dal_publish_slot_header {level; index; commitment; proof} ->
         let slot_header =
           `O
             [
               ("index", json_of_int index);
               ("level", json_of_int level);
               ("commitment", json_of_commitment commitment);
+              ("commitment_proof", json_of_commitment_proof proof);
             ]
         in
         [

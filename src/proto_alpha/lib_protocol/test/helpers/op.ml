@@ -1028,7 +1028,7 @@ let dal_publish_slot_header ?force_reveal ?counter ?fee ?gas_limit
     ?storage_limit
     ~source:src
     ctxt
-    (Dal_publish_slot_header {slot_header})
+    (Dal_publish_slot_header slot_header)
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk (Context.branch ctxt) to_sign_op

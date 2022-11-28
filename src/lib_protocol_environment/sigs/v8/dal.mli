@@ -52,11 +52,11 @@ module Commitment : sig
   (** An encoding for a commitment. *)
   val encoding : commitment Data_encoding.t
 
-  (** [commitment_to_b58check commitment] returns a b58 representation
+  (** [to_b58check commitment] returns a b58 representation
         of [commitment]. *)
   val to_b58check : commitment -> string
 
-  (** [commitment_of_b58check_opt bytes] computes a commitment from
+  (** [of_b58check_opt bytes] computes a commitment from
         its b58 representation. Returns [None] if it is not a valid
         representation. *)
   val of_b58check_opt : string -> commitment option
@@ -72,8 +72,12 @@ end
      bounded by a constant. *)
 type commitment_proof
 
-(** An encoding for the proof of a commitment. *)
-val commitment_proof_encoding : commitment_proof Data_encoding.t
+module Commitment_proof : sig
+  (** An encoding for a commitment proof. *)
+  val encoding : commitment_proof Data_encoding.t
+
+  val zero : commitment_proof
+end
 
 (** [verify_commitment srs commitment proof] checks whether
      [commitment] is a valid [commitment]. In particular, it check

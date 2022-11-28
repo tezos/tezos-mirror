@@ -46,7 +46,7 @@ val split_and_store :
   Cryptobox.t ->
   Store.t ->
   slot ->
-  Cryptobox.Commitment.t tzresult Lwt.t
+  (Cryptobox.Commitment.t * Cryptobox.commitment_proof) tzresult Lwt.t
 
 (** [get_shard store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id]. *)

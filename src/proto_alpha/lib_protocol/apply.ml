@@ -1401,7 +1401,7 @@ let apply_manager_operation :
           in
           return (ctxt, result, [])
       | None -> tzfail Tx_rollup_errors.Proof_undecodable)
-  | Dal_publish_slot_header {slot_header} ->
+  | Dal_publish_slot_header slot_header ->
       Dal_apply.apply_publish_slot_header ctxt slot_header >>?= fun ctxt ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Dal_publish_slot_header_result {consumed_gas} in

@@ -581,7 +581,8 @@ module Dal = struct
           (encode_bytes_to_hex_string slot)
       in
       let data = JSON.unannotate slot in
-      make ~data POST ["slot"; "split"] JSON.as_string
+      make ~data POST ["slot"; "split"] @@ fun json ->
+      JSON.(json |-> "commitment" |> as_string, json |-> "proof" |> as_string)
 
     let slot_content slot_header =
       make GET ["slot"; "content"; slot_header] get_bytes_from_json_string_node
@@ -673,7 +674,10 @@ module Dal = struct
       in
       let slot = String.to_bytes padded_message in
       match Cryptobox.polynomial_from_slot cryptobox slot with
-      | Ok r -> Cryptobox.commit cryptobox r
+      | Ok r ->
+          let c = Cryptobox.commit cryptobox r in
+          let p = Cryptobox.prove_commitment cryptobox r in
+          (c, p)
       | Error (`Slot_wrong_size str) -> on_error str
 
     let to_string commitment = Cryptobox.Commitment.to_b58check commitment

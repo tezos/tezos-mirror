@@ -163,8 +163,6 @@ module Inner = struct
 
     let _proof_shards_encoding = g1_encoding
 
-    let commitment_proof_encoding = g1_encoding
-
     let _proof_single_encoding = g1_encoding
 
     let page_proof_encoding = g1_encoding
@@ -257,7 +255,28 @@ module Inner = struct
     end)
   end
 
-  include Commitment
+  module Commitment_proof = struct
+    let zero = Bls12_381.G1.zero
+
+    let to_bytes = Bls12_381.G1.to_compressed_bytes
+
+    let of_bytes_exn bytes =
+      match Bls12_381.G1.of_compressed_bytes_opt bytes with
+      | None ->
+          Format.kasprintf
+            Stdlib.failwith
+            "Unexpected data (DAL commitment proof)"
+      | Some proof -> proof
+
+    (* We divide by two because we use the compressed representation. *)
+    let size = Bls12_381.G1.size_in_bytes / 2
+
+    let raw_encoding =
+      let open Data_encoding in
+      conv to_bytes of_bytes_exn (Fixed.bytes size)
+
+    let encoding = raw_encoding
+  end
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)

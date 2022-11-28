@@ -157,15 +157,16 @@ let split_and_store watcher dal_constants store slot =
   let r =
     let open Result_syntax in
     let* polynomial = Cryptobox.polynomial_from_slot dal_constants slot in
-    let slot_header = Cryptobox.commit dal_constants polynomial in
-    return (polynomial, slot_header)
+    let commitment = Cryptobox.commit dal_constants polynomial in
+    let proof = Cryptobox.prove_commitment dal_constants polynomial in
+    return (polynomial, commitment, proof)
   in
   let open Lwt_result_syntax in
   match r with
-  | Ok (polynomial, slot_header) ->
+  | Ok (polynomial, commitment, commitment_proof) ->
       let shards = Cryptobox.shards_from_polynomial dal_constants polynomial in
-      let* () = save store watcher slot_header shards in
-      Lwt.return_ok slot_header
+      let* () = save store watcher commitment shards in
+      Lwt.return_ok (commitment, commitment_proof)
   | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
 
 let check_slot_consistency dal_parameters shards =
