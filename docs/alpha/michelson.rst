@@ -509,115 +509,18 @@ Core instructions
 Control structures
 ~~~~~~~~~~~~~~~~~~
 
--  ``FAILWITH``: Explicitly abort the current program.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'a : \_   ->   \_
-
-This special instruction aborts the current program exposing the top
-element of the stack in its error message (first rule below). It makes
-the output useless since all subsequent instructions will simply
-ignore their usual semantics to propagate the failure up to the main
-result (second rule below). Its type is thus completely generic.
-
-::
-
-    > FAILWITH / a : _  =>  [FAILED]
-    > _ / [FAILED]  =>  [FAILED]
-
--  ``{}``: Empty sequence.
-
-::
-
-    :: 'A   ->   'A
-
-    > {} / SA  =>  SA
-
--  ``{ I ; C }``: Sequence.
-
-::
-
-    :: 'A   ->   'C
-       iff   I :: [ 'A -> 'B ]
-             C :: [ 'B -> 'C ]
-
-    > I ; C / SA  =>  SC
-        where   I / SA  =>  SB
-        and   C / SB  =>  SC
-
--  ``IF bt bf``: Conditional branching.
-
-::
-
-    :: bool : 'A   ->   'B
-       iff   bt :: [ 'A -> 'B ]
-             bf :: [ 'A -> 'B ]
-
-    > IF bt bf / True : S  =>  bt / S
-    > IF bt bf / False : S  =>  bf / S
-
--  ``LOOP body``: A generic loop.
-
-::
-
-    :: bool : 'A   ->   'A
-       iff   body :: [ 'A -> bool : 'A ]
-
-    > LOOP body / True : S  =>  body ; LOOP body / S
-    > LOOP body / False : S  =>  S
-
--  ``LOOP_LEFT body``: A loop with an accumulator.
-
-::
-
-    :: (or 'a 'b) : 'A   ->  'b : 'A
-       iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
-
-    > LOOP_LEFT body / (Left a) : S  =>  body ; LOOP_LEFT body / a : S
-    > LOOP_LEFT body / (Right b) : S  =>  b : S
-
--  ``DIP code``: Runs code protecting the top element of the stack.
-
-::
-
-    :: 'b : 'A   ->   'b : 'C
-       iff   code :: [ 'A -> 'C ]
-
-    > DIP code / x : S  =>  x : S'
-        where    code / S  =>  S'
-
--  ``DIP n code``: Runs code protecting the ``n`` topmost elements of
-   the stack. In particular, ``DIP 0 code`` is equivalent to ``code``
-   and ``DIP 1 code`` is equivalent to ``DIP code``.
-
-::
-
-    :: 'a{1} : ... : 'a{n} : 'A   ->   'a{1} : ... : 'a{n} : 'B
-       iff   code :: [ 'A -> 'B ]
-
-    > DIP n code / x{1} : ... : x{n} : S  =>  x{1} : ... : x{n} : S'
-        where    code / S  =>  S'
-
--  ``EXEC``: Execute a function from the stack.
-
-::
-
-    :: 'a : lambda 'a 'b : 'C   ->   'b : 'C
-
-    > EXEC / a : f : S  =>  r : S
-        where f / a : []  =>  r : []
-
--  ``APPLY``: Partially apply a tuplified function from the stack.
-   Values that are not both pushable and storable
-   (values of type ``operation``, ``contract _`` and ``big map _ _``)
-   cannot be captured by ``APPLY`` (cannot appear in ``'a``).
-
-::
-
-    :: 'a : lambda (pair 'a 'b) 'c : 'C   ->   lambda 'b 'c : 'C
-
-    > APPLY / a : f : S  => { PUSH 'a a ; PAIR ; f } : S
+-  ``FAILWITH``: Explicitly abort the current program (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-FAILWITH>`__).
+-  ``{}``: Empty sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOOP>`__).
+-  ``{ I ; C }``: Sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SEQ>`__).
+-  ``IF bt bf``: Conditional branching (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-IF>`__).
+-  ``LOOP body``: A generic loop (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP>`__).
+-  ``LOOP_LEFT body``: A loop with an accumulator (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LOOP_LEFT>`__).
+-  ``DIP code``: Runs code protecting the top element of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIP>`__).
+-  ``DIP n code``: Runs code protecting the ``n`` topmost elements of the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DIPN>`__).
+-  ``EXEC``: Execute a function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EXEC>`__).
+-  ``APPLY``: Partially apply a tuplified function from the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-APPLY>`__).
 
 Stack operations
 ~~~~~~~~~~~~~~~~
