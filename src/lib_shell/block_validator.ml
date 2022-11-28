@@ -243,6 +243,7 @@ let on_validation_request w
                                 in
                                 with_retry_to_load_protocol (fun () ->
                                     Block_validator_process.apply_block
+                                      ~should_precheck:false
                                       bv.validation_process
                                       chain_store
                                       ~predecessor:pred

@@ -1282,72 +1282,6 @@ let recompute_metadata ~chain_id ~predecessor_block_header ~predecessor_context
       tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
-let apply ?simulate ?cached_result
-    {
-      chain_id;
-      user_activated_upgrades;
-      user_activated_protocol_overrides;
-      operation_metadata_size_limit;
-      max_operations_ttl;
-      predecessor_block_header;
-      predecessor_block_metadata_hash;
-      predecessor_ops_metadata_hash;
-      predecessor_context;
-    } ~cache block_hash block_header operations =
-  let open Lwt_result_syntax in
-  let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Proto) =
-    match Registered_protocol.get pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
-  in
-  let module Block_validation = Make (Proto) in
-  Block_validation.apply
-    ?simulate
-    ?cached_result
-    chain_id
-    ~user_activated_upgrades
-    ~user_activated_protocol_overrides
-    ~operation_metadata_size_limit
-    ~max_operations_ttl
-    ~predecessor_block_header
-    ~predecessor_block_metadata_hash
-    ~predecessor_ops_metadata_hash
-    ~predecessor_context
-    ~cache
-    ~block_header
-    operations
-
-let apply ?simulate ?cached_result c ~cache block_header operations =
-  let open Lwt_result_syntax in
-  let block_hash = Block_header.hash block_header in
-  let*! r =
-    (* The cache might be inconsistent with the context. By forcing
-       the reloading of the cache, we restore the consistency. *)
-    let*! r =
-      apply ?simulate ?cached_result c ~cache block_hash block_header operations
-    in
-    match r with
-    | Error (Validation_errors.Inconsistent_hash _ :: _) ->
-        (* The shell makes an assumption over the protocol concerning the cache which may be broken. In that case, the application fails with an [Inconsistency_hash] error. To make the node resilient to such problem, when such an error occurs, we retry the application using a fresh cache. *)
-        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
-        apply
-          ?cached_result
-          c
-          ~cache:`Force_load
-          block_hash
-          block_header
-          operations
-    | (Ok _ | Error _) as res -> Lwt.return res
-  in
-  match r with
-  | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      tzfail (System_error {errno = Unix.error_message errno; fn; msg})
-  | (Ok _ | Error _) as res -> Lwt.return res
-
 let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     ~predecessor_context ~cache block_header operations =
   let open Lwt_result_syntax in
@@ -1370,6 +1304,94 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     ~cache
     ~block_header
     operations
+
+let apply ?simulate ?cached_result ?(should_precheck = true)
+    {
+      chain_id;
+      user_activated_upgrades;
+      user_activated_protocol_overrides;
+      operation_metadata_size_limit;
+      max_operations_ttl;
+      predecessor_block_header;
+      predecessor_block_metadata_hash;
+      predecessor_ops_metadata_hash;
+      predecessor_context;
+    } ~cache block_hash block_header operations =
+  let open Lwt_result_syntax in
+  let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
+  let* (module Proto) =
+    match Registered_protocol.get pred_protocol_hash with
+    | None ->
+        tzfail
+          (Unavailable_protocol
+             {block = block_hash; protocol = pred_protocol_hash})
+    | Some p -> return p
+  in
+  let* () =
+    if should_precheck && Proto.(compare environment_version V7 >= 0) then
+      precheck
+        ~chain_id
+        ~predecessor_block_header
+        ~predecessor_block_hash:block_header.Block_header.shell.predecessor
+        ~predecessor_context
+        ~cache
+        block_header
+        operations
+    else return_unit
+  in
+  let module Block_validation = Make (Proto) in
+  Block_validation.apply
+    ?simulate
+    ?cached_result
+    chain_id
+    ~user_activated_upgrades
+    ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit
+    ~max_operations_ttl
+    ~predecessor_block_header
+    ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash
+    ~predecessor_context
+    ~cache
+    ~block_header
+    operations
+
+let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
+    block_header operations =
+  let open Lwt_result_syntax in
+  let block_hash = Block_header.hash block_header in
+  let*! r =
+    (* The cache might be inconsistent with the context. By forcing
+       the reloading of the cache, we restore the consistency. *)
+    let*! r =
+      apply
+        ?simulate
+        ?cached_result
+        ?should_precheck
+        apply_environment
+        ~cache
+        block_hash
+        block_header
+        operations
+    in
+    match r with
+    | Error (Validation_errors.Inconsistent_hash _ :: _) ->
+        (* The shell makes an assumption over the protocol concerning the cache which may be broken. In that case, the application fails with an [Inconsistency_hash] error. To make the node resilient to such problem, when such an error occurs, we retry the application using a fresh cache. *)
+        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
+        apply
+          ?cached_result
+          ?should_precheck
+          apply_environment
+          ~cache:`Force_load
+          block_hash
+          block_header
+          operations
+    | (Ok _ | Error _) as res -> Lwt.return res
+  in
+  match r with
+  | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
+      tzfail (System_error {errno = Unix.error_message errno; fn; msg})
+  | (Ok _ | Error _) as res -> Lwt.return res
 
 let preapply ~chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit ~timestamp
