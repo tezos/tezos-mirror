@@ -87,7 +87,7 @@ _`Delegate`
     rights to participate in consensus (aka baking_ rights) and in
     governance.
     The delegate's rights are calculated based on its own tokens plus the sum of tokens
-    delegated to it.
+    delegated to it. Note that since ``tz4`` accounts cannot be delegates.
 
 _`Delegation`
     An operation_ in which an account_ balance is lent to a

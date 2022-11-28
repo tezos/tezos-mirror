@@ -1893,7 +1893,9 @@ optional delegate, the initial amount taken from the current
 contract, and the initial storage of the originated contract.
 The contract is returned as a first class value (to be dropped, passed
 as parameter or stored). The ``CONTRACT 'p`` instruction will fail
-until it is actually originated.
+until it is actually originated. Note that since ``tz4`` addresses
+cannot be registered as delegates, the origination operation will fail
+if the delegate is a ``tz4``.
 
 -  ``TRANSFER_TOKENS``: Forge a transaction.
 
@@ -1919,6 +1921,7 @@ key hash of a registered delegate that is not the current delegate of
 the contract, then this operation sets the delegate of the contract to
 this registered delegate. The operation fails if ``kh`` is the current
 delegate of the contract or if ``kh`` is not a registered delegate.
+Note that ``tz4`` addresses cannot be registered as delegates.
 
 -  ``BALANCE``: Push the current amount of mutez held by the executing
    contract, including any mutez added by the calling transaction.
