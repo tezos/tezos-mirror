@@ -64,7 +64,9 @@ let deposit_stake ctxt rollup staker =
   let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let staker_contract, stake = get_contract_and_stake ctxt staker in
-  let* ctxt, staker_balance = Token.balance ctxt (`Contract staker_contract) in
+  let* ctxt, staker_balance =
+    Contract_storage.get_balance_carbonated ctxt staker_contract
+  in
   let* () =
     fail_when
       Tez_repr.(staker_balance < stake)
