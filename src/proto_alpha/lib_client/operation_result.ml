@@ -398,7 +398,7 @@ let pp_manager_operation_content (type kind) source ppf
         sc_rollup
         Contract.pp
         source
-  | Dal_publish_slot_header {slot_header} ->
+  | Dal_publish_slot_header slot_header ->
       Format.fprintf
         ppf
         "Data availability slot header publishing:@,Slot: %a"

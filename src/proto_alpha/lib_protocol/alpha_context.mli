@@ -4632,9 +4632,8 @@ and _ manager_operation =
       entrypoint : Entrypoint.t;
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header : {
-      slot_header : Dal.Slot.Header.operation;
-    }
+  | Dal_publish_slot_header :
+      Dal.Slot.Header.operation
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;

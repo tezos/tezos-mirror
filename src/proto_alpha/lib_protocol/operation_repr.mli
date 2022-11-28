@@ -494,9 +494,8 @@ and _ manager_operation =
           (** The entrypoint of the smart contract address that should receive the tickets. *)
     }
       -> Kind.transfer_ticket manager_operation
-  | Dal_publish_slot_header : {
-      slot_header : Dal_slot_repr.Header.operation;
-    }
+  | Dal_publish_slot_header :
+      Dal_slot_repr.Header.operation
       -> Kind.dal_publish_slot_header manager_operation
       (** [Sc_rollup_originate] allows an implicit account to originate a new
           smart contract rollup (initialized with a given boot sector).

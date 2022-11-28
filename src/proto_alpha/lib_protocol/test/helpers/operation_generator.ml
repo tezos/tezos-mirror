@@ -660,7 +660,7 @@ let generate_dal_publish_slot_header =
     Alpha_context.Dal.Slot.Header.
       {header = {id = {published_level; index}; commitment}; proof}
   in
-  QCheck2.Gen.pure (Dal_publish_slot_header {slot_header})
+  QCheck2.Gen.pure (Dal_publish_slot_header slot_header)
 
 let generate_sc_rollup_originate =
   let kind = Sc_rollup.Kind.Example_arith in
