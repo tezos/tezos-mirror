@@ -184,3 +184,22 @@ module ScRollup = struct
           (Invalid_argument
              "origination_proof_exn: could not produce an origination proof")
 end
+
+module EpoxyEntity = struct
+  include Zk_rollup.Address
+
+  let of_source s =
+    let open Lwt_result_syntax in
+    let* rollup =
+      match Zk_rollup.Address.of_b58check_opt s with
+      | None -> tzfail @@ error_of_fmt "bad epoxy notation"
+      | Some rollup -> return rollup
+    in
+    return rollup
+
+  let to_source rollup = return (Zk_rollup.Address.to_b58check rollup)
+
+  let name = "epoxy"
+end
+
+module EpoxyAlias = Client_aliases.Alias (EpoxyEntity)

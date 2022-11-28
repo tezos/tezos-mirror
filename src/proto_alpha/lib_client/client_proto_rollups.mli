@@ -34,3 +34,5 @@ module ScRollup : sig
   val origination_proof_exn :
     boot_sector:string -> Sc_rollup.Kind.t -> Sc_rollup.wrapped_proof Lwt.t
 end
+
+module EpoxyAlias : Client_aliases.Alias with type t = Zk_rollup.t

@@ -272,4 +272,28 @@ module Sc_rollup_params : sig
     (Sc_rollup.Number_of_ticks.t, full) Tezos_clic.parameter
 end
 
+module Zk_rollup_params : sig
+  val address_parameter : (Zk_rollup.t, full) Tezos_clic.parameter
+
+  val plonk_public_parameters_parameter :
+    ( Plonk.Main_protocol.verifier_public_parameters
+      * Plonk.Main_protocol.transcript,
+      full )
+    Tezos_clic.parameter
+
+  val update_parameter : (Zk_rollup.Update.t, full) Tezos_clic.parameter
+
+  val operations_parameter :
+    ( (Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list,
+      full )
+    Tezos_clic.parameter
+
+  val state_parameter : (Zk_rollup.State.t, full) Tezos_clic.parameter
+
+  val circuits_info_parameter :
+    ( [`Fee | `Private | `Public] Zk_rollup.Account.SMap.t,
+      full )
+    Tezos_clic.parameter
+end
+
 val fee_parameter_args : (Injection.fee_parameter, full) Tezos_clic.arg

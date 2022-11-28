@@ -179,7 +179,8 @@ let register_protocol_specific_because_regression_tests () =
   Sc_rollup.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Ticket_receipt_and_rpc.register ~protocols:[Alpha] ;
-  Views.register [Alpha]
+  Views.register [Alpha] ;
+  Zk_rollup.register ~protocols:[Alpha]
 
 let () =
   register_protocol_independent_tests () ;

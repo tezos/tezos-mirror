@@ -1742,6 +1742,60 @@ val spawn_multiple_fa1_2_transfers :
   t ->
   Process.t
 
+module Zk_rollup : sig
+  (** Run
+      [octez-client originate epoxy <alias> from <src>
+        public_parameters file:<public_parameters_file>
+        init_state file:<init_state_file>
+        circuits_info file:<circuits_info_file>
+        nb_ops <nb_ops>
+        -G <gas_cap> --burn_cap <burn_cap> --S <storage_limit>]
+      and return the ZKRU address. *)
+  val originate :
+    ?expect_failure:bool ->
+    t ->
+    src:string ->
+    alias:string ->
+    public_parameters_file:string ->
+    init_state_file:string ->
+    circuits_info_file:string ->
+    nb_ops:int ->
+    gas_cap:int ->
+    burn_cap:int ->
+    storage_limit:int ->
+    string option Lwt.t
+
+  (** Run
+      [octez-client epoxy publish from <src>
+        rollup <zk_rollup>
+        ops file:<ops_file>
+        -G <gas_cap> --burn_cap <burn_cap>]. *)
+  val publish :
+    ?expect_failure:bool ->
+    t ->
+    src:string ->
+    zk_rollup:string ->
+    ops_file:string ->
+    gas_cap:int ->
+    burn_cap:int ->
+    unit Lwt.t
+
+  (** Run
+      [octez-client epoxy update from <src>
+        rollup <zk_rollup>
+        update file:<update_files>
+        -G <gas_cap> --burn_cap <burn_cap>]. *)
+  val update :
+    ?expect_failure:bool ->
+    t ->
+    src:string ->
+    zk_rollup:string ->
+    update_file:string ->
+    gas_cap:int ->
+    burn_cap:int ->
+    unit Lwt.t
+end
+
 (** {2 High-Level Functions} *)
 
 (** Create a client with mode [Client] and import all secret keys

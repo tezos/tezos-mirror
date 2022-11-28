@@ -2134,6 +2134,98 @@ module Sc_rollup = struct
     {value = process; run = parse}
 end
 
+module Zk_rollup = struct
+  let extract_zku_address client_output =
+    client_output =~* rex ".*?(epx1\\w{33}.*)"
+
+  let originate ?(expect_failure = false) client ~src ~alias
+      ~public_parameters_file ~init_state_file ~circuits_info_file ~nb_ops
+      ~gas_cap ~burn_cap ~storage_limit =
+    let* client_output =
+      spawn_command
+        client
+        (["--wait"; "none"]
+        @ [
+            "originate";
+            "epoxy";
+            alias;
+            "from";
+            src;
+            "public_parameters";
+            "file:" ^ public_parameters_file;
+            "init_state";
+            "file:" ^ init_state_file;
+            "circuits_info";
+            "file:" ^ circuits_info_file;
+            "nb_ops";
+            string_of_int nb_ops;
+            "-G";
+            string_of_int gas_cap;
+            "--burn-cap";
+            string_of_int burn_cap;
+            "-S";
+            string_of_int storage_limit;
+          ])
+      |> Process.check_and_read_stdout ~expect_failure
+    in
+    let address = extract_zku_address client_output in
+    let* () = bake_for client in
+    Log.info "epoxy originate" ;
+    Lwt.return address
+
+  let publish ?(expect_failure = false) client ~src ~zk_rollup ~ops_file
+      ~gas_cap ~burn_cap =
+    let* () =
+      spawn_command
+        client
+        (["--wait"; "none"]
+        @ [
+            "epoxy";
+            "publish";
+            "from";
+            src;
+            "rollup";
+            zk_rollup;
+            "ops";
+            "file:" ^ ops_file;
+            "-G";
+            string_of_int gas_cap;
+            "--burn-cap";
+            string_of_int burn_cap;
+          ])
+      |> Process.check ~expect_failure
+    in
+    let* () = bake_for client in
+    Log.info "epoxy publish" ;
+    Lwt.return_unit
+
+  let update ?(expect_failure = false) client ~src ~zk_rollup ~update_file
+      ~gas_cap ~burn_cap =
+    let* () =
+      spawn_command
+        client
+        (["--wait"; "none"]
+        @ [
+            "epoxy";
+            "update";
+            "from";
+            src;
+            "rollup";
+            zk_rollup;
+            "update";
+            "file:" ^ update_file;
+            "-G";
+            string_of_int gas_cap;
+            "--burn-cap";
+            string_of_int burn_cap;
+          ])
+      |> Process.check ~expect_failure
+    in
+    let* () = bake_for client in
+    Log.info "epoxy update" ;
+    Lwt.return_unit
+end
+
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
   let client =
     create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()

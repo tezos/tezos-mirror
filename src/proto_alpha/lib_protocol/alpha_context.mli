@@ -2406,6 +2406,9 @@ module Zk_rollup : sig
     type t = {static : static; dynamic : dynamic}
 
     val encoding : t Data_encoding.t
+
+    val circuits_info_encoding :
+      [`Public | `Private | `Fee] SMap.t Data_encoding.t
   end
 
   (** This module re-exports definitions from {!Zk_rollup_operation_repr}. *)
