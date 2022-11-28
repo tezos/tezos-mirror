@@ -77,6 +77,7 @@ type error +=
       expected : Tezos_crypto.Operation_list_list_hash.t;
       found : Tezos_crypto.Operation_list_list_hash.t;
     }
+  | Applying_non_prechecked_block of Tezos_crypto.Block_hash.t
   | Failed_to_checkout_context of Tezos_crypto.Context_hash.t
   | System_error of {errno : string; fn : string; msg : string}
   | Missing_test_protocol of Tezos_crypto.Protocol_hash.t

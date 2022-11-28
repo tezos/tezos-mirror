@@ -946,12 +946,20 @@ let apply_block ?(simulate = false)
     (E {validator_process = (module VP); validator}) chain_store ~predecessor
     header operations =
   let open Lwt_result_syntax in
+  let block_hash = Block_header.hash header in
+  let*! is_prechecked =
+    Store.Block.is_known_prechecked chain_store block_hash
+  in
+  let* () =
+    fail_unless
+      is_prechecked
+      (Block_validator_errors.Applying_non_prechecked_block block_hash)
+  in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
   let* live_blocks, live_operations =
     Store.Chain.compute_live_blocks chain_store ~block:predecessor
   in
-  let block_hash = Block_header.hash header in
   let*? () =
     Block_validation.check_liveness
       ~live_operations
