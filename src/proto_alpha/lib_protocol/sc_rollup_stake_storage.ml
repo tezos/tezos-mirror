@@ -318,9 +318,20 @@ let refine_stake ctxt rollup staker staked_on commitment =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
      Add a test checking that L2 nodes can catch up after going offline. *)
   let rec go node ctxt =
-    (* WARNING: Do NOT reorder this sequence of ifs.
-       we must check for staked_on before LCC, since refining
-       from the LCC to another commit is a valid operation. *)
+    (*
+
+         The recursive calls of this function are protected from
+         infinite recursion because [Commitment_storage] and
+         [Commitment_stake_count] are using carbonated storage.
+
+         Hence, at each step of the traversal, the gas strictly
+         decreases.
+
+         WARNING: Do NOT reorder this sequence of ifs. We must check
+         for staked_on before LCC, since refining from the LCC to
+         another commit is a valid operation.
+
+    *)
     if Commitment_hash.(node = staked_on) then (
       (* Previously staked commit found:
          Insert new commitment if not existing *)
@@ -489,6 +500,16 @@ let remove_staker ctxt rollup staker =
       in
       let* ctxt = modify_staker_count ctxt rollup Int32.pred in
       let rec go node ctxt =
+        (*
+
+           The recursive calls of this function are protected from
+           infinite recursion because [Commitment_storage] and
+           [Commitment_stake_count] are using carbonated storage.
+
+           Hence, at each step of the traversal, the gas strictly
+           decreases.
+
+        *)
         if Commitment_hash.(node = lcc) then return ctxt
         else
           let* pred, ctxt =
