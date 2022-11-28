@@ -38,9 +38,9 @@ module Slots_handlers = struct
 
   let patch_slot ctxt commitment () slot_id =
     call_handler
-      (fun store cryptobox ->
+      (fun store _cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.add_slot_id commitment slot_id store cryptobox in
+        let*! r = Slot_manager.add_slot_id commitment slot_id store in
         match r with Ok () -> return_some () | Error `Not_found -> return_none)
       ctxt
 end
