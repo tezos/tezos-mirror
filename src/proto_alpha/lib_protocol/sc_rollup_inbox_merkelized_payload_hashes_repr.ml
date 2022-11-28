@@ -203,12 +203,10 @@ let verify_proof inclusion_proof =
   let* cell =
     match inclusion_proof with
     | cell :: _ -> ok cell
-    | [] ->
-        error (Merkelized_payload_hashes_proof_error "inclusion proof is empty")
+    | [] -> error (Merkelized_payload_hashes_proof_error "proof is empty")
   in
   let rec aux (hash_map, ptr_list) = function
-    | [] ->
-        error (Merkelized_payload_hashes_proof_error "inclusion proof is empty")
+    | [] -> error (Merkelized_payload_hashes_proof_error "proof is empty")
     | [target] ->
         let target_ptr = hash target in
         let hash_map = Hash.Map.add target_ptr target hash_map in
@@ -231,7 +229,7 @@ let verify_proof inclusion_proof =
          ~cell_ptr
          ~target_ptr
          ptr_list)
-      (Merkelized_payload_hashes_proof_error "invalid inclusion proof")
+      (Merkelized_payload_hashes_proof_error "invalid proof")
   in
   return (target, cell)
 

@@ -511,7 +511,7 @@ let verify_payloads_proof {proof; payload} head_cell_hash n =
     tzfail
       (Inbox_proof_error
          "Provided message counter is out of the valid range [0 -- (max_index \
-          + 1)] ")
+          + 1)]")
 
 (** [produce_payloads_proof get_payloads_history head_cell_hash ~index]
 
@@ -575,7 +575,7 @@ let produce_payloads_proof get_payloads_history head_cell_hash ~index =
 let verify_inclusion_proof inclusion_proof snapshot_history_proof =
   let open Result_syntax in
   let rec aux (hash_map, ptr_list) = function
-    | [] -> error (Inbox_proof_error "inclusion proof is empty")
+    | [] -> tzfail (Inbox_proof_error "inclusion proof is empty")
     | [target] ->
         let target_ptr = hash_history_proof target in
         let hash_map = Hash.Map.add target_ptr target hash_map in

@@ -333,7 +333,7 @@ let test_merkelized_payload_hashes_proof (payloads, index) =
    skip list than testing merkelized payload. But it was easier to test with a
    skip-list with hashes as pointer. *)
 let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let make_proof = Merkelized_payload_hashes.Internal_for_tests.make_proof in
   let hd ~__LOC__ l = List.hd l |> opt_get ~__LOC__ in
   let tl ~__LOC__ l = List.tl l |> opt_get ~__LOC__ in
@@ -410,7 +410,7 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
     let res =
       Environment.wrap_tzresult @@ Merkelized_payload_hashes.verify_proof proof
     in
-    assert_merkelized_payload_proof_error ~__LOC__ "invalid inclusion proof" res
+    assert_merkelized_payload_proof_error ~__LOC__ "invalid proof" res
   in
   let* () = assert_fails ~__LOC__ proof_with_missing_cell in
   let* () = assert_fails ~__LOC__ proof_with_invalid_cell_in_path in
