@@ -17,7 +17,7 @@ To start browsing, either follow one of the guided paths below, or directly pick
 .. raw:: html
 
     <details>
-    <summary><a>Never heard of Tezos? Let's meet! (See more) </a></summary><div style="max-width:1000px">
+    <summary><a>Never heard of Tezos? Let's get acquainted! (See more) </a></summary><div style="max-width:1000px">
 
 Tezos is a distributed consensus platform (a blockchain) with meta-consensus
 capability.
@@ -85,7 +85,7 @@ If you intend to participate to Tezos not just as a mere user, but also as a bak
 
     <details>
 
-    <summary><a>Want to know how it works? No secret, let us explain! (See more)</a></summary><div style="max-width:1000px">
+    <summary><a>Want to know how it works? It's no secret, let us explain! (See more)</a></summary><div style="max-width:1000px">
 
 If you want to know more about the Tezos *technology*, there are several sections in the documentation presenting the main design principles of Tezos, and some high-level implementation principles of Octez:
 
@@ -106,7 +106,7 @@ If you want to know more about the Tezos *technology*, there are several section
 
     <details>
 
-    <summary><a>Are you an application developer? Find how to program. (See more)</a></summary><div style="max-width:1000px">
+    <summary><a>Are you an application developer? Find how to program with Tezos. (See more)</a></summary><div style="max-width:1000px">
 
 Tezos is an open platform. As any programmable blockchain, its value lies in the increasing base of smart contracts and distributed applications covering various domains, but also in the tools that make the ecosystem easier to use and more efficient, such as wallets, indexers, and many others.
 
@@ -156,7 +156,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Introduction:
+   :caption: Introduction
    :hidden:
 
    introduction/tezos
@@ -169,7 +169,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: User doc:
+   :caption: User doc
    :hidden:
 
    user/versioning
@@ -183,7 +183,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Shell doc:
+   :caption: Shell doc
    :hidden:
 
    shell/the_big_picture
@@ -214,7 +214,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Alpha Development Protocol doc:
+   :caption: Alpha Development Protocol doc
    :hidden:
 
    alpha/protocol
@@ -224,7 +224,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Developer doc:
+   :caption: Developer doc
    :hidden:
 
    developer/rpc
@@ -232,7 +232,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Core Developer doc:
+   :caption: Core Developer doc
    :hidden:
 
    developer/contributing_index
@@ -247,7 +247,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Protocols:
+   :caption: Protocols
    :hidden:
 
    protocols/naming
@@ -259,7 +259,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: Releases:
+   :caption: Releases
    :hidden:
 
    releases/releases
@@ -268,7 +268,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
 .. toctree::
    :maxdepth: 2
-   :caption: APIs:
+   :caption: APIs
    :hidden:
 
    api/api-inline
