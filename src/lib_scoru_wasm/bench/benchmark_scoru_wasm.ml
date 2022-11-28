@@ -40,41 +40,6 @@
 
 open Inputs
 
-let scenario_tx_kernel_deposit_transfer_withdraw_LOOP =
-  Scenario.make_scenario
-    "tx_kernel - deposit_transfer_withdraw"
-    Kernels.tx_kernal_vRam_latest
-    [
-      Scenario.make_scenario_step
-        "Load inbox"
-        (Scenario.load_messages
-           1l
-           [
-             Deposit (File Messages.Deposit_transfer_withdraw.fst_deposit);
-             Deposit (File Messages.Deposit_transfer_withdraw.snd_deposit);
-             Other (File Messages.Deposit_transfer_withdraw.invalid_message);
-             Other (File Messages.Deposit_transfer_withdraw.valid_message);
-           ]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
-    ]
-
-let scenario_tx_kernel_deposit_transfer_withdraw_many_transfers_LOOP =
-  Scenario.make_scenario
-    "tx_kernel - deposit_transfer_withdraw_many_transfers"
-    Kernels.tx_kernal_vRam_latest
-    [
-      Scenario.make_scenario_step
-        "Load inbox"
-        (Scenario.load_messages
-           1l
-           [
-             Deposit (File Messages.Deposit_transfer_withdraw.fst_deposit);
-             Deposit (File Messages.Deposit_transfer_withdraw.snd_deposit);
-             Other (File Messages.Large.transfer_two_actors);
-           ]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
-    ]
-
 let scenario_computation_kernel =
   Scenario.make_scenario
     "computation kernel"
@@ -97,6 +62,30 @@ let scenario_unreachable_kernel =
       Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
 
+let demo_input_step =
+  Scenario.make_scenario_step
+    "Load inbox"
+    (Scenario.load_messages
+       0l
+       [
+         Encoded (File Messages.Demo.deposit_blue);
+         Encoded (File Messages.Demo.deposit_green);
+         Encoded (File Messages.Demo.deposit_red)
+         (* Other "gen_messages/transfer_0_000"; *);
+       ])
+
+let scenario_tx_kernel_demo =
+  Scenario.make_scenario
+    "tx_kernel - demo scenario"
+    Kernels.tx_kernel_dac
+    [demo_input_step; Scenario.make_scenario_step "Loop" Scenario.exec_slow]
+
+let scenario_tx_kernel_demo_fast =
+  Scenario.make_scenario
+    "tx_kernel - demo scenario fast"
+    Kernels.tx_kernel_dac
+    [demo_input_step; Scenario.make_scenario_step "Loop" Scenario.exec_fast]
+
 let filename () =
   let t = Unix.localtime (Unix.time ()) in
   Printf.sprintf
@@ -111,12 +100,12 @@ let () =
   Lwt_main.run
   @@ Scenario.run_scenarios
        ~verbose:true
-       ~totals:false
+       ~totals:true
        ~irmin:false
        (filename ())
        [
          Scenario.ignore_scenario scenario_unreachable_kernel;
          Scenario.ignore_scenario scenario_computation_kernel;
-         scenario_tx_kernel_deposit_transfer_withdraw_LOOP;
-         scenario_tx_kernel_deposit_transfer_withdraw_many_transfers_LOOP;
+         scenario_tx_kernel_demo;
+         scenario_tx_kernel_demo_fast;
        ]
