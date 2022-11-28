@@ -441,7 +441,7 @@ let ir_model ?specialization instr_or_cont =
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
           model_1 instr_or_cont (affine_model name)
       | N_ICheck_signature_ed25519 | N_ICheck_signature_secp256k1
-      | N_ICheck_signature_p256 ->
+      | N_ICheck_signature_p256 | N_ICheck_signature_bls ->
           model_1 instr_or_cont (affine_model name)
       | N_IContract | N_ITransfer_tokens | N_IImplicit_account ->
           model_0 instr_or_cont (const1_model name)

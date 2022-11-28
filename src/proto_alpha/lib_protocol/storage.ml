@@ -903,12 +903,14 @@ module Public_key_hash = struct
   module Path_Ed25519 = Path_encoding.Make_hex (Ed25519.Public_key_hash)
   module Path_Secp256k1 = Path_encoding.Make_hex (Secp256k1.Public_key_hash)
   module Path_P256 = Path_encoding.Make_hex (P256.Public_key_hash)
+  module Path_Bls = Path_encoding.Make_hex (Bls.Public_key_hash)
 
   let to_path (key : public_key_hash) l =
     match key with
     | Ed25519 h -> "ed25519" :: Path_Ed25519.to_path h l
     | Secp256k1 h -> "secp256k1" :: Path_Secp256k1.to_path h l
     | P256 h -> "p256" :: Path_P256.to_path h l
+    | Bls h -> "bls" :: Path_Bls.to_path h l
 
   let of_path : _ -> public_key_hash option = function
     | "ed25519" :: rest -> (
@@ -923,13 +925,18 @@ module Public_key_hash = struct
         match Path_P256.of_path rest with
         | Some pkh -> Some (P256 pkh)
         | None -> None)
+    | "bls" :: rest -> (
+        match Path_Bls.of_path rest with
+        | Some pkh -> Some (Bls pkh)
+        | None -> None)
     | _ -> None
 
   let path_length =
     let l1 = Path_Ed25519.path_length
     and l2 = Path_Secp256k1.path_length
-    and l3 = Path_P256.path_length in
-    assert (Compare.Int.(l1 = l2 && l2 = l3)) ;
+    and l3 = Path_P256.path_length
+    and l4 = Path_Bls.path_length in
+    assert (Compare.Int.(l1 = l2 && l2 = l3 && l3 = l4)) ;
     l1 + 1
 end
 

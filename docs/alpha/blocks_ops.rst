@@ -181,7 +181,7 @@ manager operations are the only fee-paying and
   *baker*), or to register themselves as delegates.
 - The ``Update_consensus_key`` operation allows users to delegate the
   responsibility of signing blocks and consensus-related operations to
-  another account.
+  another account. Note that consensus keys cannot be BLS public keys.
 - The ``Origination`` operation is used to
   :ref:`originate<Origination>`, that is to deploy, smart contracts
   in the Tezos blockchain.

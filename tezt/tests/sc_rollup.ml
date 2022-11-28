@@ -1488,14 +1488,12 @@ let mode_publish mode publishes sc_rollup_node sc_rollup_client sc_rollup node
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
-  let level = Node.get_level node in
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
   let* () = send_messages levels_to_commitment client in
-  let* level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (level + levels_to_commitment)
-  in
+  let level = Node.get_level node in
+  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level in
   Log.info "Starting other rollup node." ;
   let purposes = ["publish"; "cement"; "add_messages"] in
   let operators =
@@ -1521,9 +1519,7 @@ let mode_publish mode publishes sc_rollup_node sc_rollup_client sc_rollup node
   let* _level = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Other rollup node synchronized." ;
   let* () = send_messages levels_to_commitment client in
-  let* level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (level + levels_to_commitment)
-  in
+  let level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level
   and* _ = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Both rollup nodes have reached level %d." level ;
@@ -2563,7 +2559,7 @@ let test_scenario_client_with_account ~account ~variant ~kind f =
    -------------------------------------------------------------------
 *)
 let test_rollup_client_show_address ~kind =
-  let account = Constant.tz4_account in
+  let account = Constant.aggregate_tz4_account in
   test_scenario_client_with_account ~account ~kind ~variant:"show address"
   @@ fun rollup_client ->
   let* shown_account =
@@ -2589,7 +2585,7 @@ let test_rollup_client_show_address ~kind =
    ----------------------------------------
 *)
 let test_rollup_client_generate_keys ~kind =
-  let account = Constant.tz4_account in
+  let account = Constant.aggregate_tz4_account in
   test_scenario_client_with_account ~account ~kind ~variant:"gen address"
   @@ fun rollup_client ->
   let alias = "test_key" in
@@ -2601,7 +2597,7 @@ let test_rollup_client_generate_keys ~kind =
    ------------------------------------
 *)
 let test_rollup_client_list_keys ~kind =
-  let account = Constant.tz4_account in
+  let account = Constant.aggregate_tz4_account in
   test_scenario_client_with_account ~account ~kind ~variant:"list alias"
   @@ fun rollup_client ->
   let* maybe_keys = Sc_rollup_client.list_keys rollup_client in

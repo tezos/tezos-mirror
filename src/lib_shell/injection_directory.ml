@@ -48,18 +48,17 @@ let inject_block validator ?force ?chain bytes operations =
 let inject_operation validator ~force ?chain bytes =
   let open Lwt_result_syntax in
   let*! chain_id = read_chain_id validator chain in
-  let t =
-    match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
-    | None -> failwith "Can't parse the operation"
-    | Some op -> Validator.inject_operation validator ~force ?chain_id op
-  in
-  let hash = Tezos_crypto.Operation_hash.hash_bytes [bytes] in
-  Lwt.return (hash, t)
+  match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
+  | None -> failwith "Can't parse the operation"
+  | Some op ->
+      let t = Validator.inject_operation validator ~force ?chain_id op in
+      let hash = Operation.hash op in
+      return (hash, t)
 
 let inject_operations validator ~force ?chain bytes_list =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let* rev_hashes, rev_promises =
-    List.fold_left_s
+    List.fold_left_es
       (fun (hashes, promises) bytes ->
         let* hash, promise = inject_operation validator ~force ?chain bytes in
         return (hash :: hashes, promise :: promises))
@@ -131,14 +130,14 @@ let build_rpc_directory validator =
     dir := Tezos_rpc.Directory.register !dir s (fun () p q -> f p q)
   in
   let inject_operation ~force q contents =
-    let*! hash, wait =
+    let* hash, wait =
       inject_operation validator ~force ?chain:q#chain contents
     in
     let* () = if q#async then return_unit else wait in
     return hash
   in
   let inject_operations q contents =
-    let*! hashes, wait =
+    let* hashes, wait =
       inject_operations validator ~force:q#force ?chain:q#chain contents
     in
     let* () = if q#async then return_unit else wait in

@@ -117,71 +117,119 @@ let pp_kind fmt k =
 
 (** {2 Generators} *)
 
+module Gen_hash (H : sig
+  type t
+
+  val size : int
+
+  val of_bytes_exn : bytes -> t
+end) =
+struct
+  let gen =
+    let open QCheck2.Gen in
+    let+ str = string_size (pure H.size) in
+    H.of_bytes_exn (Bytes.unsafe_of_string str)
+end
+
 (** {3 Selection in hashes list} *)
 
-let block_hashes =
-  List.map
-    Tezos_crypto.Block_hash.of_b58check_exn
-    [
-      "BLbcVY1kYiKQy2MJJfoHJMN2xRk5QPG1PEKWMDSyW2JMxBsMmiL";
-      "BLFhLKqQQn32Cc9QXqtEqysYqWNCowNKaypVHP5zEyZcywbXcHo";
-      "BLuurCvGmNPTzXSnGCpcFPy5h8A49PwH2LnfAWBnp5R1qv5czwe";
-    ]
+let gen_block_hash =
+  let module G = Gen_hash (Tezos_crypto.Block_hash) in
+  G.gen
 
-let payload_hashes =
-  List.map
-    Block_payload_hash.of_b58check_exn
-    [
-      "vh2gWcSUUhJBwvjx4vS7JN5ioMVWpHCSK6W2MKNPr5dn6NUdfFDQ";
-      "vh1p1VzeYjZLEW6WDqdTwVy354KEmGCDgPmagEKcLN4NT4X58mNk";
-      "vh2TyrWeZ2dydEy9ZjmvrjQvyCs5sdHZPypcZrXDUSM1tNuPermf";
-    ]
+let random_payload_hash =
+  let module G = Gen_hash (Block_payload_hash) in
+  G.gen
 
-let random_payload_hash = QCheck2.Gen.oneofl payload_hashes
+let gen_algo = QCheck2.Gen.oneofl Tezos_crypto.Signature.algos
 
-let signatures =
-  List.map
-    Tezos_crypto.Signature.of_b58check_exn
-    [
-      "sigaNsiye7D8dJHKSQZBwDbS2aQNXipDP7bw8uQnMgnaXi5pcnoPZRKXrDeFRx4FjWJD2xfyUA9CuBXhwPHhVs7LxkL4vT32";
-      "sigvtPBMQvk2DgNtu3AKFU1ZRsagGxsoiZVQyQhJNEojReBY2vE5sDwt3H7Mh8RMe27QHBjemxqhMVVszZqpNsdDux6KAELX";
-      "sighje7pEbUUwGtJ4GTP7uzMZe5SFz6dRRC3BvZBHnrRHnc47WHGnVdfiscHPMek7esmj7saTuj54QBWy3SezyA2EGbHkmW5";
-    ]
+let random_seed =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.Hacl.Ed25519.sk_size) in
+  Bytes.unsafe_of_string str
 
-let random_signature = QCheck2.Gen.oneofl signatures
+let random_keys =
+  let open QCheck2.Gen in
+  let* algo = gen_algo in
+  let+ seed = random_seed in
+  Tezos_crypto.Signature.generate_key ~algo ~seed ()
 
-let pkhs =
-  List.map
-    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
-    [
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
-      "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU";
-    ]
+let random_tz1 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.Ed25519.Public_key_hash.size) in
+  (Ed25519 (Tezos_crypto.Ed25519.Public_key_hash.of_string_exn str)
+    : public_key_hash)
 
-let random_pkh = QCheck2.Gen.oneofl pkhs
+let random_tz2 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.Secp256k1.Public_key_hash.size) in
+  (Secp256k1 (Tezos_crypto.Secp256k1.Public_key_hash.of_string_exn str)
+    : public_key_hash)
 
-let pks =
-  List.map
-    Tezos_crypto.Signature.Public_key.of_b58check_exn
-    [
-      "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
-      "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
-      "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU";
-    ]
+let random_tz3 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.P256.Public_key_hash.size) in
+  (P256 (Tezos_crypto.P256.Public_key_hash.of_string_exn str) : public_key_hash)
 
-let random_pk = QCheck2.Gen.oneofl pks
+let random_tz4 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.Bls.Public_key_hash.size) in
+  (Bls (Tezos_crypto.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
 
-let contract_hashes =
-  List.map
-    Contract_hash.of_b58check_exn
-    [
-      "KT1WvzYHCNBvDSdwafTHv7nJ1dWmZ8GCYuuC";
-      "KT1NkWx47WzJeHCSyB62WjLtFn4tRf3uXBur";
-      "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
-    ]
+let random_pkh =
+  let open QCheck2.Gen in
+  let* algo = gen_algo in
+  match algo with
+  | Ed25519 -> random_tz1
+  | Secp256k1 -> random_tz2
+  | P256 -> random_tz3
+  | Bls -> random_tz4
 
-let random_contract_hash = QCheck2.Gen.oneofl contract_hashes
+let random_pk =
+  let open QCheck2.Gen in
+  let+ _, pk, _ = random_keys in
+  pk
+
+let random_signature =
+  let open QCheck2.Gen in
+  let* algo = option ~ratio:0.8 gen_algo in
+  match algo with
+  | None ->
+      let+ str = string_size (pure Tezos_crypto.Ed25519.size) in
+      (Unknown (Bytes.unsafe_of_string str) : Tezos_crypto.Signature.t)
+  | Some Ed25519 ->
+      let+ str = string_size (pure Tezos_crypto.Ed25519.size) in
+      (Ed25519 (Tezos_crypto.Ed25519.of_string_exn str)
+        : Tezos_crypto.Signature.t)
+  | Some Secp256k1 ->
+      let+ str = string_size (pure Tezos_crypto.Secp256k1.size) in
+      (Secp256k1 (Tezos_crypto.Secp256k1.of_string_exn str)
+        : Tezos_crypto.Signature.t)
+  | Some P256 ->
+      let+ str = string_size (pure Tezos_crypto.P256.size) in
+      (P256 (Tezos_crypto.P256.of_string_exn str) : Tezos_crypto.Signature.t)
+  | Some Bls ->
+      let+ seed = random_seed in
+      let _, _, sk = Tezos_crypto.Signature.generate_key ~algo:Bls ~seed () in
+      Tezos_crypto.Signature.sign sk Bytes.empty
+
+let random_signature =
+  let open QCheck2.Gen in
+  graft_corners
+    random_signature
+    Tezos_crypto.Signature.
+      [
+        of_ed25519 Tezos_crypto.Ed25519.zero;
+        of_secp256k1 Tezos_crypto.Secp256k1.zero;
+        of_p256 Tezos_crypto.P256.zero;
+        of_bls Tezos_crypto.Bls.zero;
+        Unknown (Bytes.make 64 '\000');
+      ]
+    ()
+
+let random_contract_hash =
+  let module G = Gen_hash (Contract_hash) in
+  G.gen
 
 let block_headers =
   let bh1 =
@@ -203,73 +251,33 @@ let block_headers =
 
 let random_block_header = QCheck2.Gen.oneofl block_headers
 
-let tx_rollups =
-  List.filter_map
-    Tx_rollup.of_b58check_opt
-    [
-      "txr1hFmPcr5y1P2xTm7W2y1sfjLLCUdzCZGvg";
-      "txr1jux4nZWf8ToGZc4ojLBbT538BBTTSiJUD";
-      "txr1TAFTENC2YACvoMDrpJHCbdvdfSSjcjEjc";
-    ]
+let random_tx_rollup =
+  let open QCheck2.Gen in
+  let module G = Gen_hash (Tezos_crypto.Operation_hash) in
+  let+ oph = G.gen in
+  let nonce = Origination_nonce.Internal_for_tests.initial oph in
+  Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
 
-let random_tx_rollup = QCheck2.Gen.oneofl tx_rollups
+let random_sc_rollup =
+  let module G = Gen_hash (Sc_rollup.Address) in
+  G.gen
 
-let sc_rollups =
-  List.map
-    Sc_rollup.Address.of_b58check_exn
-    [
-      "scr1FPSu51gGtyv9S5HqDqXeH16DJviJ9qpr6";
-      "scr1U39BVdpVQun1QjjiXfd3XgoBKcenWt5sb";
-      "scr1Kqqbvust2adJMtSu2V4fcd49oQHug4BLb";
-    ]
+let random_proto =
+  let module G = Gen_hash (Tezos_crypto.Protocol_hash) in
+  G.gen
 
-let random_sc_rollup = QCheck2.Gen.oneofl sc_rollups
-
-let protos =
-  List.map
-    (fun s -> Tezos_crypto.Protocol_hash.of_b58check_exn s)
-    [
-      "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha84efbeiF6cm";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha91249Z65tWS";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha537f5h25LnN";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha5c8fefgDYkr";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha3f31feSSarC";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabe31ahnkxSC";
-      "ProtoALphaALphaALphaALphaALphaALphaALphabab3bgRb7zQ";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaf8d39cctbpk";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha3b981byuYxD";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaa116bccYowi";
-      "ProtoALphaALphaALphaALphaALphaALphaALphacce68eHqboj";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha225c7YrWwR7";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha58743cJL6FG";
-      "ProtoALphaALphaALphaALphaALphaALphaALphac91bcdvmJFR";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha1faaadhV7oW";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha98232gD94QJ";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha9d1d8cijvAh";
-      "ProtoALphaALphaALphaALphaALphaALphaALphaeec52dKF6Gx";
-      "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX";
-    ]
-
-let random_proto = QCheck2.Gen.oneofl protos
-
-let codes =
-  List.filter_map
-    Blinded_public_key_hash.activation_code_of_hex
-    [
-      "41f98b15efc63fa893d61d7d6eee4a2ce9427ac4";
-      "411dfef031eeecc506de71c9df9f8e44297cf5ba";
-      "08d7d355bc3391d12d140780b39717d9f46fcf87";
-    ]
-
-let random_code = QCheck2.Gen.oneofl codes
+let random_code =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Tezos_crypto.Ed25519.Public_key_hash.size) in
+  let (`Hex hex) = Hex.of_string str in
+  Blinded_public_key_hash.activation_code_of_hex hex
+  |> WithExceptions.Option.get ~loc:__LOC__
 
 (** {2 Operations parameters generators} *)
 
 let random_shell : Tezos_base.Operation.shell_header QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ branch = oneofl block_hashes in
+  let+ branch = gen_block_hash in
   Tezos_base.Operation.{branch}
 
 let gen_slot =
@@ -320,8 +328,6 @@ let random_contract =
   else
     let+ contract_hash = random_contract_hash in
     Contract.Originated contract_hash
-
-let random_contract_hash = QCheck2.Gen.oneofl contract_hashes
 
 let gen_counters =
   let open QCheck2.Gen in
@@ -376,10 +382,9 @@ let generate_op (gen_op : 'kind contents QCheck2.Gen.t) :
     'kind operation QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* op = gen_op in
-  let* signature = random_signature in
+  let* signature = option ~ratio:0.9 random_signature in
   let+ shell = random_shell in
   let contents = Single op in
-  let signature = Some signature in
   let protocol_data = {contents; signature} in
   wrap_operation shell protocol_data
 
@@ -437,7 +442,7 @@ let generate_double_baking =
 let generate_activate_account =
   let open QCheck2.Gen in
   let* activation_code = random_code in
-  let+ id = random_pkh in
+  let+ id = random_tz1 in
   let id =
     match id with
     | Tezos_crypto.Signature.Ed25519 pkh -> pkh

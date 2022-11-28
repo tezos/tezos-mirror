@@ -279,6 +279,7 @@ module Cost_of = struct
         | Ed25519 _ -> cost_N_ICheck_signature_ed25519 (Bytes.length b)
         | Secp256k1 _ -> cost_N_ICheck_signature_secp256k1 (Bytes.length b)
         | P256 _ -> cost_N_ICheck_signature_p256 (Bytes.length b)
+        | Bls _ -> cost_N_ICheck_signature_bls (Bytes.length b)
       in
       atomic_step_cost cost
 
@@ -698,7 +699,7 @@ module Cost_of = struct
              cost_DECODING_PUBLIC_KEY_ed25519
              (max
                 cost_DECODING_PUBLIC_KEY_secp256k1
-                cost_DECODING_PUBLIC_KEY_p256))
+                (max cost_DECODING_PUBLIC_KEY_p256 cost_DECODING_PUBLIC_KEY_bls)))
 
     let public_key_readable =
       atomic_step_cost
@@ -707,7 +708,9 @@ module Cost_of = struct
              cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519
              (max
                 cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1
-                cost_B58CHECK_DECODING_PUBLIC_KEY_p256))
+                (max
+                   cost_B58CHECK_DECODING_PUBLIC_KEY_p256
+                   cost_B58CHECK_DECODING_PUBLIC_KEY_bls)))
 
     let key_hash_optimized =
       atomic_step_cost
@@ -716,7 +719,9 @@ module Cost_of = struct
              cost_DECODING_PUBLIC_KEY_HASH_ed25519
              (max
                 cost_DECODING_PUBLIC_KEY_HASH_secp256k1
-                cost_DECODING_PUBLIC_KEY_HASH_p256))
+                (max
+                   cost_DECODING_PUBLIC_KEY_HASH_p256
+                   cost_DECODING_PUBLIC_KEY_HASH_bls)))
 
     let key_hash_readable =
       atomic_step_cost
@@ -725,7 +730,9 @@ module Cost_of = struct
              cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519
              (max
                 cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1
-                cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256))
+                (max
+                   cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256
+                   cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls)))
 
     let signature_optimized =
       atomic_step_cost
@@ -734,7 +741,7 @@ module Cost_of = struct
              cost_DECODING_SIGNATURE_ed25519
              (max
                 cost_DECODING_SIGNATURE_secp256k1
-                cost_DECODING_SIGNATURE_p256))
+                (max cost_DECODING_SIGNATURE_p256 cost_DECODING_SIGNATURE_bls)))
 
     let signature_readable =
       atomic_step_cost
@@ -743,7 +750,9 @@ module Cost_of = struct
              cost_B58CHECK_DECODING_SIGNATURE_ed25519
              (max
                 cost_B58CHECK_DECODING_SIGNATURE_secp256k1
-                cost_B58CHECK_DECODING_SIGNATURE_p256))
+                (max
+                   cost_B58CHECK_DECODING_SIGNATURE_p256
+                   cost_B58CHECK_DECODING_SIGNATURE_bls)))
 
     let chain_id_optimized = atomic_step_cost cost_DECODING_CHAIN_ID
 
@@ -816,7 +825,7 @@ module Cost_of = struct
              cost_ENCODING_PUBLIC_KEY_ed25519
              (max
                 cost_ENCODING_PUBLIC_KEY_secp256k1
-                cost_ENCODING_PUBLIC_KEY_p256))
+                (max cost_ENCODING_PUBLIC_KEY_p256 cost_ENCODING_PUBLIC_KEY_bls)))
 
     let public_key_readable =
       atomic_step_cost
@@ -825,7 +834,9 @@ module Cost_of = struct
              cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519
              (max
                 cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1
-                cost_B58CHECK_ENCODING_PUBLIC_KEY_p256))
+                (max
+                   cost_B58CHECK_ENCODING_PUBLIC_KEY_p256
+                   cost_B58CHECK_ENCODING_PUBLIC_KEY_bls)))
 
     let key_hash_optimized =
       atomic_step_cost
@@ -834,7 +845,9 @@ module Cost_of = struct
              cost_ENCODING_PUBLIC_KEY_HASH_ed25519
              (max
                 cost_ENCODING_PUBLIC_KEY_HASH_secp256k1
-                cost_ENCODING_PUBLIC_KEY_HASH_p256))
+                (max
+                   cost_ENCODING_PUBLIC_KEY_HASH_p256
+                   cost_ENCODING_PUBLIC_KEY_HASH_bls)))
 
     let key_hash_readable =
       atomic_step_cost
@@ -843,7 +856,9 @@ module Cost_of = struct
              cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519
              (max
                 cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1
-                cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256))
+                (max
+                   cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256
+                   cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls)))
 
     let signature_optimized =
       atomic_step_cost
@@ -852,7 +867,7 @@ module Cost_of = struct
              cost_ENCODING_SIGNATURE_ed25519
              (max
                 cost_ENCODING_SIGNATURE_secp256k1
-                cost_ENCODING_SIGNATURE_p256))
+                (max cost_ENCODING_SIGNATURE_p256 cost_ENCODING_SIGNATURE_bls)))
 
     let signature_readable =
       atomic_step_cost
@@ -861,7 +876,9 @@ module Cost_of = struct
              cost_B58CHECK_ENCODING_SIGNATURE_ed25519
              (max
                 cost_B58CHECK_ENCODING_SIGNATURE_secp256k1
-                cost_B58CHECK_ENCODING_SIGNATURE_p256))
+                (max
+                   cost_B58CHECK_ENCODING_SIGNATURE_p256
+                   cost_B58CHECK_ENCODING_SIGNATURE_bls)))
 
     let chain_id_optimized = atomic_step_cost cost_ENCODING_CHAIN_ID
 

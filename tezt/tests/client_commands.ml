@@ -47,6 +47,56 @@ module Helpers = struct
     in
     let* () = Client.bake_for_and_wait client in
     return contract
+
+  let get_balance pkh client =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
+
+  let supported_signature_schemes = function
+    | Protocol.Alpha -> ["ed25519"; "secp256k1"; "p256"; "bls"]
+    | Lima | Kathmandu -> ["ed25519"; "secp256k1"; "p256"]
+
+  let airdrop_and_reveal client accounts =
+    Log.info "Airdrop 1000tz to each account" ;
+    let batches =
+      Ezjsonm.list
+        (fun account ->
+          `O
+            [
+              ("destination", `String account.Account.public_key_hash);
+              ("amount", `String "1000");
+            ])
+        accounts
+    in
+    let*! () =
+      Client.multiple_transfers
+        ~giver:Constant.bootstrap1.public_key_hash
+        ~json_batch:(Ezjsonm.to_string batches)
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* balances =
+      Lwt_list.map_p
+        (fun account ->
+          let* balance = get_balance account.Account.public_key_hash client in
+          return (account.alias, balance))
+        accounts
+    in
+    List.iter
+      (fun (alias, balance) ->
+        Check.((Tez.to_string balance = "1000") string)
+          ~error_msg:(sf "%s has balance %%L instead of %%R" alias))
+      balances ;
+    Log.info "Revealing public keys" ;
+    let* () =
+      Lwt_list.iter_p
+        (fun account ->
+          let*! () = Client.reveal ~src:account.Account.alias client in
+          unit)
+        accounts
+    in
+    Client.bake_for_and_wait client
 end
 
 module Simulation = struct
@@ -178,9 +228,7 @@ module Simulation = struct
 end
 
 module Transfer = struct
-  let get_balance pkh client =
-    RPC.Client.call client
-    @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
+  open Helpers
 
   let alias_pkh_destination =
     Protocol.register_test
@@ -268,9 +316,179 @@ module Transfer = struct
       ~error_msg:"Balance of victim should be %R but is %L." ;
     unit
 
-  let register protocol =
-    alias_pkh_destination protocol ;
-    alias_pkh_source protocol
+  let transfer_tz4 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Transfer from and to accounts"
+      ~tags:["client"; "transfer"; "bls"; "tz4"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    Log.info "Generating new accounts" ;
+    let gen_accounts i =
+      Lwt_list.map_s
+        (fun sig_alg ->
+          Client.gen_and_show_keys
+            ~alias:(sf "account_%s_%d" sig_alg i)
+            ~sig_alg
+            client)
+        (supported_signature_schemes protocol)
+    in
+    let* accounts1 = gen_accounts 1 in
+    let* accounts2 = gen_accounts 2 in
+    let accounts = accounts1 @ accounts2 in
+    let* () = airdrop_and_reveal client accounts in
+    let test_transfer (from : Account.key) (dest : Account.key) =
+      Log.info "Test transfer from %s to %s" from.alias dest.alias ;
+      let amount = Tez.of_int 10 in
+      let fee = Tez.of_int 1 in
+      let* balance_from0 = get_balance from.public_key_hash client
+      and* balance_dest0 = get_balance dest.public_key_hash client in
+      let* () =
+        Client.transfer
+          ~amount
+          ~giver:from.public_key_hash
+          ~receiver:dest.public_key_hash
+          ~fee
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* balance_from = get_balance from.public_key_hash client
+      and* balance_dest = get_balance dest.public_key_hash client in
+      let expected_balance_from = Tez.(balance_from0 - (amount + fee)) in
+      let expected_balance_dest = Tez.(balance_dest0 + amount) in
+      Check.(
+        (Tez.to_string balance_from = Tez.to_string expected_balance_from)
+          string)
+        ~error_msg:(sf "Sender %s has balance %%L instead of %%R" from.alias) ;
+      Check.(
+        (Tez.to_string balance_dest = Tez.to_string expected_balance_dest)
+          string)
+        ~error_msg:(sf "Receiver %s has balance %%L instead of %%R" dest.alias) ;
+      unit
+    in
+    Lwt_list.iter_s
+      (fun from ->
+        Lwt_list.iter_s (fun dest -> test_transfer from dest) accounts2)
+      accounts1
+
+  let batch_transfers_tz4 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Batch transfers"
+      ~tags:["client"; "batch"; "transfer"; "bls"; "tz4"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    Log.info "Generating new accounts" ;
+    let gen_accounts i =
+      Lwt_list.map_s
+        (fun sig_alg ->
+          Client.gen_and_show_keys
+            ~alias:(sf "account_%s_%d" sig_alg i)
+            ~sig_alg
+            client)
+        (supported_signature_schemes protocol)
+    in
+    let* accounts = gen_accounts 1 in
+    let* dests = gen_accounts 2 in
+    let* () = airdrop_and_reveal client (accounts @ dests) in
+    let test_batch_transfer (from : Account.key) =
+      Log.info "Test batch transfer from %s" from.alias ;
+      let* balance_from0 = get_balance from.public_key_hash client
+      and* balance_dests0 =
+        Lwt_list.map_p
+          (fun dest -> get_balance dest.Account.public_key_hash client)
+          dests
+      in
+      let amount = Tez.of_int 10 in
+      let fee = Tez.of_int 1 in
+      let batches =
+        Ezjsonm.list
+          (fun account ->
+            `O
+              [
+                ("destination", `String account.Account.public_key_hash);
+                ("amount", `String (Tez.to_string amount));
+                ("fee", `String (Tez.to_string fee));
+              ])
+          dests
+      in
+      let*! () =
+        Client.multiple_transfers
+          ~giver:from.alias
+          ~json_batch:(Ezjsonm.to_string batches)
+          ~fee_cap:(Tez.of_int 10)
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* balance_from = get_balance from.public_key_hash client
+      and* balance_dests =
+        Lwt_list.map_p
+          (fun dest -> get_balance dest.Account.public_key_hash client)
+          dests
+      in
+      let expected_balance_from =
+        let total =
+          Tez.(
+            mutez_int64 (amount + fee)
+            |> Int64.(mul @@ of_int @@ List.length dests)
+            |> of_mutez_int64)
+        in
+        Tez.(balance_from0 - total)
+      in
+      let expected_balance_dests =
+        List.map (fun b -> Tez.(b + amount)) balance_dests0
+      in
+      Check.(
+        (Tez.to_string balance_from = Tez.to_string expected_balance_from)
+          string)
+        ~error_msg:(sf "Sender %s has balance %%L instead of %%R" from.alias) ;
+      List.iter2
+        (fun balance_dest expected_balance_dest ->
+          Check.(
+            (Tez.to_string balance_dest = Tez.to_string expected_balance_dest)
+              string)
+            ~error_msg:"Receiver has balance %L instead of %R")
+        balance_dests
+        expected_balance_dests ;
+      unit
+    in
+    Lwt_list.iter_s test_batch_transfer accounts
+
+  let forbidden_set_delegate_tz4 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate forbidden on tz4"
+      ~tags:["client"; "set_delegate"; "bls"; "tz4"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* () =
+      match protocol with
+      | Kathmandu | Lima -> unit
+      | Alpha ->
+          let* () = Client.import_secret_key client Constant.tz4_account in
+          airdrop_and_reveal client [Constant.tz4_account]
+    in
+    let*? set_delegate_process =
+      Client.set_delegate
+        client
+        ~src:Constant.tz4_account.public_key_hash
+        ~delegate:Constant.tz4_account.public_key_hash
+    in
+    let msg =
+      match protocol with
+      | Kathmandu | Lima -> rex "Invalid contract notation \"tz4.*\""
+      | Alpha ->
+          rex
+            "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
+    in
+    Process.check_error set_delegate_process ~exit_code:1 ~msg
+
+  let register protocols =
+    alias_pkh_destination protocols ;
+    alias_pkh_source protocols ;
+    transfer_tz4 protocols ;
+    batch_transfers_tz4 protocols ;
+    forbidden_set_delegate_tz4 protocols
 end
 
 module Dry_run = struct
@@ -372,7 +590,64 @@ module Dry_run = struct
   let register protocols = test_gas_consumed protocols
 end
 
+module Signatures = struct
+  open Helpers
+
+  let test_check_signature =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test client signatures and on chain check"
+      ~tags:["client"; "signature"; "check"; "bls"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let prg = "file:./tezt/tests/contracts/proto_alpha/check_signature.tz" in
+    let contract = "check_sig_contract" in
+    let* _hash =
+      Client.originate_contract
+        ~alias:contract
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap2.alias
+        ~burn_cap:(Tez.of_int 10)
+        ~prg
+        client
+    in
+    Log.info "Generating new accounts" ;
+    let* accounts =
+      Lwt_list.map_s
+        (fun sig_alg ->
+          Client.gen_and_show_keys
+            ~alias:(sf "account_%s" sig_alg)
+            ~sig_alg
+            client)
+        (supported_signature_schemes protocol)
+    in
+    let* () = airdrop_and_reveal client accounts in
+    let test (account : Account.key) =
+      let msg = "0x" ^ Hex.show (Hex.of_string "Some nerdy quote") in
+      let* signature =
+        Client.sign_bytes ~signer:account.alias ~data:msg client
+      in
+      Client.transfer
+        client
+        ~amount:Tez.zero
+        ~giver:account.public_key_hash
+        ~receiver:contract
+        ~arg:(sf "Pair %S %S %s" account.public_key signature msg)
+    in
+    let* () = Lwt_list.iter_s test accounts in
+    let* () = Client.bake_for_and_wait client in
+    let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+    let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+    Check.(
+      (List.length ops = List.length (supported_signature_schemes protocol)) int)
+      ~error_msg:"Block contains %L operations but should have %R" ;
+    unit
+
+  let register protocols = test_check_signature protocols
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
-  Dry_run.register protocols
+  Dry_run.register protocols ;
+  Signatures.register protocols

@@ -67,22 +67,26 @@ module V0 = struct
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls _ -> None
 
     let public_key : V_latest.Public_key.t -> Public_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls _ -> None
 
     let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls _ -> None
 
     let signature : V_latest.t -> t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
+      | V_latest.Bls _ -> None
   end
 end
 

@@ -176,6 +176,37 @@ let test_drain_empty_delegate ~exclude_ck () =
         "Drain delegate without enough balance for allocation burn or drain \
          fees")
 
+let test_tz4_consensus_key () =
+  Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
+  let account1_pkh = Context.Contract.pkh contracts in
+  let consensus_account = Account.new_account ~algo:Bls () in
+  let delegate = account1_pkh in
+  let consensus_pk = consensus_account.pk in
+  let consensus_pkh = consensus_account.pkh in
+  transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
+  >>=? fun blk' ->
+  Op.update_consensus_key (B blk') (Contract.Implicit delegate) consensus_pk
+  >>=? fun operation ->
+  let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
+      ]
+      when Tezos_crypto.Bls.Public_key.(pk = tz4_pk) ->
+        return_unit
+    | err ->
+        failwith
+          "Error trace:@,\
+          \ %a does not match the \
+           [Delegate_consensus_key.Invalid_consensus_key_update_tz4] error"
+          Error_monad.pp_print_trace
+          err
+  in
+  Incremental.begin_construction blk' >>=? fun inc ->
+  Incremental.validate_operation ~expect_failure inc operation
+  >>=? fun (_i : Incremental.t) -> return_unit
+
 let test_endorsement_with_consensus_key () =
   Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
   let account1_pkh = Context.Contract.pkh contracts in
@@ -265,6 +296,7 @@ let tests =
         "test empty drain delegate with ck"
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
+      tztest "test tz4 consensus key" `Quick test_tz4_consensus_key;
       tztest
         "test endorsement with ck"
         `Quick

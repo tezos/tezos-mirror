@@ -1364,8 +1364,50 @@ let test_registered_self_delegate_key_init_delegation () =
   Context.Contract.delegate (B b) contract >>=? fun delegate ->
   Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh >>=? fun () -> return_unit
 
+let test_bls_account_cannot_self_delegate () =
+  let open Lwt_result_syntax in
+  let* b, bootstrap = Context.init1 ~consensus_threshold:0 () in
+  let {Account.pkh = tz4_pkh; pk = tz4_pk; _} =
+    Account.new_account ~algo:Bls ()
+  in
+  let tz4_contract = Alpha_context.Contract.Implicit tz4_pkh in
+  let* operation =
+    Op.transaction
+      ~force_reveal:true
+      (B b)
+      bootstrap
+      tz4_contract
+      (of_int 200_000)
+  in
+  let* b = Block.bake ~operation b in
+  let* operation = Op.revelation (B b) tz4_pk in
+  let* b = Block.bake ~operation b in
+  let* operation = Op.delegation (B b) tz4_contract (Some tz4_pkh) in
+  let* inc = Incremental.begin_construction b in
+  let tz4_pkh = match tz4_pkh with Bls pkh -> pkh | _ -> assert false in
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Contract_delegate_storage.Forbidden_tz4_delegate pkh);
+      ]
+      when Tezos_crypto.Bls.Public_key_hash.(pkh = tz4_pkh) ->
+        return_unit
+    | err ->
+        failwith
+          "Error trace:@,\
+           %a does not match the \
+           [Contract_delegate_storage.Forbidden_tz4_delegate] error"
+          Error_monad.pp_print_trace
+          err
+  in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc operation
+  in
+  return_unit
+
 let tests_delegate_registration =
   [
+    Tztest.tztest "TEST" `Quick test_bls_account_cannot_self_delegate;
     (*** unregistered delegate key: no self-delegation ***)
     (* no token transfer, no self-delegation *)
     Tztest.tztest

@@ -1,0 +1,20 @@
+parameter (pair key signature bytes) ;
+storage unit ;
+code { CAR ;
+       UNPAIR ;
+       SWAP ;
+       UNPAIR ;
+       DUP 3 ;
+       HASH_KEY ;
+       IMPLICIT_ACCOUNT ;
+       SENDER ;
+       SWAP ;
+       ADDRESS ;
+       COMPARE ;
+       EQ ;
+       IF {} { PUSH string "invalid signer" ; FAILWITH } ;
+       DIG 2 ;
+       CHECK_SIGNATURE ;
+       IF { UNIT } { PUSH string "invalid signature" ; FAILWITH } ;
+       NIL operation ;
+       PAIR }

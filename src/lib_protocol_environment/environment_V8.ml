@@ -80,6 +80,7 @@ module type T = sig
        and type Signature.public_key_hash =
         Tezos_crypto.Signature.V1.public_key_hash
        and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
+       and type Signature.signature = Tezos_crypto.Signature.V1.signature
        and type Signature.t = Tezos_crypto.Signature.V1.t
        and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
@@ -274,6 +275,26 @@ struct
 
     let def name ?title ?description encoding =
       def (Param.name ^ "." ^ name) ?title ?description encoding
+
+    (* TODO: https://gitlab.com/nomadic-labs/data-encoding/-/issues/58
+       Remove when fix is integrated in data-encoding. *)
+    let splitted ~json ~binary =
+      let open Data_encoding__.Encoding in
+      let e = splitted ~json ~binary in
+      {
+        e with
+        encoding =
+          (match e.encoding with
+          | Splitted {encoding; json_encoding; _} ->
+              Splitted
+                {
+                  encoding;
+                  json_encoding;
+                  is_obj = is_obj json && is_obj binary;
+                  is_tup = is_tup json && is_tup binary;
+                }
+          | desc -> desc);
+      }
   end
 
   module Time = Time.Protocol
@@ -453,6 +474,20 @@ struct
         (Public_key.t * watermark option * bytes) list -> t -> bool
 
       val aggregate_signature_opt : t list -> t option
+    end
+
+    module type SPLIT_SIGNATURE = sig
+      include SIGNATURE
+
+      type prefix
+
+      type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+      val split_signature : t -> splitted
+
+      val of_splitted : splitted -> t option
+
+      val prefix_encoding : prefix Data_encoding.t
     end
 
     module type FIELD = sig

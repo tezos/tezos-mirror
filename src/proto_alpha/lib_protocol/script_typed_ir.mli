@@ -87,7 +87,7 @@ module Script_signature : sig
 
   val compare : t -> t -> int
 
-  val size : int
+  val size : t -> int
 end
 
 type signature = Script_signature.t

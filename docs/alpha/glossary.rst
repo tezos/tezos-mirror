@@ -87,7 +87,7 @@ _`Delegate`
     rights to participate in consensus (aka baking_ rights) and in
     governance.
     The delegate's rights are calculated based on its own tokens plus the sum of tokens
-    delegated to it.
+    delegated to it. Note that since ``tz4`` accounts cannot be delegates.
 
 _`Delegation`
     An operation_ in which an account_ balance is lent to a
@@ -140,7 +140,7 @@ _`Implicit account`
     If *registered*, an `implicit account`_ can act as a delegate_.
 
     The address of an `implicit account`_ always starts with the
-    letters `tz` followed by `1`, `2` or `3` (depending on the
+    letters `tz` followed by `1`, `2`, `3` or `4` (depending on the
     signature scheme) and finally the hash of the public key.
 
 _`Layer 1`

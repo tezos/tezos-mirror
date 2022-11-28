@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,39 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type public_key_hash =
-  | Ed25519 of Ed25519.Public_key_hash.t
-  | Secp256k1 of Secp256k1.Public_key_hash.t
-  | P256 of P256.Public_key_hash.t
-  | Bls of Bls.Public_key_hash.t
+(** Testing
+    -------
+    Component:    Protocol Library
+    Invocation:   dune exec \
+                  src/proto_alpha/lib_protocol/test/pbt/test_operation_encoding.exe
+    Subject:      Encoding for operations
+*)
 
-type public_key =
-  | Ed25519 of Ed25519.Public_key.t
-  | Secp256k1 of Secp256k1.Public_key.t
-  | P256 of P256.Public_key.t
-  | Bls of Bls.Public_key.t
+open Protocol
+open QCheck2
+open Lib_test.Qcheck2_helpers
 
-type watermark =
-  | Block_header of Chain_id.t
-  | Endorsement of Chain_id.t
-  | Generic_operation
-  | Custom of bytes
+(** {2 Generators}  *)
+let generate_operation =
+  let open Gen in
+  let+ _kind, (_hash, op) = Operation_generator.generate_operation in
+  op
 
-type signature =
-  | Ed25519 of Ed25519.t
-  | Secp256k1 of Secp256k1.t
-  | P256 of P256.t
-  | Bls of Bls.t
-  | Unknown of Bytes.t
+(** {2 Tests} *)
 
-type prefix = Bls_prefix of Bytes.t
+let test_operation =
+  let open Alpha_context in
+  let gen = generate_operation in
+  let eq {shell = s1; protocol_data = Operation_data d1}
+      {shell = s2; protocol_data = Operation_data d2} =
+    let o1 : _ Operation.t = {shell = s1; protocol_data = d1} in
+    let o2 : _ Operation.t = {shell = s2; protocol_data = d2} in
+    match Operation.equal o1 o2 with None -> false | Some Eq -> true
+  in
+  test_roundtrip
+    ~count:2000
+    ~title:"Operation.t"
+    ~gen
+    ~eq
+    Alpha_context.Operation.encoding
 
-include
-  S.SPLIT_SIGNATURE
-    with type Public_key_hash.t = public_key_hash
-     and type Public_key.t = public_key
-     and type watermark := watermark
-     and type prefix := prefix
-     and type t = signature
-
-val size : t -> int
+let () =
+  let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
+  Alcotest.run
+    "Operation_encoding"
+    [("roundtrip", qcheck_wrap [test_operation])]

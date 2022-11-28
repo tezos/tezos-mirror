@@ -551,19 +551,24 @@ let to_list = function Contents_list l -> contents_list_to_list l
 (* This first version of of_list has the type (_, string) result expected by
    the conv_with_guard combinator of Data_encoding. For a more conventional
    return type see [of_list] below. *)
-let rec of_list_internal = function
+let of_list_internal contents =
+  let rec of_list_internal acc = function
+    | [] -> Ok acc
+    | Contents o :: os -> (
+        match (o, acc) with
+        | ( Manager_operation _,
+            Contents_list (Single (Manager_operation _) as rest) ) ->
+            (of_list_internal [@tailcall]) (Contents_list (Cons (o, rest))) os
+        | Manager_operation _, Contents_list (Cons _ as rest) ->
+            (of_list_internal [@tailcall]) (Contents_list (Cons (o, rest))) os
+        | _ ->
+            Error
+              "Operation list of length > 1 should only contain manager \
+               operations.")
+  in
+  match List.rev contents with
   | [] -> Error "Operation lists should not be empty."
-  | [Contents o] -> Ok (Contents_list (Single o))
-  | Contents o :: os -> (
-      of_list_internal os >>? fun (Contents_list os) ->
-      match (o, os) with
-      | Manager_operation _, Single (Manager_operation _) ->
-          Ok (Contents_list (Cons (o, os)))
-      | Manager_operation _, Cons _ -> Ok (Contents_list (Cons (o, os)))
-      | _ ->
-          Error
-            "Operation list of length > 1 should only contains manager \
-             operations.")
+  | Contents o :: os -> of_list_internal (Contents_list (Single o)) os
 
 type error += Contents_list_error of string (* `Permanent *)
 
@@ -627,6 +632,13 @@ let zk_rollup_operation_update_tag = zk_rollup_operation_tag_offset + 2
 
 module Encoding = struct
   open Data_encoding
+
+  (** These tags are reserved for future extensions: [fd] - [ff]. *)
+  let reserved_tag t = Compare.Int.(t >= 0xfd)
+
+  let signature_prefix_tag = 0xff
+
+  let () = assert (reserved_tag signature_prefix_tag)
 
   let case tag name args proj inj =
     case
@@ -1752,8 +1764,57 @@ module Encoding = struct
       zk_rollup_operation_update_tag
       Manager_operations.zk_rollup_update_case
 
+  type packed_case = PCase : 'b case -> packed_case
+
+  let contents_cases =
+    [
+      PCase endorsement_case;
+      PCase preendorsement_case;
+      PCase dal_attestation_case;
+      PCase seed_nonce_revelation_case;
+      PCase vdf_revelation_case;
+      PCase double_endorsement_evidence_case;
+      PCase double_preendorsement_evidence_case;
+      PCase double_baking_evidence_case;
+      PCase activate_account_case;
+      PCase proposals_case;
+      PCase ballot_case;
+      PCase reveal_case;
+      PCase transaction_case;
+      PCase origination_case;
+      PCase delegation_case;
+      PCase set_deposits_limit_case;
+      PCase increase_paid_storage_case;
+      PCase update_consensus_key_case;
+      PCase drain_delegate_case;
+      PCase failing_noop_case;
+      PCase register_global_constant_case;
+      PCase tx_rollup_origination_case;
+      PCase tx_rollup_submit_batch_case;
+      PCase tx_rollup_commit_case;
+      PCase tx_rollup_return_bond_case;
+      PCase tx_rollup_finalize_commitment_case;
+      PCase tx_rollup_remove_commitment_case;
+      PCase tx_rollup_rejection_case;
+      PCase tx_rollup_dispatch_tickets_case;
+      PCase transfer_ticket_case;
+      PCase dal_publish_slot_header_case;
+      PCase sc_rollup_originate_case;
+      PCase sc_rollup_add_messages_case;
+      PCase sc_rollup_cement_case;
+      PCase sc_rollup_publish_case;
+      PCase sc_rollup_refute_case;
+      PCase sc_rollup_timeout_case;
+      PCase sc_rollup_execute_outbox_message_case;
+      PCase sc_rollup_recover_bond_case;
+      PCase zk_rollup_origination_case;
+      PCase zk_rollup_publish_case;
+      PCase zk_rollup_update_case;
+    ]
+
   let contents_encoding =
-    let make (Case {tag; name; encoding; select; proj; inj}) =
+    let make (PCase (Case {tag; name; encoding; select; proj; inj})) =
+      assert (not @@ reserved_tag tag) ;
       case
         (Tag tag)
         name
@@ -1761,72 +1822,167 @@ module Encoding = struct
         (fun o -> match select o with None -> None | Some o -> Some (proj o))
         (fun x -> Contents (inj x))
     in
-    def "operation.alpha.contents"
-    @@ union
-         [
-           make endorsement_case;
-           make preendorsement_case;
-           make dal_attestation_case;
-           make seed_nonce_revelation_case;
-           make vdf_revelation_case;
-           make double_endorsement_evidence_case;
-           make double_preendorsement_evidence_case;
-           make double_baking_evidence_case;
-           make activate_account_case;
-           make proposals_case;
-           make ballot_case;
-           make reveal_case;
-           make transaction_case;
-           make origination_case;
-           make delegation_case;
-           make set_deposits_limit_case;
-           make increase_paid_storage_case;
-           make update_consensus_key_case;
-           make drain_delegate_case;
-           make failing_noop_case;
-           make register_global_constant_case;
-           make tx_rollup_origination_case;
-           make tx_rollup_submit_batch_case;
-           make tx_rollup_commit_case;
-           make tx_rollup_return_bond_case;
-           make tx_rollup_finalize_commitment_case;
-           make tx_rollup_remove_commitment_case;
-           make tx_rollup_rejection_case;
-           make tx_rollup_dispatch_tickets_case;
-           make transfer_ticket_case;
-           make dal_publish_slot_header_case;
-           make sc_rollup_originate_case;
-           make sc_rollup_add_messages_case;
-           make sc_rollup_cement_case;
-           make sc_rollup_publish_case;
-           make sc_rollup_refute_case;
-           make sc_rollup_timeout_case;
-           make sc_rollup_execute_outbox_message_case;
-           make sc_rollup_recover_bond_case;
-           make zk_rollup_origination_case;
-           make zk_rollup_publish_case;
-           make zk_rollup_update_case;
-         ]
+    def "operation.alpha.contents" @@ union (List.map make contents_cases)
 
   let contents_list_encoding =
     conv_with_guard to_list of_list_internal (Variable.list contents_encoding)
 
-  let optional_signature_encoding =
+  let protocol_data_json_encoding =
     conv
-      (function Some s -> s | None -> Signature.zero)
-      (fun s -> if Signature.equal s Signature.zero then None else Some s)
-      Signature.encoding
+      (fun (Operation_data {contents; signature}) ->
+        (Contents_list contents, signature))
+      (fun (Contents_list contents, signature) ->
+        Operation_data {contents; signature})
+      (obj2
+         (req "contents" (dynamic_size contents_list_encoding))
+         (opt "signature" Signature.encoding))
 
+  type contents_or_signature_prefix =
+    | Actual_contents of packed_contents
+    | Signature_prefix of Signature.prefix
+
+  let contents_or_signature_prefix_encoding =
+    let make_contents (PCase (Case {tag; name; encoding; select; proj; inj})) =
+      assert (not @@ reserved_tag tag) ;
+      case
+        (Tag tag)
+        name
+        encoding
+        (function
+          | Actual_contents o -> (
+              match select o with None -> None | Some o -> Some (proj o))
+          | _ -> None)
+        (fun x -> Actual_contents (Contents (inj x)))
+    in
+    def "operation.alpha.contents_or_signature_prefix"
+    @@ union
+    @@ case
+         (Tag signature_prefix_tag)
+         "signature_prefix"
+         (obj1 (req "signature_prefix" Signature.prefix_encoding))
+         (function Signature_prefix prefix -> Some prefix | _ -> None)
+         (fun prefix -> Signature_prefix prefix)
+       (* The case signature_prefix is added to the operation's contents so that
+          we can store the prefix of BLS signatures without breaking the
+          encoding of operations. *)
+       :: List.map make_contents contents_cases
+
+  let of_contents_and_signature_prefix contents_and_prefix =
+    let open Result_syntax in
+    let rec loop acc = function
+      | [] -> Ok acc
+      | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
+      | Actual_contents (Contents o) :: os -> (
+          match (o, acc) with
+          | ( Manager_operation _,
+              Contents_list (Single (Manager_operation _) as rest) ) ->
+              (loop [@tailcall]) (Contents_list (Cons (o, rest))) os
+          | Manager_operation _, Contents_list (Cons _ as rest) ->
+              (loop [@tailcall]) (Contents_list (Cons (o, rest))) os
+          | _ ->
+              Error
+                "Operation list of length > 1 should only contain manager \
+                 operations.")
+    in
+    let rev_contents, prefix =
+      match List.rev contents_and_prefix with
+      | Signature_prefix prefix :: rev_contents -> (rev_contents, Some prefix)
+      | rev_contents -> (rev_contents, None)
+    in
+    let+ packed_contents =
+      match rev_contents with
+      | [] -> Error "Operation lists should not be empty."
+      | Signature_prefix _ :: _ -> Error "Signature prefix must appear last"
+      | Actual_contents (Contents o) :: os -> loop (Contents_list (Single o)) os
+    in
+    (packed_contents, prefix)
+
+  let protocol_data_binary_encoding =
+    conv_with_guard
+      (fun (Operation_data {contents; signature}) ->
+        let contents_list =
+          List.map (fun c -> Actual_contents c)
+          @@ to_list (Contents_list contents)
+        in
+        let contents_and_signature_prefix, sig_suffix =
+          match signature with
+          | None -> (contents_list, Signature.(to_bytes zero))
+          | Some signature -> (
+              let {Signature.prefix; suffix} =
+                Signature.split_signature signature
+              in
+              match prefix with
+              | None -> (contents_list, suffix)
+              | Some prefix ->
+                  (contents_list @ [Signature_prefix prefix], suffix))
+        in
+        (contents_and_signature_prefix, sig_suffix))
+      (fun (contents_and_signature_prefix, suffix) ->
+        let open Result_syntax in
+        let* Contents_list contents, prefix =
+          of_contents_and_signature_prefix contents_and_signature_prefix
+        in
+        let+ signature =
+          Result.of_option ~error:"Invalid signature"
+          @@ Signature.of_splitted {Signature.prefix; suffix}
+        in
+        let signature =
+          match prefix with
+          | None ->
+              if Signature.(signature = zero) then None else Some signature
+          | Some _ -> Some signature
+        in
+        Operation_data {contents; signature})
+      (obj2
+         (req
+            "contents_and_signature_prefix"
+            (Variable.list contents_or_signature_prefix_encoding))
+         (req "signature_suffix" (Fixed.bytes Hex 64)))
+
+  (* The binary and JSON encodings are different for protocol data, because we
+     have to fit BLS signatures (which are 96 bytes long) in a backward
+     compatible manner with fixed size signatures of 64 bytes.
+
+     The JSON encoding is the same as in the previous protocols.
+
+     To support BLS signatures, we extract the prefix of the signature and fit
+     it inside the field [contents] while keeping the 64 bytes suffix in the
+     same place as the other signature kinds (i.e. at the end).
+
+     For instance the binary protocol data for a transfer operation signed by a
+     Ed25519 key would look like:
+
+     +----------------+------------+
+     |  Transaction   | signature  |
+     +----+------+----+------------+
+     | 6C |  ... | 00 | (64 bytes) |
+     +----+------+----+------------+
+
+     The same transfer signed by a BLS key would be instead:
+
+     +----------------+----------------------------+-------------------+
+     |  Transaction   |      signature prefix      | signature suffix  |
+     +----+------+----+----+----+------------------+-------------------+
+     | 6C |  ... | 00 | ff | 03 | (first 32 bytes) | (last 64 bytes)   |
+     +----+------+----+----+----+------------------+-------------------+
+
+     Which can also be viewed with an equivalent schema:
+
+     +----------------+----+---------------+--------------------------+
+     |  Transaction   | ff | signature tag |        signature         |
+     +----+------+----+----+---------------+--------------------------+
+     | 6C |  ... | 00 | ff |   03 (BLS)    | (96 bytes BLS signature) |
+     +----+------+----+----+---------------+--------------------------+
+
+     NOTE: BLS only supports the tagged format and Ed25519, Secp256k1 and P256
+     signatures only support the untagged one. The latter restriction is only
+     here to guarantee unicity of the binary representation for signatures.
+  *)
   let protocol_data_encoding =
     def "operation.alpha.contents_and_signature"
-    @@ conv
-         (fun (Operation_data {contents; signature}) ->
-           (Contents_list contents, signature))
-         (fun (Contents_list contents, signature) ->
-           Operation_data {contents; signature})
-         (obj2
-            (req "contents" contents_list_encoding)
-            (req "signature" optional_signature_encoding))
+    @@ splitted
+         ~json:protocol_data_json_encoding
+         ~binary:protocol_data_binary_encoding
 
   let operation_encoding =
     conv

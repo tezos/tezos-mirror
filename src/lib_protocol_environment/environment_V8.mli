@@ -80,6 +80,7 @@ module type T = sig
        and type Signature.public_key_hash =
         Tezos_crypto.Signature.V1.public_key_hash
        and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
+       and type Signature.signature = Tezos_crypto.Signature.V1.signature
        and type Signature.t = Tezos_crypto.Signature.V1.t
        and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
        and type Micheline.canonical_location = Micheline.canonical_location

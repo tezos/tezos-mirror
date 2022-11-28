@@ -151,7 +151,7 @@ end
 
 (** Test: instantiate Signature_Properties over Signature
     with algo in generate key respectively set to
-    Ed25519, Secp256k1, P256. *)
+    Ed25519, Secp256k1, P256, Bls. *)
 let () =
   let module Bls_Props =
     Aggregate_Signature_Properties
@@ -183,5 +183,12 @@ let () =
   in
 
   [("bls12_381", qcheck_wrap Bls_Props.tests)]
-  @ List.map f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1"); (P256, "P256")]
+  @ List.map
+      f
+      [
+        (Ed25519, "Ed25519");
+        (Secp256k1, "Secp256k1");
+        (P256, "P256");
+        (Bls, "Bls");
+      ]
   |> Alcotest.run "tezos-crypto-prop-signature"

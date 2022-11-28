@@ -28,7 +28,8 @@ Delegation
 ----------
 
 A *delegate* is any :ref:`implicit account <Implicit account>` registered as
-such by emitting a delegate registration operation.
+such by emitting a delegate registration operation. Note that ``tz4`` accounts
+cannot be registered as delegate.
 
 Any :ref:`account <Account>` (implicit or originated) can specify a delegate
 through a delegation operation.

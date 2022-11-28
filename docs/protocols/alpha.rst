@@ -60,6 +60,14 @@ RPC Changes
 Operation receipts
 ------------------
 
+Cryptography
+------------
+
+- Support for BLS signatures and introduction of a new account type whose
+  address has the prefix ``tz4`` (whose keys are BLS-MinPk key pairs). The
+  ``CHECK_SIGNATURE`` instruction of Michelson can also check BLS
+  signatures. ``tz4`` accounts are forbidden to be delegates. (MR :gl:`!5444`)
+
 Bug Fixes
 ---------
 

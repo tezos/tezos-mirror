@@ -88,11 +88,12 @@ let check_inbox_success (inbox : Tx_rollup_node.Inbox.t) =
       match result |->? "deposit_result" with
       | None ->
           (* Not a deposit, must be a batch *)
-          let results =
-            JSON.(
-              result |->? "batch_v1_result" |> Option.get |-> "results"
-              |> as_list)
+          let batch_result =
+            match result |->? "batch_v1_result" with
+            | Some r -> r
+            | None -> JSON.(result |-> "batch_v2_result")
           in
+          let results = JSON.(batch_result |-> "results" |> as_list) in
           List.iteri
             (fun j tr_json ->
               match JSON.(tr_json |=> 1 |> as_string_opt) with
@@ -2234,8 +2235,9 @@ let test_tickets_context =
         ~error_msg:"Ticket is %L but expected %R" ;
       unit)
 
-let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
-    ~finalize_commitment_signer ~dispatch_withdrawals_signer () =
+let test_round_trip ~title ?before_init
+    ?(withdraw_dest = Constant.bootstrap2.public_key_hash) ~originator ~operator
+    ~batch_signer ~finalize_commitment_signer ~dispatch_withdrawals_signer () =
   Protocol.register_test
     ~__FILE__
     ~title
@@ -2334,7 +2336,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
         craft_withdraw_and_sign
           tx_client
           ~signer:bls_key_2
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest:withdraw_dest
           ~ticket:ticket_id
           ~qty:5L
       in
@@ -2343,7 +2345,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
         craft_withdraw_and_sign
           tx_client
           ~signer:bls_key_1
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest:withdraw_dest
           ~ticket:ticket_id
           ~qty:10L
       in
@@ -2406,7 +2408,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       let*! () =
         Client.transfer_tickets
           ~qty:15L
-          ~src:Constant.bootstrap2.public_key_hash
+          ~src:withdraw_dest
           ~destination:withdraw_contract
           ~entrypoint:"default"
           ~contents:{|"toru"|}
@@ -2426,6 +2428,30 @@ let test_withdrawals =
     ~batch_signer:Constant.bootstrap5.public_key_hash
     ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
     ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+    ()
+
+let test_withdrawals_tz4 =
+  let before_init client =
+    let* () = Client.import_secret_key client Constant.tz4_account in
+    let* () =
+      Client.transfer
+        ~amount:(Tez.of_int 1_000)
+        ~giver:Constant.bootstrap1.public_key_hash
+        ~receiver:Constant.tz4_account.alias
+        ~burn_cap:Tez.one
+        client
+    in
+    Client.bake_for_and_wait client
+  in
+  test_round_trip
+    ~title:"TX_rollup: dispatch withdrawals to tz4 account"
+    ~originator:Constant.bootstrap2.public_key_hash
+    ~operator:Constant.bootstrap1.public_key_hash
+    ~batch_signer:Constant.bootstrap5.public_key_hash
+    ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
+    ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+    ~before_init
+    ~withdraw_dest:Constant.tz4_account.public_key_hash
     ()
 
 let test_single_signer =
@@ -2712,12 +2738,17 @@ let test_withdraw_command =
           ~ticket:ticket_id
       in
       let* _ =
+        let dest =
+          match protocol with
+          | Lima | Kathmandu -> Constant.bootstrap2.public_key_hash
+          | Alpha -> Constant.tz4_account.public_key_hash
+        in
         inject_withdraw
           ~counter:2L
           tx_client
           ~source:bls_key_1.aggregate_alias
           ~qty:1L
-          ~dest:Constant.bootstrap2.public_key_hash
+          ~dest
           ~ticket:ticket_id
       in
       let* () = Client.bake_for_and_wait client in
@@ -2960,6 +2991,7 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
+  test_withdrawals_tz4 [Alpha] ;
   test_single_signer protocols ;
   test_signer_reveals protocols ;
   test_accuser protocols ;

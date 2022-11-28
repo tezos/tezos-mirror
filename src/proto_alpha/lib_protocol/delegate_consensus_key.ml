@@ -26,6 +26,7 @@
 type error +=
   | Invalid_consensus_key_update_noop of Cycle_repr.t
   | Invalid_consensus_key_update_active
+  | Invalid_consensus_key_update_tz4 of Bls.Public_key.t
 
 let () =
   register_error_kind
@@ -54,7 +55,21 @@ let () =
         "The delegate consensus key is already used by another delegate")
     Data_encoding.empty
     (function Invalid_consensus_key_update_active -> Some () | _ -> None)
-    (fun () -> Invalid_consensus_key_update_active)
+    (fun () -> Invalid_consensus_key_update_active) ;
+  register_error_kind
+    `Permanent
+    ~id:"delegate.consensus_key.tz4"
+    ~title:"Consensus key cannot be a tz4"
+    ~description:"Consensus key cannot be a tz4 (BLS public key)."
+    ~pp:(fun ppf pk ->
+      Format.fprintf
+        ppf
+        "The consensus key %a is forbidden as it is a BLS public key."
+        Bls.Public_key_hash.pp
+        (Bls.Public_key.hash pk))
+    Data_encoding.(obj1 (req "delegate_pk" Bls.Public_key.encoding))
+    (function Invalid_consensus_key_update_tz4 pk -> Some pk | _ -> None)
+    (fun pk -> Invalid_consensus_key_update_tz4 pk)
 
 type pk = Raw_context.consensus_pk = {
   delegate : Signature.Public_key_hash.t;
@@ -97,12 +112,17 @@ let check_unused ctxt pkh =
   let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
   fail_when is_active Invalid_consensus_key_update_active
 
+let check_not_tz4 : Signature.Public_key.t -> unit tzresult = function
+  | Bls pk -> error (Invalid_consensus_key_update_tz4 pk)
+  | Ed25519 _ | Secp256k1 _ | P256 _ -> Ok ()
+
 let set_unused = Storage.Consensus_keys.remove
 
 let set_used = Storage.Consensus_keys.add
 
 let init ctxt delegate pk =
   let open Lwt_result_syntax in
+  let*? () = check_not_tz4 pk in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt pkh in
   let*! ctxt = set_used ctxt pkh in
@@ -176,6 +196,7 @@ let register_update ctxt delegate pk =
       Signature.Public_key.(pk = active_pubkey)
       (Invalid_consensus_key_update_noop first_active_cycle)
   in
+  let*? () = check_not_tz4 pk in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt pkh in
   let*! ctxt = set_used ctxt pkh in

@@ -31,16 +31,22 @@
 *)
 
 (* same as `baker_test`, `baker_test.ml` but using the signer *)
-let signer_simple_test ~title ~tags ~keys =
-  Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
+let signer_test protocol ~keys =
   (* init the signer and import all the bootstrap_keys *)
   let* signer = Signer.init ~keys () in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
+      ~base:(Right (protocol, None))
+      []
+  in
   let* node, client =
     Client.init_with_protocol
       ~keys:[Constant.activator]
       `Client
       ~protocol
       ~timestamp:Now
+      ~parameter_file
       ()
   in
   let* _ =
@@ -57,11 +63,60 @@ let signer_simple_test ~title ~tags ~keys =
   Log.info "New head arrive level 2" ;
   let* _ = level_3_promise in
   Log.info "New head arrive level 3" ;
-  Lwt.return_unit
+  return client
+
+let signer_simple_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"signer test"
+    ~tags:["node"; "baker"; "signer"; "tz1"]
+  @@ fun protocol ->
+  let* _ =
+    signer_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
+  in
+  unit
+
+let signer_bls_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"BLS signer test"
+    ~tags:["node"; "baker"; "signer"; "bls"]
+  @@ fun protocol ->
+  let* _node, client = Client.init_with_protocol `Client ~protocol () in
+  let* signer = Signer.init ~keys:[Constant.tz4_account] () in
+  let* () =
+    let uri = Signer.uri signer in
+    Client.import_signer_key client Constant.tz4_account uri
+  in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:Constant.tz4_account.public_key_hash
+      ~burn_cap:(Tez.of_int 1)
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let get_balance_tz4 client =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:Constant.tz4_account.public_key_hash
+         ()
+  in
+  let* balance_0 = get_balance_tz4 client in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 5)
+      ~giver:Constant.tz4_account.public_key_hash
+      ~receiver:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* balance_1 = get_balance_tz4 client in
+  Check.((Tez.mutez_int64 balance_0 > Tez.mutez_int64 balance_1) int64)
+    ~error_msg:"Tz4 sender %s has decreased balance after transfer" ;
+  unit
 
 let register ~protocols =
-  signer_simple_test
-    ~title:"signer test"
-    ~tags:["node"; "baker"; "signer"]
-    ~keys:(Account.Bootstrap.keys |> Array.to_list)
-    protocols
+  signer_simple_test protocols ;
+  signer_bls_test [Alpha]
