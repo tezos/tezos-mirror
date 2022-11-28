@@ -131,7 +131,6 @@ module Aux = struct
      the level of the output buffer and resets its id to zero. *)
     val read_input :
       input_buffer:Input_buffer.t ->
-      output_buffer:Output_buffer.t ->
       memory:memory ->
       level_offset:int32 ->
       id_offset:int32 ->
@@ -277,8 +276,8 @@ module Aux = struct
           | exn ->
               fail (M.exn_to_error ~default:Error.Generic_invalid_access exn))
 
-    let read_input ~input_buffer ~output_buffer ~memory ~level_offset ~id_offset
-        ~dst ~max_bytes =
+    let read_input ~input_buffer ~memory ~level_offset ~id_offset ~dst
+        ~max_bytes =
       let open Lwt_result_syntax in
       let*! res =
         Lwt.catch
@@ -300,7 +299,6 @@ module Aux = struct
             let* () =
               M.store_num memory id_offset 0l (I64 (Z.to_int64 message_counter))
             in
-            Output_buffer.ensure_outbox_at_level output_buffer raw_level ;
             return (Int32.of_int input_size))
           (fun exn ->
             match exn with
@@ -542,7 +540,7 @@ let read_input_name = "tezos_read_input"
 
 let read_input =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer durable memories inputs ->
+    (fun input_buffer _output_buffer durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [
@@ -555,7 +553,6 @@ let read_input =
           let* x =
             Aux.read_input
               ~input_buffer
-              ~output_buffer
               ~memory
               ~level_offset
               ~id_offset

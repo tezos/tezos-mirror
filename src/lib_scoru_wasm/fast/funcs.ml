@@ -96,7 +96,6 @@ let make (module Builtins : Builtins.S) state =
         with_mem @@ fun memory ->
         Host_funcs.Aux.read_input
           ~input_buffer:state.buffers.input
-          ~output_buffer:state.buffers.output
           ~memory
           ~level_offset
           ~id_offset

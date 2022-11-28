@@ -440,6 +440,11 @@ let set_input_step input_info message pvm_state =
         in
         match Pvm_input_kind.from_raw_input message with
         | Internal End_of_level -> Padding
+        | Internal Start_of_level ->
+            Wasm.Output_buffer.ensure_outbox_at_level
+              pvm_state.buffers.Wasm.Eval.output
+              raw_level ;
+            Collect
         | _ -> Collect)
     | Stuck _ -> Lwt.return pvm_state.tick_state
     | Snapshot -> return_stuck "start"

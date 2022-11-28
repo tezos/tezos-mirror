@@ -1463,6 +1463,65 @@ let test_scheduling_one_inbox () = test_scheduling_multiple_inboxes [10]
 let test_scheduling_five_inboxes () =
   test_scheduling_multiple_inboxes [10; 5; 15; 8; 2]
 
+let test_outboxes_at_each_level () =
+  let open Lwt_syntax in
+  let open Tezos_webassembly_interpreter.Output_buffer in
+  let output_message = "output_message" in
+
+  (* Checks that each outbox exists for levels 0 to [outbox_level] *)
+  let rec check_outboxes buffer outbox_level =
+    let* message = get_message buffer {outbox_level; message_index = Z.zero} in
+    assert (message = Bytes.of_string output_message) ;
+    if outbox_level <= 0l then return_unit
+    else check_outboxes buffer (Int32.pred outbox_level)
+  in
+
+  let rec step_inboxes curr_level max_level tree =
+    let* tree = set_empty_inbox_step curr_level tree in
+    let* tree = eval_until_input_requested tree in
+
+    (* The PVM shouldn't be stuck, it only outputs one message. *)
+    let* status = Wasm.Internal_for_tests.get_tick_state tree in
+    assert (not @@ is_stuck status) ;
+
+    (* Lets check the outboxes are consistent and all exist. *)
+    let* buffer = Wasm.Internal_for_tests.get_output_buffer tree in
+    assert (
+      Outboxes.num_elements buffer
+      = Int32.succ curr_level (* One for each level, including 0 *)) ;
+    let* () = check_outboxes buffer curr_level in
+
+    (* Take another round of evaluation. *)
+    if curr_level = max_level then return_unit
+    else step_inboxes (Int32.succ curr_level) max_level tree
+  in
+
+  let module_ =
+    Format.sprintf
+      {|
+(module
+ (import "smart_rollup_core" "write_output"
+         (func $write_output (param i32 i32) (result i32)))
+ (data (i32.const 100) "%s")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+       (call $write_output (i32.const 100) (i32.const %d))
+       (drop)
+       )
+)|}
+      output_message
+      (String.length output_message)
+  in
+  let* tree =
+    initial_tree
+      ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
+      ~from_binary:false
+      module_
+  in
+  let* () = step_inboxes 0l 5l tree in
+  return_ok_unit
+
 let tests =
   [
     tztest
@@ -1547,4 +1606,8 @@ let tests =
       `Quick
       test_scheduling_five_inboxes;
     tztest "Test inbox clean-up" `Quick test_inbox_cleanup;
+    tztest
+      "Test outboxes are created at each level"
+      `Quick
+      test_outboxes_at_each_level;
   ]

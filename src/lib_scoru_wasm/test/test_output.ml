@@ -55,13 +55,13 @@ let test_aux_write_output () =
   let* _ =
     Host_funcs.Aux.read_input
       ~input_buffer
-      ~output_buffer
       ~memory
       ~level_offset:4l
       ~id_offset:10l
       ~dst:50l
       ~max_bytes:36000l
   in
+  Output_buffer.ensure_outbox_at_level output_buffer 2l ;
   let output_level = Output_buffer.get_last_level output_buffer in
   assert (output_level = Some 2l) ;
   let* result =
@@ -130,6 +130,7 @@ let test_write_host_fun () =
   in
   let values = Values.[Num (I32 50l); Num (I32 5l)] in
 
+  Output_buffer.ensure_outbox_at_level output 2l ;
   let* _, result =
     Eval.invoke
       ~module_reg
