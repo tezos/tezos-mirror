@@ -69,6 +69,8 @@ let test_script_hash_regression =
         "macros";
         "mini_scenarios";
         "non_regression";
+        "ill_typed";
+        "legacy";
       ]
     in
     List.concat_map
