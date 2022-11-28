@@ -1707,7 +1707,7 @@ let test_deposit_withdraw_max_big_tickets =
   let* () =
     repeat max_withdrawals_per_batch (fun () ->
         let*! () =
-          Client.Tx_rollup.transfer_tickets
+          Client.transfer_tickets
             ~qty:l2_amount
             ~src:account
             ~destination:withdraw_contract

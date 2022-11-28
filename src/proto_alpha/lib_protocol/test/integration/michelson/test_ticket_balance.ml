@@ -718,6 +718,55 @@ let test_send_and_store_zero_amount_tickets () =
   in
   return_unit
 
+(** Test sending tickets to an implicit account. *)
+let test_send_tickets_to_implicit_account () =
+  let* block, baker, contract, contract2 = Contract_helpers.init () in
+  let () =
+    match (contract, contract2) with
+    | Contract.Implicit _, Contract.Implicit _ -> ()
+    | _ -> assert false
+  in
+  (* A contract that receives an address and mints and sends a ticket to it. *)
+  let* ticketer, _script, block =
+    originate
+      ~baker
+      ~source_contract:contract
+      ~script:
+        {|
+        { parameter address;
+          storage unit;
+          code { CAR ;
+                 CONTRACT (ticket string) ;
+                 IF_NONE
+                   { PUSH string "Contract of type `ticket(string)` not found" ;
+                     FAILWITH }
+                   { PUSH mutez 0;
+                     PUSH nat 1 ;
+                     PUSH string "Ticket" ;
+                     TICKET ;
+                     ASSERT_SOME ;
+                     TRANSFER_TOKENS ;
+                     PUSH unit Unit ;
+                     NIL operation ;
+                     DIG 2 ;
+                     CONS ;
+                     PAIR }}}
+      |}
+      ~storage:"Unit"
+      block
+  in
+  let* block =
+    transaction
+      ~entrypoint:Entrypoint.default
+      ~baker
+      ~sender:contract
+      block
+      ~recipient:ticketer
+      ~parameters:(Printf.sprintf {|"%s"|} (Contract.to_b58check contract2))
+  in
+  let token = string_token ~ticketer "Ticket" in
+  assert_token_balance ~loc:__LOC__ block token contract2 (Some 1)
+
 (** Test sending tickets in a big-map. *)
 let test_send_tickets_in_big_map () =
   let* {block; baker; contract = source_contract} = init_env () in
@@ -1690,6 +1739,10 @@ let tests =
     Tztest.tztest "Test add to big-map" `Quick test_add_to_big_map;
     Tztest.tztest "Test swap big-map" `Quick test_swap_big_map;
     Tztest.tztest "Test send ticket" `Quick test_send_tickets;
+    Tztest.tztest
+      "Test send ticket to implicit"
+      `Quick
+      test_send_tickets_to_implicit_account;
     Tztest.tztest
       "Test send and store tickets with amount 0"
       `Quick

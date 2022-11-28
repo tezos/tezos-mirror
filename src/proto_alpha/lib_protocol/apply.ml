@@ -316,6 +316,48 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
   in
   return (ctxt, result, [])
 
+let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
+    ~amount ~before_operation ctxt =
+  let destination = Contract.Implicit destination in
+  Contract.allocated ctxt destination >>= fun already_allocated ->
+  let ex_token, ticket_amount =
+    Ticket_scanner.ex_token_and_amount_of_ex_ticket
+    @@ Ticket_scanner.Ex_ticket (ty, ticket)
+  in
+  Ticket_token_unparser.unparse ctxt ex_token >>=? fun (ticket_token, ctxt) ->
+  Token.transfer ctxt (`Contract source) (`Contract destination) amount
+  >>=? fun (ctxt, balance_updates) ->
+  let ticket_receipt =
+    Ticket_receipt.
+      [
+        {
+          ticket_token;
+          updates =
+            [
+              {
+                account = Destination.Contract destination;
+                amount = Script_int.(to_zint (ticket_amount :> n num));
+              };
+            ];
+        };
+      ]
+  in
+  return
+    ( ctxt,
+      Transaction_to_contract_result
+        {
+          storage = None;
+          lazy_storage_diff = None;
+          balance_updates;
+          ticket_receipt;
+          originated_contracts = [];
+          consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+          storage_size = Z.zero;
+          paid_storage_size_diff = Z.zero;
+          allocated_destination_contract = not already_allocated;
+        },
+      [] )
+
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
   let contract = Contract.Originated contract_hash in
@@ -575,6 +617,26 @@ let apply_internal_operation_contents :
         ~amount
         ~pkh
         ~before_operation:ctxt_before_op
+      >|=? fun (ctxt, res, ops) ->
+      ( ctxt,
+        (ITransaction_result res : kind successful_internal_operation_result),
+        ops )
+  | Transaction_to_implicit_with_ticket
+      {
+        destination;
+        ticket_ty = Script_typed_ir.Ticket_t (ty, _ty_metadata);
+        ticket;
+        amount;
+        unparsed_ticket = _;
+      } ->
+      apply_transaction_to_implicit_with_ticket
+        ~source
+        ~destination
+        ~ty
+        ~ticket
+        ~amount
+        ~before_operation:ctxt_before_op
+        ctxt
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
         (ITransaction_result res : kind successful_internal_operation_result),

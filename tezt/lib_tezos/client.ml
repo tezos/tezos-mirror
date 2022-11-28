@@ -1897,40 +1897,40 @@ module Tx_rollup = struct
     in
     let parse process = Process.check process in
     {value = process; run = parse}
-
-  let transfer_tickets ?(wait = "none") ?burn_cap ?hooks ~qty ~src ~destination
-      ~entrypoint ~contents ~ty ~ticketer client =
-    let process =
-      spawn_command
-        ?hooks
-        client
-        (["--wait"; wait]
-        @ [
-            "transfer";
-            Int64.to_string qty;
-            "tickets";
-            "from";
-            src;
-            "to";
-            destination;
-            "with";
-            "entrypoint";
-            entrypoint;
-            "and";
-            "contents";
-            contents;
-            "and";
-            "type";
-            ty;
-            "and";
-            "ticketer";
-            ticketer;
-          ]
-        @ optional_arg "burn-cap" Tez.to_string burn_cap)
-    in
-    let parse process = Process.check process in
-    {value = process; run = parse}
 end
+
+let transfer_tickets ?(wait = "none") ?burn_cap ?hooks ?expect_failure ~qty ~src
+    ~destination ~entrypoint ~contents ~ty ~ticketer client =
+  let process =
+    spawn_command
+      ?hooks
+      client
+      (["--wait"; wait]
+      @ [
+          "transfer";
+          Int64.to_string qty;
+          "tickets";
+          "from";
+          src;
+          "to";
+          destination;
+          "with";
+          "entrypoint";
+          entrypoint;
+          "and";
+          "contents";
+          contents;
+          "and";
+          "type";
+          ty;
+          "and";
+          "ticketer";
+          ticketer;
+        ]
+      @ optional_arg "burn-cap" Tez.to_string burn_cap)
+  in
+  let parse process = Process.check ?expect_failure process in
+  {value = process; run = parse}
 
 let spawn_show_voting_period ?endpoint client =
   spawn_command ?endpoint client (mode_arg client @ ["show"; "voting"; "period"])

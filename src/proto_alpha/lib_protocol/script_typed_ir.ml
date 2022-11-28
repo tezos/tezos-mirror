@@ -1142,6 +1142,11 @@ and ('arg, 'ret) lambda =
 
 and 'arg typed_contract =
   | Typed_implicit : public_key_hash -> unit typed_contract
+  | Typed_implicit_with_ticket : {
+      ticket_ty : ('arg ticket, _) ty;
+      destination : public_key_hash;
+    }
+      -> 'arg ticket typed_contract
   | Typed_originated : {
       arg_ty : ('arg, _) ty;
       contract_hash : Contract_hash.t;
@@ -1436,6 +1441,14 @@ and 'kind internal_operation_contents =
       amount : Tez.tez;
     }
       -> Kind.transaction internal_operation_contents
+  | Transaction_to_implicit_with_ticket : {
+      destination : Signature.Public_key_hash.t;
+      ticket_ty : ('content ticket, _) ty;
+      ticket : 'content ticket;
+      unparsed_ticket : Script.lazy_expr;
+      amount : Tez.tez;
+    }
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {
       destination : Contract_hash.t;
       amount : Tez.tez;
@@ -1526,6 +1539,7 @@ type ('arg, 'storage) script =
 let manager_kind :
     type kind. kind internal_operation_contents -> kind Kind.manager = function
   | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
+  | Transaction_to_implicit_with_ticket _ -> Kind.Transaction_manager_kind
   | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
   | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_sc_rollup _ -> Kind.Transaction_manager_kind
@@ -2256,6 +2270,8 @@ let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function
 module Typed_contract = struct
   let destination : type a. a typed_contract -> Destination.t = function
     | Typed_implicit pkh -> Destination.Contract (Implicit pkh)
+    | Typed_implicit_with_ticket {destination; _} ->
+        Destination.Contract (Implicit destination)
     | Typed_originated {contract_hash; _} ->
         Destination.Contract (Originated contract_hash)
     | Typed_tx_rollup {tx_rollup; _} -> Destination.Tx_rollup tx_rollup
@@ -2264,13 +2280,14 @@ module Typed_contract = struct
 
   let arg_ty : type a. a typed_contract -> a ty_ex_c = function
     | Typed_implicit _ -> (Ty_ex_c Unit_t : a ty_ex_c)
+    | Typed_implicit_with_ticket {ticket_ty; _} -> Ty_ex_c ticket_ty
     | Typed_originated {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_tx_rollup {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_sc_rollup {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_zk_rollup {arg_ty; _} -> Ty_ex_c arg_ty
 
   let entrypoint : type a. a typed_contract -> Entrypoint.t = function
-    | Typed_implicit _ -> Entrypoint.default
+    | Typed_implicit _ | Typed_implicit_with_ticket _ -> Entrypoint.default
     | Typed_tx_rollup _ -> Entrypoint.deposit
     | Typed_originated {entrypoint; _} | Typed_sc_rollup {entrypoint; _} ->
         entrypoint

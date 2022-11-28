@@ -4531,16 +4531,32 @@ and parse_contract :
   match destination with
   | Contract contract -> (
       match contract with
-      | Implicit pkh ->
+      | Implicit destination ->
           Lwt.return
-            (if Entrypoint.is_default entrypoint then
-             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-             Gas_monad.run ctxt @@ ty_eq ~error_details arg unit_t
-             >|? fun (eq, ctxt) ->
-             (ctxt, eq >|? fun Eq : arg typed_contract -> Typed_implicit pkh)
-            else
-              (* An implicit account on any other entrypoint is not a valid contract. *)
-              ok (error ctxt (fun _loc -> No_such_entrypoint entrypoint)))
+          @@
+          if Entrypoint.is_default entrypoint then
+            (* An implicit account on the "default" entrypoint always exists and has type unit
+               or (ticket cty). *)
+            let typecheck =
+              let open Gas_monad.Syntax in
+              let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
+              match arg with
+              | Unit_t ->
+                  return (Typed_implicit destination : arg typed_contract)
+              | Ticket_t _ as ticket_ty ->
+                  return (Typed_implicit_with_ticket {ticket_ty; destination})
+              | _ ->
+                  Gas_monad.of_result
+                  @@ Error
+                       (match error_details with
+                       | Fast -> (Inconsistent_types_fast : err)
+                       | Informative loc ->
+                           trace_of_error @@ default_ty_eq_error loc arg unit_t)
+            in
+            Gas_monad.run ctxt typecheck >|? fun (v, ctxt) -> (ctxt, v)
+          else
+            (* An implicit account on any other entrypoint is not a valid contract. *)
+            ok @@ error ctxt (fun _loc -> No_such_entrypoint entrypoint)
       | Originated contract_hash ->
           trace
             (Invalid_contract (loc, contract))
