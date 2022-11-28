@@ -7,3 +7,5 @@ docker:amd64:
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "true"
   stage: build
+  tags:
+    - build_dedicated

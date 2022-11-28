@@ -8,3 +8,5 @@ build_x86_64:
   needs: [trigger]
   variables:
     ARCH: "x86_64"
+  tags:
+    - build_dedicated

@@ -5,3 +5,5 @@ build_get_contracts:
     - .build_template
   script:
     - dune build @devtools/get_contracts/check
+  tags:
+    - build_dedicated
