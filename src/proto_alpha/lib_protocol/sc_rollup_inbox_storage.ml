@@ -27,12 +27,6 @@
 open Sc_rollup_errors
 module Store = Storage.Sc_rollup
 
-let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
-  ( num_messages + 1,
-    total_messages_size
-    + String.length
-        (message : Sc_rollup_inbox_message_repr.serialized :> string) )
-
 let get_inbox ctxt =
   let open Lwt_result_syntax in
   let* inbox = Store.Inbox.get ctxt in
@@ -56,25 +50,6 @@ let _assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
 let add_messages ctxt messages =
   let open Lwt_result_syntax in
   let open Raw_context in
-  let* num_messages, total_messages_size, ctxt =
-    List.fold_left_es
-      (fun (num_messages, total_messages_size, ctxt) message ->
-        let*? ctxt =
-          Raw_context.consume_gas
-            ctxt
-            Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages
-        in
-        let num_messages, total_messages_size =
-          update_num_and_size_of_messages
-            ~num_messages
-            ~total_messages_size
-            message
-        in
-        return (num_messages, total_messages_size, ctxt))
-      (0, 0, ctxt)
-      messages
-  in
-
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
      In the current setup, we can stop the chain when hitting the
      limit. *)
@@ -85,14 +60,8 @@ let add_messages ctxt messages =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3292
 
      The carbonation needs to be activated again with the new internal inbox's
-     design, i.e. the skip list. *)
-  let cost_add_serialized_messages =
-    Sc_rollup_costs.cost_add_serialized_messages
-      ~num_messages
-      ~total_messages_size
-      0l
-  in
-  let*? ctxt = Raw_context.consume_gas ctxt cost_add_serialized_messages in
+     design, i.e. the skip list.
+  *)
   let current_messages = Sc_rollup_in_memory_inbox.current_messages ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
@@ -185,8 +154,6 @@ let init_inbox ~timestamp ~predecessor ctxt =
   return ctxt
 
 module Internal_for_tests = struct
-  let update_num_and_size_of_messages = update_num_and_size_of_messages
-
   let add_start_of_level ctxt =
     add_internal_message ctxt Sc_rollup_inbox_message_repr.Start_of_level
 

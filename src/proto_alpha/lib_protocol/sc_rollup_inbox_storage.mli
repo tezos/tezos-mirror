@@ -69,15 +69,6 @@ val finalize_inbox_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
 (**/**)
 
 module Internal_for_tests : sig
-  (** [update_num_and_size_of_messages ~num_messages ~total_messages_size
-      message] returns the length and total messages size
-      [messages]. *)
-  val update_num_and_size_of_messages :
-    num_messages:int ->
-    total_messages_size:int ->
-    Sc_rollup_inbox_message_repr.serialized ->
-    int * int
-
   (** Push a [Start_of_level] internal inbox message in the inbox. *)
   val add_start_of_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
