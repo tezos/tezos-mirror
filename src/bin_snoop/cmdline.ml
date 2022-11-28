@@ -79,7 +79,7 @@ type infer_parameters_options = {
 (* Outcome of command-line parsing. *)
 
 type command =
-  | Benchmark of {bench_name : string; bench_opts : benchmark_options}
+  | Benchmark of {bench_name : Namespace.t; bench_opts : benchmark_options}
   | Infer of {
       model_name : string;
       workload_data : string;

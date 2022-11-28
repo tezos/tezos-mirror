@@ -252,7 +252,7 @@ let codegen (Model.Model model) (sol : solution)
 let codegen_module models sol transform =
   let items =
     List.filter_map
-      (fun (name, (model, _)) ->
+      (fun (name, {Registration.model; _}) ->
         let name = Format.asprintf "cost_%a" Namespace.pp name in
         codegen model sol transform name)
       models

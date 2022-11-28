@@ -131,6 +131,7 @@ module Benchmark_cmd = struct
       {default_benchmark_options with options}
       |> set_save_file save_file |> set_csv_export csv_export
     in
+    let bench_name = Namespace.of_string bench_name in
     commandline_outcome_ref :=
       Some (Benchmark {bench_name; bench_opts = options}) ;
     Lwt.return_ok ()
@@ -226,8 +227,7 @@ module Benchmark_cmd = struct
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (module Bench : Benchmark.S) ->
-                 Namespace.to_string Bench.name)
+               (fun (name, _) -> Namespace.to_string name)
                (Registration.all_benchmarks ())
            in
            Lwt.return_ok res)
@@ -625,7 +625,7 @@ module Codegen_cmd = struct
            let res =
              List.map
                (fun (name, _) -> Namespace.to_string name)
-               (Registration.all_registered_models ())
+               (Registration.all_models ())
            in
            Lwt.return_ok res)
          (fun _ str -> Lwt.return_ok str))
@@ -738,8 +738,7 @@ module List_cmd = struct
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (module Bench : Benchmark.S) ->
-                 Namespace.to_string Bench.name)
+               (fun (name, _) -> Namespace.to_string name)
                (Registration.all_benchmarks ())
            in
            Lwt.return_ok res)
@@ -767,22 +766,8 @@ module List_cmd = struct
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (param, _) -> Namespace.to_string param)
-               (Registration.all_registered_parameters ())
-           in
-           Lwt.return_ok res)
-         (fun _ str -> Lwt.return_ok str))
-
-  let namespace_param () =
-    Tezos_clic.param
-      ~name:"NAMESPACE"
-      ~desc:"Namespace of a set of benchmarks"
-      (Tezos_clic.parameter
-         ~autocomplete:(fun _ ->
-           let res =
-             List.map
-               (fun (ns : Namespace.t) -> Namespace.to_string ns)
-               (Registration.all_namespaces ())
+               (fun (param, _) -> Free_variable.to_string param)
+               (Registration.all_parameters ())
            in
            Lwt.return_ok res)
          (fun _ str -> Lwt.return_ok str))
@@ -809,7 +794,9 @@ module List_cmd = struct
     Lwt_result_syntax.return_unit
 
   let handler_all_bench show_tags () =
-    base_handler_bench (Registration.all_benchmarks ()) show_tags
+    base_handler_bench
+      (Registration.all_benchmarks () |> List.map snd)
+      show_tags
 
   let params_all_tags = Tezos_clic.fixed ["list"; "all"; "tags"]
 
@@ -825,7 +812,9 @@ module List_cmd = struct
       @@ seq_of_param tag_param)
 
   let handler_bench_tags_any show_tags tags () =
-    base_handler_bench (Registration.all_benchmarks_with_any_of tags) show_tags
+    base_handler_bench
+      (Registration.find_benchmarks_with_tags ~mode:`Any tags |> List.map snd)
+      show_tags
 
   let params_bench_tags_all =
     Tezos_clic.(
@@ -833,7 +822,9 @@ module List_cmd = struct
       @@ seq_of_param tag_param)
 
   let handler_bench_tags_all show_tags tags () =
-    base_handler_bench (Registration.all_benchmarks_with_all_of tags) show_tags
+    base_handler_bench
+      (Registration.find_benchmarks_with_tags ~mode:`All tags |> List.map snd)
+      show_tags
 
   let params_bench_tags_exact =
     Tezos_clic.(
@@ -841,15 +832,18 @@ module List_cmd = struct
       @@ seq_of_param tag_param)
 
   let handler_bench_tags_exact show_tags tags () =
-    base_handler_bench (Registration.all_benchmarks_with_exactly tags) show_tags
+    base_handler_bench
+      (Registration.find_benchmarks_with_tags ~mode:`Exact tags |> List.map snd)
+      show_tags
 
   let params_bench_match =
     Tezos_clic.(
-      prefixes ["list"; "benchmarks"; "in"] @@ namespace_param () @@ stop)
+      prefixes ["list"; "benchmarks"; "in"] @@ benchmark_param () @@ stop)
 
   let handler_bench_match show_tags pattern () =
     base_handler_bench
-      (Registration.find_benchmarks_in_namespace pattern)
+      (Registration.find_benchmarks_in_namespace (Namespace.of_string pattern)
+      |> List.map snd)
       show_tags
 
   let params_all_param = Tezos_clic.fixed ["list"; "all"; "parameters"]
@@ -861,13 +855,13 @@ module List_cmd = struct
            Format.fprintf
              fmt
              "%a@.\tModels: %a"
-             Namespace.pp
+             Free_variable.pp
              param
              (Format.pp_print_list
                 ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
                 Namespace.pp)
              models))
-      (Registration.all_registered_parameters ()) ;
+      (Registration.all_parameters ()) ;
     Lwt_result_syntax.return_unit
 
   let params_all_models = Tezos_clic.fixed ["list"; "all"; "models"]
@@ -875,12 +869,12 @@ module List_cmd = struct
   let handler_all_models () () =
     Format.printf
       "%a@."
-      (Format.pp_print_list (fun fmt (name, (model, _)) ->
+      (Format.pp_print_list (fun fmt (name, {Registration.model; _}) ->
            let printed =
              match model with Model.Model model -> print_model model
            in
            Format.fprintf fmt "%a@.\t%s" Namespace.pp name printed))
-      (Registration.all_registered_models ()) ;
+      (Registration.all_models ()) ;
     Lwt_result_syntax.return_unit
 
   let group =
@@ -972,8 +966,6 @@ module Config_cmd = struct
 
   let benchmark_param = List_cmd.benchmark_param
 
-  let namespace_param = List_cmd.namespace_param
-
   let options_merge =
     Tezos_clic.args1
       (Tezos_clic.switch
@@ -1016,6 +1008,7 @@ module Config_cmd = struct
       @@ config_file_param () @@ prefix "for" @@ benchmark_param () @@ stop)
 
   let handler_check () config_file benchmark () =
+    let benchmark = Namespace.of_string benchmark in
     let bench = Registration.find_benchmark_exn benchmark in
     match Benchmark.ex_unpack bench with
     | Benchmark.Ex bench ->
@@ -1028,12 +1021,13 @@ module Config_cmd = struct
     Tezos_clic.(
       prefixes ["config"; "generate"; "default"; "in"]
       @@ config_file_param () @@ prefix "for"
-      @@ seq_of_param (namespace_param ()))
+      @@ seq_of_param (benchmark_param ()))
 
   let handler_generate_default () config_file namespaces () =
+    let namespaces = List.map Namespace.of_string namespaces in
     let benchmarks =
       List.map Registration.find_benchmarks_in_namespace namespaces
-      |> List.flatten
+      |> List.flatten |> List.map snd
     in
     let config = Config.generate_default benchmarks in
     let str =
@@ -1083,7 +1077,7 @@ module Config_cmd = struct
   let params_edit =
     Tezos_clic.(
       prefixes ["config"; "edit"]
-      @@ config_file_param () @@ prefix "for" @@ namespace_param () @@ stop)
+      @@ config_file_param () @@ prefix "for" @@ benchmark_param () @@ stop)
 
   let handler_edit (editor, stdin, file, json) config_path namespace () =
     let input =
@@ -1281,11 +1275,11 @@ module Display_info_cmd = struct
 
   let pp_fancy_model (type a) fmt
       ((module M : Model.Model_impl with type arg_type = a), l) =
-    let pp_local fmt (bench_name, local_name) =
+    let pp_local fmt {Registration.bench_name; local_model_name} =
       Format.fprintf
         fmt
         "\027[0;33;40m(%s)\027[m %a"
-        local_name
+        local_model_name
         Namespace.pp
         bench_name
     in
@@ -1306,20 +1300,25 @@ module Display_info_cmd = struct
       l
 
   let pp_fancy_parameter fmt (s, l) =
-    bold_block fmt "Name" Format.pp_print_string s ;
+    bold_block fmt "Name" Free_variable.pp s ;
     bold_block fmt "In models" (Format.pp_print_list Namespace.pp) l
 
   let display_benchmark_handler () s () =
+    let s = Namespace.of_string s in
     let b = Registration.find_benchmark_exn s in
     Format.printf "@.%a@." pp_fancy_benchmark b ;
     Lwt.return_ok ()
 
   let display_model_handler () s () =
-    let Model.Model m, l = Registration.find_model_exn s in
+    let s = Namespace.of_string s in
+    let {Registration.model = Model.Model m; from = l} =
+      Registration.find_model_exn s
+    in
     Format.printf "@.%a@." pp_fancy_model (m, l) ;
     Lwt.return_ok ()
 
   let display_parameter_handler () s () =
+    let s = Free_variable.of_string s in
     let l = Registration.find_parameter_exn s in
     Format.printf "@.%a@." pp_fancy_parameter (s, l) ;
     Lwt.return_ok ()

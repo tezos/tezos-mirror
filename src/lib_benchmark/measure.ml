@@ -335,9 +335,7 @@ let load : filename:string -> packed_measurement =
   Format.eprintf "Measure.load: loaded %s@." filename ;
   match Data_encoding.Binary.of_string serialized_workload_encoding str with
   | Ok {bench_name; measurement_bytes} -> (
-      let bench =
-        Registration.find_benchmark_exn (Namespace.to_string bench_name)
-      in
+      let bench = Registration.find_benchmark_exn bench_name in
       match Benchmark.ex_unpack bench with
       | Ex ((module Bench) as bench) -> (
           match
