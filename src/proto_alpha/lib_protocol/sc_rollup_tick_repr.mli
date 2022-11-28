@@ -59,6 +59,8 @@ val of_number_of_ticks : Sc_rollup_repr.Number_of_ticks.t -> t
 
 val of_z : Z.t -> t
 
+val to_z : t -> Z.t
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

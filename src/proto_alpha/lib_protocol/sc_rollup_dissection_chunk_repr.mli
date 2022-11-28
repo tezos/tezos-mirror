@@ -37,9 +37,8 @@ val encoding : t Data_encoding.t
 
 val default_check_sections_number :
   default_number_of_sections:int ->
-  start_chunk:t ->
-  stop_chunk:t ->
-  t list ->
+  number_of_sections:int ->
+  dist:Z.t ->
   unit tzresult
 
 (** We check firstly that [dissection] is the correct length. It must
@@ -62,11 +61,11 @@ val default_check_sections_number :
     game' attack) will mean that sometimes the honest play is a
     dissection with multiple [None] states. *)
 val default_check :
+  section_maximum_size:Z.t ->
   check_sections_number:
     (default_number_of_sections:int ->
-    start_chunk:t ->
-    stop_chunk:t ->
-    t list ->
+    number_of_sections:int ->
+    dist:Z.t ->
     unit tzresult) ->
   default_number_of_sections:int ->
   start_chunk:t ->
@@ -101,7 +100,7 @@ type error +=
   | Dissection_ticks_not_increasing
         (** Invalid provided dissection because ticks are not increasing between
           two successive sections. *)
-  | Dissection_invalid_distribution
+  | Dissection_invalid_distribution of Z.t
         (** Invalid provided dissection because ticks split is not well balanced
           across sections *)
   | Dissection_invalid_successive_states_shape

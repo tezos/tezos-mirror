@@ -213,9 +213,17 @@ module Make (Context : P) :
     | IAdd -> Format.fprintf fmt "add"
     | IStore x -> Format.fprintf fmt "store(%s)" x
 
-  let check_dissection =
+  let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk =
+    let open Sc_rollup_dissection_chunk_repr in
+    let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
+    let section_maximum_size = Z.div dist (Z.of_int 2) in
     Sc_rollup_dissection_chunk_repr.(
-      default_check ~check_sections_number:default_check_sections_number)
+      default_check
+        ~section_maximum_size
+        ~check_sections_number:default_check_sections_number
+        ~default_number_of_sections
+        ~start_chunk
+        ~stop_chunk)
 
   (*
 

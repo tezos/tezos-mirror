@@ -70,7 +70,7 @@ module Impl : Pvm.S = struct
 
   let kind = Sc_rollup.Kind.of_pvm (module PVM)
 
-  let new_dissection = Game_helpers.default_new_dissection
+  let new_dissection = Game_helpers.Wasm.new_dissection
 
   module State = Context.PVMState
 
