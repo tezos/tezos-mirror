@@ -56,10 +56,12 @@ module DAC = struct
     let for_each_page (hash, page_contents) =
       Hash_storage.save_bytes reveal_data_dir hash page_contents
     in
-    let size = Protocol.Alpha_context.Constants.sc_rollup_message_size_limit in
     let data, pagination_scheme = input in
     match pagination_scheme with
     | Merkle_tree_V0 ->
+        let size =
+          Protocol.Alpha_context.Constants.sc_rollup_message_size_limit
+        in
         Merkle_tree.V0.serialize_payload ~max_page_size:size data ~for_each_page
     | Hash_chain_V0 -> Hash_chain.V0.serialize_payload ~for_each_page data
 

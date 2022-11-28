@@ -467,8 +467,7 @@ end
 
 module Hash_chain = struct
   (* Return substring of [str] after the first [n] char. Returns the original string
-     if n <=0. Returns an empty string if the substring after the first [n] chars
-     is empty. *)
+     if n <= 0. Returns an empty string if n > String.length str *)
   let take_after str n =
     let n = max 0 n in
     String.sub str (min (String.length str) n) (max 0 (String.length str - n))

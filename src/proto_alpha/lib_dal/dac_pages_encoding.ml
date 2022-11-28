@@ -388,13 +388,14 @@ module Hash_chain = struct
   module type PAGE_FMT = sig
     type h
 
+    type page = {succ_hash : h; content : string}
+
     val content_limit : int
 
-    val hash_to_string : h -> string
+    val serialize_hash : h -> string
 
-    (** Serializes a successor hash and content into a single page (an element in
-        the hash link) *)
-    val serialize_content : h -> string -> string
+    (** Serializes a single page (an element in the hash link). *)
+    val serialize_page : page -> string
   end
 
   module Make (Hashing_scheme : sig
@@ -417,7 +418,8 @@ module Hash_chain = struct
             let page =
               match linked_pages with
               | [] -> chunk
-              | (succ_hash, _) :: _ -> P.serialize_content succ_hash chunk
+              | (succ_hash, _) :: _ ->
+                  P.serialize_page {succ_hash; content = chunk}
             in
             let page = Bytes.of_string page in
             let hash = hash page in
@@ -457,12 +459,17 @@ module Hash_chain = struct
       (struct
         type h = Sc_rollup_reveal_hash.t
 
+        type page = {succ_hash : h; content : string}
+
         let content_limit =
           (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
 
-        let hash_to_string = Sc_rollup_reveal_hash.to_b58check
+        let serialize_hash = Sc_rollup_reveal_hash.to_b58check
 
-        let serialize_content succ_hash content =
-          Format.asprintf "%s hash:%s" content (hash_to_string succ_hash)
+        let serialize_page page =
+          Format.asprintf
+            "%s hash:%s"
+            page.content
+            (serialize_hash page.succ_hash)
       end)
 end

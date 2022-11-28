@@ -1045,15 +1045,16 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
-let send_messages ?(src = Constant.bootstrap2.alias) ?(f = Fun.id) client msgs =
-  let msg = f @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs) in
+let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
+    client msgs =
+  let msg =
+    alter_final_msg
+    @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
+  in
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
   Client.bake_for_and_wait client
 
-let bake_levels ?hook n client =
-  fold n () @@ fun i () ->
-  let* () = match hook with None -> unit | Some hook -> hook i in
-  Client.bake_for_and_wait client
+let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
 let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     sc_rollup_address node client _pvm_name =
@@ -1324,32 +1325,34 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
       return ()
 
 (* DAC tests *)
-let assert_valid_root_hash expected_rh actual_rh =
+let check_valid_root_hash expected_rh actual_rh =
   Check.(
     (actual_rh = expected_rh)
       string
-      ~error_msg:"Invalid root hash returned (Current:%L <> Expected: %R)")
+      ~error_msg:"Invalid root hash returned (Current: %L <> Expected: %R)")
 
-let assert_preimage expected_preimage actual_preimage =
+let check_preimage expected_preimage actual_preimage =
   Check.(
     (actual_preimage = expected_preimage)
       string
       ~error_msg:
-        "Preimage does not match expected value (Current:%L <> Expected: %R)")
+        "Preimage does not match expected value (Current: %L <> Expected: %R)")
 
 let test_dal_node_handles_dac_store_preimage_merkle_V0 _protocol dal_node
     sc_rollup_node _sc_rollup_address _node _client pvm_name =
-  let preimage = "test" in
+  let payload = "test" in
   let* actual_rh =
     RPC.call
       dal_node
-      (Rollup.Dal.RPC.dac_store_preimage preimage "Merkle_tree_V0")
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Merkle_tree_V0")
   in
   (* Expected reveal hash equals to the result of
      [Tezos_dal_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
   *)
   let expected_rh = "scrrh1Y5hijnFNJPb96EFTY9SjZ4epyaYF9xU3Eid9KCj9vda25H8W" in
-  assert_valid_root_hash expected_rh actual_rh ;
+  check_valid_root_hash expected_rh actual_rh ;
   let filename =
     Filename.concat
       (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
@@ -1362,22 +1365,24 @@ let test_dal_node_handles_dac_store_preimage_merkle_V0 _protocol dal_node
   let recovered_preimage =
     String.sub recovered_payload 5 (String.length recovered_payload - 5)
   in
-  assert_preimage preimage recovered_preimage ;
-  return ()
+  check_preimage payload recovered_preimage ;
+  unit
 
 let test_dal_node_handles_dac_store_preimage_hash_chain_V0 _protocol dal_node
     sc_rollup_node _sc_rollup_address _node _client pvm_name =
-  let preimage = "test" in
+  let payload = "test" in
   let* actual_rh =
     RPC.call
       dal_node
-      (Rollup.Dal.RPC.dac_store_preimage preimage "Hash_chain_V0")
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Hash_chain_V0")
   in
   (* Expected reveal hash equals to the result of
      [Tezos_dal_alpha.Dac_pages_encoding.Hash_chain.V0.serialize_payload "test"].
   *)
   let expected_rh = "scrrh1hYNyzXmagRDi22knBt5dhMMi6Sivdo1ztf5wXiectRnzbSyX" in
-  assert_valid_root_hash expected_rh actual_rh ;
+  check_valid_root_hash expected_rh actual_rh ;
   let filename =
     Filename.concat
       (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
@@ -1387,10 +1392,10 @@ let test_dal_node_handles_dac_store_preimage_hash_chain_V0 _protocol dal_node
   let recovered_payload = really_input_string cin (in_channel_length cin) in
   let () = close_in cin in
   let recovered_preimage =
-    String.sub recovered_payload 0 (String.length preimage)
+    String.sub recovered_payload 0 (String.length payload)
   in
-  assert_preimage preimage recovered_preimage ;
-  return ()
+  check_preimage payload recovered_preimage ;
+  unit
 
 let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
     sc_rollup_address _node client _pvm_name =
@@ -1404,29 +1409,34 @@ let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
-
   let nadd = 32 * 1024 in
-  let data =
-    (* let buf = Buffer.create (nadd * 3 + 2) in *)
-    let rec aux b = function
-      | n when n > 0 ->
-          Buffer.add_string b "1 +" ;
-          (aux [@tailcall]) b (n - 1)
-      | _ ->
-          Buffer.add_string b "value" ;
-          String.of_bytes (Buffer.to_bytes b)
+  let payload =
+    let rec aux b n =
+      if n > 0 then (
+        Buffer.add_string b "1 +" ;
+        (aux [@tailcall]) b (n - 1))
+      else (
+        Buffer.add_string b "value" ;
+        String.of_bytes (Buffer.to_bytes b))
     in
     let buf = Buffer.create ((nadd * 3) + 2) in
     Buffer.add_string buf "0 " ;
     aux buf nadd
   in
   let* actual_rh =
-    RPC.call dal_node (Rollup.Dal.RPC.dac_store_preimage data "Hash_chain_V0")
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Hash_chain_V0")
   in
   let expected_rh = "scrrh1bZAo4kfAohhKcvgKc4yLHYN49EPuHezNXgFraa1mEbKSTCwf" in
-  assert_valid_root_hash expected_rh actual_rh ;
+  check_valid_root_hash expected_rh actual_rh ;
   let* () =
-    send_messages client ["hash:" ^ actual_rh] ~f:(fun s -> "text:" ^ s)
+    send_messages
+      client
+      ["hash:" ^ actual_rh]
+      ~alter_final_msg:(fun s -> "text:" ^ s)
   in
   let* () = bake_levels 2 client in
   let* _ =
@@ -1452,9 +1462,13 @@ let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
 
 let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
     sc_rollup_address _node client _pvm_name =
-  let data = "Some data that is not related to the hash" in
+  let payload = "Some data that is not related to the hash" in
   let _actual_rh =
-    RPC.call dal_node (Rollup.Dal.RPC.dac_store_preimage data "Hash_chain_V0")
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Hash_chain_V0")
   in
   let errorneous_hash =
     "scrrh1kXE3tnCVTJ21aDNVeaV86e8rS6jtiMEDpjZJtDnLXRThQdmy"
@@ -1465,7 +1479,6 @@ let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   (* Prepare the handler to wait for the rollup node to fail before
      sending the L1 message that will trigger the failure. This
@@ -1476,7 +1489,10 @@ let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
   let* () =
-    send_messages client ["hash:" ^ errorneous_hash] ~f:(fun s -> "text:" ^ s)
+    send_messages
+      client
+      ["hash:" ^ errorneous_hash]
+      ~alter_final_msg:(fun s -> "text:" ^ s)
   in
   expect_failure ()
 
