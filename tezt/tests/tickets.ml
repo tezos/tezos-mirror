@@ -859,6 +859,115 @@ let test_originated_implicit_can_be_equipotent =
   in
   unit
 
+let setup_sc_enabled_node protocol ~parameters_ty =
+  let parameters = [(["sc_rollup_enable"], `Bool true)] in
+  let base = Either.right (protocol, None) in
+  let* parameter_file = Protocol.write_parameter_file ~base parameters in
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* tezos_node, tezos_client =
+    Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
+  in
+  let* sc_rollup =
+    Client.Sc_rollup.(
+      originate
+        ~burn_cap:(Tez.of_int 2)
+        ~src:Constant.bootstrap1.alias
+        ~kind:"wasm_2_0_0"
+        ~parameters_ty
+        ~boot_sector:Constant.wasm_echo_kernel_boot_sector
+        tezos_client)
+  in
+  let* () = Client.bake_for_and_wait tezos_client in
+  return (tezos_node, tezos_client, sc_rollup)
+
+let test_send_tickets_to_sc_rollup =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Minting then sending tickets to smart-contract rollup should succeed \
+       with appropriate ticket updates field in receipt."
+    ~tags:["client"; "michelson"]
+    ~supports:(Protocol.From_protocol 16)
+  @@ fun protocol ->
+  let* _node, client, sc_rollup =
+    setup_sc_enabled_node protocol ~parameters_ty:"list (ticket string)"
+  in
+  let* ticketer =
+    Client.originate_contract
+      ~alias:"ticketer"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~prg:(protocol_dependent_path protocol "send_ticket_list_multiple.tz")
+      ~init:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:ticketer
+      ~arg:(sf "%S" sc_rollup)
+      ~hooks
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  unit
+
+let test_send_tickets_from_storage_to_sc_rollup =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "Sending tickets from storage to smart-contract rollup should succeed \
+       with appropriate ticket updates field in receipt."
+    ~tags:["client"; "michelson"]
+    ~supports:(Protocol.From_protocol 16)
+  @@ fun protocol ->
+  let* _node, client, sc_rollup =
+    setup_sc_enabled_node protocol ~parameters_ty:"list (ticket string)"
+  in
+  let* ticketer =
+    Client.originate_contract
+      ~alias:"ticketer"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~prg:(protocol_dependent_path protocol "send_tickets_from_storage.tz")
+      ~init:"{}"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    (* Call "mint" entrypoint to mint tickets and store them in storage.  *)
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:ticketer
+      ~entrypoint:"mint"
+      ~hooks
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    (* Call "send" entrypoint to send tickets to sc-rollup from storage.  *)
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:ticketer
+      ~arg:(sf "%S" sc_rollup)
+      ~entrypoint:"send"
+      ~hooks
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  unit
+
 let register ~protocols =
   test_create_and_remove_tickets protocols ;
   test_send_tickets_in_big_map protocols ;
@@ -870,4 +979,6 @@ let register ~protocols =
   test_zero_ticket_rejection protocols ;
   test_ticket_overdraft_rejection protocols ;
   test_ticket_of_wrong_type_rejection protocols ;
-  test_originated_implicit_can_be_equipotent protocols
+  test_originated_implicit_can_be_equipotent protocols ;
+  test_send_tickets_to_sc_rollup protocols ;
+  test_send_tickets_from_storage_to_sc_rollup protocols
