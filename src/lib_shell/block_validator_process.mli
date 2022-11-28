@@ -74,11 +74,15 @@ val reconfigure_event_logging :
 (** [apply_block bvp predecessor header os] checks the liveness of the
     operations and then call [Block_validation.apply]
 
+    [should_precheck] when set, triggers the block prechecking before applying
+    it, see [Block_validation.apply].
+
     If [simulate] is true, the context resulting from the application
     will not be committed to disk. Set to false by default.
 *)
 val apply_block :
   ?simulate:bool ->
+  ?should_precheck:bool ->
   t ->
   Store.chain_store ->
   predecessor:Store.Block.t ->

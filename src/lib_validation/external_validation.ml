@@ -45,6 +45,7 @@ type request =
         Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
+      should_precheck : bool;
       simulate : bool;
     }
   | Preapply of {
@@ -175,7 +176,7 @@ let case_validate tag =
   case
     tag
     ~title:"validate"
-    (obj8
+    (obj9
        (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "pred_header" (dynamic_size Block_header.encoding))
@@ -183,6 +184,7 @@ let case_validate tag =
        (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
        (req "max_operations_ttl" int31)
        (req "operations" (list (list (dynamic_size Operation.encoding))))
+       (req "should_precheck" bool)
        (req "simulate" bool))
     (function
       | Validate
@@ -194,6 +196,7 @@ let case_validate tag =
             predecessor_ops_metadata_hash;
             max_operations_ttl;
             operations;
+            should_precheck;
             simulate;
           } ->
           Some
@@ -204,6 +207,7 @@ let case_validate tag =
               predecessor_ops_metadata_hash,
               max_operations_ttl,
               operations,
+              should_precheck,
               simulate )
       | _ -> None)
     (fun ( chain_id,
@@ -213,6 +217,7 @@ let case_validate tag =
            predecessor_ops_metadata_hash,
            max_operations_ttl,
            operations,
+           should_precheck,
            simulate ) ->
       Validate
         {
@@ -223,6 +228,7 @@ let case_validate tag =
           predecessor_ops_metadata_hash;
           max_operations_ttl;
           operations;
+          should_precheck;
           simulate;
         })
 
