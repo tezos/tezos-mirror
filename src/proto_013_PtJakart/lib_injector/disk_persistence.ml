@@ -91,7 +91,7 @@ let () =
     Data_encoding.(
       obj4
         (req "action" (string_enum [("close", `Close); ("open", `Open)]))
-        (req "unix_code" Tezos_base_unix.Unix_error.encoding)
+        (req "unix_code" Tezos_stdlib_unix.Unix_error.encoding)
         (req "caller" string)
         (req "arg" string))
     (function
@@ -107,7 +107,7 @@ let () =
     ~pp:(fun ppf error ->
       Format.fprintf ppf "Unix error: %s" (Unix.error_message error))
     `Temporary
-    Data_encoding.(obj1 (req "error" Tezos_base_unix.Unix_error.encoding))
+    Data_encoding.(obj1 (req "error" Tezos_stdlib_unix.Unix_error.encoding))
     (function Unix_error e -> Some e | _ -> None)
     (fun e -> Unix_error e) ;
   register_error_kind
