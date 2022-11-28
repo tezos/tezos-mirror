@@ -748,8 +748,10 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+        {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
+      =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
+    pp_ticket_receipt ppf ticket_receipt ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in

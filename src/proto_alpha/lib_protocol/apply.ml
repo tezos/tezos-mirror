@@ -962,11 +962,28 @@ let apply_manager_operation :
             ticket
             amount
           >>=? fun (ctxt, paid_storage_size_diff) ->
+          Ticket_token_unparser.unparse ctxt ticket
+          >>=? fun (ticket_token, ctxt) ->
+          let amount = Script_int.(to_zint (amount :> n num)) in
+          let ticket_receipt =
+            Ticket_receipt.
+              [
+                {
+                  ticket_token;
+                  updates =
+                    [
+                      {account = Contract source_contract; amount = Z.neg amount};
+                      {account = Contract destination; amount};
+                    ];
+                };
+              ]
+          in
           return
             ( ctxt,
               Transfer_ticket_result
                 {
                   balance_updates = [];
+                  ticket_receipt;
                   consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
                   paid_storage_size_diff;
                 },
@@ -990,11 +1007,28 @@ let apply_manager_operation :
             token
             amount
           >>=? fun (ctxt, paid_storage_size_diff) ->
+          Ticket_token_unparser.unparse ctxt token
+          >>=? fun (ticket_token, ctxt) ->
+          let amount = Script_int.(to_zint (amount :> n num)) in
+          let ticket_receipt =
+            Ticket_receipt.
+              [
+                {
+                  ticket_token;
+                  updates =
+                    [
+                      {account = Contract source_contract; amount = Z.neg amount}
+                      (* The transfer of the ticket to [destination] is part of the internal operation [op]. *);
+                    ];
+                };
+              ]
+          in
           return
             ( ctxt,
               Transfer_ticket_result
                 {
                   balance_updates = [];
+                  ticket_receipt;
                   consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
                   paid_storage_size_diff;
                 },

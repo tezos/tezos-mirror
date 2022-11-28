@@ -220,6 +220,7 @@ and _ successful_manager_operation_result =
       -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
   | Transfer_ticket_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }

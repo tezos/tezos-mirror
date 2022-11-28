@@ -117,6 +117,7 @@ type _ successful_manager_operation_result =
       -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
   | Transfer_ticket_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
@@ -747,8 +748,9 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.transfer_ticket_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj4
             (req "balance_updates" Receipt.balance_updates_encoding)
+            (req "ticket_updates" Ticket_receipt.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -757,11 +759,28 @@ module Manager_result = struct
       ~kind:Kind.Transfer_ticket_manager_kind
       ~proj:(function
         | Transfer_ticket_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            (balance_updates, consumed_gas, paid_storage_size_diff))
-      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
+            {
+              balance_updates;
+              ticket_receipt;
+              consumed_gas;
+              paid_storage_size_diff;
+            } ->
+            ( balance_updates,
+              ticket_receipt,
+              consumed_gas,
+              paid_storage_size_diff ))
+      ~inj:
+        (fun ( balance_updates,
+               ticket_receipt,
+               consumed_gas,
+               paid_storage_size_diff ) ->
         Transfer_ticket_result
-          {balance_updates; consumed_gas; paid_storage_size_diff})
+          {
+            balance_updates;
+            ticket_receipt;
+            consumed_gas;
+            paid_storage_size_diff;
+          })
 
   let dal_publish_slot_header_case =
     make
