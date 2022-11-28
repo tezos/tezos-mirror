@@ -51,8 +51,6 @@ let qcheck_make_lwt_res ?print ?count ~name ~gen f =
     ~gen
     (fun a -> Lwt_main.run (f a))
 
-let lift k = Environment.wrap_tzresult k
-
 let tick_to_int_exn ?(__LOC__ = __LOC__) t =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
 
@@ -363,8 +361,8 @@ let gen_arith_pvm_messages ~gen_size =
   snd inputs |> List.rev |> String.concat " "
 
 (** Generate a list of level and associated arith pvm messages. *)
-let gen_arith_pvm_messages_for_levels ~start_level ~max_level =
-  gen_messages_for_levels
+let gen_arith_pvm_payloads_for_levels ~start_level ~max_level =
+  gen_payloads_for_levels
     ~start_level
     ~max_level
     (gen_arith_pvm_messages ~gen_size:(QCheck2.Gen.pure 0))
@@ -907,7 +905,7 @@ module Arith_test_pvm = struct
     in
     return (state, fuel, tick, our_states)
 
-  let eval_inbox ?fuel ~messages ~tick state =
+  let eval_inbox ?fuel ~inputs ~tick state =
     let open Lwt_result_syntax in
     List.fold_left_es
       (fun (state, fuel, tick, our_states) input ->
@@ -916,9 +914,9 @@ module Arith_test_pvm = struct
         in
         return (state, fuel, tick, our_states))
       (state, fuel, tick, [])
-      messages
+      inputs
 
-  let eval_inputs ~metadata ?fuel list_of_inputs =
+  let eval_inputs ~metadata ?fuel inputs_per_levels =
     let open Lwt_result_syntax in
     let*! state = initial_state () in
     let*! state_hash = state_hash state in
@@ -936,13 +934,13 @@ module Arith_test_pvm = struct
     (* 3. We evaluate the inbox. *)
     let* state, _fuel, tick, our_states =
       List.fold_left_es
-        (fun (state, fuel, tick, our_states) messages ->
+        (fun (state, fuel, tick, our_states) inputs ->
           let* state, fuel, tick, our_states' =
-            eval_inbox ?fuel ~messages ~tick state
+            eval_inbox ?fuel ~inputs ~tick state
           in
           return (state, fuel, tick, our_states @ our_states'))
         (state, fuel, tick, our_states)
-        list_of_inputs
+        inputs_per_levels
     in
     let our_states =
       List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
@@ -960,17 +958,7 @@ let construct_inbox_proto block list_of_messages contract =
   let open Lwt_result_syntax in
   let* block, infos_per_level =
     List.fold_left_es
-      (fun ((block : Block.t), acc) (messages : message list) ->
-        (* Print infos: *)
-        let messages =
-          List.filter_map
-            (fun {message; _} ->
-              match message with
-              | `Message message -> Some message
-              | `SOL | `Info_per_level _ | `EOL ->
-                  (* Those are added by the protocol. *) None)
-            messages
-        in
+      (fun ((block : Block.t), acc) ({messages; _} : payloads_per_level) ->
         let* block =
           match messages with
           | [] ->
@@ -1053,50 +1041,31 @@ type player_client = {
   final_tick : Tick.t;
   inbox :
     Sc_rollup.Inbox_merkelized_payload_hashes.History.t
-    Sc_rollup_helpers.Level_tree_histories.t
+    Sc_rollup_helpers.Payloads_histories.t
     * Inbox.History.t
     * Inbox.t;
-  list_of_inputs : input list list;
+  payloads_per_levels : payloads_per_level list;
   metadata : Metadata.t;
   context : Tezos_context_memory.Context.t;
 }
 
-let pp_list_of_inputs ~verbose ppf list_of_inputs =
-  let open Format in
-  if verbose then
-    (pp_print_list
-       (fun ppf messages ->
-         fprintf ppf "inputs: %a" (pp_print_list pp_input) messages)
-       ppf)
-      list_of_inputs
-  else
-    fprintf
-      ppf
-      "%d inputs"
-      (List.fold_left
-         (fun acc messages -> acc + List.length messages)
-         0
-         list_of_inputs)
-
-let pp_player_client ~verbose ppf
+let pp_player_client ppf
     {
       player;
       states = _;
       final_tick;
       inbox = _;
-      list_of_inputs;
+      payloads_per_levels = _;
       metadata = _;
       context = _;
     } =
   Format.fprintf
     ppf
-    "@[<v 2>player:@,%a@]@,final tick: %a@,@[<v 2>levels and inputs:@,%a@]"
+    "@[<v 2>player:@,%a@]@,final tick: %a@"
     pp_player
     player
     Tick.pp
     final_tick
-    (pp_list_of_inputs ~verbose)
-    list_of_inputs
 
 module Player_client = struct
   let empty_memory_ctxt id =
@@ -1106,166 +1075,163 @@ module Player_client = struct
        Tezos_context_memory.Context.empty index
 
   (** Construct an inbox based on [list_of_messages] in the player context. *)
-  let construct_inbox ~inbox ~origination_level list_of_messages =
+  let construct_inbox ~inbox list_of_messages =
     let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
-    let level_tree_histories = Level_tree_histories.empty in
+    let level_tree_histories = Payloads_histories.empty in
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Sc_rollup_helpers.fill_inbox
          ~inbox
-         ~origination_level
-         ~shift_level:(Raw_level.of_int32_exn 2l)
          history
          level_tree_histories
          list_of_messages
 
-  (** Generate [our_states] for [list_of_inputs] based on the strategy.
+  (** Generate [our_states] for [payloads_per_levels] based on the strategy.
       It needs [start_level] and [max_level] in case it will need to generate
       new inputs. *)
-  let gen_our_states ~metadata strategy ~start_level ~max_level list_of_inputs =
+  let gen_our_states ~metadata strategy ~start_level ~max_level
+      payloads_per_levels =
     let open QCheck2.Gen in
-    let eval_inputs (list_of_inputs : input trace trace) =
+    let eval_inputs (payloads_per_levels : payloads_per_level list) =
       Lwt_main.run
       @@
       let open Lwt_result_syntax in
-      let*! r = Arith_test_pvm.eval_inputs ~metadata list_of_inputs in
+      let inputs_per_levels =
+        List.map (fun {inputs; _} -> inputs) payloads_per_levels
+      in
+      let*! r = Arith_test_pvm.eval_inputs ~metadata inputs_per_levels in
       Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
     match strategy with
     | Perfect ->
         (* The perfect player does not lie, evaluates correctly the inputs. *)
-        let _state, tick, our_states = eval_inputs list_of_inputs in
-        return (tick, our_states, list_of_inputs)
+        let _state, tick, our_states = eval_inputs payloads_per_levels in
+        return (tick, our_states, payloads_per_levels)
     | Random ->
         (* Random player generates its own list of inputs. *)
-        let* new_messages =
-          gen_arith_pvm_messages_for_levels ~start_level ~max_level
+        let* new_payloads_per_levels =
+          gen_arith_pvm_payloads_for_levels ~start_level ~max_level
         in
-        let new_inputs = list_of_inputs_from_list_of_messages new_messages in
-        let _state, tick, our_states = eval_inputs new_inputs in
-        return (tick, our_states, new_inputs)
+        let _state, tick, our_states = eval_inputs new_payloads_per_levels in
+        return (tick, our_states, new_payloads_per_levels)
     | Lazy ->
-        (* Lazy player removes inputs from [list_of_inputs]. *)
-        let n = List.length list_of_inputs in
+        (* Lazy player removes inputs from [payloads_per_levels]. *)
+        let n = List.length payloads_per_levels in
         let* remove_k = 1 -- n in
-        let new_inputs = List.take_n (n - remove_k) list_of_inputs in
+        let new_inputs = List.take_n (n - remove_k) payloads_per_levels in
         let _state, tick, our_states = eval_inputs new_inputs in
         return (tick, our_states, new_inputs)
     | Eager ->
         (* Eager player executes correctly the inbox until a certain point. *)
-        let nb_of_input =
-          List.fold_left
-            (fun acc inputs -> acc + List.length inputs)
-            0
-            list_of_inputs
+        let* corrupt_at_level = 0 -- (List.length payloads_per_levels - 1) in
+        let payloads_per_level =
+          Stdlib.List.nth payloads_per_levels corrupt_at_level
+          |> fun {payloads; _} -> List.length payloads
         in
-        let* corrupt_at_k = 0 -- (nb_of_input - 1) in
-        let message = "42 7 +" in
-        (* Once an input is corrupted, everything after will be corrupted
-           as well. *)
-        let new_inputs =
-          let idx = ref (-1) in
-          List.map
-            (fun inputs ->
-              List.map
-                (fun input ->
-                  incr idx ;
-                  if !idx = corrupt_at_k then
-                    match input with
-                    | Sc_rollup.Inbox_message {inbox_level; message_counter; _}
-                      ->
-                        make_external_input
-                          ~inbox_level
-                          ~message_counter
-                          message
-                    | _ -> (* We don't produce any reveals. *) assert false
-                  else input)
-                inputs)
-            list_of_inputs
+        let* corrupt_at_k = 0 -- payloads_per_level in
+        let payloads_per_levels =
+          List.mapi
+            (fun l payloads_per_level ->
+              if l = corrupt_at_level then
+                let inputs =
+                  List.mapi
+                    (fun k input ->
+                      if k = corrupt_at_k then
+                        make_input
+                          ~inbox_level:(Raw_level.of_int32_exn 42l)
+                          ~message_counter:(Z.of_int 42)
+                          (make_external_inbox_message "foo")
+                      else input)
+                    payloads_per_level.inputs
+                in
+                {payloads_per_level with inputs}
+              else payloads_per_level)
+            payloads_per_levels
         in
-        let _state, tick, our_states = eval_inputs new_inputs in
-        return (tick, our_states, new_inputs)
+        let _state, tick, our_states = eval_inputs payloads_per_levels in
+        return (tick, our_states, payloads_per_levels)
     | Keen ->
         (* Keen player will add more inputs. *)
         let* offset = 1 -- 5 in
-        let* new_messages =
-          gen_arith_pvm_messages_for_levels
+        let* new_payloads_per_levels =
+          gen_arith_pvm_payloads_for_levels
             ~start_level:max_level
             ~max_level:(max_level + offset)
         in
-        let new_inputs = list_of_inputs_from_list_of_messages new_messages in
-        let new_inputs = list_of_inputs @ new_inputs in
-        let _state, tick, our_states = eval_inputs new_inputs in
-        return (tick, our_states, new_inputs)
+        let new_payloads_per_levels =
+          payloads_per_levels @ new_payloads_per_levels
+        in
+        let _state, tick, our_states = eval_inputs new_payloads_per_levels in
+        return (tick, our_states, new_payloads_per_levels)
     | SOL_hater ->
-        let new_inputs =
-          List.map (fun inputs -> Stdlib.List.tl inputs) list_of_inputs
-        in
-        let _state, tick, our_states = eval_inputs new_inputs in
-        return (tick, our_states, new_inputs)
-    | EOL_hater ->
-        let new_inputs =
+        let new_payloads_per_levels =
           List.map
-            (fun inputs ->
-              let rev_inputs = List.rev inputs in
-              let without_eol = Stdlib.List.tl rev_inputs in
-              List.rev without_eol)
-            list_of_inputs
+            (fun payloads_per_level ->
+              {
+                payloads_per_level with
+                inputs = Stdlib.List.tl payloads_per_level.inputs;
+              })
+            payloads_per_levels
         in
-        let _state, tick, our_states = eval_inputs new_inputs in
-        return (tick, our_states, new_inputs)
+        let _state, tick, our_states = eval_inputs new_payloads_per_levels in
+        return (tick, our_states, new_payloads_per_levels)
+    | EOL_hater ->
+        let new_payloads_per_levels =
+          List.map
+            (fun payloads_per_level ->
+              let inputs =
+                let rev_inputs = List.rev payloads_per_level.inputs in
+                let without_eol = Stdlib.List.tl rev_inputs in
+                List.rev without_eol
+              in
+              {payloads_per_level with inputs})
+            payloads_per_levels
+        in
+        let _state, tick, our_states = eval_inputs new_payloads_per_levels in
+        return (tick, our_states, new_payloads_per_levels)
     | Info_hater ->
-        let* corrupt_at_l = 0 -- List.length list_of_inputs in
+        let* corrupt_at_l = 0 -- List.length payloads_per_levels in
         let dumb_timestamp = Time_repr.of_seconds 42L in
         let dumb_predecessor = Tezos_crypto.Block_hash.zero in
 
-        let new_inputs =
+        let new_payloads_per_levels =
           List.mapi
-            (fun i inputs ->
-              if i = corrupt_at_l then
-                let inputs =
-                  match inputs with
-                  | sol :: _info_per_level :: rst ->
-                      let new_info_per_level =
-                        make_info_per_level
-                          ~inbox_level:
-                            Raw_level.(Internal_for_tests.add root (i + 1))
-                          ~timestamp:dumb_timestamp
-                          ~predecessor:dumb_predecessor
-                      in
-                      sol :: new_info_per_level :: rst
-                  | _ -> assert false
-                in
-                inputs
-              else inputs)
-            list_of_inputs
+            (fun l payloads_per_level ->
+              if l = corrupt_at_l then
+                {
+                  payloads_per_level with
+                  timestamp = dumb_timestamp;
+                  predecessor = dumb_predecessor;
+                }
+              else payloads_per_level)
+            payloads_per_levels
         in
-        let _state, tick, our_states = eval_inputs new_inputs in
-        return (tick, our_states, new_inputs)
+        let _state, tick, our_states = eval_inputs new_payloads_per_levels in
+        return (tick, our_states, new_payloads_per_levels)
 
   (** [gen ~inbox ~rollup ~origination_level ~start_level ~max_level player
-      list_of_inputs] generates a {!player_client} based on
+      payloads_per_levels] generates a {!player_client} based on
       its {!player.strategy}. *)
   let gen ~inbox ~rollup ~origination_level ~start_level ~max_level player
-      list_of_inputs =
+      payloads_per_levels =
     let open QCheck2.Gen in
     let ctxt = empty_memory_ctxt "foo" in
     let metadata = Sc_rollup.Metadata.{address = rollup; origination_level} in
-    let* tick, our_states, list_of_inputs =
+    let* tick, our_states, payloads_per_levels =
       gen_our_states
         ~metadata
         player.strategy
         ~start_level
         ~max_level
-        list_of_inputs
+        payloads_per_levels
     in
-    let inbox = construct_inbox ~inbox ~origination_level list_of_inputs in
+    let inbox = construct_inbox ~inbox payloads_per_levels in
     return
       {
         player;
         final_tick = tick;
         states = our_states;
         inbox;
-        list_of_inputs;
+        payloads_per_levels;
         metadata;
         context = ctxt;
       }
@@ -1311,22 +1277,21 @@ let build_proof ~player_client start_tick (game : Game.t) =
   (* No messages are added between [game.start_level] and the current level
      so we can take the existing inbox of players. Otherwise, we should find the
      inbox of [start_level]. *)
-  let level_tree_histories, history, inbox = player_client.inbox in
-  let get_level_tree_history level_messages_hash =
-    Level_tree_histories.find level_messages_hash level_tree_histories
+  let payloads_histories, history, inbox = player_client.inbox in
+  let get_payloads_history witness_hash =
+    Payloads_histories.find witness_hash payloads_histories
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Lwt.return
   in
-  let*? history, history_proof =
-    lift @@ Inbox.form_history_proof history inbox
-  in
+  let history_proof = Inbox.old_levels_messages inbox in
   (* We start a game on a commitment that starts at [Tick.initial], the fuel
      is necessarily [start_tick]. *)
   let fuel = tick_to_int_exn start_tick in
   let metadata = player_client.metadata in
-  let*! r =
-    Arith_test_pvm.eval_inputs ~metadata ~fuel player_client.list_of_inputs
+  let inputs_per_levels =
+    List.map (fun {inputs; _} -> inputs) player_client.payloads_per_levels
   in
+  let*! r = Arith_test_pvm.eval_inputs ~metadata ~fuel inputs_per_levels in
   let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
   let module P = struct
     include Arith_test_pvm
@@ -1344,7 +1309,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
 
       let inbox = history_proof
 
-      let get_level_tree_history = get_level_tree_history
+      let get_payloads_history = get_payloads_history
     end
 
     (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992
@@ -1496,40 +1461,19 @@ let gen_game ~p1_strategy ~p2_strategy =
   in
   let start_level = origination_level + 1 in
   let max_level = start_level + commitment_period - 1 in
-  let* list_of_messages =
-    gen_arith_pvm_messages_for_levels ~start_level ~max_level
+  let* payloads_per_levels =
+    gen_arith_pvm_payloads_for_levels ~start_level ~max_level
   in
 
   let block, infos_per_level =
-    construct_inbox_proto block list_of_messages contract3
+    construct_inbox_proto block payloads_per_levels contract3
   in
 
-  (* Once we created the protocol inbox, we only need inputs. *)
-  let list_of_inputs = list_of_inputs_from_list_of_messages list_of_messages in
-
-  let list_of_inputs =
-    let _incr_counter = function
-      | Inbox_message {inbox_level; message_counter; payload} ->
-          Inbox_message
-            {inbox_level; message_counter = Z.succ message_counter; payload}
-      | Reveal _ -> assert false
-    in
+  let payloads_per_levels =
     Stdlib.List.map2
-      (fun messages (timestamp, predecessor) ->
-        match messages with
-        | sol :: Inbox_message {inbox_level; _} :: (_ as rst) ->
-            (* The info per level created by the generator is invalid, it
-               did not have the correct timestamp and predecessor, we
-               replace it. *)
-            let info_per_level =
-              Sc_rollup_helpers.make_info_per_level
-                ~inbox_level
-                ~timestamp
-                ~predecessor
-            in
-            sol :: info_per_level :: rst
-        | _ -> assert false)
-      list_of_inputs
+      (fun payloads_per_level (timestamp, predecessor) ->
+        {payloads_per_level with timestamp; predecessor})
+      payloads_per_levels
       infos_per_level
   in
   let* p1_client =
@@ -1540,7 +1484,7 @@ let gen_game ~p1_strategy ~p2_strategy =
       ~max_level
       ~rollup
       p1
-      list_of_inputs
+      payloads_per_levels
   in
   let* p2_client =
     Player_client.gen
@@ -1550,7 +1494,7 @@ let gen_game ~p1_strategy ~p2_strategy =
       ~max_level
       ~rollup
       p2
-      list_of_inputs
+      payloads_per_levels
   in
   let* p1_start = bool in
   let commitment_level = origination_level + commitment_period in
@@ -1562,7 +1506,7 @@ let gen_game ~p1_strategy ~p2_strategy =
       p1_client,
       p2_client,
       p1_start,
-      list_of_inputs )
+      payloads_per_levels )
 
 (** Shrinker is really slow. Deactivating it. *)
 let gen_game ~p1_strategy ~p2_strategy =
@@ -1701,25 +1645,14 @@ let test_game ~p1_strategy ~p2_strategy () =
              p1_client,
              p2_client,
              p1_start,
-             list_of_messages ) ->
-      let verbose = false in
+             _payloads_per_levels ) ->
       Format.asprintf
-        "@[<v>@,\
-         @[<v 2>p1:@,\
-         %a@]@,\
-         @[<v 2>p2:@,\
-         %a@]@,\
-         %s@,\
-         @[<v 2>levels and inputs:@,\
-         %a@]@,\
-         @]"
-        (pp_player_client ~verbose)
+        "@[<v>@,@[<v 2>p1:@,%a@]@,@[<v 2>p2:@,%a@]@,%s@,@]"
+        pp_player_client
         p1_client
-        (pp_player_client ~verbose)
+        pp_player_client
         p2_client
-        (if p1_start then "p1" else "p2")
-        (pp_list_of_inputs ~verbose)
-        list_of_messages)
+        (if p1_start then "p1" else "p2"))
     ~count:100
     ~name
     ~gen:(gen_game ~p1_strategy ~p2_strategy)

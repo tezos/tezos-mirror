@@ -363,11 +363,11 @@ let take_snapshot inbox = inbox.old_levels_messages
     on the [history] parameter's [capacity]. Updates the
     [inbox.current_level] and [inbox.old_levels_messages]. *)
 let archive history inbox witness =
+  let open Result_syntax in
   (* [form_history_proof history inbox] adds the current inbox level to the
      history and creates new [inbox.old_levels_messages] including
      the current level. *)
   let form_history_proof history inbox =
-    let open Result_syntax in
     let prev_cell = inbox.old_levels_messages in
     let prev_cell_ptr = hash_history_proof prev_cell in
     let* history = History.remember prev_cell_ptr prev_cell history in
@@ -375,8 +375,6 @@ let archive history inbox witness =
     let cell = Skip_list.next ~prev_cell ~prev_cell_ptr level_proof in
     return (history, cell)
   in
-
-  let open Result_syntax in
   let current_level_proof =
     let hash = Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness in
     {hash; level = inbox.level}
@@ -743,6 +741,9 @@ let init_witness_no_history =
       (* We extract the [witness] from the result monad so the caller does
          not have to deal with the error case. This is a top-level declaration,
          this will fail at compile-time. *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4359
+
+         Adding [SOL] without the history could remove the result monad here. *)
       assert false
 
 let add_info_per_level ~timestamp ~predecessor payloads_history witness =

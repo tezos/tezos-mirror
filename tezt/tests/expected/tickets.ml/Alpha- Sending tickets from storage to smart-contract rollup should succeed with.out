@@ -49,7 +49,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[SC_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4871.741 units (will add 100 for safety)
+Estimated gas: 4868.941 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -60,13 +60,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000798
+    Fee to the baker: ꜩ0.000797
     Expected counter: 4
-    Gas limit: 4972
+    Gas limit: 4969
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000798
-      payload fees(the block proposer) ....... +ꜩ0.000798
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000797
+      payload fees(the block proposer) ....... +ꜩ0.000797
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -96,7 +96,7 @@ This sequence of operations was run:
           Parameter: { Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket2" 1) ;
                        Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket" 1) }
           This transaction was successfully applied
-          Consumed gas: 1010.439
+          Consumed gas: 1007.639
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string
@@ -108,17 +108,4 @@ This sequence of operations was run:
             Content: "Ticket2"
             Account updates:
               [SC_ROLLUP_HASH] ... +1
-          Resulting inbox state: { level = 5
-                                   current messages hash  = hash: [SC_ROLLUP_INBOX_LEVEL_TREE_HASH]
-                                   level: 5
-                                   nb_messages_in_commitment_period = 15
-                                   old_levels_messages = 
-       content = hash: [SC_ROLLUP_INBOX_LEVEL_TREE_HASH]
-                                   level: 4
-       index = 4
-       back_pointers = [SC_ROLLUP_INBOX_HASH]
-                                   [SC_ROLLUP_INBOX_HASH]
-                                   [SC_ROLLUP_INBOX_HASH]
-    
-                                   }
 

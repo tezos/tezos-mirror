@@ -731,29 +731,6 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
   | None -> failwith "Unable to retrieve inbox from sc rollup node"
   | Some inbox -> parse_inbox inbox
 
-let test_rollup_inbox_size ~kind =
-  test_l1_scenario
-    {
-      variant = None;
-      tags = ["inbox"];
-      description = "check inbox has the correct number of messages";
-    }
-    ~kind
-  @@ fun _sc_rollup _tezos_node client ->
-  let n = 10 in
-  let* () = send_messages n client in
-  let* _hash, _level, inbox_msg_during_commitment_period =
-    get_inbox_from_tezos_node client
-  in
-  (* Expect [n] messages per level + SOL/Info_per_level/EOL for each level
-     including at inbox's creation. *)
-  return
-  @@ Check.(
-       (inbox_msg_during_commitment_period
-       = (n * (n + 1) / 2) + (((n + 1) * 3) + 3))
-         int
-         ~error_msg:"expected value %R, got %L")
-
 let fetch_messages_from_block client =
   let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
   let messages =
@@ -3654,7 +3631,6 @@ let register ~kind ~protocols =
   test_rollup_node_running ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
   test_stakers_commitments ~kind protocols ;
-  test_rollup_inbox_size ~kind protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
     ~variant:"basic"

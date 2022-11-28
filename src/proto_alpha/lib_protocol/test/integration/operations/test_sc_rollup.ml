@@ -2223,35 +2223,24 @@ let test_refute_invalid_metadata () =
   in
   assert_refute_result ~game_status:expected_game_status incr
 
-let full_history_inbox (timestamp, predecessor) all_inbox_messages =
+let full_history_inbox (timestamp, predecessor) all_external_messages =
   let open Sc_rollup_helpers in
-  (* Add the SOL/Info_per_level/EOL to the list of inbox messages. *)
-  let all_inbox_messages =
+  let payloads_per_levels =
     List.map
-      (fun (inbox_level, (timestamp, predecessor), inbox_messages) ->
-        wrap_messages ~timestamp ~predecessor inbox_level inbox_messages)
-      all_inbox_messages
+      (fun ((timestamp, predecessor), level, external_messages) ->
+        wrap_messages ~timestamp ~predecessor level external_messages)
+      all_external_messages
   in
-  (* Create a inbox adding the messages from [all_inbox_messages]. *)
-  let all_inbox_inputs =
-    List.map
-      (fun messages ->
-        List.map (fun Sc_rollup_helpers.{input; message = _} -> input) messages)
-      all_inbox_messages
-  in
-  Sc_rollup_helpers.construct_inbox ~timestamp ~predecessor all_inbox_inputs
+  Sc_rollup_helpers.construct_inbox ~timestamp ~predecessor payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Sc_rollup_helpers in
-  let level_tree_histories, history, inbox = full_history_inbox in
-  let*? history, history_proof =
-    Sc_rollup.Inbox.form_history_proof history inbox
-    |> Environment.wrap_tzresult
-  in
+  let payloads_histories, history, inbox = full_history_inbox in
+  let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
   (* Create an inclusion proof of the inbox message at [(l, n)]. *)
   let* proof, _ =
     Sc_rollup.Inbox.produce_proof
-      ~get_level_tree_history:(get_level_tree_history level_tree_histories)
+      ~get_payloads_history:(get_payloads_history payloads_histories)
       history
       history_proof
       (l, n)
@@ -2301,19 +2290,18 @@ let test_automatically_added_internal_messages () =
   let* block = Block.bake ~operation block in
   let level_two_info = info_per_block block in
 
-  (* Bake an extra block to archive all inbox messages for the snapshot. *)
-  let* block = Block.bake block in
   let* inbox = Context.Sc_rollup.inbox (B block) in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
 
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
-  let*? ((_level_tree_histories, history, inbox) as full_history_inbox) =
+  let*? ((_level_tree_histories, _history, inbox) as full_history_inbox) =
     full_history_inbox
       level_zero_info
-      [(level_one, level_one_info, []); (level_two, level_two_info, ["foo"])]
+      [(level_one_info, level_one, []); (level_two_info, level_two, ["foo"])]
   in
 
+  let level_two = Raw_level.of_int32_exn 2l in
   (* Assert SOL is at position 0. *)
   let sol = Sc_rollup_helpers.make_sol ~inbox_level:level_two in
   let* () =
@@ -2363,10 +2351,7 @@ let test_automatically_added_internal_messages () =
   in
 
   (* Assert the computed inbox and protocol's inbox are equal. *)
-  let*? _history, history_proof =
-    Sc_rollup.Inbox.form_history_proof history inbox
-    |> Environment.wrap_tzresult
-  in
+  let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
   Assert.equal
     ~loc:__LOC__
     Sc_rollup.Inbox.equal_history_proof

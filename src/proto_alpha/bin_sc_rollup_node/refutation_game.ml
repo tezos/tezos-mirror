@@ -177,7 +177,7 @@ module Make (Interpreter : Interpreter.S) :
       Node_context.checkout_context node_ctxt snapshot_hash
     in
     let snapshot_ctxt_index = Context.index snapshot_ctxt in
-    let snapshot = Sc_rollup.Inbox.old_levels_messages snapshot_inbox in
+    let snapshot = Sc_rollup.Inbox.take_snapshot snapshot_inbox in
     let* dal_slots_history =
       Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
     in
