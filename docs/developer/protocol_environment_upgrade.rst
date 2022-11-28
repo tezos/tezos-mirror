@@ -105,6 +105,7 @@ And finally, bump environment version in ``src/proto_alpha/lib_protocol/TEZOS_PR
 
 For an example, check `the MR in which the environment V6 was activated <https://gitlab.com/tezos/tezos/-/merge_requests/4961>`__.
 
+Additionally, you have to update the documentation of protocol Alpha to reflect the fact that it now uses environment ``V<N>``. For that, see meta-issue :gl:`#4155`, which explains all the necessary changes (don't worry, the changes are very limited).
 
 Making changes in the environment
 ---------------------------------

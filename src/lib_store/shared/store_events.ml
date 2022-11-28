@@ -226,7 +226,7 @@ let context_gc_is_not_allowed =
     ~level:Warning
     ~name:"gc_is_not_allowed"
     ~msg:
-      "garbage collection is not fully enable on this data directory: context \
+      "garbage collection is not fully enabled on this data directory: context \
        cannot be garbage collected. Please read the documentation or import a \
        snapshot to enable it"
     ()
