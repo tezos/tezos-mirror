@@ -61,6 +61,16 @@ ifneq ($(filter ${ALL_EXECUTABLES},${OCTEZ_EXECUTABLES}),$(foreach executable,${
 $(error Unexpected list of executables to build, make sure environment variable OCTEZ_EXECUTABLES is unset)
 endif
 
+# Where to copy executables.
+# Used when building Docker images to help with the COPY instruction.
+OCTEZ_BIN_DIR?=.
+
+VALID_OCTEZ_BIN_DIRS=. bin
+
+ifeq ($(filter ${VALID_OCTEZ_BIN_DIRS},${OCTEZ_BIN_DIR}),)
+$(error Unexpected value for OCTEZ_BIN_DIR (got: ${OCTEZ_BIN_DIR}, expecting one of: ${VALID_OCTEZ_BIN_DIRS}))
+endif
+
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifdef TEZOS_WITHOUT_OPAM
 current_ocaml_version := $(shell ocamlc -version)
@@ -173,26 +183,27 @@ endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) ./
-	@ln -s octez-node tezos-node
-	@ln -s octez-client tezos-client
-	@ln -s octez-admin-client tezos-admin-client
-	@ln -s octez-signer tezos-signer
-	@ln -s octez-codec tezos-codec
-	@ln -s octez-protocol-compiler tezos-protocol-compiler
-	@ln -s octez-proxy-server tezos-proxy-server
-	@ln -s octez-baker-PtKathma tezos-baker-014-PtKathma
-	@ln -s octez-accuser-PtKathma tezos-accuser-014-PtKathma
-	@ln -s octez-tx-rollup-node-PtKathma tezos-tx-rollup-node-014-PtKathma
-	@ln -s octez-tx-rollup-client-PtKathma tezos-tx-rollup-client-014-PtKathma
-	@ln -s octez-baker-PtLimaPt tezos-baker-015-PtLimaPt
-	@ln -s octez-accuser-PtLimaPt tezos-accuser-015-PtLimaPt
-	@ln -s octez-tx-rollup-node-PtLimaPt tezos-tx-rollup-node-015-PtLimaPt
-	@ln -s octez-tx-rollup-client-PtLimaPt tezos-tx-rollup-client-015-PtLimaPt
-	@ln -s octez-baker-alpha tezos-baker-alpha
-	@ln -s octez-accuser-alpha tezos-accuser-alpha
-	@ln -s octez-tx-rollup-node-alpha tezos-tx-rollup-node-alpha
-	@ln -s octez-tx-rollup-client-alpha tezos-tx-rollup-client-alpha
+	@mkdir -p $(OCTEZ_BIN_DIR)/
+	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
+	@ln -s $(OCTEZ_BIN_DIR)/octez-node tezos-node
+	@ln -s $(OCTEZ_BIN_DIR)/octez-client tezos-client
+	@ln -s $(OCTEZ_BIN_DIR)/octez-admin-client tezos-admin-client
+	@ln -s $(OCTEZ_BIN_DIR)/octez-signer tezos-signer
+	@ln -s $(OCTEZ_BIN_DIR)/octez-codec tezos-codec
+	@ln -s $(OCTEZ_BIN_DIR)/octez-protocol-compiler tezos-protocol-compiler
+	@ln -s $(OCTEZ_BIN_DIR)/octez-proxy-server tezos-proxy-server
+	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-PtKathma tezos-baker-014-PtKathma
+	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-PtKathma tezos-accuser-014-PtKathma
+	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-node-PtKathma tezos-tx-rollup-node-014-PtKathma
+	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-PtKathma tezos-tx-rollup-client-014-PtKathma
+	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-PtLimaPt tezos-baker-015-PtLimaPt
+	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-PtLimaPt tezos-accuser-015-PtLimaPt
+	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-node-PtLimaPt tezos-tx-rollup-node-015-PtLimaPt
+	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-PtLimaPt tezos-tx-rollup-client-015-PtLimaPt
+	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-alpha tezos-baker-alpha
+	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-alpha tezos-accuser-alpha
+	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-node-alpha tezos-tx-rollup-node-alpha
+	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-alpha tezos-tx-rollup-client-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
