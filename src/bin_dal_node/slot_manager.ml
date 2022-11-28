@@ -82,3 +82,10 @@ let add_slot_id commitment slot_id node_store =
     Store.Legacy.associate_slot_id_with_commitment node_store commitment slot_id
   in
   return_unit
+
+let get_slot_content commitment node_store =
+  let open Lwt_result_syntax in
+  let*! slot_opt = Store.Legacy.find_slot_by_commitment node_store commitment in
+  match slot_opt with
+  | None -> fail `Not_found
+  | Some slot_content -> return slot_content
