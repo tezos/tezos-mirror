@@ -1045,6 +1045,7 @@ val originate_contract_at :
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
+  ?prefix:string ->
   amount:Tez.t ->
   src:string ->
   t ->
@@ -1062,6 +1063,7 @@ val spawn_originate_contract_at :
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
+  ?prefix:string ->
   amount:Tez.t ->
   src:string ->
   t ->
@@ -1260,6 +1262,7 @@ val run_script_at :
   ?self_address:string ->
   ?source:string ->
   ?payer:string ->
+  ?prefix:string ->
   storage:string ->
   input:string ->
   t ->
@@ -1274,6 +1277,7 @@ val spawn_run_script_at :
   ?self_address:string ->
   ?source:string ->
   ?payer:string ->
+  ?prefix:string ->
   storage:string ->
   input:string ->
   t ->

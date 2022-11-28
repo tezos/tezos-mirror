@@ -1315,13 +1315,15 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
   | Some hash -> return hash
 
 let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
-    ?burn_cap ?gas_limit ?dry_run ~amount ~src client name protocol =
+    ?burn_cap ?gas_limit ?dry_run ?prefix ~amount ~src client name protocol =
   let alias =
     match List.rev name with
     | [] -> Test.fail "name must not be an empty list"
     | last :: _ -> last
   in
-  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  let prg =
+    Michelson_script.find ?prefix name protocol |> Michelson_script.path
+  in
   let process =
     spawn_originate_contract
       ?hooks
@@ -1341,13 +1343,15 @@ let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
   (alias, process)
 
 let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
-    ?gas_limit ?dry_run ~amount ~src client name protocol =
+    ?gas_limit ?dry_run ?prefix ~amount ~src client name protocol =
   let alias =
     match List.rev name with
     | [] -> Test.fail "name must not be an empty list"
     | last :: _ -> last
   in
-  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  let prg =
+    Michelson_script.find ?prefix name protocol |> Michelson_script.path
+  in
   let* res =
     originate_contract
       ?hooks
@@ -1521,10 +1525,10 @@ let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
   @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
 
-let spawn_run_script_at ?hooks ?balance ?self_address ?source ?payer ~storage
-    ~input client script_name protocol =
+let spawn_run_script_at ?hooks ?balance ?self_address ?source ?payer ?prefix
+    ~storage ~input client script_name protocol =
   let prg =
-    Michelson_script.find script_name protocol |> Michelson_script.path
+    Michelson_script.find ?prefix script_name protocol |> Michelson_script.path
   in
   spawn_run_script
     ?hooks
@@ -1609,9 +1613,11 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
         "Cannot extract new storage from client_output: %s"
         client_output
 
-let run_script_at ?hooks ?balance ?self_address ?source ?payer ~storage ~input
-    client name protocol =
-  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+let run_script_at ?hooks ?balance ?self_address ?source ?payer ?prefix ~storage
+    ~input client name protocol =
+  let prg =
+    Michelson_script.find name ?prefix protocol |> Michelson_script.path
+  in
   run_script
     ?hooks
     ?balance
