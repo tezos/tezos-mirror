@@ -773,30 +773,20 @@ module List_cmd = struct
          ())
 
   let base_handler_bench bench_list show_tags =
-    if show_tags then
-      List.iter
-        (fun (module Bench : Benchmark.S) ->
-          Format.fprintf
-            Format.std_formatter
-            "%a: %s\n\tTags: %a\n"
-            Namespace.pp
-            Bench.name
-            Bench.info
-            (Format.pp_print_list
-               ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
-               Format.pp_print_string)
-            Bench.tags)
-        bench_list
-    else
-      List.iter
-        (fun (module Bench : Benchmark.S) ->
-          Format.fprintf
-            Format.std_formatter
-            "%a: %s\n"
-            Namespace.pp
-            Bench.name
-            Bench.info)
-        bench_list ;
+    Format.printf
+      "%a@."
+      (Format.pp_print_list (fun fmt (module Bench : Benchmark.S) ->
+           Format.fprintf fmt "%a: %s" Namespace.pp Bench.name Bench.info ;
+           if show_tags then
+             Format.fprintf
+               fmt
+               "@.\tTags: %a"
+               (Format.pp_print_list
+                  ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+                  Format.pp_print_string)
+               Bench.tags
+           else ()))
+      bench_list ;
     Lwt_result_syntax.return_unit
 
   let handler_all_bench show_tags () =
@@ -846,17 +836,18 @@ module List_cmd = struct
   let params_all_param = Tezos_clic.fixed ["list"; "all"; "parameters"]
 
   let handler_all_param () () =
-    List.iter
-      (fun (param, models) ->
-        Format.fprintf
-          Format.std_formatter
-          "%a\n\tModels: %a\n"
-          Namespace.pp
-          param
-          (Format.pp_print_list
-             ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
-             Namespace.pp)
-          models)
+    Format.printf
+      "%a@."
+      (Format.pp_print_list (fun fmt (param, models) ->
+           Format.fprintf
+             fmt
+             "%a@.\tModels: %a"
+             Namespace.pp
+             param
+             (Format.pp_print_list
+                ~pp_sep:(fun formatter () -> Format.fprintf formatter "; ")
+                Namespace.pp)
+             models))
       (Registration.all_registered_parameters ()) ;
     Lwt_result_syntax.return_unit
 
@@ -869,17 +860,13 @@ module List_cmd = struct
     M.model
 
   let handler_all_models () () =
-    List.iter
-      (fun (name, (model, _)) ->
-        let printed =
-          match model with Model.Model model -> print_model model
-        in
-        Format.fprintf
-          Format.std_formatter
-          "%a\n\t%s\n"
-          Namespace.pp
-          name
-          printed)
+    Format.printf
+      "%a@."
+      (Format.pp_print_list (fun fmt (name, (model, _)) ->
+           let printed =
+             match model with Model.Model model -> print_model model
+           in
+           Format.fprintf fmt "%a@.\t%s" Namespace.pp name printed))
       (Registration.all_registered_models ()) ;
     Lwt_result_syntax.return_unit
 
