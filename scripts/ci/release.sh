@@ -10,7 +10,7 @@ scripts_dir=$(dirname "$current_dir")
 src_dir=$(dirname "$scripts_dir")
 script_inputs_dir="$src_dir/script-inputs"
 
-binaries="$(cat "$script_inputs_dir/binaries-for-release")"
+binaries="$(cat "$script_inputs_dir/released-executables")"
 
 ### Compute GitLab release names
 

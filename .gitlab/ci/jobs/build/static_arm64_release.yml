@@ -1,0 +1,11 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# See comments in static_x86_64_experimental.yml.
+build:static-arm64-linux-binaries:
+  extends:
+    - .build_static_binaries_template
+  variables:
+    ARCH: "arm64"
+    EXECUTABLE_FILES: "script-inputs/released-executables"
+  tags:
+    - arm64

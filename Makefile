@@ -70,6 +70,10 @@ all:
 release:
 	@$(MAKE) build PROFILE=release
 
+.PHONY: static
+static:
+	@$(MAKE) build build-unreleased PROFILE=static
+
 .PHONY: build-parameters
 build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters

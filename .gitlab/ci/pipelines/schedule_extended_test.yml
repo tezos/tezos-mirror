@@ -2,7 +2,7 @@ include:
   # Stage: build
   - .gitlab/ci/jobs/build/x86_64.yml
   - .gitlab/ci/jobs/build/arm64.yml
-  - .gitlab/ci/jobs/build/static_x86_64_linux_binaries.yml
+  - .gitlab/ci/jobs/build/static_x86_64_experimental.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/integration_pytest_old_protocols.yml
