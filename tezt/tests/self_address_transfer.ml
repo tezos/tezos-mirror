@@ -31,6 +31,15 @@
    Subject: Regression tests for the Michelson [SELF_ADDRESS] instruction
 *)
 
+let contract_path protocol kind contract =
+  sf
+    "tests_python/contracts_%s/%s/%s"
+    (match protocol with
+    | Protocol.Alpha -> "alpha"
+    | _ -> sf "%03d" @@ Protocol.number protocol)
+    kind
+    contract
+
 let hooks = Tezos_regression.hooks
 
 let test_self_address_transfer =
@@ -45,7 +54,7 @@ let test_self_address_transfer =
       ~alias:"self_address_sender.tz"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/self_address_sender.tz"
+      ~prg:(contract_path protocol "mini_scenarios" "self_address_sender.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
@@ -56,7 +65,7 @@ let test_self_address_transfer =
       ~alias:"self_address_receiver.tz"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/self_address_receiver.tz"
+      ~prg:(contract_path protocol "mini_scenarios" "self_address_receiver.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
