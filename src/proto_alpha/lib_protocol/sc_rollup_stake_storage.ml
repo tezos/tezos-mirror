@@ -315,8 +315,13 @@ let refine_stake ctxt rollup staker staked_on commitment =
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let*? ctxt, new_hash = Sc_rollup_commitment_storage.hash ctxt commitment in
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
      Add a test checking that L2 nodes can catch up after going offline. *)
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
+     Check value of max_lookahead_in_blocks against gas exhaustion
+     during this function execution. *)
   let rec go node ctxt =
     (*
 
@@ -499,6 +504,10 @@ let remove_staker ctxt rollup staker =
         Store.Stakers.remove_existing (ctxt, rollup) staker
       in
       let* ctxt = modify_staker_count ctxt rollup Int32.pred in
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
+         Check value of max_lookahead_in_blocks against gas exhaustion
+         during this function execution. *)
       let rec go node ctxt =
         (*
 
