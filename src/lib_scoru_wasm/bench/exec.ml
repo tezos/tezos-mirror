@@ -30,11 +30,20 @@ open Wasm_pvm_state.Internal_state
 type phase = Decoding | Initialising | Linking | Evaluating | Padding
 [@@deriving show {with_path = false}]
 
-let run_loop f a =
+let run_loop_aux f a =
   Lwt_list.fold_left_s
     f
     a
     [Decoding; Linking; Initialising; Evaluating; Padding]
+
+let rec run_loop ?(reboot = None) f a =
+  let open Lwt_syntax in
+  let* next_a = run_loop_aux f a in
+  match reboot with
+  | None -> return next_a
+  | Some need_reboot ->
+      let* should_reboot = need_reboot next_a in
+      if should_reboot then run_loop ~reboot f next_a else return next_a
 
 (** Predicate defining the different phases of an execution *)
 let should_continue phase (pvm_state : pvm_state) =
@@ -46,7 +55,7 @@ let should_continue phase (pvm_state : pvm_state) =
     | Evaluating, Eval _ when Wasm_vm.eval_has_finished pvm_state.tick_state ->
         false
     | Evaluating, Eval _ -> true
-    | Padding, Eval _ -> true
+    | Padding, Padding -> true
     | _, _ -> false
   in
   Lwt.return continue
@@ -70,8 +79,6 @@ let run kernel k =
   in
   return res
 
-let set_full_input_step s = Wasm_utils.set_full_input_step [s]
-
 let read_message name =
   let open Tezt.Base in
   let kernel_file =
@@ -83,3 +90,37 @@ let initial_boot_sector_from_kernel ?(max_tick = 1000000000000L) kernel =
   let open Lwt_syntax in
   let+ tree = Wasm_utils.initial_tree ~max_tick ~from_binary:true kernel in
   tree
+
+type input = File of string | Str of string
+
+let read_input = function Str s -> s | File s -> read_message s
+
+type message = Deposit of input | Other of input | Encoded of input
+
+let encode_message = function
+  | Deposit s ->
+      Pvm_input_kind.(
+        Internal_for_tests.to_binary_input
+          (Internal Deposit)
+          (Some (read_input s)))
+  | Other s ->
+      Pvm_input_kind.(
+        Internal_for_tests.to_binary_input External (Some (read_input s)))
+  | Encoded s -> read_input s
+
+let set_internal_message level counter message state =
+  let encoded_message = encode_message message in
+  Wasm_utils.Wasm.set_input_step
+    (Wasm_utils.input_info level counter)
+    encoded_message
+    state
+
+let load_messages messages level tree =
+  let open Lwt_syntax in
+  (* Uses the test utilities as a reference. *)
+  let* tree =
+    Wasm_utils.set_inputs_step set_internal_message messages level tree
+  in
+  (* this should only advance the tick counter after executing the input steps
+     until the next snapshot is reached. *)
+  Wasm_utils.eval_to_snapshot ~max_steps:Int64.max_int tree

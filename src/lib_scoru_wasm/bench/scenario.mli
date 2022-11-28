@@ -55,14 +55,13 @@ val ignore_scenario : scenario -> scenario
 (** action corresponding to one top level call of PVM *)
 val exec_loop : Wasm.tree action
 
-(** [exec_on_message message] returns the action corresponding to
-      adding the message in the inbox  *)
-val exec_on_message : string -> Wasm.tree action
+(** action corresponding to a top level call of PVM,
+    including reboots if necessary. *)
+val exec_loop : Wasm.tree action
 
-(** [exec_on_message_from_file message] returns the action corresponding to:
-      - reading [message] from a file
-      - adding the message in the inbox  *)
-val exec_on_message_from_file : string -> Wasm.tree action
+(** [load_messages level messages] returns the action corresponding to
+      adding a list of [messages] in the inbox at a given [level]. *)
+val load_messages : int32 -> Exec.message list -> Wasm.tree action
 
 (** [run_scenarios filename benches] Execute a list of scenario with options:
       - verbose: print info during execution
