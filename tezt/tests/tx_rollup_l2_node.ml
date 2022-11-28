@@ -2404,7 +2404,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       let* () = Client.bake_for_and_wait client in
       Log.info "Transfer the tickets to withdraw contract" ;
       let*! () =
-        Client.Tx_rollup.transfer_tickets
+        Client.transfer_tickets
           ~qty:15L
           ~src:Constant.bootstrap2.public_key_hash
           ~destination:withdraw_contract

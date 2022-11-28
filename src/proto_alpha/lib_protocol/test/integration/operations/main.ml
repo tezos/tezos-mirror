@@ -46,5 +46,6 @@ let () =
       ("sc rollup", Test_sc_rollup.tests);
       ("sc rollup transfer", Test_sc_rollup_transfer.tests);
       ("zk rollup", Test_zk_rollup.tests);
+      ("transfer ticket", Test_transfer_ticket.tests);
     ]
   |> Lwt_main.run

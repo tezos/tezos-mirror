@@ -1459,21 +1459,22 @@ module Tx_rollup : sig
     ticket_dispatch_info_data_list:string list ->
     t ->
     unit Runnable.process
-
-  val transfer_tickets :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?hooks:Process.hooks ->
-    qty:int64 ->
-    src:string ->
-    destination:string ->
-    entrypoint:string ->
-    contents:string ->
-    ty:string ->
-    ticketer:string ->
-    t ->
-    unit Runnable.process
 end
+
+val transfer_tickets :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?hooks:Process.hooks ->
+  ?expect_failure:bool ->
+  qty:int64 ->
+  src:string ->
+  destination:string ->
+  entrypoint:string ->
+  contents:string ->
+  ty:string ->
+  ticketer:string ->
+  t ->
+  unit Runnable.process
 
 (** Run [octez-client show voting period] and return the period name. *)
 val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t

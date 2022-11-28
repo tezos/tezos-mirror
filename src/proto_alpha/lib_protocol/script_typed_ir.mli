@@ -1162,6 +1162,11 @@ and ('arg, 'ret) lambda =
 
 and 'arg typed_contract =
   | Typed_implicit : public_key_hash -> unit typed_contract
+  | Typed_implicit_with_ticket : {
+      ticket_ty : ('arg ticket, _) ty;
+      destination : public_key_hash;
+    }
+      -> 'arg ticket typed_contract
   | Typed_originated : {
       arg_ty : ('arg, _) ty;
       contract_hash : Contract_hash.t;
@@ -1582,6 +1587,14 @@ and ('input, 'output) view_signature =
 and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
       destination : Signature.Public_key_hash.t;
+      amount : Tez.tez;
+    }
+      -> Kind.transaction internal_operation_contents
+  | Transaction_to_implicit_with_ticket : {
+      destination : Signature.Public_key_hash.t;
+      ticket_ty : ('content ticket, _) ty;
+      ticket : 'content ticket;
+      unparsed_ticket : Script.lazy_expr;
       amount : Tez.tez;
     }
       -> Kind.transaction internal_operation_contents

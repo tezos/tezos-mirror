@@ -623,6 +623,20 @@ let transfer (type t) (ctxt, sc) gas amount location
   | Typed_implicit destination ->
       let () = parameters in
       return (Transaction_to_implicit {destination; amount}, None, ctxt)
+  | Typed_implicit_with_ticket {destination; ticket_ty} ->
+      unparse_data ctxt Optimized ticket_ty parameters
+      >>=? fun (unparsed_ticket, ctxt) ->
+      return
+        ( Transaction_to_implicit_with_ticket
+            {
+              destination;
+              amount;
+              ticket_ty;
+              ticket = parameters;
+              unparsed_ticket = Script.lazy_expr unparsed_ticket;
+            },
+          None,
+          ctxt )
   | Typed_originated
       {arg_ty = parameters_ty; contract_hash = destination; entrypoint} ->
       collect_lazy_storage ctxt parameters_ty parameters

@@ -1,0 +1,195 @@
+
+./octez-client --mode mockup --wait none originate contract ticketer transferring 1 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/send_ticket_list.tz --init Unit --burn-cap 1
+Node is bootstrapped.
+Estimated gas: 1441.840 units (will add 100 for safety)
+Estimated storage: 402 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000529
+    Expected counter: 1
+    Gas limit: 1542
+    Storage limit: 422 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000529
+      payload fees(the block proposer) ....... +ꜩ0.000529
+    Origination:
+      From: [PUBLIC_KEY_HASH]
+      Credit: ꜩ1
+      Script:
+        { parameter address ;
+          storage unit ;
+          code { CAR ;
+                 CONTRACT (list (ticket string)) ;
+                 ASSERT_SOME ;
+                 PUSH mutez 0 ;
+                 NIL (ticket string) ;
+                 PUSH nat 1 ;
+                 PUSH string "Ticket" ;
+                 TICKET ;
+                 ASSERT_SOME ;
+                 CONS ;
+                 TRANSFER_TOKENS ;
+                 NIL operation ;
+                 SWAP ;
+                 CONS ;
+                 UNIT ;
+                 SWAP ;
+                 PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 145 bytes
+        Paid storage size diff: 145 bytes
+        Consumed gas: 1441.840
+        Balance updates:
+          [PUBLIC_KEY_HASH] ... -ꜩ0.03625
+          storage fees ........................... +ꜩ0.03625
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+          [PUBLIC_KEY_HASH] ... -ꜩ1
+          [CONTRACT_HASH] ... +ꜩ1
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as ticketer.
+
+./octez-client --mode mockup --wait none originate contract blackhole transferring 1 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/tickets_list_blackhole.tz --init Unit --burn-cap 1
+Node is bootstrapped.
+Estimated gas: 1410.157 units (will add 100 for safety)
+Estimated storage: 299 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000423
+    Expected counter: 2
+    Gas limit: 1511
+    Storage limit: 319 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000423
+      payload fees(the block proposer) ....... +ꜩ0.000423
+    Origination:
+      From: [PUBLIC_KEY_HASH]
+      Credit: ꜩ1
+      Script:
+        { parameter (list (ticket string)) ;
+          storage unit ;
+          code { CDR ; NIL operation ; PAIR } }
+        Initial storage: Unit
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 42 bytes
+        Paid storage size diff: 42 bytes
+        Consumed gas: 1410.157
+        Balance updates:
+          [PUBLIC_KEY_HASH] ... -ꜩ0.0105
+          storage fees ........................... +ꜩ0.0105
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+          [PUBLIC_KEY_HASH] ... -ꜩ1
+          [CONTRACT_HASH] ... +ꜩ1
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as blackhole.
+
+./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
+Node is bootstrapped.
+Estimated gas: 5793.984 units (will add 100 for safety)
+Estimated storage: 66 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000884
+    Expected counter: 3
+    Gas limit: 5894
+    Storage limit: 86 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000884
+      payload fees(the block proposer) ....... +ꜩ0.000884
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[CONTRACT_HASH]"
+      This transaction was successfully applied
+      Updated storage: Unit
+      Storage size: 145 bytes
+      Paid storage size diff: 66 bytes
+      Consumed gas: 3041.341
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.0165
+        storage fees ........................... +ꜩ0.0165
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Parameter: { Pair 0x01b90a0e40c09f8a1de565627e93370247fbfe637b00 (Pair "Ticket" 1) }
+          This transaction was successfully applied
+          Updated storage: Unit
+          Storage size: 42 bytes
+          Consumed gas: 2753.804
+
+
+./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[PUBLIC_KEY_HASH]"'
+Node is bootstrapped.
+This simulation failed:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0
+    Expected counter: 4
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: "[PUBLIC_KEY_HASH]"
+      This operation FAILED.
+
+Runtime error in contract [CONTRACT_HASH]:
+  01: { parameter address ;
+  02:   storage unit ;
+  03:   code { CAR ;
+  04:          CONTRACT (list (ticket string)) ;
+  05:          ASSERT_SOME ;
+  06:          PUSH mutez 0 ;
+  07:          NIL (ticket string) ;
+  08:          PUSH nat 1 ;
+  09:          PUSH string "Ticket" ;
+  10:          TICKET ;
+  11:          ASSERT_SOME ;
+  12:          CONS ;
+  13:          TRANSFER_TOKENS ;
+  14:          NIL operation ;
+  15:          SWAP ;
+  16:          CONS ;
+  17:          UNIT ;
+  18:          SWAP ;
+  19:          PAIR } }
+At line 5 characters 9 to 20,
+script reached FAILWITH instruction
+with Unit
+Fatal error:
+  transfer simulation failed

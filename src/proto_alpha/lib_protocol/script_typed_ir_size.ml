@@ -191,6 +191,8 @@ let dup_n_gadt_witness_size n (_w : (_, _, _, _) dup_n_gadt_witness) =
 
 let contract_size : type t. t typed_contract -> nodes_and_size = function
   | Typed_implicit _ -> ret_adding zero (h1w +! public_key_hash_in_memory_size)
+  | Typed_implicit_with_ticket {ticket_ty; destination = _} ->
+      ret_adding (ty_size ticket_ty) (h2w +! public_key_hash_in_memory_size)
   | Typed_originated {arg_ty; contract_hash = _; entrypoint} ->
       ret_adding
         (ty_size arg_ty)
