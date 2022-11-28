@@ -679,19 +679,6 @@ let pre_filter_manager :
               | `Fail errs -> errs
               | `Weight_ok (_, weight) -> `Passed_prefilter weight)))
 
-type Environment.Error_monad.error += Outdated_endorsement
-
-let () =
-  Environment.Error_monad.register_error_kind
-    `Temporary
-    ~id:"prefilter.outdated_endorsement"
-    ~title:"Endorsement is outdated"
-    ~description:"Endorsement is outdated"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Endorsement is outdated")
-    Data_encoding.unit
-    (function Outdated_endorsement -> Some () | _ -> None)
-    (fun () -> Outdated_endorsement)
-
 type Environment.Error_monad.error += Wrong_operation
 
 let () =
@@ -699,11 +686,11 @@ let () =
     `Temporary
     ~id:"prefilter.wrong_operation"
     ~title:"Wrong operation"
-    ~description:"Failing_noop and old endorsement format are not accepted."
+    ~description:"Failing_noop operations are not accepted in the mempool."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Failing_noop and old endorsement format are not accepted")
+        "Failing_noop operations are not accepted in the mempool")
     Data_encoding.unit
     (function Wrong_operation -> Some () | _ -> None)
     (fun () -> Wrong_operation)
