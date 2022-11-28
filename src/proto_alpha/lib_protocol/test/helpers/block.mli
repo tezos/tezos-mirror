@@ -226,6 +226,15 @@ val bake_n :
   t ->
   block tzresult Lwt.t
 
+(** Bakes until the given level is reached. *)
+val bake_until_level :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
+  Raw_level.t ->
+  t ->
+  block tzresult Lwt.t
+
 (** Version of bake_n that returns a list of all balance updates included
     in the metadata of baked blocks. **)
 val bake_n_with_all_balance_updates :

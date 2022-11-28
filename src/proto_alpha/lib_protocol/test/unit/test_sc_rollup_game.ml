@@ -102,19 +102,15 @@ let two_stakers_in_conflict () =
         compressed_state = hash1;
       }
   in
+  let level l = T.valid_inbox_level ctxt l in
   let* parent, _, ctxt =
-    T.lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-         ctxt
-         rollup
-         defender
-         parent_commit
+    T.lift @@ T.advance_level_n_refine_stake ctxt rollup defender parent_commit
   in
   let child1 =
     Commitment_repr.
       {
         predecessor = parent;
-        inbox_level = T.valid_inbox_level ctxt 2l;
+        inbox_level = level 2l;
         number_of_ticks = T.number_of_ticks_exn 10000L;
         compressed_state = hash2;
       }
@@ -123,11 +119,12 @@ let two_stakers_in_conflict () =
     Commitment_repr.
       {
         predecessor = parent;
-        inbox_level = T.valid_inbox_level ctxt 2l;
+        inbox_level = level 2l;
         number_of_ticks = T.number_of_ticks_exn 10000L;
         compressed_state = hash3;
       }
   in
+  let ctxt = T.advance_level_for_commitment ctxt child1 in
   let* _, _, ctxt, _ =
     T.lift
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup defender child1
@@ -219,19 +216,15 @@ let test_staker_injectivity () =
         compressed_state = hash1;
       }
   in
+  let level l = T.valid_inbox_level ctxt l in
   let* c1_hash, _, ctxt =
-    T.lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-         ctxt
-         rollup
-         operator
-         agreed_commit
+    T.lift @@ T.advance_level_n_refine_stake ctxt rollup operator agreed_commit
   in
   let challenging_commit compressed_state =
     Commitment_repr.
       {
         predecessor = c1_hash;
-        inbox_level = T.valid_inbox_level ctxt 2l;
+        inbox_level = level 2l;
         number_of_ticks = T.number_of_ticks_exn 10000L;
         compressed_state;
       }
@@ -240,6 +233,7 @@ let test_staker_injectivity () =
     List.fold_left_es
       (fun ctxt (hash, player) ->
         let commit = challenging_commit hash in
+        let ctxt = T.advance_level_for_commitment ctxt commit in
         let* _, _, ctxt, _ =
           T.lift
           @@ Sc_rollup_stake_storage.publish_commitment

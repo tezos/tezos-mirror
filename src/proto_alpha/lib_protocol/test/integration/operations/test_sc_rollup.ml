@@ -209,41 +209,54 @@ let number_of_ticks_exn n =
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
+let next_inbox_level ?predecessor ctxt rollup =
+  let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
+  let+ constants = Context.get_constants ctxt in
+  let commitment_freq =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  let pred_level =
+    Option.fold
+      ~none:genesis_info.level
+      ~some:(fun pred -> pred.Sc_rollup.Commitment.inbox_level)
+      predecessor
+  in
+  Raw_level.Internal_for_tests.add pred_level commitment_freq
+
 let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
     ctxt rollup =
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
-  let predecessor, pred_level =
+  let predecessor_hash =
     match predecessor with
-    | Some pred ->
-        (Sc_rollup.Commitment.hash_uncarbonated pred, pred.inbox_level)
-    | None -> (genesis_info.commitment_hash, genesis_info.level)
+    | Some pred -> Sc_rollup.Commitment.hash_uncarbonated pred
+    | None -> genesis_info.commitment_hash
   in
   let* compressed_state =
     match compressed_state with
     | None ->
         let* {compressed_state; _} =
-          Context.Sc_rollup.commitment ctxt rollup predecessor
+          Context.Sc_rollup.commitment ctxt rollup predecessor_hash
         in
         return compressed_state
     | Some compressed_state -> return compressed_state
   in
-  let* inbox_level =
-    let+ constants = Context.get_constants ctxt in
-    let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _}
-        =
-      constants.parametric.sc_rollup
-    in
-    Raw_level.of_int32_exn
-      (Int32.add (Raw_level.to_int32 pred_level) (Int32.of_int commitment_freq))
-  in
+  let* inbox_level = next_inbox_level ?predecessor ctxt rollup in
   return
     Sc_rollup.Commitment.
       {
-        predecessor;
+        predecessor = predecessor_hash;
         inbox_level;
         number_of_ticks = number_of_ticks_exn number_of_ticks;
         compressed_state;
       }
+
+(* Bakes blocks to satisfy requirement of next_commitment.inbox_level <= current_level *)
+let bake_blocks_until_next_inbox_level ?predecessor block rollup =
+  let* next_level = next_inbox_level ?predecessor (B block) rollup in
+  Block.bake_until_level next_level block
+
+let bake_blocks_until_inbox_level block commitment =
+  Block.bake_until_level commitment.Sc_rollup.Commitment.inbox_level block
 
 let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
     block =
@@ -458,6 +471,16 @@ let hash_commitment incr commitment =
   (Incremental.set_alpha_ctxt incr ctxt, hash)
 
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
+  let* incr =
+    if
+      (Incremental.header incr).Block_header.shell.level
+      < Raw_level.to_int32 commitment.Sc_rollup.Commitment.inbox_level
+    then
+      let* block = Incremental.finalize_block incr in
+      let* block = bake_blocks_until_inbox_level block commitment in
+      Incremental.begin_construction block
+    else return incr
+  in
   let* operation = Op.sc_rollup_publish (I incr) originator rollup commitment in
   let* incr = Incremental.add_operation incr operation in
   let* block = Incremental.finalize_block incr in
@@ -486,19 +509,12 @@ let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
    is also published and cemented). *)
 let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
-  let* constants = Context.get_constants (I incr) in
-  let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _} =
-    constants.parametric.sc_rollup
-  in
   let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
     let level = Raw_level.to_int32 inbox_level in
     if level >= Int32.of_int min_inbox_level then return (hash, incr)
     else
-      let next_inbox_level =
-        Raw_level.of_int32_exn (Int32.add level (Int32.of_int commitment_freq))
-      in
-      let commitment =
-        {commitment with predecessor = hash; inbox_level = next_inbox_level}
+      let* commitment =
+        dummy_commitment ~predecessor:commitment (I incr) rollup
       in
       let* hash, incr =
         publish_and_cement_commitment incr ~baker ~originator rollup commitment
@@ -657,6 +673,7 @@ let recover_bond_with_success i contract rollup =
 let test_publish_cement_and_recover_bond () =
   let* block, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
+  let* block = bake_blocks_until_next_inbox_level block rollup in
   let* i = Incremental.begin_construction block in
   (* not staked yet *)
   let* () = recover_bond_not_staked i contract rollup in
@@ -695,6 +712,7 @@ let test_publish_cement_and_recover_bond () =
     that the second publish fails. *)
 let test_publish_fails_on_backtrack () =
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
   let* commitment1 = dummy_commitment (I i) rollup in
@@ -725,6 +743,7 @@ let test_publish_fails_on_backtrack () =
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
   let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
+  let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract1, contract2 = contracts in
   let* i = Incremental.begin_construction ctxt in
   let* commitment1 = dummy_commitment (I i) rollup in
@@ -761,6 +780,7 @@ let test_cement_fails_on_conflict () =
 
 let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     =
+  let* block = bake_blocks_until_next_inbox_level block rollup in
   let* i = Incremental.begin_construction block in
   let* commitment = dummy_commitment (I i) rollup in
   let* operation = Op.sc_rollup_publish (B block) contract rollup commitment in
@@ -1744,6 +1764,7 @@ let add_op block op =
 
 let add_publish ~rollup block account commitment =
   let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
+  let* block = bake_blocks_until_inbox_level block commitment in
   add_op block publish
 
 (** [test_timeout] test multiple cases of the timeout logic.
@@ -2391,16 +2412,16 @@ let test_zero_tick_commitment_fails () =
 let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
-    init_and_originate Context.T3 "unit"
+    (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
+    init_and_originate
+      ~sc_rollup_challenge_window_in_blocks:60
+      Context.T3
+      "unit"
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
     constants.parametric.sc_rollup.challenge_window_in_blocks
   in
-  let commitment_period =
-    constants.parametric.sc_rollup.commitment_period_in_blocks
-  in
-  let* block = Block.bake_n commitment_period block in
   let* publish1, commitment1 =
     publish_op_and_dummy_commitment
       ~src:account1
@@ -2415,8 +2436,10 @@ let test_curfew () =
       rollup
       block
   in
+  let* block = bake_blocks_until_inbox_level block commitment1 in
   let* block = Block.bake ~operations:[publish1; publish2] block in
   let* block = Block.bake_n (challenge_window - 1) block in
+
   let* publish11, commitment11 =
     publish_op_and_dummy_commitment
       ~src:account1
@@ -2438,8 +2461,9 @@ let test_curfew () =
       rollup
       block
   in
+  let* block = bake_blocks_until_inbox_level block commitment11 in
   let* block = Block.bake ~operations:[publish11; publish21; publish3] block in
-  let* publish111, _commitment111 =
+  let* publish111, commitment111 =
     publish_op_and_dummy_commitment
       ~src:account1
       ~predecessor:commitment11
@@ -2460,6 +2484,7 @@ let test_curfew () =
       rollup
       block
   in
+  let* block = bake_blocks_until_inbox_level block commitment111 in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr publish111 in
   let* incr = Incremental.add_operation incr publish211 in

@@ -892,6 +892,28 @@ let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote n
     b
     (1 -- n)
 
+let rec bake_while ?(baking_mode = Application) ?policy
+    ?liquidity_baking_toggle_vote predicate b =
+  let open Lwt_result_syntax in
+  let* new_block = bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b in
+  if predicate new_block then
+    (bake_while [@ocaml.tailcall])
+      ~baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      predicate
+      new_block
+  else return b
+
+let bake_until_level ?(baking_mode = Application) ?policy
+    ?liquidity_baking_toggle_vote level b =
+  bake_while
+    ~baking_mode
+    ?policy
+    ?liquidity_baking_toggle_vote
+    (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
+    b
+
 let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
     ?liquidity_baking_toggle_vote n b =
   List.fold_left_es
