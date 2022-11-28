@@ -145,6 +145,15 @@ let main_command =
 (* List of program commands *)
 let commands = [main_command]
 
+let global_options = Tezos_clic.no_options
+
+let dispatch initial_ctx args =
+  let open Lwt_result_syntax in
+  let* ctx, remaining_args =
+    Tezos_clic.parse_global_options global_options initial_ctx args
+  in
+  Tezos_clic.dispatch commands ctx remaining_args
+
 let () =
   ignore
     Tezos_clic.(
@@ -153,9 +162,13 @@ let () =
         (if Unix.isatty Unix.stdout then Ansi else Plain)
         Short) ;
   let args = Array.to_list Sys.argv |> List.tl |> Option.value ~default:[] in
-  let result = Lwt_main.run (Tezos_clic.dispatch commands () args) in
+  let result = Lwt_main.run (dispatch () args) in
   match result with
   | Ok _ -> ()
+  | Error [Tezos_clic.Version] ->
+      let version = Tezos_version.Bin_version.version_string in
+      Format.printf "%s\n" version ;
+      exit 0
   | Error e ->
       Format.eprintf
         "%a\n%!"
