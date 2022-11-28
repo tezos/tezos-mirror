@@ -650,6 +650,9 @@ module Dal = struct
           ]
       in
       make ~data PATCH ["slots"; commitment] as_empty_object_or_fail
+
+    let get_slot commitment =
+      make GET ["slots"; commitment] get_bytes_from_json_string_node
   end
 
   let make
