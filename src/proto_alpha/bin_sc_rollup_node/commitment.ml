@@ -185,7 +185,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       match
         Sc_rollup.Number_of_ticks.of_value @@ Z.to_int64 number_of_ticks
       with
-      | Some number_of_ticks -> return number_of_ticks
+      | Some number_of_ticks ->
+          if number_of_ticks = Sc_rollup.Number_of_ticks.zero then
+            failwith "A 0-tick commitment is impossible"
+          else return number_of_ticks
       | None ->
           failwith "Invalid number of ticks %s" (Z.to_string number_of_ticks)
     in

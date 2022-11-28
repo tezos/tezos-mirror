@@ -344,16 +344,10 @@ module Make (PVM : Pvm.S) = struct
       (* Obtain inbox and its messages for this block. *)
       let*! inbox = Store.Inboxes.find store hash in
       match inbox with
-      | None ->
-          (* A level with no messages for use. Skip it. *)
-          let* level = State.level_of_hash store hash in
-          return (state, Z.zero, Raw_level.of_int32_exn level, fuel)
+      | None -> failwith "There is no empty inbox"
       | Some inbox ->
           let inbox_level = Inbox.inbox_level inbox in
           let*! messages = Store.Messages.get store hash in
-          (* TODO: #2717
-             The length of messages here can potentially overflow the [int] returned from [List.length].
-          *)
           let num_messages = List.length messages |> Z.of_int in
           (* Evaluate all the messages for this level. *)
           let>* state, fuel =
