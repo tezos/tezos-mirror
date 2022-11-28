@@ -166,6 +166,9 @@ val shard_encoding : shard Data_encoding.t
 (** An encoding for a map of shares. *)
 val shards_encoding : share IntMap.t Data_encoding.t
 
+(** [encoded_share_size t] returns the size of a share in byte depending on [t] *)
+val encoded_share_size : t -> int
+
 (** [polynomial_from_shards t shares] computes the original polynomial
      from [shares]. The proportion of shares needed is [1] over
      [C.redundancy_factor] the total number of shards. It is

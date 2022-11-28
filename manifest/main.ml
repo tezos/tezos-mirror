@@ -3240,6 +3240,25 @@ let octez_dal_node_lib =
         octez_client_base |> open_;
         octez_protocol_updater |> open_;
         octez_client_base_unix |> open_;
+        octez_stdlib_unix |> open_;
+        octez_crypto_dal |> open_;
+      ]
+
+let _octez_dal_node_lib_tests =
+  tests
+    ["test_lib_dal_node"]
+    ~path:"src/lib_dal_node/test"
+    ~opam:"tezos-dal-node-lib"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_test_helpers |> open_;
+        octez_base_test_helpers |> open_;
+        octez_crypto_dal |> open_;
+        octez_dal_node_lib |> open_;
+        alcotest_lwt;
       ]
 
 let octez_node_config =

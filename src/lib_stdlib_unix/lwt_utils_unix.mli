@@ -199,4 +199,4 @@ val with_atomic_open_out :
 val with_open_in :
   string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
-  ('a, [`Open | `Close] io_error) result Lwt.t
+  ('a, [> `Open | `Close] io_error) result Lwt.t
