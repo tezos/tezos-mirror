@@ -46,3 +46,19 @@ module Info : sig
     pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
     unit
 end
+
+(** The metrics related to Inboxes *)
+module Inbox : sig
+  (** The type of an inbox metrics *)
+  type t = {head_inbox_level : Prometheus.Gauge.t}
+
+  (** The stats for the inboxes *)
+  module Stats : sig
+    (** The list of messages from the head *)
+    val head_messages_list :
+      Protocol.Alpha_context.Sc_rollup.Inbox_message.t list ref
+  end
+
+  (** The inboxes metrics *)
+  val metrics : t
+end
