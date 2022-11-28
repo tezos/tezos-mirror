@@ -28,7 +28,7 @@ let executable_name = Filename.basename Sys.executable_name
 let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 
 let register_signers () =
-  Tezos_client_base.Client_keys.register_aggregate_signer
+  Tezos_client_base.Client_keys_v0.register_aggregate_signer
     (module Tezos_signer_backends.Unencrypted.Aggregate)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025

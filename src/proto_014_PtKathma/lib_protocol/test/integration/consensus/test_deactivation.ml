@@ -311,7 +311,8 @@ let test_delegation () =
   Context.Contract.delegate_opt (B b) a1 >>=? fun delegate ->
   (match delegate with
   | None -> assert false
-  | Some pkh -> assert (Tezos_crypto.Signature.Public_key_hash.equal pkh m1.pkh)) ;
+  | Some pkh ->
+      assert (Tezos_crypto.Signature.V0.Public_key_hash.equal pkh m1.pkh)) ;
   let constants = Default_parameters.constants_test in
   let one_roll = constants.tokens_per_roll in
   Op.transaction ~force_reveal:true (B b) a1 a3 one_roll >>=? fun transact ->
@@ -324,7 +325,8 @@ let test_delegation () =
   Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
   (match delegate with
   | None -> assert false
-  | Some pkh -> assert (Tezos_crypto.Signature.Public_key_hash.equal pkh m3.pkh)) ;
+  | Some pkh ->
+      assert (Tezos_crypto.Signature.V0.Public_key_hash.equal pkh m3.pkh)) ;
   check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m3
   >>=? fun () ->
   check_stake ~loc:__LOC__ b m3 >>=? fun () -> check_stake ~loc:__LOC__ b m1

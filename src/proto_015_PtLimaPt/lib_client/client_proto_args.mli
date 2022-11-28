@@ -61,7 +61,7 @@ val entrypoint_arg : (Entrypoint.t option, full) Tezos_clic.arg
 val default_entrypoint_arg : (Entrypoint.t option, full) Tezos_clic.arg
 
 val delegate_arg :
-  (Tezos_crypto.Signature.Public_key_hash.t option, full) Tezos_clic.arg
+  (Tezos_crypto.Signature.V0.Public_key_hash.t option, full) Tezos_clic.arg
 
 val max_priority_arg : (int option, full) Tezos_clic.arg
 
@@ -118,7 +118,8 @@ val global_constant_param :
   ('a, full) Tezos_clic.params ->
   (string -> 'a, full) Tezos_clic.params
 
-val signature_parameter : (Tezos_crypto.Signature.t, full) Tezos_clic.parameter
+val signature_parameter :
+  (Tezos_crypto.Signature.V0.t, full) Tezos_clic.parameter
 
 module Daemon : sig
   val baking_switch : (bool, full) Tezos_clic.arg

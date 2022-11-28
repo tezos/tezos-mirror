@@ -88,7 +88,8 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
   in
   let protocol_data =
     if mempool_mode then None
-    else Some {Block_header.contents; signature = Tezos_crypto.Signature.zero}
+    else
+      Some {Block_header.contents; signature = Tezos_crypto.Signature.V0.zero}
   in
   let header =
     {
@@ -103,7 +104,7 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
           context = Tezos_crypto.Context_hash.zero;
           operations_hash = Tezos_crypto.Operation_list_list_hash.zero;
         };
-      protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
     }
   in
   begin_construction

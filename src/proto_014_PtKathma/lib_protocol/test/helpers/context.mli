@@ -95,7 +95,8 @@ module Vote : sig
 
   val get_ballot_list :
     t ->
-    (Tezos_crypto.Signature.Public_key_hash.t * Vote.ballot) list tzresult Lwt.t
+    (Tezos_crypto.Signature.V0.Public_key_hash.t * Vote.ballot) list tzresult
+    Lwt.t
 
   val get_current_period : t -> Voting_period.info tzresult Lwt.t
 
@@ -104,7 +105,8 @@ module Vote : sig
   val get_participation_ema : Block.t -> int32 tzresult Lwt.t
 
   val get_listings :
-    t -> (Tezos_crypto.Signature.Public_key_hash.t * int64) list tzresult Lwt.t
+    t ->
+    (Tezos_crypto.Signature.V0.Public_key_hash.t * int64) list tzresult Lwt.t
 
   val get_proposals : t -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
@@ -231,8 +233,8 @@ type 'accounts init :=
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?bootstrap_delegations:
-    (Tezos_crypto.Signature.Public_key_hash.t
-    * Tezos_crypto.Signature.Public_key_hash.t)
+    (Tezos_crypto.Signature.V0.Public_key_hash.t
+    * Tezos_crypto.Signature.V0.Public_key_hash.t)
     list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->

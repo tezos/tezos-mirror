@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Client_keys
+open Client_keys_v0
 open Tezos_sapling.Core.Client
 
 (* Transform a spending key to an uri, encrypted or not. *)

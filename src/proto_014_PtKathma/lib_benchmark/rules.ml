@@ -580,7 +580,7 @@ end
 
 module Data_rewrite_leaves
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) =
+    (Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S) =
 struct
   let hole_patt =
     let open Patt in
@@ -917,7 +917,7 @@ end
 
 module Data
     (Michelson_base : Michelson_samplers_base.S)
-    (Crypto_samplers : Crypto_samplers.Finite_key_pool_S) =
+    (Crypto_samplers : Crypto_samplers.V0.Finite_key_pool_S) =
 struct
   let match_data_node =
     let open Patt in

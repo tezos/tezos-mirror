@@ -100,7 +100,7 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
       Partial_construction {predecessor_hash = predecessor.hash; timestamp}
     else
       let block_header_data =
-        {Block_header.contents; signature = Tezos_crypto.Signature.zero}
+        {Block_header.contents; signature = Tezos_crypto.Signature.V0.zero}
       in
       Construction
         {predecessor_hash = predecessor.hash; timestamp; block_header_data}
@@ -118,7 +118,7 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
           context = Tezos_crypto.Context_hash.zero;
           operations_hash = Tezos_crypto.Operation_list_list_hash.zero;
         };
-      protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
     }
   in
   begin_validation_and_application

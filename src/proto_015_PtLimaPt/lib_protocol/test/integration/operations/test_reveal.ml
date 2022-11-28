@@ -146,12 +146,12 @@ let test_reveal_with_fake_account () =
 
      These preambles are too verbose and boilerplate. We should factor
      out revealing fresh unrevealed accounts. *)
-  when_ (Tezos_crypto.Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
+  when_ (Tezos_crypto.Signature.V0.Public_key_hash.equal a_pkh b_pkh) (fun () ->
       failwith
         "Expected different pkhs: got %a %a"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         a_pkh
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         b_pkh)
   >>=? fun () ->
   Op.transaction (B blk) bootstrap a_contract Tez.one >>=? fun oa ->
@@ -228,12 +228,12 @@ let test_reveal_with_fake_account_already_revealed () =
 
      These preambles are too verbose and boilerplate. We should factor
      out revealing fresh unrevealed accounts. *)
-  when_ (Tezos_crypto.Signature.Public_key_hash.equal a_pkh b_pkh) (fun () ->
+  when_ (Tezos_crypto.Signature.V0.Public_key_hash.equal a_pkh b_pkh) (fun () ->
       failwith
         "Expected different pkhs: got %a %a"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         a_pkh
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         b_pkh)
   >>=? fun () ->
   Op.transaction (B blk) bootstrap a_contract Tez.one >>=? fun oa ->

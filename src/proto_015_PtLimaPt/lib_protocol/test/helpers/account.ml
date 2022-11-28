@@ -27,14 +27,14 @@ open Protocol
 open Alpha_context
 
 type t = {
-  pkh : Tezos_crypto.Signature.Public_key_hash.t;
-  pk : Tezos_crypto.Signature.Public_key.t;
-  sk : Tezos_crypto.Signature.Secret_key.t;
+  pkh : Tezos_crypto.Signature.V0.Public_key_hash.t;
+  pk : Tezos_crypto.Signature.V0.Public_key.t;
+  sk : Tezos_crypto.Signature.V0.Secret_key.t;
 }
 
 type account = t
 
-let known_accounts = Tezos_crypto.Signature.Public_key_hash.Table.create 17
+let known_accounts = Tezos_crypto.Signature.V0.Public_key_hash.Table.create 17
 
 let random_seed ~rng_state =
   Bytes.init Tezos_crypto.Hacl.Ed25519.sk_size (fun _i ->
@@ -42,14 +42,14 @@ let random_seed ~rng_state =
 
 let new_account ?seed () =
   let pkh, pk, sk =
-    Tezos_crypto.Signature.generate_key ~algo:Ed25519 ?seed ()
+    Tezos_crypto.Signature.V0.generate_key ~algo:Ed25519 ?seed ()
   in
   let account = {pkh; pk; sk} in
-  Tezos_crypto.Signature.Public_key_hash.Table.add known_accounts pkh account ;
+  Tezos_crypto.Signature.V0.Public_key_hash.Table.add known_accounts pkh account ;
   account
 
 let add_account ({pkh; _} as account) =
-  Tezos_crypto.Signature.Public_key_hash.Table.add known_accounts pkh account
+  Tezos_crypto.Signature.V0.Public_key_hash.Table.add known_accounts pkh account
 
 let activator_account =
   let seed = random_seed ~rng_state:(Random.State.make [|0x1337533D|]) in
@@ -57,21 +57,21 @@ let activator_account =
 
 let find pkh =
   match
-    Tezos_crypto.Signature.Public_key_hash.Table.find known_accounts pkh
+    Tezos_crypto.Signature.V0.Public_key_hash.Table.find known_accounts pkh
   with
   | Some k -> return k
   | None ->
       failwith
         "Missing account: %a"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         pkh
 
 let find_alternate pkh =
   let exception Found of t in
   try
-    Tezos_crypto.Signature.Public_key_hash.Table.iter
+    Tezos_crypto.Signature.V0.Public_key_hash.Table.iter
       (fun pkh' account ->
-        if not (Tezos_crypto.Signature.Public_key_hash.equal pkh pkh') then
+        if not (Tezos_crypto.Signature.V0.Public_key_hash.equal pkh pkh') then
           raise (Found account))
       known_accounts ;
     raise Not_found
@@ -86,8 +86,8 @@ let dummy_account =
 let default_initial_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
 let generate_accounts ?rng_state ?(initial_balances = []) ?bootstrap_delegations
-    n : (t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list =
-  Tezos_crypto.Signature.Public_key_hash.Table.clear known_accounts ;
+    n : (t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option) list =
+  Tezos_crypto.Signature.V0.Public_key_hash.Table.clear known_accounts ;
   let amount i =
     match List.nth_opt initial_balances i with
     | None -> default_initial_balance
@@ -110,13 +110,13 @@ let generate_accounts ?rng_state ?(initial_balances = []) ?bootstrap_delegations
   List.map
     (fun i ->
       let pkh, pk, sk =
-        Tezos_crypto.Signature.generate_key
+        Tezos_crypto.Signature.V0.generate_key
           ~algo:Ed25519
           ~seed:(random_seed ~rng_state)
           ()
       in
       let account = {pkh; pk; sk} in
-      Tezos_crypto.Signature.Public_key_hash.Table.add
+      Tezos_crypto.Signature.V0.Public_key_hash.Table.add
         known_accounts
         pkh
         account ;
@@ -130,7 +130,7 @@ let commitment_secret =
 
 let new_commitment ?seed () =
   let pkh, pk, sk =
-    Tezos_crypto.Signature.generate_key ?seed ~algo:Ed25519 ()
+    Tezos_crypto.Signature.V0.generate_key ?seed ~algo:Ed25519 ()
   in
   let unactivated_account = {pkh; pk; sk} in
   let open Commitment in

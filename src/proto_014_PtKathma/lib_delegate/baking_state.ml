@@ -31,9 +31,9 @@ open Protocol_client_context
     public key, its public key hash, and its secret key. *)
 type delegate = {
   alias : string option;
-  public_key : Tezos_crypto.Signature.Public_key.t;
-  public_key_hash : Tezos_crypto.Signature.Public_key_hash.t;
-  secret_key_uri : Client_keys.sk_uri;
+  public_key : Tezos_crypto.Signature.V0.Public_key.t;
+  public_key_hash : Tezos_crypto.Signature.V0.Public_key_hash.t;
+  secret_key_uri : Client_keys_v0.sk_uri;
 }
 
 let delegate_encoding =
@@ -50,14 +50,16 @@ let delegate_encoding =
         public_key;
         public_key_hash;
         secret_key_uri =
-          (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
+          (match Client_keys_v0.make_sk_uri (Uri.of_string secret_key_uri) with
           | Ok sk -> sk
           | Error e -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace e);
       })
     (obj4
        (req "alias" (option string))
-       (req "public_key" Tezos_crypto.Signature.Public_key.encoding)
-       (req "public_key_hash" Tezos_crypto.Signature.Public_key_hash.encoding)
+       (req "public_key" Tezos_crypto.Signature.V0.Public_key.encoding)
+       (req
+          "public_key_hash"
+          Tezos_crypto.Signature.V0.Public_key_hash.encoding)
        (req "secret_key_uri" string))
 
 let pp_delegate fmt {alias; public_key_hash; _} =
@@ -66,14 +68,14 @@ let pp_delegate fmt {alias; public_key_hash; _} =
       Format.fprintf
         fmt
         "%a"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         public_key_hash
   | Some alias ->
       Format.fprintf
         fmt
         "%s (%a)"
         alias
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         public_key_hash
 
 type validation_mode = Node | Local of Abstract_context_index.t
@@ -222,7 +224,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
     other words the list of rounds when it will be the proposer), and
     its endorsing power. *)
 type endorsing_slot = {
-  delegate : Tezos_crypto.Signature.Public_key_hash.t;
+  delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
   slots : Slot.t list;
   endorsing_power : int;
 }
@@ -584,7 +586,7 @@ module DelegateSet = struct
     type t = delegate
 
     let compare {public_key_hash = pkh; _} {public_key_hash = pkh'; _} =
-      Tezos_crypto.Signature.Public_key_hash.compare pkh pkh'
+      Tezos_crypto.Signature.V0.Public_key_hash.compare pkh pkh'
   end)
 
   let find_pkh pkh s =
@@ -592,7 +594,7 @@ module DelegateSet = struct
     try
       iter
         (fun ({public_key_hash; _} as delegate) ->
-          if Tezos_crypto.Signature.Public_key_hash.equal pkh public_key_hash
+          if Tezos_crypto.Signature.V0.Public_key_hash.equal pkh public_key_hash
           then raise (Found delegate)
           else ())
         s ;

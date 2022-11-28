@@ -160,14 +160,14 @@ let not_equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =
   not_equal ~loc Tez.( = ) "Tez are equal" Tez.pp a b
 
 (* pkh *)
-let equal_pkh ~loc (a : Tezos_crypto.Signature.Public_key_hash.t)
-    (b : Tezos_crypto.Signature.Public_key_hash.t) =
-  let module PKH = Tezos_crypto.Signature.Public_key_hash in
+let equal_pkh ~loc (a : Tezos_crypto.Signature.V0.Public_key_hash.t)
+    (b : Tezos_crypto.Signature.V0.Public_key_hash.t) =
+  let module PKH = Tezos_crypto.Signature.V0.Public_key_hash in
   equal ~loc PKH.equal "Public key hashes aren't equal" PKH.pp a b
 
-let not_equal_pkh ~loc (a : Tezos_crypto.Signature.Public_key_hash.t)
-    (b : Tezos_crypto.Signature.Public_key_hash.t) =
-  let module PKH = Tezos_crypto.Signature.Public_key_hash in
+let not_equal_pkh ~loc (a : Tezos_crypto.Signature.V0.Public_key_hash.t)
+    (b : Tezos_crypto.Signature.V0.Public_key_hash.t) =
+  let module PKH = Tezos_crypto.Signature.V0.Public_key_hash in
   not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
 
 (* protocol hash *)

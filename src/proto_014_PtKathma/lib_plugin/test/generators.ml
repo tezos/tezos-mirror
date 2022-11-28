@@ -26,14 +26,14 @@
 let string_gen = QCheck2.Gen.small_string ?gen:None
 
 let public_key_hash_gen :
-    (Tezos_crypto.Signature.public_key_hash
-    * Tezos_crypto.Signature.public_key
-    * Tezos_crypto.Signature.secret_key)
+    (Tezos_crypto.Signature.V0.public_key_hash
+    * Tezos_crypto.Signature.V0.public_key
+    * Tezos_crypto.Signature.V0.secret_key)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ seed = string_size (32 -- 64) in
   let seed = Bytes.of_string seed in
-  Tezos_crypto.Signature.generate_key ~seed ()
+  Tezos_crypto.Signature.V0.generate_key ~seed ()
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2407
    move this function to an helper file? *)
@@ -51,7 +51,7 @@ let dummy_manager_op_info oph =
   }
 
 let dummy_manager_op_info_with_key_gen :
-    (Plugin.Mempool.manager_op_info * Tezos_crypto.Signature.public_key_hash)
+    (Plugin.Mempool.manager_op_info * Tezos_crypto.Signature.V0.public_key_hash)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ oph, (pkh, _, _) = pair operation_hash_gen public_key_hash_gen in
@@ -86,7 +86,7 @@ let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =
           {
             state with
             op_prechecked_managers =
-              Tezos_crypto.Signature.Public_key_hash.Map.add
+              Tezos_crypto.Signature.V0.Public_key_hash.Map.add
                 pkh
                 info
                 state.op_prechecked_managers;
@@ -105,7 +105,7 @@ let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =
 
 let with_filter_state_operation_gen :
     Plugin.Mempool.state ->
-    (Plugin.Mempool.manager_op_info * Tezos_crypto.Signature.public_key_hash)
+    (Plugin.Mempool.manager_op_info * Tezos_crypto.Signature.V0.public_key_hash)
     QCheck2.Gen.t =
  fun state ->
   let open QCheck2.Gen in
@@ -122,7 +122,8 @@ let with_filter_state_operation_gen :
 
 let filter_state_with_operation_gen :
     (Plugin.Mempool.state
-    * (Plugin.Mempool.manager_op_info * Tezos_crypto.Signature.public_key_hash))
+    * (Plugin.Mempool.manager_op_info
+      * Tezos_crypto.Signature.V0.public_key_hash))
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   filter_state_gen >>= fun state ->

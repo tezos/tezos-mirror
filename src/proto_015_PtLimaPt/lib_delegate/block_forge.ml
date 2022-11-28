@@ -52,7 +52,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce;
           liquidity_baking_toggle_vote;
         };
-      signature = Tezos_crypto.Signature.zero;
+      signature = Tezos_crypto.Signature.V0.zero;
     }
 
 let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
@@ -385,7 +385,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
   let unsigned_block_header =
     {
       Block_header.shell = shell_header;
-      protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
     }
   in
   return {unsigned_block_header; operations}

@@ -156,7 +156,9 @@ let inject_vdf_revelation cctxt hash chain_id solution =
       ~solution
       ()
   in
-  let bytes = Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero in
+  let bytes =
+    Tezos_crypto.Signature.V0.concat bytes Tezos_crypto.Signature.V0.zero
+  in
   Shell_services.Injection.operation cctxt ~chain bytes
 
 (* Checks if the VDF setup saved in the state is equal to the one computed

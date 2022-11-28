@@ -210,7 +210,7 @@ let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
   (match nonce_config with
   | Deterministic ->
       let data = Data_encoding.Binary.to_bytes_exn Raw_level.encoding level in
-      Client_keys.deterministic_nonce delegate.secret_key_uri data
+      Client_keys_v0.deterministic_nonce delegate.secret_key_uri data
       >>=? fun nonce ->
       return (Data_encoding.Binary.of_bytes_exn Nonce.encoding nonce)
   | Random -> (
@@ -247,7 +247,9 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             ()
           >>=? fun bytes ->
           let bytes =
-            Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero
+            Tezos_crypto.Signature.V0.concat
+              bytes
+              Tezos_crypto.Signature.V0.zero
           in
           Shell_services.Injection.operation ~async:true cctxt ~chain bytes
           >>=? fun oph ->

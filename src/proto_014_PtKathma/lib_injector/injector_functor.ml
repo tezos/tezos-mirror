@@ -507,9 +507,9 @@ module Make (Rollup : PARAMETERS) = struct
       Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
     in
     let* signature =
-      Client_keys.sign
+      Client_keys_v0.sign
         state.cctxt
-        ~watermark:Tezos_crypto.Signature.Generic_operation
+        ~watermark:Tezos_crypto.Signature.V0.Generic_operation
         state.signer.sk
         unsigned_op_bytes
     in
@@ -619,14 +619,7 @@ module Make (Rollup : PARAMETERS) = struct
           assert false
       | Ok packed_contents_list -> packed_contents_list
     in
-    let signature =
-      match state.signer.pkh with
-      | Tezos_crypto.Signature.Ed25519 _ ->
-          Tezos_crypto.Signature.of_ed25519 Tezos_crypto.Ed25519.zero
-      | Secp256k1 _ ->
-          Tezos_crypto.Signature.of_secp256k1 Tezos_crypto.Secp256k1.zero
-      | P256 _ -> Tezos_crypto.Signature.of_p256 Tezos_crypto.P256.zero
-    in
+    let signature = Tezos_crypto.Signature.V0.zero in
     let branch = Tezos_crypto.Block_hash.zero in
     let operation =
       {
@@ -924,7 +917,7 @@ module Make (Rollup : PARAMETERS) = struct
           let tags = Tags.of_list tags in
           let strategy, tags =
             match
-              Tezos_crypto.Signature.Public_key_hash.Map.find_opt signer acc
+              Tezos_crypto.Signature.V0.Public_key_hash.Map.find_opt signer acc
             with
             | None -> (strategy, tags)
             | Some (other_strategy, other_tags) ->
@@ -939,14 +932,14 @@ module Make (Rollup : PARAMETERS) = struct
                 in
                 (strategy, Tags.union other_tags tags)
           in
-          Tezos_crypto.Signature.Public_key_hash.Map.add
+          Tezos_crypto.Signature.V0.Public_key_hash.Map.add
             signer
             (strategy, tags)
             acc)
-        Tezos_crypto.Signature.Public_key_hash.Map.empty
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.empty
         signers
     in
-    Tezos_crypto.Signature.Public_key_hash.Map.iter_es
+    Tezos_crypto.Signature.V0.Public_key_hash.Map.iter_es
       (fun signer (strategy, tags) ->
         let+ worker =
           Worker.launch

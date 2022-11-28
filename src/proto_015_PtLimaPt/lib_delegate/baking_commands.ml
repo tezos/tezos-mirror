@@ -166,7 +166,7 @@ let liquidity_baking_toggle_vote_arg =
     liquidity_baking_toggle_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
-    (pkhs : Tezos_crypto.Signature.public_key_hash list) =
+    (pkhs : Tezos_crypto.Signature.V0.public_key_hash list) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
     {
       Baking_state.alias = Some alias;
@@ -176,12 +176,12 @@ let get_delegates (cctxt : Protocol_client_context.full)
     }
   in
   (if pkhs = [] then
-   Client_keys.get_keys cctxt >>=? fun keys ->
+   Client_keys_v0.get_keys cctxt >>=? fun keys ->
    List.map proj_delegate keys |> return
   else
     List.map_es
       (fun pkh ->
-        Client_keys.get_key cctxt pkh >>=? function
+        Client_keys_v0.get_key cctxt pkh >>=? function
         | alias, pk, sk_uri -> return (proj_delegate (alias, pkh, pk, sk_uri)))
       pkhs)
   >>=? fun delegates ->
@@ -202,7 +202,7 @@ let get_delegates (cctxt : Protocol_client_context.full)
 
 let sources_param =
   Tezos_clic.seq_of_param
-    (Client_keys.Public_key_hash.source_param
+    (Client_keys_v0.Public_key_hash.source_param
        ~name:"baker"
        ~desc:
          "name of the delegate owning the endorsement/baking right or name of \

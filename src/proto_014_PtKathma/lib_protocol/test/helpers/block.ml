@@ -84,7 +84,7 @@ let get_next_baker_by_account pkh block =
   | None ->
       failwith
         "No slots found for %a"
-        Tezos_crypto.Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.V0.Public_key_hash.pp
         pkh)
   >>=? fun {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} ->
   Environment.wrap_tzresult (Round.to_int round) >>?= fun round ->
@@ -99,7 +99,7 @@ let get_next_baker_excluding excludes block =
          (fun {Plugin.RPC.Baking_rights.delegate; _} ->
            not
              (List.mem
-                ~equal:Tezos_crypto.Signature.Public_key_hash.equal
+                ~equal:Tezos_crypto.Signature.V0.Public_key_hash.equal
                 delegate
                 excludes))
          bakers
@@ -169,7 +169,7 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Tezos_crypto.Signature.sign
+      Tezos_crypto.Signature.V0.sign
         ~watermark:
           Block_header.(to_watermark (Block_header Tezos_crypto.Chain_id.zero))
         delegate.sk
@@ -422,7 +422,7 @@ let genesis_with_parameters parameters =
     header =
       {
         shell;
-        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+        protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
       };
     operations = [];
     context;
@@ -430,8 +430,8 @@ let genesis_with_parameters parameters =
 
 let validate_initial_accounts
     (initial_accounts :
-      (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list)
-    tokens_per_roll =
+      (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option)
+      list) tokens_per_roll =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
   (* Check there is at least one roll *)
@@ -599,8 +599,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold
     (initial_accounts :
-      (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list)
-    =
+      (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option)
+      list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -642,7 +642,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     header =
       {
         shell;
-        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+        protocol_data = {contents; signature = Tezos_crypto.Signature.V0.zero};
       };
     operations = [];
     context;
@@ -650,8 +650,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
 
 let alpha_context ?commitments ?min_proposal_quorum
     (initial_accounts :
-      (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list)
-    =
+      (Account.t * Tez.t * Tezos_crypto.Signature.V0.Public_key_hash.t option)
+      list) =
   prepare_initial_context_params ?min_proposal_quorum initial_accounts
   >>=? fun (constants, shell, _hash) ->
   initial_alpha_context ?commitments constants shell initial_accounts

@@ -110,14 +110,14 @@ let view_options =
     (unparsing_mode_arg ~default:"Readable")
 
 let dummy_callback =
-  Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero
+  Contract.Implicit Tezos_crypto.Signature.V0.Public_key_hash.zero
 
 let get_contract_caller_keys cctxt (caller : Contract.t) =
   match caller with
   | Originated _ ->
       failwith "only implicit accounts can be the source of a contract call"
   | Implicit source ->
-      Client_keys.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
       return (source, caller_pk, caller_sk)
 
 let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =

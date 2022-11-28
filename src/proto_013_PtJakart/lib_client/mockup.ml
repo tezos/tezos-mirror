@@ -1007,7 +1007,7 @@ module Protocol_constants_overrides = struct
 end
 
 module Parsed_account = struct
-  type t = {name : string; sk_uri : Client_keys.sk_uri; amount : Tez.t}
+  type t = {name : string; sk_uri : Client_keys_v0.sk_uri; amount : Tez.t}
 
   let pp ppf account =
     let open Format in
@@ -1027,13 +1027,15 @@ module Parsed_account = struct
       (fun (name, sk_uri, amount) -> {name; sk_uri; amount})
       (obj3
          (req "name" string)
-         (req "sk_uri" Client_keys.Secret_key.encoding)
+         (req "sk_uri" Client_keys_v0.Secret_key.encoding)
          (req "amount" Tez.encoding))
 
   let to_bootstrap_account repr =
-    Tezos_client_base.Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
-    Tezos_client_base.Client_keys.public_key pk_uri >>=? fun public_key ->
-    let public_key_hash = Tezos_crypto.Signature.Public_key.hash public_key in
+    Client_keys_v0.neuterize repr.sk_uri >>=? fun pk_uri ->
+    Client_keys_v0.public_key pk_uri >>=? fun public_key ->
+    let public_key_hash =
+      Tezos_crypto.Signature.V0.Public_key.hash public_key
+    in
     return
       Parameters.
         {public_key_hash; public_key = Some public_key; amount = repr.amount}
@@ -1044,7 +1046,7 @@ module Parsed_account = struct
     let wallet = (cctxt :> Client_context.wallet) in
     let parsed_account_reprs = ref [] in
     let errors = ref [] in
-    Client_keys.list_keys wallet >>=? fun all_keys ->
+    Client_keys_v0.list_keys wallet >>=? fun all_keys ->
     List.iter_s
       (function
         | name, pkh, _pk_opt, Some sk_uri -> (
@@ -1093,8 +1095,10 @@ module Bootstrap_account = struct
       (fun (public_key_hash, public_key, amount) ->
         {public_key_hash; public_key; amount})
       (obj3
-         (req "public_key_hash" Tezos_crypto.Signature.Public_key_hash.encoding)
-         (opt "public_key" Tezos_crypto.Signature.Public_key.encoding)
+         (req
+            "public_key_hash"
+            Tezos_crypto.Signature.V0.Public_key_hash.encoding)
+         (opt "public_key" Tezos_crypto.Signature.V0.Public_key.encoding)
          (req "amount" Tez.encoding))
 end
 
@@ -1106,7 +1110,7 @@ module Bootstrap_contract = struct
       (fun {delegate; amount; script} -> (delegate, amount, script))
       (fun (delegate, amount, script) -> {delegate; amount; script})
       (obj3
-         (opt "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+         (opt "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
          (req "amount" Tez.encoding)
          (req "script" Script.encoding))
 end
@@ -1167,10 +1171,10 @@ let lib_parameters_json_encoding =
       (fun (pk, amount) ->
         {
           Parameters.public_key = Some pk;
-          public_key_hash = Tezos_crypto.Signature.Public_key.hash pk;
+          public_key_hash = Tezos_crypto.Signature.V0.Public_key.hash pk;
           amount;
         })
-      (tup2 Tezos_crypto.Signature.Public_key.encoding Tez.encoding)
+      (tup2 Tezos_crypto.Signature.V0.Public_key.encoding Tez.encoding)
   in
   Data_encoding.(
     merge_objs
@@ -1391,7 +1395,7 @@ let mem_init :
         ]
     in
     let open Protocol.Alpha_context.Block_header in
-    let _, _, sk = Tezos_crypto.Signature.generate_key () in
+    let _, _, sk = Tezos_crypto.Signature.V0.generate_key () in
     let proof_of_work_nonce =
       Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
     in
@@ -1411,7 +1415,7 @@ let mem_init :
         (shell_header, contents)
     in
     let signature =
-      Tezos_crypto.Signature.sign
+      Tezos_crypto.Signature.V0.sign
         ~watermark:
           Protocol.Alpha_context.Block_header.(
             to_watermark (Block_header chain_id))

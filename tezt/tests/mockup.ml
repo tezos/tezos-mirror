@@ -1082,7 +1082,8 @@ let test_create_mockup_config_show_init_roundtrip protocols =
     | typ when typ =~ rex "#/definitions/.*\\.mutez" ->
         let n_opt = numerical_of_string ~typ value in
         `String (distinct_sample_numeric ~minimum:0 n_opt |> string_of_int)
-    | "#/definitions/Signature.Public_key_hash" ->
+    | "#/definitions/Signature.Public_key_hash"
+    | "#/definitions/Signature.V0.Public_key_hash" ->
         let value' =
           distinct_sample_list
             ~equal:String.equal

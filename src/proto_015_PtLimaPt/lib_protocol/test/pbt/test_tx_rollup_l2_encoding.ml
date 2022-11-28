@@ -76,7 +76,7 @@ let idx_l2_address_gen =
   oneof [idx_l2_address_idx_gen; return idx_l2_address_value]
 
 let public_key_hash =
-  Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
+  Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn
     "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let public_key_hash_gen =
@@ -90,7 +90,7 @@ let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
      we could introduce a bit more randomness here *)
   let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
   let ticketer_pkh =
-    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn ticketer_b58
+    Tezos_crypto.Signature.V0.Public_key_hash.of_b58check_exn ticketer_b58
   in
   let ticketer = Protocol.Alpha_context.Contract.Implicit ticketer_pkh in
   Tx_rollup_l2_helpers.make_unit_ticket_key ticketer l2_address

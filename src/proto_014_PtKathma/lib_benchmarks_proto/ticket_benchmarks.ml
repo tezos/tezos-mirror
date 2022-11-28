@@ -256,8 +256,8 @@ let () = Registration_helpers.register (module Has_tickets_type_benchmark)
 let ticket_sampler rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
   let pkh, _, _ =
-    Tezos_crypto.Signature.generate_key
-      ~algo:Tezos_crypto.Signature.Ed25519
+    Tezos_crypto.Signature.V0.generate_key
+      ~algo:Tezos_crypto.Signature.V0.Ed25519
       ~seed
       ()
   in

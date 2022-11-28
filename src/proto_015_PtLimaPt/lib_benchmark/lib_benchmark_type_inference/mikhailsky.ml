@@ -386,12 +386,18 @@ module Data = struct
 
   let key_hash kh =
     let b =
-      Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding kh
+      Data_encoding.Binary.to_bytes_exn
+        Environment.Signature.Public_key_hash.encoding
+        kh
     in
     prim A_Key_hash [bytes b] []
 
   let key k =
-    let b = Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k in
+    let b =
+      Data_encoding.Binary.to_bytes_exn
+        Environment.Signature.Public_key.encoding
+        k
+    in
     prim A_Key [bytes b] []
 
   let integer (i : int) = prim A_Int [int (Z.of_int i)] []

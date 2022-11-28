@@ -52,7 +52,7 @@ let test_check_manager_restriction_fresh =
         {
           filter_state with
           op_prechecked_managers =
-            Tezos_crypto.Signature.Public_key_hash.Map.remove
+            Tezos_crypto.Signature.V0.Public_key_hash.Map.remove
               pkh
               filter_state.op_prechecked_managers;
         }
@@ -71,7 +71,7 @@ let test_check_manager_restriction_fresh =
             "@[<v 2>Check manager restriction failed!@,\
              %a should not be in the set of precheck managers:@,\
              %a@]"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_state
             filter_state)
@@ -93,7 +93,7 @@ let test_check_manager_restriction_fail =
         {
           filter_state with
           op_prechecked_managers =
-            Tezos_crypto.Signature.Public_key_hash.Map.add
+            Tezos_crypto.Signature.V0.Public_key_hash.Map.add
               pkh
               {op_info with fee = Alpha_context.Tez.one}
               (* We force higher fee than below: [one > zero]. *)
@@ -114,7 +114,7 @@ let test_check_manager_restriction_fail =
             "@[<v 2>Check manager restriction failed!@,\
              %a should be in the set of precheck managers:@,\
              %a@]"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_state
             filter_state
@@ -124,7 +124,7 @@ let test_check_manager_restriction_fail =
              %a is in the set of precheck managers:@,\
              %a@,\
              but should not replace the old operation:%a@]"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_state
             filter_state
@@ -148,7 +148,7 @@ let test_check_manager_restriction_replace =
         {
           filter_state with
           op_prechecked_managers =
-            Tezos_crypto.Signature.Public_key_hash.Map.add
+            Tezos_crypto.Signature.V0.Public_key_hash.Map.add
               pkh
               op_info
               filter_state.op_prechecked_managers;
@@ -168,7 +168,7 @@ let test_check_manager_restriction_replace =
             "@[<v 2>Check manager restriction failed!@,\
              %a should be in the set of precheck managers:@,\
              %a@]"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_state
             filter_state
@@ -178,7 +178,7 @@ let test_check_manager_restriction_replace =
              %a is in the set of prechecked managers:@,\
              %a but the old version should have been replaced because the new \
              fees(%a) are higher@]"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_state
             filter_state
@@ -212,11 +212,11 @@ let test_add_manager_restriction_set =
           Format.fprintf
             fmt
             "%a was not found in prechecked_managers : %a"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_prechecked_managers
             set)
-        ~cond:(Tezos_crypto.Signature.Public_key_hash.Map.mem pkh)
+        ~cond:(Tezos_crypto.Signature.V0.Public_key_hash.Map.mem pkh)
         filter_state.op_prechecked_managers
         ())
 
@@ -301,7 +301,7 @@ let test_add_manager_restriction_check =
             "@[<v 2>Check manager restriction failed!@,\
              %a should be in the set of precheck managers:@,\
              %a@]"
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             pkh
             pp_state
             filter_state
@@ -332,7 +332,7 @@ let test_remove =
       in
       let actual_state = remove ~filter_state op_info.operation_hash in
       let expected_prechecked_managers =
-        Tezos_crypto.Signature.Public_key_hash.Map.remove
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.remove
           pkh
           filter_state.op_prechecked_managers
       in

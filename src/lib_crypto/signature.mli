@@ -2,6 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,58 +25,74 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type public_key_hash =
-  | Ed25519 of Ed25519.Public_key_hash.t
-  | Secp256k1 of Secp256k1.Public_key_hash.t
-  | P256 of P256.Public_key_hash.t
+(** Cryptographic signatures are versioned to expose different versions to
+    different protocols, depending on the support.  *)
 
-type public_key =
-  | Ed25519 of Ed25519.Public_key.t
-  | Secp256k1 of Secp256k1.Public_key.t
-  | P256 of P256.Public_key.t
+(** The type of conversion modules from one version to another. *)
+module type CONV = sig
+  module V_from : S.COMMON_SIGNATURE
 
-type secret_key =
-  | Ed25519 of Ed25519.Secret_key.t
-  | Secp256k1 of Secp256k1.Secret_key.t
-  | P256 of P256.Secret_key.t
+  module V_to : S.COMMON_SIGNATURE
 
-type watermark =
-  | Block_header of Chain_id.t
-  | Endorsement of Chain_id.t
-  | Generic_operation
-  | Custom of Bytes.t
+  val public_key_hash : V_from.Public_key_hash.t -> V_to.Public_key_hash.t
 
-val bytes_of_watermark : watermark -> Bytes.t
+  val public_key : V_from.Public_key.t -> V_to.Public_key.t
 
-val pp_watermark : Format.formatter -> watermark -> unit
+  val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t
 
-include
-  S.SIGNATURE
-    with type Public_key_hash.t = public_key_hash
-     and type Public_key.t = public_key
-     and type Secret_key.t = secret_key
-     and type watermark := watermark
+  val signature : V_from.t -> V_to.t
+end
 
-(** [append sk buf] is the concatenation of [buf] and the
-    serialization of the signature of [buf] signed by [sk]. *)
-val append : ?watermark:watermark -> secret_key -> Bytes.t -> Bytes.t
+(** The type of {e partial} conversion modules from one version to another. *)
+module type CONV_OPT = sig
+  module V_from : S.COMMON_SIGNATURE
 
-(** [concat buf t] is the concatenation of [buf] and the serialization
-    of [t]. *)
-val concat : Bytes.t -> t -> Bytes.t
+  module V_to : S.COMMON_SIGNATURE
 
-include S.RAW_DATA with type t := t
+  val public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t option
 
-val of_secp256k1 : Secp256k1.t -> t
+  val public_key : V_from.Public_key.t -> V_to.Public_key.t option
 
-val of_ed25519 : Ed25519.t -> t
+  val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
 
-val of_p256 : P256.t -> t
+  val signature : V_from.t -> V_to.t option
+end
 
-type algo = Ed25519 | Secp256k1 | P256
+(** The module [V_latest] is to be used by the shell and points to the latest
+    available version of signatures. *)
+module V_latest : module type of Signature_v1
 
-val generate_key :
-  ?algo:algo ->
-  ?seed:Bytes.t ->
-  unit ->
-  public_key_hash * public_key * secret_key
+(** [V0] supports Ed25519, Secp256k1, and P256. *)
+module V0 : sig
+  include module type of Signature_v0
+
+  (** Converting from signatures of {!V_latest} to {!V0}. *)
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v0
+end
+
+(** [V1] supports Ed25519, Secp256k1, P256. It is a copy of {!V0} without type
+    equalities. *)
+module V1 : sig
+  include module type of Signature_v1
+
+  (** Converting from signatures of {!V_latest} to {!V1}. *)
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v1
+end
+
+include module type of V_latest
+
+(** Converting from signatures of {!V_latest} to {!V_latest}. This module
+    implements conversions which are the identity, so total, but we keep the
+    signature as {!CONV_OPT} for compatibility with {!V0.Of_V_latest} and
+    {!V1.Of_V_latest} and to ease snapshotting. *)
+module Of_V_latest :
+  CONV_OPT with module V_from := V_latest and module V_to := V_latest
+
+(** Converting from signatures of {!V0} to {!V_latest}. *)
+module Of_V0 : CONV with module V_from := V0 and module V_to := V_latest
+
+(** Converting from signatures of {!V1} to {!V_latest}. *)
+module Of_V1 : CONV with module V_from := V1 and module V_to := V_latest

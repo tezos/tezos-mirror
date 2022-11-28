@@ -67,7 +67,7 @@ val set_delegate :
   ?fee:Tez.t ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   Contract_hash.t ->
   public_key_hash option ->
   Kind.transaction Kind.manager Injection.result tzresult Lwt.t
@@ -105,7 +105,7 @@ val transfer :
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->
-  src_sk:Client_keys.sk_uri ->
+  src_sk:Client_keys_v0.sk_uri ->
   contract:Contract.t ->
   destination:Contract.t ->
   ?entrypoint:Entrypoint.t ->

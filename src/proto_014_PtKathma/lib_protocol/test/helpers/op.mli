@@ -30,8 +30,8 @@ open Alpha_context
    Improve documentation of the operation helpers *)
 
 val sign :
-  ?watermark:Tezos_crypto.Signature.watermark ->
-  Tezos_crypto.Signature.secret_key ->
+  ?watermark:Tezos_crypto.Signature.V0.watermark ->
+  Tezos_crypto.Signature.V0.secret_key ->
   Context.t ->
   packed_contents_list ->
   packed_operation
@@ -230,7 +230,7 @@ val originated_contract : Operation.packed -> Contract.t
 val register_global_constant :
   ?force_reveal:bool ->
   ?counter:Z.t ->
-  ?public_key:Tezos_crypto.Signature.public_key ->
+  ?public_key:Tezos_crypto.Signature.V0.public_key ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -261,7 +261,7 @@ val double_baking :
 
 val activation :
   Context.t ->
-  Tezos_crypto.Signature.Public_key_hash.t ->
+  Tezos_crypto.Signature.V0.Public_key_hash.t ->
   Blinded_public_key_hash.activation_code ->
   Operation.packed tzresult Lwt.t
 

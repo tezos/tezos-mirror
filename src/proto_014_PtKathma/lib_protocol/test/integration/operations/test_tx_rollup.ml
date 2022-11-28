@@ -311,8 +311,8 @@ let commitment_hash_testable =
 
 let public_key_hash_testable =
   Alcotest.testable
-    Tezos_crypto.Signature.Public_key_hash.pp
-    Tezos_crypto.Signature.Public_key_hash.( = )
+    Tezos_crypto.Signature.V0.Public_key_hash.pp
+    Tezos_crypto.Signature.V0.Public_key_hash.( = )
 
 let raw_level_testable = Alcotest.testable Raw_level.pp Raw_level.( = )
 

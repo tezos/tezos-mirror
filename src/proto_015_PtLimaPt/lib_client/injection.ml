@@ -192,9 +192,9 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       fprintf
         ppf
         "Watermark: `%a` (0x%s)"
-        Tezos_crypto.Signature.pp_watermark
+        Tezos_crypto.Signature.V0.pp_watermark
         watermark
-        (Hex.of_bytes (Tezos_crypto.Signature.bytes_of_watermark watermark)
+        (Hex.of_bytes (Tezos_crypto.Signature.V0.bytes_of_watermark watermark)
         |> Hex.show)) ;
   item (fun ppf () ->
       pp_print_text ppf "Operation bytes: " ;
@@ -218,7 +218,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       pp_print_text
         ppf
         "Blake 2B Hash (ledger-style, with operation watermark): " ;
-      hash_pp [Tezos_crypto.Signature.bytes_of_watermark watermark; bytes]) ;
+      hash_pp [Tezos_crypto.Signature.V0.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
       Operation.unsigned_encoding
@@ -244,7 +244,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
       let watermark =
         match contents with
         (* TODO-TB sign endorsement? *)
-        | _ -> Tezos_crypto.Signature.Generic_operation
+        | _ -> Tezos_crypto.Signature.V0.Generic_operation
       in
       (if verbose_signing then
        cctxt#message
@@ -252,14 +252,14 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
          (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
       else Lwt.return_unit)
       >>= fun () ->
-      Client_keys.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
+      Client_keys_v0.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
       return_some signature)
   >>=? fun signature ->
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = Bytes.length bytes + Tezos_crypto.Signature.size in
+  let size = Bytes.length bytes + Tezos_crypto.Signature.V0.size in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -794,7 +794,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
-            + Tezos_crypto.Signature.size
+            + Tezos_crypto.Signature.V0.size
           else
             Data_encoding.Binary.length
               Operation.contents_encoding
@@ -1216,10 +1216,12 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
            (fun acc (_oph, {protocol_data = Operation_data {contents; _}; _}) ->
              match contents with
              | Single (Manager_operation {source; _} as _op)
-               when Tezos_crypto.Signature.Public_key_hash.equal source src ->
+               when Tezos_crypto.Signature.V0.Public_key_hash.equal source src
+               ->
                  Contents_list contents :: acc
              | Cons (Manager_operation {source; _}, _rest) as _op
-               when Tezos_crypto.Signature.Public_key_hash.equal source src ->
+               when Tezos_crypto.Signature.V0.Public_key_hash.equal source src
+               ->
                  Contents_list contents :: acc
              | _ -> acc)
            []
@@ -1342,14 +1344,14 @@ let replace_operation (type kind) (cctxt : #full) chain source
           cctxt#error
             "Cannot replace! No applied manager operation found for %a in \
              mempool@."
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             source
           >>= fun () -> exit 1
       | _ :: _ :: _ as l ->
           cctxt#error
             "More than one applied manager operation found for %a in mempool. \
              Found %d operations. Are you sure the node is in precheck mode?@."
-            Tezos_crypto.Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.V0.Public_key_hash.pp
             source
             (List.length l)
           >>= fun () -> exit 1

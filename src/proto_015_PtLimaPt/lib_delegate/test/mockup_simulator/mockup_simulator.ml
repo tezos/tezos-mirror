@@ -821,8 +821,8 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
            Baking_state.consensus_key) ->
       let open Tezos_client_base in
       let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
-      Client_keys.neuterize secret_key_uri >>=? fun public_key_uri ->
-      Client_keys.register_key
+      Client_keys_v0.neuterize secret_key_uri >>=? fun public_key_uri ->
+      Client_keys_v0.register_key
         wallet
         ~force:false
         (public_key_hash, public_key_uri, secret_key_uri)
@@ -855,7 +855,7 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
   Lwt.pick [listener_process (); baker_process ()] >>=? fun () ->
   User_hooks.check_chain_on_success ~chain:state.chain
 
-let genesis_protocol_data (baker_sk : Tezos_crypto.Signature.secret_key)
+let genesis_protocol_data (baker_sk : Tezos_crypto.Signature.V0.secret_key)
     (predecessor_block_hash : Tezos_crypto.Block_hash.t)
     (block_header : Block_header.shell_header) : Bytes.t =
   let proof_of_work_nonce =
@@ -885,7 +885,7 @@ let genesis_protocol_data (baker_sk : Tezos_crypto.Signature.secret_key)
       (block_header, contents)
   in
   let signature =
-    Tezos_crypto.Signature.sign
+    Tezos_crypto.Signature.V0.sign
       ~watermark:
         Alpha_context.Block_header.(to_watermark (Block_header chain_id))
       baker_sk
@@ -901,7 +901,7 @@ let deduce_baker_sk
       (Protocol.Alpha_context.Parameters.bootstrap_account
       * Tezos_mockup_commands.Mockup_wallet.bootstrap_secret)
       list) (total_accounts : int) (level : int) :
-    Tezos_crypto.Signature.secret_key tzresult Lwt.t =
+    Tezos_crypto.Signature.V0.secret_key tzresult Lwt.t =
   (match (total_accounts, level) with
   | _, 0 -> return 0 (* apparently this doesn't really matter *)
   | _ ->
@@ -916,7 +916,7 @@ let deduce_baker_sk
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   let secret_key =
-    Tezos_crypto.Signature.Secret_key.of_b58check_exn
+    Tezos_crypto.Signature.V0.Secret_key.of_b58check_exn
       (Uri.path (secret.sk_uri :> Uri.t))
   in
   return secret_key
@@ -1093,7 +1093,7 @@ type config = {
   round1 : int64;
   timeout : int;
   delegate_selection :
-    (int32 * (int32 * Tezos_crypto.Signature.public_key_hash) list) list;
+    (int32 * (int32 * Tezos_crypto.Signature.V0.public_key_hash) list) list;
   initial_seed : State_hash.t option;
   consensus_committee_size : int;
   consensus_threshold : int;
@@ -1128,7 +1128,7 @@ let make_baking_delegate
     }
 
 let run ?(config = default_config) bakers_spec =
-  Tezos_client_base.Client_keys.register_signer
+  Tezos_client_base.Client_keys_v0.register_signer
     (module Tezos_signer_backends.Unencrypted) ;
   let total_accounts =
     List.fold_left (fun acc (n, _) -> acc + n) 0 bakers_spec
@@ -1229,7 +1229,7 @@ let check_block_signature ~block_hash ~(block_header : Block_header.t)
       (block_header.shell, protocol_data.contents)
   in
   if
-    Tezos_crypto.Signature.check
+    Tezos_crypto.Signature.V0.check
       ~watermark:
         Alpha_context.Block_header.(to_watermark (Block_header chain_id))
       public_key
@@ -1241,7 +1241,7 @@ let check_block_signature ~block_hash ~(block_header : Block_header.t)
       "unexpected signature for %a; tried with %a@."
       Tezos_crypto.Block_hash.pp
       block_hash
-      Tezos_crypto.Signature.Public_key.pp
+      Tezos_crypto.Signature.V0.Public_key.pp
       public_key
 
 type op_predicate =
@@ -1278,7 +1278,7 @@ let op_is_signed_by ~public_key (op_hash : Tezos_crypto.Operation_hash.t)
                 Alpha_context.Operation.to_watermark (Endorsement chain_id)
             | Preendorsement _ ->
                 Alpha_context.Operation.to_watermark (Preendorsement chain_id)
-            | _ -> Tezos_crypto.Signature.Generic_operation)
+            | _ -> Tezos_crypto.Signature.V0.Generic_operation)
       | _ ->
           failwith
             "unexpected contents in %a@."
@@ -1298,7 +1298,7 @@ let op_is_signed_by ~public_key (op_hash : Tezos_crypto.Operation_hash.t)
               (op.shell, Contents_list d.contents)
           in
           return
-            (Tezos_crypto.Signature.check
+            (Tezos_crypto.Signature.V0.check
                ~watermark
                public_key
                signature

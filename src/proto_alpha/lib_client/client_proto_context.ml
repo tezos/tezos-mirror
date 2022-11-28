@@ -769,6 +769,8 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
        Tezos_crypto.Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
+  let pk = Tezos_crypto.Signature.Of_V1.public_key pk in
+  let sk = Tezos_crypto.Signature.Of_V1.secret_key sk in
   Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
    Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk

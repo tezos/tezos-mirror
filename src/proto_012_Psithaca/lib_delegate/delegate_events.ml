@@ -498,7 +498,7 @@ module Baking_forge = struct
       ("fitness", Fitness.encoding)
       ("client", Data_encoding.string)
       ("predecessor", Tezos_crypto.Block_hash.encoding)
-      ("baker", Client_keys.Public_key_hash.encoding)
+      ("baker", Client_keys_v0.Public_key_hash.encoding)
 
   let injected_block =
     declare_7
@@ -550,7 +550,7 @@ module Baking_forge = struct
       ("timestamp", Time.System.encoding)
       ("client", Data_encoding.string)
       ("predecessor", Tezos_crypto.Block_hash.encoding)
-      ("baker", Client_keys.Public_key_hash.encoding)
+      ("baker", Client_keys_v0.Public_key_hash.encoding)
 
   let read_nonce_fail =
     declare_1
@@ -693,7 +693,7 @@ module Endorsement = struct
       ("level", Alpha_context.Raw_level.encoding)
       ("client", Data_encoding.string)
       ("op_hash", Tezos_crypto.Operation_hash.encoding)
-      ("baker", Client_keys.Public_key_hash.encoding)
+      ("baker", Client_keys_v0.Public_key_hash.encoding)
 
   let endorsing =
     declare_3
@@ -782,6 +782,6 @@ module Endorsement = struct
       ~name:"error_while_endorsing"
       ~msg:"error while injecting endorsement for baker {baker}: {errors}"
       ~pp2:pp_print_top_error_of_trace
-      ("baker", Client_keys.Public_key_hash.encoding)
+      ("baker", Client_keys_v0.Public_key_hash.encoding)
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 end

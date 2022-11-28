@@ -145,8 +145,9 @@ module Default_config = struct
 end
 
 let make_default_samplers ?(algo = `Default) cfg :
-    (module Crypto_samplers.Finite_key_pool_S) * (module Michelson_samplers.S) =
-  let module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+    (module Crypto_samplers.V0.Finite_key_pool_S)
+    * (module Michelson_samplers.S) =
+  let module Crypto_samplers = Crypto_samplers.V0.Make_finite_key_pool (struct
     let size = 16
 
     let algo = algo
@@ -2325,14 +2326,14 @@ module Registration_section = struct
         ~kinstr:(ILevel (dummy_loc, halt))
         ()
 
-    let check_signature (algo : Tezos_crypto.Signature.algo) ~for_intercept =
+    let check_signature (algo : Tezos_crypto.Signature.V0.algo) ~for_intercept =
       let name =
         match algo with
-        | Tezos_crypto.Signature.Ed25519 ->
+        | Tezos_crypto.Signature.V0.Ed25519 ->
             Interpreter_workload.N_ICheck_signature_ed25519
-        | Tezos_crypto.Signature.Secp256k1 ->
+        | Tezos_crypto.Signature.V0.Secp256k1 ->
             Interpreter_workload.N_ICheck_signature_secp256k1
-        | Tezos_crypto.Signature.P256 ->
+        | Tezos_crypto.Signature.V0.P256 ->
             Interpreter_workload.N_ICheck_signature_p256
       in
       benchmark_with_stack_sampler
@@ -2351,7 +2352,7 @@ module Registration_section = struct
               else Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
             in
             let signed_message =
-              Tezos_crypto.Signature.sign sk unsigned_message
+              Tezos_crypto.Signature.V0.sign sk unsigned_message
             in
             let signed_message = Script_signature.make signed_message in
             (pk, (signed_message, (unsigned_message, eos))))
@@ -2361,11 +2362,11 @@ module Registration_section = struct
       check_signature algo ~for_intercept:true ;
       check_signature algo ~for_intercept:false
 
-    let () = check_signature Tezos_crypto.Signature.Ed25519
+    let () = check_signature Tezos_crypto.Signature.V0.Ed25519
 
-    let () = check_signature Tezos_crypto.Signature.Secp256k1
+    let () = check_signature Tezos_crypto.Signature.V0.Secp256k1
 
-    let () = check_signature Tezos_crypto.Signature.P256
+    let () = check_signature Tezos_crypto.Signature.V0.P256
 
     let () =
       simple_benchmark
@@ -3075,8 +3076,8 @@ module Registration_section = struct
           let step_constants =
             {
               source =
-                Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero;
-              payer = Tezos_crypto.Signature.Public_key_hash.zero;
+                Contract.Implicit Tezos_crypto.Signature.V0.Public_key_hash.zero;
+              payer = Tezos_crypto.Signature.V0.Public_key_hash.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;
               balance = Tez.zero;

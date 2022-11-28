@@ -30,7 +30,7 @@ open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts
 open Client_proto_programs
-open Client_keys
+open Client_keys_v0
 open Client_proto_args
 
 let encrypted_switch =
@@ -141,7 +141,7 @@ let transfer_command amount source destination cctxt
   | None ->
       let contract = source in
       Managed_contract.get_contract_manager cctxt source >>=? fun source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       Managed_contract.transfer
         cctxt
         ~chain:cctxt#chain
@@ -165,7 +165,7 @@ let transfer_command amount source destination cctxt
         ?counter
         ()
   | Some source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       transfer
         cctxt
         ~chain:cctxt#chain
@@ -534,7 +534,7 @@ let commands network () =
         | None ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -558,7 +558,7 @@ let commands network () =
               errors
             >>= fun _ -> return_unit
         | Some mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -615,7 +615,7 @@ let commands network () =
         | None ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -638,7 +638,7 @@ let commands network () =
               errors
             >>= fun _ -> return_unit
         | Some mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -663,7 +663,7 @@ let commands network () =
          gas_limit_arg
          storage_limit_arg
          delegate_arg
-         (Client_keys.force_switch ())
+         (Client_keys_v0.force_switch ())
          init_arg
          no_print_source_flag
          minimal_fees_arg
@@ -717,7 +717,7 @@ let commands network () =
             failwith
               "only implicit accounts can be the source of an origination"
         | Some source -> (
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
                 Injection.minimal_fees;
@@ -850,11 +850,11 @@ let commands network () =
             | None ->
                 Managed_contract.get_contract_manager cctxt source
                 >>=? fun source ->
-                Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-                return (source, src_pk, src_sk)
+                Client_keys_v0.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk)
             | Some source ->
-                Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-                return (source, src_pk, src_sk))
+                Client_keys_v0.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk))
             >>=? fun (source, src_pk, src_sk) ->
             List.mapi_ep prepare operations >>=? fun contents ->
             let (Manager_list contents) =
@@ -1082,7 +1082,7 @@ let commands network () =
         match Contract.is_implicit source with
         | None -> failwith "only implicit accounts can be revealed"
         | Some source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
                 Injection.minimal_fees;
@@ -1135,7 +1135,7 @@ let commands network () =
              burn_cap )
            src_pkh
            cctxt ->
-        Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
+        Client_keys_v0.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         let fee_parameter =
           {
             Injection.minimal_fees;
@@ -1367,7 +1367,7 @@ let commands network () =
           match Contract.is_implicit source with
           | None -> failwith "only implicit accounts can submit proposals"
           | Some src_pkh -> (
-              Client_keys.get_key cctxt src_pkh
+              Client_keys_v0.get_key cctxt src_pkh
               >>=? fun (src_name, _src_pk, src_sk) ->
               get_period_info
               (* Find period info of the successor, because the operation will
@@ -1438,7 +1438,7 @@ let commands network () =
                   not
                     (List.exists
                        (fun (pkh, _) ->
-                         Tezos_crypto.Signature.Public_key_hash.equal
+                         Tezos_crypto.Signature.V0.Public_key_hash.equal
                            pkh
                            src_pkh)
                        listings)
@@ -1446,7 +1446,7 @@ let commands network () =
                   error
                     "Public-key-hash `%a` from account `%s` does not appear to \
                      have voting rights."
-                    Tezos_crypto.Signature.Public_key_hash.pp
+                    Tezos_crypto.Signature.V0.Public_key_hash.pp
                     src_pkh
                     src_name ;
                 if !errors <> [] then
@@ -1542,7 +1542,7 @@ let commands network () =
           match Contract.is_implicit source with
           | None -> failwith "only implicit accounts can submit ballot"
           | Some src_pkh ->
-              Client_keys.get_key cctxt src_pkh
+              Client_keys_v0.get_key cctxt src_pkh
               >>=? fun (_src_name, _src_pk, src_sk) ->
               get_period_info
               (* Find period info of the successor, because the operation will

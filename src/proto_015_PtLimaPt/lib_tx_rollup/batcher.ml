@@ -33,7 +33,7 @@ type state = {
   constants : Constants.t;
   batch_burn_limit : Tez.t option;
   index : Context.index;
-  signer : Tezos_crypto.Signature.public_key_hash;
+  signer : Tezos_crypto.Signature.V0.public_key_hash;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
@@ -241,7 +241,7 @@ module Types = struct
   type nonrec state = state
 
   type parameters = {
-    signer : Tezos_crypto.Signature.public_key_hash;
+    signer : Tezos_crypto.Signature.V0.public_key_hash;
     index : Context.index;
     constants : Constants.t;
     batch_burn_limit : Tez.t option;

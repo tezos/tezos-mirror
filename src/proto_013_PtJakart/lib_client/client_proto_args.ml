@@ -205,7 +205,7 @@ let default_arg_arg =
     string_parameter
 
 let delegate_arg =
-  Client_keys.Public_key_hash.source_arg
+  Client_keys_v0.Public_key_hash.source_arg
     ~long:"delegate"
     ~placeholder:"address"
     ~doc:"delegate of the contract\nMust be a known address."
@@ -548,7 +548,7 @@ let no_confirmation =
 
 let signature_parameter =
   Tezos_clic.parameter (fun _cctxt s ->
-      match Tezos_crypto.Signature.of_b58check_opt s with
+      match Tezos_crypto.Signature.V0.of_b58check_opt s with
       | Some s -> return s
       | None -> failwith "Not given a valid signature")
 

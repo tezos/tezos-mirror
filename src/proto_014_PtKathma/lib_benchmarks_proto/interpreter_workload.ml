@@ -1337,19 +1337,19 @@ let extract_ir_sized_step :
   | ILevel (_, _), _ -> Instructions.level
   | ICheck_signature (_, _), (public_key, (_signature, (message, _))) -> (
       match public_key with
-      | Tezos_crypto.Signature.Ed25519 _pk ->
+      | Tezos_crypto.Signature.V0.Ed25519 _pk ->
           let pk = Size.of_int Tezos_crypto.Ed25519.size in
-          let signature = Size.of_int Tezos_crypto.Signature.size in
+          let signature = Size.of_int Tezos_crypto.Signature.V0.size in
           let message = Size.bytes message in
           Instructions.check_signature_ed25519 pk signature message
-      | Tezos_crypto.Signature.Secp256k1 _pk ->
+      | Tezos_crypto.Signature.V0.Secp256k1 _pk ->
           let pk = Size.of_int Tezos_crypto.Secp256k1.size in
-          let signature = Size.of_int Tezos_crypto.Signature.size in
+          let signature = Size.of_int Tezos_crypto.Signature.V0.size in
           let message = Size.bytes message in
           Instructions.check_signature_secp256k1 pk signature message
-      | Tezos_crypto.Signature.P256 _pk ->
+      | Tezos_crypto.Signature.V0.P256 _pk ->
           let pk = Size.of_int Tezos_crypto.P256.size in
-          let signature = Size.of_int Tezos_crypto.Signature.size in
+          let signature = Size.of_int Tezos_crypto.Signature.V0.size in
           let message = Size.bytes message in
           Instructions.check_signature_p256 pk signature message)
   | IHash_key (_, _), _ -> Instructions.hash_key

@@ -26,26 +26,50 @@
 (* Primitives for sampling crypto-related data *)
 
 module type Param_S = sig
+  type algo
+
   val size : int
 
-  val algo : [`Algo of Tezos_crypto.Signature.algo | `Default]
+  val algo : [`Algo of algo | `Default]
 end
 
-module type Finite_key_pool_S = sig
-  val pk : Tezos_crypto.Signature.public_key Base_samplers.sampler
+module type P_Finite_key_pool_S = sig
+  type public_key_hash
 
-  val pkh : Tezos_crypto.Signature.public_key_hash Base_samplers.sampler
+  type public_key
 
-  val sk : Tezos_crypto.Signature.secret_key Base_samplers.sampler
+  type secret_key
 
-  val all :
-    (Tezos_crypto.Signature.public_key_hash
-    * Tezos_crypto.Signature.public_key
-    * Tezos_crypto.Signature.secret_key)
-    Base_samplers.sampler
+  val pk : public_key Base_samplers.sampler
+
+  val pkh : public_key_hash Base_samplers.sampler
+
+  val sk : secret_key Base_samplers.sampler
+
+  val all : (public_key_hash * public_key * secret_key) Base_samplers.sampler
 end
 
-module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
+module type Signature_S = sig
+  include Tezos_crypto.S.SIGNATURE
+
+  type algo
+
+  val algos : algo list
+
+  val generate_key :
+    ?algo:algo ->
+    ?seed:Bytes.t ->
+    unit ->
+    Public_key_hash.t * Public_key.t * Secret_key.t
+end
+
+module Make_p_finite_key_pool
+    (Signature : Signature_S)
+    (Arg : Param_S with type algo := Signature.algo) :
+  P_Finite_key_pool_S
+    with type public_key_hash := Signature.Public_key_hash.t
+     and type public_key := Signature.Public_key.t
+     and type secret_key := Signature.Secret_key.t = struct
   let () = if Arg.size < 1 then invalid_arg "Make_finite_key_pool" else ()
 
   (* Hardcoded bc not directly accessible through the Tezos_crypto API. *)
@@ -53,12 +77,7 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
 
   let key_pool = Queue.create ()
 
-  let all_algos =
-    [|
-      Tezos_crypto.Signature.Ed25519;
-      Tezos_crypto.Signature.Secp256k1;
-      Tezos_crypto.Signature.P256;
-    |]
+  let all_algos = Array.of_list Signature.algos
 
   let uniform_algo state =
     let i = Random.State.int state (Array.length all_algos) in
@@ -74,7 +93,7 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
       let seed =
         Base_samplers.uniform_bytes ~nbytes:minimal_seed_length state
       in
-      let triple = Tezos_crypto.Signature.generate_key ~algo ~seed () in
+      let triple = Signature.generate_key ~algo ~seed () in
       Queue.add triple key_pool ;
       triple)
     else
@@ -100,3 +119,39 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
 
   let all = get_next
 end
+
+module V0 = struct
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V0.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V0.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V0.Secret_key.t
+
+  module Make_finite_key_pool =
+    Make_p_finite_key_pool (Tezos_crypto.Signature.V0)
+end
+
+module V1 = struct
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash := Tezos_crypto.Signature.V1.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V1.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V1.Secret_key.t
+
+  module Make_finite_key_pool =
+    Make_p_finite_key_pool (Tezos_crypto.Signature.V1)
+end
+
+module V_latest = struct
+  module type Finite_key_pool_S =
+    P_Finite_key_pool_S
+      with type public_key_hash :=
+        Tezos_crypto.Signature.V_latest.Public_key_hash.t
+       and type public_key := Tezos_crypto.Signature.V_latest.Public_key.t
+       and type secret_key := Tezos_crypto.Signature.V_latest.Secret_key.t
+
+  module Make_finite_key_pool =
+    Make_p_finite_key_pool (Tezos_crypto.Signature.V_latest)
+end
+
+include V_latest

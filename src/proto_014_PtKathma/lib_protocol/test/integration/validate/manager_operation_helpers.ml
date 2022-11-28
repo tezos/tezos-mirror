@@ -1167,7 +1167,7 @@ let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
    increment of the counters aka 1 for a single operation, n for a
    batch of n manager operations. *)
 type probes = {
-  source : Tezos_crypto.Signature.Public_key_hash.t;
+  source : Tezos_crypto.Signature.V0.Public_key_hash.t;
   fee : Tez.tez;
   gas_limit : Gas.Arith.integral;
   nb_counter : Z.t;

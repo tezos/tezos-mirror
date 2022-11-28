@@ -205,7 +205,7 @@ let sign_block_header state proposer unsigned_block_header =
   >>=? function
   | false -> fail (Block_previously_baked {level; round})
   | true ->
-      Client_keys.sign
+      Client_keys_v0.sign
         cctxt
         proposer.secret_key_uri
         ~watermark:Block_header.(to_watermark (Block_header chain_id))
@@ -383,7 +383,7 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
            Operation.unsigned_encoding
            unsigned_operation
        in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+       Client_keys_v0.sign cctxt ~watermark sk_uri unsigned_operation_bytes
       else
         fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
       >>= function
@@ -472,7 +472,7 @@ let sign_endorsements state endorsements =
            Operation.unsigned_encoding
            unsigned_operation
        in
-       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+       Client_keys_v0.sign cctxt ~watermark sk_uri unsigned_operation_bytes
       else fail (Baking_highwatermarks.Block_previously_endorsed {round; level}))
       >>= function
       | Error err ->

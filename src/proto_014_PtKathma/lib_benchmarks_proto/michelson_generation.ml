@@ -44,7 +44,7 @@ let generator_config_encoding =
 
 (* ----------------------------------------------------------------------- *)
 
-module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+module Crypto_samplers = Crypto_samplers.V0.Make_finite_key_pool (struct
   let size = 16
 
   let algo = `Default

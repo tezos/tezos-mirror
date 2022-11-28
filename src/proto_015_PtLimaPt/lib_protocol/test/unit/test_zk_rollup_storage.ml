@@ -45,9 +45,9 @@ let batch_size = 10
 module ZKRU = struct
   include Alpha_context.Zk_rollup
 
-  type pkh = Tezos_crypto.Signature.Public_key_hash.t
+  type pkh = Tezos_crypto.Signature.V0.Public_key_hash.t
 
-  let pkh_encoding = Tezos_crypto.Signature.Public_key_hash.encoding
+  let pkh_encoding = Tezos_crypto.Signature.V0.Public_key_hash.encoding
 
   type ticket_hash = Alpha_context.Ticket_hash.t
 
@@ -141,7 +141,7 @@ module Raw_context_tests = struct
   let pending_list_append () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Tezos_crypto.Signature.generate_key () in
+    let pkh, _, _ = Tezos_crypto.Signature.V0.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -170,7 +170,7 @@ module Raw_context_tests = struct
   let pending_list_append_errors () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Tezos_crypto.Signature.generate_key () in
+    let pkh, _, _ = Tezos_crypto.Signature.V0.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.

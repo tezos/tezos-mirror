@@ -110,7 +110,7 @@ let test_encode_decode_internal_inbox_message () =
   let source =
     Result.get_ok
       ~loc:__LOC__
-      (Tezos_crypto.Signature.Public_key_hash.of_b58check
+      (Tezos_crypto.Signature.V0.Public_key_hash.of_b58check
          "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
   in
   let*? (Script_typed_ir.Ty_ex_c pair_nat_ticket_string_ty) =

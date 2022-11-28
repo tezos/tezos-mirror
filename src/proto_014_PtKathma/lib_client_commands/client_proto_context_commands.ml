@@ -30,7 +30,7 @@ open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
 open Client_proto_rollups
-open Client_keys
+open Client_keys_v0
 open Client_proto_args
 
 let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
@@ -677,7 +677,7 @@ let transfer_command amount (source : Contract.t) destination
       let contract = source in
       Managed_contract.get_contract_manager cctxt contract_hash
       >>=? fun source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       Managed_contract.transfer
         cctxt
         ~chain:cctxt#chain
@@ -702,7 +702,7 @@ let transfer_command amount (source : Contract.t) destination
         ?counter
         ()
   | Implicit source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       transfer
         cctxt
         ~chain:cctxt#chain
@@ -879,7 +879,7 @@ let commands_rw () =
         | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -903,7 +903,7 @@ let commands_rw () =
               errors
             >>= fun _ -> return_unit
         | Implicit mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -933,7 +933,7 @@ let commands_rw () =
         | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Managed_contract.set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -956,7 +956,7 @@ let commands_rw () =
               errors
             >>= fun _ -> return_unit
         | Implicit mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
               ~chain:cctxt#chain
@@ -981,7 +981,7 @@ let commands_rw () =
          gas_limit_arg
          storage_limit_arg
          delegate_arg
-         (Client_keys.force_switch ())
+         (Client_keys_v0.force_switch ())
          init_arg
          no_print_source_flag
          fee_parameter_args)
@@ -1025,7 +1025,7 @@ let commands_rw () =
             failwith
               "only implicit accounts can be the source of an origination"
         | Implicit source -> (
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             originate_contract
               cctxt
               ~chain:cctxt#chain
@@ -1148,11 +1148,11 @@ let commands_rw () =
             | Originated contract ->
                 Managed_contract.get_contract_manager cctxt contract
                 >>=? fun source ->
-                Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-                return (source, src_pk, src_sk)
+                Client_keys_v0.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk)
             | Implicit source ->
-                Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-                return (source, src_pk, src_sk))
+                Client_keys_v0.get_key cctxt source
+                >>=? fun (_, src_pk, src_sk) -> return (source, src_pk, src_sk))
             >>=? fun (source, src_pk, src_sk) ->
             List.mapi_ep prepare operations >>=? fun contents ->
             let (Manager_list contents) =
@@ -1310,7 +1310,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can register global constants"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             register_global_constant
               cctxt
               ~chain:cctxt#chain
@@ -1412,7 +1412,7 @@ let commands_rw () =
         match source with
         | Originated _ -> failwith "only implicit accounts can be revealed"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             reveal
               cctxt
               ~dry_run
@@ -1436,7 +1436,7 @@ let commands_rw () =
       @@ prefixes ["as"; "delegate"]
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter) src_pkh cctxt ->
-        Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
+        Client_keys_v0.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         register_as_delegate
           cctxt
           ~chain:cctxt#chain
@@ -1530,7 +1530,7 @@ let commands_rw () =
         match source with
         | Originated _ -> failwith "only implicit accounts can submit proposals"
         | Implicit src_pkh -> (
-            Client_keys.get_key cctxt src_pkh
+            Client_keys_v0.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
             (* Find period info of the successor, because the operation will
@@ -1615,7 +1615,7 @@ let commands_rw () =
                 error
                   "Public-key-hash `%a` from account `%s` does not appear to \
                    have voting rights."
-                  Tezos_crypto.Signature.Public_key_hash.pp
+                  Tezos_crypto.Signature.V0.Public_key_hash.pp
                   src_pkh
                   src_name ;
               if !errors <> [] then
@@ -1716,7 +1716,7 @@ let commands_rw () =
         match source with
         | Originated _ -> failwith "only implicit accounts can submit ballot"
         | Implicit src_pkh ->
-            Client_keys.get_key cctxt src_pkh
+            Client_keys_v0.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
             (* Find period info of the successor, because the operation will
@@ -1762,7 +1762,7 @@ let commands_rw () =
               (if force then cctxt#warning else cctxt#error)
                 "Public-key-hash `%a` from account `%s` does not appear to \
                  have voting rights."
-                Tezos_crypto.Signature.Public_key_hash.pp
+                Tezos_crypto.Signature.V0.Public_key_hash.pp
                 src_pkh
                 src_name)
             >>= fun () ->
@@ -1806,7 +1806,7 @@ let commands_rw () =
               Contract.pp
               contract
         | Implicit mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_deposits_limit
               cctxt
               ~chain:cctxt#chain
@@ -1846,7 +1846,7 @@ let commands_rw () =
               Contract.pp
               contract
         | Implicit mgr ->
-            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            Client_keys_v0.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_deposits_limit
               cctxt
               ~chain:cctxt#chain
@@ -1888,7 +1888,7 @@ let commands_rw () =
            amount_in_bytes
            payer
            (cctxt : Protocol_client_context.full) ->
-        Client_keys.get_key cctxt payer >>=? fun (_, src_pk, manager_sk) ->
+        Client_keys_v0.get_key cctxt payer >>=? fun (_, src_pk, manager_sk) ->
         increase_paid_storage
           cctxt
           ~chain:cctxt#chain
@@ -1943,7 +1943,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can originate transaction rollups"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             Protocol_client_context.Alpha_block_services.Header.shell_header
               cctxt
               ()
@@ -2026,7 +2026,7 @@ let commands_rw () =
             failwith
               "Only implicit accounts can submit transaction rollup batches"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_batch
               cctxt
               ~chain:cctxt#chain
@@ -2101,7 +2101,7 @@ let commands_rw () =
             failwith
               "Only implicit accounts can submit transaction rollup commitments"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2157,7 +2157,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can finalize commitments"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_finalize_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2208,7 +2208,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can deposit/recover bonds"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_return_bond
               cctxt
               ~chain:cctxt#chain
@@ -2260,7 +2260,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can remove commitments."
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_remove_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2368,7 +2368,7 @@ let commands_rw () =
               "Only implicit accounts can reject transaction rollup \
                commitments."
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_rejection
               cctxt
               ~chain:cctxt#chain
@@ -2466,7 +2466,7 @@ let commands_rw () =
               "Only implicit account can dispatch tickets for a transaction \
                rollup."
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             tx_rollup_dispatch_tickets
               cctxt
               ~chain:cctxt#chain
@@ -2550,7 +2550,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can transfer tickets."
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             transfer_ticket
               cctxt
               ~chain:cctxt#chain
@@ -2623,7 +2623,7 @@ let commands_rw () =
             failwith
               "Only implicit accounts can originate smart-contract rollups"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let (module R : Sc_rollup.PVM.S) = pvm in
             let Michelson_v1_parser.{expanded; _} = parameters_ty in
             let parameters_ty = Script.lazy_expr expanded in
@@ -2702,7 +2702,7 @@ let commands_rw () =
                   "Could not read list of messages (expected list of bytes)"
             | messages -> return messages))
         >>=? fun messages ->
-        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_add_messages
           cctxt
           ~chain:cctxt#chain
@@ -2766,7 +2766,7 @@ let commands_rw () =
             failwith "Only implicit accounts can cement commitments"
         | Implicit source -> return source)
         >>=? fun source ->
-        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_cement
           cctxt
           ~chain:cctxt#chain
@@ -2870,7 +2870,7 @@ let commands_rw () =
                transactions"
         | Implicit source -> return source)
         >>=? fun source ->
-        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_execute_outbox_message
           cctxt
           ~chain:cctxt#chain
@@ -2929,7 +2929,7 @@ let commands_rw () =
         | Originated _ ->
             failwith "Only implicit accounts can deposit/recover bonds"
         | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Client_keys_v0.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             sc_rollup_recover_bond
               cctxt
               ~chain:cctxt#chain

@@ -250,14 +250,15 @@ module Mempool = struct
     grandparent_level_start : Alpha_context.Timestamp.t option;
     round_zero_duration : Period.t option;
     op_prechecked_managers :
-      manager_op_info Tezos_crypto.Signature.Public_key_hash.Map.t;
+      manager_op_info Tezos_crypto.Signature.V0.Public_key_hash.Map.t;
         (** All managers that are the source of manager operations
             prechecked in the mempool. Each manager in the map is associated to
             a record of type [manager_op_info] (See for record details above).
             Each manager in the map should be accessible
             with an operation hash in [operation_hash_to_manager]. *)
     operation_hash_to_manager :
-      Tezos_crypto.Signature.Public_key_hash.t Tezos_crypto.Operation_hash.Map.t;
+      Tezos_crypto.Signature.V0.Public_key_hash.t
+      Tezos_crypto.Operation_hash.Map.t;
         (** Map of operation hash to manager used to remove a manager from
             [op_prechecked_managers] with an operation hash. Each manager in the
             map should also be in [op_prechecked_managers]. *)
@@ -279,7 +280,8 @@ module Mempool = struct
     {
       grandparent_level_start = None;
       round_zero_duration = None;
-      op_prechecked_managers = Tezos_crypto.Signature.Public_key_hash.Map.empty;
+      op_prechecked_managers =
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.empty;
       operation_hash_to_manager = Tezos_crypto.Operation_hash.Map.empty;
       prechecked_operations_count = 0;
       ops_prechecked = ManagerOpWeightSet.empty;
@@ -359,7 +361,7 @@ module Mempool = struct
         in
         let removed_op = ref None in
         let op_prechecked_managers =
-          Tezos_crypto.Signature.Public_key_hash.Map.update
+          Tezos_crypto.Signature.V0.Public_key_hash.Map.update
             source
             (function
               | None -> None
@@ -546,7 +548,7 @@ module Mempool = struct
 
   let check_manager_restriction config filter_state source ~fee ~gas_limit =
     match
-      Tezos_crypto.Signature.Public_key_hash.Map.find
+      Tezos_crypto.Signature.V0.Public_key_hash.Map.find
         source
         filter_state.op_prechecked_managers
     with
@@ -1142,7 +1144,7 @@ module Mempool = struct
       filter_state with
       op_prechecked_managers =
         (* Manager not seen yet, record it for next ops *)
-        Tezos_crypto.Signature.Public_key_hash.Map.add
+        Tezos_crypto.Signature.V0.Public_key_hash.Map.add
           source
           info
           filter_state.op_prechecked_managers;
@@ -2236,7 +2238,7 @@ module RPC = struct
       let operation : _ operation = {shell; protocol_data} in
       let hash = Operation.hash {shell; protocol_data} in
       let ctxt = Origination_nonce.init ctxt hash in
-      let payload_producer = Tezos_crypto.Signature.Public_key_hash.zero in
+      let payload_producer = Tezos_crypto.Signature.V0.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
           Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
@@ -3778,7 +3780,7 @@ module RPC = struct
   module Baking_rights = struct
     type t = {
       level : Raw_level.t;
-      delegate : Tezos_crypto.Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       round : int;
       timestamp : Timestamp.t option;
     }
@@ -3792,7 +3794,7 @@ module RPC = struct
           {level; delegate; round; timestamp})
         (obj4
            (req "level" Raw_level.encoding)
-           (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "round" uint16)
            (opt "estimated_time" Timestamp.encoding))
 
@@ -3806,7 +3808,7 @@ module RPC = struct
       type baking_rights_query = {
         levels : Raw_level.t list;
         cycle : Cycle.t option;
-        delegates : Tezos_crypto.Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
         max_round : int option;
         all : bool;
       }
@@ -3861,7 +3863,7 @@ module RPC = struct
         if Compare.Int.(round > max_round) then return (List.rev acc)
         else
           let (Misc.LCons (pk, next)) = l in
-          let delegate = Tezos_crypto.Signature.Public_key.hash pk in
+          let delegate = Tezos_crypto.Signature.V0.Public_key.hash pk in
           estimated_time
             round_durations
             ~current_level
@@ -3880,16 +3882,16 @@ module RPC = struct
       @@ List.fold_left
            (fun (acc, previous) r ->
              if
-               Tezos_crypto.Signature.Public_key_hash.Set.exists
-                 (Tezos_crypto.Signature.Public_key_hash.equal r.delegate)
+               Tezos_crypto.Signature.V0.Public_key_hash.Set.exists
+                 (Tezos_crypto.Signature.V0.Public_key_hash.equal r.delegate)
                  previous
              then (acc, previous)
              else
                ( r :: acc,
-                 Tezos_crypto.Signature.Public_key_hash.Set.add
+                 Tezos_crypto.Signature.V0.Public_key_hash.Set.add
                    r.delegate
                    previous ))
-           ([], Tezos_crypto.Signature.Public_key_hash.Set.empty)
+           ([], Tezos_crypto.Signature.V0.Public_key_hash.Set.empty)
            rights
 
     let register () =
@@ -3923,7 +3925,7 @@ module RPC = struct
           | _ :: _ as delegates ->
               let is_requested p =
                 List.exists
-                  (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
+                  (Tezos_crypto.Signature.V0.Public_key_hash.equal p.delegate)
                   delegates
               in
               List.filter is_requested rights)
@@ -3940,7 +3942,7 @@ module RPC = struct
 
   module Endorsing_rights = struct
     type delegate_rights = {
-      delegate : Tezos_crypto.Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       first_slot : Slot.t;
       endorsing_power : int;
     }
@@ -3959,7 +3961,7 @@ module RPC = struct
         (fun (delegate, first_slot, endorsing_power) ->
           {delegate; first_slot; endorsing_power})
         (obj3
-           (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "first_slot" Slot.encoding)
            (req "endorsing_power" uint16))
 
@@ -3983,7 +3985,7 @@ module RPC = struct
       type endorsing_rights_query = {
         levels : Raw_level.t list;
         cycle : Cycle.t option;
-        delegates : Tezos_crypto.Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
       }
 
       let endorsing_rights_query =
@@ -4061,7 +4063,8 @@ module RPC = struct
                 (fun rights_at_level ->
                   let is_requested p =
                     List.exists
-                      (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
+                      (Tezos_crypto.Signature.V0.Public_key_hash.equal
+                         p.delegate)
                       delegates
                   in
                   match
@@ -4084,7 +4087,7 @@ module RPC = struct
   module Validators = struct
     type t = {
       level : Raw_level.t;
-      delegate : Tezos_crypto.Signature.Public_key_hash.t;
+      delegate : Tezos_crypto.Signature.V0.Public_key_hash.t;
       slots : Slot.t list;
     }
 
@@ -4095,7 +4098,7 @@ module RPC = struct
         (fun (level, delegate, slots) -> {level; delegate; slots})
         (obj3
            (req "level" Raw_level.encoding)
-           (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+           (req "delegate" Tezos_crypto.Signature.V0.Public_key_hash.encoding)
            (req "slots" (list Slot.encoding)))
 
     module S = struct
@@ -4105,7 +4108,7 @@ module RPC = struct
 
       type validators_query = {
         levels : Raw_level.t list;
-        delegates : Tezos_crypto.Signature.Public_key_hash.t list;
+        delegates : Tezos_crypto.Signature.V0.Public_key_hash.t list;
       }
 
       let validators_query =
@@ -4155,7 +4158,7 @@ module RPC = struct
           | _ :: _ as delegates ->
               let is_requested p =
                 List.exists
-                  (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
+                  (Tezos_crypto.Signature.V0.Public_key_hash.equal p.delegate)
                   delegates
               in
               List.filter is_requested rights)

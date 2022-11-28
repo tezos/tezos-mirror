@@ -78,10 +78,10 @@ module type T = sig
        and type Bls.Public_key.t = Tezos_crypto.Bls.Public_key.t
        and type Bls.t = Tezos_crypto.Bls.t
        and type Signature.public_key_hash =
-        Tezos_crypto.Signature.public_key_hash
-       and type Signature.public_key = Tezos_crypto.Signature.public_key
-       and type Signature.t = Tezos_crypto.Signature.t
-       and type Signature.watermark = Tezos_crypto.Signature.watermark
+        Tezos_crypto.Signature.V1.public_key_hash
+       and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
+       and type Signature.t = Tezos_crypto.Signature.V1.t
+       and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
