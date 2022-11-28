@@ -236,7 +236,7 @@ let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
     match compressed_state with
     | None ->
         let* {compressed_state; _} =
-          Context.Sc_rollup.commitment ctxt rollup genesis_info.commitment_hash
+          Context.Sc_rollup.commitment ctxt rollup predecessor
         in
         return compressed_state
     | Some compressed_state -> return compressed_state
@@ -614,6 +614,23 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
   let* () = Assert.equal_tez ~loc:__LOC__ expected_liquid liquid in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_frozen frozen in
   return ()
+
+(* Generates a list of cemented dummy commitments. *)
+let gen_commitments incr ~baker ~originator rollup ~predecessor_hash
+    ~num_commitments =
+  let rec aux incr predecessor_hash n acc =
+    if n <= 0 then return (List.rev acc, incr)
+    else
+      let* predecessor =
+        Context.Sc_rollup.commitment (I incr) rollup predecessor_hash
+      in
+      let* commitment = dummy_commitment ~predecessor (I incr) rollup in
+      let* commitment_hash, incr =
+        publish_and_cement_commitment incr ~baker ~originator rollup commitment
+      in
+      aux incr commitment_hash (n - 1) (predecessor_hash :: acc)
+  in
+  aux incr predecessor_hash num_commitments []
 
 let attempt_to_recover_bond i contract rollup =
   let* recover_bond_op = Op.sc_rollup_recover_bond (I i) contract rollup in
@@ -1055,6 +1072,114 @@ let test_single_transaction_batch () =
     (Destination.Contract (Originated ticket_receiver))
     (Some 1)
 
+(** Test that checks that an outbox message can be executed against all stored
+    cemented commitments but not against an outdated one. *)
+let test_older_cemented_commitment () =
+  let* block, (baker, originator) = context_init Context.T2 in
+  let source = Context.Contract.pkh originator in
+  let baker = Context.Contract.pkh baker in
+  (* Originate a rollup that accepts a list of string tickets as input. *)
+  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* incr = Incremental.begin_construction block in
+  (* Originate a contract that accepts a pair of nat and ticket string input.  *)
+  let* ticket_receiver, incr =
+    originate_contract
+      incr
+      ~script:ticket_receiver
+      ~storage:"{}"
+      ~source_contract:originator
+      ~baker
+  in
+  (* Ticket-token with content "red". *)
+  let* red_token =
+    string_ticket_token "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red"
+  in
+  let verify_outbox_message_execution incr cemented_commitment =
+    (* Set up the balance so that the self contract owns one ticket. *)
+    let* _ticket_hash, incr =
+      adjust_ticket_token_balance_of_rollup
+        (I incr)
+        rollup
+        red_token
+        ~delta:Z.one
+    in
+    (* Create an atomic batch message. *)
+    let transactions =
+      [
+        ( ticket_receiver,
+          Entrypoint.default,
+          {|Pair 42 (Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1)|} );
+      ]
+    in
+    let output = make_output ~outbox_level:0 ~message_index:0 transactions in
+    let* Sc_rollup_operations.{operations; _}, incr =
+      execute_outbox_message_without_proof_validation
+        incr
+        rollup
+        ~cemented_commitment
+        ~source
+        output
+    in
+    (* Confirm that each transaction maps to one operation. *)
+    let* () =
+      verify_execute_outbox_message_operations
+        ~loc:__LOC__
+        incr
+        ~source
+        ~operations
+        ~expected_transactions:transactions
+    in
+    (* Verify that the balance has moved to ticket-receiver. *)
+    let* () =
+      assert_ticket_token_balance
+        ~loc:__LOC__
+        incr
+        red_token
+        (Destination.Sc_rollup rollup)
+        None
+    in
+    assert_ticket_token_balance
+      ~loc:__LOC__
+      incr
+      red_token
+      (Destination.Contract (Originated ticket_receiver))
+      (Some 1)
+  in
+  let* max_num_stored_cemented_commitments =
+    let* ctxt = Context.to_alpha_ctxt (I incr) in
+    return
+    @@ Alpha_context.Constants.max_number_of_stored_cemented_commitments ctxt
+  in
+  (* Publish and cement a commitment. *)
+  let* first_commitment_hash, incr =
+    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  in
+  (* Generate a list of commitments that exceed the maximum number of stored
+     ones by one. *)
+  let* commitment_hashes, incr =
+    gen_commitments
+      incr
+      ~baker
+      ~originator
+      rollup
+      ~predecessor_hash:first_commitment_hash
+      ~num_commitments:(max_num_stored_cemented_commitments + 1)
+  in
+  match commitment_hashes with
+  | too_old_commitment :: stored_hashes ->
+      (* Executing outbox message for the old non-stored commitment should fail. *)
+      let* () =
+        assert_fails
+          ~loc:__LOC__
+          ~error:Sc_rollup_operations.Sc_rollup_invalid_last_cemented_commitment
+          (verify_outbox_message_execution incr too_old_commitment)
+      in
+      (* Executing outbox message for the recent ones should succeed. *)
+      List.iteri_es
+        (fun _ix commitment -> verify_outbox_message_execution incr commitment)
+        stored_hashes
+  | _ -> failwith "Expected non-empty list of commitment hashes."
+
 let test_multi_transaction_batch () =
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
@@ -1230,6 +1355,67 @@ let test_execute_message_twice () =
        incr
        rollup
        ~cemented_commitment
+       ~source
+       output)
+
+(** Verifies that it is not possible to execute the same message twice from
+    different commitments. *)
+let test_execute_message_twice_different_cemented_commitments () =
+  let* block, (baker, originator) = context_init Context.T2 in
+  let baker = Context.Contract.pkh baker in
+  let source = Context.Contract.pkh originator in
+  (* Originate a rollup that accepts a list of string tickets as input. *)
+  let* block, rollup = sc_originate block originator "list (ticket string)" in
+  let* incr = Incremental.begin_construction block in
+  (* Originate a contract that accepts a pair of nat and ticket string input.  *)
+  let* string_receiver, incr =
+    originate_contract
+      incr
+      ~script:string_receiver
+      ~storage:{|""|}
+      ~source_contract:originator
+      ~baker
+  in
+  (* Publish and cement a commitment. *)
+  let* first_cemented_commitment, incr =
+    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  in
+  let* predecessor =
+    Context.Sc_rollup.commitment (I incr) rollup first_cemented_commitment
+  in
+  let* commitment = dummy_commitment ~predecessor (I incr) rollup in
+  let* second_cemented_commitment, incr =
+    publish_and_cement_commitment incr ~baker ~originator rollup commitment
+  in
+  (* Create an atomic batch message. *)
+  let transactions = [(string_receiver, Entrypoint.default, {|"Hello"|})] in
+  let output = make_output ~outbox_level:0 ~message_index:1 transactions in
+  (* Execute the message once - should succeed. *)
+  let* Sc_rollup_operations.{operations; _}, incr =
+    execute_outbox_message_without_proof_validation
+      incr
+      rollup
+      ~cemented_commitment:first_cemented_commitment
+      ~source
+      output
+  in
+  (* Confirm that each transaction maps to one operation. *)
+  let* () =
+    verify_execute_outbox_message_operations
+      ~loc:__LOC__
+      incr
+      ~source
+      ~operations
+      ~expected_transactions:transactions
+  in
+  (* Execute the same message again should fail. *)
+  assert_fails
+    ~loc:__LOC__
+    ~error:Sc_rollup_errors.Sc_rollup_outbox_message_already_applied
+    (execute_outbox_message_without_proof_validation
+       incr
+       rollup
+       ~cemented_commitment:second_cemented_commitment
        ~source
        output)
 
@@ -2464,6 +2650,10 @@ let tests =
       `Quick
       test_single_transaction_batch;
     Tztest.tztest
+      "execute outbox message against older cemented commitment"
+      `Quick
+      test_older_cemented_commitment;
+    Tztest.tztest
       "multi-transaction atomic batch"
       `Quick
       test_multi_transaction_batch;
@@ -2472,6 +2662,10 @@ let tests =
       `Quick
       test_transaction_with_invalid_type;
     Tztest.tztest "execute same message twice" `Quick test_execute_message_twice;
+    Tztest.tztest
+      "execute same message twice against different cemented commitments"
+      `Quick
+      test_execute_message_twice_different_cemented_commitments;
     Tztest.tztest
       "transaction with zero amount ticket"
       `Quick

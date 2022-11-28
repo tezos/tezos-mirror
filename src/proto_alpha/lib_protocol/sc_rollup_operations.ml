@@ -408,26 +408,32 @@ let validate_outbox_level ctxt ~outbox_level ~lcc_level =
 let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     ~cemented_commitment ~source ~output_proof =
   let open Lwt_result_syntax in
-  (* TODO: #3211
-     Allow older cemented commits as well.
-     This has the benefits of eliminating any race condition where new commits
-     are cemented and makes inclusion proofs obsolete. *)
+  (* Get inbox level of last cemented commitment, needed to validate that the
+     outbox message is active. This call also implicitly checks that the rollup
+     exists. *)
   let* lcc_hash, lcc_level, ctxt =
     Sc_rollup.Commitment.last_cemented_commitment_hash_with_level ctxt rollup
   in
-  (* Check that the last-cemented-commitment matches the one for the given
-     rollup. This is important in order to guarantee that the inclusion-proof
-     is for the correct state-hash. *)
+  (* Check that the commitment is a cemented commitment still stored in the
+     context. We start from the [lcc_hash] of the rollup, which we know to be
+     stored in context. *)
+  let* is_cemented_commitment_in_context, ctxt =
+    Sc_rollup.Commitment.check_if_commitments_are_related
+      ctxt
+      rollup
+      ~descendant:lcc_hash
+      ~ancestor:cemented_commitment
+  in
   let* () =
     fail_unless
-      Sc_rollup.Commitment.Hash.(lcc_hash = cemented_commitment)
+      is_cemented_commitment_in_context
       Sc_rollup_invalid_last_cemented_commitment
   in
   (* Validate and decode the output proofs. *)
   let* Sc_rollup.{outbox_level; message_index; message}, ctxt =
     validate_and_decode_output_proof
       ctxt
-      ~cemented_commitment:lcc_hash
+      ~cemented_commitment
       rollup
       ~output_proof
   in

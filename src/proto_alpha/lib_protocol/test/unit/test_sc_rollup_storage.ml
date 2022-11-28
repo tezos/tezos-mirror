@@ -2578,6 +2578,104 @@ let test_get_cemented_commitments_with_levels () =
     cemented_commitments_with_levels
     expected_commitments_with_levels
 
+(* Produces [max_num_stored_cemented_commitments] number of commitments and
+   verifies that each of them is an ancestor of the last cemented commitment. *)
+let test_are_commitments_related_when_related () =
+  let* ctxt, rollup, c0, staker =
+    originate_rollup_and_deposit_with_one_staker ()
+  in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  (* Produce and stake on n commitments, each on top of the other. *)
+  (* Fetch number of stored commitments in context. *)
+  let max_num_stored_cemented_commitments =
+    (Raw_context.constants ctxt).sc_rollup
+      .max_number_of_stored_cemented_commitments
+  in
+  (* Produce and store a number of commitments equal to the maximum number of
+     cemented commitments that can be stored. *)
+  let number_of_commitments = max_num_stored_cemented_commitments in
+  let* commitments, ctxt =
+    lift
+    @@ produce_and_refine
+         ~number_of_commitments
+         ~predecessor:c0
+         ctxt
+         staker
+         rollup
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  (* Cement all commitments that have been produced. *)
+  let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+  (* Check that check_if_commitments_are_related detects that each
+     cemented commitment is an ancestor of the last cemented commitment. *)
+  let* lcc, ctxt =
+    lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
+  in
+  commitments
+  |> List.iter_es (fun commitment ->
+         let* is_commitment_cemented, _ctxt =
+           lift
+           @@ Sc_rollup_commitment_storage.check_if_commitments_are_related
+                ctxt
+                rollup
+                ~descendant:lcc
+                ~ancestor:commitment
+         in
+         Assert.equal_bool ~loc:__LOC__ is_commitment_cemented true)
+
+(** Tests that [check_if_commitments_are_related] returns false for two
+    unrelated commitments. *)
+let test_unrelated_commitments () =
+  let* ctxt, rollup, genesis_hash, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let level = valid_inbox_level ctxt in
+  let commitment1 =
+    Commitment_repr.
+      {
+        predecessor = genesis_hash;
+        inbox_level = level 1l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker1
+         commitment1
+  in
+  let commitment2 =
+    Commitment_repr.
+      {
+        predecessor = genesis_hash;
+        inbox_level = level 1l;
+        number_of_ticks = number_of_ticks_exn 44L;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* c2, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker2
+         commitment2
+  in
+  let* are_commitments_related, _ctxt =
+    lift
+    @@ Sc_rollup_commitment_storage.check_if_commitments_are_related
+         ctxt
+         rollup
+         ~descendant:c1
+         ~ancestor:c2
+  in
+  Assert.equal_bool ~loc:__LOC__ are_commitments_related false
+
 let tests =
   [
     Tztest.tztest
@@ -2810,6 +2908,14 @@ let tests =
       "Getting cemented commitments returns multiple cemented commitments"
       `Quick
       test_get_cemented_commitments_with_levels;
+    Tztest.tztest
+      "All cemented commitments are ancestors of last cemented commitment"
+      `Quick
+      test_are_commitments_related_when_related;
+    Tztest.tztest
+      "Unrelated commitments are classified as such"
+      `Quick
+      test_unrelated_commitments;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460
