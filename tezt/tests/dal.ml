@@ -1001,6 +1001,27 @@ let test_dal_node_test_patch_slots _protocol parameters cryptobox _node client
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:1 in
   patch_slot_rpc ~slot_level:(-4) ~slot_index:3
 
+let test_dal_node_test_get_slots _protocol parameters cryptobox _node client
+    dal_node =
+  let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let* slot = Rollup.Dal.make_slot (generate_dummy_slot size) client in
+  let commit =
+    Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
+  in
+  let* () =
+    let* response = RPC.call_raw dal_node @@ Rollup.Dal.RPC.get_slot commit in
+    return @@ RPC.check_string_response ~code:404 response
+  in
+  let* _commitment = RPC.call dal_node (Rollup.Dal.RPC.post_slot slot) in
+  (* commit = _commitment already test in /POST test. *)
+  let* got_slot = RPC.call dal_node (Rollup.Dal.RPC.get_slot commit) in
+  Check.(Rollup.Dal.content_of_slot slot = Rollup.Dal.content_of_slot got_slot)
+    Check.string
+    ~error_msg:
+      "The slot content retrieved from the node is not as expected (expected = \
+       %L, got = %R)" ;
+  unit
+
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -1584,6 +1605,10 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node PATCH /slots"
     test_dal_node_test_patch_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node GET /slots"
+    test_dal_node_test_get_slots
     protocols ;
 
   (* Tests with all nodes *)
