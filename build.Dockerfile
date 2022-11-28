@@ -4,7 +4,9 @@ FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 # use alpine /bin/ash and set pipefail.
 # see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-# do not move the ARG below above the FROM or it gets erased
+# Do not move the ARG below above the FROM or it gets erased.
+# More precisely: ARG above FROM can be used in the FROM itself, but nowhere else.
+ARG EXECUTABLES
 ARG GIT_SHORTREF
 ARG GIT_DATETIME
 ARG GIT_VERSION
@@ -27,7 +29,7 @@ COPY --chown=tezos:nogroup vendors tezos/vendors
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 ENV GIT_VERSION=${GIT_VERSION}
-RUN opam exec -- make -C tezos experimental-release
+RUN opam exec -- make -C tezos release EXECUTABLES="${EXECUTABLES}" OCTEZ_BIN_DIR=bin
 # Gather the parameters of all active protocols in 1 place
 RUN while read -r protocol; do \
     mkdir -p tezos/parameters/"$protocol"-parameters && \

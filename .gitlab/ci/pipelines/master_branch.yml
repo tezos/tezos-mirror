@@ -3,8 +3,8 @@ include:
   - .gitlab/ci/jobs/build/static_x86_64_experimental.yml
   - .gitlab/ci/jobs/build/static_arm64_experimental.yml
   - .gitlab/ci/jobs/build/arm64.yml
-  - .gitlab/ci/jobs/build/docker_amd64_release.yml
-  - .gitlab/ci/jobs/build/docker_arm64_release.yml
+  - .gitlab/ci/jobs/build/docker_amd64_experimental.yml
+  - .gitlab/ci/jobs/build/docker_arm64_experimental.yml
 
   # Stage: test
   - .gitlab/ci/jobs/test/ometrics_code_quality_default.yml
