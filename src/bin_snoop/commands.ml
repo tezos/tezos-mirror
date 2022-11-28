@@ -1165,6 +1165,39 @@ module Generate_config_cmd = struct
       show_config_handler
 end
 
+module Workload_cmd = struct
+  let options_dump = Tezos_clic.no_options
+
+  let handler_dump () workload_data output_path () =
+    let packed_measurement = Measure.load ~filename:workload_data in
+    Measure.packed_measurement_save_json packed_measurement output_path ;
+    Lwt.return_ok ()
+
+  let params_dump =
+    Tezos_clic.(
+      prefixes ["workload"; "dump"]
+      @@ string ~name:"WORKLOAD-FILE" ~desc:"Workload file name"
+      @@ prefix "to"
+      @@ string ~name:"OUTPUT-FILE" ~desc:"JSON file name to write the content"
+      @@ stop)
+
+  let group =
+    {
+      Tezos_clic.name = "workload";
+      title = "Commands for manipulating workload files";
+    }
+
+  let command_dump =
+    Tezos_clic.command
+      ~desc:"Dump the content of a workload file in JSON format"
+      ~group
+      options_dump
+      params_dump
+      handler_dump
+
+  let commands = [command_dump]
+end
+
 let all_commands =
   [
     Benchmark_cmd.command;
@@ -1174,7 +1207,7 @@ let all_commands =
     Codegen_inferred_cmd.command;
     Generate_config_cmd.command;
   ]
-  @ List_cmd.commands @ Config_cmd.commands
+  @ List_cmd.commands @ Config_cmd.commands @ Workload_cmd.commands
   @ Registration.all_custom_commands ()
 
 module Global_options = struct

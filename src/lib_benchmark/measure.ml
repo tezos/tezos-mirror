@@ -100,13 +100,36 @@ let options_encoding =
          (seed, nsamples, bench_number, minor_heap_size, config_file))
        (fun (seed, nsamples, bench_number, minor_heap_size, config_file) ->
          {seed; nsamples; bench_number; minor_heap_size; config_file})
-       (tup5
-          (option Benchmark_helpers.int_encoding)
-          Benchmark_helpers.int_encoding
-          Benchmark_helpers.int_encoding
-          heap_size_encoding
-          (option string))
+       (obj5
+          (req "seed" (option Benchmark_helpers.int_encoding))
+          (req "samples_per_bench" Benchmark_helpers.int_encoding)
+          (req "bench_number" Benchmark_helpers.int_encoding)
+          (req "minor_heap_size" heap_size_encoding)
+          (req "config_file" (option string)))
 
+let rfc3339_encoding =
+  let of_tm tm =
+    let time_s, _ = Unix.mktime tm in
+    let ptime =
+      WithExceptions.Option.get ~loc:__LOC__ @@ Ptime.of_float_s @@ time_s
+    in
+    Ptime.to_rfc3339 ~tz_offset_s:0 ptime
+  in
+  let to_tm rfc3339_string =
+    Ptime.of_rfc3339 ~strict:true rfc3339_string
+    |> Ptime.rfc3339_error_to_msg
+    |> Result.map_error (function `Msg e -> e)
+    |> Result.map (fun (utc, _, _) ->
+           let seconds = Ptime.to_float_s utc in
+           Unix.gmtime seconds)
+  in
+  (* let strip_msg =  Result.map_error (fun `Msg s -> s) in *)
+  Data_encoding.conv_with_guard
+    (fun tm -> of_tm tm)
+    (fun str -> to_tm str)
+    Data_encoding.string
+
+(* Encoding for workload data files for compatabilty *)
 let unix_tm_encoding : Unix.tm Data_encoding.encoding =
   let to_tuple tm =
     let open Unix in
@@ -180,10 +203,10 @@ let measurement_encoding workload_encoding =
          (bench_opts, workload_data, date))
        (fun (bench_opts, workload_data, date) ->
          {bench_opts; workload_data; date})
-       (tup3
-          options_encoding
-          (workload_data_encoding workload_encoding)
-          unix_tm_encoding)
+       (obj3
+          (req "benchmark_options" options_encoding)
+          (req "workload_data" (workload_data_encoding workload_encoding))
+          (req "date" rfc3339_encoding))
 
 let serialized_workload_encoding =
   let open Data_encoding in
@@ -278,6 +301,24 @@ let save :
     Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
   in
   ()
+
+let packed_measurement_save_json measurement_packed output_path =
+  let (Measurement (bench, measurement)) = measurement_packed in
+  let module Bench = (val bench) in
+  let encoding_measurement = measurement_encoding Bench.workload_encoding in
+  let encoding =
+    Data_encoding.(
+      obj2
+        (req "benchmark_namespace" Namespace.encoding)
+        (req "measurement_data" encoding_measurement))
+  in
+  let data = Data_encoding.Json.construct encoding (Bench.name, measurement) in
+  let json = Data_encoding.Json.to_string data in
+  Out_channel.with_open_text output_path (fun oc ->
+      Printf.fprintf oc "%s\n" json) ;
+  Format.eprintf
+    "Measure.packed_measurement_save_json: saved to %s\n"
+    output_path
 
 let load : filename:string -> packed_measurement =
  fun ~filename ->
