@@ -700,7 +700,7 @@ let apply_internal_operation_contents :
         ~payload
         ~sender
         ~source:payer
-      >>=? fun (inbox_after, _size, ctxt) ->
+      >>=? fun ctxt ->
       Ticket_scanner.type_has_tickets ctxt parameters_ty
       >>?= fun (has_tickets, ctxt) ->
       Ticket_accounting.ticket_balances_of_value
@@ -732,8 +732,7 @@ let apply_internal_operation_contents :
       >|=? fun (ticket_receipt, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
-        Transaction_to_sc_rollup_result
-          {consumed_gas; ticket_receipt; inbox_after}
+        Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt}
       in
       (ctxt, ITransaction_result result, [])
   | Event {ty = _; unparsed_data = _; tag = _} ->
@@ -1457,10 +1456,9 @@ let apply_manager_operation :
       in
       return (ctxt, result, [])
   | Sc_rollup_add_messages {messages} ->
-      Sc_rollup.Inbox.add_external_messages ctxt messages
-      >>=? fun (inbox_after, _size, ctxt) ->
+      Sc_rollup.Inbox.add_external_messages ctxt messages >>=? fun ctxt ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
+      let result = Sc_rollup_add_messages_result {consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
       Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
@@ -2664,12 +2662,11 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
-  let* _inbox, _diff, ctxt =
+  let* ctxt =
     Sc_rollup.Inbox.add_info_per_level
+      ~timestamp:block_header.shell.timestamp
+      ~predecessor:block_header.shell.predecessor
       ctxt
-      block_header.shell.timestamp
-      block_header.shell.predecessor
   in
   let mode =
     Application
@@ -2725,9 +2722,11 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
-  let* _inbox, _diff, ctxt =
-    Sc_rollup.Inbox.add_info_per_level ctxt timestamp predecessor_hash
+  let* ctxt =
+    Sc_rollup.Inbox.add_info_per_level
+      ~timestamp
+      ~predecessor:predecessor_hash
+      ctxt
   in
   let mode =
     Full_construction
@@ -2764,8 +2763,7 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
-  let* _inbox, _diff, ctxt =
+  let* ctxt =
     (* The mode [Partial_construction] is used in simulation. We try to
        put a realistic value of the block's timestamp. Even though, it should
        not have an impact on the simulation of the following smart rollup
@@ -2776,7 +2774,7 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
       Timestamp.(predecessor_timestamp +? minimal_block_delay)
     in
     let predecessor = predecessor_hash in
-    Sc_rollup.Inbox.add_info_per_level ctxt timestamp predecessor
+    Sc_rollup.Inbox.add_info_per_level ~timestamp ~predecessor ctxt
   in
   let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
@@ -2866,7 +2864,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
-  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_end_of_level ctxt in
+  let* ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in

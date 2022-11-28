@@ -38,7 +38,7 @@ module State = struct
 
   let add_history = Store.Histories.add
 
-  let add_messages_history = Store.Level_tree_histories.add
+  let add_messages_history = Store.Payloads_histories.add
 
   let level_of_hash = State.level_of_hash
 
@@ -145,16 +145,10 @@ let get_messages Node_context.{l1_ctxt; _} head =
         block.operations
         {apply; apply_internal})
   in
-  let eol = Sc_rollup.Inbox_message.Internal End_of_level in
-  let messages = List.rev (eol :: rev_messages) in
   let ({timestamp; predecessor; _} : Block_header.shell_header) =
     block.header.shell
   in
-  let sol = Sc_rollup.Inbox_message.Internal Start_of_level in
-  let info_per_level =
-    Sc_rollup.Inbox_message.Internal (Info_per_level {timestamp; predecessor})
-  in
-  return (sol :: info_per_level :: messages)
+  return (List.rev rev_messages, timestamp, predecessor)
 
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
@@ -167,17 +161,10 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages level inbox history messages =
+let add_messages ~timestamp ~predecessor inbox history messages =
   let open Lwt_result_syntax in
-  let messages_history =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-       We need to set a geq value than the actual number of messages here. *)
-    Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity:10000L
-  in
   lift
-  @@ let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
-     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+  @@ (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
 
          The number of messages during commitment period is broken with the
          unique inbox. *)
@@ -191,19 +178,27 @@ let add_messages level inbox history messages =
       *     ~level
       *     inbox
       * in *)
-     let*? messages_history, messages_tree, history, inbox =
-       Sc_rollup.Inbox.add_messages
-         messages_history
-         history
-         inbox
-         level
-         messages
-         None
-     in
-     let messages_tree_hash =
-       Sc_rollup.Inbox_merkelized_payload_hashes.hash messages_tree
-     in
-     return (messages_history, messages_tree_hash, history, inbox)
+  let*? ( messages_history,
+          history,
+          inbox,
+          _witness,
+          messages_with_protocol_internal_messages ) =
+    Sc_rollup.Inbox.add_all_messages
+      ~timestamp
+      ~predecessor
+      history
+      inbox
+      messages
+  in
+  let Sc_rollup.Inbox.{hash = witness_hash; _} =
+    Sc_rollup.Inbox.current_level_proof inbox
+  in
+  return
+    ( messages_history,
+      witness_hash,
+      history,
+      inbox,
+      messages_with_protocol_internal_messages )
 
 let process_head (node_ctxt : _ Node_context.t)
     Layer1.({level; hash = head_hash} as head) =
@@ -212,11 +207,6 @@ let process_head (node_ctxt : _ Node_context.t)
     Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
   in
   if level >= first_inbox_level then
-    let* messages = get_messages node_ctxt head_hash in
-    let*! () =
-      Inbox_event.get_messages head_hash level (List.length messages)
-    in
-    let*! () = State.add_messages node_ctxt.store head_hash messages in
     (*
 
           We compute the inbox of this block using the inbox of its
@@ -235,8 +225,32 @@ let process_head (node_ctxt : _ Node_context.t)
         return (Context.empty node_ctxt.context)
       else Node_context.checkout_context node_ctxt predecessor.hash
     in
-    let* messages_history, messages_hash, history, inbox =
-      add_messages level inbox history messages
+    let* collected_messages, timestamp, predecessor_hash =
+      get_messages node_ctxt head_hash
+    in
+    let*! () =
+      Inbox_event.get_messages
+        head_hash
+        (Raw_level.to_int32 level)
+        (List.length collected_messages)
+    in
+    let* ( messages_history,
+           messages_hash,
+           history,
+           inbox,
+           messages_with_protocol_internal_messages ) =
+      add_messages
+        ~timestamp
+        ~predecessor:predecessor_hash
+        inbox
+        history
+        collected_messages
+    in
+    let*! () =
+      State.add_messages
+        node_ctxt.store
+        head_hash
+        messages_with_protocol_internal_messages
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
     let*! () =

@@ -3327,6 +3327,8 @@ module Sc_rollup : sig
 
     type history_proof
 
+    val old_levels_messages : t -> history_proof
+
     val equal_history_proof : history_proof -> history_proof -> bool
 
     val pp_history_proof : Format.formatter -> history_proof -> unit
@@ -3338,32 +3340,34 @@ module Sc_rollup : sig
         with type key = Hash.t
          and type value = history_proof
 
+    type level_proof = private {
+      hash : Inbox_merkelized_payload_hashes.Hash.t;
+      level : Raw_level.t;
+    }
+
+    val current_level_proof : t -> level_proof
+
     type serialized_proof
 
     val serialized_proof_encoding : serialized_proof Data_encoding.t
 
-    val add_messages :
-      Inbox_merkelized_payload_hashes.History.t ->
+    val add_all_messages :
+      timestamp:Time.t ->
+      predecessor:Block_hash.t ->
       History.t ->
       t ->
-      Raw_level.t ->
-      Inbox_message.serialized list ->
-      Inbox_merkelized_payload_hashes.t option ->
+      Inbox_message.t list ->
       (Inbox_merkelized_payload_hashes.History.t
-      * Inbox_merkelized_payload_hashes.t
       * History.t
-      * t)
+      * t
+      * Inbox_merkelized_payload_hashes.t
+      * Inbox_message.t list)
       tzresult
 
     val add_messages_no_history :
-      t ->
-      Raw_level.t ->
       Inbox_message.serialized list ->
-      Inbox_merkelized_payload_hashes.t option ->
-      (Inbox_merkelized_payload_hashes.t * t) tzresult
-
-    val form_history_proof :
-      History.t -> t -> (History.t * history_proof) tzresult
+      Inbox_merkelized_payload_hashes.t ->
+      Inbox_merkelized_payload_hashes.t tzresult
 
     val take_snapshot : t -> history_proof
 
@@ -3393,7 +3397,7 @@ module Sc_rollup : sig
       inbox_message option tzresult
 
     val produce_proof :
-      get_level_tree_history:
+      get_payloads_history:
         (Inbox_merkelized_payload_hashes.Hash.t ->
         Inbox_merkelized_payload_hashes.History.t Lwt.t) ->
       History.t ->
@@ -3401,15 +3405,21 @@ module Sc_rollup : sig
       Raw_level.t * Z.t ->
       (proof * inbox_message option) tzresult Lwt.t
 
-    val init :
+    val finalize_inbox_level_no_history :
+      t -> Inbox_merkelized_payload_hashes.t -> t tzresult
+
+    val init_witness_no_history : Inbox_merkelized_payload_hashes.t
+
+    val add_info_per_level_no_history :
+      timestamp:Time.t ->
+      predecessor:Block_hash.t ->
+      Inbox_merkelized_payload_hashes.t ->
+      Inbox_merkelized_payload_hashes.t tzresult
+
+    val genesis :
       timestamp:Time.t -> predecessor:Block_hash.t -> Raw_level.t -> t tzresult
 
     module Internal_for_tests : sig
-      val eq_tree :
-        Inbox_merkelized_payload_hashes.t ->
-        Inbox_merkelized_payload_hashes.t ->
-        bool
-
       val produce_inclusion_proof :
         History.t ->
         history_proof ->
@@ -3418,11 +3428,15 @@ module Sc_rollup : sig
 
       val serialized_proof_of_string : string -> serialized_proof
 
-      val dumb_init : Raw_level.t -> t
+      val add_start_of_level : context -> context tzresult Lwt.t
+
+      val add_end_of_level : context -> context tzresult Lwt.t
+
+      val add_info_per_level :
+        context -> Time.t -> Block_hash.t -> context tzresult Lwt.t
     end
 
-    val add_external_messages :
-      context -> string list -> (t * Z.t * context) tzresult Lwt.t
+    val add_external_messages : context -> string list -> context tzresult Lwt.t
 
     val add_deposit :
       context ->
@@ -3430,14 +3444,15 @@ module Sc_rollup : sig
       sender:Contract_hash.t ->
       source:public_key_hash ->
       destination:rollup ->
-      (t * Z.t * context) tzresult Lwt.t
+      context tzresult Lwt.t
 
-    val add_start_of_level : context -> (t * Z.t * context) tzresult Lwt.t
-
-    val add_end_of_level : context -> (t * Z.t * context) tzresult Lwt.t
+    val finalize_inbox_level : context -> context tzresult Lwt.t
 
     val add_info_per_level :
-      context -> Time.t -> Block_hash.t -> (t * Z.t * context) tzresult Lwt.t
+      timestamp:Time.t ->
+      predecessor:Block_hash.t ->
+      context ->
+      context tzresult Lwt.t
 
     val get_inbox : context -> (t * context) tzresult Lwt.t
   end
@@ -3842,7 +3857,7 @@ module Sc_rollup : sig
 
         val history : Inbox.History.t
 
-        val get_level_tree_history :
+        val get_payloads_history :
           Inbox_merkelized_payload_hashes.Hash.t ->
           Inbox_merkelized_payload_hashes.History.t Lwt.t
       end

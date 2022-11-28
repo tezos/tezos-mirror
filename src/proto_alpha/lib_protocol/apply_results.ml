@@ -136,7 +136,6 @@ type _ successful_manager_operation_result =
       -> Kind.sc_rollup_originate successful_manager_operation_result
   | Sc_rollup_add_messages_result : {
       consumed_gas : Gas.Arith.fp;
-      inbox_after : Sc_rollup.Inbox.t;
     }
       -> Kind.sc_rollup_add_messages successful_manager_operation_result
   | Sc_rollup_cement_result : {
@@ -410,19 +409,16 @@ module Manager_result = struct
         case
           ~title:"To_sc_rollup"
           (Tag 2)
-          (obj3
+          (obj2
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-             (req "ticket_updates" Ticket_receipt.encoding)
-             (req "inbox_after" Sc_rollup.Inbox.encoding))
+             (req "ticket_updates" Ticket_receipt.encoding))
           (function
-            | Transaction_to_sc_rollup_result
-                {consumed_gas; ticket_receipt; inbox_after} ->
-                Some (consumed_gas, ticket_receipt, inbox_after)
+            | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
+                Some (consumed_gas, ticket_receipt)
             | _ -> None)
           (function
-            | consumed_gas, ticket_receipt, inbox_after ->
-                Transaction_to_sc_rollup_result
-                  {consumed_gas; ticket_receipt; inbox_after});
+            | consumed_gas, ticket_receipt ->
+                Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
       ]
 
   let transaction_case =
@@ -917,19 +913,15 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_add_messages_case
       ~encoding:
-        (obj2
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "inbox_after" Sc_rollup.Inbox.encoding))
+        (obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Sc_rollup_add_messages_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_add_messages_result {consumed_gas; inbox_after} ->
-            (consumed_gas, inbox_after))
+        | Sc_rollup_add_messages_result {consumed_gas} -> consumed_gas)
       ~kind:Kind.Sc_rollup_add_messages_manager_kind
-      ~inj:(fun (consumed_gas, inbox_after) ->
-        Sc_rollup_add_messages_result {consumed_gas; inbox_after})
+      ~inj:(fun consumed_gas -> Sc_rollup_add_messages_result {consumed_gas})
 
   let sc_rollup_cement_case =
     make

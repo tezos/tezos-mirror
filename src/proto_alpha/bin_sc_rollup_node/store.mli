@@ -127,7 +127,7 @@ module Histories :
     of one level. The store is indexed by a level in order to maintain a small
     structure in memory. Only the message history of one level is fetched when
     computing the proof. *)
-module Level_tree_histories :
+module Payloads_histories :
   Store_sigs.Append_only_map
     with type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
      and type value = Sc_rollup.Inbox_merkelized_payload_hashes.History.t

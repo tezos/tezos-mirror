@@ -287,7 +287,6 @@ module Sc_rollup_add_external_messages_benchmark = struct
       ignore
         (Sc_rollup_inbox_repr.add_messages_no_history
            inbox
-           last_level
            [message]
            current_messages)
     in
