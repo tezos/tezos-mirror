@@ -22,9 +22,6 @@ mkdir -pv "octez-binaries/$ARCH"
 echo "Build and install static binaries"
 make static
 
-# Trim the dune cache, if used.
-dune cache trim --size=250GB
-
 echo "Check executables and move them to the destination directory"
 # Disable https://www.shellcheck.net/wiki/SC2086 because:
 # - it's meant to prevent word splitting and we actually want to split words

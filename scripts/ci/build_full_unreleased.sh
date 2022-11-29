@@ -27,5 +27,5 @@ make build-unreleased
 # shellcheck disable=SC2086
 dune build ${COVERAGE_OPTIONS} src/bin_tps_evaluation
 
-# Trim the dune cache, if used.
-dune cache trim --size=250GB
+# 4. clean-up caches before uploading the cache
+opam clean

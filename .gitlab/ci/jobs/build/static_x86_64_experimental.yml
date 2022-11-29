@@ -20,5 +20,3 @@ build:static-x86_64-linux-binaries:
   variables:
     ARCH: "x86_64"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
-  tags:
-    - build_dedicated
