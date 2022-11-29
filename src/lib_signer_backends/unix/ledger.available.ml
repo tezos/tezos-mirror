@@ -134,13 +134,12 @@ module Ledger_commands = struct
     match res with
     | Error
         (Ledgerwallet.Transport.AppError
-          {status = Ledgerwallet.Transport.Status.Incorrect_length_for_ins; msg})
-      ->
+          {status = Ledgerwallet.Status.Incorrect_length_for_ins; msg}) ->
         tzfail (Ledger_msg_chunk_too_long msg)
     | Error err -> tzfail (LedgerError err)
     | Ok v -> return v
 
-  let get_version ~device_info h =
+  let get_version ~device_name h =
     let open Lwt_result_syntax in
     let buf = Buffer.create 100 in
     let pp = Format.formatter_of_buffer buf in
@@ -150,7 +149,7 @@ module Ledger_commands = struct
     | Error e ->
         let*! () =
           Events.(emit Ledger.not_tezos)
-            ( device_info.Hidapi.path,
+            ( device_name,
               Format.asprintf "@[Ledger %a@]" Ledgerwallet.Transport.pp_error e
             )
         in
@@ -170,7 +169,7 @@ module Ledger_commands = struct
         let*! () =
           Events.(emit Ledger.found_application)
             ( Format.asprintf "%a" Ledgerwallet_tezos.Version.pp version,
-              device_info.path,
+              device_name,
               git_commit )
         in
         let cleaned_up =
@@ -281,10 +280,7 @@ module Ledger_commands = struct
       | Error
           (LedgerError
              (AppError
-               {
-                 status = Ledgerwallet.Transport.Status.Referenced_data_not_found;
-                 _;
-               })
+               {status = Ledgerwallet.Status.Referenced_data_not_found; _})
           :: _) ->
           return `No_baking_authorized
       | Error _ as e -> Lwt.return e
@@ -594,82 +590,92 @@ module Request_cache =
 type request_info = {
   version : Ledgerwallet_tezos.Version.t;
   git_commit : string;
-  device_info : Hidapi.device_info;
   ledger_id : Ledger_id.t;
+  path : Ledgerwallet.Transport.path;
 }
 
 let cache = Request_cache.create 7
 
-(* Those constants are provided by the vendor (e.g. check the udev
-   rules they provide): *)
-let vendor_id = 0x2c97
+let path_name (path : Ledgerwallet.Transport.path) =
+  match path with
+  | Hidapi_path device_info -> device_info.path
+  | Proxy_path _ -> "proxy"
 
-(* These come from the ledger's udev rules *)
-let nano_s_product_ids = [0x0001] @ (0x1000 -- 0x101f)
+type 'a ledger_function =
+  Ledgerwallet.Transport.t ->
+  Ledgerwallet_tezos.Version.t * string ->
+  device_path:Ledgerwallet.Transport.path ->
+  Ledger_id.t ->
+  ('a option, tztrace) result Lwt.t
 
-let nano_x_product_ids = [0x0004] @ (0x4000 -- 0x401f)
-
-let nano_s_plus_product_ids = [0x0005] @ (0x5000 -- 0x501f)
-
-let use_ledger ?(filter : Filter.t = `None) f =
+let use_ledger ?(filter : Filter.t = `None) (f : 'a ledger_function) =
   let open Lwt_result_syntax in
-  let ledgers =
-    let all_product_ids =
-      nano_s_product_ids @ nano_x_product_ids @ nano_s_plus_product_ids
-    in
-    let open Hidapi in
-    List.filter
-      (fun hid -> List.mem ~equal:Int.equal hid.product_id all_product_ids)
-      (enumerate ~vendor_id ())
-  in
+  let ledgers = Ledgerwallet.Transport.enumerate () in
   let*! () =
     Events.(emit Ledger.found)
       ( List.length ledgers,
         String.concat
           " -- "
           (List.map
-             Hidapi.(
-               fun l -> Printf.sprintf "(%04x, %04x)" l.vendor_id l.product_id)
+             (fun (path : Ledgerwallet.Transport.path) ->
+               match path with
+               | Proxy_path _ -> "Proxy"
+               | Hidapi_path l ->
+                   Printf.sprintf "(%04x, %04x)" l.vendor_id l.product_id)
              ledgers) )
   in
-  let process_device device_info f =
-    let*! () = Events.(emit Ledger.processing) device_info.Hidapi.path in
-    (* HID interfaces get the number 0
-       (cf. https://github.com/LedgerHQ/ledger-nano-s/issues/48)
-       *BUT* on MacOSX the Hidapi library does not report the interface-number
-       so we look at the usage-page (which is even more unspecified but used by
-       prominent Ledger users:
-       https://github.com/LedgerHQ/ledgerjs/commit/333ade0d55dc9c59bcc4b451cf7c976e78629681).
-    *)
-    if
-      device_info.Hidapi.interface_number = 0
-      || device_info.Hidapi.interface_number = -1
-         && device_info.Hidapi.usage_page = 0xffa0
-    then
-      match filter with
-      | `Hid_path hp when device_info.path <> hp -> return_none
-      | _ -> (
-          match Hidapi.(open_path device_info.path) with
-          | None -> return_none
-          | Some h ->
-              Lwt.finalize
-                (fun () ->
-                  let* o = Ledger_commands.get_version ~device_info h in
-                  match o with
-                  | Some version_git
-                    when Filter.version_matches filter version_git ->
-                      let* ledger_id = Ledger_id.get h in
-                      f h version_git device_info ledger_id
-                  | None | Some _ -> return_none)
-                (fun () ->
-                  Hidapi.close h ;
-                  Lwt.return_unit))
-    else return_none
+  let selected (path : Ledgerwallet.Transport.path) =
+    let id_ok =
+      match path with
+      | Proxy_path _ -> true
+      | Hidapi_path device_info ->
+          (* HID interfaces get the number 0
+             (cf. https://github.com/LedgerHQ/ledger-nano-s/issues/48)
+             *BUT* on MacOSX the Hidapi library does not report the interface-number
+             so we look at the usage-page (which is even more unspecified but used by
+             prominent Ledger users:
+             https://github.com/LedgerHQ/ledgerjs/commit/333ade0d55dc9c59bcc4b451cf7c976e78629681).
+          *)
+          device_info.Hidapi.interface_number = 0
+          || device_info.Hidapi.interface_number = -1
+             && device_info.Hidapi.usage_page = 0xffa0
+    in
+    id_ok
+    &&
+    match filter with
+    | `None -> true
+    | `Version _ -> true
+    | `Hid_path hp -> (
+        match path with
+        | Proxy_path _ -> false
+        | Hidapi_path device_info -> device_info.path = hp)
+  in
+
+  let process_device (path : Ledgerwallet.Transport.path) =
+    let device_name = path_name path in
+    if not (selected path) then return_none
+    else
+      let*! () = Events.(emit Ledger.processing) device_name in
+      match Ledgerwallet.Transport.open_path path with
+      | None -> return_none
+      | Some h ->
+          Lwt.finalize
+            (fun () ->
+              let* o = Ledger_commands.get_version ~device_name h in
+              match o with
+              | Some version_git when Filter.version_matches filter version_git
+                ->
+                  let* ledger_id = Ledger_id.get h in
+                  f h version_git ~device_path:path ledger_id
+              | None | Some _ -> return_none)
+            (fun () ->
+              Ledgerwallet.Transport.close h ;
+              Lwt.return_unit)
   in
   let rec go = function
     | [] -> return_none
     | h :: t -> (
-        let* o = process_device h f in
+        let* o = process_device h in
         match o with Some x -> return_some x | None -> go t)
   in
   go ledgers
@@ -685,10 +691,11 @@ let is_derivation_scheme_supported version curve =
     let {major; minor; patch; _} = version in
     (major, minor, patch) >= min_version_of_derivation_scheme curve)
 
-let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg f =
+let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg
+    (f : 'a ledger_function) =
   let open Lwt_result_syntax in
-  let f hidapi (version, git_commit) device_info ledger_id =
-    let go () = f hidapi (version, git_commit) device_info ledger_id in
+  let f hidapi (version, git_commit) ~device_path ledger_id =
+    let go () = f hidapi (version, git_commit) ~device_path ledger_id in
     match ledger_uri with
     | `Ledger_account {Ledger_account.curve; _} ->
         if is_derivation_scheme_supported version curve then go ()
@@ -707,10 +714,13 @@ let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg f =
     | _ -> go ()
   in
   let* o =
-    let check_filter (hid_path, version, git_commit) =
+    let check_filter (transport_path, version, git_commit) =
       match (filter : Filter.t) with
       | `None -> true
-      | `Hid_path path -> hid_path = path
+      | `Hid_path path -> (
+          match (transport_path : Ledgerwallet.Transport.path) with
+          | Hidapi_path device_info -> device_info.path = path
+          | Proxy_path _ -> false)
       | `Version (_, f) -> f (version, git_commit)
     in
     let ledger_id =
@@ -719,26 +729,27 @@ let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg f =
       | `Ledger_account {ledger; _} -> ledger
     in
     match Request_cache.find_opt cache ledger_id with
-    | Some {version; git_commit; device_info; ledger_id}
-      when check_filter (device_info.path, version, git_commit) -> (
-        match Hidapi.(open_path device_info.path) with
+    | Some {path; version; git_commit; ledger_id}
+      when check_filter (path, version, git_commit) -> (
+        match Ledgerwallet.Transport.(open_path path) with
         | None -> return_none
         | Some hidapi ->
             Lwt.finalize
-              (fun () -> f hidapi (version, git_commit) device_info ledger_id)
               (fun () ->
-                Hidapi.close hidapi ;
+                f hidapi (version, git_commit) ~device_path:path ledger_id)
+              (fun () ->
+                Ledgerwallet.Transport.close hidapi ;
                 Lwt.return_unit))
     | Some _ | None ->
         use_ledger
           ~filter
-          (fun hidapi (version, git_commit) device_info ledger_id ->
+          (fun hidapi (version, git_commit) ~device_path ledger_id ->
             Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
                 Request_cache.replace
                   cache
                   ledger_id
-                  {version; git_commit; device_info; ledger_id} ;
-                f hidapi (version, git_commit) device_info ledger_id))
+                  {path = device_path; version; git_commit; ledger_id} ;
+                f hidapi (version, git_commit) ~device_path ledger_id))
   in
   match o with
   | Some o -> return o
@@ -817,7 +828,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
           let* {curve; path; _} = Ledger_uri.full_account ledger_uri in
           use_ledger_or_fail
             ~ledger_uri
-            (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (_version, _git_commit) ~device_path:_ _ledger_id ->
               let* pk =
                 Ledger_commands.public_key ?first_import hidapi curve path
               in
@@ -850,7 +861,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
     let* {curve; path; _} = Ledger_uri.full_account ledger_uri in
     use_ledger_or_fail
       ~ledger_uri
-      (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+      (fun hidapi (version, _git_commit) ~device_path:_ _ledger_id ->
         let* bytes =
           Ledger_commands.sign ?watermark ~version hidapi curve path msg
         in
@@ -862,7 +873,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
     let* {curve; path; _} = Ledger_uri.full_account ledger_uri in
     use_ledger_or_fail
       ~ledger_uri
-      (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+      (fun hidapi (_version, _git_commit) ~device_path:_ _ledger_id ->
         let* bytes =
           Ledger_commands.get_deterministic_nonce hidapi curve path msg
         in
@@ -901,7 +912,7 @@ let generic_commands group =
         (fun () (cctxt : Client_context.full) ->
           let* _ =
             use_ledger
-              (fun _hidapi (version, git_commit) device_info ledger_id ->
+              (fun _hidapi (version, git_commit) ~device_path ledger_id ->
                 let open Hidapi in
                 let*! () =
                   cctxt#message
@@ -909,17 +920,26 @@ let generic_commands group =
                     Format.(
                       fun ppf ->
                         let intro =
-                          asprintf
-                            "Found a %a (git-description: %S) application \
-                             running on %s %s at [%s]."
-                            Ledgerwallet_tezos.Version.pp
-                            version
-                            git_commit
-                            (device_info.manufacturer_string
-                            |> Option.value ~default:"NO-MANUFACTURER")
-                            (device_info.product_string
-                            |> Option.value ~default:"NO-PRODUCT")
-                            device_info.path
+                          match device_path with
+                          | Proxy_path _ ->
+                              asprintf
+                                "Found a %a (git-description: %S) application \
+                                 running on proxy server."
+                                Ledgerwallet_tezos.Version.pp
+                                version
+                                git_commit
+                          | Hidapi_path device_info ->
+                              asprintf
+                                "Found a %a (git-description: %S) application \
+                                 running on %s %s at [%s]."
+                                Ledgerwallet_tezos.Version.pp
+                                version
+                                git_commit
+                                (device_info.manufacturer_string
+                                |> Option.value ~default:"NO-MANUFACTURER")
+                                (device_info.product_string
+                                |> Option.value ~default:"NO-PRODUCT")
+                                device_info.path
                         in
                         pp_open_vbox ppf 0 ;
                         fprintf ppf "## Ledger `%a`@," Ledger_id.pp ledger_id ;
@@ -966,7 +986,7 @@ let generic_commands group =
         (fun test_sign ledger_uri (cctxt : Client_context.full) ->
           use_ledger_or_fail
             ~ledger_uri
-            (fun hidapi (version, git_commit) device_info _ledger_id ->
+            (fun hidapi (version, git_commit) ~device_path _ledger_id ->
               let*! () =
                 cctxt#message
                   "Found ledger corresponding to %a:"
@@ -974,21 +994,31 @@ let generic_commands group =
                   ledger_uri
               in
               let*! () =
-                cctxt#message
-                  "* Manufacturer: %s"
-                  (Option.value device_info.manufacturer_string ~default:"NONE")
-              in
-              let*! () =
-                cctxt#message
-                  "* Product: %s"
-                  (Option.value device_info.product_string ~default:"NONE")
-              in
-              let*! () =
-                cctxt#message
-                  "* Application: %a (git-description: %S)"
-                  Ledgerwallet_tezos.Version.pp
-                  version
-                  git_commit
+                match device_path with
+                | Proxy_path _ -> Lwt.return_unit
+                | Hidapi_path device_info ->
+                    let*! () =
+                      cctxt#message
+                        "* Manufacturer: %s"
+                        (Option.value
+                           device_info.manufacturer_string
+                           ~default:"NONE")
+                    in
+                    let*! () =
+                      cctxt#message
+                        "* Product: %s"
+                        (Option.value
+                           device_info.product_string
+                           ~default:"NONE")
+                    in
+                    let*! () =
+                      cctxt#message
+                        "* Application: %a (git-description: %S)"
+                        Ledgerwallet_tezos.Version.pp
+                        version
+                        git_commit
+                    in
+                    Lwt.return_unit
               in
               let* () =
                 match ledger_uri with
@@ -1097,7 +1127,7 @@ let baking_commands group =
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
-            (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (version, _git_commit) ~device_path:_ _ledger_id ->
               let* authorized =
                 Ledger_commands.get_authorized_path hidapi version
               in
@@ -1158,7 +1188,7 @@ let baking_commands group =
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
-            (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (version, _git_commit) ~device_path:_ _ledger_id ->
               let* () =
                 match version with
                 | {Ledgerwallet_tezos.Version.app_class = Tezos; _} ->
@@ -1257,7 +1287,7 @@ let baking_commands group =
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
-            (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (version, _git_commit) ~device_path:_ _ledger_id ->
               let* () =
                 let open Ledgerwallet_tezos.Version in
                 match version with
@@ -1354,7 +1384,7 @@ let baking_commands group =
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
-            (fun hidapi (_version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (_version, _git_commit) ~device_path:_ _ledger_id ->
               let* () =
                 Ledger_commands.wrap_ledger_cmd (fun pp ->
                     Ledgerwallet_tezos.deauthorize_baking ~pp hidapi)
@@ -1392,7 +1422,7 @@ let high_water_mark_commands group watermark_spelling =
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
-            (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (version, _git_commit) ~device_path:_ _ledger_id ->
               match version.app_class with
               | Tezos ->
                   failwith
@@ -1457,7 +1487,7 @@ let high_water_mark_commands group watermark_spelling =
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
-            (fun hidapi (version, _git_commit) _device_info _ledger_id ->
+            (fun hidapi (version, _git_commit) ~device_path:_ _ledger_id ->
               match version.app_class with
               | Tezos ->
                   failwith "Fatal: this operation is only valid with TezBake"
