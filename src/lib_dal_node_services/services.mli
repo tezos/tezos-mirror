@@ -81,3 +81,13 @@ val get_slot :
   ; params : unit * Cryptobox.commitment
   ; query : unit >
   service
+
+(** Compute the proof associated to a commitment. *)
+val get_slot_commitment_proof :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Cryptobox.commitment_proof
+  ; prefix : unit
+  ; params : unit * Cryptobox.commitment
+  ; query : unit >
+  service

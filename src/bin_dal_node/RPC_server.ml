@@ -51,6 +51,22 @@ module Slots_handlers = struct
         let*! r = Slot_manager.get_slot_content commitment store in
         match r with Ok s -> return_some s | Error `Not_found -> return_none)
       ctxt
+
+  let get_slot_commitment_proof ctxt commitment () () =
+    call_handler
+      (fun store cryptobox ->
+        let open Lwt_result_syntax in
+        let*! slot = Slot_manager.get_slot_content commitment store in
+        match slot with
+        | Error `Not_found -> return_none
+        | Ok slot -> (
+            match Cryptobox.polynomial_from_slot cryptobox slot with
+            | Error _ ->
+                (* Storage consistency ensure we can always compute the polynomial from the slot. *)
+                assert false
+            | Ok polynomial ->
+                return_some (Cryptobox.prove_commitment cryptobox polynomial)))
+      ctxt
 end
 
 let add_service registerer service handler directory =
@@ -74,6 +90,10 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.get_slot
        (Slots_handlers.get_slot_content ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.get_slot_commitment_proof
+       (Slots_handlers.get_slot_commitment_proof ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in

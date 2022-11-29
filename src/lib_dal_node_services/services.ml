@@ -99,3 +99,18 @@ let get_slot :
     ~query:Tezos_rpc.Query.empty
     ~output:Types.slot_content
     Tezos_rpc.Path.(open_root / "slots" /: Cryptobox.Commitment.rpc_arg)
+
+let get_slot_commitment_proof :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Cryptobox.commitment_proof
+    ; prefix : unit
+    ; params : unit * Cryptobox.commitment
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"Compute the proof associated with a commitment"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Cryptobox.Commitment_proof.encoding
+    Tezos_rpc.Path.(
+      open_root / "slots" /: Cryptobox.Commitment.rpc_arg / "proof")
