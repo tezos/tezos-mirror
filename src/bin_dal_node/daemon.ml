@@ -133,8 +133,7 @@ module Handler = struct
   let new_head ctxt cctxt =
     (* Monitor heads and store published slot headers indexed by block hash. *)
     let open Lwt_result_syntax in
-    let handler _stopper
-        (block_hash, (_block_header : Tezos_base.Block_header.t)) =
+    let handler _stopper (block_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
       | Ready {plugin = (module Plugin); _} ->
@@ -143,9 +142,10 @@ module Handler = struct
           in
           let*! () =
             Slot_manager.store_slot_headers
-              (Node_context.get_store ctxt).slot_headers_store
-              block_hash
+              ~block_level:header.shell.level
+              ~block_hash
               slot_headers
+              (Node_context.get_store ctxt)
           in
           return_unit
     in

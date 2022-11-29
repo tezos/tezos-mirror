@@ -53,8 +53,14 @@ module Plugin = struct
       process_manager_operations [] block.operations {apply; apply_internal})
     |> List.map_es (fun slot ->
            return
-             ( Dal.Slot_index.to_int slot.Dal.Slot.Header.id.index,
-               slot.Dal.Slot.Header.commitment ))
+             Dal_plugin.
+               {
+                 published_level =
+                   Raw_level.to_int32 slot.Dal.Slot.Header.id.published_level;
+                 slot_index =
+                   Dal.Slot_index.to_int slot.Dal.Slot.Header.id.index;
+                 commitment = slot.Dal.Slot.Header.commitment;
+               })
 
   module RPC = RPC
 end

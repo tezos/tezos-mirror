@@ -189,4 +189,21 @@ module Legacy = struct
     let path = Legacy_paths.slot_by_commitment commitment_b58 in
     let* res_opt = find node_store.slots_store path in
     Option.map Bytes.of_string res_opt |> Lwt.return
+
+  let legacy_add_slot_headers ~block_hash slot_headers node_store =
+    let slot_headers_store = node_store.slot_headers_store in
+    List.iter_s
+      (fun slot_header ->
+        let Dal_plugin.{slot_index; commitment; _} = slot_header in
+        Slot_headers_store.add
+          slot_headers_store
+          ~primary_key:block_hash
+          ~secondary_key:slot_index
+          commitment)
+      slot_headers
+
+  let add_slot_headers ~block_level:_ ~block_hash slot_headers node_store =
+    (* Saving slots headers with the new storage layout will be added in the
+       next MR. *)
+    legacy_add_slot_headers ~block_hash slot_headers node_store
 end

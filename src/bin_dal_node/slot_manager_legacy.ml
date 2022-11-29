@@ -206,13 +206,3 @@ let get_slot_pages cryptobox store slot_header =
       ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
   in
   return @@ List.map (fun page -> String.to_bytes page) pages
-
-let store_slot_headers store block_hash slot_headers =
-  List.iter_s
-    (fun (slot_index, slot_header) ->
-      Slot_headers_store.add
-        store
-        ~primary_key:block_hash
-        ~secondary_key:slot_index
-        slot_header)
-    slot_headers
