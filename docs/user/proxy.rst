@@ -2,30 +2,32 @@ Proxy mode
 ----------
 
 The ``octez-client``, described in
-:ref:`its own tutorial <howtouse_tezos_client>`, forwards all RPCs to a node.
-The current page describes the *proxy* mode, a mode where the client
-performs protocol RPCs locally. For the computations to be correct,
-the proxy client only requests the data it needs from the node, and uses
-this data locally to perform its own computations.
-For an entirely local mode, see the :doc:`mockup mode <mockup>`.
+:ref:`a dedicated tutorial <howtouse_tezos_client>`, heavily relies on node RPCs to implement its features. Thus, when a client need to perform some computation which cannot be done entirely locally, but which is implemented by a node RPC, it will simply call the corresponding RPC.
 
-Estimating gas required by a smart contract call or asking for baking rights
-are typical examples of potentially long computation the proxy mode relieves
-the node of.
+The current page describes the *proxy* mode, an execution mode where the client
+avoids some RPC calls to the node, especially computation-intensive RPCs.
+Thus, for computations that cannot be done entirely locally,
+the proxy client only requests the data it needs from the node using RPCs (that are not computation-intensive), and uses
+this data locally to perform computations by itself, whenever possible.
+
+For an entirely local mode, which never calls node RPCs, see the :doc:`mockup mode <mockup>`.
+
+Typical examples of potentially long computations the proxy mode relieves
+the node of include estimating gas required by a smart contract call or asking for baking rights.
 
 Executing commands in proxy mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The CLI interface of the client in proxy mode (the *proxy client* in short)
 is the same as the default client. To turn proxy mode ON,
-pass ``--mode proxy`` to ``octez-client``.
+simply pass option ``--mode proxy`` to ``octez-client``.
 
 Because some computations usually done by the node are protocol-dependent, the proxy mode has to be configured for a specific protocol.
 However, the proxy mode does not support all protocols.
 Execute ``octez-client list proxy protocols`` to see the supported protocols.
 It is expected that, at any given time, the proxy mode supports ``Alpha``,
-the current protocol of Mainnet and the current protocol proposal on Mainnet
-at the time of release.
+the current protocol of Mainnet, and the current protocol proposal on Mainnet
+at the time of release, if any.
 
 Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -138,7 +140,6 @@ In this case, the bulk of the computation is done locally.
 If you also want to see the data requests to the node, do the following before running your commands::
 
     $ export TEZOS_LOG="proxy_rpc_ctxt->debug; proxy_rpc->debug"
-
 
 How to deploy to relieve nodes from some RPCs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
