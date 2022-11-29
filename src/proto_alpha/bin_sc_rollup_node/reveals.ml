@@ -28,8 +28,6 @@ module Reveal_hash = Protocol.Sc_rollup_reveal_hash
 type error +=
   | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
   | Could_not_open_preimage_file of String.t
-  | Empty_reveal_data
-  | PVM_not_supported of Protocol.Alpha_context.Sc_rollup.Kind.t
 
 let () =
   register_error_kind
@@ -65,31 +63,7 @@ let () =
     Data_encoding.(obj1 (req "hash" string))
     (function
       | Could_not_open_preimage_file filename -> Some filename | _ -> None)
-    (fun filename -> Could_not_open_preimage_file filename) ;
-  register_error_kind
-    `Permanent
-    ~id:"sc_rollup_node_empty_reveal_data"
-    ~title:"Empty revelation data"
-    ~description:"Empty revelation data."
-    ~pp:(fun ppf () ->
-      Format.pp_print_string ppf "Tried to import or use empty revelation data.")
-    Data_encoding.unit
-    (function Empty_reveal_data -> Some () | _ -> None)
-    (fun () -> Empty_reveal_data) ;
-  register_error_kind
-    `Permanent
-    ~id:"sc_rollup_node_reveal_data_not_supported"
-    ~title:"Revelation data not supported for PVM"
-    ~description:"Revelation data not supported for PVM."
-    ~pp:(fun ppf kind ->
-      Format.fprintf
-        ppf
-        "Revelation data not supported for PVM %s"
-        (Protocol.Alpha_context.Sc_rollup.Kind.name_of kind))
-    Data_encoding.(
-      obj1 (req "pvm_kind" Protocol.Alpha_context.Sc_rollup.Kind.encoding))
-    (function PVM_not_supported k -> Some k | _ -> None)
-    (fun k -> PVM_not_supported k)
+    (fun filename -> Could_not_open_preimage_file filename)
 
 type source = String of string | File of string
 
@@ -101,21 +75,9 @@ let file_contents filename =
       return contents)
     (fun _ -> tzfail @@ Could_not_open_preimage_file filename)
 
-let save_string filename s =
-  let cout = open_out filename in
-  output_string cout s ;
-  close_out cout
-
 let path data_dir pvm_name hash =
   let hash = Format.asprintf "%a" Reveal_hash.pp hash in
   Filename.(concat (concat data_dir pvm_name) hash)
-
-let ensure_dir_exists data_dir pvm_name =
-  let path = Filename.concat data_dir pvm_name in
-  if Sys.(file_exists path) then (
-    if not (Sys.is_directory path) then
-      Stdlib.failwith (path ^ " should be a directory."))
-  else Sys.mkdir path 0o700
 
 let get ~data_dir ~pvm_name ~hash =
   let open Lwt_result_syntax in
@@ -130,144 +92,3 @@ let get ~data_dir ~pvm_name ~hash =
       (Wrong_hash {found = contents_hash; expected = hash})
   in
   return contents
-
-module Arith = struct
-  let pvm_name =
-    Protocol.Alpha_context.Sc_rollup.ArithPVM.Protocol_implementation.name
-
-  type input =
-    | String of {s : string; mutable pos : int; len : int}
-    | Input of in_channel
-
-  let rev_chunks_of_input input =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3853
-       Can be made more efficient. *)
-    let get_char () =
-      match input with
-      | Input cin -> ( try Some (input_char cin) with End_of_file -> None)
-      | String ({s; pos; len} as sin) ->
-          if pos >= len then None
-          else (
-            sin.pos <- pos + 1 ;
-            Some s.[pos])
-    in
-    let buf = Buffer.create 31 in
-    let tokens =
-      (* let cin = open_in filename in *)
-      let rec aux tokens =
-        match get_char () with
-        | None ->
-            List.rev
-            @@
-            if Buffer.length buf > 0 then
-              let token = Buffer.contents buf in
-              token :: tokens
-            else tokens
-        | Some ' ' ->
-            let token = Buffer.contents buf in
-            Buffer.clear buf ;
-            aux (token :: tokens)
-        | Some c ->
-            Buffer.add_char buf c ;
-            aux tokens
-      in
-      let tokens = aux [] in
-      tokens
-    in
-    let limit =
-      (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
-    in
-    Buffer.clear buf ;
-    let make_chunk () =
-      let chunk = Buffer.contents buf in
-      Buffer.clear buf ;
-      chunk
-    in
-    let chunks, _ =
-      List.fold_left
-        (fun (chunks, size) token ->
-          let len = String.length token in
-          if size + len > limit then (
-            let chunk = make_chunk () in
-            Buffer.add_string buf token ;
-            (chunk :: chunks, len))
-          else
-            let len =
-              if Buffer.length buf > 0 then (
-                Buffer.add_char buf ' ' ;
-                len + 1)
-              else len
-            in
-            Buffer.add_string buf token ;
-            (chunks, size + len))
-        ([], 0)
-        tokens
-    in
-    let chunks =
-      if Buffer.length buf > 0 then make_chunk () :: chunks else chunks
-    in
-    chunks
-
-  let link_rev_chunks rev_chunks =
-    let rec aux successor_hash linked_chunks = function
-      | [] -> linked_chunks
-      | chunk :: rev_chunks ->
-          let cell =
-            match successor_hash with
-            | None -> chunk
-            | Some h -> Format.asprintf "%s hash:%a" chunk Reveal_hash.pp h
-          in
-          let hash = Reveal_hash.hash_string ~scheme:Blake2B [cell] in
-          aux (Some hash) ((hash, cell) :: linked_chunks) rev_chunks
-    in
-    aux None [] rev_chunks
-
-  let input_of_source = function
-    | File filename -> Input (open_in filename)
-    | String s -> String {s; pos = 0; len = String.length s}
-
-  let close_input = function String _ -> () | Input cin -> close_in cin
-
-  let chunkify source =
-    let input = input_of_source source in
-    let rev_chunks = rev_chunks_of_input input in
-    let linked_hashed_chunks = link_rev_chunks rev_chunks in
-    close_input input ;
-    linked_hashed_chunks
-
-  let first_hash = function
-    | (hash, _) :: _ -> ok hash
-    | [] -> error Empty_reveal_data
-
-  let import data_dir source =
-    ensure_dir_exists data_dir pvm_name ;
-    let linked_hashed_chunks = chunkify source in
-    List.iter
-      (fun (hash, data) -> save_string (path data_dir pvm_name hash) data)
-      linked_hashed_chunks ;
-    first_hash linked_hashed_chunks
-
-  let chunkify source =
-    let open Result_syntax in
-    let linked_hashed_chunks = chunkify source in
-    let chunks_map =
-      linked_hashed_chunks |> List.to_seq
-      |> Protocol.Sc_rollup_reveal_hash.Map.of_seq
-    in
-    let+ hash = first_hash linked_hashed_chunks in
-    (chunks_map, hash)
-end
-
-let import ~data_dir (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
-    ~filename =
-  match pvm_kind with
-  | Example_arith -> Arith.import data_dir (File filename)
-  | Wasm_2_0_0 ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4067
-         Add support for multiple revelation data serialization schemes *)
-      error (PVM_not_supported pvm_kind)
-
-let chunkify (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) source =
-  match pvm_kind with
-  | Example_arith -> Arith.chunkify source
-  | Wasm_2_0_0 -> error (PVM_not_supported pvm_kind)

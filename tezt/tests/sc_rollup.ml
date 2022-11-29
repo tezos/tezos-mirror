@@ -2439,62 +2439,6 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
       ~error_msg:"State hashes should be different! (%L, %R)") ;
   unit
 
-let test_rollup_arith_uses_reveals ~kind =
-  let nadd = 32 * 1024 in
-  test_full_scenario
-    ~timeout:120
-    ~kind
-    {
-      tags = ["reveals"];
-      variant = None;
-      description = "rollup node correctly handles reveals";
-    }
-  @@ fun sc_rollup_node sc_rollup_client sc_rollup _node client ->
-  let filename =
-    let filename, cout = Filename.open_temp_file "sc_rollup" ".in" in
-    output_string cout "0 " ;
-    for _i = 1 to nadd do
-      output_string cout "1 + "
-    done ;
-    output_string cout "value" ;
-    close_out cout ;
-    filename
-  in
-  let* hash = Sc_rollup_node.import sc_rollup_node ~pvm_name:kind ~filename in
-  let* genesis_info =
-    RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
-  let* level =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
-  in
-
-  let* () = send_text_messages client ["hash:" ^ hash] in
-  let* () = bake_levels 2 client in
-  let* _ =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
-  in
-
-  let*! encoded_value =
-    Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
-  in
-  let value =
-    match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-    | Error error ->
-        failwith
-          (Format.asprintf
-             "The arithmetic PVM has an unexpected state: %a"
-             Data_encoding.Binary.pp_read_error
-             error)
-    | Ok x -> x
-  in
-  Check.(
-    (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
-  unit
-
 let test_reveals_fails_on_wrong_hash ~kind =
   test_full_scenario
     ~timeout:120
@@ -3899,9 +3843,6 @@ let register ~protocols =
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
-  (* DAC tests, not supported yet by the Wasm PVM *)
-  test_rollup_arith_uses_reveals protocols ~kind:"arith" ;
-  test_reveals_fails_on_wrong_hash protocols ~kind:"arith" ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols

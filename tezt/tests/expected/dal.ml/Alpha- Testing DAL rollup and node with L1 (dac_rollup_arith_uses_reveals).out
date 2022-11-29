@@ -37,23 +37,9 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/dal/slot_headers
-[ { "level": 3, "index": 0,
-    "commitment":
-      "sh23Xtg7DY2qvSKgM1TiQDLH4cGZ2tHQwiQ5usHYdBUMzkirZUEVkSKoBDvjQePseeKFnQDGc9" },
-  { "level": 3, "index": 1,
-    "commitment":
-      "[DAL_SLOT_HEADER]" },
-  { "level": 3, "index": 2,
-    "commitment":
-      "sh237VRQLZqf8Uno4hjiiJh8RJxuwhPF4xWnPq2VKuC2ZbwVp3w9nw36iGfLHzpQrbopWx8GFq" } ]
-
-./octez-sc-rollup-client-alpha rpc get /global/block/head/dal/confirmed_slot_pages
-[]
-
-./octez-client --wait none send sc rollup message '["dal:3:0:0","dal:3:1:0"]' from bootstrap2
+./octez-client --wait none send sc rollup message 'text:["hash:scrrh1bZAo4kfAohhKcvgKc4yLHYN49EPuHezNXgFraa1mEbKSTCwf"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.226 units (will add 100 for safety)
+Estimated gas: 1001.463 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -64,26 +50,28 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000365
-    Expected counter: 2
+    Fee to the baker: ꜩ0.000402
+    Expected counter: 1
     Gas limit: 1102
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000365
-      payload fees(the block proposer) ....... +ꜩ0.000365
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000402
+      payload fees(the block proposer) ....... +ꜩ0.000402
     Smart contract rollup messages submission
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1001.226
-      Resulting inbox state: { level = 5
+      Consumed gas: 1001.463
+      Resulting inbox state: { level = 3
                                current messages hash  = hash: [SC_ROLLUP_INBOX_LEVEL_TREE_HASH]
-                               level: 5 nb_messages_in_commitment_period = 16
+                               level: 3 nb_messages_in_commitment_period = 9
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_LEVEL_TREE_HASH]
-                               level: 4
-       index = 4
+                               level: 2
+       index = 2
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-                               [SC_ROLLUP_INBOX_HASH]
                                [SC_ROLLUP_INBOX_HASH]
     
                                }
 
+
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
+"\000\000\128\000"

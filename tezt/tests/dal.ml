@@ -132,7 +132,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
       ~src:bootstrap1_key
       ~kind:pvm_name
       ~boot_sector:""
-      ~parameters_ty:"unit"
+      ~parameters_ty:"string"
       tezos_client
   in
   let sc_rollup_node =
@@ -1045,10 +1045,16 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
-let send_messages ?(src = Constant.bootstrap2.alias) client msgs =
-  let msg = Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs) in
+let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
+    client msgs =
+  let msg =
+    alter_final_msg
+    @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
+  in
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
   Client.bake_for_and_wait client
+
+let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
 let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     sc_rollup_address node client _pvm_name =
@@ -1319,21 +1325,34 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
       return ()
 
 (* DAC tests *)
+let check_valid_root_hash expected_rh actual_rh =
+  Check.(
+    (actual_rh = expected_rh)
+      string
+      ~error_msg:"Invalid root hash returned (Current: %L <> Expected: %R)")
 
-let test_dal_node_handles_dac_store_preimage _protocol dal_node sc_rollup_node
-    _sc_rollup_address _node _client pvm_name =
-  let preimage = "test" in
+let check_preimage expected_preimage actual_preimage =
+  Check.(
+    (actual_preimage = expected_preimage)
+      string
+      ~error_msg:
+        "Preimage does not match expected value (Current: %L <> Expected: %R)")
+
+let test_dal_node_handles_dac_store_preimage_merkle_V0 _protocol dal_node
+    sc_rollup_node _sc_rollup_address _node _client pvm_name =
+  let payload = "test" in
   let* actual_rh =
-    RPC.call dal_node (Rollup.Dal.RPC.dac_store_preimage preimage)
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Merkle_tree_V0")
   in
   (* Expected reveal hash equals to the result of
      [Tezos_dal_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
   *)
   let expected_rh = "scrrh1Y5hijnFNJPb96EFTY9SjZ4epyaYF9xU3Eid9KCj9vda25H8W" in
-  Check.(
-    (actual_rh = expected_rh)
-      string
-      ~error_msg:"Invalid root hash returned (Current:%L <> Expected: %R)") ;
+  check_valid_root_hash expected_rh actual_rh ;
   let filename =
     Filename.concat
       (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
@@ -1346,12 +1365,136 @@ let test_dal_node_handles_dac_store_preimage _protocol dal_node sc_rollup_node
   let recovered_preimage =
     String.sub recovered_payload 5 (String.length recovered_payload - 5)
   in
+  check_preimage payload recovered_preimage ;
+  unit
+
+let test_dal_node_handles_dac_store_preimage_hash_chain_V0 _protocol dal_node
+    sc_rollup_node _sc_rollup_address _node _client pvm_name =
+  let payload = "test" in
+  let* actual_rh =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Hash_chain_V0")
+  in
+  (* Expected reveal hash equals to the result of
+     [Tezos_dal_alpha.Dac_pages_encoding.Hash_chain.V0.serialize_payload "test"].
+  *)
+  let expected_rh = "scrrh1hYNyzXmagRDi22knBt5dhMMi6Sivdo1ztf5wXiectRnzbSyX" in
+  check_valid_root_hash expected_rh actual_rh ;
+  let filename =
+    Filename.concat
+      (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
+      actual_rh
+  in
+  let cin = open_in filename in
+  let recovered_payload = really_input_string cin (in_channel_length cin) in
+  let () = close_in cin in
+  let recovered_preimage =
+    String.sub recovered_payload 0 (String.length payload)
+  in
+  check_preimage payload recovered_preimage ;
+  unit
+
+let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
+    sc_rollup_address _node client _pvm_name =
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info
+         sc_rollup_address
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  in
+  let nadd = 32 * 1024 in
+  let payload =
+    let rec aux b n =
+      if n > 0 then (
+        Buffer.add_string b "1 +" ;
+        (aux [@tailcall]) b (n - 1))
+      else (
+        Buffer.add_string b "value" ;
+        String.of_bytes (Buffer.to_bytes b))
+    in
+    let buf = Buffer.create ((nadd * 3) + 2) in
+    Buffer.add_string buf "0 " ;
+    aux buf nadd
+  in
+  let* actual_rh =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Hash_chain_V0")
+  in
+  let expected_rh = "scrrh1bZAo4kfAohhKcvgKc4yLHYN49EPuHezNXgFraa1mEbKSTCwf" in
+  check_valid_root_hash expected_rh actual_rh ;
+  let* () =
+    send_messages
+      client
+      ["hash:" ^ actual_rh]
+      ~alter_final_msg:(fun s -> "text:" ^ s)
+  in
+  let* () = bake_levels 2 client in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 2)
+  in
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let*! encoded_value =
+    Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
+  in
+  let value =
+    match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+    | Error error ->
+        failwith
+          (Format.asprintf
+             "The arithmetic PVM has an unexpected state: %a"
+             Data_encoding.Binary.pp_read_error
+             error)
+    | Ok x -> x
+  in
   Check.(
-    (recovered_preimage = preimage)
-      string
-      ~error_msg:
-        "Preimage does not match expected value (Current:%L <> Expected: %R)") ;
-  return ()
+    (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
+  unit
+
+let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
+    sc_rollup_address _node client _pvm_name =
+  let payload = "Some data that is not related to the hash" in
+  let _actual_rh =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.dac_store_preimage
+         ~payload
+         ~pagination_scheme:"Hash_chain_V0")
+  in
+  let errorneous_hash =
+    "scrrh1kXE3tnCVTJ21aDNVeaV86e8rS6jtiMEDpjZJtDnLXRThQdmy"
+  in
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info
+         sc_rollup_address
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  (* Prepare the handler to wait for the rollup node to fail before
+     sending the L1 message that will trigger the failure. This
+     ensures that the failure handler can access the status code
+     of the rollup node even after it has terminated. *)
+  let expect_failure = Sc_rollup_node.wait_for_failure_handler sc_rollup_node in
+  let* _level =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  in
+  let* () =
+    send_messages
+      client
+      ["hash:" ^ errorneous_hash]
+      ~alter_final_msg:(fun s -> "text:" ^ s)
+  in
+  expect_failure ()
 
 let test_dal_node_imports_dac_member =
   Protocol.register_test
@@ -1454,6 +1597,18 @@ let register ~protocols =
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
-    "dac_handles_reveal_data"
-    test_dal_node_handles_dac_store_preimage
+    "dac_reveals_data_merkle_tree_v0"
+    test_dal_node_handles_dac_store_preimage_merkle_V0
+    protocols ;
+  scenario_with_all_nodes
+    "dac_reveals_data_hash_chain_v0"
+    test_dal_node_handles_dac_store_preimage_hash_chain_V0
+    protocols ;
+  scenario_with_all_nodes
+    "dac_rollup_arith_uses_reveals"
+    test_rollup_arith_uses_reveals
+    protocols ;
+  scenario_with_all_nodes
+    "dac_rollup_arith_wrong_hash"
+    test_reveals_fails_on_wrong_hash
     protocols

@@ -609,11 +609,14 @@ module Dal = struct
       make ~data POST ["shards"; slot_header] (fun json ->
           JSON.(json |> as_list |> List.map encode))
 
-    let dac_store_preimage preimage =
+    let dac_store_preimage ~payload ~pagination_scheme =
       let preimage =
         JSON.parse
           ~origin:"dal_node_dac_store_preimage_rpc"
-          (encode_bytes_to_hex_string preimage)
+          (Format.sprintf
+             {|{"payload":%s,"pagination_scheme":"%s"}|}
+             (encode_bytes_to_hex_string payload)
+             pagination_scheme)
       in
       let data = JSON.unannotate preimage in
       make ~data PUT ["plugin"; "dac"; "store_preimage"] JSON.as_string

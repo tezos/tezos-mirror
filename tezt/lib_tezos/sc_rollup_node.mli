@@ -166,13 +166,6 @@ val wait_for_ready : t -> unit Lwt.t
    passed. *)
 val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
 
-(** [import sc_node ~pvm_name ~filename] makes the contents of
-    [filename] available as raw data chunks to the rollup assuming
-    that it runs according to a given [pvm_name].
-    Returns the hash of the first of these chunks.
-    The implementation is PVM-dependent. *)
-val import : t -> pvm_name:string -> filename:string -> string Lwt.t
-
 (** [wait_for ?where sc_node event_name filter] waits for the SCORU node
     [sc_node] to emit an event named [name] (usually this is the name the event
     is declared with, concatenated with [".v0"]). [wait_for] continues to wait

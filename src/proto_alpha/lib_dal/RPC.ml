@@ -31,25 +31,39 @@ module Registration = struct
 end
 
 module DAC = struct
-  module Hashing_scheme = Dac_pages_encoding.Merkle_tree.V0
   module Hash_storage = Dac_preimage_data_manager.Reveal_hash
+
+  let store_preimage_request_encoding =
+    Data_encoding.(
+      obj2
+        (req "payload" Data_encoding.(bytes Hex))
+        (req "pagination_scheme" Dac_pages_encoding.pagination_scheme_encoding))
+
+  let store_preimage_response_encoding = Protocol.Sc_rollup_reveal_hash.encoding
 
   module S = struct
     let dac_store_preimage =
       RPC_service.put_service
         ~description:"Split DAC reveal data"
         ~query:RPC_query.empty
-        ~input:Data_encoding.(bytes Hex)
-        ~output:Hashing_scheme.hash_encoding
+        ~input:store_preimage_request_encoding
+        ~output:store_preimage_response_encoding
         RPC_path.(open_root / "dac" / "store_preimage")
   end
 
-  let handle_serialize_dac_store_preimage reveal_data_dir data =
+  let handle_serialize_dac_store_preimage reveal_data_dir input =
+    let open Dac_pages_encoding in
     let for_each_page (hash, page_contents) =
       Hash_storage.save_bytes reveal_data_dir hash page_contents
     in
-    let size = Protocol.Alpha_context.Constants.sc_rollup_message_size_limit in
-    Hashing_scheme.serialize_payload ~max_page_size:size data ~for_each_page
+    let data, pagination_scheme = input in
+    match pagination_scheme with
+    | Merkle_tree_V0 ->
+        let size =
+          Protocol.Alpha_context.Constants.sc_rollup_message_size_limit
+        in
+        Merkle_tree.V0.serialize_payload ~max_page_size:size data ~for_each_page
+    | Hash_chain_V0 -> Hash_chain.V0.serialize_payload ~for_each_page data
 
   let register_serialize_dac_store_preimage reveal_data_dir =
     Registration.register0_noctxt
