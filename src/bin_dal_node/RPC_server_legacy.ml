@@ -34,7 +34,7 @@ let handle_split_slot ctxt () slot =
     Slot_manager.split_and_store
       store.slots_watcher
       cryptobox
-      store.slots_store
+      store.shard_store
       slot
   in
   (Cryptobox.Commitment.to_b58check commitment, proof)
@@ -44,7 +44,7 @@ let handle_slot ctxt (_, commitment) () () =
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_slot
     cryptobox
-    (Node_context.get_store ctxt).slots_store
+    (Node_context.get_store ctxt).shard_store
     commitment
 
 let handle_stored_slot_headers ctxt (_, block_hash) () () =
@@ -61,29 +61,24 @@ let handle_slot_pages ctxt (_, commitment) () () =
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_slot_pages
     cryptobox
-    (Node_context.get_store ctxt).slots_store
+    (Node_context.get_store ctxt).shard_store
     commitment
 
 let handle_shard ctxt ((_, commitment), shard) () () =
+  let open Lwt_result_syntax in
+  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_shard
-    (Node_context.get_store ctxt).slots_store
+    cryptobox
+    (Node_context.get_store ctxt).shard_store
     commitment
     shard
 
 let handle_shards ctxt (_, commitment) () shards =
   let open Lwt_result_syntax in
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
-  let dal_parameters = Cryptobox.parameters cryptobox in
-  let shards =
-    let open Slot_manager in
-    List.fold_left
-      (fun acc id -> Shard_id_set.add id acc)
-      Shard_id_set.empty
-      shards
-  in
   Slot_manager.get_shards
-    (Node_context.get_store ctxt).slots_store
-    dal_parameters
+    cryptobox
+    (Node_context.get_store ctxt).shard_store
     commitment
     shards
 

@@ -179,7 +179,7 @@ module Handler = struct
       in
       let* () =
         Slot_manager.save_shards
-          (Node_context.get_store ctxt).slots_store
+          (Node_context.get_store ctxt).shard_store
           (Node_context.get_store ctxt).slots_watcher
           ready_ctxt.Node_context.cryptobox
           slot_header
