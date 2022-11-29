@@ -153,18 +153,18 @@ let save store watcher slot_header shards =
   Lwt_watcher.notify watcher slot_header ;
   return_unit
 
-let split_and_store watcher dal_constants store slot =
+let split_and_store watcher cryptobox store slot =
   let r =
     let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot dal_constants slot in
-    let commitment = Cryptobox.commit dal_constants polynomial in
-    let proof = Cryptobox.prove_commitment dal_constants polynomial in
+    let* polynomial = Cryptobox.polynomial_from_slot cryptobox slot in
+    let commitment = Cryptobox.commit cryptobox polynomial in
+    let proof = Cryptobox.prove_commitment cryptobox polynomial in
     return (polynomial, commitment, proof)
   in
   let open Lwt_result_syntax in
   match r with
   | Ok (polynomial, commitment, commitment_proof) ->
-      let shards = Cryptobox.shards_from_polynomial dal_constants polynomial in
+      let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
       let* () = save store watcher commitment shards in
       Lwt.return_ok (commitment, commitment_proof)
   | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
@@ -185,16 +185,16 @@ let check_slot_consistency dal_parameters shards =
             {provided = List.length shards; required = required_shards};
         ]
 
-let polynomial_from_shards dal_constants shards =
-  match Cryptobox.polynomial_from_shards dal_constants shards with
+let polynomial_from_shards cryptobox shards =
+  match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Ok p
   | Error (`Invert_zero msg | `Not_enough_shards msg) ->
       Error [Merging_failed msg]
 
-let save_shards store watcher dal_constants slot_header shards =
+let save_shards store watcher cryptobox slot_header shards =
   let open Lwt_result_syntax in
-  let*? polynomial = polynomial_from_shards dal_constants shards in
-  let rebuilt_slot_header = Cryptobox.commit dal_constants polynomial in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
+  let rebuilt_slot_header = Cryptobox.commit cryptobox polynomial in
   let*? () =
     if Cryptobox.Commitment.equal slot_header rebuilt_slot_header then Ok ()
     else Result_syntax.fail [Invalid_shards_slot_header_association]
@@ -253,8 +253,9 @@ let get_shards store dal_parameters slot_header shard_ids =
     []
     slot_header
 
-let get_slot dal_parameters dal_constants store slot_header =
+let get_slot cryptobox store slot_header =
   let open Lwt_result_syntax in
+  let dal_parameters = Cryptobox.parameters cryptobox in
   let* shards =
     fold_stored_shards
       ~check_shards:true
@@ -264,18 +265,18 @@ let get_slot dal_parameters dal_constants store slot_header =
       Cryptobox.IntMap.empty
       slot_header
   in
-  let*? polynomial = polynomial_from_shards dal_constants shards in
-  let slot = Cryptobox.polynomial_to_bytes dal_constants polynomial in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
+  let slot = Cryptobox.polynomial_to_bytes cryptobox polynomial in
   let*! () =
     Event.(
       emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
   in
   return slot
 
-let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
-    store slot_header =
+let get_slot_pages cryptobox store slot_header =
   let open Lwt_result_syntax in
-  let* slot = get_slot initial_constants dal_constants store slot_header in
+  let dal_parameters = Cryptobox.parameters cryptobox in
+  let* slot = get_slot cryptobox store slot_header in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
@@ -283,7 +284,7 @@ let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
      Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
   let*? pages =
     String.chunk_bytes
-      page_size
+      dal_parameters.page_size
       slot
       ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
   in

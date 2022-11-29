@@ -30,7 +30,7 @@ open Tezos_rpc_http_server
 module Slots_handlers = struct
   let call_handler handler ctxt =
     let open Lwt_result_syntax in
-    let*? {dal_constants = cryptobox; _} = Node_context.get_ready ctxt in
+    let*? {cryptobox; _} = Node_context.get_ready ctxt in
     let store = Node_context.get_store ctxt in
     handler store cryptobox
 
