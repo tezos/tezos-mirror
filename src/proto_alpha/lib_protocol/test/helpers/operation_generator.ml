@@ -669,10 +669,6 @@ let generate_sc_rollup_originate =
   let origination_proof =
     Lwt_main.run (Sc_rollup_helpers.origination_proof ~boot_sector kind)
   in
-  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-  let origination_proof =
-    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
-  in
   QCheck2.Gen.pure
     (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
 

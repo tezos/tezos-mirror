@@ -156,24 +156,18 @@ module ScRollup = struct
           let* proof =
             Arith_pvm.produce_origination_proof context boot_sector
           in
-          return
-            (Sc_rollup.Arith_pvm_with_proof
-               (module struct
-                 include Arith_pvm
-
-                 let proof = proof
-               end))
+          let*? proof =
+            Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof
+          in
+          return proof
       | Sc_rollup.Kind.Wasm_2_0_0 ->
           let open Lwt_result_syntax in
           let context = Tezos_context_memory.make_empty_context () in
           let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
-          return
-            (Sc_rollup.Wasm_2_0_0_pvm_with_proof
-               (module struct
-                 include Wasm_pvm
-
-                 let proof = proof
-               end))
+          let*? proof =
+            Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof
+          in
+          return proof
     in
     let open Lwt_syntax in
     let* res = aux kind in

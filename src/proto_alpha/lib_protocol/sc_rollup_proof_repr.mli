@@ -43,8 +43,6 @@
     is the case, we don't need the input proof at all and the [input_proof]
     parameter in our proof should be [None]. *)
 
-open Sc_rollup_repr
-
 (** The proof that a reveal is valid. *)
 type reveal_proof =
   | Raw_data_proof of string
@@ -90,25 +88,50 @@ type input_proof =
   | Reveal_proof of reveal_proof
   | First_inbox_message
 
-type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
+type 'proof t = {pvm_step : 'proof; input_proof : input_proof option}
+
+type serialized = private string
+
+(** [serialize_pvm_step ~pvm proof] turns a structured representation
+    of a step proof of [pvm] into its serialized representation. *)
+val serialize_pvm_step :
+  pvm:('state, 'proof, 'output) Sc_rollups.PVM.implementation ->
+  'proof ->
+  serialized tzresult
+
+(** [unserialize_pvm_step ~pvm proof] turns a serialized
+    representation of a step proof of [pvm] into its structured
+    representation. *)
+val unserialize_pvm_step :
+  pvm:('state, 'proof, 'output) Sc_rollups.PVM.implementation ->
+  serialized ->
+  'proof tzresult
 
 type error += Sc_rollup_proof_check of string
 
 type error += Sc_rollup_invalid_serialized_inbox_proof
 
-val encoding : t Data_encoding.t
+val serialized_encoding : serialized Data_encoding.t
 
-val pp : Format.formatter -> t -> unit
+val encoding : serialized t Data_encoding.t
+
+val pp : Format.formatter -> 'a t -> unit
 
 (** The state hash of the machine before the step. This must be checked
     against the value in the refutation game as well as checking the
     proof is valid. *)
-val start : t -> State_hash.t
+val start_of_pvm_step :
+  pvm:('state, 'proof, 'output) Sc_rollups.PVM.implementation ->
+  'proof ->
+  Sc_rollup_repr.State_hash.t
 
 (** The state hash of the machine after the step. This must be checked
     against the value in the refutation game as well as checking the
     proof is valid. *)
-val stop : t -> State_hash.t
+val stop_of_pvm_step :
+  pvm:('state, 'proof, 'output) Sc_rollups.PVM.implementation ->
+  'proof ->
+  Sc_rollup_repr.State_hash.t
 
 (** Check the validity of a proof.
 
@@ -135,14 +158,14 @@ val stop : t -> State_hash.t
     input_request for the state at the beginning of the proof.
 *)
 val valid :
+  pvm:('state, 'proof, 'output) Sc_rollups.PVM.implementation ->
   metadata:Sc_rollup_metadata_repr.t ->
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   Dal_slot_repr.History.t ->
   Dal_slot_repr.parameters ->
   dal_attestation_lag:int ->
-  pvm_name:string ->
-  t ->
+  'proof t ->
   (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
   Lwt.t
 
@@ -227,4 +250,4 @@ val produce :
   metadata:Sc_rollup_metadata_repr.t ->
   (module PVM_with_context_and_state) ->
   Raw_level_repr.t ->
-  t tzresult Lwt.t
+  serialized t tzresult Lwt.t

@@ -31,14 +31,6 @@ module V2_0_0 : sig
   module type S = sig
     include Sc_rollup_PVM_sig.S
 
-    (** [name] is "wasm_2_0_0".
-
-      WebAssembly is an "evergreen" specification. We aim to track
-      the latest major version, 2.0 at the time of writing. We
-      use the minor version number to track changes to our fork.
-   *)
-    val name : string
-
     (** [parse_boot_sector s] builds a boot sector from its human
       writable description. *)
     val parse_boot_sector : string -> string option

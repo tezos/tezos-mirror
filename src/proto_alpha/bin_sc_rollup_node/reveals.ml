@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol.Alpha_context
 module Reveal_hash = Protocol.Sc_rollup_reveal_hash
 
 type error +=
@@ -79,9 +80,9 @@ let path data_dir pvm_name hash =
   let hash = Format.asprintf "%a" Reveal_hash.pp hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
-let get ~data_dir ~pvm_name ~hash =
+let get ~data_dir ~pvm_kind ~hash =
   let open Lwt_result_syntax in
-  let filename = path data_dir pvm_name hash in
+  let filename = path data_dir (Sc_rollup.Kind.to_string pvm_kind) hash in
   let* contents = file_contents filename in
   let*? () =
     let contents_hash =

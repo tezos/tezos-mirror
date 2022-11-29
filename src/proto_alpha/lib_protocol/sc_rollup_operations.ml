@@ -86,57 +86,6 @@ type origination_result = {
   genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
 }
 
-let origination_proof_of_string origination_proof kind =
-  let open Lwt_result_syntax in
-  match kind with
-  | Sc_rollup.Kind.Example_arith ->
-      let* proof =
-        match
-          Data_encoding.Binary.of_string_opt
-            Sc_rollup.ArithPVM.Protocol_implementation.proof_encoding
-            origination_proof
-        with
-        | Some x -> return x
-        | None ->
-            tzfail
-              (Sc_rollup_proof_repr.Sc_rollup_proof_check
-                 "invalid encoding for Arith origination proof")
-      in
-
-      let (module PVM : Sc_rollup.PVM_with_proof
-            with type proof = Sc_rollup.ArithPVM.Protocol_implementation.proof)
-          =
-        (module struct
-          include Sc_rollup.ArithPVM.Protocol_implementation
-
-          let proof = proof
-        end)
-      in
-      return @@ Sc_rollup.Arith_pvm_with_proof (module PVM)
-  | Sc_rollup.Kind.Wasm_2_0_0 ->
-      let* proof =
-        match
-          Data_encoding.Binary.of_string_opt
-            Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation.proof_encoding
-            origination_proof
-        with
-        | Some x -> return x
-        | None ->
-            tzfail
-              (Sc_rollup_proof_repr.Sc_rollup_proof_check
-                 "invalid encoding for Wasm_2_0_0 origination proof")
-      in
-      let (module PVM : Sc_rollup.PVM_with_proof
-            with type proof =
-              Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation.proof) =
-        (module struct
-          include Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation
-
-          let proof = proof
-        end)
-      in
-      return @@ Sc_rollup.Wasm_2_0_0_pvm_with_proof (module PVM)
-
 type 'ret continuation = unit -> 'ret tzresult
 
 (* Only a subset of types are supported for rollups.
@@ -223,26 +172,22 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
   (* Check that the type is valid for rollups. *)
   validate_parameters_ty ctxt arg_type
 
-let check_origination_proof kind boot_sector origination_proof =
+let check_origination_proof (type state proof output)
+    ~(pvm : (state, proof, output) Sc_rollup.PVM.implementation) boot_sector
+    origination_proof =
   let open Lwt_result_syntax in
-  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-  let kind' = Sc_rollup.wrapped_proof_kind_exn origination_proof in
-  let* () =
-    fail_when
-      Compare.String.(
-        Sc_rollup.Kind.name_of kind <> Sc_rollup.Kind.name_of kind')
-      (Sc_rollup_proof_repr.Sc_rollup_proof_check "incorrect kind proof")
-  in
-  let*! is_valid = PVM.verify_origination_proof PVM.proof boot_sector in
+  let (module PVM) = pvm in
+  let*! is_valid = PVM.verify_origination_proof origination_proof boot_sector in
   let* () =
     fail_when
       (not is_valid)
       (Sc_rollup_proof_repr.Sc_rollup_proof_check "invalid origination proof")
   in
-  return PVM.(proof_stop_state proof)
+  return PVM.(proof_stop_state origination_proof)
 
 let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
   let open Lwt_result_syntax in
+  let (Packed ((module PVM) as pvm)) = Sc_rollup.Kind.pvm_of kind in
   let*? ctxt =
     let open Result_syntax in
     let* parameters_ty, ctxt =
@@ -254,9 +199,11 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
     validate_untyped_parameters_ty ctxt parameters_ty
   in
 
-  let* origination_proof = origination_proof_of_string origination_proof kind in
+  let*? origination_proof =
+    Sc_rollup.Proof.unserialize_pvm_step ~pvm origination_proof
+  in
   let* genesis_hash =
-    check_origination_proof kind boot_sector origination_proof
+    check_origination_proof ~pvm boot_sector origination_proof
   in
   let genesis_commitment =
     Sc_rollup.Commitment.genesis_commitment
@@ -347,7 +294,7 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     ~output_proof =
   let open Lwt_result_syntax in
   (* Lookup the PVM of the rollup. *)
-  let* ctxt, (module PVM : Sc_rollup.PVM.S) =
+  let* ctxt, Packed (module PVM) =
     let+ ctxt, kind = Sc_rollup.kind ctxt rollup in
     (ctxt, Sc_rollup.Kind.pvm_of kind)
   in
@@ -503,8 +450,6 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
 
 module Internal_for_tests = struct
   let execute_outbox_message = execute_outbox_message
-
-  let origination_proof_of_string = origination_proof_of_string
 end
 
 let execute_outbox_message ctxt =

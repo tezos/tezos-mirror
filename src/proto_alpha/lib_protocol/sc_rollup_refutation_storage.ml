@@ -254,7 +254,6 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
     Commitment_storage.get_commitment_unsafe ctxt rollup child_info.predecessor
   in
   let* inbox, ctxt = Sc_rollup_inbox_storage.get_inbox ctxt in
-  let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
   let default_number_of_sections =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
@@ -267,7 +266,6 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
       ~start_level:current_level
       (Sc_rollup_inbox_repr.take_snapshot inbox)
       slots_history_snapshot
-      ~pvm_name:(Sc_rollups.Kind.name_of kind)
       ~parent:parent_info
       ~child:child_info
       ~refuter
@@ -286,6 +284,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make player opponent in
   let* game, ctxt = get_game ctxt rollup stakers in
+  let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
   let* () =
     fail_unless
       (Sc_rollup_repr.Staker.equal
@@ -297,6 +296,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
   let dal = (Constants_storage.parametric ctxt).dal in
   let* move_result =
     Sc_rollup_game_repr.play
+      kind
       dal.cryptobox_parameters
       ~dal_attestation_lag:dal.attestation_lag
       ~stakers

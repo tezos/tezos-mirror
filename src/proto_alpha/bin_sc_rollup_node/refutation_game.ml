@@ -216,7 +216,7 @@ module Make (Interpreter : Interpreter.S) :
       let reveal hash =
         let open Lwt_syntax in
         let* res =
-          Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_name:PVM.name ~hash
+          Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_kind:PVM.kind ~hash
         in
         match res with Ok data -> return @@ Some data | Error _ -> return None
 
@@ -249,6 +249,11 @@ module Make (Interpreter : Interpreter.S) :
       @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in
+    let*? pvm_step =
+      Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module PVM) proof.pvm_step
+      |> Environment.wrap_tzresult
+    in
+    let proof = {proof with pvm_step} in
     let*! res =
       Sc_rollup.Proof.valid
         ~metadata
@@ -257,7 +262,7 @@ module Make (Interpreter : Interpreter.S) :
         dal_slots_history
         dal_parameters
         ~dal_attestation_lag
-        ~pvm_name:game.pvm_name
+        ~pvm:(module PVM)
         proof
       >|= Environment.wrap_tzresult
     in
@@ -359,6 +364,11 @@ module Make (Interpreter : Interpreter.S) :
             .Unreliable_tezos_node_returning_inconsistent_game
       | Some (start_state, _start_hash) ->
           let* proof = generate_proof node_ctxt game start_state in
+          let*? pvm_step =
+            Sc_rollup.Proof.serialize_pvm_step ~pvm:(module PVM) proof.pvm_step
+            |> Environment.wrap_tzresult
+          in
+          let proof = {proof with pvm_step} in
           let choice = start_tick in
           return {choice; step = Proof proof}
     in

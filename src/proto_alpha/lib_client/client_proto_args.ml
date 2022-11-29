@@ -915,17 +915,17 @@ module Sc_rollup_params = struct
 
   let rollup_kind_parameter =
     Tezos_clic.parameter (fun _ name ->
-        match Sc_rollup.Kind.pvm_of_name ~name with
+        match Sc_rollup.Kind.of_string name with
         | None ->
             failwith
               "Parameter '%s' is not a valid rollup name (must be one of %s)"
               name
-              (String.concat ", " Sc_rollup.Kind.all_names)
+              (String.concat ", " Sc_rollup.Kind.(List.map to_string all))
         | Some k -> return k)
 
   let boot_sector_parameter =
     let from_text s =
-      return (fun (module R : Sc_rollup.PVM.S) ->
+      return (fun (Sc_rollup.PVM.Packed (module R)) ->
           R.parse_boot_sector s |> function
           | None -> failwith "Invalid boot sector"
           | Some boot_sector -> return boot_sector)

@@ -193,7 +193,6 @@ module V1 = struct
     dal_snapshot : Dal_slot_repr.History.t;
     start_level : Raw_level_repr.t;
     inbox_level : Raw_level_repr.t;
-    pvm_name : string;
     game_state : game_state;
   }
 
@@ -261,21 +260,13 @@ module V1 = struct
     | Final_move _, _ -> false
 
   let equal
-      {
-        turn;
-        inbox_snapshot;
-        dal_snapshot;
-        start_level;
-        inbox_level;
-        pvm_name;
-        game_state;
-      } g2 =
+      {turn; inbox_snapshot; dal_snapshot; start_level; inbox_level; game_state}
+      g2 =
     player_equal turn g2.turn
     && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot g2.inbox_snapshot
     && Dal_slot_repr.History.equal dal_snapshot g2.dal_snapshot
     && Raw_level_repr.equal start_level g2.start_level
     && Raw_level_repr.equal inbox_level g2.inbox_level
-    && String.equal pvm_name g2.pvm_name
     && game_state_equal game_state g2.game_state
 
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
@@ -322,12 +313,6 @@ module V1 = struct
             Final_move {agreed_start_chunk; refuted_stop_chunk});
       ]
 
-  let restrict_pvm_name_encoding =
-    let restrict_string l =
-      Data_encoding.string_enum @@ List.map (fun x -> (x, x)) l
-    in
-    restrict_string Sc_rollups.Kind.all_names
-
   let encoding =
     let open Data_encoding in
     conv
@@ -337,7 +322,6 @@ module V1 = struct
              dal_snapshot;
              start_level;
              inbox_level;
-             pvm_name;
              game_state;
            } ->
         ( turn,
@@ -345,14 +329,12 @@ module V1 = struct
           dal_snapshot,
           start_level,
           inbox_level,
-          pvm_name,
           game_state ))
       (fun ( turn,
              inbox_snapshot,
              dal_snapshot,
              start_level,
              inbox_level,
-             pvm_name,
              game_state ) ->
         {
           turn;
@@ -360,16 +342,14 @@ module V1 = struct
           dal_snapshot;
           start_level;
           inbox_level;
-          pvm_name;
           game_state;
         })
-      (obj7
+      (obj6
          (req "turn" player_encoding)
          (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
          (req "dal_snapshot" Dal_slot_repr.History.encoding)
          (req "start_level" Raw_level_repr.encoding)
          (req "inbox_level" Raw_level_repr.encoding)
-         (req "pvm_name" restrict_pvm_name_encoding)
          (req "game_state" game_state_encoding))
 
   let pp_dissection ppf d =
@@ -402,7 +382,7 @@ module V1 = struct
     Format.fprintf
       ppf
       "%a playing; inbox snapshot = %a; start level = %a; inbox level = %a; \
-       pvm_name = %s; game_state = %a"
+       game_state = %a"
       pp_player
       game.turn
       Sc_rollup_inbox_repr.pp_history_proof
@@ -411,7 +391,6 @@ module V1 = struct
       game.start_level
       Raw_level_repr.pp
       game.inbox_level
-      game.pvm_name
       pp_game_state
       game.game_state
 end
@@ -491,7 +470,7 @@ end
 
 let make_chunk state_hash tick = {state_hash; tick}
 
-let initial inbox dal_snapshot ~start_level ~pvm_name
+let initial inbox dal_snapshot ~start_level
     ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender
     ~default_number_of_sections =
@@ -518,13 +497,12 @@ let initial inbox dal_snapshot ~start_level ~pvm_name
     dal_snapshot;
     start_level;
     inbox_level = child.inbox_level;
-    pvm_name;
     game_state;
   }
 
 type step =
   | Dissection of dissection_chunk list
-  | Proof of Sc_rollup_proof_repr.t
+  | Proof of Sc_rollup_proof_repr.serialized Sc_rollup_proof_repr.t
 
 let step_encoding =
   let open Data_encoding in
@@ -685,15 +663,15 @@ let check_proof_distance_is_one ~start_tick ~stop_tick =
   error_unless Z.(equal dist one) (Proof_unexpected_section_size dist)
 
 (** Check the proof begins with the correct state. *)
-let check_proof_start_state ~start_state proof =
-  let start_proof = Sc_rollup_proof_repr.start proof in
+let check_proof_start_state ~pvm ~start_state proof =
+  let start_proof = Sc_rollup_proof_repr.start_of_pvm_step ~pvm proof in
   error_unless
     (Option.equal State_hash.equal start_state (Some start_proof))
     (Proof_start_state_hash_mismatch
        {start_state_hash = start_state; start_proof})
 
 (** Check the proof stops with a different state than refuted one. *)
-let check_proof_stop_state ~stop_state input_given
+let check_proof_stop_state ~pvm ~stop_state input_given
     (input_request : Sc_rollup_PVM_sig.input_request) proof validate =
   let stop_proof =
     match (input_given, input_request) with
@@ -701,7 +679,7 @@ let check_proof_stop_state ~stop_state input_given
     | Some _, Initial
     | Some _, First_after _
     | Some _, Needs_reveal _ ->
-        Some (Sc_rollup_proof_repr.stop proof)
+        Some (Sc_rollup_proof_repr.stop_of_pvm_step ~pvm proof)
     | Some _, No_input_required
     | None, Initial
     | None, First_after _
@@ -727,23 +705,23 @@ let check_proof_refute_stop_state ~stop_state input input_request proof =
   check_proof_stop_state ~stop_state input input_request proof false
 
 (** Returns the validity of the first final move on top of a dissection. *)
-let validity_final_move dal_parameters ~dal_attestation_lag ~first_move
+let validity_final_move ~pvm ~dal_parameters ~dal_attestation_lag ~first_move
     ~metadata ~proof ~game ~start_chunk ~stop_chunk =
   let open Lwt_result_syntax in
   let*! res =
-    let {inbox_snapshot; inbox_level; pvm_name; dal_snapshot; _} = game in
+    let {inbox_snapshot; inbox_level; dal_snapshot; _} = game in
     let*! valid =
       (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
          This function is not resilient to dal parameters changes
          (cryptobox parameters or dal_attestation_lag for instance). *)
       Sc_rollup_proof_repr.valid
+        ~pvm
         ~metadata
         inbox_snapshot
         inbox_level
         dal_snapshot
         dal_parameters
         ~dal_attestation_lag
-        ~pvm_name
         proof
     in
     let*? () =
@@ -754,23 +732,28 @@ let validity_final_move dal_parameters ~dal_attestation_lag ~first_move
       else ok ()
     in
     let*? () =
-      check_proof_start_state ~start_state:start_chunk.state_hash proof
+      check_proof_start_state
+        ~pvm
+        ~start_state:start_chunk.state_hash
+        proof.pvm_step
     in
     match valid with
     | Ok (input, input_request) ->
         let*? () =
           if first_move then
             check_proof_refute_stop_state
+              ~pvm
               ~stop_state:stop_chunk.state_hash
               input
               input_request
-              proof
+              proof.pvm_step
           else
             check_proof_validate_stop_state
+              ~pvm
               ~stop_state:stop_chunk.state_hash
               input
               input_request
-              proof
+              proof.pvm_step
         in
         return_true
     | _ -> return_false
@@ -785,10 +768,11 @@ let validity_final_move dal_parameters ~dal_attestation_lag ~first_move
     - The proof stop on the state different than the refuted one.
     - The proof is correctly verified.
 *)
-let validity_first_final_move dal_parameters ~dal_attestation_lag ~metadata
-    ~proof ~game ~start_chunk ~stop_chunk =
+let validity_first_final_move ~pvm ~dal_parameters ~dal_attestation_lag
+    ~metadata ~proof ~game ~start_chunk ~stop_chunk =
   validity_final_move
-    dal_parameters
+    ~pvm
+    ~dal_parameters
     ~dal_attestation_lag
     ~first_move:true
     ~metadata
@@ -804,10 +788,11 @@ let validity_first_final_move dal_parameters ~dal_attestation_lag ~metadata
     - The proof stop on the state validates the refuted one.
     - The proof is correctly verified.
 *)
-let validity_second_final_move dal_parameters ~dal_attestation_lag ~metadata
-    ~agreed_start_chunk ~refuted_stop_chunk ~game ~proof =
+let validity_second_final_move ~pvm ~dal_parameters ~dal_attestation_lag
+    ~metadata ~agreed_start_chunk ~refuted_stop_chunk ~game ~proof =
   validity_final_move
-    dal_parameters
+    ~pvm
+    ~dal_parameters
     ~dal_attestation_lag
     ~first_move:false
     ~metadata
@@ -823,57 +808,52 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
-let play dal_parameters ~dal_attestation_lag ~stakers metadata game refutation =
+let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game
+    refutation =
   let open Lwt_result_syntax in
+  let (Packed ((module PVM) as pvm)) = Sc_rollups.Kind.pvm_of kind in
   let mk_loser loser =
     let loser = Index.staker stakers loser in
     Either.Left (Loser {loser; reason = Conflict_resolved})
   in
   match (refutation.step, game.game_state) with
-  | Dissection states, Dissecting {dissection; default_number_of_sections} -> (
+  | Dissection states, Dissecting {dissection; default_number_of_sections} ->
       let*? start_chunk, stop_chunk =
         find_choice dissection refutation.choice
       in
-      match Sc_rollups.Kind.pvm_of_name ~name:game.pvm_name with
-      | Some (module PVM) ->
-          let*? () =
-            PVM.check_dissection
-              ~default_number_of_sections
-              ~start_chunk
-              ~stop_chunk
-              states
-          in
-          let new_game_state =
-            Dissecting {dissection = states; default_number_of_sections}
-          in
-          return
-            (Either.Right
-               {
-                 turn = opponent game.turn;
-                 inbox_snapshot = game.inbox_snapshot;
-                 dal_snapshot = game.dal_snapshot;
-                 start_level = game.start_level;
-                 inbox_level = game.inbox_level;
-                 pvm_name = game.pvm_name;
-                 game_state = new_game_state;
-               })
-      | None ->
-          (*
-             Assuming the [pvm_name] registered in the [game]
-             structure is correct, this case cannot happen. This
-             property is enforced by the correctness of the
-             implementation of the rejection game, and is strengthen
-             by the encoding of [game].
-           *)
-          assert false)
+      let*? () =
+        PVM.check_dissection
+          ~default_number_of_sections
+          ~start_chunk
+          ~stop_chunk
+          states
+      in
+      let new_game_state =
+        Dissecting {dissection = states; default_number_of_sections}
+      in
+      return
+        (Either.Right
+           {
+             turn = opponent game.turn;
+             inbox_snapshot = game.inbox_snapshot;
+             dal_snapshot = game.dal_snapshot;
+             start_level = game.start_level;
+             inbox_level = game.inbox_level;
+             game_state = new_game_state;
+           })
   | Dissection _, Final_move _ -> tzfail Dissecting_during_final_move
   | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
       let*? start_chunk, stop_chunk =
         find_choice dissection refutation.choice
       in
+      let*? pvm_step =
+        Sc_rollup_proof_repr.unserialize_pvm_step ~pvm proof.pvm_step
+      in
+      let proof = {proof with pvm_step} in
       let*! player_result =
         validity_first_final_move
-          dal_parameters
+          ~pvm
+          ~dal_parameters
           ~dal_attestation_lag
           ~proof
           ~metadata
@@ -896,13 +876,17 @@ let play dal_parameters ~dal_attestation_lag ~stakers metadata game refutation =
                dal_snapshot = game.dal_snapshot;
                start_level = game.start_level;
                inbox_level = game.inbox_level;
-               pvm_name = game.pvm_name;
                game_state = new_game_state;
              })
   | Proof proof, Final_move {agreed_start_chunk; refuted_stop_chunk} ->
+      let*? pvm_step =
+        Sc_rollup_proof_repr.unserialize_pvm_step ~pvm proof.pvm_step
+      in
+      let proof = {proof with pvm_step} in
       let*! player_result =
         validity_second_final_move
-          dal_parameters
+          ~pvm
+          ~dal_parameters
           ~dal_attestation_lag
           ~metadata
           ~agreed_start_chunk

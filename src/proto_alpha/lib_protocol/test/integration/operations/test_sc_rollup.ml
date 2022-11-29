@@ -174,20 +174,6 @@ let test_disable_feature_flag () =
   let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
   return_unit
 
-(** [test_sc_rollups_all_well_defined] checks that the [kind_of_string] is
-    consistent with the names declared in the PVM implementations. *)
-let test_sc_rollups_all_well_defined () =
-  let all_names_are_valid () =
-    List.iter_es
-      (fun k ->
-        let (module P : Sc_rollup.PVM.S) = Sc_rollup.Kind.pvm_of k in
-        fail_unless
-          (Sc_rollup.Kind.of_name P.name = Some k)
-          (err (Printf.sprintf "PVM name `%s' is not a valid kind name" P.name)))
-      Sc_rollup.Kind.all
-  in
-  all_names_are_valid ()
-
 (** Initializes the context and originates a SCORU. *)
 let sc_originate ?(boot_sector = "") ?origination_proof block contract
     parameters_ty =
@@ -858,10 +844,6 @@ let test_originating_with_invalid_boot_sector_proof () =
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Example_arith
   in
-  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-  let origination_proof =
-    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
-  in
   let*! res =
     init_and_originate
       ~boot_sector:"another boot sector"
@@ -883,10 +865,6 @@ let test_originating_with_invalid_kind_proof () =
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Wasm_2_0_0
   in
-  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-  let origination_proof =
-    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
-  in
   let*! res =
     init_and_originate
       ~boot_sector:"a boot sector"
@@ -903,7 +881,11 @@ let test_originating_with_invalid_kind_proof () =
   | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let test_originating_with_random_proof () =
-  let origination_proof = "bad proof" in
+  let origination_proof =
+    Data_encoding.Binary.(
+      of_string_exn Sc_rollup.Proof.serialized_encoding
+      @@ to_string_exn Data_encoding.string Hex.(show @@ of_string "bad proof"))
+  in
   let*! res =
     init_and_originate
       ~boot_sector:"some boot sector"
@@ -1922,17 +1904,13 @@ let dumb_proof ~choice =
   let*! arith_state = Arith_pvm.initial_state ~empty in
   let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
   let input = Sc_rollup_helpers.make_external_input "c4c4" in
-  let* proof =
+  let* pvm_step =
     Arith_pvm.produce_proof context_arith_pvm (Some input) arith_state
     >|= Environment.wrap_tzresult
   in
   let pvm_step =
-    Sc_rollup.Arith_pvm_with_proof
-      (module struct
-        include Arith_pvm
-
-        let proof = proof
-      end)
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) pvm_step
   in
   let inbox_proof =
     Sc_rollup.Proof.Inbox_proof
@@ -1940,7 +1918,8 @@ let dumb_proof ~choice =
         level = Raw_level.root;
         message_counter = Z.zero;
         proof =
-          Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string "c4c4";
+          Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string
+            "dummy proof";
       }
   in
   let proof = Sc_rollup.Proof.{pvm_step; input_proof = Some inbox_proof} in
@@ -2118,18 +2097,13 @@ let make_refutation_metadata ?(boot_sector = "") metadata =
   let* state = Arith_pvm.eval state in
   let input = Sc_rollup.(Reveal (Metadata metadata)) in
   let* proof = Arith_pvm.produce_proof context (Some input) state in
-  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-  let wrapped_proof =
-    Sc_rollup.Arith_pvm_with_proof
-      (module struct
-        include Arith_pvm
-
-        let proof = proof
-      end)
+  let pvm_step = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+  let pvm_step =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) pvm_step
   in
   let choice = Sc_rollup.Tick.(next initial) in
   let step : Sc_rollup.Game.step =
-    let pvm_step = wrapped_proof in
     let input_proof = Some Sc_rollup.Proof.(Reveal_proof Metadata_proof) in
     Proof {pvm_step; input_proof}
   in
@@ -2597,10 +2571,6 @@ let tests =
       "check effect of disabled feature flag"
       `Quick
       test_disable_feature_flag;
-    Tztest.tztest
-      "check that all rollup kinds are correctly enumerated"
-      `Quick
-      test_sc_rollups_all_well_defined;
     Tztest.tztest
       "can publish a commit, cement it and withdraw stake"
       `Quick

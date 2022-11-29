@@ -3283,13 +3283,13 @@ let commands_rw () =
              storage_limit,
              counter )
            source
-           pvm
+           kind
            parameters_ty
            boot_sector
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
+        let (Packed (module R) as pvm) = Sc_rollup.Kind.pvm_of kind in
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
         let* boot_sector = boot_sector pvm in
@@ -3309,7 +3309,7 @@ let commands_rw () =
             ~src_pk
             ~src_sk
             ~fee_parameter
-            ~kind:(Sc_rollup.Kind.of_pvm pvm)
+            ~kind
             ~boot_sector
             ~parameters_ty
             ()

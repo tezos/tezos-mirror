@@ -151,8 +151,6 @@ let gen_inbox_history_proof inbox_level =
   let* inbox = gen_inbox inbox_level in
   return (Sc_rollup_inbox_repr.take_snapshot inbox)
 
-let gen_pvm_name = Gen.oneofl Sc_rollups.Kind.all_names
-
 let gen_tick =
   let open Gen in
   let* t = small_nat in
@@ -192,19 +190,10 @@ let gen_game =
   let* start_level = gen_start_level in
   let* inbox_snapshot = gen_inbox_history_proof inbox_level in
   let* dal_snapshot = gen_dal_slots_history () in
-  let* pvm_name = gen_pvm_name in
   let* game_state = gen_game_state in
   return
     Sc_rollup_game_repr.
-      {
-        turn;
-        dal_snapshot;
-        inbox_snapshot;
-        start_level;
-        inbox_level;
-        pvm_name;
-        game_state;
-      }
+      {turn; dal_snapshot; inbox_snapshot; start_level; inbox_level; game_state}
 
 let gen_conflict =
   let open Gen in

@@ -3507,8 +3507,6 @@ module Sc_rollup : sig
     type boot_sector = string
 
     module type S = sig
-      val name : string
-
       val parse_boot_sector : string -> boot_sector option
 
       val pp_boot_sector : Format.formatter -> boot_sector -> unit
@@ -3575,7 +3573,14 @@ module Sc_rollup : sig
       end
     end
 
-    type t = (module S)
+    type ('state, 'proof, 'output) implementation =
+      (module S
+         with type state = 'state
+          and type proof = 'proof
+          and type output_proof = 'output)
+
+    type t = Packed : ('state, 'proof, 'output) implementation -> t
+    [@@unboxed]
   end
 
   module Kind : sig
@@ -3583,19 +3588,15 @@ module Sc_rollup : sig
 
     val encoding : t Data_encoding.t
 
+    val pp : Format.formatter -> t -> unit
+
     val pvm_of : t -> PVM.t
-
-    val of_pvm : PVM.t -> t
-
-    val pvm_of_name : name:string -> PVM.t option
-
-    val name_of : t -> string
-
-    val of_name : string -> t option
 
     val all : t list
 
-    val all_names : string list
+    val of_string : string -> t option
+
+    val to_string : t -> string
   end
 
   module ArithPVM : sig
@@ -3786,25 +3787,6 @@ module Sc_rollup : sig
     type error += Sc_rollup_does_not_exist of t
   end
 
-  module type PVM_with_proof = sig
-    include PVM.S
-
-    val proof : proof
-  end
-
-  type wrapped_proof =
-    | Unencodable of (module PVM_with_proof)
-    | Arith_pvm_with_proof of
-        (module PVM_with_proof
-           with type proof = ArithPVM.Protocol_implementation.proof)
-    | Wasm_2_0_0_pvm_with_proof of
-        (module PVM_with_proof
-           with type proof = Wasm_2_0_0PVM.Protocol_implementation.proof)
-
-  val wrapped_proof_kind_exn : wrapped_proof -> Kind.t
-
-  val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
-
   module Proof : sig
     type reveal_proof =
       | Raw_data_proof of string
@@ -3823,7 +3805,23 @@ module Sc_rollup : sig
       | Reveal_proof of reveal_proof
       | First_inbox_message
 
-    type t = {pvm_step : wrapped_proof; input_proof : input_proof option}
+    type 'proof t = {pvm_step : 'proof; input_proof : input_proof option}
+
+    type serialized = private string
+
+    val serialize_pvm_step :
+      pvm:('state, 'proof, 'output) PVM.implementation ->
+      'proof ->
+      serialized tzresult
+
+    val unserialize_pvm_step :
+      pvm:('state, 'proof, 'output) PVM.implementation ->
+      serialized ->
+      'proof tzresult
+
+    val serialized_encoding : serialized Data_encoding.t
+
+    val encoding : serialized t Data_encoding.t
 
     module type PVM_with_context_and_state = sig
       include PVM.S
@@ -3862,21 +3860,21 @@ module Sc_rollup : sig
     type error += Sc_rollup_proof_check of string
 
     val valid :
+      pvm:('state, 'proof, 'output) PVM.implementation ->
       metadata:Metadata.t ->
       Inbox.history_proof ->
       Raw_level.t ->
       Dal.Slots_history.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
-      pvm_name:string ->
-      t ->
+      'proof t ->
       (input option * input_request) tzresult Lwt.t
 
     val produce :
       metadata:Metadata.t ->
       (module PVM_with_context_and_state) ->
       Raw_level.t ->
-      t tzresult Lwt.t
+      serialized t tzresult Lwt.t
   end
 
   module Game : sig
@@ -3908,7 +3906,6 @@ module Sc_rollup : sig
       dal_snapshot : Dal.Slots_history.t;
       start_level : Raw_level.t;
       inbox_level : Raw_level.t;
-      pvm_name : string;
       game_state : game_state;
     }
 
@@ -3928,7 +3925,9 @@ module Sc_rollup : sig
 
     val opponent : player -> player
 
-    type step = Dissection of dissection_chunk list | Proof of Proof.t
+    type step =
+      | Dissection of dissection_chunk list
+      | Proof of Proof.serialized Proof.t
 
     type refutation = {choice : Tick.t; step : step}
 
@@ -3960,7 +3959,6 @@ module Sc_rollup : sig
       Inbox.history_proof ->
       Dal.Slots_history.t ->
       start_level:Raw_level.t ->
-      pvm_name:string ->
       parent:Commitment.t ->
       child:Commitment.t ->
       refuter:Staker.t ->
@@ -3969,6 +3967,7 @@ module Sc_rollup : sig
       t
 
     val play :
+      Kind.t ->
       Dal.parameters ->
       dal_attestation_lag:int ->
       stakers:Index.t ->
@@ -4646,7 +4645,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
-      origination_proof : string;
+      origination_proof : Sc_rollup.Proof.serialized;
       parameters_ty : Script.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation

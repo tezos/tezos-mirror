@@ -48,7 +48,7 @@ module Impl : Pvm.S = struct
   module PVM = Sc_rollup.ArithPVM.Make (Arith_proof_format)
   include PVM
 
-  let kind = Sc_rollup.Kind.of_pvm (module PVM)
+  let kind = Sc_rollup.Kind.Example_arith
 
   module State = Context.PVMState
 
