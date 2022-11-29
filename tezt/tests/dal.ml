@@ -1360,9 +1360,19 @@ let check_preimage expected_preimage actual_preimage =
         "Preimage does not match expected value (Current: %L <> Expected: %R)")
 
 let test_dal_node_handles_dac_store_preimage_merkle_V0 _protocol dal_node
-    sc_rollup_node _sc_rollup_address _node _client pvm_name =
+    sc_rollup_node _sc_rollup_address _node client pvm_name =
+  (* Terminate the dal node before setting dac parameters. *)
+  let* () = Dal_node.terminate dal_node in
+  let* dac_member = Client.bls_gen_keys ~alias:"dac_member" client in
+  let* dac_member_info = Client.bls_show_address ~alias:dac_member client in
+  let dac_member_address = dac_member_info.aggregate_public_key_hash in
+  let* () = Dal_node.Dac.set_parameters ~threshold:1 dal_node in
+  let* () =
+    Dal_node.Dac.add_committee_member ~address:dac_member_address dal_node
+  in
+  let* () = Dal_node.run dal_node in
   let payload = "test" in
-  let* actual_rh =
+  let* actual_rh, l1_operation =
     RPC.call
       dal_node
       (Rollup.Dal.RPC.dac_store_preimage
@@ -1387,12 +1397,19 @@ let test_dal_node_handles_dac_store_preimage_merkle_V0 _protocol dal_node
     String.sub recovered_payload 5 (String.length recovered_payload - 5)
   in
   check_preimage payload recovered_preimage ;
+  let* is_signature_valid =
+    RPC.call dal_node (Rollup.Dal.RPC.dac_verify_signature l1_operation)
+  in
+  Check.(
+    (is_signature_valid = true)
+      bool
+      ~error_msg:"Signature of external message is not valid") ;
   unit
 
 let test_dal_node_handles_dac_store_preimage_hash_chain_V0 _protocol dal_node
     sc_rollup_node _sc_rollup_address _node _client pvm_name =
   let payload = "test" in
-  let* actual_rh =
+  let* actual_rh, _l1_operation =
     RPC.call
       dal_node
       (Rollup.Dal.RPC.dac_store_preimage
@@ -1444,7 +1461,7 @@ let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
     Buffer.add_string buf "0 " ;
     aux buf nadd
   in
-  let* actual_rh =
+  let* actual_rh, _l1_operation =
     RPC.call
       dal_node
       (Rollup.Dal.RPC.dac_store_preimage
@@ -1622,18 +1639,22 @@ let register ~protocols =
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
+    ~tags:["dac"; "dal_node"]
     "dac_reveals_data_merkle_tree_v0"
     test_dal_node_handles_dac_store_preimage_merkle_V0
     protocols ;
   scenario_with_all_nodes
+    ~tags:["dac"; "dal_node"]
     "dac_reveals_data_hash_chain_v0"
     test_dal_node_handles_dac_store_preimage_hash_chain_V0
     protocols ;
   scenario_with_all_nodes
+    ~tags:["dac"; "dal_node"]
     "dac_rollup_arith_uses_reveals"
     test_rollup_arith_uses_reveals
     protocols ;
   scenario_with_all_nodes
+    ~tags:["dac"; "dal_node"]
     "dac_rollup_arith_wrong_hash"
     test_reveals_fails_on_wrong_hash
     protocols

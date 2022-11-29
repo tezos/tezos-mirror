@@ -88,9 +88,10 @@ let register ctxt = register_new ctxt (register_legacy ctxt)
 
 let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
 
-let start configuration ctxt =
+let start configuration cctxt ctxt dac_pks_opt dac_sk_uris =
   let open Lwt_syntax in
-  let Configuration.{rpc_addr; rpc_port; dac = {reveal_data_dir; _}; _} =
+  let Configuration.
+        {rpc_addr; rpc_port; dac = {reveal_data_dir; threshold; _}; _} =
     configuration
   in
   let dir = register ctxt in
@@ -99,7 +100,13 @@ let start configuration ctxt =
     Tezos_rpc.Directory.register_dynamic_directory dir plugin_prefix (fun () ->
         match Node_context.get_status ctxt with
         | Ready {plugin = (module Plugin); _} ->
-            Lwt.return (Plugin.RPC.rpc_services ~reveal_data_dir)
+            Lwt.return
+              (Plugin.RPC.rpc_services
+                 ~reveal_data_dir
+                 cctxt
+                 dac_pks_opt
+                 dac_sk_uris
+                 threshold)
         | Starting -> Lwt.return Tezos_rpc.Directory.empty)
   in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in

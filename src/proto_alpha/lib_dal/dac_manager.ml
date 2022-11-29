@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type T = sig
-  module Proto : Registered_protocol.T
-
-  val get_constants :
-    Tezos_shell_services.Chain_services.chain ->
-    Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
-    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
-
-  val get_published_slot_headers :
-    Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
-    (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
-
-  module RPC : sig
-    val rpc_services :
-      reveal_data_dir:string ->
-      #Client_context.wallet ->
-      Tezos_crypto.Aggregate_signature.public_key option list ->
-      Client_keys.aggregate_sk_uri option list ->
-      int ->
-      unit Tezos_rpc.Directory.directory
-  end
+module Reveal_hash = struct
+  module Storage = Dac_preimage_data_manager.Reveal_hash
+  module Signatures = Dac_signature_manager.Reveal_hash
+  module External_message = Dac_external_message_manager.Reveal_hash
 end
-
-val register : (module T) -> unit
-
-val get : Tezos_crypto.Protocol_hash.Table.key -> (module T) option
