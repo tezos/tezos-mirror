@@ -79,10 +79,102 @@ module Next : Benchmark.S = struct
     let prev_cell_ptr = () in
     let closure () = ignore (next ~prev_cell ~prev_cell_ptr ()) in
     Generator.Plain {workload; closure}
+
   let () =
     Registration.register_for_codegen
       (Namespace.basename name)
       (Model.For_codegen next_model)
 end
 
+(* A model to estimate [Sc_rollup_inbox_repr.hash_skip_list_cell]. *)
+module Hash_cell = struct
+  let name = ns "hash_cell"
+
+  let info = "Estimating the costs of hashing a skip list cell"
+
+  let tags = ["skip_list"]
+
+  module Skip_list = Skip_list_repr.Make (struct
+    let basis = 2
+  end)
+
+  module Hash = Sc_rollup_inbox_repr.Hash
+
+  let hash merkelized =
+    let payload_hash = Skip_list.content merkelized in
+    let back_pointers_hashes = Skip_list.back_pointers merkelized in
+    Hash.to_bytes payload_hash :: List.map Hash.to_bytes back_pointers_hashes
+    |> Hash.hash_bytes
+
+  type config = {max_index : int}
+
+  let config_encoding =
+    let open Data_encoding in
+    conv
+      (fun {max_index} -> max_index)
+      (fun max_index -> {max_index})
+      (obj1 (req "max_index" int31))
+
+  let default_config = {max_index = 65536}
+
+  type workload = {nb_backpointers : int}
+
+  let workload_encoding =
+    let open Data_encoding in
+    conv
+      (fun {nb_backpointers} -> nb_backpointers)
+      (fun nb_backpointers -> {nb_backpointers})
+      (obj1 (req "max_nb_backpointers" int31))
+
+  let workload_to_vector {nb_backpointers} =
+    Sparse_vec.String.of_list
+      [("nb_backpointers", float_of_int nb_backpointers)]
+
+  let hash_skip_list_cell_model =
+    Model.make
+      ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
+      ~model:
+        (Model.affine
+           ~intercept:(Free_variable.of_string "cost_hash_skip_list_cell")
+           ~coeff:(Free_variable.of_string "cost_hash_skip_list_cell_coef"))
+
+  let models = [("skip_list_hash", hash_skip_list_cell_model)]
+
+  let benchmark rng_state conf () =
+    let skip_list_len =
+      Base_samplers.sample_in_interval
+        ~range:{min = 1; max = conf.max_index}
+        rng_state
+    in
+    let random_hash () =
+      Hash.hash_string
+        [Base_samplers.string ~size:{min = 32; max = 32} rng_state]
+    in
+    let cell =
+      let rec repeat n cell =
+        if n = 0 then cell
+        else
+          let prev_cell = cell and prev_cell_ptr = hash cell in
+          repeat
+            (n - 1)
+            (Skip_list.next ~prev_cell ~prev_cell_ptr (random_hash ()))
+      in
+      repeat skip_list_len (Skip_list.genesis (random_hash ()))
+    in
+    let nb_backpointers = List.length (Skip_list.back_pointers cell) in
+    let workload = {nb_backpointers} in
+    let closure () = ignore (hash cell) in
+    Generator.Plain {workload; closure}
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (benchmark rng_state config)
+
+  let () =
+    Registration.register_for_codegen
+      (Namespace.basename name)
+      (Model.For_codegen hash_skip_list_cell_model)
+end
+
 let () = Registration_helpers.register (module Next)
+
+let () = Registration_helpers.register (module Hash_cell)
