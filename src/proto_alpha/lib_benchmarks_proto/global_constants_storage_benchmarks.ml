@@ -318,7 +318,7 @@ module Set_add : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(logn ~name ~coeff:(fv "size"))) );
+            ~model:(logn ~name ~coeff:(fv "set_add_coeff"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -370,7 +370,7 @@ module Set_elements : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(linear ~name ~coeff:(fv "size"))) );
+            ~model:(linear ~name ~coeff:(fv "set_elements_coeff"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -433,8 +433,8 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
             ~model:
               (Model.affine
                  ~name
-                 ~intercept:(fv "b58_check_cost")
-                 ~coeff:(fv "size"))) );
+                 ~intercept:(fv "b58_check_intercept")
+                 ~coeff:(fv "b58_check_coeff"))) );
     ]
 
   (* To create realistic benchmarks, we generate a random Micheline expression,
@@ -490,7 +490,7 @@ struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(linear ~name ~coeff:(fv "size"))) );
+            ~model:(linear ~name ~coeff:(fv "blake2b_hash_coeff"))) );
     ]
 
   let create_benchmark rng_state _config () =
@@ -563,7 +563,7 @@ module Global_constants_storage_expand_models = struct
     let workload_to_vector : workload -> Sparse_vec.String.t =
      fun constants ->
       Sparse_vec.String.of_list
-        [("number of constants", float_of_int constants)]
+        [("number_of_constants", float_of_int constants)]
 
     (** The cost of Branch 2 is linear to the number of constants in the expression. As
         discussed above, the constant time operation [Script_expr_hash.of_b58check_opt]
@@ -574,7 +574,7 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:(linear ~name ~coeff:(fv "number of constants"))) );
+              ~model:(linear ~name ~coeff:(fv "storage_exp_cst_coeff"))) );
       ]
 
     (* To test Branch 2 as nearly as possible, we generate a Micheline Seq
@@ -633,7 +633,7 @@ module Global_constants_storage_expand_models = struct
 
     let workload_to_vector : workload -> Sparse_vec.String.t =
      fun size ->
-      Sparse_vec.String.of_list [("number of nodes", float_of_int size)]
+      Sparse_vec.String.of_list [("number_of_nodes", float_of_int size)]
 
     (* The cost of Branch 3 is the cost of traversing a single node. It
        is therefore linear to the number of nodes being traversed. This is
@@ -656,8 +656,8 @@ module Global_constants_storage_expand_models = struct
               ~model:
                 (nlogn
                    ~name
-                   ~intercept:(fv "cst")
-                   ~coeff:(fv "number of nodes"))) );
+                   ~intercept:(fv "storage_exp_no_cst_intercept")
+                   ~coeff:(fv "storage_exp_no_cst_coeff"))) );
       ]
 
     (** We benchmark this by generating a random Micheline expression without constants
