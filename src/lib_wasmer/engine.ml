@@ -28,8 +28,6 @@
 open Utils
 open Api
 
-exception Failed_to_create
-
 type t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
      Ensure that ownership and lifetime of [Types.Engine.t] is respected.
@@ -39,7 +37,7 @@ type t =
 let create config =
   let config = Config.to_owned config in
   let engine = Functions.Engine.new_with_config config in
-  check_null_ptr Failed_to_create engine ;
+  check_null_ptr Error.(make_exception Create_engine) engine ;
   engine
 
 let delete = Functions.Engine.delete

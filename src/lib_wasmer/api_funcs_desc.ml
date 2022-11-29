@@ -137,6 +137,12 @@ module Functions (S : FOREIGN) = struct
           "wasmer_features_threads"
           (ptr Types.Wasmer.Features.t @-> bool @-> returning bool)
     end
+
+    let last_error_length =
+      foreign "wasmer_last_error_length" (void @-> returning int)
+
+    let last_error =
+      foreign "wasmer_last_error_message" (ptr char @-> int @-> returning int)
   end
 
   (** Functions with the [wasm_config_] prefix *)
