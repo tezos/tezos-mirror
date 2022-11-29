@@ -109,15 +109,26 @@ let tick_state_encoding =
 let durable_buffers_encoding =
   Tezos_tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
 
-let default_buffers validity_period () =
+let default_buffers validity_period message_limit () =
   Tezos_webassembly_interpreter.Eval.
     {
       input = Tezos_webassembly_interpreter.Input_buffer.alloc ();
       output =
         Tezos_webassembly_interpreter.Output_buffer.alloc
           ~validity_period
+          ~message_limit
           ~last_level:None;
     }
+
+let output_buffer_parameters_encoding =
+  Tezos_tree_encoding.(
+    conv
+      (fun (validity_period, message_limit) -> {validity_period; message_limit})
+      (fun {validity_period; message_limit} -> (validity_period, message_limit))
+      (tup2
+         ~flatten:true
+         (value ["pvm"; "outbox_validity_period"] Data_encoding.int32)
+         (value ["pvm"; "outbox_message_limit"] Data_encoding.z)))
 
 let pvm_state_encoding =
   let open Tezos_tree_encoding in
@@ -131,7 +142,7 @@ let pvm_state_encoding =
            last_top_level_call,
            max_nb_ticks,
            maximum_reboots_per_input,
-           outbox_validity_period ) ->
+           output_buffer_parameters ) ->
       {
         last_input_info;
         current_tick;
@@ -145,13 +156,16 @@ let pvm_state_encoding =
           (*`Gather_floppies` uses `get_info`, that decodes the state of the
             PVM, which at the start of the rollup doesn't exist. *)
           Option.value_f
-            ~default:(default_buffers outbox_validity_period)
+            ~default:
+              (default_buffers
+                 output_buffer_parameters.validity_period
+                 output_buffer_parameters.message_limit)
             buffers;
         tick_state;
         last_top_level_call;
         max_nb_ticks;
         maximum_reboots_per_input;
-        outbox_validity_period;
+        output_buffer_parameters;
       })
     (fun {
            last_input_info;
@@ -163,7 +177,7 @@ let pvm_state_encoding =
            last_top_level_call;
            max_nb_ticks;
            maximum_reboots_per_input;
-           outbox_validity_period;
+           output_buffer_parameters;
          } ->
       ( last_input_info,
         current_tick,
@@ -174,7 +188,7 @@ let pvm_state_encoding =
         last_top_level_call,
         max_nb_ticks,
         maximum_reboots_per_input,
-        outbox_validity_period ))
+        output_buffer_parameters ))
     (tup10
        ~flatten:true
        (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
@@ -189,7 +203,7 @@ let pvm_state_encoding =
           ~default:Constants.maximum_reboots_per_input
           ["pvm"; "maximum_reboots_per_input"]
           Data_encoding.n)
-       (value ["pvm"; "outbox_validity_period"] Data_encoding.int32))
+       output_buffer_parameters_encoding)
 
 module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.S with type tree = T.tree = struct
@@ -227,7 +241,8 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       version
       empty_tree
 
-  let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period bs tree =
+  let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period
+      ~outbox_message_limit bs tree =
     let open Lwt_syntax in
     let open Tezos_tree_encoding in
     let* durable =
@@ -243,12 +258,16 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
         current_tick = Z.zero;
         reboot_counter = Z.succ Constants.maximum_reboots_per_input;
         durable;
-        buffers = default_buffers outbox_validity_period ();
+        buffers = default_buffers outbox_validity_period outbox_message_limit ();
         tick_state = Collect;
         last_top_level_call = Z.zero;
         max_nb_ticks = ticks_per_snapshot;
         maximum_reboots_per_input = Constants.maximum_reboots_per_input;
-        outbox_validity_period;
+        output_buffer_parameters =
+          {
+            validity_period = outbox_validity_period;
+            message_limit = outbox_message_limit;
+          };
       }
     in
     encode pvm tree

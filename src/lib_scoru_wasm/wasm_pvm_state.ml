@@ -106,6 +106,12 @@ module Internal_state = struct
     | Stuck of Wasm_pvm_errors.t
     | Padding
 
+  type output_buffer_parameters = {
+    validity_period : int32;
+        (** Number of levels an outbox is kept before being cleaned-up. *)
+    message_limit : Z.t;  (** Maximum number of messages per inbox *)
+  }
+
   type pvm_state = {
     last_input_info : input_info option;  (** Info about last read input. *)
     current_tick : Z.t;  (** Current tick of the PVM. *)
@@ -119,8 +125,8 @@ module Internal_state = struct
     max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
     maximum_reboots_per_input : Z.t;
         (** Number of reboots between two inputs. *)
-    outbox_validity_period : int32;
-        (** Number of levels an outbox is kept before being cleaned-up. *)
+    output_buffer_parameters : output_buffer_parameters;
+        (** Outbox paramaters defined by the protocol. *)
   }
 
   type computation_status =

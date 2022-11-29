@@ -85,6 +85,8 @@ module V2_0_0 = struct
 
   let outbox_validity_period = Int32.of_int 40_320
 
+  let outbox_message_limit = Z.of_int 100
+
   let well_known_reveal_preimage = ""
 
   let well_known_reveal_hash =
@@ -264,6 +266,7 @@ module V2_0_0 = struct
       WASM_machine.install_boot_sector
         ~ticks_per_snapshot
         ~outbox_validity_period
+        ~outbox_message_limit
         boot_sector
         state
 

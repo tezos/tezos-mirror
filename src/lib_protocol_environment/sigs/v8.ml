@@ -12104,6 +12104,7 @@ module Make
   val install_boot_sector :
     ticks_per_snapshot:Z.t ->
     outbox_validity_period:int32 ->
+    outbox_message_limit:Z.t ->
     string ->
     Tree.tree ->
     Tree.tree Lwt.t

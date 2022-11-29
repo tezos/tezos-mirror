@@ -70,6 +70,7 @@ module type S = sig
   val install_boot_sector :
     ticks_per_snapshot:Z.t ->
     outbox_validity_period:int32 ->
+    outbox_message_limit:Z.t ->
     string ->
     tree ->
     tree Lwt.t

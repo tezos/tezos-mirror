@@ -3677,6 +3677,8 @@ module Sc_rollup : sig
 
     val outbox_validity_period : int32
 
+    val outbox_message_limit : Z.t
+
     val well_known_reveal_preimage : string
 
     val well_known_reveal_hash : Sc_rollup_reveal_hash.t
