@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, Inc. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let big_encoding =
+  let open Json_encoding in
+  list
+    (obj3 (req "z" (list null)) (req "o" (seq bool)) (req "t" (array string)))
+
+let () = Random.self_init ()
+
+let string () = String.init 8 (fun _ -> Char.unsafe_chr (65 + Random.int 26))
+
+let bool i =
+  (* bools are placed in a Seq, which is re-evaluated, so the "randomness"
+     needs to be deterministic. *)
+  i mod 3 = 0 || i mod 5 = 0
+
+let seq_unfold f init =
+  (* for compatibility with OCaml < 4.11 we redefine Seq.unfold *)
+  let rec aux acc () =
+    match f acc with
+    | None -> Seq.Nil
+    | Some (elt, acc) -> Seq.Cons (elt, aux acc)
+  in
+  aux init
+
+let o3 len =
+  let len = max len 0 in
+  ( List.init len (fun _ -> ()),
+    seq_unfold (fun l -> if l >= len then None else Some (bool l, l + 1)) 0,
+    Array.init len (fun _ -> string ()) )
+
+let big len = List.init len (fun _ -> o3 (len / 10))
+
+let test1 len =
+  Printf.printf "Testing big-value streaming (%d)\n%!" len ;
+  let big_value = big len in
+  let direct_seq = Json_encoding.construct_seq big_encoding big_value in
+  let ezjsonm = Json_encoding.construct big_encoding big_value in
+  let indirect_seq = Json_encoding.jsonm_lexeme_seq_of_ezjson ezjsonm in
+  assert (List.of_seq direct_seq = List.of_seq indirect_seq) ;
+  Printf.printf "Success for big-value streaming (%d)\n%!" len
+
+let is_jsoo =
+  match Sys.backend_type with
+  | Other "js_of_ocaml" -> true
+  | Native | Bytecode | Other _ -> false
+
 let () =
-  Random.self_init () ;
-  Alcotest.run
-    "tezos-data-encoding"
-    [
-      ("success", Success.tests);
-      ("invalid_encoding", Invalid_encoding.tests);
-      ("read_failure", Read_failure.tests);
-      ("write_failure", Write_failure.tests);
-      ("randomized", Randomized.tests);
-      ("versioned", Versioned.tests);
-      ("registration", Registrationed.tests);
-      ("mu", Mu.tests);
-      ("slice", Slice_test.tests);
-      ("conv_with_guard", Guarded_conv.tests);
-      ("with_decoding_guard", Guarded_decode.tests);
-      ("int31_int32", Int31_int32.tests);
-      ("inline_phantom", Reference_check.Inline_phantom.tests);
-      ("mu_phantom", Reference_check.Mu_phantom.tests);
-      ("fixed_list", Fixed_list.tests);
-      ("fixed_array", Fixed_array.tests);
-      ("compact", Compact.tests);
-      ("check-size", Check_size_negative.tests);
-      ("uint-like-n", Uint_like_n.tests);
-      ("int-like-z", Int_like_z.tests);
-      ("safer-encoding", Test_safer_encoding.tests);
-      ("lazy-bytes", Lazy_bytes.tests);
-    ]
+  test1 0 ;
+  test1 16 ;
+  test1 63 ;
+  test1 514 ;
+  test1 1001 ;
+  (* This test running with js_of_ocaml consumes too much memory for
+     the CI *)
+  if not is_jsoo then test1 4321

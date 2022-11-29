@@ -13,6 +13,7 @@
   (pps ppx_hash)))
 
 (documentation
+ (package data-encoding)
  (mld_files index tutorial))
 
 (rule

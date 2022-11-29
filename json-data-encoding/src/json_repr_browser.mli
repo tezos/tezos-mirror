@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright 2014 OCamlPro                                                   *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +24,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Random.self_init () ;
-  Alcotest.run
-    "tezos-data-encoding"
-    [
-      ("success", Success.tests);
-      ("invalid_encoding", Invalid_encoding.tests);
-      ("read_failure", Read_failure.tests);
-      ("write_failure", Write_failure.tests);
-      ("randomized", Randomized.tests);
-      ("versioned", Versioned.tests);
-      ("registration", Registrationed.tests);
-      ("mu", Mu.tests);
-      ("slice", Slice_test.tests);
-      ("conv_with_guard", Guarded_conv.tests);
-      ("with_decoding_guard", Guarded_decode.tests);
-      ("int31_int32", Int31_int32.tests);
-      ("inline_phantom", Reference_check.Inline_phantom.tests);
-      ("mu_phantom", Reference_check.Mu_phantom.tests);
-      ("fixed_list", Fixed_list.tests);
-      ("fixed_array", Fixed_array.tests);
-      ("compact", Compact.tests);
-      ("check-size", Check_size_negative.tests);
-      ("uint-like-n", Uint_like_n.tests);
-      ("int-like-z", Int_like_z.tests);
-      ("safer-encoding", Test_safer_encoding.tests);
-      ("lazy-bytes", Lazy_bytes.tests);
-    ]
+(** An abstract type for native browser objects. *)
+type value
+
+(** A view over the browser representation.*)
+module Repr : Json_repr.Repr with type value = value
+
+(** Pre-instanciated {!Json_encoding.Make}. *)
+module Json_encoding : Json_encoding.S with type repr_value = value
+
+(** Pre-instanciated {!Json_encoding.Make}. *)
+module Json_query : module type of Json_query.Make (Repr)
+
+(** Parse a JSON string using the native browser parser. *)
+val parse : string -> value
+
+(** Produce a JSON string using the native browser printer.
+
+    If indent is not present, everything is printed on a single line.
+    Otherwise, it is the number (up to 10) of spaces inserted at
+    beginning of lines for each indentation level. *)
+val stringify : ?indent:int -> value -> string
+
+(** Same as {!parse} with native browser strings. *)
+val parse_js_string : Js.js_string Js.t -> value
+
+(** Same as {!stringify} with native browser strings. *)
+val js_stringify : ?indent:int -> value -> Js.js_string Js.t
