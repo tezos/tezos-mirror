@@ -137,30 +137,27 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
       tzfail (invalid_block hash error)
   | None | Some _ -> return_unit
 
-let precheck_block bvp chain_store ~predecessor block_header block_hash
+let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
     operations =
-  Block_validator_process.precheck_block
-    bvp
-    chain_store
-    ~predecessor
-    block_header
-    block_hash
-    operations
-
-let precheck_block_and_advertise bvp chain_db chain_store ~predecessor hash
-    header operations =
   let open Lwt_result_syntax in
+  let*! () = Events.(emit prechecking_block) block_hash in
   let* () =
-    precheck_block bvp chain_store ~predecessor header hash operations
+    Block_validator_process.precheck_block
+      bvp
+      chain_store
+      ~predecessor
+      block_header
+      block_hash
+      operations
   in
+  let*! () = Events.(emit prechecked_block) block_hash in
   (* Add the block and operations to the cache of the ddb to make them
      available to our peers *)
-  let* () =
-    Distributed_db.inject_prechecked_block chain_db hash header operations
-  in
-  (* Headers which have been preapplied can be advertised before being fully applied. *)
-  Distributed_db.Advertise.prechecked_head chain_db header ;
-  return_unit
+  Distributed_db.inject_prechecked_block
+    chain_db
+    block_hash
+    block_header
+    operations
 
 let on_validation_request w
     {
@@ -202,64 +199,55 @@ let on_validation_request w
                   let* pred =
                     Store.Block.read_block chain_store header.shell.predecessor
                   in
+                  let with_retry_to_load_protocol f =
+                    let*! r = f () in
+                    match r with
+                    (* [Unavailable_protocol] is expected to be the
+                       first error in the trace *)
+                    | Error (Unavailable_protocol {protocol; _} :: _) ->
+                        let* _ =
+                          Protocol_validator.fetch_and_compile_protocol
+                            bv.protocol_validator
+                            ?peer
+                            ~timeout:bv.limits.protocol_timeout
+                            protocol
+                        in
+                        f ()
+                    | _ -> Lwt.return r
+                  in
                   let*! r =
-                    if precheck_and_notify then
-                      let*! () = Events.(emit prechecking_block) hash in
-                      let* () =
-                        precheck_block_and_advertise
-                          bv.validation_process
-                          chain_db
-                          chain_store
-                          ~predecessor:pred
-                          hash
-                          header
-                          operations
-                      in
-                      let*! v = Events.(emit prechecked_block) hash in
-                      return v
-                    else return_unit
+                    protect ~canceler:(Worker.canceler w) (fun () ->
+                        protect ?canceler (fun () ->
+                            with_retry_to_load_protocol (fun () ->
+                                precheck_block
+                                  bv.validation_process
+                                  chain_db
+                                  chain_store
+                                  ~predecessor:pred
+                                  header
+                                  hash
+                                  operations)))
                   in
                   match r with
-                  | Error errs ->
-                      assert precheck_and_notify ;
-                      return (Precheck_failed errs)
+                  | Error errs -> return (Precheck_failed errs)
                   | Ok () -> (
+                      if precheck_and_notify then
+                        (* Headers which have been preapplied can be advertised
+                           before being fully applied. *)
+                        Distributed_db.Advertise.prechecked_head chain_db header ;
                       let* result =
                         protect ~canceler:(Worker.canceler w) (fun () ->
                             protect ?canceler (fun () ->
                                 let*! () =
                                   Events.(emit validating_block) hash
                                 in
-                                let*! r =
-                                  Block_validator_process.apply_block
-                                    bv.validation_process
-                                    chain_store
-                                    ~predecessor:pred
-                                    header
-                                    operations
-                                in
-                                match r with
-                                | Ok x -> return x
-                                (* [Unavailable_protocol] is expected to be the
-                                   first error in the trace *)
-                                | Error (Unavailable_protocol {protocol; _} :: _)
-                                  ->
-                                    let* _ =
-                                      Protocol_validator
-                                      .fetch_and_compile_protocol
-                                        bv.protocol_validator
-                                        ?peer
-                                        ~timeout:bv.limits.protocol_timeout
-                                        protocol
-                                    in
-                                    (* Retry validating after fetching the protocol *)
+                                with_retry_to_load_protocol (fun () ->
                                     Block_validator_process.apply_block
                                       bv.validation_process
                                       chain_store
                                       ~predecessor:pred
                                       header
-                                      operations
-                                | Error _ as x -> Lwt.return x))
+                                      operations)))
                       in
                       Shell_metrics.Block_validator
                       .set_operation_per_pass_collector
