@@ -111,10 +111,10 @@ module Handler = struct
       | Some plugin ->
           let (module Plugin : Dal_plugin.T) = plugin in
           let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
-          let* dal_constants =
+          let* cryptobox =
             init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
           in
-          Node_context.set_ready ctxt (module Plugin) dal_constants ;
+          Node_context.set_ready ctxt (module Plugin) cryptobox ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
@@ -160,8 +160,8 @@ module Handler = struct
     (* Monitor neighbor DAL nodes and download published slots as shards. *)
     let open Lwt_result_syntax in
     let handler n_cctxt ready_ctxt slot_header =
-      let dal_constants = ready_ctxt.Node_context.dal_constants in
-      let dal_parameters = Cryptobox.parameters dal_constants in
+      let cryptobox = ready_ctxt.Node_context.cryptobox in
+      let dal_parameters = Cryptobox.parameters cryptobox in
       let downloaded_shard_ids =
         0
         -- ((dal_parameters.number_of_shards / dal_parameters.redundancy_factor)
@@ -181,7 +181,7 @@ module Handler = struct
         Slot_manager.save_shards
           (Node_context.get_store ctxt).slots_store
           (Node_context.get_store ctxt).slots_watcher
-          ready_ctxt.dal_constants
+          ready_ctxt.Node_context.cryptobox
           slot_header
           shards
       in

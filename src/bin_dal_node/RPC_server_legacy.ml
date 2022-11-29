@@ -28,12 +28,12 @@ open Tezos_dal_node_services
 
 let handle_split_slot ctxt () slot =
   let open Lwt_result_syntax in
-  let*? {dal_constants; _} = Node_context.get_ready ctxt in
+  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   let store = Node_context.get_store ctxt in
   let+ commitment, proof =
     Slot_manager.split_and_store
       store.slots_watcher
-      dal_constants
+      cryptobox
       store.slots_store
       slot
   in
@@ -41,9 +41,9 @@ let handle_split_slot ctxt () slot =
 
 let handle_slot ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
-  let*? {dal_constants; _} = Node_context.get_ready ctxt in
+  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_slot
-    dal_constants
+    cryptobox
     (Node_context.get_store ctxt).slots_store
     commitment
 
@@ -58,9 +58,9 @@ let handle_stored_slot_headers ctxt (_, block_hash) () () =
 
 let handle_slot_pages ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
-  let*? {dal_constants; _} = Node_context.get_ready ctxt in
+  let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_slot_pages
-    dal_constants
+    cryptobox
     (Node_context.get_store ctxt).slots_store
     commitment
 
@@ -72,8 +72,8 @@ let handle_shard ctxt ((_, commitment), shard) () () =
 
 let handle_shards ctxt (_, commitment) () shards =
   let open Lwt_result_syntax in
-  let*? {dal_constants; _} = Node_context.get_ready ctxt in
-  let dal_parameters = Cryptobox.parameters dal_constants in
+  let*? {cryptobox; _} = Node_context.get_ready ctxt in
+  let dal_parameters = Cryptobox.parameters cryptobox in
   let shards =
     let open Slot_manager in
     List.fold_left

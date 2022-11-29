@@ -26,7 +26,7 @@
 (** A [ready_ctx] value contains globally needed informations for a running dal
     node. It is available when both cryptobox is initialized and dal plugin is
     loaded. *)
-type ready_ctxt = {dal_constants : Cryptobox.t; plugin : (module Dal_plugin.T)}
+type ready_ctxt = {cryptobox : Cryptobox.t; plugin : (module Dal_plugin.T)}
 
 (** The status of the dal node *)
 type status = Ready of ready_ctxt | Starting
