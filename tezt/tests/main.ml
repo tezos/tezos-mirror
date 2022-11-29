@@ -164,6 +164,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Synchronisation_heuristic.register ~protocols ;
   Tenderbake.register ~protocols ;
   Testnet_dictator.register ~protocols ;
+  Transfer.register ~protocols ;
   Tickets.register ~protocols ;
   Timelock.register ~protocols ;
   Tx_rollup.register ~protocols ;
