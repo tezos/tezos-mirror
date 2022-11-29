@@ -82,8 +82,16 @@ let hash merkelized =
   :: List.map Hash.to_bytes back_pointers_hashes
   |> Hash.hash_bytes
 
-let pp =
-  Skip_list.pp ~pp_content:Sc_rollup_inbox_message_repr.Hash.pp ~pp_ptr:Hash.pp
+let pp fmt merkelized =
+  Format.fprintf
+    fmt
+    "@[<v>cell ptr: %a@,@[<v 2>cell content:@,%a@]@]"
+    Hash.pp_short
+    (hash merkelized)
+    (Skip_list.pp
+       ~pp_content:Sc_rollup_inbox_message_repr.Hash.pp_short
+       ~pp_ptr:Hash.pp_short)
+    merkelized
 
 let encoding =
   Skip_list.encoding Hash.encoding Sc_rollup_inbox_message_repr.Hash.encoding

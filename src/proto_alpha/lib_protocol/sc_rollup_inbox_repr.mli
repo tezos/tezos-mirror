@@ -375,6 +375,8 @@ module Internal_for_tests : sig
     payload : Sc_rollup_inbox_message_repr.serialized option;
   }
 
+  val pp_payloads_proof : Format.formatter -> payloads_proof -> unit
+
   val produce_payloads_proof :
     (Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t Lwt.t) ->

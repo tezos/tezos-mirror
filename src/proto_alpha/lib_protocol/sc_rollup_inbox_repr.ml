@@ -387,6 +387,21 @@ let inclusion_proof_encoding =
 
 let pp_inclusion_proof = Format.pp_print_list pp_history_proof
 
+let pp_payloads_proof fmt {proof; payload} =
+  Format.fprintf
+    fmt
+    "payload: %a@,@[<v 2>proof:@,%a@]"
+    Format.(
+      pp_print_option
+        ~none:(fun fmt () -> pp_print_string fmt "None")
+        (fun fmt payload ->
+          pp_print_string
+            fmt
+            (Sc_rollup_inbox_message_repr.unsafe_to_string payload)))
+    payload
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.pp_proof
+    proof
+
 (* See the main docstring for this type (in the mli file) for
    definitions of the three proof parameters [starting_point],
    [message] and [snapshot]. In the below we deconstruct
@@ -406,8 +421,14 @@ let pp_inclusion_proof = Format.pp_print_list pp_history_proof
    [history_proof] equals [snapshot]. *)
 type proof = {inclusion_proof : inclusion_proof; message_proof : payloads_proof}
 
-let pp_proof fmt {inclusion_proof; message_proof = _} =
-  Format.fprintf fmt "inclusion proof: %a@" pp_inclusion_proof inclusion_proof
+let pp_proof fmt {inclusion_proof; message_proof} =
+  Format.fprintf
+    fmt
+    "@[<v>@[<v 2>inclusion proof:@,%a@]@,@[<v 2>payloads proof:@,%a@]@]"
+    pp_inclusion_proof
+    inclusion_proof
+    pp_payloads_proof
+    message_proof
 
 let proof_encoding =
   let open Data_encoding in
@@ -830,6 +851,8 @@ module Internal_for_tests = struct
     proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
     payload : Sc_rollup_inbox_message_repr.serialized option;
   }
+
+  let pp_payloads_proof = pp_payloads_proof
 
   let produce_payloads_proof = produce_payloads_proof
 

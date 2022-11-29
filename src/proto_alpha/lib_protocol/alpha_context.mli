@@ -3497,6 +3497,8 @@ module Sc_rollup : sig
         payload : Inbox_message.serialized option;
       }
 
+      val pp_payloads_proof : Format.formatter -> payloads_proof -> unit
+
       val produce_payloads_proof :
         (Inbox_merkelized_payload_hashes.Hash.t ->
         Inbox_merkelized_payload_hashes.History.t Lwt.t) ->
