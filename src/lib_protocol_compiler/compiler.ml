@@ -27,8 +27,6 @@ let default_warnings = Defaults.warnings
 
 let default_warn_error = "-a+8"
 
-let () = Clflags.unsafe_string := false
-
 (** Override the default 'Env.Persistent_signature.load'
     with a lookup in locally defined hashtable.
 *)
