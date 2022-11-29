@@ -114,7 +114,7 @@ let metrics_addr_arg =
   Tezos_clic.arg
     ~long:"metrics-addr"
     ~placeholder:
-      "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9932)"
+      "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
     ~doc:"The address of the smart-contract rollup node metrics server."
     Client_proto_args.string_parameter
 
