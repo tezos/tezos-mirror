@@ -103,6 +103,8 @@ let span pred =
 
 let rex ?opts r = (r, Re.compile (Re.Perl.re ?opts r))
 
+let rexf ?opts fmt = Printf.ksprintf (rex ?opts) fmt
+
 let show_rex = fst
 
 let ( =~ ) s (_, r) = Re.execp r s
