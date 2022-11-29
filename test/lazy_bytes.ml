@@ -83,6 +83,10 @@ let test () =
     Data_encoding.Json.construct lazy_encoding broken_lazy_value_from_json
   in
   assert (json_from_broken = json_from_broken_from_broken) ;
+  let bytes_from_broken_from_broken =
+    Data_encoding.Encoding.force_bytes broken_lazy_value_from_json
+  in
+  assert (broken_lazy_bytes = bytes_from_broken_from_broken) ;
 
   ()
 
