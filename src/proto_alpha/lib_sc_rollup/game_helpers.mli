@@ -50,3 +50,21 @@ val make_dissection :
   our_stop_chunk:Dissection_chunk.t ->
   Tick.t trace ->
   Dissection_chunk.t list tzresult Lwt.t
+
+module Wasm : sig
+  (** [new_dissection ~default_number_of_sections ~start_chunk
+      ~our_stop_chunk] computes a dissection that satisfies the
+      dissection predicate of the WASM PVM, that is all the ticks in
+      the dissection are aligned with the size of a snapshot.
+
+      If [start_chunk] is not a multiple of the size of a snapshot or
+      if the distance between [start_chunk] and [stop_chunk] is not
+      greater than the size of a snapshot, then
+      {!default_new_dissection} is called, because it means the WASM
+      PVM is stuck.  *)
+  val new_dissection :
+    default_number_of_sections:int ->
+    start_chunk:Game.dissection_chunk ->
+    our_stop_chunk:Game.dissection_chunk ->
+    Tick.t list
+end

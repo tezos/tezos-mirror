@@ -279,6 +279,43 @@ let gen_tick ?(lower_bound = 0) ?(upper_bound = 10_000) () =
   let+ tick = lower_bound -- upper_bound in
   tick_of_int_exn ~__LOC__ tick
 
+(** Generate two chunks consisting in valid boundaries for a dissection *)
+let gen_wasm_pvm_dissection_boundaries kind =
+  let open QCheck2.Gen in
+  let open Alpha_context in
+  let* broken = bool in
+  let* state_hash = gen_random_hash in
+  let* base = Z.of_int <$> 0 -- 10_000 in
+  let* len =
+    Z.of_int
+    <$>
+    match kind with
+    | `Kernel_run -> pure 1
+    | `Short -> 2 -- 32
+    | `Large -> 1_000 -- 10_000
+  in
+  let+ offset =
+    if broken then 1 -- Z.to_int Sc_rollup.Wasm_2_0_0PVM.ticks_per_snapshot
+    else pure 0
+  in
+  let start_tick =
+    Sc_rollup.Tick.of_z @@ Z.(base * Sc_rollup.Wasm_2_0_0PVM.ticks_per_snapshot)
+  in
+  let stop_tick =
+    Sc_rollup.Tick.of_z
+    @@ Z.(
+         ((base + len) * Sc_rollup.Wasm_2_0_0PVM.ticks_per_snapshot)
+         + Z.of_int offset)
+  in
+  let start_chunk =
+    Sc_rollup.Dissection_chunk.
+      {tick = start_tick; state_hash = Some State_hash.zero}
+  in
+  let stop_chunk =
+    Sc_rollup.Dissection_chunk.{tick = stop_tick; state_hash = Some state_hash}
+  in
+  (start_chunk, stop_chunk)
+
 (** [gen_arith_pvm_messages ~gen_size] is a `correct list` generator.
     It generates a list of strings that are either integers or `+` to be
     consumed by the arithmetic PVM.
@@ -519,7 +556,7 @@ module Dissection = struct
              stop_chunk,
              default_number_of_sections,
              distance ) ->
-        let expected_len = succ distance in
+        let expected_len = distance in
         truncate_and_check_error
           dissection
           start_chunk
@@ -747,7 +784,7 @@ module Dissection = struct
           Z.succ @@ Tick.distance start_chunk.tick stop_chunk.tick
         in
         let max_section_length =
-          Z.(succ @@ (distance - of_int default_number_of_sections))
+          Z.(distance - of_int default_number_of_sections)
         in
         let section_length = Z.one in
 
@@ -770,6 +807,8 @@ module Dissection = struct
         let invalid_dissection =
           replace_distances start_chunk.tick picked_section dissection
         in
+        let dist = Tick.distance start_chunk.tick stop_chunk.tick in
+        let half_dist = Z.div dist (Z.of_int 2) in
         assert_fails_with
           ~__LOC__
           (Game.Internal_for_tests.check_dissection
@@ -777,7 +816,7 @@ module Dissection = struct
              ~start_chunk
              ~stop_chunk
              invalid_dissection)
-          Dissection_chunk.Dissection_invalid_distribution)
+          (Dissection_chunk.Dissection_invalid_distribution half_dist))
 
   let tests =
     ( "Dissection",
@@ -1577,6 +1616,70 @@ let prepare_game ~p1_start block rollup lcc commitment_level p1_client p2_client
       ~refuter_commitment:p2_commitment
       (p2_client, p1_client)
 
+let check_distribution = function
+  | fst :: snd :: rst ->
+      let open Dissection_chunk in
+      let dist = Tick.distance fst.tick snd.tick in
+      let _, min_len, max_len =
+        List.fold_left
+          (fun (previous_tick, min_len, max_len) chunk ->
+            let dist = Tick.distance previous_tick chunk.tick in
+            (* We only consider length that are greater or equal than
+               the snapshot size. The last one may not be as big, if
+               the PVM was stuck. *)
+            if Compare.Z.(dist < Sc_rollup.Wasm_2_0_0PVM.ticks_per_snapshot)
+            then (chunk.tick, min_len, max_len)
+            else (chunk.tick, Z.min min_len dist, Z.max max_len dist))
+          (snd.tick, dist, dist)
+          rst
+      in
+      Z.(max_len - min_len <= Sc_rollup.Wasm_2_0_0PVM.ticks_per_snapshot)
+  | _ -> true
+
+let test_wasm_dissection name kind =
+  qcheck_make_lwt_res
+    ~count:1_000_000
+    ~name
+    ~print:(fun (start_chunk, stop_chunk) ->
+      Format.asprintf
+        "dissection from %a to %a"
+        Dissection_chunk.pp
+        start_chunk
+        Dissection_chunk.pp
+        stop_chunk)
+    ~gen:(gen_wasm_pvm_dissection_boundaries kind)
+    (fun (start_chunk, stop_chunk) ->
+      let open Lwt_result_syntax in
+      let+ dissection =
+        Game_helpers.(
+          make_dissection
+            ~state_hash_from_tick:(fun _ ->
+              return_some Sc_rollup.State_hash.zero)
+            ~start_chunk
+            ~our_stop_chunk:stop_chunk
+          @@ Wasm.new_dissection
+               ~start_chunk
+               ~our_stop_chunk:stop_chunk
+               ~default_number_of_sections:32)
+      in
+      if kind <> `Kernel_run then assert (check_distribution dissection) ;
+      match
+        Wasm_2_0_0PVM.Protocol_implementation.check_dissection
+          ~default_number_of_sections:32
+          ~start_chunk
+          ~stop_chunk:{stop_chunk with state_hash = Some State_hash.zero}
+          dissection
+      with
+      | Ok () -> true
+      | Error e ->
+          Format.printf
+            "dissection %a caused errors %a\n"
+            Game.pp_dissection
+            dissection
+            Environment.Error_monad.pp_trace
+            e ;
+          false)
+
 (** Create a test of [p1_strategy] against [p2_strategy]. One of them
     must be a {!Perfect} player, otherwise, we do not care about which
     cheater wins. *)
@@ -1685,6 +1788,9 @@ let tests =
   ( "Refutation",
     qcheck_wrap
       [
+        test_wasm_dissection "dissection is one kernel_run" `Kernel_run;
+        test_wasm_dissection "dissection shorter than 32 kernel_run" `Short;
+        test_wasm_dissection "dissection larger than 32 kernel_run" `Large;
         test_perfect_against_random;
         test_perfect_against_lazy;
         test_perfect_against_keen;

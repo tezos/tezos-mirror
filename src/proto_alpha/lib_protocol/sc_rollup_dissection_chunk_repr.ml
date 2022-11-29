@@ -64,7 +64,7 @@ type error +=
       chunk_stop_tick : Sc_rollup_tick_repr.t;
     }
   | (* `Permanent *) Dissection_ticks_not_increasing
-  | (* `Permanent *) Dissection_invalid_distribution
+  | (* `Permanent *) Dissection_invalid_distribution of Z.t
   | (* `Permanent *) Dissection_invalid_successive_states_shape
 
 let pp_state_hash =
@@ -85,32 +85,30 @@ let pp ppf {state_hash; tick} =
     Sc_rollup_tick_repr.pp
     tick
 
-let default_check_sections_number ~default_number_of_sections ~start_chunk
-    ~stop_chunk dissection =
+let default_check_sections_number ~default_number_of_sections
+    ~number_of_sections ~dist =
   let open Result_syntax in
-  let len = Z.of_int @@ List.length dissection in
-  let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
+  let number_of_sections = Z.of_int number_of_sections in
+  let default_number_of_sections = Z.of_int default_number_of_sections in
   let should_be_equal_to expected =
-    Dissection_number_of_sections_mismatch {expected; given = len}
+    Dissection_number_of_sections_mismatch
+      {expected; given = number_of_sections}
   in
-  let num_sections = Z.of_int @@ default_number_of_sections in
-  if Z.geq dist num_sections then
-    error_unless Z.(equal len num_sections) (should_be_equal_to num_sections)
-  else if Z.(gt dist one) then
-    error_unless Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
-  else tzfail (Dissection_invalid_number_of_sections len)
+  if Compare.Z.(default_number_of_sections <= dist) then
+    error_unless
+      Compare.Z.(number_of_sections = default_number_of_sections)
+      (should_be_equal_to default_number_of_sections)
+  else if Compare.Z.(dist > Z.one) then
+    error_unless Compare.Z.(number_of_sections = dist) (should_be_equal_to dist)
+  else tzfail (Dissection_invalid_number_of_sections number_of_sections)
 
-let default_check ~check_sections_number ~default_number_of_sections
-    ~start_chunk ~stop_chunk dissection =
+let default_check ~section_maximum_size ~check_sections_number
+    ~default_number_of_sections ~start_chunk ~stop_chunk dissection =
   let open Result_syntax in
-  let len = Z.of_int @@ List.length dissection in
+  let number_of_sections = Compare.Int.max 0 (List.length dissection - 1) in
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let* () =
-    check_sections_number
-      ~default_number_of_sections
-      ~start_chunk
-      ~stop_chunk
-      dissection
+    check_sections_number ~default_number_of_sections ~number_of_sections ~dist
   in
   let* () =
     match (List.hd dissection, List.last_opt dissection) with
@@ -145,9 +143,9 @@ let default_check ~check_sections_number ~default_number_of_sections
     | _ ->
         (* This case is probably already handled by the
            [Dissection_invalid_number_of_sections] returned above *)
-        tzfail (Dissection_invalid_number_of_sections len)
+        tzfail
+          (Dissection_invalid_number_of_sections (Z.of_int number_of_sections))
   in
-  let half_dist = Z.(div dist (of_int 2) |> succ) in
   let rec traverse states =
     match states with
     | {state_hash = None; _} :: {state_hash = Some _; _} :: _ ->
@@ -155,8 +153,8 @@ let default_check ~check_sections_number ~default_number_of_sections
     | {tick; _} :: ({tick = next_tick; state_hash = _} as next) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           let incr = Sc_rollup_tick_repr.distance tick next_tick in
-          if Z.(leq incr half_dist) then traverse (next :: others)
-          else tzfail Dissection_invalid_distribution
+          if Z.(leq incr section_maximum_size) then traverse (next :: others)
+          else tzfail (Dissection_invalid_distribution section_maximum_size)
         else tzfail Dissection_ticks_not_increasing
     | _ -> return ()
   in
@@ -297,19 +295,20 @@ let () =
     Data_encoding.empty
     (function Dissection_ticks_not_increasing -> Some () | _ -> None)
     (fun () -> Dissection_ticks_not_increasing) ;
-  let description =
-    "Maximum tick increment in a section cannot be more than half total \
-     dissection length"
-  in
   register_error_kind
     `Permanent
     ~id:"Dissection_invalid_distribution"
     ~title:description
     ~description
-    ~pp:(fun ppf () -> Format.pp_print_string ppf description)
-    Data_encoding.empty
-    (function Dissection_invalid_distribution -> Some () | _ -> None)
-    (fun () -> Dissection_invalid_distribution) ;
+    ~pp:(fun ppf max ->
+      Format.fprintf
+        ppf
+        "Maximum tick increment in a section cannot be more than %a ticks"
+        Z.pp_print
+        max)
+    Data_encoding.(obj1 (req "section_max_size" n))
+    (function Dissection_invalid_distribution max -> Some max | _ -> None)
+    (fun max -> Dissection_invalid_distribution max) ;
   let description = "Cannot recover from a blocked state in a dissection" in
   register_error_kind
     `Permanent

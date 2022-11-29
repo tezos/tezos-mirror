@@ -46,6 +46,10 @@ let assert_fails_with ~__LOC__ k expected_err =
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res (( = ) expected_err)
 
+let assert_fails_with_f ~__LOC__ k f =
+  let*! res = k in
+  Assert.proto_error ~loc:__LOC__ res f
+
 let tick_of_int_exn n =
   match Tick.of_int n with None -> assert false | Some t -> t
 
@@ -73,7 +77,7 @@ let init_dissection ~size ?init_tick start_hash =
       ~some:(fun init_tick -> init_tick size)
       init_tick
   in
-  Stdlib.List.init size init_tick
+  Stdlib.List.init (size + 1) init_tick
 
 let init_refutation ~size ?init_tick start_hash =
   G.
@@ -144,7 +148,7 @@ let test_poorly_distributed_dissection () =
   let init_tick size i =
     mk_dissection_chunk
     @@
-    if i = size - 1 then (None, tick_of_int_exn 10000)
+    if i = size then (None, tick_of_int_exn 10000)
     else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
   in
   let* ctxt =
@@ -154,10 +158,10 @@ let test_poorly_distributed_dissection () =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
   let move = init_refutation ~size ~init_tick start_hash in
-  assert_fails_with
+  assert_fails_with_f
     ~__LOC__
     (T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move)
-    D.Dissection_invalid_distribution
+    (function D.Dissection_invalid_distribution _ -> true | _ -> false)
 
 let test_single_valid_game_move () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
@@ -167,11 +171,11 @@ let test_single_valid_game_move () =
   in
   let tick_per_state = 10_000 / size in
   let dissection =
-    Stdlib.List.init size (fun i ->
+    Stdlib.List.init (size + 1) (fun i ->
         mk_dissection_chunk
         @@
         if i = 0 then (Some start_hash, tick_of_int_exn 0)
-        else if i = size - 1 then (None, tick_of_int_exn 10000)
+        else if i = size then (None, tick_of_int_exn 10000)
         else (Some (hash_int i), tick_of_int_exn (i * tick_per_state)))
   in
   let* ctxt =

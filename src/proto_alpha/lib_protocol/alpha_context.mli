@@ -3141,6 +3141,10 @@ module Sc_rollup : sig
 
     val to_int : t -> int option
 
+    val of_z : Z.t -> t
+
+    val to_z : t -> Z.t
+
     val encoding : t Data_encoding.t
 
     val pp : Format.formatter -> t -> unit
@@ -3495,7 +3499,7 @@ module Sc_rollup : sig
           chunk_stop_tick : Tick.t;
         }
       | Dissection_ticks_not_increasing
-      | Dissection_invalid_distribution
+      | Dissection_invalid_distribution of Z.t
       | Dissection_invalid_successive_states_shape
   end
 

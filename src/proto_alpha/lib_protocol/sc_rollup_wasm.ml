@@ -32,6 +32,8 @@ type error += WASM_output_proof_production_failed
 
 type error += WASM_invalid_claim_about_outbox
 
+type error += WASM_invalid_dissection_distribution
+
 let () =
   let open Data_encoding in
   let msg = "Invalid claim about outbox" in
@@ -63,7 +65,20 @@ let () =
     ~description:msg
     unit
     (function WASM_proof_production_failed -> Some () | _ -> None)
-    (fun () -> WASM_proof_production_failed)
+    (fun () -> WASM_proof_production_failed) ;
+  let msg =
+    "Invalid dissection distribution: not all ticks are a multiplier of the \
+     maximum number of ticks of a snapshot"
+  in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_wasm_invalid_dissection_distribution"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function WASM_invalid_dissection_distribution -> Some () | _ -> None)
+    (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
@@ -522,9 +537,123 @@ module V2_0_0 = struct
       | Some (_, false) -> fail WASM_invalid_claim_about_outbox
       | None -> fail WASM_output_proof_production_failed
 
-    let check_dissection =
-      Sc_rollup_dissection_chunk_repr.(
-        default_check ~check_sections_number:default_check_sections_number)
+    let check_sections_number ~default_number_of_sections ~number_of_sections
+        ~dist =
+      let open Sc_rollup_dissection_chunk_repr in
+      let is_stop_chunk_aligned =
+        Compare.Z.(Z.rem dist ticks_per_snapshot = Z.zero)
+      in
+      let max_number_of_sections = Z.(div dist ticks_per_snapshot) in
+      let expected =
+        Compare.Z.min
+          (Z.of_int default_number_of_sections)
+          (if is_stop_chunk_aligned then max_number_of_sections
+          else Z.succ max_number_of_sections)
+      in
+      let given = Z.of_int number_of_sections in
+      error_unless
+        Compare.Z.(given = expected)
+        (Dissection_number_of_sections_mismatch {given; expected})
+
+    let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
+        dissection =
+      let open Result_syntax in
+      let open Sc_rollup_dissection_chunk_repr in
+      let dist =
+        Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick
+      in
+      (*
+        We fall back to the default dissection check when the
+        [kernel_run] culprit has been found and is being dissected.
+
+        This condition will also be met if the PVM is stuck (because
+        it is unlikely that [ticks_per_snapshot] messages can be
+        posted in a commitment period), which is OKay because the Fast
+        Execution cannot be leveraged in that case, which means the
+        ad-hoc dissection predicate would not provide any speed up.
+      *)
+      if Compare.Z.(dist <= ticks_per_snapshot) then
+        default_check
+          ~section_maximum_size:Z.(div dist (Z.of_int 2))
+          ~check_sections_number:default_check_sections_number
+          ~default_number_of_sections
+          ~start_chunk
+          ~stop_chunk
+          dissection
+      else
+        (*
+           There are enough ticks to consider that at least one call
+           to [kernel_run] is involved.
+
+           We now need to consider two cases: either [stop_chunk] is a
+           multiple of [ticks_per_snapshot] (the PVM is not stuck), or
+           it is not (the PVM has been stuck during the processing
+           of one of the ticks of the dissection).
+
+           For the latter case, we want to validate a dissection if
+
+             1. Every complete [kernel_run] invocations are dissected
+                as normal in the n-1 first chunks, and
+             2. The final section contains all the ticks of the
+                interrupted [kernel_run].
+        *)
+        let is_stop_chunk_aligned =
+          Compare.Z.(Z.rem dist ticks_per_snapshot = Z.zero)
+        in
+        (*
+           We keep the same dissection predicate as the default
+           dissection that a given section cannot be more than half of
+           the “full distance”, but we only consider the complete
+           calls to [kernel_run] in the “full distance”. The remainder
+           ticks will be put in the very last section.
+        *)
+        let considered_dist =
+          if is_stop_chunk_aligned then dist
+          else
+            let last_valid_stop_tick =
+              Sc_rollup_tick_repr.of_z
+                Z.(
+                  mul
+                    (div
+                       (Sc_rollup_tick_repr.to_z stop_chunk.tick)
+                       ticks_per_snapshot)
+                    ticks_per_snapshot)
+            in
+            Sc_rollup_tick_repr.(distance start_chunk.tick last_valid_stop_tick)
+        in
+        (*
+           There is one last corner case to consider: if the stuck
+           state happens in the second [kernel_run] of the period.
+
+           In this case, the considered distance is equal to the
+           snapshot size, and divided this value by two means the
+           maximum size of a section becomes 0.
+
+           So we keep that a section length is at least
+           [ticks_per_snapshot].
+        *)
+        let section_maximum_size =
+          Z.max ticks_per_snapshot (Z.div considered_dist (Z.of_int 2))
+        in
+        let* () =
+          default_check
+            ~section_maximum_size
+            ~check_sections_number
+            ~default_number_of_sections
+            ~start_chunk
+            ~stop_chunk
+            dissection
+        in
+        error_unless
+          (List.for_all
+             (fun chunk ->
+               let open Sc_rollup_tick_repr in
+               Z.(
+                 equal (rem (to_z chunk.tick) ticks_per_snapshot) zero
+                 || Sc_rollup_tick_repr.equal start_chunk.tick chunk.tick
+                 || Sc_rollup_tick_repr.equal stop_chunk.tick chunk.tick))
+             dissection)
+          WASM_invalid_dissection_distribution
 
     module Internal_for_tests = struct
       let insert_failure state =
