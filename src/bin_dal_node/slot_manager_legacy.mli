@@ -69,11 +69,7 @@ val get_shards :
     disk the shards associated to [slot_header], gathers them, rebuilds and
     returns the [slot]. *)
 val get_slot :
-  Cryptobox.parameters ->
-  Cryptobox.t ->
-  Store.t ->
-  Cryptobox.commitment ->
-  slot tzresult Lwt.t
+  Cryptobox.t -> Store.t -> Cryptobox.commitment -> slot tzresult Lwt.t
 
 (** [get_slot_pages] behaves as [get_slot], except that it also
     splits the slot into pages before returning them.
@@ -83,11 +79,7 @@ val get_slot :
     length is not a multiple of the page-size specified in the
     [Cryptobox.parameters] argument. *)
 val get_slot_pages :
-  Cryptobox.parameters ->
-  Cryptobox.t ->
-  Store.t ->
-  Cryptobox.commitment ->
-  bytes list tzresult Lwt.t
+  Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
 
 (** [save_shards store slot_header shards] stores [shards] onto the [store]
     associated to the given [slot_header] *)

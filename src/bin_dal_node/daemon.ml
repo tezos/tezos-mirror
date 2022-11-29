@@ -68,7 +68,7 @@ let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
   in
   let*? () = Cryptobox.load_parameters initialisation_parameters in
   match Cryptobox.make parameters with
-  | Ok cryptobox -> return (cryptobox, parameters)
+  | Ok cryptobox -> return cryptobox
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
 module Handler = struct
@@ -111,14 +111,10 @@ module Handler = struct
       | Some plugin ->
           let (module Plugin : Dal_plugin.T) = plugin in
           let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
-          let* dal_constants, dal_parameters =
+          let* dal_constants =
             init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
           in
-          Node_context.set_ready
-            ctxt
-            (module Plugin)
-            dal_constants
-            dal_parameters ;
+          Node_context.set_ready ctxt (module Plugin) dal_constants ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
@@ -164,9 +160,12 @@ module Handler = struct
     (* Monitor neighbor DAL nodes and download published slots as shards. *)
     let open Lwt_result_syntax in
     let handler n_cctxt ready_ctxt slot_header =
-      let params = ready_ctxt.Node_context.dal_parameters in
+      let dal_constants = ready_ctxt.Node_context.dal_constants in
+      let dal_parameters = Cryptobox.parameters dal_constants in
       let downloaded_shard_ids =
-        0 -- ((params.number_of_shards / params.redundancy_factor) - 1)
+        0
+        -- ((dal_parameters.number_of_shards / dal_parameters.redundancy_factor)
+           - 1)
       in
       let* shards =
         RPC_server_legacy.shards_rpc n_cctxt slot_header downloaded_shard_ids

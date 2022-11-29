@@ -253,8 +253,9 @@ let get_shards store dal_parameters slot_header shard_ids =
     []
     slot_header
 
-let get_slot dal_parameters dal_constants store slot_header =
+let get_slot dal_constants store slot_header =
   let open Lwt_result_syntax in
+  let dal_parameters = Cryptobox.parameters dal_constants in
   let* shards =
     fold_stored_shards
       ~check_shards:true
@@ -272,10 +273,10 @@ let get_slot dal_parameters dal_constants store slot_header =
   in
   return slot
 
-let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
-    store slot_header =
+let get_slot_pages dal_constants store slot_header =
   let open Lwt_result_syntax in
-  let* slot = get_slot initial_constants dal_constants store slot_header in
+  let dal_parameters = Cryptobox.parameters dal_constants in
+  let* slot = get_slot dal_constants store slot_header in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
@@ -283,7 +284,7 @@ let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
      Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
   let*? pages =
     String.chunk_bytes
-      page_size
+      dal_parameters.page_size
       slot
       ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
   in
