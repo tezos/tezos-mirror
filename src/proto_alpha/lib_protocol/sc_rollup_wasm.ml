@@ -83,6 +83,13 @@ let () =
 module V2_0_0 = struct
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
+  let well_known_reveal_preimage = ""
+
+  let well_known_reveal_hash =
+    Sc_rollup_reveal_hash.hash_string
+      ~scheme:Blake2B
+      [well_known_reveal_preimage]
+
   (*
     This is the state hash of reference that both the prover of the
     node and the verifier of the protocol {!Protocol_implementation}
@@ -303,10 +310,7 @@ module V2_0_0 = struct
           | None ->
               (* In case of an invalid hash, the rollup is
                  blocked. Any commitment will be invalid. *)
-              Waiting_for_reveal
-                (Reveal_raw_data
-                   (Sc_rollup_reveal_hash.zero
-                      ~scheme:Sc_rollup_reveal_hash.Blake2B)))
+              Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash))
       | Reveal_required Wasm_2_0_0.Reveal_metadata ->
           Waiting_for_reveal Reveal_metadata
 
