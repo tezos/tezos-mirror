@@ -1228,6 +1228,15 @@ let output_buffer_encoding =
        (value_option ["last_level"] Data_encoding.int32)
        (value ["validity_period"] Data_encoding.int32))
 
+let output_buffer_encoding =
+  conv
+    (fun (message_limit, outboxes) -> Output_buffer.{message_limit; outboxes})
+    (fun Output_buffer.{message_limit; outboxes} -> (message_limit, outboxes))
+    (tup2
+       ~flatten:true
+       (value ["message_limit"] Data_encoding.z)
+       (scope ["outboxes"] outboxes_encoding))
+
 let config_encoding ~host_funcs =
   conv
     (fun (step_kont, stack_size_limit) ->

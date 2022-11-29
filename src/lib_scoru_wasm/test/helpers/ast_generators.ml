@@ -661,12 +661,14 @@ let output_buffer_gen =
   in
   let* last_level = option (map Int32.of_int (int_range 0 10)) in
   let* validity_period = map Int32.of_int (int_range 0 10) in
+  let* message_limit = map Z.of_int small_int in
   return
     Output_buffer.
       {
         outboxes = Outboxes.(create ~values:outboxes ());
         last_level;
         validity_period;
+        message_limit;
       }
 
 let label_gen ~module_reg =
