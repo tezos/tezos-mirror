@@ -94,6 +94,7 @@
   Sc_rollup_inbox_repr
   Sc_rollup_commitment_repr
   Sc_rollup_proof_repr
+  Skip_list_costs
   Sc_rollup_costs
   Sc_rollup_game_repr
   Tx_rollup_level_repr
@@ -370,6 +371,7 @@
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
+  skip_list_costs.ml skip_list_costs.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
@@ -629,6 +631,7 @@
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
+  skip_list_costs.ml skip_list_costs.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
@@ -893,6 +896,7 @@
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
+  skip_list_costs.ml skip_list_costs.mli
   sc_rollup_costs.ml sc_rollup_costs.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
