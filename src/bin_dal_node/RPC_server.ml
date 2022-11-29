@@ -56,13 +56,16 @@ module Slots_handlers = struct
     call_handler
       (fun store cryptobox ->
         let open Lwt_result_syntax in
+        (* This handler may be costly: We need to recompute the
+           polynomial and then compute the proof. *)
         let*! slot = Slot_manager.get_slot_content commitment store in
         match slot with
         | Error `Not_found -> return_none
         | Ok slot -> (
             match Cryptobox.polynomial_from_slot cryptobox slot with
             | Error _ ->
-                (* Storage consistency ensure we can always compute the polynomial from the slot. *)
+                (* Storage consistency ensure we can always compute the
+                   polynomial from the slot. *)
                 assert false
             | Ok polynomial ->
                 return_some (Cryptobox.prove_commitment cryptobox polynomial)))

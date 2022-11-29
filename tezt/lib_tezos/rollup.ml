@@ -666,6 +666,11 @@ module Dal = struct
 
     let get_slot commitment =
       make GET ["slots"; commitment] get_bytes_from_json_string_node
+
+    type commitment_proof = string
+
+    let get_slot_proof commitment =
+      make GET ["slots"; commitment; "proof"] JSON.as_string
   end
 
   let make

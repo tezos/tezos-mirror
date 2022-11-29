@@ -1022,6 +1022,26 @@ let test_dal_node_test_get_slots _protocol parameters cryptobox _node client
        %L, got = %R)" ;
   unit
 
+let test_dal_node_test_get_slot_proof _protocol parameters cryptobox _node
+    client dal_node =
+  let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let* slot = Rollup.Dal.make_slot (generate_dummy_slot size) client in
+  let* commitment = RPC.call dal_node (Rollup.Dal.RPC.post_slot slot) in
+  let* proof = RPC.call dal_node (Rollup.Dal.RPC.get_slot_proof commitment) in
+  let _, expected_proof =
+    Rollup.Dal.Commitment.dummy_commitment cryptobox (generate_dummy_slot size)
+  in
+  let (`Hex expected_proof) =
+    Data_encoding.Binary.to_bytes_exn
+      Rollup.Dal.Cryptobox.Commitment_proof.encoding
+      expected_proof
+    |> Hex.of_bytes
+  in
+  Check.(proof = expected_proof)
+    Check.string
+    ~error_msg:"Wrong proof computed (got = %L, expected = %R)" ;
+  unit
+
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -1633,7 +1653,10 @@ let register ~protocols =
     "dal node GET /slots"
     test_dal_node_test_get_slots
     protocols ;
-
+  scenario_with_layer1_and_dal_nodes
+    "dal node GET /slot/<commitment>/proof"
+    test_dal_node_test_get_slot_proof
+    protocols ;
   (* Tests with all nodes *)
   test_dal_node_dac_threshold_not_reached protocols ;
   scenario_with_all_nodes
