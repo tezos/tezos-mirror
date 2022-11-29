@@ -15,6 +15,11 @@ New Environment Version (V8)
 This protocol requires a different protocol environment version than Lima.
 It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
 
+- Update data-encoding to 0.7.1. (MR :gl:`!6854`)
+
+- Provide only modern bytes and string combinators in environment data encoding.
+  (MR :gl:`!6919`)
+
 Michelson opcodes for logical operations on bytes
 -------------------------------------------------
 
@@ -29,13 +34,15 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6590`, :gl:`!6623`, :gl:`!6641`, :gl:`!6549`, :gl:`!6672`, :gl:`!6500`,
 :gl:`!6718`, :gl:`!6699`, :gl:`!6630`, :gl:`!6794`, :gl:`!6823`, :gl:`!6828`,
 :gl:`!6676`, :gl:`!6698`, :gl:`!6507`, :gl:`!6879`, :gl:`!6860`, :gl:`!6716`,
-:gl:`!6468`)
+:gl:`!6468`, :gl:`!6857`, :gl:`!6652`, :gl:`!6913`, :gl:`!6838`, :gl:`!6914`,
+:gl:`!6717`, :gl:`!6560`, :gl:`!6891`, :gl:`!6726`, :gl:`!6935`, :gl:`!6951`,
+:gl:`!6946`, :gl:`!6954`, :gl:`!6942`, :gl:`!6963`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
 Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!6047`,
-:gl:`!6884`)
+:gl:`!6884`, :gl:`!6836`, :gl:`!6855`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
@@ -117,4 +124,4 @@ Internal
 
 - Use let-bindings in ticket-accounting module. (MR :gl:`!6770`)
 
-- Use condensed syntax modules in protocol. (MR :gl:`!6844`)
+- Use condensed syntax modules in protocol. (MRs :gl:`!6844`, :gl:`!6864`)
