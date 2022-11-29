@@ -37,6 +37,7 @@ module Error = struct
     | Generic_invalid_access
     | Store_readonly_value
     | Store_not_a_node
+    | Full_outbox
 
   (** [code error] returns the error code associated to the error. *)
   let code = function
@@ -50,6 +51,7 @@ module Error = struct
     | Generic_invalid_access -> -8l
     | Store_readonly_value -> -9l
     | Store_not_a_node -> -10l
+    | Full_outbox -> -11l
 end
 
 module type Memory_access = sig
@@ -244,6 +246,7 @@ module Aux = struct
           | Durable.Invalid_key _ -> fail Error.Store_invalid_key
           | Durable.Value_not_found -> fail Error.Store_not_a_value
           | Durable.Tree_not_found -> fail Error.Store_not_a_node
+          | Output_buffer.Full_outbox -> fail Error.Full_outbox
           | exn ->
               fail @@ M.exn_to_error ~default:Error.Generic_invalid_access exn)
 
@@ -307,8 +310,11 @@ module Aux = struct
         else
           let num_bytes = Int32.to_int num_bytes in
           let* payload = M.load_bytes memory src num_bytes in
-          let*! Output_buffer.{outbox_level = _; message_index = _} =
-            Output_buffer.push_message output_buffer (Bytes.of_string payload)
+          let* Output_buffer.{outbox_level = _; message_index = _} =
+            guard (fun () ->
+                Output_buffer.push_message
+                  output_buffer
+                  (Bytes.of_string payload))
           in
           return 0l
       in

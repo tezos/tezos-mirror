@@ -74,6 +74,8 @@ module Error : sig
     | Store_not_a_node
         (** There is no tree at key. It has no value, nor any subtrees.
             Has code `-10`. *)
+    | Full_outbox
+        (** The outbox is full an cannot accept new messages at this level. Has code `-11`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32
