@@ -158,6 +158,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Script_hash_regression.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Script_conversion.register ~protocols ;
+  Script_illtyped.register ~protocols ;
   Signer_test.register ~protocols ;
   Stresstest_command.register ~protocols ;
   Synchronisation_heuristic.register ~protocols ;
