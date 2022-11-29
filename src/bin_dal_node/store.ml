@@ -174,4 +174,11 @@ module Legacy = struct
     let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
     let path = Legacy_paths.slot_by_commitment commitment_b58 in
     mem node_store.slots_store path
+
+  let find_slot_by_commitment node_store commitment =
+    let open Lwt_syntax in
+    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    let* res_opt = find node_store.slots_store path in
+    Option.map Bytes.of_string res_opt |> Lwt.return
 end

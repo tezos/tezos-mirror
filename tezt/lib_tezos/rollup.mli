@@ -295,6 +295,10 @@ module Dal : sig
       slot_level:int ->
       slot_index:int ->
       (Dal_node.t, unit) RPC_core.t
+
+    (** Call RPC "GET /slots/<commitment>" to retrieve the slot content associated with the
+        given commitment. *)
+    val get_slot : commitment -> (Dal_node.t, slot) RPC_core.t
   end
 
   val make :

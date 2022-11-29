@@ -57,6 +57,11 @@ let polynomial_from_slot cryptobox slot =
       let {slot_size = expected; _} = parameters cryptobox in
       tzfail @@ Invalid_slot_size {provided; expected}
 
+let commitment_should_exist node_store commitment =
+  let open Lwt_result_syntax in
+  let*! exists = Store.Legacy.exists_slot_by_commitment node_store commitment in
+  if not exists then fail `Not_found else return_unit
+
 (* Main functions *)
 
 let add_slots slot node_store cryptobox =
@@ -70,15 +75,17 @@ let add_slots slot node_store cryptobox =
   in
   return commitment
 
-let add_slot_id commitment slot_id node_store _cryptobox =
+let add_slot_id commitment slot_id node_store =
   let open Lwt_result_syntax in
-  let*! exists = Store.Legacy.exists_slot_by_commitment node_store commitment in
-  if not exists then fail `Not_found
-  else
-    let*! () =
-      Store.Legacy.associate_slot_id_with_commitment
-        node_store
-        commitment
-        slot_id
-    in
-    return_unit
+  let* () = commitment_should_exist node_store commitment in
+  let*! () =
+    Store.Legacy.associate_slot_id_with_commitment node_store commitment slot_id
+  in
+  return_unit
+
+let get_slot_content commitment node_store =
+  let open Lwt_result_syntax in
+  let*! slot_opt = Store.Legacy.find_slot_by_commitment node_store commitment in
+  match slot_opt with
+  | None -> fail `Not_found
+  | Some slot_content -> return slot_content

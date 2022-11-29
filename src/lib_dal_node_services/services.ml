@@ -84,3 +84,18 @@ let patch_slot :
     ~input:Types.slot_id_encoding
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "slots" /: Cryptobox.Commitment.rpc_arg)
+
+let get_slot :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Cryptobox.slot
+    ; prefix : unit
+    ; params : unit * Cryptobox.commitment
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Retrieve the content of the slot associated with the given commitment."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Types.slot_content
+    Tezos_rpc.Path.(open_root / "slots" /: Cryptobox.Commitment.rpc_arg)
