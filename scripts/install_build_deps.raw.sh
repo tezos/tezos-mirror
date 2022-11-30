@@ -14,7 +14,7 @@ export OPAMYES="${OPAMYES:=true}"
 # needed, so here we only make opam acknowledge that we have a rust compiler
 # we installed by our own.
 # If we use opam depext, it will probably not install the right version.
-OPAMASSUMEDEPEXTS=true opam install conf-rust
+OPAMASSUMEDEPEXTS=true opam install conf-rust conf-rust-2021
 
 # Opam < 2.1 uses opam-depext as a plugin, later versions provide the option
 # `--depext-only`:
