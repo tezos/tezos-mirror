@@ -36,12 +36,12 @@ module Blake2B = struct
         let title = "A smart contract rollup reveal hash"
 
         let b58check_prefix =
-          "\017\144\121\209\203" (* "scrrh1(54)" decoded from Base58. *)
+          "\230\206\128\200\196" (* "scrrh1(56)" decoded from Base58. *)
 
-        let size = Some 31
+        let size = Some 32
       end)
 
-  let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 54
+  let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 56
 end
 
 type supported_hashes = Blake2B
