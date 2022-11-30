@@ -17,7 +17,6 @@ depends: [
   "tezos-benchmark-examples"
   "tezos-shell-benchmarks"
   "tezos-benchmarks-proto-alpha"
-  "ocamlgraph"
   "pyml"
   "prbnmcn-stats" { = "0.0.4" }
 ]

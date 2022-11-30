@@ -16,7 +16,6 @@
   tezos-shell-benchmarks
   tezos-benchmarks-proto-alpha
   str
-  ocamlgraph
   pyml
   prbnmcn-stats)
  (link_flags

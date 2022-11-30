@@ -3173,6 +3173,7 @@ let octez_benchmark =
         prbnmcn_stats;
         pringo;
         pyml;
+        ocamlgraph;
         ocaml_migrate_parsetree;
         opam_only "hashcons" V.True;
       ]
@@ -6156,7 +6157,6 @@ let _octez_snoop =
         octez_shell_benchmarks;
         Protocol.(benchmarks_proto_exn alpha);
         str;
-        ocamlgraph;
         pyml;
         prbnmcn_stats;
       ]

@@ -398,7 +398,7 @@ let load_files (model_name : string) (files : string list) =
         let filename_short = prune filename in
         let measurement = Measure.load ~filename in
         match measurement with
-        | Tezos_benchmark.Measure.Measurement ((module Bench), m) -> (
+        | Measure.Measurement ((module Bench), m) -> (
             match find_model_or_generic model_name Bench.models with
             | None -> graph
             | Some model ->
