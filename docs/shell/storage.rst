@@ -47,15 +47,19 @@ potential branches in the process to yield a linear history.
 
 When an un-reorganizable former cycle is retrieved, it is then
 **archived** in what is called the *cemented cycles*. This process is
-called a **merge** and is performed asynchronously. Depending on
-which history mode is ran and on the amount of additional cycles,
-blocks and/or their associated metadata present in these cemented
-cycles may or may not be preserved. For instance, if the history mode
-is *Archive*, every block and metadata are preserved, if *Full* with 5
-additional cycles is given, all the cemented cycles will be present
-but only the five most recent cemented cycles will have some metadata
-kept, lastly, if *Rolling* with 0 additional cycles, no cemented
-cycles will be preserved.
+called a **merge** and is performed asynchronously. Depending on which
+history mode is ran and on the amount of additional cycles, blocks
+and/or their associated metadata present in these cemented cycles may
+or may not be preserved. For instance, if the history mode is
+*Archive*, every block, and all its metadata, is preserved. If it is *Full* with 5
+additional cycles, all the cemented cycles will be present
+but only the 10 most recent cemented cycles will have some metadata
+kept (that is, *5 + 5 = 10* as the
+:ref:`PRESERVED_CYCLES<ps_constants>` protocol parameter, which on
+Mainnet is currently set to 5 cycles, forces the node to keep at least
+these cycles). Finally, if it is set to *Rolling* with 0 additional cycles, only 5
+cylcles (the :ref:`preserved_cycles<ps_constants>` ones) with metadata
+will be kept.
 
 Depending on its history mode, the store maintains two specific
 values:
