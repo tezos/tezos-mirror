@@ -537,7 +537,7 @@ A detailed description of the following instructions can be found in the `intera
 - ``DUG n``: Place the element on top of the stack at depth ``n`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-DUG>`__).
 -  ``PUSH 'a x``: Push a constant value of a given type onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PUSH>`__).
 -  ``LAMBDA 'a 'b code``: Push a lambda with the given parameter type ``'a`` and return type ``'b`` onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA>`__).
-- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the code, recursively, with the given parameter type ``'a`` and return a value of type ``'b`` onto the stack (if it terminates before gas exhaustion) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA_REC>`__).
+- ``LAMBDA_REC 'a 'b code``: Push a recursive lambda onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LAMBDA_REC>`__).
 
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
