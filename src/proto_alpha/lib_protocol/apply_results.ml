@@ -165,6 +165,7 @@ type _ successful_manager_operation_result =
       -> Kind.sc_rollup_timeout successful_manager_operation_result
   | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
@@ -1014,8 +1015,9 @@ module Manager_result = struct
         .sc_rollup_execute_outbox_message_case
       ~encoding:
         Data_encoding.(
-          obj3
+          obj4
             (req "balance_updates" Receipt.balance_updates_encoding)
+            (req "ticket_updates" Ticket_receipt.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -1026,11 +1028,28 @@ module Manager_result = struct
       ~kind:Kind.Sc_rollup_execute_outbox_message_manager_kind
       ~proj:(function
         | Sc_rollup_execute_outbox_message_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            (balance_updates, consumed_gas, paid_storage_size_diff))
-      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
+            {
+              balance_updates;
+              ticket_receipt;
+              consumed_gas;
+              paid_storage_size_diff;
+            } ->
+            ( balance_updates,
+              ticket_receipt,
+              consumed_gas,
+              paid_storage_size_diff ))
+      ~inj:
+        (fun ( balance_updates,
+               ticket_receipt,
+               consumed_gas,
+               paid_storage_size_diff ) ->
         Sc_rollup_execute_outbox_message_result
-          {balance_updates; consumed_gas; paid_storage_size_diff})
+          {
+            balance_updates;
+            ticket_receipt;
+            consumed_gas;
+            paid_storage_size_diff;
+          })
 
   let sc_rollup_recover_bond_case =
     make

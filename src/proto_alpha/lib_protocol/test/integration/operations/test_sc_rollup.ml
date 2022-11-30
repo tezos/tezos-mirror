@@ -1500,7 +1500,9 @@ let test_execute_message_override_applied_messages_slot () =
       ~cemented_commitment_hash =
     let transactions = [(string_receiver, Entrypoint.default, {|"Hello"|})] in
     let output = make_output ~outbox_level ~message_index transactions in
-    let* Sc_rollup_operations.{operations = _; paid_storage_size_diff}, incr =
+    let* ( Sc_rollup_operations.
+             {operations = _; ticket_receipt = _; paid_storage_size_diff},
+           incr ) =
       execute_outbox_message_without_proof_validation
         incr
         rollup

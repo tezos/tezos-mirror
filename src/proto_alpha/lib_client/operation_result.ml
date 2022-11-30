@@ -821,10 +821,12 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_sc_rollup_execute_outbox_message_result
       (Sc_rollup_execute_outbox_message_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+        {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
+      =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
-    pp_balance_updates ppf balance_updates
+    pp_balance_updates ppf balance_updates ;
+    pp_ticket_receipt ppf ticket_receipt
   in
   let pp_sc_rollup_recover_bond_result
       (Sc_rollup_recover_bond_result {balance_updates; consumed_gas}) =

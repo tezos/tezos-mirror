@@ -35,6 +35,7 @@ type error +=
 (** Result of calling the {!execute_outbox_message} function. *)
 type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
+  ticket_receipt : Ticket_receipt.t;
   operations : Script_typed_ir.packed_internal_operation list;
 }
 
