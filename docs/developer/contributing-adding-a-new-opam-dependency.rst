@@ -103,6 +103,10 @@ In order to create the opam repository MR:
 - Push your branch.
 - Create the opam repository MR from this branch.
 
+You can test the MR locally using the command
+``OPAM_REPOSITORY_TAG=<commit-id> make build-deps``. This will rebuild the
+dependencies locally using the ``<commit_id>`` of the opam-repository.
+
 Fourth, back in your local copy of Tezos, **update the variables in the**
 :src:`.gitlab-ci.yml` **and** :src:`scripts/version.sh` **files**. Specifically, set
 the ``build_deps_image_version`` and the ``opam_repository_tag`` variables
