@@ -260,6 +260,7 @@ let run ~readonly input output =
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          should_precheck;
           simulate;
         } ->
         let*! () = Events.(emit validation_request block_header) in
@@ -302,6 +303,7 @@ let run ~readonly input output =
               Block_validation.apply
                 ~simulate
                 ?cached_result
+                ~should_precheck
                 env
                 block_header
                 operations

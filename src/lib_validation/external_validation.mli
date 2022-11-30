@@ -46,6 +46,7 @@ type request =
         Tezos_crypto.Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
+      should_precheck : bool;
       simulate : bool;
     }
   | Preapply of {

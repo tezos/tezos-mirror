@@ -68,6 +68,11 @@ Node
   of ``octez-node`` and that was already used internally (and that was
   not usable on its own).
 
+- Fixed a bug that caused the bootstrap pipeline to apply a block without
+  prechecking it first. This issue only occurs for recent protocols (i.e., Lima
+  and later) where the validation of a block is dissociated from its
+  application. (MR :gl:`!7014`)
+
 Client
 ------
 
