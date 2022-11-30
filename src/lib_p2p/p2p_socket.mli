@@ -161,6 +161,24 @@ val write : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
     dropped, or fails with a corresponding error otherwise. *)
 val write_now : ('msg, 'meta) t -> 'msg -> bool tzresult
 
+(** type of an encoded_message parameterized by the type of message
+    it can be encoded from *)
+type 'msg encoded_message
+
+(** Copies and encoded message in a newly allocated one *)
+val copy_encoded_message : 'msg encoded_message -> 'msg encoded_message
+
+(** Encodes a message to be used with [write_encoded_now].*)
+val encode : ('msg, 'meta) t -> 'msg -> 'msg encoded_message tzresult
+
+(** Similar to [write_now conn msg] but with a preencoded message.
+    [msg] will be overwritten and should not be used after this
+    invocation.
+    It will fail if called on a closed connection with the
+    `P2p_errors.Connection_closed` error.
+*)
+val write_encoded_now : ('msg, 'meta) t -> 'msg encoded_message -> bool tzresult
+
 (** [write_sync conn msg] returns when [msg] has been successfully
     sent to the remote end of [conn], or fails accordingly. *)
 val write_sync : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t

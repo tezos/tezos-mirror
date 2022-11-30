@@ -255,8 +255,22 @@ val try_send :
   'msg ->
   bool
 
-(** Send a message to all peers *)
-val broadcast : ('msg, 'peer_meta, 'conn_meta) net -> 'msg -> unit
+(** [broadcast connections ~except ~(alt:if_conn,then_msg) msg] will
+    send messages to all [connections] that do not satisfy the
+    predicate [except]. [alt] can be used to send an alternative
+    message [then_msg] to connections that do satisfy the [if_conn]
+    predicate. [?except] and [?alt] can be used to selectively
+    transfer messages.
+
+    Broadcasting is best effort and nothing ensures that messages are
+    actually received (https://gitlab.com/tezos/tezos/-/issues/4205).
+*)
+val broadcast :
+  ('msg, 'peer_meta, 'conn_meta) connection P2p_peer.Table.t ->
+  ?except:(('msg, 'peer_meta, 'conn_meta) connection -> bool) ->
+  ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
+  'msg ->
+  unit
 
 val fold_connections :
   ('msg, 'peer_meta, 'conn_meta) net ->
@@ -281,3 +295,18 @@ val greylist_peer : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t -> unit
 val watcher :
   ('msg, 'peer_meta, 'conn_meta) net ->
   P2p_connection.P2p_event.t Lwt_stream.t * Lwt_watcher.stopper
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** [broadcast_conns connections ~except ~(alt:if_conn,then_msg)
+      msg] is similarly to broadcast.
+      But it exposes the internal `connection = P2p_conn.t` type for
+      testing purposes *)
+  val broadcast_conns :
+    ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_peer.Table.t ->
+    ?except:(('msg, 'peer_meta, 'conn_meta) P2p_conn.t -> bool) ->
+    ?alt:(('msg, 'peer_meta, 'conn_meta) connection -> bool) * 'msg ->
+    'msg ->
+    unit
+end

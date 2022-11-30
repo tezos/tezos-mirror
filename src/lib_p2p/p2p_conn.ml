@@ -165,6 +165,10 @@ let write t msg = P2p_socket.write t.conn (Message msg)
 
 let write_sync t msg = P2p_socket.write_sync t.conn (Message msg)
 
+let encode t msg = P2p_socket.encode t.conn (Message msg)
+
+let write_encoded_now t buf = P2p_socket.write_encoded_now t.conn buf
+
 let write_now t msg = P2p_socket.write_now t.conn (Message msg)
 
 let write_swap_request t point peer_id =

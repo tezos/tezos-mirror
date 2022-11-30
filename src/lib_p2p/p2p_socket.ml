@@ -536,6 +536,10 @@ module Reader = struct
   let shutdown st = Error_monad.cancel_with_exceptions st.canceler
 end
 
+type 'msg encoded_message = bytes list
+
+let copy_encoded_message = List.map Bytes.copy
+
 module Writer = struct
   type ('msg, 'meta) t = {
     canceler : Lwt_canceler.t;
@@ -566,7 +570,7 @@ module Writer = struct
     in
     loop buf
 
-  let encode_message st msg =
+  let encode_message (st : ('msg, _) t) msg =
     match Data_encoding.Binary.to_bytes st.encoding msg with
     | Error we ->
         Result_syntax.tzfail
@@ -776,11 +780,18 @@ let write_sync {writer; _} msg =
       in
       waiter)
 
-let write_now {writer; _} msg =
+let encode {writer : ('msg, _) Writer.t; _} msg =
+  Writer.encode_message writer msg
+
+let write_encoded_now {writer; _} buf =
   let open Result_syntax in
-  let* buf = Writer.encode_message writer msg in
   try Ok (Lwt_pipe.Maybe_bounded.push_now writer.messages (buf, None))
   with Lwt_pipe.Closed -> tzfail P2p_errors.Connection_closed
+
+let write_now t msg =
+  let open Result_syntax in
+  let* buf = encode t msg in
+  write_encoded_now t buf
 
 let rec split_bytes size bytes =
   if Bytes.length bytes <= size then [bytes]

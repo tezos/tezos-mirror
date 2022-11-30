@@ -269,10 +269,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
     tzfail Validation_errors.Known_invalid
   else if not valid_predecessor then (
     let*! () = Events.(emit missing_new_head_predecessor) block_received in
-    Distributed_db.Request.current_branch
-      pv.parameters.chain_db
-      ~peer:pv.peer_id
-      () ;
+    Distributed_db.Request.current_branch pv.parameters.chain_db pv.peer_id ;
     return_unit)
   else
     only_if_fitness_increases w header hash @@ function
@@ -328,7 +325,9 @@ let on_no_request w =
   Prometheus.Counter.inc_one metrics.on_no_request ;
   let timespan = pv.parameters.limits.new_head_request_timeout in
   let* () = Events.(emit no_new_head_from_peer) (pv.peer_id, timespan) in
-  Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
+  Distributed_db.Request.current_head_from_peer
+    pv.parameters.chain_db
+    pv.peer_id ;
   Lwt.return_unit
 
 let on_request (type a b) w (req : (a, b) Request.t) : (a, b) result Lwt.t =
@@ -393,10 +392,9 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
         in
         match fetched_and_compiled with
         | Ok _ ->
-            Distributed_db.Request.current_head
+            Distributed_db.Request.current_head_from_peer
               pv.parameters.chain_db
-              ~peer:pv.peer_id
-              () ;
+              pv.peer_id ;
             return_ok_unit
         | Error _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3061

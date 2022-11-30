@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2020 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -347,18 +347,56 @@ module Real = struct
           ((P2p_conn.info conn).peer_id, err) ;
         false
 
-  let broadcast {pool; _} msg =
+  (* Memoization of broadcast encoded [msg] inside a buffer [buf]. *)
+  (* For generalisation purposes, each connection has a `writer` that
+     defines a specific encoding for messages. Currently we use the
+     same encoding for every connection. It makes this simple
+     memoization possible but will need modifications if connections
+     have specialised encodings. *)
+  let broadcast_encode conn buff msg =
+    let open Result_syntax in
+    match !buff with
+    | None ->
+        let* encoded_msg = P2p_conn.encode conn msg in
+        buff := Some encoded_msg ;
+        return encoded_msg
+    | Some em -> return em
+
+  let send_conn ?alt conn buf alt_buf msg =
+    let open Result_syntax in
+    (* Silently discards Error P2p_errors.Connection_closed in case
+                  the pipe is closed. Shouldn't happen because
+       - no race conditions (no Lwt)
+       - the peer state is Running.
+
+       Also ignore if the message is dropped instead of being added
+       to the write queue. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4205
+       Ensure sent messages are actually sent.
+    *)
+    ignore
+    @@ let* encoded_msg =
+         match alt with
+         | None -> broadcast_encode conn buf msg
+         | Some (if_conn, then_msg) ->
+             if if_conn conn then broadcast_encode conn alt_buf then_msg
+             else broadcast_encode conn buf msg
+       in
+       P2p_conn.write_encoded_now
+         conn
+         (P2p_socket.copy_encoded_message encoded_msg)
+
+  let broadcast connections ?except ?alt msg =
+    let buf = ref None in
+    let alt_buf = ref None in
+    let send conn = send_conn ?alt conn buf alt_buf msg in
     P2p_peer.Table.iter
-      (fun _peer_id peer_info ->
-        match P2p_peer_state.get peer_info with
-        | Running {data = conn; _} ->
-            (* Silently discards Error P2p_errors.Connection_closed in case
-                the pipe is closed. Shouldn't happen because
-                - no race conditions (no Lwt)
-                - the peer state is Running. *)
-            ignore (P2p_conn.write_now conn msg : bool tzresult)
+      (fun _peer_id conn ->
+        match except with
+        | None -> send conn
+        | Some f when not (f conn) -> send conn
         | _ -> ())
-      (P2p_pool.connected_peer_ids pool) ;
+      connections ;
     Events.(emit__dont_wait__use_with_care broadcast) ()
 
   let fold_connections {pool; _} ~init ~f =
@@ -430,7 +468,6 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   send :
     ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit tzresult Lwt.t;
   try_send : ('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> bool;
-  broadcast : 'msg -> unit;
   pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t option;
   connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t option;
   fold_connections :
@@ -516,7 +553,6 @@ let create ~config ~limits peer_cfg conn_cfg msg_cfg =
       recv_any = Real.recv_any net;
       send = Real.send net;
       try_send = Real.try_send net;
-      broadcast = Real.broadcast net;
       pool = Some net.pool;
       connect_handler = Some net.connect_handler;
       fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f);
@@ -568,7 +604,6 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     iter_connections = (fun _f -> ());
     on_new_connection = (fun _f -> ());
     negotiated_version = (fun _ -> announced_version);
-    broadcast = ignore;
     pool = None;
     connect_handler = None;
     activate = (fun _ -> ());
@@ -615,7 +650,8 @@ let send net = net.send
 
 let try_send net = net.try_send
 
-let broadcast net = net.broadcast
+let broadcast connections ?except ?alt msg =
+  Real.broadcast connections ?except ?alt msg
 
 let fold_connections net = net.fold_connections
 
@@ -632,3 +668,9 @@ let greylist_peer net peer_id =
 let watcher net = Lwt_watcher.create_stream net.watcher
 
 let negotiated_version net = net.negotiated_version
+
+module Internal_for_tests = struct
+  let broadcast_conns (connections : ('a, 'b, 'c) P2p_conn.t P2p_peer.Table.t)
+      ?except ?alt msg =
+    broadcast connections ?except ?alt msg
+end

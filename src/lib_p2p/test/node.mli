@@ -30,8 +30,14 @@
    The function [sync] is used to create a barrier for all the nodes of a
    network. *)
 
-(** The only simple none p2p message used by the nodes. *)
-type message = Ping
+(** Simple p2p message used by the nodes.
+
+    - [Ping] is a none-message used by nodes in simple communication
+    tests.
+    - [BigPing] is used to add arbitrary long data (similar to
+    mempools sent in the actual network) to test bandwidth and chunks
+    splitting.*)
+type message = Ping | BigPing of Tezos_crypto.Operation_hash.t list
 
 type metadata = Metadata
 
@@ -49,6 +55,12 @@ type t = {
 
 (** [sync node] join [node] to a synchronization barrier. *)
 val sync : t -> unit tzresult Lwt.t
+
+(** [gen_points npoints ~port addr] generated [npoints] points. If
+    [port] is not specified, it loops and generates points randomly
+    until it finds [npoints] that are not currently used.
+    *)
+val gen_points : int -> ?port:int -> P2p_addr.t -> P2p_point.Id.t list
 
 (** [detach_nodes f points] creates a network with one node for each [points].
     [f] is the behavior of each node.
