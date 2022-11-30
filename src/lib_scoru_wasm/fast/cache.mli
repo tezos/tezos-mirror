@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,32 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+(** Signature of Cache configuration modules *)
+module type CACHE_INFO = sig
+  module Key : Stdlib.Hashtbl.HashedType
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-      ("WASM VM", Test_wasm_vm.tests);
-      ("Module Initialisation", Test_init.tests);
-      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
-      ("Hash correspondence", Test_hash_consistency.tests);
-      ("Reveal", Test_reveal.tests);
-      ("Fast Execution", Test_fast.tests);
-      ("Fast Execution cache", Test_fast_cache.tests);
-    ]
-  |> Lwt_main.run
+  type value
+
+  (** will be called by the cache each time a value is replaced / removed *)
+  val delete : value -> unit
+end
+
+(** Functorized Cache *)
+module Make (Input : CACHE_INFO) : sig
+  type key = Input.Key.t
+
+  type value = Input.value
+
+  type cache
+
+  val create : int -> cache
+
+  val find_opt : cache -> key -> value option
+
+  val replace : cache -> key -> value -> unit
+
+  val is_in : cache -> key -> bool
+end

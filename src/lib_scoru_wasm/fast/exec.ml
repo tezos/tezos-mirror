@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,11 +34,8 @@ let store =
   Wasmer.Store.create engine
 
 let load_kernel durable =
-  let open Lwt.Syntax in
-  let* kernel = Durable.find_value_exn durable Constants.kernel_key in
-  let+ kernel = Lazy_containers.Chunked_byte_vector.to_string kernel in
   let store = Lazy.force store in
-  Wasmer.Module.(create store Binary kernel)
+  Module_cache.load_kernel store durable
 
 let compute builtins durable buffers =
   let open Lwt.Syntax in
@@ -74,6 +72,8 @@ let compute builtins durable buffers =
   let* () = kernel_run () in
 
   Wasmer.Instance.delete instance ;
-  Wasmer.Module.delete module_ ;
 
+  (* TODO: #4283
+     The module is cached, but the cash is never cleaned.
+     This is the point where it was scrubed before.*)
   Lwt.return host_state.durable
