@@ -81,6 +81,7 @@ val id1 : P2p_identity.t Lwt.t
 val id2 : P2p_identity.t Lwt.t
 
 val run_nodes :
+  ?port:int ->
   ((unit, unit) Process.Channel.t ->
   P2p_io_scheduler.t ->
   Ipaddr.V6.t ->

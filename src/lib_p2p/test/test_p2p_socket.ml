@@ -45,6 +45,8 @@ let tzassert b pos =
 
 let high_pow_target = Tezos_crypto.Crypto_box.make_pow_target 100.
 
+let port = ref None
+
 let sync ch =
   let open Lwt_result_syntax in
   let* () = Process.Channel.push ch () in
@@ -212,7 +214,7 @@ module Pow_check = struct
     let* conn = connect sched addr port id in
     tzassert (is_connection_closed conn) __POS__
 
-  let run _dir = run_nodes client server
+  let run _dir = run_nodes ?port:!port client server
 end
 
 (** Spawns a client and a server. After the client getting connected to
@@ -580,6 +582,9 @@ let spec =
                       p2p.io-scheduler ->  debug "
                    ())),
         " Log up to debug msgs even in io_scheduler" );
+      ( "--port",
+        Int (fun p -> port := Some p),
+        " Listening port of the first peer." );
     ]
 
 let init_logs =
