@@ -124,4 +124,12 @@ module V2_0_0 : sig
 
       see #3590 for more pointers *)
   val ticks_per_snapshot : Z.t
+
+  (** The hash requested by the WASM PVM if it cannot decode the input
+      provided by the WASM kernel, that is, if the bytes value cannot
+      be decoded with {!Sc_rollup_reveal_hash.encoding}. *)
+  val well_known_reveal_hash : Sc_rollup_reveal_hash.t
+
+  (** The preimage of {!well_known_reveal_hash}. *)
+  val well_known_reveal_preimage : string
 end

@@ -3659,6 +3659,10 @@ module Sc_rollup : sig
   module Wasm_2_0_0PVM : sig
     val ticks_per_snapshot : Z.t
 
+    val well_known_reveal_preimage : string
+
+    val well_known_reveal_hash : Sc_rollup_reveal_hash.t
+
     module type P = sig
       module Tree :
         Context.TREE with type key = string list and type value = bytes
