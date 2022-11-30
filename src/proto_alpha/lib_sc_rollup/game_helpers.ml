@@ -53,14 +53,14 @@ let default_new_dissection ~default_number_of_sections
   in
   make [] Z.one (Tick.jump start_chunk.tick first_section_length)
 
-let make_dissection ~state_of_tick ~state_hash_of_eval_result ?start_state
+let make_dissection ~state_of_tick ~state_hash_of_eval_state ?start_state
     ~start_chunk ~our_stop_chunk ticks =
   let rec make_dissection_aux start_state ticks acc =
     let open Lwt_result_syntax in
     match ticks with
     | tick :: rst ->
         let* eval_state = state_of_tick ?start_state tick in
-        let state_hash = Option.map state_hash_of_eval_result eval_state in
+        let state_hash = Option.map state_hash_of_eval_state eval_state in
         let chunk = Dissection_chunk.{tick; state_hash} in
         make_dissection_aux eval_state rst (chunk :: acc)
     | [] -> return @@ List.rev (our_stop_chunk :: acc)

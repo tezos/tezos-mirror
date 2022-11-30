@@ -46,7 +46,7 @@ val default_new_dissection :
     the state hash associated to each ticks. *)
 val make_dissection :
   state_of_tick:(?start_state:'a -> Tick.t -> ('a option, 'trace) result Lwt.t) ->
-  state_hash_of_eval_result:('a -> State_hash.t) ->
+  state_hash_of_eval_state:('a -> State_hash.t) ->
   ?start_state:'a ->
   start_chunk:Dissection_chunk.t ->
   our_stop_chunk:Dissection_chunk.t ->

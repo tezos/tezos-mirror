@@ -186,7 +186,7 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
   let state_of_tick ?start_state:_ tick =
     return @@ list_assoc tick our_states
   in
-  let state_hash_of_eval_result = Fun.id in
+  let state_hash_of_eval_state = Fun.id in
   let our_stop_chunk =
     Dissection_chunk.
       {stop_chunk with state_hash = list_assoc stop_chunk.tick our_states}
@@ -201,7 +201,7 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
        Game_helpers.(
          make_dissection
            ~state_of_tick
-           ~state_hash_of_eval_result
+           ~state_hash_of_eval_state
            ~start_chunk
            ~our_stop_chunk
          @@ default_new_dissection
@@ -1611,8 +1611,9 @@ let test_wasm_dissection name kind =
       let+ dissection =
         Game_helpers.(
           make_dissection
-            ~state_hash_from_tick:(fun _ ->
+            ~state_of_tick:(fun ?start_state:_ _ ->
               return_some Sc_rollup.State_hash.zero)
+            ~state_hash_of_eval_state:Fun.id
             ~start_chunk
             ~our_stop_chunk:stop_chunk
           @@ Wasm.new_dissection

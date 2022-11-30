@@ -34,17 +34,25 @@ module type S = sig
 
   type fuel
 
-  type eval_result = {
-    state : PVM.state;
-    state_hash : PVM.hash;
+  (** Evaluation state for the PVM.  *)
+  type eval_state = {
+    state : PVM.state;  (** The actual PVM state. *)
+    state_hash : PVM.hash;  (** Hash of [state]. *)
+    tick : Sc_rollup.Tick.t;  (** Tick of [state]. *)
     inbox_level : Raw_level.t;
-    tick : Sc_rollup.Tick.t;
-    num_ticks : Z.t;
-    num_messages : int;
+        (** Inbox level in which messages are evaluated. *)
     message_counter_offset : int;
+        (** Offset for message index, which corresponds to the number of
+            messages of the inbox already evaluated.  *)
     remaining_fuel : fuel;
+        (** Fuel remaining for the evaluation of the inbox. *)
     remaining_messages : Sc_rollup.Inbox_message.t list;
+        (** Messages of the inbox that remain to be evaluated.  *)
   }
+
+  (** Evaluation result for the PVM which contains the evaluation state and
+      additional information.  *)
+  type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
 
   (** [eval_block_inbox ~fuel node_ctxt (inbox, messages) state] evaluates the
       [messages] for the [inbox] in the given [state] of the PVM and returns the
@@ -69,12 +77,8 @@ module type S = sig
       used as an additional source of data for revelation ticks. *)
   val eval_messages :
     ?reveal_map:string Sc_rollup_reveal_hash.Map.t ->
-    fuel:fuel ->
     _ Node_context.t ->
-    message_counter_offset:int ->
-    PVM.state ->
-    Raw_level.t ->
-    Sc_rollup.Inbox_message.t list ->
+    eval_state ->
     eval_result Node_context.delayed_write tzresult Lwt.t
 end
 
@@ -85,17 +89,17 @@ module Make (PVM : Pvm.S) = struct
 
     type fuel = F.t
 
-    type eval_result = {
+    type eval_state = {
       state : PVM.state;
       state_hash : PVM.hash;
-      inbox_level : Raw_level.t;
       tick : Sc_rollup.Tick.t;
-      num_ticks : Z.t;
-      num_messages : int;
+      inbox_level : Raw_level.t;
       message_counter_offset : int;
       remaining_fuel : fuel;
       remaining_messages : Sc_rollup.Inbox_message.t list;
     }
+
+    type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
 
     let get_reveal ~data_dir reveal_map hash =
       let found_in_map =
@@ -422,11 +426,18 @@ module Make (PVM : Pvm.S) = struct
       in
       return (state, num_messages, inbox_level, fuel)
 
-    let eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
-        inbox_level messages =
+    let eval_messages ?reveal_map node_ctxt
+        {
+          state;
+          tick = initial_tick;
+          inbox_level;
+          message_counter_offset;
+          remaining_fuel = fuel;
+          remaining_messages = messages;
+          _;
+        } =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
-      let*! initial_tick = PVM.get_tick state in
       let>* state, remaining_fuel, num_messages, remaining_messages =
         match messages with
         | [] ->
@@ -468,18 +479,18 @@ module Make (PVM : Pvm.S) = struct
       let*! final_tick = PVM.get_tick state in
       let*! state_hash = PVM.state_hash state in
       let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
-      return
+      let eval_state =
         {
           state;
           state_hash;
-          inbox_level;
           tick = final_tick;
-          num_ticks;
-          num_messages;
+          inbox_level;
           message_counter_offset = message_counter_offset + num_messages;
           remaining_fuel;
           remaining_messages;
         }
+      in
+      return {state = eval_state; num_ticks; num_messages}
   end
 
   module Free = Make_fueled (Fuel.Free)

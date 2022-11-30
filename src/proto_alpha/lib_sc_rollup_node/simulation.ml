@@ -133,18 +133,25 @@ module Make (Interpreter : Interpreter.S) :
          info_per_level = _;
        } as sim) messages =
     let open Lwt_result_syntax in
+    let*! state_hash = PVM.state_hash state in
+    let*! tick = PVM.get_tick state in
+    let eval_state =
+      Fueled_pvm.
+        {
+          state;
+          state_hash;
+          tick;
+          inbox_level;
+          message_counter_offset = nb_messages_inbox;
+          remaining_fuel = Fuel.Free.of_ticks 0L;
+          remaining_messages = messages;
+        }
+    in
     (* Build new state *)
     let* eval_result =
-      Fueled_pvm.eval_messages
-        ?reveal_map
-        ~fuel:(Fuel.Free.of_ticks 0L)
-        node_ctxt
-        ~message_counter_offset:nb_messages_inbox
-        state
-        inbox_level
-        messages
+      Fueled_pvm.eval_messages ?reveal_map node_ctxt eval_state
     in
-    let Fueled_pvm.{state; num_ticks; num_messages; _} =
+    let Fueled_pvm.{state = {state; _}; num_ticks; num_messages; _} =
       Delayed_write_monad.ignore eval_result
     in
     let*! ctxt = PVM.State.set ctxt state in

@@ -45,10 +45,10 @@ module type S = sig
 
   val state_of_tick :
     _ Node_context.t ->
-    ?start_state:Accounted_pvm.eval_result ->
+    ?start_state:Accounted_pvm.eval_state ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
-    Accounted_pvm.eval_result option tzresult Lwt.t
+    Accounted_pvm.eval_state option tzresult Lwt.t
 
   val state_of_head :
     'a Node_context.t ->
@@ -225,8 +225,6 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           state_hash;
           inbox_level;
           tick;
-          num_ticks = Z.zero;
-          num_messages = 0;
           message_counter_offset = 0;
           remaining_fuel = Fuel.Accounted.of_ticks 0L;
           remaining_messages = messages;
@@ -234,24 +232,20 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   (** [run_for_ticks node_ctxt start_state tick_distance] starts the evaluation
       of messages in the [start_state] for at most [tick_distance]. *)
-  let run_to_tick node_ctxt
-      Accounted_pvm.
+  let run_to_tick node_ctxt start_state tick =
+    let open Delayed_write_monad.Lwt_result_syntax in
+    let tick_distance =
+      Sc_rollup.Tick.distance tick start_state.Accounted_pvm.tick |> Z.to_int64
+    in
+    let>+ eval_result =
+      Accounted_pvm.eval_messages
+        node_ctxt
         {
-          state;
-          message_counter_offset;
-          remaining_messages;
-          inbox_level;
-          tick = start_tick;
-          _;
-        } tick =
-    let tick_distance = Sc_rollup.Tick.distance tick start_tick |> Z.to_int64 in
-    Accounted_pvm.eval_messages
-      ~fuel:(Fuel.Accounted.of_ticks tick_distance)
-      node_ctxt
-      ~message_counter_offset
-      state
-      inbox_level
-      remaining_messages
+          start_state with
+          remaining_fuel = Fuel.Accounted.of_ticks tick_distance;
+        }
+    in
+    eval_result.state
 
   let state_of_tick_aux node_ctxt ~start_state (event : Sc_rollup_block.t) tick
       =
