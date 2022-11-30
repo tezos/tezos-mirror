@@ -197,6 +197,62 @@ let test_host_func_start_restriction () =
         "host functions must not access memory during initialisation"
       stuck)
 
+let test_bad_entrypoint_name () =
+  let open Lwt_result_syntax in
+  let module_ =
+    {|
+      (module
+        (memory 1)
+        (export "mem"(memory 0))
+        (func (export "bad_entrypoint")
+          (unreachable)
+        )
+      )|}
+  in
+
+  let*! bad_module_tree = initial_tree module_ in
+  let*! bad_module_tree = eval_until_input_requested bad_module_tree in
+  let*! bad_module_tree = set_empty_inbox_step 0l bad_module_tree in
+  let* stuck, _ = eval_until_stuck bad_module_tree in
+  assert (
+    check_error
+      ~expected_kind:`Invalid_state
+      ~expected_reason:
+        (Format.sprintf
+           "Invalid_module: no `%s` function exported"
+           Constants.wasm_entrypoint)
+      stuck) ;
+  return_unit
+
+(* `kernel_run` will be found, but this is not a function. *)
+let test_bad_export () =
+  let open Lwt_result_syntax in
+  let module_ =
+    {|
+      (module
+        (memory 1)
+        (export "kernel_run" (memory 0))
+        (func (export "bad_entrypoint")
+          (unreachable)
+        )
+      )|}
+  in
+
+  let*! bad_module_tree = initial_tree module_ in
+  let*! bad_module_tree = eval_until_input_requested bad_module_tree in
+  let*! bad_module_tree = set_empty_inbox_step 0l bad_module_tree in
+  let* stuck, _ = eval_until_stuck bad_module_tree in
+  Format.printf "%a\n%!" pp_state (Stuck stuck) ;
+  assert (
+    check_error
+      ~expected_kind:`Invalid_state
+      ~expected_reason:
+        (Format.sprintf
+           "Invalid_module: no `%s` function exported"
+           Constants.wasm_entrypoint)
+      stuck) ;
+  return_unit
+
 let tests =
   [
     tztest "init requires memory 0 export" `Quick test_memory0_export;
@@ -206,4 +262,9 @@ let tests =
       "host functions are restricted in start"
       `Quick
       test_host_func_start_restriction;
+    tztest "Check not found `kernel_run` error" `Quick test_bad_entrypoint_name;
+    tztest
+      "Check `kernel_run` not being a function error"
+      `Quick
+      test_bad_export;
   ]

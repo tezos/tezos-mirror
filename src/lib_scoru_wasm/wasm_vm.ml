@@ -178,12 +178,20 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
         Wasm.Instance.ModuleMap.get Constants.wasm_main_module_name module_reg
       in
       let* extern =
-        Wasm.Instance.NameMap.get
-          Constants.wasm_entrypoint
-          module_inst.Wasm.Instance.exports
+        Lwt.catch
+          (fun () ->
+            let+ extern =
+              Wasm.Instance.NameMap.get
+                Constants.wasm_entrypoint
+                module_inst.Wasm.Instance.exports
+            in
+            Some extern)
+          (function
+            | Tezos_lazy_containers.Lazy_map.UnexpectedAccess -> return_none
+            | exn -> raise exn)
       in
       match extern with
-      | Wasm.Instance.ExternFunc main_func ->
+      | Some (Wasm.Instance.ExternFunc main_func) ->
           let admin_instr' = Wasm.Eval.Invoke main_func in
           let admin_instr = Wasm.Source.{it = admin_instr'; at = no_region} in
           (* Clear the values and the locals in the frame. *)
@@ -206,7 +214,9 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
             ~status:Failing
             (Stuck
                (Wasm_pvm_errors.invalid_state
-                  "Invalid_module: no `main` function exported")))
+                  (Format.sprintf
+                     "Invalid_module: no `%s` function exported"
+                     Constants.wasm_entrypoint))))
   | Init {self; ast_module; init_kont; module_reg} ->
       let* init_kont =
         Wasm.Eval.init_step
