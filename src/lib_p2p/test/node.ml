@@ -70,21 +70,28 @@ module Event = struct
   let bye = declare_0 ~section ~name:"bye" ~msg:"Bye." ~level:Info ()
 end
 
-type message = Ping
+type message = Ping | BigPing of Tezos_crypto.Operation_hash.t list
 
 let msg_config : message P2p_params.message_config =
+  let open Data_encoding in
+  let case ?max_length ~tag ~title encoding unwrap wrap =
+    P2p_params.Encoding {tag; title; encoding; wrap; unwrap; max_length}
+  in
   {
     encoding =
       [
-        P2p_params.Encoding
-          {
-            tag = 0x10;
-            title = "Ping";
-            encoding = Data_encoding.empty;
-            wrap = (function () -> Ping);
-            unwrap = (function Ping -> Some ());
-            max_length = None;
-          };
+        case
+          ~tag:0x10
+          ~title:"Ping"
+          empty
+          (function Ping -> Some () | _ -> None)
+          (fun () -> Ping);
+        case
+          ~tag:0x11
+          ~title:"BigPing"
+          (list Tezos_crypto.Operation_hash.encoding)
+          (function BigPing l -> Some l | _ -> None)
+          (fun l -> BigPing l);
       ];
     chain_name = Distributed_db_version.Name.of_string "SANDBOXED_TEZOS";
     distributed_db_versions = Distributed_db_version.[zero; one];
@@ -239,8 +246,15 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
                 Lwt.return_unit)
               trusted_points
           in
-          let* welcome =
+          let*! welcome =
             P2p_welcome.create ~backlog:10 connect_handler ~addr port
+          in
+          let* welcome =
+            match welcome with
+            | Ok w -> Lwt.return @@ Ok w
+            | Error _ ->
+                let*! () = Lwt_unix.sleep 2. in
+                P2p_welcome.create ~backlog:10 connect_handler ~addr port
           in
           P2p_welcome.activate welcome ;
           let*! () = Event.(emit node_ready) port in

@@ -30,8 +30,14 @@
    The function [sync] is used to create a barrier for all the nodes of a
    network. *)
 
-(** The only simple none p2p message used by the nodes. *)
-type message = Ping
+(** Simple p2p message used by the nodes.
+
+    - [Ping] is a none-message used by nodes in simple communication
+    tests.
+    - [BigPing] is used to add arbitrary long data (similar to
+    mempools sent in the actual network) to test bandwidth and chunks
+    splitting.*)
+type message = Ping | BigPing of Tezos_crypto.Operation_hash.t list
 
 type metadata = Metadata
 

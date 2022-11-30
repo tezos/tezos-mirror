@@ -161,6 +161,18 @@ val write : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t
     dropped, or fails with a corresponding error otherwise. *)
 val write_now : ('msg, 'meta) t -> 'msg -> bool tzresult
 
+(** Encodes a message to be used with [write_encoded_now].*)
+val encode : ('msg, 'meta) t -> 'msg -> bytes list tzresult
+
+(** Similar to [write_now conn msg] but with a preencoded message.
+    [msg] will be overwritten and should not be used after this
+    invocation.
+
+    Writing a message encoded with an encoder different from the one
+    used for this connection might lead to banishment.
+*)
+val write_encoded_now : ('msg, 'meta) t -> bytes list -> bool tzresult
+
 (** [write_sync conn msg] returns when [msg] has been successfully
     sent to the remote end of [conn], or fails accordingly. *)
 val write_sync : ('msg, 'meta) t -> 'msg -> unit tzresult Lwt.t

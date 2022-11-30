@@ -110,8 +110,9 @@ module Simple = struct
     let open Lwt_result_syntax in
     List.iter_ep
       (fun conn ->
-        let* Node.Ping = trace Read @@ P2p_conn.read conn in
-        return_unit)
+        let* msg = trace Read @@ P2p_conn.read conn in
+        match msg with Node.Ping -> return_unit | _ -> assert false
+        (* in this test only Ping messages are used. *))
       conns
 
   let close_all conns = List.iter_p P2p_conn.disconnect conns
@@ -158,7 +159,7 @@ module Random_connections = struct
            point
     in
     let*! _ = trace Write @@ P2p_conn.write conn Node.Ping in
-    let* Node.Ping = trace Read @@ P2p_conn.read conn in
+    let* _ = trace Read @@ P2p_conn.read conn in
     let*! () = Lwt_unix.sleep (0.2 +. Random.float 1.0) in
     let*! () = P2p_conn.disconnect conn in
     let*! () =

@@ -92,6 +92,22 @@ val write_sync : ('msg, 'peer, 'conn) t -> 'msg -> unit tzresult Lwt.t
     [t'] is the internal [P2p_socket.t] inside [t]. *)
 val write_now : ('msg, 'peer, 'conn) t -> 'msg -> bool tzresult
 
+(** [encode t messsage] encodes a message to be used with
+    [write_encoded_now]. It is particularly useful to avoid encoding
+    several times the same message.*)
+val encode : ('msg, 'peer, 'conn) t -> 'msg -> bytes list tzresult
+
+(** [write_encoded_now t msg] is [P2p_socket.write_now t' msg] where
+    [t'] is the internal [P2p_socket.t] inside [t] and [msg] has been
+    pre-encoded using [encode].
+    [msg] will be overwritten and should not be used after this
+    invocation.
+
+    Writing a message encoded with an encoder different from the one
+    used for this connection might lead to banishment.
+*)
+val write_encoded_now : ('msg, 'peer, 'conn) t -> bytes list -> bool tzresult
+
 val equal_sock : ('msg, 'peer, 'conn) t -> ('msg, 'peer, 'conn) t -> bool
 
 val disconnect : ?wait:bool -> ('msg, 'peer, 'conn) t -> unit Lwt.t
