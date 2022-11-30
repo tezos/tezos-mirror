@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module provides benchmarks for skip list operations for basis = 2. *)
+
 open Protocol
 
 let ns = Namespace.make Registration_helpers.ns "skip_list"
@@ -33,6 +35,7 @@ let fv s = Free_variable.of_namespace (ns s)
     the parameters for [Skip_list_cost_model.model_next]. *)
 module Next : Benchmark.S = struct
   include Skip_list_repr.Make (struct
+    (** The benchmarks must be run again if [basis] is changed. *)
     let basis = 2
   end)
 
