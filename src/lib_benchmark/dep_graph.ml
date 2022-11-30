@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(* Models associated to benchmarks have free variables. Some of these
-   variables are to be inferred from the empirical data, but some others
-   must be provided by other models and correspond to _dependencies_
-   of a model upon the result of another one.
-
-   The goal of this module is to take as input a set of models seen as
-   sets of free variables and infer back a partial dependency ordering
-   among them. In particular, a topological sort of this partial ordering
-   yields a scheduling for the inference process that respects cross-model
-   dependencies.
-
-   Such a problem does not always have a solution, or can have several
-   solutions (ie it is in general ill-posed). When there's more than
-   one possible solution, we use a simple heuristic to pick one.
-*)
 
 module Fv_map = Free_variable.Map
 module Fv_set = Free_variable.Set
@@ -259,16 +243,6 @@ let pp_print_set fmtr (set : Free_variable.Set.t) =
   Format.pp_print_list
     ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ";")
     Free_variable.pp
-    fmtr
-    elts ;
-  Format.fprintf fmtr " }"
-
-let pp_print_set_set fmtr (set_set : Fv_set_set.t) =
-  let elts = Fv_set_set.elements set_set in
-  Format.fprintf fmtr "{ " ;
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr ";")
-    pp_print_set
     fmtr
     elts ;
   Format.fprintf fmtr " }"
