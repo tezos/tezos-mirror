@@ -45,9 +45,10 @@ module type S = sig
 
   val state_of_tick :
     _ Node_context.t ->
+    ?start_state:Accounted_pvm.eval_result ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
-    (PVM.state * PVM.hash) option tzresult Lwt.t
+    Accounted_pvm.eval_result option tzresult Lwt.t
 
   val state_of_head :
     'a Node_context.t ->
@@ -184,11 +185,11 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
     else return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
 
-  (** [run_for_ticks node_ctxt block tick_distance] starts the
-      evaluation of the inbox at [block] for at most [tick_distance]. *)
-  let run_for_ticks node_ctxt (block : Sc_rollup_block.t) tick_distance =
+  (** Returns the starting evaluation before the evaluation of the block. It
+      contains the PVM state at the end of the execution of the previous block
+      and the messages the block ([remaining_messages]). *)
+  let start_state_of_block node_ctxt (block : Sc_rollup_block.t) =
     let open Lwt_result_syntax in
-    let open Delayed_write_monad.Lwt_result_syntax in
     let pred_level = Raw_level.to_int32 block.header.level |> Int32.pred in
     let* ctxt =
       Node_context.checkout_context node_ctxt block.header.predecessor
@@ -203,6 +204,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let* {is_migration_block; predecessor; predecessor_timestamp; messages} =
       Node_context.get_messages node_ctxt block.header.inbox_witness
     in
+    let inbox_level = Sc_rollup.Inbox.inbox_level inbox in
+    let*! tick = PVM.get_tick state in
+    let*! state_hash = PVM.state_hash state in
     let messages =
       let open Sc_rollup.Inbox_message in
       Internal Start_of_level
@@ -214,33 +218,67 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         :: messages
       @ [Internal End_of_level]
     in
-    let>* state, _counter, _level, _fuel =
-      Accounted_pvm.eval_block_inbox
-        ~fuel:(Fuel.Accounted.of_ticks tick_distance)
-        node_ctxt
-        (inbox, messages)
-        state
-    in
-    return state
+    return
+      Accounted_pvm.
+        {
+          state;
+          state_hash;
+          inbox_level;
+          tick;
+          num_ticks = Z.zero;
+          num_messages = 0;
+          message_counter_offset = 0;
+          remaining_fuel = Fuel.Accounted.of_ticks 0L;
+          remaining_messages = messages;
+        }
+
+  (** [run_for_ticks node_ctxt start_state tick_distance] starts the evaluation
+      of messages in the [start_state] for at most [tick_distance]. *)
+  let run_to_tick node_ctxt
+      Accounted_pvm.
+        {
+          state;
+          message_counter_offset;
+          remaining_messages;
+          inbox_level;
+          tick = start_tick;
+          _;
+        } tick =
+    let tick_distance = Sc_rollup.Tick.distance tick start_tick |> Z.to_int64 in
+    Accounted_pvm.eval_messages
+      ~fuel:(Fuel.Accounted.of_ticks tick_distance)
+      node_ctxt
+      ~message_counter_offset
+      state
+      inbox_level
+      remaining_messages
 
   (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)] for a
       given [tick] if this [tick] happened before [level].  Otherwise, returns
       [None].*)
-  let state_of_tick node_ctxt tick level =
+  let state_of_tick node_ctxt ?start_state tick level =
     let open Lwt_result_syntax in
     let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
     match event with
     | None -> return_none
     | Some event ->
         assert (Raw_level.(event.header.level <= level)) ;
-        let tick_distance =
-          Sc_rollup.Tick.distance tick event.initial_tick |> Z.to_int64
+        let* start_state =
+          match start_state with
+          | Some start_state
+            when Raw_level.(
+                   start_state.Accounted_pvm.inbox_level = event.header.level)
+            ->
+              return start_state
+          | _ ->
+              (* Recompute start state on level change or if we don't have a
+                 starting state on hand. *)
+              start_state_of_block node_ctxt event
         in
         (* TODO: #3384
            We should test that we always have enough blocks to find the tick
            because [state_of_tick] is a critical function. *)
-        let* state = run_for_ticks node_ctxt event tick_distance in
-        let state = Delayed_write_monad.ignore state in
-        let*! hash = PVM.state_hash state in
-        return (Some (state, hash))
+        let* result_state = run_to_tick node_ctxt start_state tick in
+        let result_state = Delayed_write_monad.ignore result_state in
+        return_some result_state
 end

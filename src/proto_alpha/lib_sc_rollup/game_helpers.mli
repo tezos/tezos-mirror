@@ -45,11 +45,13 @@ val default_new_dissection :
     dissection from [start_chunk] to [our_stop_chunk], and recomputes
     the state hash associated to each ticks. *)
 val make_dissection :
-  state_hash_from_tick:(Tick.t -> State_hash.t option tzresult Lwt.t) ->
+  state_of_tick:(?start_state:'a -> Tick.t -> ('a option, 'trace) result Lwt.t) ->
+  state_hash_of_eval_result:('a -> State_hash.t) ->
+  ?start_state:'a ->
   start_chunk:Dissection_chunk.t ->
   our_stop_chunk:Dissection_chunk.t ->
-  Tick.t trace ->
-  Dissection_chunk.t list tzresult Lwt.t
+  Tick.t list ->
+  (Dissection_chunk.t list, 'trace) result Lwt.t
 
 module Wasm : sig
   (** [new_dissection ~default_number_of_sections ~start_chunk

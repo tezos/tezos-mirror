@@ -303,25 +303,43 @@ module Make (Interpreter : Interpreter.S) :
     in
     if Result.is_ok res then return proof else assert false
 
+  type pvm_intermediate_state =
+    | Hash of PVM.hash
+    | Evaluated of Interpreter.Accounted_pvm.eval_result
+
   let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level
       ok our_view =
     let open Lwt_result_syntax in
-    let state_hash_from_tick tick =
-      let* r = Interpreter.state_of_tick node_ctxt tick last_level in
-      return (Option.map snd r)
+    let state_of_tick ?start_state tick =
+      Interpreter.state_of_tick node_ctxt ?start_state tick last_level
     in
-    let start_hash, start_tick = ok in
+    let state_hash_of_eval_result Interpreter.Accounted_pvm.{state_hash; _} =
+      state_hash
+    in
+    let start_hash, start_tick, start_state =
+      match ok with
+      | Hash hash, tick -> (hash, tick, None)
+      | Evaluated ({state_hash; _} as state), tick ->
+          (state_hash, tick, Some state)
+    in
     let start_chunk =
       Sc_rollup.Dissection_chunk.
         {state_hash = Some start_hash; tick = start_tick}
     in
-    let start_hash, start_tick = our_view in
+    let our_state, our_tick = our_view in
+    let our_state_hash =
+      Option.map
+        (fun Interpreter.Accounted_pvm.{state_hash; _} -> state_hash)
+        our_state
+    in
     let our_stop_chunk =
-      Sc_rollup.Dissection_chunk.{state_hash = start_hash; tick = start_tick}
+      Sc_rollup.Dissection_chunk.{state_hash = our_state_hash; tick = our_tick}
     in
     let* dissection =
       Game_helpers.make_dissection
-        ~state_hash_from_tick
+        ~state_of_tick
+        ~state_hash_of_eval_result
+        ?start_state
         ~start_chunk
         ~our_stop_chunk
       @@ PVM.new_dissection
@@ -332,8 +350,8 @@ module Make (Interpreter : Interpreter.S) :
     let*! () =
       Refutation_game_event.computed_dissection
         ~opponent
-        ~start_tick:(snd ok)
-        ~end_tick:(snd our_view)
+        ~start_tick
+        ~end_tick:our_tick
         dissection
     in
     return dissection
@@ -356,26 +374,32 @@ module Make (Interpreter : Interpreter.S) :
             .Unreliable_tezos_node_returning_inconsistent_game
       | Sc_rollup.Dissection_chunk.{state_hash = their_hash; tick} :: dissection
         -> (
-          let open Lwt_result_syntax in
+          let start_state =
+            match ok with
+            | Hash _, _ -> None
+            | Evaluated ok_state, _ -> Some ok_state
+          in
           let* our =
-            Interpreter.state_of_tick node_ctxt tick game.inbox_level
+            Interpreter.state_of_tick
+              node_ctxt
+              ?start_state
+              tick
+              game.inbox_level
           in
           match (their_hash, our) with
           | None, None ->
               (* This case is absurd since: [None] can only occur at the
                  end and the two players disagree about the end. *)
               assert false
-          | Some _, None | None, Some _ ->
-              return (ok, (Option.map snd our, tick))
-          | Some their_hash, Some (_, our_hash) ->
+          | Some _, None | None, Some _ -> return (ok, (our, tick))
+          | Some their_hash, Some ({state_hash = our_hash; _} as our_state) ->
               if Sc_rollup.State_hash.equal our_hash their_hash then
-                traverse (their_hash, tick) dissection
-              else return (ok, (Some our_hash, tick)))
+                traverse (Evaluated our_state, tick) dissection
+              else return (ok, (our, tick)))
     in
     match dissection with
     | Sc_rollup.Dissection_chunk.{state_hash = Some hash; tick} :: dissection ->
-        let* ok, ko = traverse (hash, tick) dissection in
-        let choice = snd ok in
+        let* ok, ko = traverse (Hash hash, tick) dissection in
         let* dissection =
           new_dissection
             ~opponent
@@ -385,7 +409,9 @@ module Make (Interpreter : Interpreter.S) :
             ok
             ko
         in
-        let chosen_section_len = Sc_rollup.Tick.distance (snd ko) choice in
+        let _, choice = ok in
+        let _, ko_tick = ko in
+        let chosen_section_len = Sc_rollup.Tick.distance ko_tick choice in
         return (choice, chosen_section_len, dissection)
     | [] | {state_hash = None; _} :: _ ->
         (*
@@ -408,7 +434,7 @@ module Make (Interpreter : Interpreter.S) :
           tzfail
             Sc_rollup_node_errors
             .Unreliable_tezos_node_returning_inconsistent_game
-      | Some (start_state, _start_hash) ->
+      | Some {state = start_state; _} ->
           let* proof = generate_proof node_ctxt game start_state in
           let*? pvm_step =
             Sc_rollup.Proof.serialize_pvm_step ~pvm:(module PVM) proof.pvm_step

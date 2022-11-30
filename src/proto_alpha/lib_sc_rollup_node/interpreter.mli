@@ -55,9 +55,10 @@ module type S = sig
       [level]. Otherwise, returns [None].*)
   val state_of_tick :
     _ Node_context.t ->
+    ?start_state:Accounted_pvm.eval_result ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
-    (PVM.state * PVM.hash) option tzresult Lwt.t
+    Accounted_pvm.eval_result option tzresult Lwt.t
 
   (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
       block [head], or the state at rollup genesis if the block is before the
