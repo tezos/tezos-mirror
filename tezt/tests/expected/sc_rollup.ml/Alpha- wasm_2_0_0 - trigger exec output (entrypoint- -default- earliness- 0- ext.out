@@ -35,7 +35,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send sc rollup message 'hex:["0000000023002501c00c5e4e94a48a49e267873112bbe3cf3373be5b000000000764656661756c74"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1000.080 units (will add 100 for safety)
+Estimated gas: 1001.330 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -48,14 +48,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000383
     Expected counter: 1
-    Gas limit: 1101
+    Gas limit: 1102
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000383
       payload fees(the block proposer) ....... +ꜩ0.000383
     Smart contract rollup messages submission
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1000.080
+      Consumed gas: 1001.364
 
 
 ./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x030002a2a8cc466664b3066c90db7641bfe59ee68ff6ab2db8aba51f88939b926b42fba2a8cc466664b3066c90db7641bfe59ee68ff6ab2db8aba51f88939b926b42fb0005820764757261626c65d09aecf89f24640ded702927c7fec3e159017ce1d5bb410d3b832841cf24c1aeec03746167c00800000004536f6d650003c09998e976abfc21a341c09b7a0d7f7bf2874b4185b5b68f82f861a0b8ffb3ff6a820576616c7565810370766d8107627566666572738205696e707574820468656164c00100066c656e677468c00100066f75747075740004820132810a6c6173745f6c6576656cc004000000080133810f76616c69646974795f706572696f64c00400009d8082013181086f7574626f78657300060004c0135db12c9dff68c37e3ca222ff3610666772481b317188e348aff2b0f96247740003c046249f852b8b3004ec9a6b9e479c88d4b0ead13b4dbc4f54f6483aa5b4a622708201350003810468656164c001008208636f6e74656e7473810130c02c000000280000000023002501c00c5e4e94a48a49e267873112bbe3cf3373be5b000000000764656661756c74066c656e677468c001010136820468656164c00100066c656e677468c00100c0c9e4c229dd7bef220d2450007566e287ff2d159abe2d41f35a62cf6020bfce320134810d6d6573736167655f6c696d6974c002a401047761736dd0fe03ae018cf40eea79437f939ebfc1536e92d117f97c036943fe5a37a2a038b9a2a8cc466664b3066c90db7641bfe59ee68ff6ab2db8aba51f88939b926b42fb00000005000000000023002501c00c5e4e94a48a49e267873112bbe3cf3373be5b000000000764656661756c74 --burn-cap 10
