@@ -128,6 +128,4 @@ module type T = sig
   module RPC_context : [%sig "v6/RPC_context.mli"]
 
   module Wasm_2_0_0 : [%sig "v6/wasm_2_0_0.mli"]
-
-  module Plonk : [%sig "v6/plonk.mli"]
 end

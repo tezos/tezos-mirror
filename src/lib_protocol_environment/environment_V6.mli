@@ -99,11 +99,6 @@ module type T = sig
        and type Bls_signature.signature = Bls12_381_signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls12_381.Fr.t = Bls12_381.Fr.t
-       and type Plonk.transcript =
-        Tezos_protocol_environment_structs.V6.Plonk.transcript
-       and type Plonk.proof = Tezos_protocol_environment_structs.V6.Plonk.proof
-       and type Plonk.verifier_public_parameters =
-        Tezos_protocol_environment_structs.V6.Plonk.verifier_public_parameters
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 
