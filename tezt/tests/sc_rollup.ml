@@ -71,7 +71,6 @@ let block_finality_time = 2
 type sc_rollup_constants = {
   origination_size : int;
   challenge_window_in_blocks : int;
-  max_number_of_messages_per_commitment_period : int;
   stake_amount : Tez.t;
   commitment_period_in_blocks : int;
   max_lookahead_in_blocks : int32;
@@ -96,9 +95,6 @@ let get_sc_rollup_constants client =
   let origination_size = json |-> "sc_rollup_origination_size" |> as_int in
   let challenge_window_in_blocks =
     json |-> "sc_rollup_challenge_window_in_blocks" |> as_int
-  in
-  let max_number_of_messages_per_commitment_period =
-    json |-> "sc_rollup_max_number_of_messages_per_commitment_period" |> as_int
   in
   let stake_amount =
     json |-> "sc_rollup_stake_amount" |> as_string |> Int64.of_string
@@ -126,7 +122,6 @@ let get_sc_rollup_constants client =
     {
       origination_size;
       challenge_window_in_blocks;
-      max_number_of_messages_per_commitment_period;
       stake_amount;
       commitment_period_in_blocks;
       max_lookahead_in_blocks;
@@ -156,14 +151,10 @@ let register_test ?(regression = false) ~__FILE__ ~tags ~title f =
   if regression then Protocol.register_regression_test ~__FILE__ ~title ~tags f
   else Protocol.register_test ~__FILE__ ~title ~tags f
 
-let setup_l1 ?commitment_period ?challenge_window
-    ?max_number_of_messages_per_commitment_period ?timeout protocol =
+let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
   let parameters =
     make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
-    @ make_parameter
-        "sc_rollup_max_number_of_messages_per_commitment_period"
-        max_number_of_messages_per_commitment_period
     @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
     @ [(["sc_rollup_enable"], `Bool true)]
   in
@@ -292,8 +283,7 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
 
 let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
     ?(parameters_ty = "string") ?challenge_window ?timeout
-    ?max_number_of_messages_per_commitment_period {variant; tags; description}
-    scenario =
+    {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
     ?regression
@@ -309,12 +299,7 @@ let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
          | None -> ""))
   @@ fun protocol ->
   let* tezos_node, tezos_client =
-    setup_l1
-      ?commitment_period
-      ?challenge_window
-      ?timeout
-      ?max_number_of_messages_per_commitment_period
-      protocol
+    setup_l1 ?commitment_period ?challenge_window ?timeout protocol
   in
   let* rollup_node, rollup_client, sc_rollup =
     setup_rollup ~parameters_ty ~kind ?boot_sector tezos_node tezos_client
@@ -708,8 +693,7 @@ let parse_inbox json =
     return
       JSON.
         ( json |-> "current_level_proof" |-> "hash" |> as_string,
-          json |-> "current_level_proof" |-> "level" |> as_int,
-          json |-> "nb_messages_in_commitment_period" |> JSON.as_int )
+          json |-> "current_level_proof" |-> "level" |> as_int )
   in
   Lwt.catch go @@ fun exn ->
   failwith
@@ -759,11 +743,9 @@ let fetch_messages_from_block client =
    tree which must have the same root hash as the one stored by the
    protocol in the context.
 *)
-let test_rollup_inbox_of_rollup_node
-    ?max_number_of_messages_per_commitment_period ?(extra_tags = []) ~variant
-    scenario ~kind =
+let test_rollup_inbox_of_rollup_node ?(extra_tags = []) ~variant scenario ~kind
+    =
   test_full_scenario
-    ?max_number_of_messages_per_commitment_period
     {
       variant = Some variant;
       tags = ["inbox"] @ extra_tags;
@@ -779,7 +761,7 @@ let test_rollup_inbox_of_rollup_node
   return
   @@ Check.(
        (inbox_from_sc_rollup_node = inbox_from_tezos_node)
-         (tuple3 string int int)
+         (tuple2 string int)
          ~error_msg:"expected value %R, got %L")
 
 let basic_scenario sc_rollup_node _rollup_client _sc_rollup _node client =
@@ -892,51 +874,6 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
      level 5. *)
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node 5 in
   unit
-
-(* Simulation of messages *)
-let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
-    client =
-  let* () = Sc_rollup_node.run sc_rollup_node [] in
-  let msg1 = "3 3 + out" in
-  let*! sim_result =
-    Sc_rollup_client.simulate
-      sc_rollup_client
-      ~reveal_pages:
-        (List.init 12 (fun j ->
-             String.init 1024 (fun i -> Char.chr (i * j mod 256))))
-      [msg1]
-  in
-  let* () = send_message client (to_text_messages_arg [msg1]) in
-  let level = Node.get_level node in
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
-  let*! real_state_hash = Sc_rollup_client.state_hash sc_rollup_client in
-  let* real_outbox =
-    Runnable.run
-    @@ Sc_rollup_client.outbox
-         sc_rollup_client
-         ~outbox_level:level
-         ~block:"head"
-  in
-  Check.((sim_result.state_hash = real_state_hash) string)
-    ~error_msg:"Simulated resulting state hash is %L but should have been %R" ;
-  Check.((JSON.encode sim_result.output = JSON.encode real_outbox) string)
-    ~error_msg:"Simulated resulting outbox is %L but should have been %R" ;
-  let*? sim_result = Sc_rollup_client.simulate sc_rollup_client [] in
-  let* () =
-    Process.check_error ~msg:(rex "Tried to add zero messages") sim_result
-  in
-  let* constants = get_sc_rollup_constants client in
-  let too_many_msgs =
-    List.init
-      constants.max_number_of_messages_per_commitment_period
-      (Fun.const "")
-  in
-  (* In the context of "head", there is already one message in the inbox, so if
-     we add max messages, we'll be over the limit. *)
-  let*? sim_result = Sc_rollup_client.simulate sc_rollup_client too_many_msgs in
-  Process.check_error
-    ~msg:(rex "Maximum number of messages reached for commitment period")
-    sim_result
 
 let bake_until ?hook cond n client =
   assert (0 <= n) ;
@@ -3822,13 +3759,6 @@ let register ~protocols =
     ~boot_sector1:"10 10 10 + +"
     ~boot_sector2:"31"
     ~kind:"arith"
-    protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind:"arith"
-    ~variant:"simulation"
-    ~extra_tags:["simulation"]
-    ~max_number_of_messages_per_commitment_period:300
-    sc_rollup_node_simulate
     protocols ;
   (* Specific Wasm PVM tezts *)
   test_rollup_node_run_with_kernel

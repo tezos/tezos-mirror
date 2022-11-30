@@ -949,8 +949,6 @@ let prepare_first_block ~level ~timestamp ctxt =
             enable = c.sc_rollup.enable;
             origination_size = c.sc_rollup.origination_size;
             challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
-            max_number_of_messages_per_commitment_period =
-              c.sc_rollup.max_number_of_messages_per_commitment_period;
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
                The following constants need to be refined. *)
             stake_amount = c.sc_rollup.stake_amount;

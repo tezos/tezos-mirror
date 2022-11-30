@@ -212,8 +212,6 @@ module V1 = struct
 
    The metadata contains :
    - [level] : the inbox level ;
-   - [nb_messages_in_commitment_period] :
-     the number of messages during the commitment period ;
    - [current_level_proof] : the [current_level] and its root hash ;
    - [old_levels_messages] : a witness of the inbox history.
 
@@ -229,53 +227,28 @@ module V1 = struct
   *)
   type t = {
     level : Raw_level_repr.t;
-    nb_messages_in_commitment_period : int64;
     current_level_proof : level_proof;
     old_levels_messages : history_proof;
   }
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-     The number of messages during commitment period is broken with the
-     unique inbox. *)
-
   let equal inbox1 inbox2 =
     (* To be robust to addition of fields in [t]. *)
-    let {
-      level;
-      nb_messages_in_commitment_period;
-      current_level_proof;
-      old_levels_messages;
-    } =
-      inbox1
-    in
+    let {level; current_level_proof; old_levels_messages} = inbox1 in
     Raw_level_repr.equal level inbox2.level
-    && Compare.Int64.(
-         equal
-           nb_messages_in_commitment_period
-           inbox2.nb_messages_in_commitment_period)
     && equal_level_proof current_level_proof inbox2.current_level_proof
     && equal_history_proof old_levels_messages inbox2.old_levels_messages
 
-  let pp fmt
-      {
-        level;
-        nb_messages_in_commitment_period;
-        current_level_proof;
-        old_levels_messages;
-      } =
+  let pp fmt {level; current_level_proof; old_levels_messages} =
     Format.fprintf
       fmt
       "@[<hov 2>{ level = %a@;\
        current messages hash  = %a@;\
-       nb_messages_in_commitment_period = %s@;\
        old_levels_messages = %a@;\
        }@]"
       Raw_level_repr.pp
       level
       pp_level_proof
       current_level_proof
-      (Int64.to_string nb_messages_in_commitment_period)
       pp_history_proof
       old_levels_messages
 
@@ -288,34 +261,14 @@ module V1 = struct
   let encoding =
     Data_encoding.(
       conv
-        (fun {
-               nb_messages_in_commitment_period;
-               level;
-               current_level_proof;
-               old_levels_messages;
-             } ->
-          ( nb_messages_in_commitment_period,
-            level,
-            current_level_proof,
-            old_levels_messages ))
-        (fun ( nb_messages_in_commitment_period,
-               level,
-               current_level_proof,
-               old_levels_messages ) ->
-          {
-            nb_messages_in_commitment_period;
-            level;
-            current_level_proof;
-            old_levels_messages;
-          })
-        (obj4
-           (req "nb_messages_in_commitment_period" int64)
+        (fun {level; current_level_proof; old_levels_messages} ->
+          (level, current_level_proof, old_levels_messages))
+        (fun (level, current_level_proof, old_levels_messages) ->
+          {level; current_level_proof; old_levels_messages})
+        (obj3
            (req "level" Raw_level_repr.encoding)
            (req "current_level_proof" level_proof_encoding)
            (req "old_levels_messages" history_proof_encoding)))
-
-  let number_of_messages_during_commitment_period inbox =
-    inbox.nb_messages_in_commitment_period
 end
 
 type versioned = V1 of V1.t
@@ -882,7 +835,6 @@ let genesis ~timestamp ~predecessor level =
   return
     {
       level;
-      nb_messages_in_commitment_period = 3L;
       current_level_proof = level_proof;
       old_levels_messages = Skip_list.genesis level_proof;
     }

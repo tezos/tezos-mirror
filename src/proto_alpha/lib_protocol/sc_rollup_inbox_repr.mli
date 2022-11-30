@@ -57,10 +57,10 @@ type error += Inbox_level_reached_messages_limit
    A message processed by the rollup can be consumed or available. A
    message unprocessed by the rollup is always available.
 
-   The number of messages in a commitment period is bounded by
-   {!Constants_storage.sc_rollup_max_number_of_messages_per_commitment_period}.
-   When an inbox reaches the maximum number of messages in the commitment
-   period, the inbox is said to be full and cannot accept more messages.
+   The number of messages in an inbox level is bounded by
+   {!Constants_repr.sc_rollup_max_number_of_messages_per_level}
+   When a level inbox reaches the maximum number of messages in the inbox level,
+   the inbox is said to be full and cannot accept more messages at this level.
    This limitation is meant to ensure that Merkle proofs about the inbox
    contents have a bounded size. (See next section.)
 
@@ -199,11 +199,6 @@ module V1 : sig
   (** [old_levels_messages inbox] returns the latest skip list cell of the inbox
       history that is not up to change (i.e. not the current level tree). *)
   val old_levels_messages : t -> history_proof
-
-  (** [number_of_messages_during_commitment_period inbox] returns the
-    number of messages added in the inbox since the beginning of
-    the current commitment period. *)
-  val number_of_messages_during_commitment_period : t -> int64
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)

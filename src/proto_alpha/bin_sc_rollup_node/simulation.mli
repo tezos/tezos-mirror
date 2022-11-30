@@ -45,7 +45,6 @@ module type S = sig
     inbox_level : Raw_level.t;
     state : PVM.state;
     reveal_map : string Sc_rollup_reveal_hash.Map.t option;
-    nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
     info_per_level : info_per_level;

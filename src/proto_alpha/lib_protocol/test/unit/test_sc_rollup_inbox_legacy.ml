@@ -110,12 +110,6 @@ let populate_inboxes level history inbox inboxes list_of_messages =
 
 let inbox = Sc_rollup_helpers.dumb_init_repr
 
-let test_init () =
-  let inbox = inbox (Raw_level_repr.of_int32_exn 42l) in
-  fail_unless
-    Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 3L)
-    (err "A new inbox should have 3 messages.")
-
 let setup_inbox_with_messages list_of_payloads f =
   let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
@@ -495,8 +489,6 @@ let test_for_successive_add_messages_with_different_histories_capacities
     (err "Trees of (supposedly) equal inboxes should be equal.")
 
 let tests =
-  [Tztest.tztest "Genesis inbox" `Quick test_init]
-  @
   let gen_history_params =
     QCheck2.Gen.(
       (* We fix the number of levels/ inboxes. *)

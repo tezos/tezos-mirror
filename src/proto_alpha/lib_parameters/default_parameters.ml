@@ -215,22 +215,6 @@ let constants_mainnet =
          origination_size = 6_314;
          challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
          commitment_period_in_blocks;
-         (*
-
-            The following value is chosen to limit the length of inbox
-            refutation proofs. In the worst case, the length of inbox
-            refutation proofs are logarithmic (in basis 2) in the
-            number of messages in the inboxes during the commitment
-            period.
-
-            With the following value, an inbox refutation proof is
-            made of at most 35 hashes, hence a payload bounded by
-            35 * 48 bytes, which far below than the 32kb of a Tezos
-            operations.
-
-         *)
-         max_number_of_messages_per_commitment_period =
-           commitment_period_in_blocks * 10_000_000;
          (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
             The following constants need to be refined. *)
          stake_amount = Tez.of_mutez_exn 10_000_000_000L;

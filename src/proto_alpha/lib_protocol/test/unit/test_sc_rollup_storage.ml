@@ -46,17 +46,7 @@ let new_context_with_stakers nb_stakers =
   let*? bootstrap_balances =
     List.init ~when_negative_length:[] nb_stakers (fun _ -> initial_balance)
   in
-  let sc_rollup_max_number_of_messages_per_commitment_period =
-    (* The default value is too large for testing. *)
-    1000
-  in
-  let* b, contracts =
-    Context.init_n
-      ~bootstrap_balances
-      nb_stakers
-      ~sc_rollup_max_number_of_messages_per_commitment_period
-      ()
-  in
+  let* b, contracts = Context.init_n ~bootstrap_balances nb_stakers () in
   let+ inc = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt inc in
   (* Necessary to originate rollups. *)
@@ -2173,49 +2163,6 @@ let check_gas_consumed ~since ~until =
   let as_cost = Gas_limit_repr.cost_of_gas @@ gas_consumed ~since ~until in
   Saturation_repr.to_int as_cost
 
-let test_limit_on_number_of_messages_during_commitment_period with_gap () =
-  let* ctxt = new_context () in
-  let* _rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
-  let commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
-  in
-  let max_number =
-    Constants_storage.sc_rollup_max_number_of_messages_per_commitment_period
-      ctxt
-  in
-  let*? payload =
-    List.init
-      ~when_negative_length:[]
-      (1 + (max_number / (commitment_period - 1)))
-    @@ fun _ -> "a"
-  in
-  let*! add_too_many_messages =
-    List.fold_left_es
-      (fun ctxt i ->
-        let ctxt =
-          if with_gap && i = commitment_period / 2 then
-            Raw_context.Internal_for_tests.add_level ctxt commitment_period
-          else ctxt
-        in
-        let* ctxt =
-          lift @@ Sc_rollup_inbox_storage.add_external_messages ctxt payload
-        in
-        return ctxt)
-      ctxt
-      (1 -- (commitment_period - 1))
-  in
-  if with_gap then
-    (* Changing the commitment period is enough to accept that many messages... *)
-    let*? (_r : Raw_context.t) = add_too_many_messages in
-    return ()
-  else
-    (* ... but if we stay in the same commitment period, it fails. *)
-    Assert.proto_error ~loc:__LOC__ add_too_many_messages @@ function
-    | Sc_rollup_errors
-      .Sc_rollup_max_number_of_messages_reached_for_commitment_period ->
-        true
-    | _ -> false
-
 let record ctxt rollup level message_index =
   Sc_rollup_outbox_storage.record_applied_message
     ctxt
@@ -2736,21 +2683,7 @@ let tests =
       "Refinement operations are commutative (cement)"
       `Quick
       test_concurrent_refinement_cement;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-       The number of messages during commitment period is broken with the
-       unique inbox. *)
-    (* Tztest.tztest
-     *   "The number of messages pushed during commitment period stays under \
-     *    limit (without gap)"
-     *   `Quick
-     *   (test_limit_on_number_of_messages_during_commitment_period false);
-     * Tztest.tztest
-     *   "The number of messages pushed during commitment period stays under \
-     *    limit (with gap)"
-     *   `Quick
-     *   (test_limit_on_number_of_messages_during_commitment_period true);
-     * Tztest.tztest "Record messages in storage outbox" `Quick test_storage_outbox; *)
+    Tztest.tztest "Record messages in storage outbox" `Quick test_storage_outbox;
     Tztest.tztest
       "Record messages in storage outbox limits"
       `Quick

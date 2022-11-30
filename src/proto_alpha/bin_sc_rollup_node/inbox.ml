@@ -164,41 +164,27 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
 let add_messages ~timestamp ~predecessor inbox history messages =
   let open Lwt_result_syntax in
   lift
-  @@ (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-         The number of messages during commitment period is broken with the
-         unique inbox. *)
-     (* let commitment_period =
-      *   node_ctxt.protocol_constants.parametric.sc_rollup
-      *     .commitment_period_in_blocks |> Int32.of_int
-      * in
-      * let inbox =
-      *   Sc_rollup.Inbox.refresh_commitment_period
-      *     ~commitment_period
-      *     ~level
-      *     inbox
-      * in *)
-  let*? ( messages_history,
-          history,
-          inbox,
-          _witness,
-          messages_with_protocol_internal_messages ) =
-    Sc_rollup.Inbox.add_all_messages
-      ~timestamp
-      ~predecessor
-      history
-      inbox
-      messages
-  in
-  let Sc_rollup.Inbox.{hash = witness_hash; _} =
-    Sc_rollup.Inbox.current_level_proof inbox
-  in
-  return
-    ( messages_history,
-      witness_hash,
-      history,
-      inbox,
-      messages_with_protocol_internal_messages )
+  @@ let*? ( messages_history,
+             history,
+             inbox,
+             _witness,
+             messages_with_protocol_internal_messages ) =
+       Sc_rollup.Inbox.add_all_messages
+         ~timestamp
+         ~predecessor
+         history
+         inbox
+         messages
+     in
+     let Sc_rollup.Inbox.{hash = witness_hash; _} =
+       Sc_rollup.Inbox.current_level_proof inbox
+     in
+     return
+       ( messages_history,
+         witness_hash,
+         history,
+         inbox,
+         messages_with_protocol_internal_messages )
 
 let process_head (node_ctxt : _ Node_context.t)
     Layer1.({level; hash = head_hash} as head) =

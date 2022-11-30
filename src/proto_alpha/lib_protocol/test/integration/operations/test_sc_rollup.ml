@@ -128,15 +128,7 @@ let assert_timeout_result ?game_status incr =
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
 let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
-    ?sc_rollup_max_number_of_messages_per_commitment_period
     ?(timeout_period_in_blocks = 10) tup =
-  let max_number_of_messages_per_commitment_period =
-    match sc_rollup_max_number_of_messages_per_commitment_period with
-    | None ->
-        Context.default_test_constants.sc_rollup
-          .max_number_of_messages_per_commitment_period
-    | Some v -> v
-  in
   Context.init_with_constants_gen
     tup
     {
@@ -147,7 +139,6 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
           Context.default_test_constants.sc_rollup with
           enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-          max_number_of_messages_per_commitment_period;
           timeout_period_in_blocks;
         };
     }
