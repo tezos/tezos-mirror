@@ -953,6 +953,13 @@ module that exports them (in our case, ``smart_rollup_core``).
 
        /// Returns the number of bytes written at `dst`, or an error
        /// code.
+       pub fn reveal_metadata(
+           dst: *mut u8,
+           max_bytes: usize,
+       ) -> i32;
+
+       /// Returns the number of bytes written at `dst`, or an error
+       /// code.
        pub fn reveal_preimage(
            hash_addr: *const u8,
            dst: *mut u8,

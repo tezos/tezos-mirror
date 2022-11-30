@@ -60,16 +60,17 @@ let reveal_metadata_module metadata_addr =
     {|
       (module
         (import "smart_rollup_core" "reveal_metadata"
-          (func $reveal_metadata (param i32) (result i32))
+          (func $reveal_metadata (param i32 i32) (result i32))
         )
         (memory 1)
         (export "mem" (memory 0))
         (func (export "kernel_run")
-          (call $reveal_metadata (i32.const %ld))
+          (call $reveal_metadata (i32.const %ld) (i32.const %d))
         )
       )
     |}
     metadata_addr
+    Tezos_scoru_wasm.Host_funcs.Internal_for_tests.metadata_size
 
 let reveal_returned_size tree =
   let open Lwt_syntax in
