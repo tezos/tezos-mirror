@@ -68,6 +68,8 @@ let to_z x = Z.of_int x
 
 let saturate_if_undef = function None -> saturated | Some x -> x
 
+let safe_z z = saturate_if_undef @@ of_z_opt z
+
 let safe_int x = of_int_opt x |> saturate_if_undef
 
 let numbits x =

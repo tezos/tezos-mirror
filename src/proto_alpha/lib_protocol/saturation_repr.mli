@@ -194,6 +194,9 @@ val mul_safe_exn : may_saturate t -> mul_safe t
    that are obviously [mul_safe]. *)
 val mul_safe_of_int_exn : int -> mul_safe t
 
+(** [safe_z z] is [of_z_opt x |> saturate_if_undef]. *)
+val safe_z : Z.t -> may_saturate t
+
 (** [safe_int x] is [of_int_opt x |> saturate_if_undef]. *)
 val safe_int : int -> may_saturate t
 

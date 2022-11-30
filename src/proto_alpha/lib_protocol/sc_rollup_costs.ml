@@ -136,3 +136,15 @@ let cost_check_dissection ~number_of_states ~tick_size ~hash_size =
 let cost_verify_output_proof ~bytes_len =
   let open S.Syntax in
   Constants.cost_verify_output_proof_per_byte * S.safe_int bytes_len
+
+let cost_add_message ~current_index ~msg_len =
+  let open S.Syntax in
+  let hash_cell_cost =
+    Skip_list_costs.model_hash_cell_computed_backpointers_count
+      ~index:current_index
+  in
+  let hash_content_cost = cost_hash_bytes ~bytes_len:msg_len in
+  let next_cell_cost =
+    Skip_list_costs.model_next ~length:(Z.succ current_index)
+  in
+  hash_cell_cost + hash_content_cost + next_cell_cost

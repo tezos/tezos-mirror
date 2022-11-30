@@ -85,3 +85,9 @@ val cost_check_dissection :
 (** [cost_verify_output_proof ~bytes_len] is the cost of verifying an output
      proof of length [bytes_len]. *)
 val cost_verify_output_proof : bytes_len:int -> Gas_limit_repr.cost
+
+(** [cost_add_message ~new_cell_index ~msg_len] returns the cost of adding a
+    message of length [msg_len] to a sc-rollup inbox. This function is used
+    internally in the [Sc_rollup_storage] module and covers the function
+    {!Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload *)
+val cost_add_message : current_index:Z.t -> msg_len:int -> Gas_limit_repr.cost

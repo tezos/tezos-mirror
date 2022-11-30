@@ -25,10 +25,16 @@
 
 (** [model_next ~length] returns the gas cost of inserting a cell in a
     skip list of a given [length], assuming basis equals 2. *)
-val model_next : length:int -> Saturation_repr.may_saturate Saturation_repr.t
+val model_next : length:Z.t -> Saturation_repr.may_saturate Saturation_repr.t
 
 (** [model_hash_cell ~backpointers_count] returns the gas cost of
    hashing the last cell with a given [backpointers_count], assuming
    basis equals 2. *)
 val model_hash_cell :
   backpointers_count:int -> Saturation_repr.may_saturate Saturation_repr.t
+
+(** [model_hash_cell_computed_backpointers_count ~index] same as
+    {!model_hash_cell} but compute the number of backpointers a specific cell
+    will have. Assuming basis equals 2. *)
+val model_hash_cell_computed_backpointers_count :
+  index:Z.t -> Saturation_repr.may_saturate Saturation_repr.t
