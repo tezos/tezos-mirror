@@ -857,7 +857,12 @@ module P2p = struct
       ()
 
   let activate_network =
-    declare_0 ~section ~name:"activate_network" ~level:Info ~msg:"activate" ()
+    declare_1
+      ~section
+      ~name:"activate_network"
+      ~level:Info
+      ~msg:"activate id {peer}"
+      ("peer", P2p_peer.Id.encoding)
 
   let message_read =
     declare_1
