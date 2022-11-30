@@ -88,7 +88,10 @@ module Next : Benchmark.S = struct
       (Model.For_codegen next_model)
 end
 
-(* A model to estimate [Sc_rollup_inbox_repr.hash_skip_list_cell]. *)
+(** Benchmark for the [Sc_rollup_inbox_repr.hash_skip_list_cell]
+   function. It is used for estimating the parameters for
+   [Skip_list_cost_model.model_hash_cell]. The model estimates hashing
+   a skip_list cell content and all its back pointers. *)
 module Hash_cell = struct
   let name = ns "hash_cell"
 
