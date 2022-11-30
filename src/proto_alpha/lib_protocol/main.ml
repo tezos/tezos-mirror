@@ -411,9 +411,8 @@ module Mempool = struct
            {predecessor_hash = head_hash; timestamp = head.timestamp})
         ~predecessor:head
     in
-    let*? fitness = Fitness.from_raw head.fitness in
-    let predecessor_round = Fitness.round fitness in
-    let grandparent_round = Fitness.predecessor_round fitness in
+    let*? predecessor_round = Fitness.round_from_raw head.fitness in
+    let*? grandparent_round = Fitness.predecessor_round_from_raw head.fitness in
     return
       (init
          ctxt
