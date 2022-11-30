@@ -59,9 +59,26 @@ let from_instance inst =
     externs
     Resolver.empty
 
+exception Export_not_found of {name : string; kind : Unsigned.uint8}
+
+let () =
+  Printexc.register_printer (function
+      | Export_not_found {name; kind} ->
+          Some
+            (Format.asprintf
+               "Export %S (%i) not found"
+               name
+               (Unsigned.UInt8.to_int kind))
+      | _ -> None)
+
 let fn exports name typ =
   let kind = Types.Externkind.func in
-  let extern = Resolver.find (name, kind) exports in
+  let extern = Resolver.find_opt (name, kind) exports in
+  let extern =
+    match extern with
+    | None -> raise (Export_not_found {name; kind})
+    | Some extern -> extern
+  in
   let func = Functions.Extern.as_func extern in
   let f = Function.call func typ in
   () ;
