@@ -36,6 +36,11 @@ type error +=
   | (* `Temporary *) Sc_rollup_staker_backtracked
   | (* `Temporary *) Sc_rollup_too_far_ahead
   | (* `Temporary *)
+      Sc_rollup_commitment_from_future of {
+      current_level : Raw_level_repr.t;
+      inbox_level : Raw_level_repr.t;
+    }
+  | (* `Temporary *)
       Sc_rollup_commitment_too_recent of {
       current_level : Raw_level_repr.t;
       min_level : Raw_level_repr.t;
@@ -449,6 +454,31 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_bad_commitment_serialization -> Some () | _ -> None)
     (fun () -> Sc_rollup_bad_commitment_serialization) ;
+  let description = "Commitment inbox level is greater than current level" in
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_commitment_from_future"
+    ~title:"Commitment from future"
+    ~description
+    ~pp:(fun ppf (current_level, inbox_level) ->
+      Format.fprintf
+        ppf
+        "%s@ Current level: %a,@ commitment inbox level: %a"
+        description
+        Raw_level_repr.pp
+        current_level
+        Raw_level_repr.pp
+        inbox_level)
+    Data_encoding.(
+      obj2
+        (req "current_level" Raw_level_repr.encoding)
+        (req "inbox_level" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_commitment_from_future {current_level; inbox_level} ->
+          Some (current_level, inbox_level)
+      | _ -> None)
+    (fun (current_level, inbox_level) ->
+      Sc_rollup_commitment_from_future {current_level; inbox_level}) ;
   let description = "Commitment is past the curfew for this level." in
   register_error_kind
     `Permanent

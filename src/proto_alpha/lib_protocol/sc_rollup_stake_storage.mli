@@ -54,6 +54,10 @@ val remove_staker :
       {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
       {li [Sc_rollup_too_far_ahead] if [staker] would be more than
         [sc_rollup_max_future_commitments] ahead of the Last Cemented Commitment}
+      {li [Sc_rollup_commitment_past_curfew] if current level is
+        more than {!Constants_storage.sc_rollup_challenge_window_in_blocks}
+        after the first commit for the same inbox level.}
+      {li [Sc_rollup_commitment_from_future] if [commitment]'s inbox level is greater than current level
       {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
         less than [sc_rollup_commitment_period] blocks ahead}
       {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor

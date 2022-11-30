@@ -558,6 +558,8 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
 
 let test_stakers_commitments ~kind =
   test_l1_scenario
+  (* Set commitment period to 6 to reduce integration test time *)
+    ~commitment_period:6
     {
       variant = None;
       tags = ["stakers"; "commitments"];
@@ -574,6 +576,11 @@ let test_stakers_commitments ~kind =
   let* {commitment_period_in_blocks; _} =
     get_sc_rollup_constants tezos_client
   in
+  (* Bake commitment_period_in_blocks blocks in order prevent commitment being posted for future inbox_level *)
+  let* () =
+    repeat commitment_period_in_blocks (fun () ->
+        Client.bake_for_and_wait tezos_client)
+  in
   let* commitment_1 =
     publish_dummy_commitment
       ~inbox_level:(inbox_level + commitment_period_in_blocks)
@@ -581,6 +588,10 @@ let test_stakers_commitments ~kind =
       ~sc_rollup
       ~src:staker_1
       tezos_client
+  in
+  let* () =
+    repeat commitment_period_in_blocks (fun () ->
+        Client.bake_for_and_wait tezos_client)
   in
   let* commitment_2 =
     publish_dummy_commitment
@@ -2573,6 +2584,11 @@ let test_consecutive_commitments _rollup_node _rollup_client sc_rollup
   let* predecessor, _ =
     last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
   in
+  (* Bake commitment_period_in_blocks blocks in order prevent commitment being posted for future inbox_level *)
+  let* () =
+    repeat commitment_period_in_blocks (fun () ->
+        Client.bake_for_and_wait tezos_client)
+  in
   let* commit_hash =
     publish_dummy_commitment
       ~inbox_level:(inbox_level + commitment_period_in_blocks)
@@ -2580,6 +2596,10 @@ let test_consecutive_commitments _rollup_node _rollup_client sc_rollup
       ~sc_rollup
       ~src:operator
       tezos_client
+  in
+  let* () =
+    repeat (commitment_period_in_blocks + 1) (fun () ->
+        Client.bake_for_and_wait tezos_client)
   in
   let* _commit_hash =
     publish_dummy_commitment
@@ -3738,6 +3758,8 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_commitment_scenario
+  (* Reduce commitment period here in order avoid waiting for default 30 (and even 60) blocks to be baked*)
+    ~commitment_period:3
     ~variant:"consecutive commitments"
     test_consecutive_commitments
     protocols

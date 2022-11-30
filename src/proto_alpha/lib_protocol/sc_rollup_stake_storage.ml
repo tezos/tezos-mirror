@@ -212,10 +212,20 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let open Lwt_result_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
-  assert_commitment_is_not_past_curfew
-    ctxt
-    rollup
-    Commitment.(commitment.inbox_level)
+  let* ctxt =
+    assert_commitment_is_not_past_curfew
+      ctxt
+      rollup
+      Commitment.(commitment.inbox_level)
+  in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let* () =
+    fail_unless
+      Raw_level_repr.(commitment.Commitment.inbox_level <= current_level)
+      (Sc_rollup_commitment_from_future
+         {current_level; inbox_level = commitment.inbox_level})
+  in
+  return ctxt
 
 let get_commitment_stake_count ctxt rollup node =
   let open Lwt_result_syntax in
