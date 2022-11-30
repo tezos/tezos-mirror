@@ -64,7 +64,9 @@ let deposit_stake ctxt rollup staker =
   let open Lwt_result_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let staker_contract, stake = get_contract_and_stake ctxt staker in
-  let* ctxt, staker_balance = Token.balance ctxt (`Contract staker_contract) in
+  let* ctxt, staker_balance =
+    Contract_storage.get_balance_carbonated ctxt staker_contract
+  in
   let* () =
     fail_when
       Tez_repr.(staker_balance < stake)
@@ -313,12 +315,28 @@ let refine_stake ctxt rollup staker staked_on commitment =
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let*? ctxt, new_hash = Sc_rollup_commitment_storage.hash ctxt commitment in
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
      Add a test checking that L2 nodes can catch up after going offline. *)
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
+     Check value of [max_lookahead_in_blocks] against gas exhaustion
+     during this function execution. *)
   let rec go node ctxt =
-    (* WARNING: Do NOT reorder this sequence of ifs.
-       we must check for staked_on before LCC, since refining
-       from the LCC to another commit is a valid operation. *)
+    (*
+
+         The recursive calls of this function are protected from
+         infinite recursion because [Commitment_storage] and
+         [Commitment_stake_count] are using carbonated storage.
+
+         Hence, at each step of the traversal, the gas strictly
+         decreases.
+
+         WARNING: Do NOT reorder this sequence of ifs. We must check
+         for [staked_on] before LCC, since refining from the LCC to
+         another commit is a valid operation.
+
+    *)
     if Commitment_hash.(node = staked_on) then (
       (* Previously staked commit found:
          Insert new commitment if not existing *)
@@ -486,7 +504,21 @@ let remove_staker ctxt rollup staker =
         Store.Stakers.remove_existing (ctxt, rollup) staker
       in
       let* ctxt = modify_staker_count ctxt rollup Int32.pred in
+
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
+         Check value of [max_lookahead_in_blocks] against gas exhaustion
+         during this function execution. *)
       let rec go node ctxt =
+        (*
+
+           The recursive calls of this function are protected from
+           infinite recursion because [Commitment_storage] and
+           [Commitment_stake_count] are using carbonated storage.
+
+           Hence, at each step of the traversal, the gas strictly
+           decreases.
+
+        *)
         if Commitment_hash.(node = lcc) then return ctxt
         else
           let* pred, ctxt =
