@@ -148,8 +148,6 @@ module V2_0_0 = struct
   module type S = sig
     include Sc_rollup_PVM_sig.S
 
-    val name : string
-
     val parse_boot_sector : string -> string option
 
     val pp_boot_sector : Format.formatter -> string -> unit
@@ -193,8 +191,6 @@ module V2_0_0 = struct
     let proof_start_state proof = Context.proof_before proof
 
     let proof_stop_state proof = Context.proof_after proof
-
-    let name = "wasm_2_0_0"
 
     let parse_boot_sector s = Hex.to_string @@ `Hex s
 

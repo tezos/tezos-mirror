@@ -30,8 +30,6 @@ module PVM : sig
   type boot_sector = string
 
   module type S = sig
-    val name : string
-
     val parse_boot_sector : string -> boot_sector option
 
     val pp_boot_sector : Format.formatter -> boot_sector -> unit
@@ -39,7 +37,13 @@ module PVM : sig
     include Sc_rollup_PVM_sig.S
   end
 
-  type t = (module S)
+  type ('state, 'proof, 'output) implementation =
+    (module S
+       with type state = 'state
+        and type proof = 'proof
+        and type output_proof = 'output)
+
+  type t = Packed : ('state, 'proof, 'output) implementation -> t [@@unboxed]
 end
 
 (** A smart contract rollup has a kind, which assigns meaning to
@@ -57,68 +61,15 @@ module Kind : sig
 
   val equal : t -> t -> bool
 
-  val pp : Format.formatter -> t -> unit
-
   (** [pvm_of kind] returns the [PVM] of the given [kind]. *)
   val pvm_of : t -> PVM.t
-
-  (** [of_pvm pvm] returns the [kind] of the given [PVM]. *)
-  val of_pvm : PVM.t -> t
-
-  (** [pvm_of_name ~name] is [Some (module I)] if an implemented PVM
-      called [name]. This function returns [None] otherwise. *)
-  val pvm_of_name : name:string -> PVM.t option
 
   (** [all] returns all implemented PVM. *)
   val all : t list
 
-  (** [all_names] returns all implemented PVM names. *)
-  val all_names : string list
+  val of_string : string -> t option
 
-  (** [of_name name] returns the kind of the PVM of the specified [name]. *)
-  val of_name : string -> t option
+  val to_string : t -> string
 
-  (** [name_of kind] returns a human-readable representation of [kind]. *)
-  val name_of : t -> string
+  val pp : Format.formatter -> t -> unit
 end
-
-(** A module signature we can use to form first-class modules that carry
-    a specific proof a long with the PVM module interface. *)
-module type PVM_with_proof = sig
-  include PVM.S
-
-  val proof : proof
-end
-
-(** A wrapper for first-class modules [(module PVM_with_proof)]. We need
-    this in order to implement an encoding function. The [Unencodable]
-    case is provided so that tests can provide their own PVM interfaces
-    without having to include proof encodings here. *)
-type wrapped_proof =
-  | Unencodable of (module PVM_with_proof)
-  | Arith_pvm_with_proof of
-      (module PVM_with_proof
-         with type proof = Sc_rollup_arith.Protocol_implementation.proof)
-  | Wasm_2_0_0_pvm_with_proof of
-      (module PVM_with_proof
-         with type proof = Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof)
-
-(** Unwrap a [wrapped_proof] into a first-class module. *)
-val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
-
-val wrapped_proof_encoding : wrapped_proof Data_encoding.t
-
-(** [wrapped_proof_kind_exn p] returns the kind of the PVM capable of
-    interpreting [p]. Raises {!Invalid_argument} iff [p] is an
-    {!Unencodable} proof (which cannot happen if [p] is constructed by
-    [wrapped_proof_encoding]).  *)
-val wrapped_proof_kind_exn : wrapped_proof -> Kind.t
-
-(** Wrap a PVM module with proof into a [wrapped_proof]. This matches on
-    the [name] in the module---if that is recognisable as a [Kind], this
-    function will encode and decode to coerce the proof to a proof in
-    the protocol implementation of the PVM. If the [name] is not
-    recognised this will fall back to using [Unencodable], so the value
-    can still be used in tests but won't work as part of a
-    [Sc_rollup_refute] operation. *)
-val wrap_proof : (module PVM_with_proof) -> wrapped_proof option

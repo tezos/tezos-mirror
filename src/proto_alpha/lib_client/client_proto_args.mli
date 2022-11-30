@@ -250,12 +250,10 @@ end
 module Sc_rollup_params : sig
   val sc_rollup_address_parameter : (Sc_rollup.t, full) Tezos_clic.parameter
 
-  val rollup_kind_parameter : (Sc_rollup.PVM.t, full) Tezos_clic.parameter
+  val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
 
   val boot_sector_parameter :
-    ( (module Sc_rollup.PVM.S) -> string tzresult Lwt.t,
-      full )
-    Tezos_clic.parameter
+    (Sc_rollup.PVM.t -> string tzresult Lwt.t, full) Tezos_clic.parameter
 
   val messages_parameter :
     ([`Bin of string | `Json of Data_encoding.json], full) Tezos_clic.parameter

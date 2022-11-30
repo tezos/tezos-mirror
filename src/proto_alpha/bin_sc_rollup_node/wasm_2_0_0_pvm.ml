@@ -68,7 +68,7 @@ module Impl : Pvm.S = struct
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
 
-  let kind = Sc_rollup.Kind.of_pvm (module PVM)
+  let kind = Sc_rollup.Kind.Wasm_2_0_0
 
   let new_dissection = Game_helpers.Wasm.new_dissection
 

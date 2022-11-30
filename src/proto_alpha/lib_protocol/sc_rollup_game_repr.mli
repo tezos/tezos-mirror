@@ -210,10 +210,6 @@ module V1 : sig
       will show that the next message available in [inbox_snapshot] is
       at [level], so shouldn't be included in this commitment.
 
-    - [pvm_name] identifies the PVM used in this rollup. It is useful to
-      have here so we can check that the proof provided in a refutation
-      is of the correct kind.
-
     - [game_state], the current state of the game, see {!game_state}
       for more information.
 
@@ -232,7 +228,6 @@ module V1 : sig
     dal_snapshot : Dal_slot_repr.History.t;
     start_level : Raw_level_repr.t;
     inbox_level : Raw_level_repr.t;
-    pvm_name : string;
     game_state : game_state;
   }
 
@@ -289,10 +284,10 @@ end
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
 
-    [initial inbox dal_slots_history ~start_level ~pvm_name
-    ~parent ~child ~refuter ~defender ~default_number_of_sections] will construct
-    an initial game where [refuter] is next to play. The game has [dissection]
-    with three states:
+    [initial inbox dal_slots_history ~start_level ~parent ~child
+    ~refuter ~defender ~default_number_of_sections] will construct an
+    initial game where [refuter] is next to play. The game has
+    [dissection] with three states:
 
       - firstly, the state (with tick zero) of [parent], the commitment
       that both stakers agree on.
@@ -313,7 +308,6 @@ val initial :
   Sc_rollup_inbox_repr.history_proof ->
   Dal_slot_repr.History.t ->
   start_level:Raw_level_repr.t ->
-  pvm_name:string ->
   parent:Sc_rollup_commitment_repr.t ->
   child:Sc_rollup_commitment_repr.t ->
   refuter:Staker.t ->
@@ -325,7 +319,7 @@ val initial :
     intermediate ticks remaining to put in it) or a proof. *)
 type step =
   | Dissection of dissection_chunk list
-  | Proof of Sc_rollup_proof_repr.t
+  | Proof of Sc_rollup_proof_repr.serialized Sc_rollup_proof_repr.t
 
 (** A [refutation] is a move in the game. [choice] is the final tick
     in the current dissection at which the two players agree. *)
@@ -369,6 +363,10 @@ val status_encoding : status Data_encoding.t
 (** Decide the loser of the game, if it exists. *)
 val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
+(* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+   Providing DAL parameters here is not resilient to their change during
+   protocol upgrade. *)
+
 (** Applies the move [refutation] to the game. Returns the game {!status}
     after applying the move.
 
@@ -381,9 +379,7 @@ val loser_of_results : alice_result:bool -> bob_result:bool -> player option
     slot's commitment).
 *)
 val play :
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-     Providing DAL parameters here is not resilient to their change during
-     protocol upgrade. *)
+  Sc_rollups.Kind.t ->
   Dal_slot_repr.parameters ->
   dal_attestation_lag:int ->
   stakers:Index.t ->

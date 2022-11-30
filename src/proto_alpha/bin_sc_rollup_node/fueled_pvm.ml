@@ -88,7 +88,7 @@ module Make (PVM : Pvm.S) = struct
       in
       match found_in_map with
       | Some data -> return data
-      | None -> Reveals.get ~data_dir ~pvm_name:PVM.name ~hash
+      | None -> Reveals.get ~data_dir ~pvm_kind:PVM.kind ~hash
 
     let continue_with_fuel consumption initial_fuel state f =
       let open Delayed_write_monad.Lwt_result_syntax in

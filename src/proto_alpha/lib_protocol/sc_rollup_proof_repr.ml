@@ -143,7 +143,29 @@ let input_proof_encoding =
   in
   union [case_inbox_proof; case_reveal_proof; first_input]
 
-type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
+type 'proof t = {pvm_step : 'proof; input_proof : input_proof option}
+
+type serialized = string
+
+let serialize_pvm_step (type state proof output)
+    ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation)
+    (proof : proof) : serialized tzresult =
+  let open Result_syntax in
+  let (module PVM) = pvm in
+  match Data_encoding.Binary.to_string_opt PVM.proof_encoding proof with
+  | Some p -> return p
+  | None -> error (Sc_rollup_proof_check "Cannot serialize proof")
+
+let unserialize_pvm_step (type state proof output)
+    ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation)
+    (proof : string) : proof tzresult =
+  let open Result_syntax in
+  let (module PVM) = pvm in
+  match Data_encoding.Binary.of_string_opt PVM.proof_encoding proof with
+  | Some p -> return p
+  | None -> error (Sc_rollup_proof_check "Cannot unserialize proof")
+
+let serialized_encoding = Data_encoding.string Hex
 
 let encoding =
   let open Data_encoding in
@@ -151,18 +173,22 @@ let encoding =
     (fun {pvm_step; input_proof} -> (pvm_step, input_proof))
     (fun (pvm_step, input_proof) -> {pvm_step; input_proof})
     (obj2
-       (req "pvm_step" Sc_rollups.wrapped_proof_encoding)
+       (req "pvm_step" serialized_encoding)
        (opt "input_proof" input_proof_encoding))
 
 let pp ppf _ = Format.fprintf ppf "Refutation game proof"
 
-let start proof =
-  let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  P.proof_start_state P.proof
+let start_of_pvm_step (type state proof output)
+    ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation)
+    (proof : proof) =
+  let (module P) = pvm in
+  P.proof_start_state proof
 
-let stop proof =
-  let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  P.proof_stop_state P.proof
+let stop_of_pvm_step (type state proof output)
+    ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation)
+    (proof : proof) =
+  let (module P) = pvm in
+  P.proof_stop_state proof
 
 (* This takes an [input] and checks if it is at or above the given level,
    and if it is at or below the origination level for this rollup.
@@ -270,11 +296,12 @@ module Dal_proofs = struct
     else return (None, None)
 end
 
-let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
-    ~dal_attestation_lag ~pvm_name proof =
+let valid (type state proof output)
+    ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
+    snapshot commit_level dal_snapshot dal_parameters ~dal_attestation_lag
+    (proof : proof t) =
   let open Lwt_result_syntax in
-  let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
+  let (module P) = pvm in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
   let* input =
     match proof.input_proof with
@@ -312,7 +339,7 @@ let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
   let input =
     Option.bind input (cut_at_level ~origination_level ~commit_level)
   in
-  let* input_requested = P.verify_proof input P.proof in
+  let* input_requested = P.verify_proof input proof.pvm_step in
   let* () =
     match (proof.input_proof, input_requested) with
     | None, No_input_required -> return_unit
@@ -460,11 +487,5 @@ let produce ~metadata pvm_and_state commit_level =
     Option.bind input_given (cut_at_level ~origination_level ~commit_level)
   in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
-  let module P_with_proof = struct
-    include P
-
-    let proof = pvm_step_proof
-  end in
-  match Sc_rollups.wrap_proof (module P_with_proof) with
-  | Some pvm_step -> return {pvm_step; input_proof}
-  | None -> proof_error "Could not wrap proof"
+  let*? pvm_step = serialize_pvm_step ~pvm:(module P) pvm_step_proof in
+  return {pvm_step; input_proof}

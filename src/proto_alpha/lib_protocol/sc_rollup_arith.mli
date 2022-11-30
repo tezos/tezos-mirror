@@ -73,9 +73,6 @@
 module type S = sig
   include Sc_rollup_PVM_sig.S
 
-  (** [name] is "arith". *)
-  val name : string
-
   (** [parse_boot_sector s] builds a boot sector from its human
       writable description. *)
   val parse_boot_sector : string -> string option

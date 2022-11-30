@@ -430,7 +430,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
-      origination_proof : string;
+      origination_proof : Sc_rollup_proof_repr.serialized;
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
@@ -1140,7 +1140,7 @@ module Encoding = struct
             obj4
               (req "pvm_kind" Sc_rollups.Kind.encoding)
               (req "boot_sector" (string Hex))
-              (req "origination_proof" (string Hex))
+              (req "origination_proof" Sc_rollup_proof_repr.serialized_encoding)
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function

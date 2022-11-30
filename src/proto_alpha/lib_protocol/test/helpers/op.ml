@@ -890,11 +890,6 @@ let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
       ~kind
       origination_proof
   in
-
-  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
-  let origination_proof =
-    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
-  in
   let* to_sign_op =
     manager_operation
       ?force_reveal

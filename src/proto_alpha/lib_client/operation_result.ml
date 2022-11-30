@@ -316,14 +316,14 @@ let pp_manager_operation_content (type kind) source ppf
         source
   | Sc_rollup_originate
       {kind; boot_sector; origination_proof = _; parameters_ty} ->
-      let (module R : Sc_rollup.PVM.S) = Sc_rollup.Kind.pvm_of kind in
       Format.fprintf
         ppf
         "Smart contract rollup origination:@,\
-         Kind: %s@,\
+         Kind: %a@,\
          Parameter type: %a@,\
          Boot sector Blake2B hash: '%a'"
-        R.name
+        Sc_rollup.Kind.pp
+        kind
         pp_micheline_from_lazy_expr
         parameters_ty
         Tezos_crypto.Blake2B.pp

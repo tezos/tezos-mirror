@@ -286,16 +286,8 @@ let test_invalid_serialized_inbox_proof () =
   (* We evaluate the boot sector, so the [input_requested] is a
      [First_after]. *)
   let*! state = Arith_pvm.eval state in
-  let*! proof = Arith_pvm.produce_proof ctxt None state in
-  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-  let wrapped_proof =
-    Sc_rollup.Arith_pvm_with_proof
-      (module struct
-        include Arith_pvm
-
-        let proof = proof
-      end)
-  in
+  let*! pvm_step = Arith_pvm.produce_proof ctxt None state in
+  let pvm_step = WithExceptions.Result.get_ok ~loc:__LOC__ pvm_step in
 
   (* We create an obviously invalid inbox *)
   let inbox_proof =
@@ -306,9 +298,7 @@ let test_invalid_serialized_inbox_proof () =
     Sc_rollup.Proof.Inbox_proof
       {level = Raw_level.root; message_counter = Z.zero; proof = inbox_proof}
   in
-  let proof =
-    Sc_rollup.Proof.{pvm_step = wrapped_proof; input_proof = Some inbox_proof}
-  in
+  let proof = Sc_rollup.Proof.{pvm_step; input_proof = Some inbox_proof} in
 
   let metadata =
     Sc_rollup.Metadata.{address = rollup; origination_level = level}
@@ -316,13 +306,13 @@ let test_invalid_serialized_inbox_proof () =
   let*! res =
     T.lift
     @@ Sc_rollup.Proof.valid
+         ~pvm:(module Arith_pvm)
          ~metadata
          snapshot
          Raw_level.root
          dal_snapshot
          dal_parameters.cryptobox_parameters
          ~dal_attestation_lag:dal_parameters.attestation_lag
-         ~pvm_name:"arith"
          proof
   in
   Assert.proto_error

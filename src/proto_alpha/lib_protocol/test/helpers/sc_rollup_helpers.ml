@@ -104,40 +104,26 @@ let origination_proof ~boot_sector = function
   | Sc_rollup.Kind.Example_arith ->
       let open Lwt_syntax in
       let context = Tezos_context_memory.make_empty_context () in
-      let* proof = Arith_pvm.produce_origination_proof context boot_sector in
+      let+ proof = Arith_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      return
-        (Sc_rollup.Arith_pvm_with_proof
-           (module struct
-             include Arith_pvm
-
-             let proof = proof
-           end))
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
   | Sc_rollup.Kind.Wasm_2_0_0 ->
       let open Lwt_syntax in
       let context = Tezos_context_memory.make_empty_context () in
-      let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
+      let+ proof = Wasm_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      return
-        (Sc_rollup.Wasm_2_0_0_pvm_with_proof
-           (module struct
-             include Wasm_pvm
-
-             let proof = proof
-           end))
+      WithExceptions.Result.get_ok ~loc:__LOC__
+      @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof
 
 let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
-    Sc_rollup.wrapped_proof tzresult Lwt.t =
+    Sc_rollup.Proof.serialized tzresult Lwt.t =
   let open Lwt_result_syntax in
   match proof_string_opt with
   | None ->
       let*! origination_proof = origination_proof ~boot_sector kind in
       return origination_proof
-  | Some proof_string ->
-      Lwt.map Environment.wrap_tzresult
-      @@ Sc_rollup_operations.Internal_for_tests.origination_proof_of_string
-           proof_string
-           kind
+  | Some proof_string -> return proof_string
 
 let genesis_commitment ~boot_sector ~origination_level = function
   | Sc_rollup.Kind.Example_arith ->

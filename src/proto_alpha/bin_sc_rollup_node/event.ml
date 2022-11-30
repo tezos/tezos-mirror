@@ -116,7 +116,7 @@ let node_is_ready ~rpc_addr ~rpc_port =
   Simple.(emit node_is_ready (rpc_addr, rpc_port))
 
 let rollup_exists ~addr ~kind =
-  let kind = Protocol.Alpha_context.Sc_rollup.Kind.name_of kind in
+  let kind = Protocol.Alpha_context.Sc_rollup.Kind.to_string kind in
   Simple.(emit rollup_exists (addr, kind))
 
 let connection_lost () = Simple.(emit connection_lost) ()
