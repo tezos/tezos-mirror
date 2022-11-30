@@ -25,6 +25,20 @@
 #                                                                           #
 #############################################################################
 
+# This is the Slack channel messages will be sent to (gas-benchmarks-reports).
+CHAN=C04HZHR11DW
+# This is the confidential Slack authorization token. It allows us to send
+# messages as the gas-benchmarks-reports bot.
+TOK="$(cat "$HOME"/slack_token)"
+
+slack() {
+    curl -X POST -H 'Authorization: Bearer '"$TOK" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"$CHAN\",\"text\":\"$1\"}" https://tezos-dev.slack.com/api/chat.postMessage
+}
+
+slack_send_file() {
+    curl -F file=@"$1" -F "initial_comment=$2" -F channels="$CHAN" -F token="$TOK" https://tezos-dev.slack.com/api/files.upload
+}
+
 OCTEZ_DIR="/data/redbull/tezos"
 
 # Check if a directory more recent than the last known one exists on the bucket.
@@ -55,6 +69,8 @@ fi
 # We update the file content as soon as possible so that concurrent runs of this
 # script are unlikely to step on each other's feet.
 echo "$LAST_DIR" > "$OCTEZ_DIR"/last_known_dir
+
+slack "New results have been uploaded to the S3 bucket in directory \`$LAST_DIR\`. I will look for regressions."
 
 INPUT_CSV_DIR="$OCTEZ_DIR/input_csvs"
 OUTPUT_CSV_DIR="$OCTEZ_DIR/output_csvs"
@@ -136,3 +152,14 @@ done
 cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
 cat "$OUTPUT_CSV_DIR"/first_*.csv > "$OUTPUT_CSV_DIR"/first.csv
 cat "$OUTPUT_CSV_DIR"/previous_*.csv > "$OUTPUT_CSV_DIR"/previous.csv
+
+if [ -s "$ALERT_FILE" ]
+then
+    slack_send_file "$ALERT_FILE" "Some regressions were found :sadparrot:"
+else
+    slack "No regression :tada:"
+fi
+
+slack_send_file "$OUTPUT_CSV_DIR/all.csv" "CSV comparing all runs"
+slack_send_file "$OUTPUT_CSV_DIR/first.csv" "CSV comparing first and last runs"
+slack_send_file "$OUTPUT_CSV_DIR/previous.csv" "CSV comparing previous and last runs"
