@@ -31,7 +31,10 @@ type t
 exception Invalid_key of string
 
 (** A value was not found in the durable store. *)
-exception Not_found
+exception Value_not_found
+
+(** A tree does not exists under key in the durable store. *)
+exception Tree_not_found
 
 (** Attempted to write/read to/from a value at [offset],
     beyond the [limit]. *)
@@ -74,7 +77,7 @@ val key_of_string_opt : string -> key option
 val find_value :
   t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t option Lwt.t
 
-(** raise @Not_found *)
+(** @raise Value_not_found *)
 val find_value_exn :
   t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t Lwt.t
 
@@ -117,7 +120,7 @@ val hash : t -> key -> Tezos_crypto.Context_hash.t option Lwt.t
 (** [hash_exn durable key] retrieves the tree hash of the value at the given [key].
     This is not the same as the hash of the value.
 
-    @raise Not_found when [key] is not found
+    @raise Value_not_found when [key] is not found
 *)
 val hash_exn : t -> key -> Tezos_crypto.Context_hash.t Lwt.t
 
@@ -138,7 +141,7 @@ val write_value_exn :
 (** [read_value durable key offset max_bytes] reads up to [max_bytes]
     bytes from the value at [key], starting at the given [offset].
 
-    @raise Not_found when [key] is not found.
+    @raise Value_not_found when [key] is not found.
     @raise Out_of_bounds when [offset] is larger than the value.
 *)
 val read_value_exn : t -> key -> int64 -> int64 -> string Lwt.t

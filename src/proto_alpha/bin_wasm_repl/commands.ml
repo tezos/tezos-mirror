@@ -342,7 +342,10 @@ let show_key tree key =
     (function
       | Tezos_scoru_wasm.Durable.Invalid_key _ ->
           Lwt_io.printf "Invalid key\n%!"
-      | Tezos_scoru_wasm.Durable.Not_found -> Lwt_io.printf "Key not found\n%!"
+      | Tezos_scoru_wasm.Durable.Value_not_found ->
+          Lwt_io.printf "No value found for key\n%!"
+      | Tezos_scoru_wasm.Durable.Tree_not_found ->
+          Lwt_io.printf "No tree found for key\n%!"
       | exn ->
           Lwt_io.printf "Unknown exception: %s\n%!" (Printexc.to_string exn))
 

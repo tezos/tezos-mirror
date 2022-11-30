@@ -540,6 +540,48 @@ let test_store_copy () =
   let* () = equal_chunks old_value_from_key new_value_from_key in
   Lwt.return_ok ()
 
+let test_store_copy_missing_path () =
+  let open Lwt_syntax in
+  (*
+  Store the following tree:
+    /durable/a/long/path/_ = "..."
+
+  We expect that copying "/a/short/path" to "a/long/path" fails with
+  Store_not_a_node
+  *)
+  let* durable = make_durable [("/a/long/path", "a very long value")] in
+  let from_key = "/a/short/path" in
+  let to_key = "/a/long/path" in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [from_key; to_key] src
+  in
+
+  let from_offset = src in
+  let from_length = Int32.of_int @@ String.length from_key in
+  let to_offset = Int32.(add from_offset from_length) in
+  let to_length = Int32.of_int @@ String.length to_key in
+  let values =
+    Values.
+      [
+        Num (I32 from_offset);
+        Num (I32 from_length);
+        Num (I32 to_offset);
+        Num (I32 to_length);
+      ]
+  in
+  let* _durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_copy
+      values
+  in
+  assert (result = [Values.(Num (I32 Host_funcs.Error.(code Store_not_a_node)))]) ;
+  Lwt.return_ok ()
+
 let test_store_move () =
   let open Lwt_syntax in
   (*
@@ -611,6 +653,48 @@ let test_store_move () =
   let* () = equal_chunks from_tree to_tree in
   Lwt.return_ok ()
 
+let test_store_move_missing_path () =
+  let open Lwt_syntax in
+  (*
+  Store the following tree:
+    /durable/a/long/path/_ = "..."
+
+  We expect that moving "/a/short/path" to "a/long/path" fails with
+  Store_not_a_node
+  *)
+  let* durable = make_durable [("/a/long/path", "a very long value")] in
+  let from_key = "/a/short/path" in
+  let to_key = "/a/long/path" in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [from_key; to_key] src
+  in
+
+  let from_offset = src in
+  let from_length = Int32.of_int @@ String.length from_key in
+  let to_offset = Int32.(add from_offset from_length) in
+  let to_length = Int32.of_int @@ String.length to_key in
+  let values =
+    Values.
+      [
+        Num (I32 from_offset);
+        Num (I32 from_length);
+        Num (I32 to_offset);
+        Num (I32 to_length);
+      ]
+  in
+  let* _durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_move
+      values
+  in
+  assert (result = [Values.(Num (I32 Host_funcs.Error.(code Store_not_a_node)))]) ;
+  Lwt.return_ok ()
+
 let test_store_read () =
   let open Lwt_syntax in
   (*
@@ -658,6 +742,46 @@ let test_store_read () =
   let* memory = retrieve_memory module_reg in
   let* value = Memory.load_bytes memory dst expected_read_bytes_len in
   assert (value = expected_read_bytes) ;
+  return_ok_unit
+
+let test_store_read_non_value () =
+  let open Lwt_syntax in
+  (*
+  Empty durable
+
+  We expect that reading from "/a/path/other" returns
+  Error.Store_not_a_value
+  *)
+  let key = "/a/path" in
+  let* durable = make_durable [] in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] src
+  in
+
+  let length = Int32.of_int @@ String.length key in
+  let dst = 40l in
+  let read_offset = 5 in
+  let values =
+    Values.
+      [
+        Num (I32 src);
+        Num (I32 length);
+        Num (I32 (Int32.of_int read_offset));
+        Num (I32 dst);
+        Num (I32 15l);
+      ]
+  in
+  let* _, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_read
+      values
+  in
+  assert (result = [Values.Num (I32 Host_funcs.Error.(code Store_not_a_value))]) ;
   return_ok_unit
 
 let test_store_value_size () =
@@ -780,6 +904,32 @@ let test_store_write () =
   in
   assert (expected_write_bytes = result) ;
 
+  (* Try writing out of bounds *)
+  let values =
+    Values.
+      [
+        Num (I32 new_key_src);
+        Num (I32 (Int32.of_int @@ String.length new_key));
+        Num (I32 1l);
+        Num (I32 contents_src);
+        Num (I32 (Int32.of_int @@ String.length contents));
+      ]
+  in
+  let* _durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_write
+      values
+  in
+  (match result with
+  | [Values.Num (I32 x)] -> Printf.printf "result %s\n" (I32.to_string_s x)
+  | _ -> assert false) ;
+  assert (
+    result = [Values.Num (I32 Host_funcs.Error.(code Store_invalid_access))]) ;
+  (* Write a new value *)
   let values =
     Values.
       [
@@ -856,8 +1006,11 @@ let tests =
     tztest "store_get_nth_key produces subtrees" `Quick test_store_get_nth_key;
     tztest "store_delete removes subtree" `Quick test_store_delete;
     tztest "store_copy" `Quick test_store_copy;
+    tztest "store_copy missing node" `Quick test_store_copy_missing_path;
     tztest "store_move" `Quick test_store_move;
+    tztest "store_move missing node" `Quick test_store_move_missing_path;
     tztest "store_read" `Quick test_store_read;
+    tztest "store_read on non-value" `Quick test_store_read_non_value;
     tztest "store_write" `Quick test_store_write;
     tztest "store_value_size" `Quick test_store_value_size;
     tztest "Durable: find value" `Quick test_durable_find_value;
