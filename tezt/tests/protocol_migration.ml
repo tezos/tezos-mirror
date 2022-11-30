@@ -82,7 +82,7 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
   in
   Log.info "Node %s initialized" (Node.name node) ;
   let* () = Client.activate_protocol ~protocol:migrate_from client in
-  Log.info "Protocol activated" ;
+  Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
   (* Bake until migration *)
   let* () =
     repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
