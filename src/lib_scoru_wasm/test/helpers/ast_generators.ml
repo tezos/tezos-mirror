@@ -758,7 +758,7 @@ let inv_concat_gen ~module_reg =
   Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
 
 let inv_reveal_tick ~module_reg =
-  let* hash = Reveal.reveal_hash_from_string_exn <$> string_size (pure 32) in
+  let* hash = string_small in
   let* base_destination = Int32.of_int <$> small_nat in
   let* max_bytes = Int32.of_int <$> small_nat in
   let* vs = small_vector_gen value_gen in

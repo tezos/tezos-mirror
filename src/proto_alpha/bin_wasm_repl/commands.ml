@@ -213,10 +213,7 @@ let pp_input_request ppf = function
   | Input_required -> Format.fprintf ppf "Waiting for input"
   | Reveal_required Reveal_metadata -> Format.fprintf ppf "Waiting for metadata"
   | Reveal_required (Reveal_raw_data hash) ->
-      Format.fprintf
-        ppf
-        "Waiting for reveal: %s"
-        (Tezos_webassembly_interpreter.Reveal.reveal_hash_to_string hash)
+      Format.fprintf ppf "Waiting for reveal: %s" hash
 
 (* [show_status tree] show the state of the PVM. *)
 let show_status tree =

@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Tztest
-open Tezos_webassembly_interpreter
 module Preimage_map = Map.Make (String)
 open Wasm_utils
 
@@ -33,7 +32,6 @@ let apply_fast ?(images = Preimage_map.empty) counter tree =
   let run_counter = ref 0l in
   let module Builtins = struct
     let reveal_preimage hash =
-      let hash = Reveal.reveal_hash_to_string hash in
       match Preimage_map.find hash images with
       | None -> Stdlib.failwith "Failed to find preimage"
       | Some preimage -> Lwt.return preimage
@@ -78,7 +76,6 @@ and check_reveal ?(images = Preimage_map.empty) tree =
   let* info = Wasm_utils.Wasm.get_info tree in
   match info.input_request with
   | Reveal_required (Reveal_raw_data hash) -> (
-      let hash = Reveal.reveal_hash_to_string hash in
       match Preimage_map.find hash images with
       | None -> Lwt.return tree
       | Some preimage ->
@@ -239,7 +236,7 @@ let test_store_read_write =
   test_against_both ~from_binary:false ~kernel ~messages:(List.repeat 100 "")
 
 let test_reveal_preimage =
-  let example_hash = "this represents the 32-byte hash" in
+  let example_hash = "this represents the 33-byte hash " in
   let example_preimage = "This is the expected preimage" in
   let images = Preimage_map.singleton example_hash example_preimage in
 
@@ -256,12 +253,12 @@ let test_reveal_preimage =
   (import
     "smart_rollup_core"
     "reveal_preimage"
-    (func $reveal_preimage (param i32 i32 i32) (result i32))
+    (func $reveal_preimage (param i32 i32 i32 i32) (result i32))
   )
 
   (memory 1)
-  (export "memory" (memory 0))
 
+  (export "memory" (memory 0))
   (data (i32.const 0) "%s") ;; The hash we want to reveal
   (data (i32.const 100) "/foo")
 
@@ -270,6 +267,8 @@ let test_reveal_preimage =
     (call $reveal_preimage
       ;; Address of the hash
       (i32.const 0)
+      ;; size of the hash
+      (i32.const 33)
       ;; Destination address and length
       (i32.const 1000) (i32.const 1000)
     )

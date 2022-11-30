@@ -912,8 +912,8 @@ let reveal_upgrade_kernel () =
   let path_start = 23 in
   let path_len = String.length path in
   let hash_start = path_start + path_len in
-  let buffer_start = hash_start + 32 in
-  (* 32 bytes for reveal hash *)
+  let buffer_start = hash_start + 33 in
+  (* 33 bytes for reveal hash *)
   Format.sprintf
     {|
 (module
@@ -922,7 +922,7 @@ let reveal_upgrade_kernel () =
   (import "smart_rollup_core" "store_delete"
     (func $store_delete (param i32 i32) (result i32)))
   (import "smart_rollup_core" "reveal_preimage"
-    (func $reveal_preimage (param i32 i32 i32) (result i32)))
+    (func $reveal_preimage (param i32 i32 i32 i32) (result i32)))
   (func (export "kernel_run")
     (local $preimage_size i32)
 
@@ -938,6 +938,7 @@ let reveal_upgrade_kernel () =
 
     (local.set $preimage_size
      (call $reveal_preimage (local.get $hash_start)
+                            (i32.const 33)
                             (local.get $buffer_start)
                             ;; buffer size
                             (i32.const 4096)))
@@ -1016,10 +1017,7 @@ let test_reveal_upgrade_kernel_ok () =
         (* The PVM has reached a point where it’s asking for some
            preimage. Since the memory is left blank, we are looking
            for the zero hash *)
-        let zero_hash =
-          Tezos_webassembly_interpreter.Reveal.reveal_hash_from_string_exn
-            (String.make 32 '\000')
-        in
+        let zero_hash = String.make 33 '\000' in
         assert (hash = zero_hash) ;
         return_unit
     | No_input_required | Input_required | Reveal_required _ -> assert false
@@ -1095,10 +1093,7 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error invalid_kernel
         (* The PVM has reached a point where it’s asking for some
            preimage. Since the memory is left blank, we are looking
            for the zero hash *)
-        let zero_hash =
-          Tezos_webassembly_interpreter.Reveal.reveal_hash_from_string_exn
-            (String.make 32 '\000')
-        in
+        let zero_hash = String.make 33 '\000' in
         assert (hash = zero_hash) ;
         return_unit
     | No_input_required | Input_required | Reveal_required _ -> assert false

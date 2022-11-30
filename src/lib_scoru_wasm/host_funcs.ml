@@ -111,6 +111,9 @@ module Aux = struct
   module type S = sig
     type memory
 
+    (** max size of intputs and outputs. *)
+    val input_output_max_size : int
+
     (** [write_output ~output_buffer ~memory ~src ~num_bytes] reads
      num_bytes from the memory of module_inst starting at src and writes
      this to the output_buffer. It also checks that the input payload is
@@ -893,20 +896,32 @@ let reveal_preimage_name = "tezos_reveal_preimage"
 
 let reveal_preimage_type =
   let input_types =
-    Types.[NumType I32Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
+    |> Vector.of_list
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
 let reveal_preimage_parse_args memories args =
   match args with
-  | Values.[Num (I32 hash_addr); Num (I32 base); Num (I32 max_bytes)] ->
+  | Values.
+      [
+        Num (I32 hash_addr);
+        Num (I32 hash_size);
+        Num (I32 base);
+        Num (I32 max_bytes);
+      ] ->
       let open Lwt_result_syntax in
       let*! memory = retrieve_memory memories in
-      let*! hash = Memory_access_interpreter.load_bytes memory hash_addr 32 in
-      Lwt_result.return
-        ( Reveal.(Reveal_raw_data (reveal_hash_from_string_exn hash)),
-          Host_funcs.{base; max_bytes} )
+      let hash_size = Int32.to_int hash_size in
+      if hash_size > Aux.input_output_max_size then
+        fail (Error.code Input_output_too_large)
+      else
+        let*! hash =
+          Memory_access_interpreter.load_bytes memory hash_addr hash_size
+        in
+        Lwt_result.return
+          (Host_funcs.(Reveal_raw_data hash), Host_funcs.{base; max_bytes})
   | _ -> raise Bad_input
 
 let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
@@ -927,7 +942,8 @@ let reveal_metadata_parse_args _memories args =
   | Values.[Num (I32 base)] ->
       Lwt.return
         (Ok
-           (Reveal.Reveal_metadata, Host_funcs.{base; max_bytes = metadata_size}))
+           ( Host_funcs.Reveal_metadata,
+             Host_funcs.{base; max_bytes = metadata_size} ))
   | _ -> raise Bad_input
 
 let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args

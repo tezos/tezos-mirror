@@ -116,10 +116,11 @@ module Make (PVM : Pvm.S) = struct
       let module Builtins = struct
         let reveal_preimage hash =
           let hash =
-            (* The 32-byte payload represents the encoded [Reveal_hash.t]. We must
+            (* The payload represents the encoded [Sc_rollup_reveal_hash.t]. We must
                decode it properly, instead of converting it byte-for-byte. *)
-            Tezos_webassembly_interpreter.Reveal.reveal_hash_to_string hash
-            |> Data_encoding.Binary.of_string_exn Sc_rollup_reveal_hash.encoding
+            Data_encoding.Binary.of_string_exn
+              Sc_rollup_reveal_hash.encoding
+              hash
           in
           let*! data =
             get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash

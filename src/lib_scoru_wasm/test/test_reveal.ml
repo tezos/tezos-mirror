@@ -36,21 +36,22 @@ open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 open Wasm_utils
 
-let reveal_preimage_module hash_addr preimage_addr max_bytes =
+let reveal_preimage_module hash_addr hash_size preimage_addr max_bytes =
   Format.sprintf
     {|
       (module
         (import "smart_rollup_core" "reveal_preimage"
-          (func $reveal_preimage (param i32 i32 i32) (result i32))
+          (func $reveal_preimage (param i32 i32 i32 i32) (result i32))
         )
         (memory 1)
         (export "mem" (memory 0))
         (func (export "kernel_run")
-          (call $reveal_preimage (i32.const %ld) (i32.const %ld) (i32.const %ld))
+          (call $reveal_preimage (i32.const %ld) (i32.const %ld) (i32.const %ld) (i32.const %ld))
         )
       )
     |}
     hash_addr
+    hash_size
     preimage_addr
     max_bytes
 
@@ -95,7 +96,10 @@ let test_reveal_preimage_gen preimage max_bytes =
   let open Lwt_result_syntax in
   let hash_addr = 120l in
   let preimage_addr = 200l in
-  let modl = reveal_preimage_module hash_addr preimage_addr max_bytes in
+  let hash_size = 33l in
+  let modl =
+    reveal_preimage_module hash_addr hash_size preimage_addr max_bytes
+  in
   let*! state = initial_tree modl in
   let*! state_snapshotted = eval_until_input_requested state in
   let*! state_with_dummy_input = set_empty_inbox_step 0l state_snapshotted in
@@ -109,9 +113,7 @@ let test_reveal_preimage_gen preimage max_bytes =
         (* The PVM has reached a point where it’s asking for some
            preimage. Since the memory is left blank, we are looking
            for the zero hash *)
-        let zero_hash =
-          Reveal.reveal_hash_from_string_exn (String.make 32 '\000')
-        in
+        let zero_hash = String.make (Int32.to_int hash_size) '\000' in
         assert (hash = zero_hash) ;
         return_unit
     | No_input_required | Input_required | Reveal_required _ -> assert false
@@ -218,7 +220,6 @@ let apply_fast ?(images = Preimage_map.empty) tree =
   let run_counter = ref 0l in
   let module Builtins = struct
     let reveal_preimage hash =
-      let hash = Reveal.reveal_hash_to_string hash in
       match Preimage_map.find hash images with
       | None -> Stdlib.failwith "Failed to find preimage"
       | Some preimage -> Lwt.return preimage
@@ -244,7 +245,7 @@ let apply_fast ?(images = Preimage_map.empty) tree =
 
 let test_fast_exec_reveal () =
   let open Lwt.Syntax in
-  let example_hash = "this represents the 32-byte hash" in
+  let example_hash = "this represents the 33-byte hash!" in
   let example_preimage = "This is the expected preimage" in
   let images = Preimage_map.singleton example_hash example_preimage in
 
@@ -261,7 +262,7 @@ let test_fast_exec_reveal () =
   (import
     "smart_rollup_core"
     "reveal_preimage"
-    (func $reveal_preimage (param i32 i32 i32) (result i32))
+    (func $reveal_preimage (param i32 i32 i32 i32) (result i32))
   )
 
   (memory 1)
@@ -275,6 +276,8 @@ let test_fast_exec_reveal () =
     (call $reveal_preimage
       ;; Address of the hash
       (i32.const 0)
+      ;; Size of the hash
+      (i32.const 33)
       ;; Destination address and length
       (i32.const 1000) (i32.const 1000)
     )

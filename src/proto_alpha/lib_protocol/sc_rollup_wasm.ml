@@ -300,7 +300,7 @@ module V2_0_0 = struct
           match
             Data_encoding.Binary.of_string_opt
               Sc_rollup_reveal_hash.encoding
-              (Wasm_2_0_0.reveal_hash_to_string hash)
+              hash
           with
           | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
           | None ->

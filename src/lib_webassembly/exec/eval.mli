@@ -118,7 +118,7 @@ type invoke_step_kont =
       concat_kont : value concat_kont;
     }
   | Inv_reveal_tick of {
-      reveal : Reveal.reveal;
+      reveal : Host_funcs.reveal;
       base_destination : int32;
       max_bytes : int32;
       code : code;
@@ -285,7 +285,7 @@ exception Reveal_error of reveal_error
 (** [is_reveal_tick config] returns [Some hash] if the evalutation is
     in a state expecting the payload of a given hash, and returns [None]
     otherwise. *)
-val is_reveal_tick : config -> Reveal.reveal option
+val is_reveal_tick : config -> Host_funcs.reveal option
 
 (** [reveal_step reveal module_reg payload config] loads [payload] in
     the memory of the module whose function is being evaluated with
