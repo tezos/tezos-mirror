@@ -641,6 +641,20 @@ type with_test = Always | Never | Only_on_64_arch
     - [private_modules]: similar to [modules], but those modules are not part of the
       library interface. They are not part of the toplevel module of the library.
 
+    - [profile]: the name of the profile to which the target belongs.
+      For each profile, a file [opam/virtual/<PROFILE_NAME>.opam] is generated.
+      This file depends on all external dependencies on which targets that belong
+      to this profile depend on, and contains no build instructions.
+      It is thus a good basis for [opam lock] to generate a [<PROFILE_NAME>.opam.locked] file.
+      Running [opam install <PROFILE_NAME>.opam.locked] will then install all dependencies
+      needed to build targets belonging to this profile.
+
+      Targets for which no profile is specified will belong to the default profile
+      given to {!generate}. Most of the time you do not need to specify a profile:
+      the default profile is fine. But if your target depends on packages that users
+      would most likely not want to install, it may be a good idea to separate it
+      into its own profile.
+
     - [opam_only_deps]: dependencies to add to the [.opam] file but not to the [dune] file.
       Typical use cases are runtime dependencies and build dependencies for users
       of the target (but not the target itself).
@@ -710,6 +724,7 @@ type 'a maker =
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
+  ?profile:string ->
   ?opam_only_deps:target list ->
   ?release:bool ->
   ?static:bool ->
@@ -1030,6 +1045,16 @@ val open_ : ?m:string -> target -> target
     Example: [tezos_base |> open_if protocol_is_recent_enough] *)
 val open_if : ?m:string -> bool -> target -> target
 
+(** Add a dependency to a profile.
+
+    See the documentation of the [?profile] argument of target makers for
+    more information about profiles.
+
+    Use [add_dep_to_profile profile dep] to add [dep] as a dependency to the
+    [opam/virtual/profile.opam] file without having to add it as a dependency of an
+    actual package. *)
+val add_dep_to_profile : string -> target -> unit
+
 (** Get a name for a given target, to display in errors.
 
     If a target has multiple names, one is chosen arbitrarily.
@@ -1042,8 +1067,13 @@ val name_for_errors : target -> string
     [public_lib], [test], etc.
 
     [make_tezt_exe] is given the list of libraries that register Tezt tests
-    and shall create a test executable that links all of them. *)
-val generate : make_tezt_exe:(target list -> target) -> unit
+    and shall create a test executable that links all of them.
+
+    [default_profile] is the name of the profile to use for targets that
+    were declared without [?profile]. See the documentation of the [?profile]
+    argument of type ['a maker]. *)
+val generate :
+  make_tezt_exe:(target list -> target) -> default_profile:string -> unit
 
 (** Run various checks.
 
