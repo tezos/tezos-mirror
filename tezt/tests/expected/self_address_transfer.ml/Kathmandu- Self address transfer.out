@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup --wait none originate contract self_address_sender.tz transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/self_address_sender.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract self_address_sender.tz transferring 0 from bootstrap1 running tests_python/contracts_014/mini_scenarios/self_address_sender.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1419.437 units (will add 100 for safety)
 Estimated storage: 339 bytes added (will add 20 for safety)
@@ -49,7 +49,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as self_address_sender.tz.
 
-./octez-client --mode mockup --wait none originate contract self_address_receiver.tz transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/self_address_receiver.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract self_address_receiver.tz transferring 0 from bootstrap1 running tests_python/contracts_014/mini_scenarios/self_address_receiver.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1420.026 units (will add 100 for safety)
 Estimated storage: 340 bytes added (will add 20 for safety)
