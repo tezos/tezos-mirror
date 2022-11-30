@@ -320,7 +320,7 @@ let refine_stake ctxt rollup staker staked_on commitment =
      Add a test checking that L2 nodes can catch up after going offline. *)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
-     Check value of max_lookahead_in_blocks against gas exhaustion
+     Check value of [max_lookahead_in_blocks] against gas exhaustion
      during this function execution. *)
   let rec go node ctxt =
     (*
@@ -333,7 +333,7 @@ let refine_stake ctxt rollup staker staked_on commitment =
          decreases.
 
          WARNING: Do NOT reorder this sequence of ifs. We must check
-         for staked_on before LCC, since refining from the LCC to
+         for [staked_on] before LCC, since refining from the LCC to
          another commit is a valid operation.
 
     *)
@@ -506,7 +506,7 @@ let remove_staker ctxt rollup staker =
       let* ctxt = modify_staker_count ctxt rollup Int32.pred in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4307
-         Check value of max_lookahead_in_blocks against gas exhaustion
+         Check value of [max_lookahead_in_blocks] against gas exhaustion
          during this function execution. *)
       let rec go node ctxt =
         (*
