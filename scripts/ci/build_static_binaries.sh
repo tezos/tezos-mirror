@@ -20,7 +20,8 @@ echo "Create destination directory"
 mkdir -pv "octez-binaries/$ARCH"
 
 echo "Build and install static binaries"
-make static
+# shellcheck disable=SC2086
+make static OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 
 echo "Check executables and move them to the destination directory"
 # Disable https://www.shellcheck.net/wiki/SC2086 because:
