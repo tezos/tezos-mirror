@@ -279,6 +279,52 @@ let select_nth_point n points =
   in
   loop n [] points
 
+let gen_points npoints ?port addr =
+  match port with
+  | Some port ->
+      let ports = port -- (port + npoints - 1) in
+      List.map (fun port -> (addr, port)) ports
+  | None ->
+      let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
+      let rec loop i ports =
+        if i <= 0 then ports
+        else
+          try
+            let main_socket = Unix.(socket PF_INET6 SOCK_STREAM 0) in
+            try
+              Unix.setsockopt main_socket Unix.SO_REUSEPORT true ;
+              Unix.setsockopt main_socket Unix.SO_REUSEADDR true ;
+              Unix.set_close_on_exec main_socket ;
+              Unix.bind
+                main_socket
+                (ADDR_INET
+                   ( uaddr,
+                     match port with
+                     | None -> 0
+                     | Some port -> port + (npoints - i) )) ;
+              Unix.listen main_socket 50 ;
+              let port =
+                match Unix.getsockname main_socket with
+                | ADDR_UNIX _ -> assert false
+                | ADDR_INET (_, port) -> port
+              in
+              Unix.close main_socket ;
+              loop (i - 1) (port :: ports)
+            with
+            | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
+              when port = None ->
+                Unix.close main_socket ;
+                loop i ports
+            | Unix.Unix_error (e, _, _) ->
+                Unix.close main_socket ;
+                Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
+          with Unix.Unix_error (e, _, _) ->
+            Format.kasprintf Stdlib.failwith "%s" (Unix.error_message e)
+      in
+
+      let ports = loop npoints [] in
+      List.map (fun port -> (addr, port)) ports
+
 (**Detach one process per id in [points], each with a p2p_pool and a
    welcome worker.
 

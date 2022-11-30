@@ -50,6 +50,12 @@ type t = {
 (** [sync node] join [node] to a synchronization barrier. *)
 val sync : t -> unit tzresult Lwt.t
 
+(** [gen_points npoints ~port addr] generated [npoints] points. If
+    [port] is not specified, it loops and generates points randomly
+    until it finds [npoints] that are not currently used.
+    *)
+val gen_points : int -> ?port:int -> P2p_addr.t -> P2p_point.Id.t list
+
 (** [detach_nodes f points] creates a network with one node for each [points].
     [f] is the behavior of each node.
     If the network is alive after [?timeout] seconds, if any is provided, the
