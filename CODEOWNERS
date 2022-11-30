@@ -62,7 +62,6 @@
 # @camlspotter = Jun Furuse
 # @emturner = Emma Turner
 # @eugenz = Eugen Zalinescu
-# @hans.hoglund = Hans Hoglund
 # @hhugo1 = Hugo Heuzard
 # @igarnier = Ilias Garnier
 # @iguerNL = Mohamed Iguernlala
@@ -91,7 +90,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hans.hoglund @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
+* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #
