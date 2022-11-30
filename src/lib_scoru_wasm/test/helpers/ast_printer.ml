@@ -428,11 +428,8 @@ let pp_concat_kont pp out Eval.{lv; rv; res; offset} =
     offset
 
 let pp_reveal out = function
-  | Reveal.Reveal_raw_data hash ->
-      Format.fprintf
-        out
-        "Reveal_raw_data (%s)"
-        (Reveal.reveal_hash_to_string hash)
+  | Host_funcs.Reveal_raw_data hash ->
+      Format.fprintf out "Reveal_raw_data (%s)" hash
   | Reveal_metadata -> Format.fprintf out "Reveal_metadata"
 
 let pp_invoke_step_kont out = function

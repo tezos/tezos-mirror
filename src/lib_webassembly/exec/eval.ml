@@ -358,7 +358,7 @@ type invoke_step_kont =
       concat_kont : value concat_kont;
     }
   | Inv_reveal_tick of {
-      reveal : Reveal.reveal;
+      reveal : Host_funcs.reveal;
       base_destination : int32;
       max_bytes : int32;
       code : code;

@@ -27,9 +27,7 @@ type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 
 type output = {outbox_level : Bounded.Non_negative_int32.t; message_index : Z.t}
 
-type reveal_hash
-
-val reveal_hash_to_string : reveal_hash -> string
+type reveal_hash = string
 
 type reveal = Reveal_raw_data of reveal_hash | Reveal_metadata
 

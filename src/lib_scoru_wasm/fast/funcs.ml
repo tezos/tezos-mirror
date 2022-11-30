@@ -272,34 +272,41 @@ let make (module Builtins : Builtins.S) state =
           ~key_offset
           ~key_length)
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4369
+     Align failure mode of reveal_* functions in Fast Execution. *)
   let reveal_preimage =
     fn
-      (i32 @-> i32 @-> i32 @-> returning1 i32)
-      (fun hash_addr dest max_bytes ->
+      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun hash_addr hash_size dest max_bytes ->
         let mem = state.retrieve_mem () in
+        let hash_size = Int32.to_int hash_size in
         let hash_addr = Int32.to_int hash_addr in
         let dest = Int32.to_int dest in
         let max_bytes = Int32.to_int max_bytes in
-        let hash =
-          String.init 32 (fun i ->
-              (* XXX: No bounds checks
-                 The "main" reveal function does not deal with out-of-bounds
-                 scenarios. That ultimate means we don't return error codes.
-                 Instead, we just fail with the exception being thrown.
-                 In most cases the Fast Exec mechanism will fall back to another
-                 execution mode to deal with this. *)
-              Memory.get mem (hash_addr + i)
-              |> Unsigned.UInt8.to_int |> Char.chr)
-          |> Tezos_webassembly_interpreter.Reveal.reveal_hash_from_string_exn
-        in
-        let+ payload = Builtins.reveal_preimage hash in
-        let revealed_bytes = min (String.length payload) max_bytes in
-        let payload = String.sub payload 0 revealed_bytes in
-        String.iteri
-          (fun i c ->
-            Char.code c |> Unsigned.UInt8.of_int |> Memory.set mem (dest + i))
-          payload ;
-        Int32.of_int revealed_bytes)
+        (* If hash_size is too large we fail and fallback to another execution
+           mode.*)
+        if hash_size > Host_funcs.Aux.input_output_max_size then
+          raise @@ Invalid_argument "Hash size too large"
+        else
+          let hash =
+            String.init hash_size (fun i ->
+                (* XXX: No bounds checks
+                   The "main" reveal function does not deal with out-of-bounds
+                   scenarios. That ultimate means we don't return error codes.
+                   Instead, we just fail with the exception being thrown.
+                   In most cases the Fast Exec mechanism will fall back to another
+                   execution mode to deal with this. *)
+                Memory.get mem (hash_addr + i)
+                |> Unsigned.UInt8.to_int |> Char.chr)
+          in
+          let+ payload = Builtins.reveal_preimage hash in
+          let revealed_bytes = min (String.length payload) max_bytes in
+          let payload = String.sub payload 0 revealed_bytes in
+          String.iteri
+            (fun i c ->
+              Char.code c |> Unsigned.UInt8.of_int |> Memory.set mem (dest + i))
+            payload ;
+          Int32.of_int revealed_bytes)
   in
   let reveal_metadata =
     fn

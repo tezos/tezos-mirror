@@ -1109,9 +1109,6 @@ struct
 
     type reveal_hash = Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
 
-    let reveal_hash_to_string =
-      Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash_to_string
-
     type reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal =
       | Reveal_raw_data of reveal_hash
       | Reveal_metadata

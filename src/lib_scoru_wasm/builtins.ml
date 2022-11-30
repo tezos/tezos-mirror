@@ -23,11 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_webassembly_interpreter
-
 module type S = sig
-  (** [reveal_preimage hash] reveals the preimage of the given 32-byte hash. *)
-  val reveal_preimage : Reveal.reveal_hash -> string Lwt.t
+  (** [reveal_preimage hash] reveals the preimage of the given hash. *)
+  val reveal_preimage : string -> string Lwt.t
 
   (** [reveal_metadata ()] returns the encoded metadata for the rollup. *)
   val reveal_metadata : unit -> string Lwt.t

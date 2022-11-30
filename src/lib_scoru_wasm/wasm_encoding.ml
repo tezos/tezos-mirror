@@ -972,11 +972,7 @@ let packed_frame_stack_encoding =
        (scope ["frame"] frame_encoding)
        (scope ["label_kont"] packed_label_kont_encoding))
 
-let reveal_hash_encoding =
-  conv
-    Reveal.reveal_hash_from_string_exn
-    Reveal.reveal_hash_to_string
-    (value [] (Data_encoding.Fixed.string 32))
+let reveal_hash_encoding = value [] (Data_encoding.string' Hex)
 
 let reveal_encoding =
   tagged_union
@@ -985,12 +981,12 @@ let reveal_encoding =
       case
         "Reveal_raw_data"
         reveal_hash_encoding
-        (function Reveal.Reveal_raw_data hash -> Some hash | _ -> None)
+        (function Host_funcs.Reveal_raw_data hash -> Some hash | _ -> None)
         (fun hash -> Reveal_raw_data hash);
       case
         "Reveal_metadata"
         (value [] Data_encoding.unit)
-        (function Reveal.Reveal_metadata -> Some () | _ -> None)
+        (function Host_funcs.Reveal_metadata -> Some () | _ -> None)
         (fun () -> Reveal_metadata);
     ]
 
