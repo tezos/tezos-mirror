@@ -82,6 +82,10 @@ val sc_max_wrapped_proof_binary_size : int
 *)
 val sc_rollup_message_size_limit : int
 
+(** A limit on the number of messages in a inbox level enforced in
+    {!Sc_rollup_inbox_repr.t}. *)
+val sc_rollup_max_number_of_messages_per_level : Z.t
+
 type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding

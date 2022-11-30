@@ -25,6 +25,8 @@
 
 type error += Inbox_proof_error of string
 
+type error += Inbox_level_reached_messages_limit
+
 (** Merkelizing inbox for smart-contract rollups.
 
    {1 Overview}

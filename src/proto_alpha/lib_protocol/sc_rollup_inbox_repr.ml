@@ -55,6 +55,8 @@ type error += Inbox_proof_error of string
 
 type error += Tried_to_add_zero_messages
 
+type error += Inbox_level_reached_messages_limit
+
 let () =
   let open Data_encoding in
   register_error_kind
@@ -78,7 +80,23 @@ let () =
     ~pp:(fun ppf _ -> Format.fprintf ppf "Tried to add zero messages")
     empty
     (function Tried_to_add_zero_messages -> Some () | _ -> None)
-    (fun () -> Tried_to_add_zero_messages)
+    (fun () -> Tried_to_add_zero_messages) ;
+
+  let description =
+    Format.sprintf
+      "There can be only %s messages in an inbox level, the limit has been \
+       reached."
+      (Z.to_string Constants_repr.sc_rollup_max_number_of_messages_per_level)
+  in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_inbox.inbox_level_reached_message_limit"
+    ~title:"Inbox level reached messages limit"
+    ~description
+    ~pp:(fun ppf _ -> Format.pp_print_string ppf description)
+    empty
+    (function Inbox_level_reached_messages_limit -> Some () | _ -> None)
+    (fun () -> Inbox_level_reached_messages_limit)
 
 module Int64_map = Map.Make (Int64)
 
@@ -345,7 +363,25 @@ let level_tree_proof_encoding =
           Sc_rollup_inbox_merkelized_payload_hashes_repr.proof_encoding)
        (opt "payload" (string Plain)))
 
+let add_protocol_internal_message payload payloads_history witness =
+  Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload
+    payloads_history
+    witness
+    payload
+
 let add_message payload payloads_history witness =
+  let open Result_syntax in
+  let message_counter =
+    Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index witness
+  in
+  let* () =
+    let max_number_of_messages_per_level =
+      Constants_repr.sc_rollup_max_number_of_messages_per_level
+    in
+    error_unless
+      Compare.Z.(message_counter <= max_number_of_messages_per_level)
+      Inbox_level_reached_messages_limit
+  in
   Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload
     payloads_history
     witness
@@ -752,7 +788,7 @@ let add_info_per_level ~timestamp ~predecessor payloads_history witness =
     Sc_rollup_inbox_message_repr.(
       serialize (Internal (Info_per_level {timestamp; predecessor})))
   in
-  add_message info_per_level payloads_history witness
+  add_protocol_internal_message info_per_level payloads_history witness
 
 let add_info_per_level_no_history ~timestamp ~predecessor witness =
   let open Result_syntax in
@@ -768,7 +804,9 @@ let finalize_inbox_level payloads_history history inbox witness =
   let open Result_syntax in
   let inbox = {inbox with level = Raw_level_repr.succ inbox.level} in
   let eol = Sc_rollup_inbox_message_repr.end_of_level_serialized in
-  let* payloads_history, witness = add_message eol payloads_history witness in
+  let* payloads_history, witness =
+    add_protocol_internal_message eol payloads_history witness
+  in
   let* history, inbox = archive history inbox witness in
   return (payloads_history, history, witness, inbox)
 
@@ -833,7 +871,7 @@ let genesis ~timestamp ~predecessor level =
   (* 2. Add [EOL]. *)
   let eol = Sc_rollup_inbox_message_repr.end_of_level_serialized in
   let* _payloads_history, witness =
-    add_message eol no_payloads_history witness
+    add_protocol_internal_message eol no_payloads_history witness
   in
 
   let level_proof =

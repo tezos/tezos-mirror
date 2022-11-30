@@ -785,6 +785,8 @@ module Constants : sig
 
   val sc_rollup_message_size_limit : int
 
+  val sc_rollup_max_number_of_messages_per_level : Z.t
+
   (** Constants parameterized by context. See {!Constants_parametric_repr}. *)
   module Parametric : sig
     type dal = {
