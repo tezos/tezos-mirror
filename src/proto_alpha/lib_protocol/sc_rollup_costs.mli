@@ -49,13 +49,6 @@ end
 val is_valid_parameters_ty_cost :
   ty_size:'a Saturation_repr.t -> Saturation_repr.may_saturate Saturation_repr.t
 
-(** [cost_add_serialized_messages ~num_messages ~total_messages_length level]
-    returns the cost of adding [num_messages] with total messages size
-    [total_messages_size] to a sc-rollup inbox at level [level]. This
-    function is used internally in the [Sc_rollup_storage] module. *)
-val cost_add_serialized_messages :
-  num_messages:int -> total_messages_size:int -> int32 -> Gas_limit_repr.cost
-
 (** [cost_serialize_internal_inbox_message internal_inbox_message] is the cost
     of the serialization of an internal inbox message. It's equal to the cost of
     serializing the script expression, with {!Script_repr.force_bytes_cost} plus

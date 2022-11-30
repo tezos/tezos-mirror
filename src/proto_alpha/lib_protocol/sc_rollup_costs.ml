@@ -88,24 +88,6 @@ module Constants = struct
   let cost_verify_output_proof_per_byte = S.safe_int 152
 end
 
-(* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
-   [l] is linear in the sum of lengths of the messages, and it is logarithmic
-   in [l]. That is, [cost_add_serialized_messages([m_1; .. ; m_n], l)] =
-   `n * cost_add_message_base +
-    cost_add_message_per_bytes * \sum_{i=1}^n length(m_i) +
-    cost_add_inbox_per_level * l`.
-*)
-let cost_add_serialized_messages ~num_messages ~total_messages_size l =
-  let open S_syntax in
-  let log_level =
-    if Int32.equal l Int32.zero then Saturation_repr.safe_int 0
-    else log2 @@ S.safe_int (Int32.to_int l)
-  in
-  let level_cost = log_level * Constants.cost_add_inbox_per_level in
-  (S.safe_int num_messages * Constants.cost_add_message_base)
-  + level_cost
-  + (Constants.cost_add_message_per_byte * S.safe_int total_messages_size)
-
 (* Reusing model from {!Ticket_costs.has_tickets_of_ty_cost}. *)
 let is_valid_parameters_ty_cost ~ty_size =
   let fixed_cost = S.safe_int 10 in
