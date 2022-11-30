@@ -540,6 +540,46 @@ val inline_tests_backend : target -> inline_tests
       where [ARCH] is a condition that only holds on 64-bit architectures. *)
 type with_test = Always | Never | Only_on_64_arch
 
+(** Release status for internal targets.
+
+    The semantics of release statuses is summed up in this table:
+
+    |                       | Unreleased | Experimental | Released | Auto_opam |
+    |-----------------------+------------+--------------+----------+-----------|
+    | make experimental     | no         | yes          | yes      | no        |
+    | docker (master)       | no         | yes          | yes      | no        |
+    | static (master)       | no         | yes          | yes      | no        |
+    | make                  | no         | no           | yes      | no        |
+    | docker (release tag)) | no         | no           | yes      | no        |
+    | static (release tag)  | no         | no           | yes      | no        |
+    | opam (release tag)    | no         | no           | yes      | if needed |
+
+    [Unreleased] means: never release.
+
+    [Experimental] means: release for [master], but not for release tags.
+    Since opam packages are not released for [master], they are never published
+    for experimental targets. However, [make experimental] builds public executables
+    and those executables are put in Docker images and made available as static
+    executables for [master].
+
+    [Released] means: release both for [master] and release tags.
+    Opam packages of released targets are published when making release tags.
+    [make] builds released public executables and those executables are put in
+    Docker images and made available as static executables, both for [master]
+    and release tags.
+
+    [Auto_opam] means: only release opam package, and only if needed.
+    The opam package is released if:
+    - one of its targets is released;
+    - or it is a transitive dependency of another released opam package.
+
+    Note that a given opam package cannot be both published and not published.
+    This means that it is not possible to have an [Unreleased] or [Experimental]
+    target in the same package as a [Released] target. It is also not possible
+    for a target to be [Unreleased] or [Experimental] if it is in an opam package
+    which is needed as a transitive dependency of a [Released] target. *)
+type release_status = Unreleased | Experimental | Released | Auto_opam
+
 (** Functions that build internal targets.
 
     The ['a] argument is instantiated by the relevant type for the name(s)
@@ -664,11 +704,9 @@ type with_test = Always | Never | Only_on_64_arch
       dependencies in the [.opam] file (unless they are required by other targets).
       Default is [false].
 
-    - [release]: defines whether this should be released.
-      Note: it is not always the case that public_exes should be released.
-      They are often public because they are needed by other opam packages, such as in tests.
-      Releasable [public_exe] values should be marked explicitly.
-      Default is [false].
+    - [release_status]: if and when this should be released.
+      See the documentation of type {!release_status}.
+      Default value is [Auto_opam].
 
     - [static]: whether to incluce [ %{workspace_root}/static-link-flags.sexp ] to the link
       flags to provide a static compilation profile.
@@ -726,7 +764,7 @@ type 'a maker =
   ?private_modules:string list ->
   ?profile:string ->
   ?opam_only_deps:target list ->
-  ?release:bool ->
+  ?release_status:release_status ->
   ?static:bool ->
   ?synopsis:string ->
   ?description:string ->
