@@ -136,6 +136,8 @@ type 'action io_error = {
   arg : string;  (** Argument given to the unix function: generally a path. *)
 }
 
+val tzfail_of_io_error : [`Close | `Open | `Rename] io_error -> 'b tzresult
+
 (** [with_open_file ~flags ~perm filename f] opens the given file
    using {!Lwt_unix.open_file} and passes the resulting file-descriptor
    to [f]. [with_open_file] ensures that the file-descriptor is closed
