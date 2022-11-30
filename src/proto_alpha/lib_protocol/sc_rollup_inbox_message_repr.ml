@@ -184,3 +184,13 @@ end
 
 let hash_serialized_message (payload : serialized) =
   Hash.hash_string [(payload :> string)]
+
+let start_of_level_serialized =
+  (* If [Start_of_level] cannot be serialized, this will be detected at
+     compilation time as we are defining a top-level value. *)
+  Data_encoding.Binary.to_string_exn encoding (Internal Start_of_level)
+
+let end_of_level_serialized =
+  (* If [End_of_level] cannot be serialized, this will be detected at
+     compilation time as we are defining a top-level value. *)
+  Data_encoding.Binary.to_string_exn encoding (Internal End_of_level)

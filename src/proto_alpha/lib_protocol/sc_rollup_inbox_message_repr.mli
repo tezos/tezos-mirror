@@ -93,3 +93,9 @@ module Hash : S.HASH
 (** [hash_serialized_message payload] is the hash of [payload]. It is used by
     {!Sc_rollup_inbox_merkelized_payload_hashes_repr.t}. *)
 val hash_serialized_message : serialized -> Hash.t
+
+(** {!serialized} representation of [Internal [Start_of_level]]. *)
+val start_of_level_serialized : serialized
+
+(** {!serialized} representation of [Internal [End_of_level]]. *)
+val end_of_level_serialized : serialized

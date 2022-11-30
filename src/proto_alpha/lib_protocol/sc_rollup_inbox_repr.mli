@@ -139,7 +139,10 @@ module V1 : sig
 
   (** A [level_proof] contains the root hash of the level tree and its
       corresponding level. *)
-  type level_proof
+  type level_proof = private {
+    hash : Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t;
+    level : Raw_level_repr.t;
+  }
 
   (** A [history_proof] is a [Skip_list.cell] that stores multiple
     hashes. [Skip_list.content history_proof] gives the hash of the
@@ -216,57 +219,39 @@ type serialized_proof
 
 val serialized_proof_encoding : serialized_proof Data_encoding.t
 
-(** [add_messages level_tree_history history inbox level payloads level_tree]
-    inserts a list of [payloads] as new messages in the [level_tree] and
-    remember them in [level_tree_history] of the current [level] of the
-    [inbox]. This function returns the new level tree as well as updated
-    [inbox], [history] and [level_tree_history].
+(** [add_all_messages history inbox messages] starts a new inbox level,
+    adds all the [messages], then ends the inbox level. It can
+    be called even if [payloads] is empty.
 
-    If the [inbox]'s level is older than [level], the [inbox] is
-    updated so that the level tree of the previous level is
-    archived. To archive a [level_tree] for a given [level], we
-    push it at the end of the [history] and update the witness of this
-    history in the [inbox]. The [inbox]'s level tree for the current
-    level is emptied to insert the [payloads] in a fresh [level_tree]
-    for [level].
+    Remembers everything needed in a created [payloads_history] and [history].
+    It is meant to be used by the rollup-node to reduce the risk of
+    de-synchronisation between the protocol and the node.
 
-  *)
-val add_messages :
-  Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t ->
+    Adds the messages pushed by the protocol and returns a list of messages
+    including them. The caller will need to execute this list of messages,
+    otherwise, it might miss some internal inputs.
+ *)
+val add_all_messages :
+  timestamp:Time.t ->
+  predecessor:Block_hash.t ->
   History.t ->
   t ->
-  Raw_level_repr.t ->
-  Sc_rollup_inbox_message_repr.serialized list ->
-  Sc_rollup_inbox_merkelized_payload_hashes_repr.t option ->
+  Sc_rollup_inbox_message_repr.t list ->
   (Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t
-  * Sc_rollup_inbox_merkelized_payload_hashes_repr.t
   * History.t
-  * t)
+  * t
+  * Sc_rollup_inbox_merkelized_payload_hashes_repr.t
+  * Sc_rollup_inbox_message_repr.t list)
   tzresult
 
-(** [add_messages_no_history inbox level payloads level_tree] behaves as
-    {!add_external_messages} except that it does not remember the inbox and
-    payload history. *)
+(** [add_messages_no_history payloads witness] updates the [witness] by
+    inserting the [payloads]. *)
 val add_messages_no_history :
-  t ->
-  Raw_level_repr.t ->
   Sc_rollup_inbox_message_repr.serialized list ->
-  Sc_rollup_inbox_merkelized_payload_hashes_repr.t option ->
-  (Sc_rollup_inbox_merkelized_payload_hashes_repr.t * t) tzresult
+  Sc_rollup_inbox_merkelized_payload_hashes_repr.t ->
+  Sc_rollup_inbox_merkelized_payload_hashes_repr.t tzresult
 
-(** [form_history_proof history inbox] creates the skip list structure that
-    includes the current inbox level, while also updating the [history].
-
-    This is used in [archive_if_needed] to produce the [old_levels_messages]
-    value for the next level of the inbox. It is also needed if you want to
-    produce a fully-up-to-date skip list for proof production. Just taking the
-    skip list stored in the inbox at [old_levels_messages] will not include the
-    current level. *)
-val form_history_proof : History.t -> t -> (History.t * history_proof) tzresult
-
-(** This is similar to {!form_history_proof} except that it is just to be used
-    on the protocol side because it doesn't ensure the history is
-    remembered. Used at the beginning of a refutation game to create the
+(** Used at the beginning of a refutation game to create the
     snapshot against which proofs in that game must be valid.
 
     One important note:
@@ -336,13 +321,13 @@ val verify_proof :
   proof ->
   Sc_rollup_PVM_sig.inbox_message option tzresult
 
-(** [produce_proof get_level_tree_history history inbox (level, counter)]
+(** [produce_proof get_payloads_history history inbox (level, counter)]
     creates an inbox proof proving the first message after the index [counter]
-    at location [level]. This will fail if the [get_level_tree_history] given
+    at location [level]. This will fail if the [get_payloads_history] given
     doesn't have sufficient data (it needs to be run on an with a full
     history). *)
 val produce_proof :
-  get_level_tree_history:
+  get_payloads_history:
     (Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t Lwt.t) ->
   History.t ->
@@ -350,16 +335,30 @@ val produce_proof :
   Raw_level_repr.t * Z.t ->
   (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
 
-(** [empty level] is an inbox started at some given [level] with no message at
-    all. *)
-val empty : Raw_level_repr.t -> t
+(** [init_witness_no_history] initializes the witness for a new inbox level
+    by adding the first input, i.e. [Start_of_level]. *)
+val init_witness_no_history : Sc_rollup_inbox_merkelized_payload_hashes_repr.t
+
+(** [add_info_per_level_no_history] adds the input [Info_per_level]. *)
+val add_info_per_level_no_history :
+  timestamp:Time.t ->
+  predecessor:Block_hash.t ->
+  Sc_rollup_inbox_merkelized_payload_hashes_repr.t ->
+  Sc_rollup_inbox_merkelized_payload_hashes_repr.t tzresult
+
+(** [finalize_inbox_level payloads_history history inbox level_witness] updates
+    the current inbox's level witness by adding [EOL], and archives the current
+    level. *)
+val finalize_inbox_level_no_history :
+  t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t tzresult
+
+(** [genesis ~timestamp ~predecessor level] initializes the inbox at some
+    given [level] with: SOL, Info_per_level {timestamp; predecessor} and EOL
+    inside. *)
+val genesis :
+  timestamp:Time.t -> predecessor:Block_hash.t -> Raw_level_repr.t -> t tzresult
 
 module Internal_for_tests : sig
-  val eq_tree :
-    Sc_rollup_inbox_merkelized_payload_hashes_repr.t ->
-    Sc_rollup_inbox_merkelized_payload_hashes_repr.t ->
-    bool
-
   (** [produce_inclusion_proof history a b] exploits [history] to produce
       a self-contained proof that [a] is an older version of [b]. *)
   val produce_inclusion_proof :

@@ -2197,7 +2197,7 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
             Raw_context.Internal_for_tests.add_level ctxt commitment_period
           else ctxt
         in
-        let* _inbox, _size_diff, ctxt =
+        let* ctxt =
           lift @@ Sc_rollup_inbox_storage.add_external_messages ctxt payload
         in
         return ctxt)

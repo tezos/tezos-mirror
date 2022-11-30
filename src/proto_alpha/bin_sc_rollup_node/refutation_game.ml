@@ -177,10 +177,7 @@ module Make (Interpreter : Interpreter.S) :
       Node_context.checkout_context node_ctxt snapshot_hash
     in
     let snapshot_ctxt_index = Context.index snapshot_ctxt in
-    let*? snapshot_history, snapshot =
-      Sc_rollup.Inbox.form_history_proof snapshot_history snapshot_inbox
-      |> Environment.wrap_tzresult
-    in
+    let snapshot = Sc_rollup.Inbox.take_snapshot snapshot_inbox in
     let* dal_slots_history =
       Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
     in
@@ -225,8 +222,8 @@ module Make (Interpreter : Interpreter.S) :
 
         let inbox = snapshot
 
-        let get_level_tree_history =
-          Store.Level_tree_histories.get node_ctxt.Node_context.store
+        let get_payloads_history =
+          Store.Payloads_histories.get node_ctxt.Node_context.store
       end
 
       module Dal_with_history = struct

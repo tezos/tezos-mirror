@@ -39,7 +39,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send sc rollup message 'text:["hash:scrrh144gSwSgX2cSw3v8p9h5rf6L6Ryvx4ewEhBDhkz7ErY9EChS47a"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.497 units (will add 100 for safety)
+Estimated gas: 1000.122 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -52,25 +52,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000404
     Expected counter: 1
-    Gas limit: 1102
+    Gas limit: 1101
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000404
       payload fees(the block proposer) ....... +ꜩ0.000404
     Smart contract rollup messages submission
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1001.497
-      Resulting inbox state: { level = 3
-                               current messages hash  = hash: [SC_ROLLUP_INBOX_LEVEL_TREE_HASH]
-                               level: 3 nb_messages_in_commitment_period = 9
-                               old_levels_messages = 
-       content = hash: [SC_ROLLUP_INBOX_LEVEL_TREE_HASH]
-                               level: 2
-       index = 2
-       back_pointers = [SC_ROLLUP_INBOX_HASH]
-                               [SC_ROLLUP_INBOX_HASH]
-    
-                               }
+      Consumed gas: 1000.122
 
 
 ./octez-sc-rollup-client-alpha get state value for vars/value --block head

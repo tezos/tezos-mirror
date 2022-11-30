@@ -161,7 +161,6 @@ type successful_transaction_result =
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;
       ticket_receipt : Ticket_receipt.t;
-      inbox_after : Sc_rollup.Inbox.t;
     }
   | Transaction_to_zk_rollup_result of {
       ticket_hash : Ticket_hash.t;
@@ -336,19 +335,16 @@ module Internal_operation = struct
         case
           ~title:"To_sc_rollup"
           (Tag 2)
-          (obj3
+          (obj2
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-             (req "ticket_receipt" Ticket_receipt.encoding)
-             (req "inbox_after" Sc_rollup.Inbox.encoding))
+             (req "ticket_receipt" Ticket_receipt.encoding))
           (function
-            | Transaction_to_sc_rollup_result
-                {consumed_gas; ticket_receipt; inbox_after} ->
-                Some (consumed_gas, ticket_receipt, inbox_after)
+            | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
+                Some (consumed_gas, ticket_receipt)
             | _ -> None)
           (function
-            | consumed_gas, ticket_receipt, inbox_after ->
-                Transaction_to_sc_rollup_result
-                  {consumed_gas; ticket_receipt; inbox_after});
+            | consumed_gas, ticket_receipt ->
+                Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
       ]
 
   let transaction_case =

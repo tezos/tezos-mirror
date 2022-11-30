@@ -27,12 +27,6 @@
 open Sc_rollup_errors
 module Store = Storage.Sc_rollup
 
-let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
-  ( num_messages + 1,
-    total_messages_size
-    + String.length
-        (message : Sc_rollup_inbox_message_repr.serialized :> string) )
-
 let get_inbox ctxt =
   let open Lwt_result_syntax in
   let* inbox = Store.Inbox.get ctxt in
@@ -54,29 +48,8 @@ let _assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
     Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
 let add_messages ctxt messages =
-  let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_result_syntax in
   let open Raw_context in
-  let* inbox, ctxt = get_inbox ctxt in
-  let* num_messages, total_messages_size, ctxt =
-    List.fold_left_es
-      (fun (num_messages, total_messages_size, ctxt) message ->
-        let*? ctxt =
-          Raw_context.consume_gas
-            ctxt
-            Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages
-        in
-        let num_messages, total_messages_size =
-          update_num_and_size_of_messages
-            ~num_messages
-            ~total_messages_size
-            message
-        in
-        return (num_messages, total_messages_size, ctxt))
-      (0, 0, ctxt)
-      messages
-  in
-
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
      In the current setup, we can stop the chain when hitting the
      limit. *)
@@ -87,34 +60,21 @@ let add_messages ctxt messages =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3292
 
      The carbonation needs to be activated again with the new internal inbox's
-     design, i.e. the skip list. *)
-  let cost_add_serialized_messages =
-    Sc_rollup_costs.cost_add_serialized_messages
-      ~num_messages
-      ~total_messages_size
-      0l
-  in
-  let*? ctxt = Raw_context.consume_gas ctxt cost_add_serialized_messages in
+     design, i.e. the skip list.
+  *)
   let current_messages = Sc_rollup_in_memory_inbox.current_messages ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
   *)
-  let*? current_messages, inbox =
-    Sc_rollup_inbox_repr.add_messages_no_history
-      inbox
-      level
-      messages
-      current_messages
+  let*? current_messages =
+    Sc_rollup_inbox_repr.add_messages_no_history messages current_messages
   in
   let ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt current_messages
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3920
-     Account the size's difference with the carbonated storage. *)
-  let* ctxt = Store.Inbox.update ctxt inbox in
-  return (inbox, Z.zero, ctxt)
+  return ctxt
 
 let serialize_external_messages ctxt external_messages =
   let open Sc_rollup_inbox_message_repr in
@@ -162,27 +122,46 @@ let add_deposit ctxt ~payload ~sender ~source ~destination =
   in
   add_internal_message ctxt internal_message
 
-module Internal_for_tests = struct
-  let update_num_and_size_of_messages = update_num_and_size_of_messages
-end
+let finalize_inbox_level ctxt =
+  let open Lwt_result_syntax in
+  let* inbox, ctxt = get_inbox ctxt in
+  let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+  let*? inbox =
+    Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness
+  in
+  let* ctxt = Store.Inbox.update ctxt inbox in
+  return ctxt
 
-let add_start_of_level ctxt =
-  add_internal_message ctxt Sc_rollup_inbox_message_repr.Start_of_level
+let add_info_per_level ~timestamp ~predecessor ctxt =
+  let open Lwt_result_syntax in
+  let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+  let*? witness =
+    Sc_rollup_inbox_repr.add_info_per_level_no_history
+      ~timestamp
+      ~predecessor
+      witness
+  in
+  let ctxt =
+    Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
+  in
+  return ctxt
 
-let add_end_of_level ctxt =
-  add_internal_message ctxt Sc_rollup_inbox_message_repr.End_of_level
-
-let add_info_per_level ctxt timestamp predecessor =
-  add_internal_message
-    ctxt
-    (Sc_rollup_inbox_message_repr.Info_per_level {timestamp; predecessor})
-
-let init ~timestamp ~predecessor ctxt =
+let init_inbox ~timestamp ~predecessor ctxt =
   let open Lwt_result_syntax in
   let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
-  let inbox = Sc_rollup_inbox_repr.empty level in
+  let*? inbox = Sc_rollup_inbox_repr.genesis ~timestamp ~predecessor level in
   let* ctxt = Store.Inbox.init ctxt inbox in
-  let* _inbox, _diff, ctxt = add_start_of_level ctxt in
-  let* _inbox, _diff, ctxt = add_info_per_level ctxt timestamp predecessor in
-  let* _inbox, _diff, ctxt = add_end_of_level ctxt in
   return ctxt
+
+module Internal_for_tests = struct
+  let add_start_of_level ctxt =
+    add_internal_message ctxt Sc_rollup_inbox_message_repr.Start_of_level
+
+  let add_end_of_level ctxt =
+    add_internal_message ctxt Sc_rollup_inbox_message_repr.End_of_level
+
+  let add_info_per_level ctxt timestamp predecessor =
+    add_internal_message
+      ctxt
+      (Sc_rollup_inbox_message_repr.Info_per_level {timestamp; predecessor})
+end

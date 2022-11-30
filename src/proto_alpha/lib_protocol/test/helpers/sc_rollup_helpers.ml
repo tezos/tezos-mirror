@@ -218,6 +218,26 @@ type message = {
     | `EOL ];
 }
 
+(** Put as much information as possible in this record so it can be used
+    in different setups:
+    1. Creating an inbox on the protocol-side, requires [messages] only.
+    2. Re-construct an inbox, requires [payloads], [timestamp], [predecessor].
+    3. Evaluate inputs in a PVM, requires [inputs]
+
+    [level] is useful for (1) (2) (3).
+ *)
+type payloads_per_level = {
+  messages : string list;  (** List of external messages. *)
+  payloads : Sc_rollup.Inbox_message.serialized list;
+      (** List of external serialized messages. *)
+  timestamp : Time.Protocol.t;  (** Timestamp of the [Info_per_level]. *)
+  predecessor : Tezos_crypto.Block_hash.t;
+      (** Predecessor of the [Info_per_level]. *)
+  level : Raw_level.t;
+  inputs : Sc_rollup.input list;
+      (** List of all inputs for the level, to be read by a PVM. *)
+}
+
 let pp_input fmt (input : Sc_rollup.input) =
   match input with
   | Reveal _ -> assert false
@@ -255,27 +275,45 @@ let strs_to_inputs inbox_level messages =
     ([], Z.of_int 2)
     messages
 
-(** Transform messages into inputs and wrap them between [SOL; info_per_level]
-    and EOL. *)
-let wrap_messages ?(timestamp = Timestamp.of_seconds 0L)
-    ?(predecessor = Tezos_crypto.Block_hash.zero) inbox_level strs =
-  let sol = {input = make_sol ~inbox_level; message = `SOL} in
-  let rev_inputs, message_counter = strs_to_inputs inbox_level strs in
-  let inputs = List.rev rev_inputs in
+(** Transform the list of all inputs the PVM should read. *)
+let make_inputs timestamp predecessor messages inbox_level =
+  (* SOL is at index 0. *)
+  let sol = make_sol ~inbox_level in
+  (* Info_per_level is at index 1. *)
   let info_per_level =
-    {
-      input = make_info_per_level ~inbox_level ~predecessor ~timestamp;
-      message = `Info_per_level (timestamp, predecessor);
-    }
+    make_info_per_level ~inbox_level ~timestamp ~predecessor
   in
-  let eol = {input = make_eol ~inbox_level ~message_counter; message = `EOL} in
-  (sol :: info_per_level :: inputs) @ [eol]
+  (* External inputs start at index 2. *)
+  let external_inputs =
+    List.mapi
+      (fun i message ->
+        make_external_input
+          ~inbox_level
+          ~message_counter:(Z.of_int (2 + i))
+          message)
+      messages
+  in
+  (* EOL is after SOL/Info_per_level and all external inputs, therefore,
+     at index [2 + List.length messages]. *)
+  let eol =
+    let message_counter = Z.of_int (2 + List.length messages) in
+    make_eol ~inbox_level ~message_counter
+  in
+  [sol; info_per_level] @ external_inputs @ [eol]
 
-(** An empty inbox level is a SOL, info_per_level and EOL. *)
-let make_empty_level ?timestamp ?predecessor inbox_level =
-  wrap_messages ?timestamp ?predecessor inbox_level []
+(** Wrap messages, timestamp and predecessor of a level into a
+    [payloads_per_level] .*)
+let wrap_messages ?(timestamp = Timestamp.of_seconds 0L)
+    ?(predecessor = Tezos_crypto.Block_hash.zero) level messages :
+    payloads_per_level =
+  let payloads = List.map make_external_inbox_message messages in
+  let inputs = make_inputs timestamp predecessor messages level in
+  {payloads; timestamp; predecessor; messages; level; inputs}
 
-let gen_messages_for_levels ~start_level ~max_level gen_message =
+let make_empty_level ?timestamp ?predecessor level =
+  wrap_messages ?timestamp ?predecessor level []
+
+let gen_payloads_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
   let rec aux acc n =
     match n with
@@ -433,88 +471,66 @@ let gen_message_reprs_for_levels_repr ~start_level ~max_level gen_message_repr =
   in
   aux [] (max_level - start_level)
 
-module Level_tree_histories =
+module Payloads_histories =
   Map.Make (Sc_rollup.Inbox_merkelized_payload_hashes.Hash)
 
-type level_tree_histories =
-  Sc_rollup.Inbox_merkelized_payload_hashes.History.t Level_tree_histories.t
+type payloads_histories =
+  Sc_rollup.Inbox_merkelized_payload_hashes.History.t Payloads_histories.t
 
-let get_level_tree_history level_tree_histories level_tree_hash =
-  Level_tree_histories.find level_tree_hash level_tree_histories
+let get_payloads_history payloads_histories witness =
+  Payloads_histories.find witness payloads_histories
   |> WithExceptions.Option.get ~loc:__LOC__
   |> Lwt.return
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3529
-
-   Factor code for the unit test.
-   this and {!Store_inbox} is highly copy-pasted from
-   test/unit/test_sc_rollup_inbox. The main difference is: we use
-   [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
-   former. *)
-let fill_inbox ~inbox ~shift_level ?origination_level
-    ?(with_level_tree_history = true) history level_tree_histories inputs =
+let fill_inbox ~inbox history payloads_histories payloads_per_levels =
   let open Result_syntax in
-  let rec aux i level_tree_histories history inbox = function
-    | [] -> return (level_tree_histories, history, inbox)
-    | (inputs : Sc_rollup.input list) :: rst ->
-        let level = Raw_level.Internal_for_tests.add shift_level i in
-        assert (
-          match origination_level with
-          | Some origination_level -> Raw_level.(origination_level < level)
-          | None -> true) ;
-        let payloads =
+  let rec aux payloads_histories history inbox = function
+    | [] -> return (payloads_histories, history, inbox)
+    | ({payloads = _; timestamp; predecessor; messages; level = _; inputs = _} :
+        payloads_per_level)
+      :: rst ->
+        let messages =
           List.map
-            (function
-              | Sc_rollup.Inbox_message {payload; _} -> payload
-              | Reveal _ -> (* We don't produce any reveals. *) assert false)
-            inputs
+            (fun message -> Sc_rollup.Inbox_message.External message)
+            messages
         in
-        let level_tree_history =
-          let capacity =
-            if with_level_tree_history then Int64.of_int @@ List.length payloads
-            else 0L
-          in
-          Sc_rollup.Inbox_merkelized_payload_hashes.History.empty ~capacity
+        let* payloads_history, history, inbox, _witness, _messages =
+          Environment.wrap_tzresult
+          @@ Sc_rollup.Inbox.add_all_messages
+               ~timestamp
+               ~predecessor
+               history
+               inbox
+               messages
         in
-        let* level_tree_history, level_tree, history, inbox =
-          Sc_rollup.Inbox.add_messages
-            level_tree_history
-            history
-            inbox
-            level
-            payloads
-            None
-          |> Environment.wrap_tzresult
+        (* Store in the history this archived level. *)
+        let Sc_rollup.Inbox.{hash = witness_hash; _} =
+          Sc_rollup.Inbox.current_level_proof inbox
         in
-        let level_tree_hash =
-          Sc_rollup.Inbox_merkelized_payload_hashes.hash level_tree
+        let payloads_histories =
+          Payloads_histories.add
+            witness_hash
+            payloads_history
+            payloads_histories
         in
-        let level_tree_histories =
-          Level_tree_histories.add
-            level_tree_hash
-            level_tree_history
-            level_tree_histories
-        in
-        aux (i + 1) level_tree_histories history inbox rst
+        aux payloads_histories history inbox rst
   in
-  aux 0 level_tree_histories history inbox inputs
+  aux payloads_histories history inbox payloads_per_levels
 
 let construct_inbox ?(inbox_creation_level = Raw_level.(root))
-    ?origination_level ?(with_histories = true) level_and_inputs =
-  let inbox = Sc_rollup.Inbox.empty inbox_creation_level in
+    ?(with_histories = true) ?(timestamp = Time.Protocol.epoch)
+    ?(predecessor = Tezos_crypto.Block_hash.zero) payloads_per_levels =
+  let inbox =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.genesis ~timestamp ~predecessor inbox_creation_level
+  in
   let history =
     let capacity = if with_histories then 10000L else 0L in
     Sc_rollup.Inbox.History.empty ~capacity
   in
-  let level_tree_histories = Level_tree_histories.empty in
-  fill_inbox
-    ?origination_level
-    ~inbox
-    ~with_level_tree_history:with_histories
-    ~shift_level:inbox_creation_level
-    history
-    level_tree_histories
-    level_and_inputs
+  let payloads_histories = Payloads_histories.empty in
+  fill_inbox ~inbox history payloads_histories payloads_per_levels
 
 let inbox_message_of_input input =
   match input with Sc_rollup.Inbox_message x -> Some x | _ -> None
@@ -525,26 +541,44 @@ let payloads_from_messages =
       | Inbox_message {payload; _} -> payload
       | Reveal _ -> assert false)
 
-let first_after ~shift_level list_of_inputs level message_counter =
-  let level_index = Int32.to_int @@ Raw_level.diff level shift_level in
-  let inputs =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.nth list_of_inputs level_index
+let first_after payloads_per_levels level message_counter =
+  let payloads_at_level level =
+    List.find
+      (fun {level = payloads_level; _} -> level = payloads_level)
+      payloads_per_levels
   in
-  match List.nth inputs (Z.to_int message_counter) with
+  let payloads_per_level =
+    WithExceptions.Option.get ~loc:__LOC__ @@ payloads_at_level level
+  in
+  match List.nth payloads_per_level.inputs (Z.to_int message_counter) with
   | Some input -> inbox_message_of_input input
   | None -> (
       (* If no input at (l, n), the next input is (l+1, 0). *)
-      match List.nth list_of_inputs (level_index + 1) with
+      let next_level = Raw_level.succ level in
+      match payloads_at_level next_level with
       | None -> None
-      | Some inputs ->
-          let input = Stdlib.List.hd inputs in
+      | Some payloads_per_level ->
+          let input = Stdlib.List.hd payloads_per_level.inputs in
           inbox_message_of_input input)
 
-let list_of_inputs_from_list_of_messages (list_of_messages : message list list)
-    =
+let list_of_inputs_from_list_of_messages
+    (payloads_per_levels : message list list) =
   List.map
     (fun inputs ->
       let payloads = List.map (fun {input; _} -> input) inputs in
       payloads)
-    list_of_messages
+    payloads_per_levels
+
+let dumb_init level =
+  WithExceptions.Result.get_ok ~loc:__LOC__
+  @@ Sc_rollup.Inbox.genesis
+       ~timestamp:Time.Protocol.epoch
+       ~predecessor:Tezos_crypto.Block_hash.zero
+       level
+
+let dumb_init_repr level =
+  WithExceptions.Result.get_ok ~loc:__LOC__
+  @@ Sc_rollup_inbox_repr.genesis
+       ~timestamp:Time.Protocol.epoch
+       ~predecessor:Tezos_crypto.Block_hash.zero
+       level

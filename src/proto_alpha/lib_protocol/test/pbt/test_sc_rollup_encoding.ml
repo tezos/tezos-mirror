@@ -91,24 +91,31 @@ let gen_inbox level =
   let* hd = gen_msg in
   let* tail = small_list gen_msg in
   let payloads = hd :: tail in
-  let level_tree_and_inbox =
+  let witness_and_inbox =
     let open Result_syntax in
-    let empty_inbox = Sc_rollup_inbox_repr.empty level in
+    let inbox = Sc_rollup_helpers.dumb_init_repr level in
     lift
-    @@ let* input_messages =
-         List.map_e
-           (fun msg -> Sc_rollup_inbox_message_repr.(serialize (External msg)))
-           payloads
-       in
-       Sc_rollup_inbox_repr.add_messages_no_history
-         empty_inbox
-         level
-         input_messages
-         None
+    @@
+    let witness = Sc_rollup_inbox_repr.init_witness_no_history in
+    let* witness =
+      Sc_rollup_inbox_repr.add_info_per_level_no_history
+        ~timestamp:Time.Protocol.epoch
+        ~predecessor:Tezos_crypto.Block_hash.zero
+        witness
+    in
+    let* input_messages =
+      List.map_e
+        (fun msg -> Sc_rollup_inbox_message_repr.(serialize (External msg)))
+        payloads
+    in
+    let* witness =
+      Sc_rollup_inbox_repr.add_messages_no_history input_messages witness
+    in
+    Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness
   in
   return
-  @@ (level_tree_and_inbox |> function
-      | Ok v -> snd v
+  @@ (witness_and_inbox |> function
+      | Ok v -> v
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 

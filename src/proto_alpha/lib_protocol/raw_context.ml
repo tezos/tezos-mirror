@@ -258,8 +258,7 @@ type back = {
     Tez_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
-  sc_rollup_current_messages :
-    Sc_rollup_inbox_merkelized_payload_hashes_repr.t option;
+  sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
 
@@ -800,6 +799,9 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
   get_cycle_eras ctxt >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
   let level = Level_repr.level_from_raw ~cycle_eras level in
+  let sc_rollup_current_messages =
+    Sc_rollup_inbox_repr.init_witness_no_history
+  in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
@@ -826,7 +828,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
-        sc_rollup_current_messages = None;
+        sc_rollup_current_messages;
         dal_slot_fee_market =
           Dal_slot_repr.Slot_market.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
@@ -1471,9 +1473,8 @@ end
 module Sc_rollup_in_memory_inbox = struct
   let current_messages ctxt = ctxt.back.sc_rollup_current_messages
 
-  let set_current_messages ctxt tree =
-    let sc_rollup_current_messages = Some tree in
-    {ctxt with back = {ctxt.back with sc_rollup_current_messages}}
+  let set_current_messages ctxt witness =
+    {ctxt with back = {ctxt.back with sc_rollup_current_messages = witness}}
 end
 
 module Dal = struct

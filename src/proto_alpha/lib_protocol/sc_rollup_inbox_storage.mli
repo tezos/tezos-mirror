@@ -29,21 +29,10 @@
 val get_inbox :
   Raw_context.t -> (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
 
-(** [add_external_messages context msg] adds [msg] to the smart rollups' inbox.
-
-    This function returns the updated context as well as the size diff.
-
-    May fail with:
-    {ul
-      {li [Sc_rollup_max_number_of_available_messages] if [inbox] is full}
-      {li [Sc_rollup_max_number_of_messages_reached_for_commitment_period] if
-      the number of messages pushed during commitment period is too high}
-    }
-*)
+(** [add_external_messages context messages] adds [messages] to the smart
+    rollups internal inbox level witness. *)
 val add_external_messages :
-  Raw_context.t ->
-  string list ->
-  (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+  Raw_context.t -> string list -> Raw_context.t tzresult Lwt.t
 
 (** [add_deposit ~payload ~sender ~source ~destination ctxt] adds the
     internal deposit message of [payload], [sender], and [source] to
@@ -57,39 +46,36 @@ val add_deposit :
   sender:Contract_hash.t ->
   source:Signature.public_key_hash ->
   destination:Sc_rollup_repr.Address.t ->
-  (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
 
 (** Initialize the inbox in the storage at protocol initialization. *)
-val init :
+val init_inbox :
   timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Raw_context.t ->
   Raw_context.t tzresult Lwt.t
 
-(** Push a [Start_of_level] internal inbox message in the inbox. *)
-val add_start_of_level :
-  Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
-
-(** Push a [End_of_level] internal inbox message in the inbox. *)
-val add_end_of_level :
-  Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
-
-(** Push a [Info_per_level] internal inbox message in the inbox. *)
+(** Adds the [Info_per_level] in the in-memory inbox level witness. *)
 val add_info_per_level :
+  timestamp:Time.t ->
+  predecessor:Block_hash.t ->
   Raw_context.t ->
-  Time.t ->
-  Block_hash.t ->
-  (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
+
+(** [finalize_inbox_level ctxt] ends the internal representation for the block.
+*)
+val finalize_inbox_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (**/**)
 
 module Internal_for_tests : sig
-  (** [update_num_and_size_of_messages ~num_messages ~total_messages_size
-      message] returns the length and total messages size
-      [messages]. *)
-  val update_num_and_size_of_messages :
-    num_messages:int ->
-    total_messages_size:int ->
-    Sc_rollup_inbox_message_repr.serialized ->
-    int * int
+  (** Push a [Start_of_level] internal inbox message in the inbox. *)
+  val add_start_of_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+  (** Push a [End_of_level] internal inbox message in the inbox. *)
+  val add_end_of_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+  (** Push a [Info_per_level] internal inbox message in the inbox. *)
+  val add_info_per_level :
+    Raw_context.t -> Time.t -> Block_hash.t -> Raw_context.t tzresult Lwt.t
 end

@@ -185,7 +185,7 @@ module type PVM_with_context_and_state = sig
 
     val history : Sc_rollup_inbox_repr.History.t
 
-    val get_level_tree_history :
+    val get_payloads_history :
       Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
       Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t Lwt.t
   end
