@@ -34,15 +34,15 @@ let test_emit_event protocol =
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol_and_wait ~protocol client in
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"emit_events.tz"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/emit_events.tz"
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "emit_events"]
+      protocol
   in
   let* () = Client.bake_for client in
   let* () =

@@ -137,15 +137,15 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
     List.map (fun (k, v) -> sf "Elt %s %s " k @@ Int.to_string v) entries
   in
   let init = "{" ^ String.concat ";" entries_s ^ "}" in
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"originated_contract_advanced"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_all.tz"
       ~init
       ~burn_cap:Tez.(of_int 9999999)
       client
+      ["mini_scenarios"; "big_map_all"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* mockup_client = Client.init_mockup ~protocol () in

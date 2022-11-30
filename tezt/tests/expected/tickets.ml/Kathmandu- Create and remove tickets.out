@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup --wait none originate contract add_clear_tickets.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_current_mainnet/add_clear_tickets.tz --init '{}' --burn-cap 1
+./octez-client --mode mockup --wait none originate contract add_clear_tickets transferring 200 from bootstrap1 running michelson_test_scripts/mini_scenarios/add_clear_tickets.tz --init '{}' --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1427.482 units (will add 100 for safety)
 Estimated storage: 372 bytes added (will add 20 for safety)
@@ -46,7 +46,7 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... +ꜩ200
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as add_clear_tickets.tz.
+Contract memorized as add_clear_tickets.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "A"'
 Node is bootstrapped.

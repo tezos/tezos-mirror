@@ -108,15 +108,15 @@ let register_fa12_test ~title ?(tags = []) test_body protocols =
              client
          in
          (* originate viewer *)
-         let* viewer_address =
-           Client.originate_contract
-             ~alias:"nat-viewer"
+         let* _viewer_alias, viewer_address =
+           Client.originate_contract_at
              ~amount:Tez.zero
              ~src:Account.Bootstrap.keys.(0).public_key_hash
-             ~prg:"file:./tezt/tests/contracts/proto_current_mainnet/nat_id.tz"
              ~init:"0"
              ~burn_cap:(Tez.of_int 1)
              client
+             ["mini_scenarios"; "nat_id"]
+             protocol
          in
          test_body protocol client fa12_script ~fa12_address ~viewer_address)
        protocols

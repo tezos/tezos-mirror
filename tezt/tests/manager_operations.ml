@@ -206,9 +206,6 @@ module Helpers = struct
       ~context_path:(Node.data_dir node // "context")
       client
 
-  let contract_file alias =
-    `File (Format.sprintf "./tezt/tests/contracts/proto_alpha/%s" alias)
-
   (** Initialize a network with two nodes *)
   let init ?(disable_operation_precheck = false)
       ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
@@ -266,19 +263,20 @@ module Helpers = struct
     in
     Lwt.return key
 
-  let originate_contract nodes ~alias =
-    Log.info "- Auxiliary step: originate contract %s." alias ;
-    let (`File prg) = contract_file alias in
-    let* contract =
-      Client.originate_contract
+  let originate_contract protocol nodes script_name =
+    Log.info
+      "- Auxiliary step: originate contract %s."
+      Michelson_script.(find script_name protocol |> name_s) ;
+    let* _alias, contract =
+      Client.originate_contract_at
         ~wait:"none"
         ~init:"{}"
-        ~alias
         ~amount:Tez.zero
         ~burn_cap:(Tez.of_int 10)
         ~src:Constant.bootstrap1.alias
-        ~prg
         nodes.main.client
+        script_name
+        protocol
     in
     let* () = bake_and_wait_block nodes.main in
     Log.info "  - Contract address is %s." contract ;
@@ -822,7 +820,10 @@ module Illtyped_originations = struct
         ~protocol
         ~source:Constant.bootstrap1
         ~init_storage:(`Json (`O [("int", `String "-10")]))
-        ~code:(Helpers.contract_file "parsable_contract.tz")
+        ~code:
+          (`File
+            Michelson_script.(
+              find ["mini_scenarios"; "parsable_contract"] protocol |> path))
         nodes.main.client
     in
     unit
@@ -1701,7 +1702,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1727,7 +1731,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1754,7 +1761,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks
@@ -1782,7 +1792,10 @@ module Simple_contract_calls = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract =
-      Helpers.originate_contract nodes ~alias:"parsable_contract.tz"
+      Helpers.originate_contract
+        protocol
+        nodes
+        ["mini_scenarios"; "parsable_contract"]
     in
     let* _ =
       Memchecks.with_applied_checks

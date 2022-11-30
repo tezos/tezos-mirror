@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup --wait none originate contract ticketer transferring 1 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/tickets_send_with_tez.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract tickets_send_with_tez transferring 1 from bootstrap1 running michelson_test_scripts/mini_scenarios/tickets_send_with_tez_016.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1439.500 units (will add 100 for safety)
 Estimated storage: 411 bytes added (will add 20 for safety)
@@ -57,7 +57,7 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... +ꜩ1
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as ticketer.
+Contract memorized as tickets_send_with_tez.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[PUBLIC_KEY_HASH]"'
 Node is bootstrapped.

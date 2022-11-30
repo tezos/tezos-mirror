@@ -126,10 +126,16 @@ let test_calling_contract_with_global_constant_success =
   let value = "999" in
   let burn_cap = Some (Tez.of_int 1) in
   let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
-  let script = "file:./tezt/tests/contracts/proto_alpha/999_constant.tz" in
   let storage = "0" in
   let input = "Unit" in
-  let* result = Client.run_script ~prg:script ~storage ~input client in
+  let* result =
+    Client.run_script_at
+      ~storage
+      ~input
+      client
+      ["mini_scenarios"; "999_constant"]
+      protocol
+  in
   let result = String.trim result in
   Log.info "Contract with constant output storage %s" result ;
   if result = value then return ()
@@ -142,10 +148,16 @@ let test_calling_contract_with_global_constant_failure =
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let script = "file:./tezt/tests/contracts/proto_alpha/999_constant.tz" in
   let storage = "0" in
   let input = "Unit" in
-  let process = Client.spawn_run_script ~prg:script ~storage ~input client in
+  let process =
+    Client.spawn_run_script_at
+      ~storage
+      ~input
+      client
+      ["mini_scenarios"; "999_constant"]
+      protocol
+  in
   Process.check_error
     ~exit_code:1
     ~msg:(rex "No registered global was found")
@@ -194,15 +206,15 @@ let test_originate_contract_with_global_constant_success =
   let value = "999" in
   let burn_cap = Some (Tez.of_int 1) in
   let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
-  let* result =
-    Client.originate_contract
-      ~alias:"with_global_constant"
+  let* _alias, result =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/999_constant.tz"
       ~init:"0"
       ~burn_cap:(Tez.of_int 2)
       client
+      ["mini_scenarios"; "999_constant"]
+      protocol
   in
   Log.info "result %s" result ;
   return ()
@@ -222,7 +234,9 @@ let test_typechecking_and_normalization_work_with_constants =
   (* Register the value *)
   let value = "Unit" in
   let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
-  let script = "file:./tezt/tests/contracts/proto_alpha/constant_unit.tz" in
+  let script =
+    Michelson_script.(find ["mini_scenarios"; "constant_unit"] protocol |> path)
+  in
   let* _ = Client.normalize_script ~script client in
   let* () = Client.typecheck_script ~script client in
   return ()
@@ -536,15 +550,15 @@ let test_origination_from_unrevealed_fees =
       client
   in
   let* _ =
-    Client.originate_contract
+    Client.originate_contract_at
       ~wait:"none"
-      ~alias:"contract_name"
       ~amount:Tez.zero
       ~src:"originator"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"None"
       ~burn_cap:(Tez.of_int 20)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   return ()
 
@@ -601,11 +615,12 @@ let test_storage_from_file =
   Lwt_io.with_temp_file (fun (temp_filename, pipe) ->
       let* () = Lwt_io.write pipe "Unit" in
       let* _storage =
-        Client.run_script
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/very_small.tz"
+        Client.run_script_at
           ~storage:temp_filename
           ~input:temp_filename
           client
+          ["mini_scenarios"; "very_small"]
+          protocol
       in
       unit)
 
