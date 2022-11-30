@@ -25,16 +25,6 @@
 
 module S = Saturation_repr
 
-module S_syntax = struct
-  let log2 x = S.safe_int (1 + S.numbits x)
-
-  let ( + ) = S.add
-
-  let ( * ) = S.mul
-
-  let ( lsr ) = S.shift_right
-end
-
 module Constants = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2648
      Fill in real benchmarked values.
@@ -62,22 +52,22 @@ module Constants = struct
   (* Cost of serializing a state hash. *)
   let cost_serialize_state_hash =
     let len = S.safe_int State_hash.size in
-    S_syntax.(cost_encode_string_per_byte * len)
+    S.Syntax.(cost_encode_string_per_byte * len)
 
   (* Cost of serializing a commitment hash. *)
   let cost_serialize_commitment_hash =
     let len = S.safe_int Sc_rollup_commitment_repr.Hash.size in
-    S_syntax.(cost_encode_string_per_byte * len)
+    S.Syntax.(cost_encode_string_per_byte * len)
 
   (* Cost of serializing a commitment. The cost of serializing the level and
      number of ticks (both int32) is negligible. *)
   let cost_serialize_commitment =
-    S_syntax.(cost_serialize_state_hash + cost_serialize_commitment_hash)
+    S.Syntax.(cost_serialize_state_hash + cost_serialize_commitment_hash)
 
   (* Cost of serializing an operation hash. *)
   let cost_serialize_operation_hash =
     let len = S.safe_int Operation_hash.size in
-    S_syntax.(cost_encode_string_per_byte * len)
+    S.Syntax.(cost_encode_string_per_byte * len)
 
   (* Cost of serializing a nonce. The cost of serializing the index (an int32)
      is negligible. *)
@@ -101,7 +91,7 @@ let cost_serialize_internal_inbox_message
   | Transfer {payload; sender = _; source = _; destination = _} ->
       let lexpr = Script_repr.lazy_expr payload in
       let expr_cost = Script_repr.force_bytes_cost lexpr in
-      S_syntax.(
+      S.Syntax.(
         expr_cost + Constants.cost_decoding_contract_optimized
         + Constants.cost_decoding_key_hash_optimized)
   | Start_of_level -> Saturation_repr.zero
@@ -120,28 +110,29 @@ let cost_deserialize_output_proof ~bytes_len =
 
 let cost_serialize_external_inbox_message ~bytes_len =
   let len = S.safe_int bytes_len in
-  S_syntax.(Constants.cost_encode_string_per_byte * len)
+  S.Syntax.(Constants.cost_encode_string_per_byte * len)
 
 (* Equal to Michelson_v1_gas.Cost_of.Interpreter.blake2b. *)
 let cost_hash_bytes ~bytes_len =
-  let open S_syntax in
+  let open S.Syntax in
   let v0 = S.safe_int bytes_len in
   S.safe_int 430 + v0 + (v0 lsr 3)
 
 let cost_compare a_size_in_bytes b_size_in_bytes =
-  let open S_syntax in
+  let open S.Syntax in
   let size_in_bytes = Compare.Int.min a_size_in_bytes b_size_in_bytes in
   let v0 = S.safe_int size_in_bytes in
   S.safe_int 35 + ((v0 lsr 6) + (v0 lsr 7))
 
 let cost_search_in_tick_list len tick_size =
-  S_syntax.(S.safe_int len * cost_compare tick_size tick_size)
+  let open S.Syntax in
+  S.safe_int len * cost_compare tick_size tick_size
 
 let cost_check_dissection ~number_of_states ~tick_size ~hash_size =
-  let open S_syntax in
+  let open S.Syntax in
   cost_search_in_tick_list number_of_states tick_size
   + (S.safe_int 2 * cost_compare hash_size hash_size)
 
 let cost_verify_output_proof ~bytes_len =
-  let open Saturation_repr in
-  S_syntax.(Constants.cost_verify_output_proof_per_byte * safe_int bytes_len)
+  let open S.Syntax in
+  Constants.cost_verify_output_proof_per_byte * S.safe_int bytes_len
