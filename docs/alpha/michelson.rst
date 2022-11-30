@@ -707,21 +707,10 @@ Operations
 Operations on unit
 ~~~~~~~~~~~~~~~~~~
 
--  ``UNIT``: Push a unit value onto the stack.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: 'A   ->   unit : 'A
-
-    > UNIT / S  =>  Unit : S
-
--  ``COMPARE``: Unit comparison
-
-::
-
-    :: unit : unit : 'S   ->   int : 'S
-
-    > COMPARE / Unit : Unit : S  =>  0 : S
+-  ``UNIT``: Push a unit value onto the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNIT>`__).
+-  ``COMPARE``: Unit comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on type never
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -762,48 +751,13 @@ branches.
 Operations on booleans
 ~~~~~~~~~~~~~~~~~~~~~~
 
--  ``OR``
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-    :: bool : bool : 'S   ->   bool : 'S
-
-    > OR / x : y : S  =>  (x | y) : S
-
--  ``AND``
-
-::
-
-    :: bool : bool : 'S   ->   bool : 'S
-
-    > AND / x : y : S  =>  (x & y) : S
-
--  ``XOR``
-
-::
-
-    :: bool : bool : 'S   ->   bool : 'S
-
-    > XOR / x : y : S  =>  (x ^ y) : S
-
--  ``NOT``
-
-::
-
-    :: bool : 'S   ->   bool : 'S
-
-    > NOT / x : S  =>  ~x : S
-
--  ``COMPARE``: Boolean comparison
-
-::
-
-    :: bool : bool : 'S   ->   int : 'S
-
-    > COMPARE / False : False : S  =>  0 : S
-    > COMPARE / False : True : S  =>  -1 : S
-    > COMPARE / True : False : S  =>  1 : S
-    > COMPARE / True : True : S  =>  0 : S
+-  ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
+-  ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
+-  ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
+-  ``NOT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
+-  ``COMPARE``: Boolean comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on integers and natural numbers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
