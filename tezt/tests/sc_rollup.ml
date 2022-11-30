@@ -2461,8 +2461,8 @@ let test_reveals_fails_on_wrong_hash ~kind =
     }
   @@ fun sc_rollup_node _sc_rollup_client sc_rollup _node client ->
   (* This value has been obtained from the logs of the test
-     scrrh1kXE3tnCVTJ21aDNVeaV86e8rS6jtiMEDpjZJtDnLXRThQdmy. *)
-  let hash = "scrrh1kXE3tnCVTJ21aDNVeaV86e8rS6jtiMEDpjZJtDnLXRThQdmy" in
+     "Alpha: arith - rollup node correctly handles reveals." *)
+  let hash = "scrrh13sj3sMk3Ne75xd4dnYGH4TF4dHzAcmXpEPkdJrQ3fBEGN4jtoF" in
   let pvm_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "arith"
   in
