@@ -1111,7 +1111,10 @@ val name_for_errors : target -> string
     were declared without [?profile]. See the documentation of the [?profile]
     argument of type ['a maker]. *)
 val generate :
-  make_tezt_exe:(target list -> target) -> default_profile:string -> unit
+  make_tezt_exe:(target list -> target) ->
+  default_profile:string ->
+  add_to_meta_package:target list ->
+  unit
 
 (** Run various checks.
 
