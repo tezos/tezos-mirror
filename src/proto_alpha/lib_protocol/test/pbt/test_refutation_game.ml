@@ -839,7 +839,7 @@ module Arith_test_pvm = struct
 
   let initial_state () =
     let open Lwt_syntax in
-    let empty = Tezos_context_memory.make_empty_tree () in
+    let empty = Sc_rollup_helpers.make_empty_tree () in
     let* state = initial_state ~empty in
     let* state = install_boot_sector state "" in
     return state
@@ -1046,7 +1046,7 @@ type player_client = {
     * Inbox.t;
   payloads_per_levels : payloads_per_level list;
   metadata : Metadata.t;
-  context : Tezos_context_memory.Context.t;
+  context : Tezos_context_memory.Context_binary.t;
 }
 
 let pp_player_client ppf
@@ -1071,8 +1071,8 @@ module Player_client = struct
   let empty_memory_ctxt id =
     let open Lwt_syntax in
     Lwt_main.run
-    @@ let+ index = Tezos_context_memory.Context.init id in
-       Tezos_context_memory.Context.empty index
+    @@ let+ index = Tezos_context_memory.Context_binary.init id in
+       Tezos_context_memory.Context_binary.empty index
 
   (** Construct an inbox based on [list_of_messages] in the player context. *)
   let construct_inbox ~inbox list_of_messages =

@@ -912,6 +912,28 @@ let test_originating_with_random_proof () =
       return_unit
   | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
+let test_originating_with_wrong_tree ~alter_binary_bit () =
+  let open Lwt_result_syntax in
+  let*! origination_proof =
+    Sc_rollup_helpers.wrong_arith_origination_proof
+      ~alter_binary_bit
+      ~boot_sector:"this should produce an invalid proof"
+  in
+  let*! res =
+    init_and_originate
+      ~boot_sector:"some boot sector"
+      ~origination_proof
+      Context.T1
+      "unit"
+  in
+  match res with
+  | Error
+      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
+      :: _) ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
+
 let assert_equal_expr ~loc e1 e2 =
   let s1 = Format.asprintf "%a" Michelson_v1_printer.print_expr e1 in
   let s2 = Format.asprintf "%a" Michelson_v1_printer.print_expr e2 in
@@ -1891,7 +1913,7 @@ module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 
 let dumb_proof ~choice =
   let open Lwt_result_syntax in
-  let context_arith_pvm = Tezos_context_memory.make_empty_context () in
+  let context_arith_pvm = Sc_rollup_helpers.make_empty_context () in
   let empty =
     Sc_rollup_helpers.In_memory_context.Tree.empty context_arith_pvm
   in
@@ -2056,7 +2078,7 @@ let test_dissection_during_final_move () =
 
 let init_arith_state ~boot_sector =
   let open Lwt_syntax in
-  let context = Tezos_context_memory.make_empty_context () in
+  let context = Sc_rollup_helpers.make_empty_context () in
   let empty = Sc_rollup_helpers.In_memory_context.Tree.empty context in
   let* state = Arith_pvm.initial_state ~empty in
   let* state = Arith_pvm.install_boot_sector state boot_sector in
@@ -2590,6 +2612,15 @@ let tests =
       "originating with random proof"
       `Quick
       test_originating_with_random_proof;
+    Tztest.tztest
+      "originating with proof for Tezos context trees"
+      `Quick
+      (test_originating_with_wrong_tree ~alter_binary_bit:false);
+    Tztest.tztest
+      "originating with proof for Tezos context trees trying to pass as a \
+       binary tree"
+      `Quick
+      (test_originating_with_wrong_tree ~alter_binary_bit:true);
     Tztest.tztest
       "originating with valid type"
       `Quick
