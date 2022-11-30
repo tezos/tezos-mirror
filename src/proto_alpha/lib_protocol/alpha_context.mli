@@ -3446,13 +3446,10 @@ module Sc_rollup : sig
       destination:rollup ->
       context tzresult Lwt.t
 
-    val finalize_inbox_level : context -> context tzresult Lwt.t
+    val finalize_inbox_level : context -> context Lwt.t
 
     val add_info_per_level :
-      timestamp:Time.t ->
-      predecessor:Block_hash.t ->
-      context ->
-      context tzresult Lwt.t
+      timestamp:Time.t -> predecessor:Block_hash.t -> context -> context Lwt.t
 
     val get_inbox : context -> (t * context) tzresult Lwt.t
   end

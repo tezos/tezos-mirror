@@ -100,35 +100,87 @@ let add_deposit ctxt ~payload ~sender ~source ~destination =
   add_internal_message ctxt internal_message
 
 let finalize_inbox_level ctxt =
-  let open Lwt_result_syntax in
-  let* inbox, ctxt = get_inbox ctxt in
-  let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
-  let*? inbox =
-    Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness
+  let open Lwt_syntax in
+  let* res =
+    let open Lwt_result_syntax in
+    let* inbox, ctxt = get_inbox ctxt in
+    let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+    let*? inbox =
+      Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness
+    in
+    let* ctxt = Store.Inbox.update ctxt inbox in
+    return ctxt
   in
-  let* ctxt = Store.Inbox.update ctxt inbox in
-  return ctxt
+  match res with
+  | Ok ctxt -> return ctxt
+  | Error err ->
+      (* As a protection, we backtrack the [ctxt] if finalizing the inbox level
+         failed. This way, we cannot make [finalize_block] fail. *)
+      Logging.(
+        log
+          Fatal
+          "Finalizing inbox level failed because of %a, the context is \
+           backtracked. Smart rollups inbox failed to finalize this block, \
+           this behavior is undefined and its consequence is unexplored."
+          pp_trace
+          err) ;
+      return ctxt
 
 let add_info_per_level ~timestamp ~predecessor ctxt =
-  let open Lwt_result_syntax in
-  let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
-  let*? witness =
-    Sc_rollup_inbox_repr.add_info_per_level_no_history
-      ~timestamp
-      ~predecessor
-      witness
+  let open Lwt_syntax in
+  let* res =
+    let open Lwt_result_syntax in
+    let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
+    let*? witness =
+      Sc_rollup_inbox_repr.add_info_per_level_no_history
+        ~timestamp
+        ~predecessor
+        witness
+    in
+    let ctxt =
+      Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
+    in
+    return ctxt
   in
-  let ctxt =
-    Raw_context.Sc_rollup_in_memory_inbox.set_current_messages ctxt witness
-  in
-  return ctxt
+  match res with
+  | Ok ctxt -> return ctxt
+  | Error err ->
+      (* As a protection, we backtrack the [ctxt] if adding the info per level
+         failed. This way, we cannot make [begin_application],
+         [begin_partial_application] and [begin_full_construction] fail. *)
+      Logging.(
+        log
+          Fatal
+          "Adding [Info_per_level] failed because of %a, the context is \
+           backtracked. Smart rollups inbox failed to finalize this block, \
+           this behavior is undefined and its consequence is unexplored."
+          pp_trace
+          err) ;
+      return ctxt
 
 let init_inbox ~timestamp ~predecessor ctxt =
-  let open Lwt_result_syntax in
-  let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
-  let*? inbox = Sc_rollup_inbox_repr.genesis ~timestamp ~predecessor level in
-  let* ctxt = Store.Inbox.init ctxt inbox in
-  return ctxt
+  let open Lwt_syntax in
+  let* res =
+    let open Lwt_result_syntax in
+    let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
+    let*? inbox = Sc_rollup_inbox_repr.genesis ~timestamp ~predecessor level in
+    let* ctxt = Store.Inbox.init ctxt inbox in
+    return ctxt
+  in
+  match res with
+  | Ok ctxt -> return ctxt
+  | Error err ->
+      (* As a protection, we backtrack the [ctxt] if initializing the inbox
+         failed. This way, we cannot make [prepare_first_block] fail. *)
+      Logging.(
+        log
+          Fatal
+          "Initializing inbox failed because of %a, the context is \
+           backtracked. Smart rollups inbox failed, this behavior is undefined \
+           and its consequence is unexplored."
+          pp_trace
+          err) ;
+      return ctxt
 
 module Internal_for_tests = struct
   let add_start_of_level ctxt =

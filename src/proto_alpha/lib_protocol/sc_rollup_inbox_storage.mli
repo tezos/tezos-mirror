@@ -53,18 +53,18 @@ val init_inbox :
   timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Raw_context.t ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t Lwt.t
 
 (** Adds the [Info_per_level] in the in-memory inbox level witness. *)
 val add_info_per_level :
   timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Raw_context.t ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t Lwt.t
 
 (** [finalize_inbox_level ctxt] ends the internal representation for the block.
 *)
-val finalize_inbox_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val finalize_inbox_level : Raw_context.t -> Raw_context.t Lwt.t
 
 (**/**)
 
