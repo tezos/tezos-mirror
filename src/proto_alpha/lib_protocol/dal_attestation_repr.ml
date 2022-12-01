@@ -39,9 +39,9 @@
    representation. Hence, if there are [256] slots, and [2] are not
    attested, this representation will be of size [32] bits + [16] bits
    = [48] bits which is better than [256] bits. *)
-type t = Bitset.t
 
-type attested_slots = t
+(* A set of (attested) slot indexes. *)
+type t = Bitset.t
 
 type operation = {
   attestor : Signature.Public_key_hash.t;
@@ -96,11 +96,15 @@ module Shard_map = Map.Make (struct
 end)
 
 module Accountability = struct
+  type attested_slots = t
+
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3109
 
      Think hard about this data structure and whether it needs to be
      optimized.
   *)
+
+  (* A list of set of shard indexes (a set of shards per slot) *)
   type t = Bitset.t list
 
   let init ~length =
@@ -120,15 +124,15 @@ module Accountability = struct
       bitset
       shards
 
-  let record_shards_availability shard_bitset_per_slot slots shards =
+  let record_shards_availability shard_bitset_per_slot attested_slots shards =
     List.mapi
       (fun slot bitset ->
-        match Bitset.mem slots slot with
+        match Bitset.mem attested_slots slot with
         | Error _ ->
             (* slot index is above the length provided at initialisation *)
             bitset
-        | Ok slot_available ->
-            if slot_available then record_slot_shard_availability bitset shards
+        | Ok slot_attested ->
+            if slot_attested then record_slot_shard_availability bitset shards
             else bitset)
       shard_bitset_per_slot
 
