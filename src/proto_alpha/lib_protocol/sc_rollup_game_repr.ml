@@ -808,8 +808,6 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2926
-   This function is incomplete and needs to account for additional gas. *)
 let cost_play _game refutation =
   match refutation.step with
   | Dissection states ->
@@ -820,7 +818,48 @@ let cost_play _game refutation =
         ~number_of_states
         ~tick_size
         ~hash_size
-  | Proof _proof -> Gas_limit_repr.free
+  | Proof _proof ->
+      (*
+
+         Proof verification is complex. We choose to follow a very
+         rough overaproximation based on the idea that proof
+         verification for both the inbox and the execution step is
+         dominated by hash computation.
+
+         Assuming that the worst case is a proof of the maximal
+         operation data length, we consider the cost of hashing a
+         balanced binary tree of this size (with a maximal size of
+         leaves since the hashing of internal nodes can be neglected.
+
+         We also consider the largest tick known. At the time writing
+         this comment, the largest tick is the origination tick of the
+         PVM. If we assume that the origination has been done with a
+         kernel of maximum size, and we also assume that most of the
+         computation cost to import this kernel in the PVM, we simply
+         consider, again, that the cost of hashing dominates
+         everything else.
+
+         We multiply this number by 10 by security.
+
+         At the time of writing this comment, this leads to 372940
+         mgas for the proof wellformedness verification and 372940
+         mgas for the cost of executing a tick.
+
+      *)
+      let open Saturation_repr in
+      (* model N_IBlake2b *)
+      (* Approximating 1.120804 x term *)
+      let cost_N_IBlake2b size =
+        let open Syntax in
+        let v0 = safe_int size in
+        safe_int 430 + v0 + (v0 lsr 3)
+      in
+      let overapproximated_hashing_size =
+        2 * Constants_repr.max_operation_data_length
+      in
+      let scale10 x = Saturation_repr.(mul (safe_int 10) x) in
+      scale10 @@ Gas_limit_repr.atomic_step_cost
+      @@ cost_N_IBlake2b overapproximated_hashing_size
 
 let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game
     refutation =
