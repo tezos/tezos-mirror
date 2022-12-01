@@ -46,7 +46,7 @@ the subsidy, and ``Pass`` to abstain.
 ``e[n+1] = e[n]`` if the flag is set to ``Pass``.
 ``e[n+1] = (1999 * e[n] // 2000) + 1_000_000`` if the flag is set to ``Off``.
 ``e[n+1] = (1999 * e[n] // 2000)`` if the flag is set to ``On``.
-When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000```.
+When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000``.
 
 If at any block ``e[n] >= 1_000_000_000`` then it means that an
 exponential moving average with a window size on the order of two
