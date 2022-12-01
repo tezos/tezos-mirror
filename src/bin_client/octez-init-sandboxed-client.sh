@@ -18,15 +18,17 @@ init_sandboxed_client() {
         client="$local_client -base-dir $client_dir -endpoint https://$host:$rpc"
         admin_client="$local_admin_client -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint https://$host:$rpc"
-        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
+        alpha_sc_rollup_node="$local_alpha_sc_rollup_node -base-dir $client_dir -endpoint https://$host:$rpc"
+        alpha_sc_rollup_client="$local_alpha_sc_rollup_client -base-dir $client_dir -endpoint https://$host:$rpc"
         compiler="$local_compiler"
     else
         client="$local_client -base-dir $client_dir -endpoint http://$host:$rpc"
         admin_client="$local_admin_client -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_baker="$local_alpha_baker -base-dir $client_dir -endpoint http://$host:$rpc"
-        alpha_endorser="$local_alpha_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
         alpha_accuser="$local_alpha_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
+        alpha_sc_rollup_node="$local_alpha_sc_rollup_node -base-dir $client_dir -endpoint http://$host:$rpc"
+        alpha_sc_rollup_client="$local_alpha_sc_rollup_client -base-dir $client_dir -endpoint http://$host:$rpc"
         compiler="$local_compiler"
     fi
 }
@@ -158,33 +160,41 @@ main () {
     echo "exec $admin_client \"\$@\""  >> $client_dir/bin/octez-admin-client
     chmod +x $client_dir/bin/octez-admin-client
 
-    for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions_without_number); do
+    for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions); do
         protocol_underscore=$(echo $protocol | tr -- - _)
+        protocol_without_number=$(echo $protocol | tr --delete "\-[0-9]")
         local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
-        local_endorser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_endorser/main_endorser_$protocol_underscore.exe"
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
+        local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
+        local_sc_rollup_client="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_client/main_sc_rollup_client_$protocol_underscore.exe"
 
         if [ -n "$USE_TLS" ]; then
             baker="$local_baker -base-dir $client_dir -endpoint https://$host:$rpc"
-            endorser="$local_endorser -base-dir $client_dir -endpoint https://$host:$rpc"
             accuser="$local_accuser -base-dir $client_dir -endpoint https://$host:$rpc"
+            sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint https://$host:$rpc"
+            sc_rollup_client="$local_sc_rollup_client -base-dir $client_dir -endpoint https://$host:$rpc"
         else
             baker="$local_baker -base-dir $client_dir -endpoint http://$host:$rpc"
-            endorser="$local_endorser -base-dir $client_dir -endpoint http://$host:$rpc"
             accuser="$local_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
+            sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint http://$host:$rpc"
+            sc_rollup_client="$local_sc_rollup_client -base-dir $client_dir -endpoint http://$host:$rpc"
         fi
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol
-        echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol
-        chmod +x $client_dir/bin/octez-baker-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol_without_number
+        echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol_without_number
+        chmod +x $client_dir/bin/octez-baker-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-endorser-$protocol
-        echo "exec $endorser \"\$@\""  >> $client_dir/bin/octez-endorser-$protocol
-        chmod +x $client_dir/bin/octez-endorser-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
+        echo "exec $sc_rollup_node \"\$@\""  >> $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
+        chmod +x $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol
-        echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol
-        chmod +x $client_dir/bin/octez-accuser-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
+        echo "exec $sc_rollup_client \"\$@\""  >> $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
+        chmod +x $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
+
+        echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol_without_number
+        echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol_without_number
+        chmod +x $client_dir/bin/octez-accuser-$protocol_without_number
     done
 
     echo '#!/bin/sh' > $client_dir/bin/octez-signer
