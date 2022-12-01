@@ -23,56 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A shard storage on disk.
-
-    To each stored slot is associated a directory named
-    after the b58 encoding of the slot commitment. The shards are files in this
-    directory, named after the shard index and whose content is a byte
-    representation of the share. *)
-type t
-
-val get_data_dir : t -> string
-
-(** [init ~max_mutexes data_dir] initiates a shard storage at [path]. [max_mutexes]
-    gives an upper bound to the number of mutexes available to the file
-    storages to handle concurrent accesses.
-
-    **Warning**: When this limit is reached, older mutexes are removed. A mutex
-    can be removed during its use in this case *)
-val init : max_mutexes:int -> string -> t tzresult Lwt.t
-
-(** [write_shards store commitment shards] stores the set [shards] on [store]
-    associated with [commitment]. In case of IO error, [Io_error] is returned. *)
-val write_shards :
-  t ->
-  Cryptobox.Commitment.t ->
-  Cryptobox.share Cryptobox.IntMap.t ->
-  unit tzresult Lwt.t
-
-(** [read_shards ~share_size dal_constants store commitment] fetches the set of
-    shards associated with [commitment] in [store]. The expected size of shards
-    is given by [dal_constants]. In case of IO error, [Io_error] is returned. *)
-val read_shards :
-  share_size:int ->
-  t ->
-  Cryptobox.Commitment.t ->
-  Cryptobox.share Cryptobox.IntMap.t tzresult Lwt.t
-
-(** [read_shard ~share_size store commitment shard_id] fetches the shard
-    associated to [commitment] in [store] with id [shard_id]. In case of IO
-    error, [Io_error] is returned.*)
-val read_shard :
-  share_size:int ->
-  t ->
-  Cryptobox.Commitment.t ->
-  int ->
-  Cryptobox.shard tzresult Lwt.t
-
-(** [read_shards_subset] has the same behavior as [read_shard] but fetches multiple
-    shard. *)
-val read_shards_subset :
-  share_size:int ->
-  t ->
-  Cryptobox.Commitment.t ->
-  int list ->
-  Cryptobox.shard list tzresult Lwt.t
+(** [shards_max_mutexes] is the limit of simultaneous mutexes on shard storage.
+     see [Shard_store.init].
+*)
+val shards_max_mutexes : int
