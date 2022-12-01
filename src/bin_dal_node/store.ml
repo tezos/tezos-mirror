@@ -71,13 +71,15 @@ let init config =
   Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
 
 module Legacy_paths : sig
-  val slot_by_commitment : string -> string list
+  type path = string list
 
-  val slot_id_by_commitment : string -> Services.Types.slot_id -> string trace
+  val slot_by_commitment : string -> path
 
-  val slot_shards_by_commitment : string -> string trace
+  val slot_id_by_commitment : string -> Services.Types.slot_id -> path
 
-  val slot_shard_by_commitment : string -> int -> string trace
+  val slot_shards_by_commitment : string -> path
+
+  val slot_shard_by_commitment : string -> int -> path
 end = struct
   module Path_internals = struct
     type internal = [`Internal]
@@ -138,6 +140,8 @@ end = struct
       in
       path prefix acc
   end
+
+  type path = string list
 
   let slot_by_commitment c = Path_internals.(data_path @@ slot_by_commitment c)
 
