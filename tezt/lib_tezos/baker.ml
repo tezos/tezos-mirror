@@ -46,6 +46,7 @@ module Parameters = struct
     mutable pending_ready : unit option Lwt.u list;
     votefile : string option;
     liquidity_baking_toggle_vote : liquidity_baking_vote option;
+    operations_pool : string option;
   }
 
   type session_state = {mutable ready : bool}
@@ -88,7 +89,8 @@ let liquidity_baking_votefile ?path vote =
   votefile
 
 let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
-    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) node client =
+    ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?operations_pool node
+    client =
   let baker =
     create
       ~path:(Protocol.baker protocol)
@@ -105,6 +107,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
         pending_ready = [];
         votefile;
         liquidity_baking_toggle_vote;
+        operations_pool;
       }
   in
   on_stdout baker (handle_raw_stdout baker) ;
@@ -130,6 +133,12 @@ let run ?event_level (baker : t) =
       liquidity_baking_vote_to_string
       baker.persistent_state.liquidity_baking_toggle_vote
   in
+  let operations_pool =
+    Cli_arg.optional_arg
+      "operations-pool"
+      Fun.id
+      baker.persistent_state.operations_pool
+  in
   let arguments =
     [
       "--endpoint";
@@ -142,7 +151,7 @@ let run ?event_level (baker : t) =
       "node";
       Node.data_dir node;
     ]
-    @ liquidity_baking_toggle_vote @ votefile @ delegates
+    @ liquidity_baking_toggle_vote @ votefile @ operations_pool @ delegates
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
@@ -168,7 +177,7 @@ let wait_for_ready baker =
       check_event baker "Baker started." promise
 
 let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
-    ?liquidity_baking_toggle_vote node client =
+    ?liquidity_baking_toggle_vote ?operations_pool node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -179,6 +188,7 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
       ?runner
       ?votefile
       ?liquidity_baking_toggle_vote
+      ?operations_pool
       ~delegates
       node
       client
