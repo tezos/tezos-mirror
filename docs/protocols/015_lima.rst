@@ -318,6 +318,10 @@ Minor Changes
 
 - Update gas for L. (MR :gl:`!6519`)
 
+- A new case has been added to the entrypoint encoding, with tag ``5``.
+  This corresponds to the ``deposit`` entrypoint used both by TORUs and
+  ZKRUs. (MR :gl:`!6045`)
+
 Internal
 --------
 
