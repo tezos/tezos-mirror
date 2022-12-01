@@ -82,16 +82,7 @@ let setup_node ~parameter_file ~protocol =
       in
       let json = JSON.put ("dal", value) json in
       json) ;
-  let* () =
-    Node.run
-      node
-      [
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4268
-
-           We use [Singleprocess] because the block validation does not yet load the SRS. *)
-        Singleprocess;
-      ]
-  in
+  let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () =
