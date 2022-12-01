@@ -75,7 +75,7 @@ let solution =
       let solver = Inference.Lasso {alpha = 1.0; positive = true} in
       (* Initialize Python to have access to Scikit's Lasso solver *)
       Pyinit.pyinit () ;
-      Inference.solve_problem problem solver
+      Inference.solve_problem ~is_constant_input:false problem solver
 
 (*
   Fourth and last step: exploiting results.

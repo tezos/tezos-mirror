@@ -41,14 +41,19 @@ type problem =
     }
   | Degenerate of {predicted : matrix; measured : matrix}
 
-type scores = {r2_score : float; rmse_score : float}
+(* R2 score is uninformative when the input is constant. (e.g. constant model)
+   We use `None` for the R2 score of such models. *)
+type scores = {r2_score : float option; rmse_score : float}
 
 let scores_to_csv_column (model_name, bench_name) scores =
   let name = model_name ^ "-" ^ Namespace.to_string bench_name in
-  [
-    ["R2_score-" ^ name; "RMSE_score-" ^ name];
-    [Float.to_string scores.r2_score; Float.to_string scores.rmse_score];
-  ]
+  let table =
+    (match scores.r2_score with
+    | None -> []
+    | Some f -> [("R2_score-" ^ name, Float.to_string f)])
+    @ [("RMSE_score-" ^ name, Float.to_string scores.rmse_score)]
+  in
+  [List.map fst table; List.map snd table]
 
 type solution = {
   mapping : (Free_variable.t * float) list;
@@ -339,15 +344,20 @@ let rmse_score ~output ~prediction =
   let output = to_scipy output in
   Scikit.rmse_score ~output ~prediction
 
-let solve_problem : problem -> solver -> solution =
- fun problem solver ->
+let solve_problem : problem -> is_constant_input:bool -> solver -> solution =
+ fun problem ~is_constant_input solver ->
+  let calculate_scores ~output ~prediction =
+    let r2_score =
+      if is_constant_input then None else r2_score ~output ~prediction
+    in
+    let rmse_score = rmse_score ~output ~prediction in
+    {r2_score; rmse_score}
+  in
   match problem with
   | Degenerate {predicted; measured} ->
       let prediction = to_scipy predicted |> Scikit_matrix.to_numpy in
       let output = median_of_output measured in
-      let r2_score = r2_score ~output ~prediction in
-      let rmse_score = rmse_score ~output ~prediction in
-      let scores = {r2_score; rmse_score} in
+      let scores = calculate_scores ~output ~prediction in
       {mapping = []; weights = empty_matrix; scores}
   | Non_degenerate {input; output; nmap; _} ->
       let output = median_of_output output in
@@ -358,9 +368,7 @@ let solve_problem : problem -> solver -> solution =
         | NNLS -> nnls ~input ~output
       in
       let prediction = predict_output ~input ~weights in
-      let r2_score = r2_score ~prediction ~output in
-      let rmse_score = rmse_score ~prediction ~output in
-      let scores = {r2_score; rmse_score} in
+      let scores = calculate_scores ~output ~prediction in
       let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
         let cols = Maths.col_dim weights in
