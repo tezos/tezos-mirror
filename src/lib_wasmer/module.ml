@@ -29,8 +29,6 @@ open Utils
 open Vectors
 open Api
 
-exception Failed_to_create
-
 type t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
      Ensure that ownership and lifetime of [Types.Module.t] is respected.
@@ -53,7 +51,7 @@ let create store format code =
   in
   let modul = Functions.Module.new_ store (Ctypes.addr wasm) in
   Byte_vector.delete wasm ;
-  check_null_ptr Failed_to_create modul ;
+  check_null_ptr Error.(make_exception Create_configuration) modul ;
   modul
 
 let imports modul =

@@ -28,8 +28,6 @@
 open Utils
 open Api
 
-exception Failed_to_create
-
 let make_features () =
   let open Functions.Wasmer.Features in
   let features = new_ () in
@@ -59,7 +57,7 @@ let default = {compiler = SINGLEPASS}
 
 let to_owned desc =
   let conf = Functions.Config.new_ () in
-  check_null_ptr Failed_to_create conf ;
+  check_null_ptr Error.(make_exception Create_configuration) conf ;
   let has_compiler = is_compiler_available desc.compiler in
   if not has_compiler then raise (Compiler_unavailable desc.compiler) ;
   Functions.Config.set_compiler conf desc.compiler ;

@@ -23,9 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [check_null_ptr exn ptr] raises [exn msg] if [ptr] is a null pointer where
-    [msg] is the last Wasmer error message. *)
-val check_null_ptr : (string -> exn) -> 'a Ctypes.ptr -> unit
+type task =
+  | Create_engine
+  | Create_store
+  | Create_configuration
+  | Create_module
+  | Instantiate_module
 
-(** [last_error ()] retrieves the last Wasmer error. *)
-val last_error : unit -> string
+let string_of_task = function
+  | Create_engine -> "creating a Wasmer engine"
+  | Create_store -> "creating a WebAssembly store"
+  | Create_configuration -> "creating a Wasmer configuration"
+  | Create_module -> "creating a WebAssembly module"
+  | Instantiate_module -> "instantiating a WebAssembly module"
+
+type t = {task : task; reason : string}
+
+exception Wasmer_error of t
+
+let make_exception task reason = Wasmer_error {task; reason}
+
+let () =
+  Printexc.register_printer @@ function
+  | Wasmer_error {task; reason} ->
+      Some
+        (Format.asprintf
+           "Wasmer errored while %s: %s"
+           (string_of_task task)
+           reason)
+  | _ -> None

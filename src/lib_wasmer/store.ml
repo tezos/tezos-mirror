@@ -28,8 +28,6 @@
 open Api
 open Utils
 
-exception Failed_to_create
-
 type t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
      Ensure that ownership and lifetime of [Types.Store.t] is respected.
@@ -38,7 +36,7 @@ type t =
 
 let create engine =
   let store = Functions.Store.new_ engine in
-  check_null_ptr Failed_to_create store ;
+  check_null_ptr Error.(make_exception Create_store) store ;
   store
 
 let delete = Functions.Store.delete

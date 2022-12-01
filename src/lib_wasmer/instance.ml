@@ -41,8 +41,6 @@ module Resolver = Map.Make (struct
     | r, _, _ -> r
 end)
 
-exception Null
-
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
    Ensure that ownership and lifetime of [Types.Instance.t] is respected.
 *)
@@ -92,7 +90,7 @@ let create store module_ externs =
   let trap = Ctypes.(!@trap) in
   Trap.check trap ;
 
-  check_null_ptr Null instance ;
+  check_null_ptr Error.(make_exception Instantiate_module) instance ;
 
   {module_; instance}
 

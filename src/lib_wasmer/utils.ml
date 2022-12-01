@@ -23,4 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let check_null_ptr exn ptr = if Ctypes.is_null ptr then raise exn else ()
+open Api
+
+let last_error () =
+  let len = Functions.Wasmer.last_error_length () in
+  let storage = Ctypes.CArray.make Ctypes.char len in
+  let len = Functions.Wasmer.last_error (Ctypes.CArray.start storage) len in
+  String.init len (Ctypes.CArray.get storage)
+
+let check_null_ptr exn ptr =
+  if Ctypes.is_null ptr then raise (exn (last_error ())) else ()
