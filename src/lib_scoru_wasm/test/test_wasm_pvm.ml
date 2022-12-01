@@ -105,7 +105,7 @@ let add_value ?(content = "a very long value") tree key_steps =
   let value = Chunked_byte_vector.of_string content in
   Tree_encoding_runner.encode
     Tezos_tree_encoding.(
-      scope ("durable" :: List.append key_steps ["_"]) chunked_byte_vector)
+      scope ("durable" :: List.append key_steps ["@"]) chunked_byte_vector)
     value
     tree
 
@@ -181,7 +181,7 @@ let should_run_store_has_kernel () =
      assertion on this path to fail, and the PVM should become stuck on the
      third assert in the kernel. *)
   let* tree =
-    Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "_"]
+    Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "@"]
   in
   let* tree = eval_until_input_requested tree in
   (* The kernel is now expected to fail, the PVM should have stuck tag on. *)

@@ -221,9 +221,9 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
              After this, the flag is set by the PVM state machine
              itself (in [compute_step]). *)
           (scope
-             ["durable"; "kernel"; "env"; "reboot"; "_"]
+             ["durable"; "kernel"; "env"; "reboot"; "@"]
              chunked_byte_vector)
-          (scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector)
+          (scope ["durable"; "kernel"; "boot.wasm"; "@"] chunked_byte_vector)
           (value ["pvm"; "max_nb_ticks"] Data_encoding.n))
       (reboot_flag, bs, ticks_per_snapshot)
       tree
