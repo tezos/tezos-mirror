@@ -1564,11 +1564,18 @@ let register_global_constant ?wait ?burn_cap ~src ~value client =
         client_output
   | Some hash -> return hash
 
-let spawn_hash_script ?hooks ~script client =
-  spawn_command ?hooks client ["hash"; "script"; script]
+type hash_script_format = TSV | CSV
 
-let hash_script ?hooks ~script client =
-  spawn_hash_script ?hooks ~script client |> Process.check_and_read_stdout
+let show_hash_script_format = function TSV -> "tsv" | CSV -> "csv"
+
+let spawn_hash_script ?hooks ?for_script ~script client =
+  spawn_command ?hooks client
+  @@ ["hash"; "script"; script]
+  @ optional_arg "for-script" show_hash_script_format for_script
+
+let hash_script ?hooks ?for_script ~script client =
+  spawn_hash_script ?hooks ?for_script ~script client
+  |> Process.check_and_read_stdout
 
 let spawn_get_contract_hash ?hooks ~contract client =
   spawn_command
@@ -1580,17 +1587,22 @@ let get_contract_hash ?hooks ~contract client =
   spawn_get_contract_hash ?hooks ~contract client
   |> Process.check_and_read_stdout
 
-let spawn_hash_scripts ?hooks ?(display_names = false) scripts client =
+let spawn_hash_scripts ?hooks ?(display_names = false) ?for_script scripts
+    client =
   spawn_command ?hooks client
   @@ ["hash"; "script"] @ scripts
   @ optional_switch "display-names" display_names
+  @ optional_arg "for-script" show_hash_script_format for_script
 
-let hash_scripts ?hooks ?display_names scripts client =
+let hash_scripts ?hooks ?display_names ?for_script scripts client =
   let* output =
-    spawn_hash_scripts ?hooks ?display_names scripts client
+    spawn_hash_scripts ?hooks ?display_names ?for_script scripts client
     |> Process.check_and_read_stdout
   in
-  return (String.split_on_char '\n' output)
+  return
+    (match String.trim output with
+    | "" -> []
+    | output -> String.split_on_char '\n' output)
 
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
