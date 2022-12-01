@@ -394,12 +394,12 @@ module Sc_rollup_in_memory_inbox : sig
 end
 
 module Dal : sig
-  (** [record_available_shards ctxt slots shards] records that the
-     list of shards [shards] were declared available. The function
-     assumes that a shard belongs to the interval [0; number_of_shards
-     - 1]. Otherwise, for each shard outside this interval, it is a
-     no-op. *)
-  val record_available_shards : t -> Dal_attestation_repr.t -> int list -> t
+  (** [record_attested_shards ctxt attestation shards] records that the
+     list of shards [shards] were attested (declared available by some
+     attestor). The function assumes that a shard belongs to the
+     interval [0; number_of_shards - 1]. Otherwise, for each shard
+     outside this interval, it is a no-op. *)
+  val record_attested_shards : t -> Dal_attestation_repr.t -> int list -> t
 
   (** [register_slot_header ctxt slot_header] returns a new context
      where the new candidate [slot] have been taken into

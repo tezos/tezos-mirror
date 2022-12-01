@@ -1600,11 +1600,11 @@ module Dal = struct
       (fun (length, slot_header) ->
         Dal_register_invalid_slot_header {length; slot_header})
 
-  let record_available_shards ctxt slots shards =
+  let record_attested_shards ctxt attestation shards =
     let dal_attestation_slot_accountability =
       Dal_attestation_repr.Accountability.record_shards_availability
         ctxt.back.dal_attestation_slot_accountability
-        slots
+        attestation
         shards
     in
     {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}

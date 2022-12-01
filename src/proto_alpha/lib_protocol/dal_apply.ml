@@ -79,7 +79,7 @@ let apply_attestation ctxt op =
       let level = Level.current ctxt in
       error (Dal_data_availibility_attestor_not_in_committee {attestor; level})
   | Some shards ->
-      Ok (Dal.Attestation.record_available_shards ctxt attestation shards)
+      Ok (Dal.Attestation.record_attested_shards ctxt attestation shards)
 
 let validate_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
