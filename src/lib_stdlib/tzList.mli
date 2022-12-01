@@ -49,3 +49,8 @@ val split_n : int -> 'a list -> 'a list * 'a list
 
 (** [rev_split_n n l] is [(rev_take_n n l, drop_n n l)] but more efficient. *)
 val rev_split_n : int -> 'a list -> 'a list * 'a list
+
+(** [all_equal cmp l] checks if all elements of [l] are identical according to [cmp].
+
+    If [l] is the empty list it is [true]. *)
+val all_equal : ('a -> 'a -> bool) -> 'a list -> bool

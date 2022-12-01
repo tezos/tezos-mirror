@@ -46,3 +46,5 @@ let take_n n l = fst (split_n n l)
 
 let rec drop_n n l =
   if n <= 0 then l else match l with [] -> [] | _ :: xs -> drop_n (n - 1) xs
+
+let all_equal cmp = function [] -> true | x :: xs -> List.for_all (cmp x) xs
