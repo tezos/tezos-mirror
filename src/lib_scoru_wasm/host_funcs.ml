@@ -913,7 +913,9 @@ let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
 let reveal_metadata_name = "tezos_reveal_metadata"
 
 let reveal_metadata_type =
-  let input_types = Types.[NumType I32Type] |> Vector.of_list in
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
@@ -923,11 +925,8 @@ let metadata_size = Int32.add 20l 4l
 
 let reveal_metadata_parse_args _memories args =
   match args with
-  | Values.[Num (I32 base)] ->
-      Lwt.return
-        (Ok
-           ( Host_funcs.Reveal_metadata,
-             Host_funcs.{base; max_bytes = metadata_size} ))
+  | Values.[Num (I32 base); Num (I32 max_bytes)] ->
+      Lwt.return (Ok (Host_funcs.Reveal_metadata, Host_funcs.{base; max_bytes}))
   | _ -> raise Bad_input
 
 let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args

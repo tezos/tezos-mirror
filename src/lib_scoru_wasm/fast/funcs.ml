@@ -310,8 +310,8 @@ let make (module Builtins : Builtins.S) state =
   in
   let reveal_metadata =
     fn
-      (i32 @-> returning1 i32)
-      (fun dest ->
+      (i32 @-> i32 @-> returning1 i32)
+      (fun dest max_bytes ->
         let mem = state.retrieve_mem () in
         let dest = Int32.to_int dest in
         let+ payload = Builtins.reveal_metadata () in
@@ -320,7 +320,7 @@ let make (module Builtins : Builtins.S) state =
             (* XXX: Check note about bounds above please! *)
             Char.code c |> Unsigned.UInt8.of_int |> Memory.set mem (dest + i))
           payload ;
-        Int32.of_int (String.length payload))
+        Int32.(min max_bytes (of_int (String.length payload))))
   in
 
   List.map
