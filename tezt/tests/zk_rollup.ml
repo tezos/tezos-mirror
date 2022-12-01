@@ -96,8 +96,7 @@ module MakeHelpers () = struct
     in
     write_file init_state_file ~contents
 
-  let of_plonk_smap s =
-    Zk_rollup.Account.SMap.of_seq @@ Plonk.Main_protocol.SMap.to_seq s
+  let of_plonk_smap s = Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq s
 
   let circuits_info_file = with_epoxy_dir "circuits_info"
 

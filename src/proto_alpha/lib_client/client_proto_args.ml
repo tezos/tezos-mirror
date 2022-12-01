@@ -1022,9 +1022,7 @@ module Zk_rollup_params = struct
         match
           Data_encoding.(
             Binary.of_bytes_opt
-              (tup2
-                 Plonk.Main_protocol.verifier_public_parameters_encoding
-                 Plonk.Main_protocol.transcript_encoding))
+              Plonk.Main_protocol.verifier_public_parameters_encoding)
             (Bytes.of_string s)
         with
         | None -> failwith "Invalid PlonK public parameter"

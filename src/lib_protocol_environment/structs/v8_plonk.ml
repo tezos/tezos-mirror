@@ -23,16 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type scalar := Bls.Primitive.Fr.t
+include Plonk.Main_protocol
 
-type public_parameters
+type public_parameters = verifier_public_parameters
 
-type proof
+type verifier_inputs = (string * scalar array list) list
 
-val public_parameters_encoding : public_parameters Data_encoding.t
+let public_parameters_encoding =
+  Plonk.Main_protocol.verifier_public_parameters_encoding
 
-val proof_encoding : proof Data_encoding.t
+let scalar_array_encoding = Data_encoding.array scalar_encoding
 
-val scalar_encoding : scalar Data_encoding.t
-
-val scalar_array_encoding : scalar array Data_encoding.t
+let verify pp inputs proof =
+  Result.value ~default:false
+  @@ Tezos_lwt_result_stdlib.Lwtreslib.Bare.Result.catch (fun () ->
+         verify pp ~inputs:(Plonk.SMap.of_list inputs) proof)

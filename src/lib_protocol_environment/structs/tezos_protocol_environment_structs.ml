@@ -115,5 +115,5 @@ module V8 = struct
   module Data_encoding = V8_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Array = V7_array
-  module Plonk = V7_plonk
+  module Plonk = V8_plonk
 end

@@ -457,9 +457,9 @@ let update ~ctxt_before_op ~ctxt ~zk_rollup ~update =
   in
   (* Run the verification of the Plonk proof *)
   let verified =
-    Plonk.verify_multi_circuits
+    Plonk.verify
       account.static.public_parameters
-      ~public_inputs:(SMap.bindings pi_map)
+      (SMap.bindings pi_map)
       update.proof
   in
   let*? () = error_unless verified Zk_rollup.Errors.Invalid_verification in

@@ -274,10 +274,7 @@ module Zk_rollup_params : sig
   val address_parameter : (Zk_rollup.t, full) Tezos_clic.parameter
 
   val plonk_public_parameters_parameter :
-    ( Plonk.Main_protocol.verifier_public_parameters
-      * Plonk.Main_protocol.transcript,
-      full )
-    Tezos_clic.parameter
+    (Plonk.Main_protocol.verifier_public_parameters, full) Tezos_clic.parameter
 
   val update_parameter : (Zk_rollup.Update.t, full) Tezos_clic.parameter
 
