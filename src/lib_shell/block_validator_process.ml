@@ -52,6 +52,7 @@ module type S = sig
 
   val apply_block :
     simulate:bool ->
+    ?should_precheck:bool ->
     t ->
     Store.chain_store ->
     predecessor:Store.Block.t ->
@@ -226,8 +227,8 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
       }
 
-  let apply_block ~simulate validator chain_store ~predecessor
-      ~max_operations_ttl block_header operations =
+  let apply_block ~simulate ?(should_precheck = true) validator chain_store
+      ~predecessor ~max_operations_ttl block_header operations =
     let open Lwt_result_syntax in
     let* env =
       make_apply_environment
@@ -249,6 +250,7 @@ module Internal_validator_process = struct
       Block_validation.apply
         ~simulate
         ?cached_result:validator.preapply_result
+        ~should_precheck
         env
         block_header
         operations
@@ -753,8 +755,8 @@ module External_validator_process = struct
     in
     return validator
 
-  let apply_block ~simulate validator chain_store ~predecessor
-      ~max_operations_ttl block_header operations =
+  let apply_block ~simulate ?(should_precheck = true) validator chain_store
+      ~predecessor ~max_operations_ttl block_header operations =
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let predecessor_block_metadata_hash =
@@ -773,6 +775,7 @@ module External_validator_process = struct
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          should_precheck;
           simulate;
         }
     in
@@ -935,16 +938,25 @@ let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =
   VP.reconfigure_event_logging validator config
 
-let apply_block ?(simulate = false)
+let apply_block ?(simulate = false) ?(should_precheck = true)
     (E {validator_process = (module VP); validator}) chain_store ~predecessor
     header operations =
   let open Lwt_result_syntax in
+  let block_hash = Block_header.hash header in
+  let* () =
+    when_ (not should_precheck) (fun () ->
+        let*! is_prechecked =
+          Store.Block.is_known_prechecked chain_store block_hash
+        in
+        fail_unless
+          is_prechecked
+          (Block_validator_errors.Applying_non_prechecked_block block_hash))
+  in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
   let* live_blocks, live_operations =
     Store.Chain.compute_live_blocks chain_store ~block:predecessor
   in
-  let block_hash = Block_header.hash header in
   let*? () =
     Block_validation.check_liveness
       ~live_operations
@@ -954,6 +966,7 @@ let apply_block ?(simulate = false)
   in
   VP.apply_block
     ~simulate
+    ~should_precheck
     validator
     chain_store
     ~predecessor

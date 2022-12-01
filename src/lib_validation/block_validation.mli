@@ -126,15 +126,17 @@ val default_operation_metadata_size_limit : int option
     2. [P.apply]
     3. [P.finalize_block]
 
+    [should_precheck] when set (default), triggers the block prechecking before
+    applying it, see [precheck]. If it is set to [false] the given block must
+    have been prechecked.
+
     If [simulate] is true, the context resulting from the application
     is not committed to disk using `Context.commit`, only the commit
-    hash is computed, using `Context.hash`. Set to false by default.
-
-    Hypothesis: we assume that the given block has already been
-                validated -- E.g. by calling [precheck]. *)
+    hash is computed, using `Context.hash`. Set to false by default. *)
 val apply :
   ?simulate:bool ->
   ?cached_result:apply_result * Tezos_protocol_environment.Context.t ->
+  ?should_precheck:bool ->
   apply_environment ->
   cache:Tezos_protocol_environment.Context.source_of_cache ->
   Block_header.t ->
