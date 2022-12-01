@@ -3555,12 +3555,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     fail_unless
       (expect_predecessor_context
       || Context_hash.equal
-           validation_store.Tezos_validation.Block_validation.context_hash
+           validation_store
+             .Tezos_validation.Block_validation.resulting_context_hash
            block_header.Block_header.shell.context)
       (Inconsistent_context_hash
          {
            expected = block_header.Block_header.shell.context;
-           got = validation_store.Tezos_validation.Block_validation.context_hash;
+           got =
+             validation_store
+               .Tezos_validation.Block_validation.resulting_context_hash;
          })
 
   let restore_and_apply_context snapshot_importer protocol_levels
@@ -3874,7 +3877,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~genesis_context_hash
             ~floating_blocks_stream
             ~new_head_with_metadata
-            ~new_head_resulting_context_hash:validation_store.context_hash
+            ~new_head_resulting_context_hash:
+              validation_store.resulting_context_hash
             ~protocol_levels
             ~history_mode)
     in

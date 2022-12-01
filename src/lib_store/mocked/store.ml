@@ -394,7 +394,7 @@ module Block = struct
     let {
       Block_validation.validation_store =
         {
-          context_hash;
+          resulting_context_hash;
           timestamp = _;
           message;
           max_operations_ttl;
@@ -519,7 +519,10 @@ module Block = struct
         in
         let block = {Block_repr.hash; contents; metadata} in
         let* () =
-          Block_store.store_block chain_store.block_store block context_hash
+          Block_store.store_block
+            chain_store.block_store
+            block
+            resulting_context_hash
         in
         let*! () =
           Store_events.(emit store_block) (hash, block_header.shell.level)

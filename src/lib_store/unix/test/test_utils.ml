@@ -463,7 +463,7 @@ let store_raw_block chain_store ?resulting_context (raw_block : Block_repr.t) =
     {
       Tezos_validation.Block_validation.validation_store =
         {
-          context_hash =
+          resulting_context_hash =
             Option.value
               ~default:(Block_repr.context raw_block)
               resulting_context;

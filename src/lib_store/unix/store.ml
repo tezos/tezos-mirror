@@ -447,7 +447,7 @@ module Block = struct
     let {
       Block_validation.validation_store =
         {
-          context_hash = resulting_context_hash;
+          resulting_context_hash;
           timestamp = _;
           message;
           max_operations_ttl;

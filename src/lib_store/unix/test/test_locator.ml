@@ -101,7 +101,7 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
     Context_ops.commit ~time:header.shell.timestamp empty_context
   in
   let header = {header with shell = {header.shell with context}} in
-  let context_hash = empty_context_hash in
+  let resulting_context_hash = empty_context_hash in
   let message = None in
   let max_operations_ttl = 0 in
   let rec loop lvl pred =
@@ -118,7 +118,7 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
         {
           Block_validation.validation_store =
             {
-              context_hash;
+              resulting_context_hash;
               timestamp = header.shell.timestamp;
               message;
               max_operations_ttl;
@@ -160,7 +160,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
   let genesis_header = {header with shell = {header.shell with context}} in
   let empty_result =
     {
-      Block_validation.context_hash = context;
+      Block_validation.resulting_context_hash = context;
       timestamp = Time.Protocol.epoch;
       message = None;
       max_operations_ttl = 0;

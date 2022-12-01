@@ -262,11 +262,12 @@ let replay_one_block strict main_chain_store validator_process block =
         (not
            (Tezos_crypto.Context_hash.equal
               expected_context_hash
-              result.validation_store.context_hash))
+              result.validation_store.resulting_context_hash))
         (fun () ->
           let*! () =
             Event.(strict_emit ~strict inconsistent_context_hash)
-              (expected_context_hash, result.validation_store.context_hash)
+              ( expected_context_hash,
+                result.validation_store.resulting_context_hash )
           in
           return_unit)
     in

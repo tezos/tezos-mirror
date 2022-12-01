@@ -275,7 +275,7 @@ let on_validation_request w
                             {
                               block;
                               resulting_context_hash =
-                                result.validation_store.context_hash;
+                                result.validation_store.resulting_context_hash;
                             } ;
                           return Validated
                       | None -> return Already_committed)))
