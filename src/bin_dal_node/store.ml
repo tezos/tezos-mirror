@@ -193,13 +193,20 @@ module Legacy = struct
   let legacy_add_slot_headers ~block_hash slot_headers node_store =
     let slot_headers_store = node_store.slot_headers_store in
     List.iter_s
-      (fun (slot_header, _status) ->
-        let Dal_plugin.{slot_index; commitment; _} = slot_header in
-        Slot_headers_store.add
-          slot_headers_store
-          ~primary_key:block_hash
-          ~secondary_key:slot_index
-          commitment)
+      (fun (slot_header, status) ->
+        match status with
+        | Dal_plugin.Succeeded ->
+            let Dal_plugin.{slot_index; commitment; _} = slot_header in
+            Slot_headers_store.add
+              slot_headers_store
+              ~primary_key:block_hash
+              ~secondary_key:slot_index
+              commitment
+        | Dal_plugin.Failed ->
+            (* This function is only supposed to add successfully applied slot
+               headers. Anyway, this piece of code will be removed once fully
+               implementing the new DAL API. *)
+            Lwt.return_unit)
       slot_headers
 
   let add_slot_headers ~block_level:_ ~block_hash slot_headers node_store =
