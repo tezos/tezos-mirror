@@ -82,6 +82,10 @@ module Constants = struct
   (* Cost of serializing a nonce. The cost of serializing the index (an int32)
      is negligible. *)
   let cost_serialize_nonce = cost_serialize_operation_hash
+
+  (* Set to [proof_size_coeff] in {!Tx_rollup_l2_verifier.verify_proof_model}.
+     This is an estimate to be updated when benchmarking is completed. *)
+  let cost_verify_output_proof_per_byte = S.safe_int 152
 end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
@@ -155,3 +159,7 @@ let cost_check_dissection ~number_of_states ~tick_size ~hash_size =
   let open S_syntax in
   cost_search_in_tick_list number_of_states tick_size
   + (S.safe_int 2 * cost_compare hash_size hash_size)
+
+let cost_verify_output_proof ~bytes_len =
+  let open Saturation_repr in
+  S_syntax.(Constants.cost_verify_output_proof_per_byte * safe_int bytes_len)
