@@ -427,25 +427,26 @@ module Dal : sig
 
   (** The DAL committee is a subset of the Tenderbake committee.  A
      shard from [0;number_of_shards] is associated to a public key
-     hash. For efficiency reasons, the committee is two-folds: a
-     mapping public key hash to shards and shards to public key
-     hashes. The DAL committee ensures the shards associated to the
+     hash. For efficiency reasons, the committee is both:
+     a mapping from public key hashes to shards and
+     a mapping from shards to public key hashes.
+     The DAL committee ensures the shards associated to the
      same public key hash are contiguous. The list of shards is
      represented as two natural numbers [(initial, power)] which
      encodes the list of shards:
-     [initial;initial + 1;...;initial + power - 1].
+     [initial; initial + 1; ... ; initial + power - 1].
 
       This data-type ensures the following invariants:
 
       - \forall pkh shard, find pkh_to_shards pkh = Some (start,n) ->
-     \forall i, i \in [start; start + n -1] -> find shard_to_pkh shard
+     \forall i, i \in [start; start + n - 1] -> find shard_to_pkh i
      = Some pkh
 
       - forall pkh shard, find shard_to_pkh shard = Some pkh ->
      \exists (start,n), find pkh_to_shards pkh = Some (start,n) /\
-     start <= shard <= start + n -1
+     start <= shard <= start + n - 1
 
-      - Given an attestor, all its shards assignement are contiguous
+      - Given an attestor, all its shard assignments are contiguous
      *)
   type committee = {
     pkh_to_shards :
@@ -456,12 +457,12 @@ module Dal : sig
   (** [compute_committee ctxt pkh_from_tenderbake_slot] computes the
      DAL committee using the [pkh_from_tenderbake_slot] function. This
      functions takes into account the fact that the DAL committee and
-     the Tenderbake committee may have different size. If the DAL
+     the Tenderbake committee may have different sizes. If the DAL
      committee is smaller, then we simply take a projection of the
      Tenderbake committee for the first [n] slots. If the DAL
-     committee is larger, shards are computed moduloe the Tenderbake
-     committee. Slots assignements are reordered for a given a public
-     key hash, to ensure all the slots (or shards in the context of
+     committee is larger, shards are computed modulo the Tenderbake
+     committee. Slots assignments are reordered for a given a public
+     key hash to ensure all the slots (or shards in the context of
      DAL) shards are contiguous (see {!type:committee}). *)
   val compute_committee :
     t ->
