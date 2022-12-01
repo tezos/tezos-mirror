@@ -25,6 +25,33 @@
 #                                                                           #
 #############################################################################
 
+# This script detects if the S3 bucket storing CSVs resulting from snoop
+# inference has been updated since the previous run of this script.
+
+# If the bucket has not been updated since the previous run of this script then
+# the script does nothing. So it is safe to run this script quite often in a
+# Cron job.
+
+# If the bucket contains new results, they are compared to two reference points:
+# the first run (declared in the FIRST_DIR environment variable; defaulting to
+# the oldest run if the variable is empty or not set) and the previous run (as
+# read in the last_known_dir file).
+
+# The script compares each CSV in the directory of the last run with CSVs of the
+# same name in the two reference directories.
+
+# The comparison is done using the gas_parameter_diff OCaml script from the
+# Tezos codebase.
+
+# If regressions are detected during the diffs, they are sent to a Slack
+# channel.
+
+# The results of all comparisons are 3 CSV tables:
+# - all.csv comparing all the runs
+# - first.csv comparing the first and last runs
+# - prev.csv comparing the previous and last runs.
+# These tables are also sent to the Slack channel
+
 # This is the Slack channel messages will be sent to (gas-benchmarks-reports).
 CHAN=C04HZHR11DW
 # This is the confidential Slack authorization token. It allows us to send
