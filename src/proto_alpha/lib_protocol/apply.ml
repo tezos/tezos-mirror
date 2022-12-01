@@ -2662,7 +2662,7 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let* ctxt =
+  let*! ctxt =
     Sc_rollup.Inbox.add_info_per_level
       ~timestamp:block_header.shell.timestamp
       ~predecessor:block_header.shell.predecessor
@@ -2722,7 +2722,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let* ctxt =
+  let*! ctxt =
     Sc_rollup.Inbox.add_info_per_level
       ~timestamp
       ~predecessor:predecessor_hash
@@ -2774,7 +2774,10 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
       Timestamp.(predecessor_timestamp +? minimal_block_delay)
     in
     let predecessor = predecessor_hash in
-    Sc_rollup.Inbox.add_info_per_level ~timestamp ~predecessor ctxt
+    let*! ctxt =
+      Sc_rollup.Inbox.add_info_per_level ~timestamp ~predecessor ctxt
+    in
+    return ctxt
   in
   let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
@@ -2864,7 +2867,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
-  let* ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
+  let*! ctxt = Sc_rollup.Inbox.finalize_inbox_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in

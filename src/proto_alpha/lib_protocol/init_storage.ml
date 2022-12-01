@@ -156,7 +156,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
       Sc_rollup_inbox_storage.init_inbox ~predecessor ~timestamp ctxt
-      >>=? fun ctxt ->
+      >>= fun ctxt ->
       return
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
@@ -170,7 +170,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp ~predecessor
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       Sc_rollup_inbox_storage.init_inbox ~predecessor ~timestamp ctxt
-      >>=? fun ctxt -> return (ctxt, []))
+      >>= fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
   >>=? fun ctxt ->
