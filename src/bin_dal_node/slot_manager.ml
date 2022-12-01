@@ -64,7 +64,7 @@ let commitment_should_exist node_store commitment =
 
 (* Main functions *)
 
-let add_slots slot node_store cryptobox =
+let add_slots node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let commitment = Cryptobox.commit cryptobox polynomial in
@@ -75,7 +75,7 @@ let add_slots slot node_store cryptobox =
   in
   return commitment
 
-let add_slot_id commitment slot_id node_store =
+let add_slot_id node_store commitment slot_id =
   let open Lwt_result_syntax in
   let* () = commitment_should_exist node_store commitment in
   let*! () =
@@ -83,7 +83,7 @@ let add_slot_id commitment slot_id node_store =
   in
   return_unit
 
-let get_slot_content commitment node_store =
+let find_slot node_store commitment =
   let open Lwt_result_syntax in
   let*! slot_opt = Store.Legacy.find_slot_by_commitment node_store commitment in
   match slot_opt with

@@ -34,13 +34,14 @@ module Slots_handlers = struct
     let store = Node_context.get_store ctxt in
     handler store cryptobox
 
-  let post_slots ctxt () slot = call_handler (Slot_manager.add_slots slot) ctxt
+  let post_slots ctxt () slot =
+    call_handler (fun store -> Slot_manager.add_slots store slot) ctxt
 
   let patch_slot ctxt commitment () slot_id =
     call_handler
       (fun store _cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.add_slot_id commitment slot_id store in
+        let*! r = Slot_manager.add_slot_id store commitment slot_id in
         match r with Ok () -> return_some () | Error `Not_found -> return_none)
       ctxt
 
@@ -48,8 +49,27 @@ module Slots_handlers = struct
     call_handler
       (fun store _cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.get_slot_content commitment store in
+        let*! r = Slot_manager.find_slot store commitment in
         match r with Ok s -> return_some s | Error `Not_found -> return_none)
+      ctxt
+
+  let get_slot_commitment_proof ctxt commitment () () =
+    call_handler
+      (fun store cryptobox ->
+        let open Lwt_result_syntax in
+        (* This handler may be costly: We need to recompute the
+           polynomial and then compute the proof. *)
+        let*! slot = Slot_manager.find_slot store commitment in
+        match slot with
+        | Error `Not_found -> return_none
+        | Ok slot -> (
+            match Cryptobox.polynomial_from_slot cryptobox slot with
+            | Error _ ->
+                (* Storage consistency ensures we can always compute the
+                   polynomial from the slot. *)
+                assert false
+            | Ok polynomial ->
+                return_some (Cryptobox.prove_commitment cryptobox polynomial)))
       ctxt
 end
 
@@ -74,6 +94,10 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.get_slot
        (Slots_handlers.get_slot_content ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.get_slot_commitment_proof
+       (Slots_handlers.get_slot_commitment_proof ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
