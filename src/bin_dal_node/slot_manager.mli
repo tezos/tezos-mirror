@@ -31,7 +31,7 @@ include module type of Slot_manager_legacy
 
 type error += Invalid_slot_size of {provided : int; expected : int}
 
-(** [add_slots slot node_Store cryptobox] computes the given [slot]'s commitment
+(** [add_slots node_store slot cryptobox] computes the given [slot]'s commitment
     and adds the association "commitment -> slot" in the DAL's [node_store] if
     the commitment is not already bound to some data.
 
@@ -40,27 +40,27 @@ type error += Invalid_slot_size of {provided : int; expected : int}
     commitment otherwise.
 *)
 val add_slots :
-  Cryptobox.slot ->
   Store.node_store ->
+  Cryptobox.slot ->
   Cryptobox.t ->
   Cryptobox.commitment tzresult Lwt.t
 
-(** [add_slot_id commitment slot_id node_Store] associates a [slot_id] to a
+(** [add_slot_id commitment node_tore slot_id] associates a [slot_id] to a
     [commitment] in [node_store]. The function returns [Error `Not_found] if
     there is no entry for [commitment] in [node_store]. Otherwise, [Ok ()] is
     returned.
 *)
 val add_slot_id :
+  Store.node_store ->
   Cryptobox.commitment ->
   Services.Types.slot_id ->
-  Store.node_store ->
   (unit, [> `Not_found]) result Lwt.t
 
-(** [get_slot_content commitment node_Store] returns the slot content associated
+(** [find_slot node_store commitment] returns the slot content associated
     with the given [commitment] in [node_store]. The function returns [Error
     `Not_found] if there is no slot content for [commitment] in [node_store].
 *)
-val get_slot_content :
-  Cryptobox.commitment ->
+val find_slot :
   Store.node_store ->
+  Cryptobox.commitment ->
   (slot, [> `Not_found]) result Lwt.t
