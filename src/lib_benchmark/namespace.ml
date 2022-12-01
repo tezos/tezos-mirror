@@ -82,7 +82,14 @@ module Hashtbl = Hashtbl.MakeSeeded (struct
 
   let equal = equal
 
+  (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+  [@@@ocaml.warning "-32"]
+
   let hash = Hashtbl.seeded_hash
+
+  let seeded_hash = Hashtbl.seeded_hash
+
+  [@@@ocaml.warning "+32"]
 end)
 
 module Set = Set.Make (struct

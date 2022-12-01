@@ -53,7 +53,14 @@ module Public_key_hash = struct
     include Stdlib.Hashtbl.MakeSeeded (struct
       include Tezos_crypto.P256.Public_key_hash
 
+      (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+      [@@@ocaml.warning "-32"]
+
       let hash = Stdlib.Hashtbl.seeded_hash
+
+      let seeded_hash = Stdlib.Hashtbl.seeded_hash
+
+      [@@@ocaml.warning "+32"]
     end)
 
     let encoding arg_encoding =

@@ -43,7 +43,22 @@ module String = struct
 
     let equal = String.equal
 
+    (* in OCaml 5, the interface of the [Hashtbl.MakeSeeded] functor has changed:
+       it expects the seeded hash function to be called [seeded_hash]. This will
+       reduce the amount of boilerplate in the long run, but in the transitionary
+       period it increases it instead: we need to expose both [hash] and
+       [seeded_hash] to be compatible with both versions of the compiler.
+
+       Depending on which OCaml compiler (4 or 5) is used, either of the hashing
+       function ([hash] or [seeded_hash]) is used. The other function is unused.
+       Thus we also need to suppress the associated warning. *)
+    [@@@ocaml.warning "-32"]
+
     let hash = Hashtbl.seeded_hash
+
+    let seeded_hash = Hashtbl.seeded_hash
+
+    [@@@ocaml.warning "+32"]
   end)
 
   module Map = Tezos_error_monad.TzLwtreslib.Map.Make (String)
