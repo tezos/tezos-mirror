@@ -1149,7 +1149,8 @@ let drain_delegate ?hooks ?endpoint ?(wait = "none") ?expect_failure ~delegate
   |> Process.check ?expect_failure
 
 let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
-    ?burn_cap ?gas_limit ?(dry_run = false) ~alias ~amount ~src ~prg client =
+    ?burn_cap ?gas_limit ?(dry_run = false) ?(force = false) ~alias ~amount ~src
+    ~prg client =
   spawn_command
     ?hooks
     ?log_output
@@ -1170,7 +1171,8 @@ let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
     @ optional_arg "init" Fun.id init
     @ optional_arg "burn-cap" Tez.to_string burn_cap
     @ optional_arg "gas-limit" string_of_int gas_limit
-    @ optional_switch "dry-run" dry_run)
+    @ optional_switch "dry-run" dry_run
+    @ optional_switch "force" force)
 
 type conversion_kind = Script | Data
 
@@ -1221,7 +1223,7 @@ let convert_data_to_json ?endpoint ~data client =
   convert_michelson_to_json ~kind:Data ?endpoint ~input:data client
 
 let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
-    ?gas_limit ?dry_run ~alias ~amount ~src ~prg client =
+    ?gas_limit ?dry_run ?force ~alias ~amount ~src ~prg client =
   let* client_output =
     spawn_originate_contract
       ?endpoint
@@ -1232,6 +1234,7 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
       ?burn_cap
       ?gas_limit
       ?dry_run
+      ?force
       ~alias
       ~amount
       ~src

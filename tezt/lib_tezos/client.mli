@@ -925,6 +925,7 @@ val originate_contract :
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
+  ?force:bool ->
   alias:string ->
   amount:Tez.t ->
   src:string ->
@@ -942,6 +943,7 @@ val spawn_originate_contract :
   ?burn_cap:Tez.t ->
   ?gas_limit:int ->
   ?dry_run:bool ->
+  ?force:bool ->
   alias:string ->
   amount:Tez.t ->
   src:string ->
