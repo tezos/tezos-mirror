@@ -77,3 +77,27 @@ val bytes_lsl : bytes -> Script_int.n Script_int.num -> bytes option
       0x1234 LSR 8 = 0x12  (instead of 0x0012)
 *)
 val bytes_lsr : bytes -> Script_int.n Script_int.num -> bytes
+
+(** Convert a natural number to bytes using big-endian encoding. *)
+val bytes_of_nat_be : Script_int.n Script_int.num -> bytes
+
+(** Convert bytes to a natural number using big-endian encoding. *)
+val nat_of_bytes_be : bytes -> Script_int.n Script_int.num
+
+(** Convert an integer to bytes using big-endian encoding.
+    Negative numbers are handled by two's-complement. *)
+val bytes_of_int_be : Script_int.z Script_int.num -> bytes
+
+(** Convert bytes to an integer using big-endian encoding.
+    Negative numbers are handled by two's-complement. *)
+val int_of_bytes_be : bytes -> Script_int.z Script_int.num
+
+module Conversion_BE : sig
+  val bytes_of_nat_be : Z.t -> bytes option
+
+  val nat_of_bytes_be : bytes -> Z.t
+
+  val bytes_of_int_be : Z.t -> bytes
+
+  val int_of_bytes_be : bytes -> Z.t
+end

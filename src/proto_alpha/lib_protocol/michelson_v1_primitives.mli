@@ -168,6 +168,8 @@ type prim =
   | I_JOIN_TICKETS
   | I_OPEN_CHEST
   | I_EMIT
+  | I_BYTES
+  | I_NAT
   | T_bool
   | T_contract
   | T_int

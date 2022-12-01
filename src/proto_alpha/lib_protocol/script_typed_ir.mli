@@ -667,6 +667,18 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | INot_bytes :
       Script.location * (bytes, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
+  | INat_bytes :
+      Script.location * (n num, 's, 'r, 'f) kinstr
+      -> (bytes, 's, 'r, 'f) kinstr
+  | IBytes_nat :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (n num, 's, 'r, 'f) kinstr
+  | IInt_bytes :
+      Script.location * (z num, 's, 'r, 'f) kinstr
+      -> (bytes, 's, 'r, 'f) kinstr
+  | IBytes_int :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (z num, 's, 'r, 'f) kinstr
   (*
      Timestamps
      ----------

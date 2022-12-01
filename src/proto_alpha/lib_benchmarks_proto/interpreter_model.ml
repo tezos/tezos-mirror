@@ -408,6 +408,10 @@ let ir_model ?specialization instr_or_cont =
       | N_INot_bytes -> model_1 instr_or_cont (affine_model name)
       | N_ILsl_bytes -> model_2 instr_or_cont (lsl_bytes_model name)
       | N_ILsr_bytes -> model_2 instr_or_cont (lsr_bytes_model name)
+      | N_IBytes_nat -> model_1 instr_or_cont (affine_model name)
+      | N_INat_bytes -> model_1 instr_or_cont (affine_model name)
+      | N_IBytes_int -> model_1 instr_or_cont (affine_model name)
+      | N_IInt_bytes -> model_1 instr_or_cont (affine_model name)
       | N_IAdd_seconds_to_timestamp | N_IAdd_timestamp_to_seconds
       | N_ISub_timestamp_seconds | N_IDiff_timestamps ->
           model_2 instr_or_cont (linear_max_model name)

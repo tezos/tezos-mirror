@@ -41,6 +41,8 @@ let compare (Num_tag x) (Num_tag y) = Z.compare x y
 
 let zero = Num_tag Z.zero
 
+let one = Num_tag Z.one
+
 let zero_n = Num_tag Z.zero
 
 let one_n = Num_tag Z.one

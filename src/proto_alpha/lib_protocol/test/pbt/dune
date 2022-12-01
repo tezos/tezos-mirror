@@ -19,7 +19,8 @@
   test_zk_rollup_encoding
   test_dal_slot_proof
   test_compare_operations
-  test_operation_encoding)
+  test_operation_encoding
+  test_bytes_conversion)
  (libraries
   tezos-base
   tezos-micheline
@@ -136,6 +137,11 @@
  (package tezos-protocol-alpha-tests)
  (action (run %{dep:./test_operation_encoding.exe})))
 
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_bytes_conversion.exe})))
+
 (rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
 
 (rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
@@ -169,3 +175,5 @@
 (rule (alias runtest3) (action (run %{exe:test_compare_operations.exe})))
 
 (rule (alias runtest3) (action (run %{exe:test_operation_encoding.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_bytes_conversion.exe})))

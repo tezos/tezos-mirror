@@ -57,6 +57,9 @@ val succ_n : n num -> n num
 (** Relative zero. *)
 val zero : z num
 
+(** Relative one. *)
+val one : z num
+
 (** Compare two numbers as if they were *)
 val compare : 'a num -> 'a num -> int
 

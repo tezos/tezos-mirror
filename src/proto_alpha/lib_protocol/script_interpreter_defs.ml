@@ -148,6 +148,18 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ISlice_bytes _ ->
       let _, (s, _) = stack in
       Interp_costs.slice_bytes s
+  | IBytes_nat _ ->
+      let n = accu in
+      Interp_costs.bytes_nat n
+  | INat_bytes _ ->
+      let b = accu in
+      Interp_costs.nat_bytes b
+  | IBytes_int _ ->
+      let n = accu in
+      Interp_costs.bytes_int n
+  | IInt_bytes _ ->
+      let b = accu in
+      Interp_costs.int_bytes b
   | IMul_teznat _ -> Interp_costs.mul_teznat
   | IMul_nattez _ -> Interp_costs.mul_nattez
   | IAbs_int _ ->

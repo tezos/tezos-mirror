@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -944,6 +945,22 @@ module Raw = struct
             let x = accu in
             let res = Script_bytes.bytes_not x in
             (step [@ocaml.tailcall]) g gas k ks res stack
+        | IBytes_nat (_, k) ->
+            let n = accu in
+            let result = Script_bytes.bytes_of_nat_be n in
+            (step [@ocaml.tailcall]) g gas k ks result stack
+        | INat_bytes (_, k) ->
+            let s = accu in
+            let result = Script_bytes.nat_of_bytes_be s in
+            (step [@ocaml.tailcall]) g gas k ks result stack
+        | IBytes_int (_, k) ->
+            let n = accu in
+            let result = Script_bytes.bytes_of_int_be n in
+            (step [@ocaml.tailcall]) g gas k ks result stack
+        | IInt_bytes (_, k) ->
+            let s = accu in
+            let result = Script_bytes.int_of_bytes_be s in
+            (step [@ocaml.tailcall]) g gas k ks result stack
         (* currency operations *)
         | IAdd_tez (_, k) ->
             let x = accu in

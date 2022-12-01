@@ -1700,12 +1700,22 @@ instructions:
     category: arithmetic
     proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']
     since: PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY
-    documentation_short: Convert a natural number or a BLS12-381 field element to an integer
+    documentation_short: Convert a natural number, a BLS12-381 field element or bytes to an integer
     documentation: |
       For natural numbers, ``INT`` is the identity cast from ``nat``
       to ``int``.  For BLS12-381 field elements, the returned value is
       always between ``0`` (inclusive) and the order of the BLS12-381 field
-      (exclusive).
+      (exclusive). For bytes, ``INT`` decodes the bytes using the big-endian
+      encoding, where negative numbers are considered in `two's complement representation
+      <https://en.wikipedia.org/wiki/Two's_complement>`_.
+
+  NAT:
+    category: arithmetic
+    proposed-in: ['ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK']
+    since: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+    documentation_short: Convert bytes to a natural number
+    documentation: |
+      ``NAT`` decodes the bytes using the big-endian encoding.
 
   ISNAT:
     category: arithmetic
@@ -1719,6 +1729,16 @@ instructions:
       represented as a natural number. Otherwise, ``None`` is
       returned.
 
+  BYTES:
+    category: arithmetic
+    proposed-in: ['ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK']
+    since: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+    documentation_short: Encode an integer or a natural number to bytes
+    documentation: |
+      ``BYTES`` encodes an integer or a natural number to bytes using the big-endian encoding.
+      For integers, negative numbers are considered in `two's complement representation
+      <https://en.wikipedia.org/wiki/Two's_complement>`_.
+  
   SAPLING_VERIFY_UPDATE:
     category: crypto
     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']

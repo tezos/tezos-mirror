@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -134,6 +135,14 @@ module Cost_of : sig
     val slice_bytes : bytes -> Gas.cost
 
     val bytes_size : Gas.cost
+
+    val bytes_nat : Script_int.n Script_int.num -> Gas.cost
+
+    val nat_bytes : bytes -> Gas.cost
+
+    val bytes_int : Script_int.z Script_int.num -> Gas.cost
+
+    val int_bytes : bytes -> Gas.cost
 
     val add_tez : Gas.cost
 

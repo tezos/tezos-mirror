@@ -68,6 +68,8 @@ int_lit, il, z, ts, nz, offset, len, n, ms :: 'z_' ::= {{ coq Z }} {{ phantom }}
   | length byt :: M :: BytesLength {{ coq (Z.of_nat (String.length byt)) }}
   | abs z :: M :: Abs {{ coq (Z.abs [[z]]) }}
   | ( n ) :: M :: Paren {{ coq ( [[n]] ) }}
+  | encode_nat_be n :: M :: EncodeNatBE {{ tex \ottkw{encode\_nat\_be} }}
+  | encode_int_be z :: M :: EncodeIntBE {{ tex \ottkw{encode\_int\_be} }}
 
   %  reflection
   | balance :: M :: Balance
@@ -124,6 +126,8 @@ bytes_lit, byt :: 'byt_' ::= {{ coq String.string }} {{ phantom }}
      | byt bitop byt' :: M :: Bitop {{ coq ( bytes_apply_bitop [[bitop]] [[byt]] [[byt']] ) }}
      | byt << n :: M :: BytesLSL {{ coq ( bytes_lsl [[byt]] [[byt']] ) }}
      | byt >> n :: M :: BytesLSR {{ coq ( bytes_lsr [[byt]] [[byt']] ) }}
+     | decode_nat_be byt :: M :: DecodeNatBE {{ tex \ottkw{dencode\_nat\_be} }}
+     | decode_int_be byt :: M :: DecodeIntBE {{ tex \ottkw{dencode\_int\_be} }}
 
 bool_lit, b :: 'b_' ::= {{ coq bool }} {{ phantom }}
      | True :: M :: True {{ coq true }}
@@ -284,6 +288,8 @@ instruction, instr, i, body :: 'i_' ::=
   | ABS :: :: ABS
   | INT :: :: INT
   | ISNAT :: :: ISNAT
+  | NAT :: :: NAT
+  | BYTES :: :: BYTES
   | SIZE :: :: SIZE
   | CAR :: :: CAR
   | CDR :: :: CDR
@@ -686,8 +692,20 @@ Typing :: 't_' ::=
        --------------------------- :: INT__bls12_381_fr
        ctx :- INT :: bls12_381_fr : A => int : A
 
+       --------------------------- :: INT__bytes
+       ctx :- INT :: bytes : A => int : A
+
        --------------------------- :: ISNAT
        ctx :- ISNAT :: int : A => option nat : A
+
+       --------------------------- :: NAT__bytes
+       ctx :- NAT :: bytes : A => nat : A
+
+       --------------------------- :: BYTES__int
+       ctx :- BYTES :: int : A => bytes : A
+
+       --------------------------- :: BYTES__nat
+       ctx :- BYTES :: nat : A => bytes : A
 
        -------------------------------- :: SIZE__set
        ctx :- SIZE :: set cty : A => nat : A
@@ -1593,6 +1611,28 @@ COMPARE / z1 : z2 : S  => :z_IntZero: 0 : S
 z1 > z2
 ----- :: COMPARE__num_gt
 COMPARE / z1 : z2 : S  => :z_IntOne: 1 : S
+
+%     Conversion between bytes and integers/naturals
+
+% :: bytes :: 'S -> nat : 'S
+
+----- :: NAT__bytes
+NAT / byt : S => decode_nat_be byt : S
+
+% :: bytes :: 'S -> int : 'S
+
+----- :: INT__bytes
+INT / byt : S => decode_int_be byt : S
+
+% :: nat :: 'S -> bytes : 'S
+
+----- :: BYTES__nat
+BYTES / n : S => encode_nat_be n : S
+
+% :: int :: 'S -> bytes : 'S
+
+----- :: BYTES__int
+BYTES / z : S => encode_int_be z : S
 
 % Operations on strings
 

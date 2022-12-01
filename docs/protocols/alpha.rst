@@ -26,6 +26,12 @@ Michelson opcodes for logical operations on bytes
 Michelson opcodes ``AND``, ``OR``, ``XOR``, ``NOT``, ``LSL`` and ``LSR``
 now support ``bytes``. (MR :gl:`!6055`)
 
+Michelson opcodes for logical operations on bytes
+-------------------------------------------------
+
+- Michelson opcodes ``NAT``, ``INT`` and ``BYTES`` for bytes-int and bytes-nat
+  conversions. (MR :gl:`!6681`)
+
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 

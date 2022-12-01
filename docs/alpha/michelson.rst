@@ -2001,6 +2001,38 @@ Logical shifts are also available on bytes.
     > LSR / x : s : S  =>  [FAILED]
         iff   s > 256
 
+Bytes can be converted to natural numbers and integers.
+
+- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
+  The ``bytes`` are allowed to have leading zeros.
+  
+::
+
+    :: bytes : 'S   ->   nat : 'S
+
+    > NAT / s : S  =>  n : S
+        iff s is a big-endian encoding of natural number n
+
+- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
+  The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
+  
+::
+
+    :: bytes : 'S   ->   int : 'S
+
+    > INT / s : S  =>  z : S
+        iff s is a big-endian encoding of integer z
+  
+- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
+
+::
+
+    :: int : 'S -> bytes : 'S
+    :: nat : 'S -> bytes : 'S
+
+    > BYTES / n : S => s : S
+       iff s is the shortest big-endian encoding of natural number or integer n
+
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2862,6 +2894,8 @@ The instructions which accept at most one variable annotation are:
    CAST
    RENAME
    CHAIN_ID
+   NAT
+   BYTES
 
 The instructions which accept at most two variable annotations are:
 
@@ -3687,6 +3721,8 @@ Full grammar
       | SPLIT_TICKET
       | JOIN_TICKETS
       | OPEN_CHEST
+      | BYTES
+      | NAT
     <type> ::=
       | <comparable type>
       | option <type>

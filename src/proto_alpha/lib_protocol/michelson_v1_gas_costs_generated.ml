@@ -116,6 +116,38 @@ let cost_N_IBlake2b size =
 (* model N_IBytes_size *)
 let cost_N_IBytes_size = S.safe_int 10
 
+(* model N_IByte_nat *)
+(* fun size -> (66.8357335892 + (2.26239804697 * size)) *)
+(* Allocate [size] bytes *)
+let cost_N_IBytes_nat size =
+  let open S_syntax in
+  let v0 = S.safe_int size in
+  S.safe_int 70 + (v0 lsl 1) + (v0 lsr 2)
+
+(* model N_INat_bytes *)
+(* fun size -> (27.7373924021 + (2.22456674632 * size)) *)
+(* Allocates [size] bytes *)
+let cost_N_INat_bytes size =
+  let open S_syntax in
+  let v0 = S.safe_int size in
+  S.safe_int 30 + (v0 lsl 1)
+
+(* model N_IBytes_int *)
+(* fun size -> (67.2231916885 + (2.29117132926 * size)) *)
+(* Allocates [size] bytes *)
+let cost_N_IBytes_int size =
+  let open S_syntax in
+  let v0 = S.safe_int size in
+  S.safe_int 70 + (v0 lsl 1) + (v0 lsr 2)
+
+(* model N_IInt_bytes *)
+(* fun size -> (26.6345701541 + (2.24766891219 * size)) *)
+(* Allocates [size] bytes *)
+let cost_N_IInt_bytes size =
+  let open S_syntax in
+  let v0 = S.safe_int size in
+  S.safe_int 30 + (v0 lsl 1)
+
 (* model N_ICar *)
 let cost_N_ICar = S.safe_int 10
 

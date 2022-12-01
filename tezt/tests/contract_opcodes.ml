@@ -1022,6 +1022,9 @@ let test_contract_opcodes protocols =
       ("not_bytes.tz", "Unit", "Unit", "Unit");
       ("lsl_bytes.tz", "Unit", "Unit", "Unit");
       ("lsr_bytes.tz", "Unit", "Unit", "Unit");
+      (* Bytes <=> int/nat conversions *)
+      ("bytes_of_nat.tz", "Unit", "Unit", "Unit");
+      ("bytes_of_int.tz", "Unit", "Unit", "Unit");
     ]
   in
   Fun.flip List.iter parameterization

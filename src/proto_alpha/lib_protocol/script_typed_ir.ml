@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -687,6 +688,18 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | INot_bytes :
       Script.location * (bytes, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
+  | INat_bytes :
+      Script.location * (n num, 's, 'r, 'f) kinstr
+      -> (bytes, 's, 'r, 'f) kinstr
+  | IBytes_nat :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (n num, 's, 'r, 'f) kinstr
+  | IInt_bytes :
+      Script.location * (z num, 's, 'r, 'f) kinstr
+      -> (bytes, 's, 'r, 'f) kinstr
+  | IBytes_int :
+      Script.location * (bytes, 's, 'r, 'f) kinstr
+      -> (z num, 's, 'r, 'f) kinstr
   (*
      Timestamps
      ----------
@@ -1604,6 +1617,10 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | IAnd_bytes (loc, _) -> loc
   | IXor_bytes (loc, _) -> loc
   | INot_bytes (loc, _) -> loc
+  | INat_bytes (loc, _) -> loc
+  | IBytes_nat (loc, _) -> loc
+  | IInt_bytes (loc, _) -> loc
+  | IBytes_int (loc, _) -> loc
   | IAdd_seconds_to_timestamp (loc, _) -> loc
   | IAdd_timestamp_to_seconds (loc, _) -> loc
   | ISub_timestamp_seconds (loc, _) -> loc
@@ -2008,6 +2025,10 @@ let kinstr_traverse i init f =
     | IAnd_bytes (_, k) -> (next [@ocaml.tailcall]) k
     | IXor_bytes (_, k) -> (next [@ocaml.tailcall]) k
     | INot_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | INat_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IBytes_nat (_, k) -> (next [@ocaml.tailcall]) k
+    | IInt_bytes (_, k) -> (next [@ocaml.tailcall]) k
+    | IBytes_int (_, k) -> (next [@ocaml.tailcall]) k
     | IAdd_seconds_to_timestamp (_, k) -> (next [@ocaml.tailcall]) k
     | IAdd_timestamp_to_seconds (_, k) -> (next [@ocaml.tailcall]) k
     | ISub_timestamp_seconds (_, k) -> (next [@ocaml.tailcall]) k

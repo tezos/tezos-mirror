@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -155,6 +156,8 @@ type prim =
   | I_JOIN_TICKETS
   | I_OPEN_CHEST
   | I_EMIT
+  | I_BYTES
+  | I_NAT
   | T_bool
   | T_contract
   | T_int
@@ -222,7 +225,7 @@ let namespace = function
   | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ | I_SWAP
   | I_TICKET | I_TICKET_DEPRECATED | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS
   | I_UNIT | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR
-  | I_OPEN_CHEST | I_EMIT ->
+  | I_OPEN_CHEST | I_EMIT | I_BYTES | I_NAT ->
       Instr_namespace
   | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
   | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
@@ -366,6 +369,8 @@ let string_of_prim = function
   | I_OPEN_CHEST -> "OPEN_CHEST"
   | I_EMIT -> "EMIT"
   | I_VIEW -> "VIEW"
+  | I_BYTES -> "BYTES"
+  | I_NAT -> "NAT"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -523,6 +528,8 @@ let prim_of_string = function
   | "JOIN_TICKETS" -> ok I_JOIN_TICKETS
   | "OPEN_CHEST" -> ok I_OPEN_CHEST
   | "EMIT" -> ok I_EMIT
+  | "BYTES" -> ok I_BYTES
+  | "NAT" -> ok I_NAT
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -775,7 +782,9 @@ let prim_encoding =
          (* Alpha_015 addition *)
          ("Lambda_rec", D_Lambda_rec);
          ("LAMBDA_REC", I_LAMBDA_REC);
-         ("TICKET", I_TICKET)
+         ("TICKET", I_TICKET);
+         ("BYTES", I_BYTES);
+         ("NAT", I_NAT)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *);
        ]
