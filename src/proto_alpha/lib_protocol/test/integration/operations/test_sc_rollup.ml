@@ -128,15 +128,7 @@ let assert_timeout_result ?game_status incr =
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
 let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
-    ?sc_rollup_max_number_of_messages_per_commitment_period
     ?(timeout_period_in_blocks = 10) tup =
-  let max_number_of_messages_per_commitment_period =
-    match sc_rollup_max_number_of_messages_per_commitment_period with
-    | None ->
-        Context.default_test_constants.sc_rollup
-          .max_number_of_messages_per_commitment_period
-    | Some v -> v
-  in
   Context.init_with_constants_gen
     tup
     {
@@ -147,7 +139,6 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
           Context.default_test_constants.sc_rollup with
           enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-          max_number_of_messages_per_commitment_period;
           timeout_period_in_blocks;
         };
     }
@@ -1706,53 +1697,33 @@ let test_insufficient_ticket_balances () =
        ~source
        output)
 
-let test_inbox_max_number_of_messages_per_commitment_period () =
-  let sc_rollup_max_number_of_messages_per_commitment_period =
-    (*
-
-       We set this parameter constant with a low value for this test
-       because the default value is too high to be tested.
-
-       This limit exists to implement a (theoretical) defensive
-       programming scheme against large inbox refutations proofs. It
-       is theoretical because the lenght of these proofs is
-       logarithmic in the number of messages.
-
-    *)
-    1000
-  in
-  let* block, (account1, account2) =
-    context_init
-      ~sc_rollup_max_number_of_messages_per_commitment_period
-      Context.T2
-  in
+let test_inbox_max_number_of_messages_per_level () =
+  let* block, (account1, account2) = context_init Context.T2 in
   let* block, _rollup = sc_originate block account1 "unit" in
-  let* constants = Context.get_constants (B block) in
-  let Constants.Parametric.{max_number_of_messages_per_commitment_period; _} =
-    constants.parametric.sc_rollup
+  let max_number_of_messages_per_level =
+    Constants.sc_rollup_max_number_of_messages_per_level
   in
   let* incr = Incremental.begin_construction block in
   (* This just one message below the limit *)
   let messages =
-    List.repeat max_number_of_messages_per_commitment_period "foo"
+    List.repeat (Z.to_int max_number_of_messages_per_level) "foo"
   in
   let* op = Op.sc_rollup_add_messages (I incr) account1 messages in
   let* incr = Incremental.add_operation ~check_size:false incr op in
   (* This break the limit *)
   let* op = Op.sc_rollup_add_messages (I incr) account2 ["foo"] in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error
-        (Sc_rollup_errors
-         .Sc_rollup_max_number_of_messages_reached_for_commitment_period as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ ->
-        failwith
-          "It should have failed with \
-           [Sc_rollup_max_number_of_messages_reached_for_commitment_period"
-  in
   let* (_incr : Incremental.t) =
+    let expect_apply_failure = function
+      | Environment.Ecoproto_error
+          (Sc_rollup_inbox_repr.Inbox_level_reached_messages_limit as e)
+        :: _ ->
+          Assert.test_error_encodings e ;
+          return_unit
+      | _ ->
+          failwith
+            "It should have failed with [Inbox_level_reached_messages_limit]"
+    in
+
     Incremental.add_operation ~expect_apply_failure incr op
   in
   return_unit
@@ -2657,14 +2628,10 @@ let tests =
       "insufficient ticket balances"
       `Quick
       test_insufficient_ticket_balances;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-       The number of messages during commitment period is broken with the
-       unique inbox. *)
-    (* Tztest.tztest
-     *   "inbox max number of messages during commitment period"
-     *   `Quick
-     *   test_inbox_max_number_of_messages_per_commitment_period; *)
+    Tztest.tztest
+      "inbox max number of messages per inbox level"
+      `Quick
+      test_inbox_max_number_of_messages_per_level;
     Tztest.tztest
       "Test that a player can't timeout another player before timeout period \
        and related timeout value."

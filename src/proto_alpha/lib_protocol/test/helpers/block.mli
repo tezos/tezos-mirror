@@ -136,7 +136,6 @@ val genesis :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
-  ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
@@ -298,7 +297,6 @@ val prepare_initial_context_params :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
-  ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
   ?dal_enable:bool ->
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->

@@ -91,6 +91,13 @@ let sc_max_wrapped_proof_binary_size = 30_000
 *)
 let sc_rollup_message_size_limit = 4_096
 
+(** A limit on the number of messages per inbox level.
+
+    Benchmarks have shown that proving the inclusion of the element at
+    index 0 in a skip list of [1_000_000] elements is ~=6Kb large.
+*)
+let sc_rollup_max_number_of_messages_per_level = Z.of_int 1_000_000
+
 type fixed = unit
 
 let fixed_encoding =
@@ -107,7 +114,9 @@ let fixed_encoding =
           max_allowed_global_constant_depth,
           cache_layout_size,
           michelson_maximum_type_size ),
-        (sc_max_wrapped_proof_binary_size, sc_rollup_message_size_limit) ))
+        ( sc_max_wrapped_proof_binary_size,
+          sc_rollup_message_size_limit,
+          sc_rollup_max_number_of_messages_per_level ) ))
     (fun ( ( _proof_of_work_nonce_size,
              _nonce_length,
              _max_anon_ops_per_block,
@@ -118,8 +127,9 @@ let fixed_encoding =
              _max_allowed_global_constant_depth,
              _cache_layout_size,
              _michelson_maximum_type_size ),
-           (_sc_max_wrapped_proof_binary_size, _sc_rollup_message_size_limit) ) ->
-      ())
+           ( _sc_max_wrapped_proof_binary_size,
+             _sc_rollup_message_size_limit,
+             _sc_rollup_number_of_messages_per_level ) ) -> ())
     (merge_objs
        (obj10
           (req "proof_of_work_nonce_size" uint8)
@@ -132,9 +142,10 @@ let fixed_encoding =
           (req "max_allowed_global_constants_depth" int31)
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
-       (obj2
+       (obj3
           (req "sc_max_wrapped_proof_binary_size" int31)
-          (req "sc_rollup_message_size_limit" int31)))
+          (req "sc_rollup_message_size_limit" int31)
+          (req "sc_rollup_max_number_of_messages_per_level" n)))
 
 let fixed = ()
 
@@ -279,13 +290,6 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The smart contract rollup challenge window in blocks must be \
         non-negative.")
-  >>? fun () ->
-  error_unless
-    Compare.Int.(
-      constants.sc_rollup.max_number_of_messages_per_commitment_period > 0)
-    (Invalid_protocol_constants
-       "The smart contract rollup max number of messages per commitment \
-        period  must be strictly greater than 0.")
   >>? fun () ->
   error_unless
     Tez_repr.(constants.sc_rollup.stake_amount >= zero)

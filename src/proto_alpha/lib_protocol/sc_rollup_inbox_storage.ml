@@ -24,7 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Sc_rollup_errors
 module Store = Storage.Sc_rollup
 
 let get_inbox ctxt =
@@ -32,31 +31,9 @@ let get_inbox ctxt =
   let* inbox = Store.Inbox.get ctxt in
   return (inbox, ctxt)
 
-let _assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
-  let nb_messages_in_commitment_period =
-    Int64.add
-      (Sc_rollup_inbox_repr.number_of_messages_during_commitment_period inbox)
-      (Int64.of_int extra_messages)
-  in
-  let limit =
-    Constants_storage.sc_rollup_max_number_of_messages_per_commitment_period
-      ctxt
-    |> Int64.of_int
-  in
-  fail_when
-    Compare.Int64.(nb_messages_in_commitment_period > limit)
-    Sc_rollup_max_number_of_messages_reached_for_commitment_period
-
 let add_messages ctxt messages =
   let open Lwt_result_syntax in
   let open Raw_context in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-     In the current setup, we can stop the chain when hitting the
-     limit. *)
-  (* let* () = *)
-  (*   assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages *)
-  (* in *)
-
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3292
 
      The carbonation needs to be activated again with the new internal inbox's

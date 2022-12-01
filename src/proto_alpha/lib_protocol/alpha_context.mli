@@ -785,6 +785,8 @@ module Constants : sig
 
   val sc_rollup_message_size_limit : int
 
+  val sc_rollup_max_number_of_messages_per_level : Z.t
+
   (** Constants parameterized by context. See {!Constants_parametric_repr}. *)
   module Parametric : sig
     type dal = {
@@ -819,7 +821,6 @@ module Constants : sig
       enable : bool;
       origination_size : int;
       challenge_window_in_blocks : int;
-      max_number_of_messages_per_commitment_period : int;
       stake_amount : Tez.t;
       commitment_period_in_blocks : int;
       max_lookahead_in_blocks : int32;
@@ -1004,8 +1005,6 @@ module Constants : sig
   val dal_enable : context -> bool
 
   val sc_rollup_origination_size : context -> int
-
-  val sc_rollup_max_number_of_messages_per_commitment_period : context -> int
 
   val sc_rollup_stake_amount : t -> Tez.t
 
@@ -3325,8 +3324,6 @@ module Sc_rollup : sig
     val equal : t -> t -> bool
 
     val inbox_level : t -> Raw_level.t
-
-    val number_of_messages_during_commitment_period : t -> int64
 
     type history_proof
 

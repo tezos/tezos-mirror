@@ -44,7 +44,6 @@ module type S = sig
     inbox_level : Raw_level.t;
     state : PVM.state;
     reveal_map : string Sc_rollup_reveal_hash.Map.t option;
-    nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
     info_per_level : info_per_level;
@@ -83,7 +82,6 @@ module Make (Interpreter : Interpreter.S) :
     inbox_level : Raw_level.t;
     state : PVM.state;
     reveal_map : string Sc_rollup_reveal_hash.Map.t option;
-    nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
     info_per_level : info_per_level;
@@ -119,11 +117,7 @@ module Make (Interpreter : Interpreter.S) :
         return (Context.empty node_ctxt.context)
       else Node_context.checkout_context node_ctxt hash
     in
-    let* inbox = Inbox.inbox_of_head node_ctxt head in
     let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
-    let nb_messages_period =
-      Sc_rollup.Inbox.number_of_messages_during_commitment_period inbox
-    in
     let+ info_per_level = simulate_info_per_level node_ctxt hash in
     let inbox_level = Raw_level.succ level in
     {
@@ -131,7 +125,6 @@ module Make (Interpreter : Interpreter.S) :
       inbox_level;
       state;
       reveal_map;
-      nb_messages_period;
       nb_messages_inbox = 0;
       level_position = Start;
       info_per_level;
@@ -143,7 +136,6 @@ module Make (Interpreter : Interpreter.S) :
          state;
          inbox_level;
          reveal_map;
-         nb_messages_period;
          nb_messages_inbox;
          level_position = _;
          info_per_level = _;
@@ -166,11 +158,7 @@ module Make (Interpreter : Interpreter.S) :
     let*! ctxt = PVM.State.set ctxt state in
     let nb_messages = List.length messages in
     let nb_messages_inbox = nb_messages_inbox + nb_messages in
-    let nb_messages_period =
-      Int64.add nb_messages_period (Int64.of_int nb_messages)
-    in
-    return
-      ({sim with ctxt; state; nb_messages_period; nb_messages_inbox}, num_ticks)
+    return ({sim with ctxt; state; nb_messages_inbox}, num_ticks)
 
   let simulate_messages (node_ctxt : Node_context.ro) sim messages =
     let open Lwt_result_syntax in
@@ -193,21 +181,6 @@ module Make (Interpreter : Interpreter.S) :
         :: Internal (Info_per_level {timestamp; predecessor})
         :: messages
       else messages
-    in
-    let max_messages =
-      node_ctxt.protocol_constants.parametric.sc_rollup
-        .max_number_of_messages_per_commitment_period |> Int64.of_int
-      |> Int64.pred (* To account for End_of_level message *)
-    in
-    let nb_messages_period =
-      Int64.add sim.nb_messages_period (Int64.of_int (List.length messages))
-    in
-    let*? () =
-      error_when
-        Compare.Int64.(nb_messages_period > max_messages)
-        (Environment.wrap_tzerror
-           Sc_rollup_errors
-           .Sc_rollup_max_number_of_messages_reached_for_commitment_period)
     in
     let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim messages in
     ({sim with level_position = Middle}, num_ticks)

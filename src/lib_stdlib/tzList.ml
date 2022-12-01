@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec repeat n x = if n <= 0 then [] else x :: repeat (pred n) x
+let repeat n x =
+  let rec loop acc n = if n <= 0 then acc else loop (x :: acc) (n - 1) in
+  loop [] n
 
 let rev_split_n n l =
   let rec loop acc n = function
