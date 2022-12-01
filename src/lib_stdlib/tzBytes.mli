@@ -29,7 +29,9 @@
     is cut to have the same length as the shorter one before taking bitwise
     AND.
 
-      ex. 0xff0f AND 0xff = 0x0f AND 0xff = 0x0f
+    Example:
+
+    [logand (Bytes.of_string "\xff\x0f") (Bytes.of_string "\xff") = Bytes.of_string "\x0f"]
 *)
 val logand : bytes -> bytes -> bytes
 
@@ -38,7 +40,9 @@ val logand : bytes -> bytes -> bytes
     If the arguments have different lengths, the shorter bytes is 0-padded
     on the left to have the same length before taking bitwise OR.
 
-      ex. 0xf000 OR 0x0f = 0xf000 OR 0x000f = 0xf00f
+    Example:
+
+    [logor (Bytes.of_string "\xf0\x00") (Bytes.of_string "\x0f") = Bytes.of_string "\xf0\x0f"]
 *)
 val logor : bytes -> bytes -> bytes
 
@@ -47,13 +51,17 @@ val logor : bytes -> bytes -> bytes
     If the arguments have different lengths, the shorter bytes is 0-padded
     on the left to have the same length before taking bitwise XOR.
 
-      ex. 0xf0ff XOR 0x0f = 0xf0ff XOR 0x000f = 0xf0f0
+    Example:
+
+    [logxor (Bytes.of_string "\xf0\xff") (Bytes.of_string "\x0f") = Bytes.of_string "\xf0\xf0"]
 *)
 val logxor : bytes -> bytes -> bytes
 
 (** Bitwise NOT on bytes.
 
-      ex. NOT 0xfff0f0 = 0x000f0f
+    Example:
+
+    [lognot (Bytes.of_string "\xff\xf0\xf0") = Bytes.of_string "\x00\x0f\x0f"]
 *)
 val lognot : bytes -> bytes
 
@@ -69,13 +77,14 @@ val lognot : bytes -> bytes
     [shift_left bs nbits] raises [Invalid_argument "shift_left"]
     when [nbits < 0].
 
-      ex. 0x1234 LSL 0 = 0x1234
-          0xffff LSL 1 = 0x01fffe
-          0x1234 LSL 1 = 0x002468  (not 0x2468)
-          0x1234 LSL 8 = 0x123400
-          0x001234 LSL 1 = 0x00002468  (not 0x002468)
-          0x001234 LSL 18 = 0x0048d00000  (not 0x48d00000)
-          0x (empty bytes) LSL 1 = 0x00
+    Examples:
+
+    - [shift_left (Bytes.of_string "\x12\x34") 0 = Bytes.of_string "\x12\x34"]
+    - [shift_left (Bytes.of_string "\xff\xff") 1 = Bytes.of_string "\x01\xff\xfe"]
+    - [shift_left (Bytes.of_string "\x12\x34") 1 = Bytes.of_string "\x00\x24\x68"] (not ["\x24\x68"])
+    - [shift_left (Bytes.of_string "\x00\x12\x34") 1 = Bytes.of_string "\x00\x00\x24\x68"] (not ["\x00\x24\x68"])
+    - [shift_left (Bytes.of_string "\x00\x12\x34") 18 = Bytes.of_string "\x00\x48\xd0\x00\x00"] (not ["\x48\xd0\x00\x00"])
+    - [shift_left Bytes.empty 1 = Bytes.of_string "\x00"]
 *)
 val shift_left : bytes -> int -> bytes
 
@@ -89,10 +98,12 @@ val shift_left : bytes -> int -> bytes
     [shift_right bs nbits] raises [Invalid_argument "shift_right"]
     when [nbits < 0].
 
-      ex. 0x1234 LSR 0 = 0x1234
-          0x1234 LSR 1 = 0x091a
-          0x1234 LSR 8 = 0x12   (not 0x0012)
-          0x123499 LSR 9 = 0x091a
-          0x1234 LSR 18 = 0x
+    Examples:
+
+    - [shift_right (Bytes.of_string "\x12\x34") 0 = Bytes.of_string "\x12\x34"]
+    - [shift_right (Bytes.of_string "\x12\x34") 1 = Bytes.of_string "\x09\x1a"]
+    - [shift_right (Bytes.of_string "\x12\x34") 8 = Bytes.of_string "\x12"] (not ["\x00\x12"])
+    - [shift_right (Bytes.of_string "\x12\x34\x99") 9 = Bytes.of_string "\x09\xa"]
+    - [shift_right (Bytes.of_string "\x12\x34") 18 = Bytes.empty]
 *)
 val shift_right : bytes -> int -> bytes
