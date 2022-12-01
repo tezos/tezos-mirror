@@ -107,9 +107,7 @@ let wrap_cemented_store_test (name, f) =
         let*! r =
           run (fun base_dir ->
               let store_dir = Naming.store_dir ~dir_path:base_dir in
-              let chain_dir =
-                Naming.chain_dir store_dir Tezos_crypto.Chain_id.zero
-              in
+              let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
               let*! () = Lwt_unix.mkdir (Naming.dir_path chain_dir) 0o700 in
               let* cemented_store =
                 Cemented_block_store.init ~readonly:false chain_dir

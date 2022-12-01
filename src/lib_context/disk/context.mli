@@ -30,7 +30,6 @@ module type TEZOS_CONTEXT_UNIX = sig
   type error +=
     | Cannot_create_file of string
     | Cannot_open_file of string
-    | Cannot_retrieve_commit_info of Tezos_crypto.Context_hash.t
     | Cannot_find_protocol
     | Suspicious_file of int
 

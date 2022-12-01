@@ -784,3 +784,7 @@ type rpc_context = {
   block_header : Block_header.shell_header;
   context : Context.t;
 }
+
+type header_context_hash_semantics =
+  | Resulting_context
+  | Predecessor_resulting_context

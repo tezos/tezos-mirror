@@ -8,6 +8,7 @@
  (instrumentation (backend tezos-time-measurement))
  (libraries
   tezos-base
+  tezos-crypto
   tezos-rpc
   tezos-context
   tezos-context-ops
@@ -18,6 +19,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_crypto
   -open Tezos_context
   -open Tezos_context_ops
   -open Tezos_shell_context

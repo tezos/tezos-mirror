@@ -520,7 +520,12 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
-  let* () = Data_version.ensure_data_dir ~mode:Is_compatible config.data_dir in
+  let* () =
+    Data_version.ensure_data_dir
+      ~mode:Is_compatible
+      config.blockchain_network.genesis
+      config.data_dir
+  in
   let* () = Config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
   Updater.init (Data_version.protocol_dir config.data_dir) ;

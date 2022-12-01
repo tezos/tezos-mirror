@@ -183,8 +183,18 @@ let write file identity =
   let open Lwt_result_syntax in
   if Sys.file_exists file then tzfail (Existent_identity_file file)
   else
+    let dummy_genesis =
+      {
+        Genesis.time = Time.Protocol.epoch;
+        block = Tezos_crypto.Block_hash.zero;
+        protocol = Tezos_crypto.Protocol_hash.zero;
+      }
+    in
     let* () =
-      Data_version.ensure_data_dir ~mode:Exists (Filename.dirname file)
+      Data_version.ensure_data_dir
+        ~mode:Exists
+        dummy_genesis
+        (Filename.dirname file)
     in
     Lwt_utils_unix.Json.write_file
       file

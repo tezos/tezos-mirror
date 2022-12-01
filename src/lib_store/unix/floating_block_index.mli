@@ -37,8 +37,9 @@ module Block_info : sig
   (** The type for storing the block's info. *)
   type t = {
     offset : int;  (** offset in the file *)
-    predecessors : Tezos_crypto.Block_hash.t list;
-        (** predecessors of the block *)
+    predecessors : Block_hash.t list;  (** predecessors of the block *)
+    resulting_context_hash : Context_hash.t;
+        (** context hash after block application*)
   }
 
   (** Pretty-printer for {!t} *)
@@ -46,8 +47,21 @@ module Block_info : sig
 end
 
 (** Key/value index associated to a floating block store where the key
-    is a {!Tezos_crypto.Block_hash.t} and the value is {!Block_info.t}. *)
-include
-  Index.S
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Block_info.t
+    is a {!Block_hash.t} and the value is {!Block_info.t}. *)
+include Index.S with type key = Block_hash.t and type value = Block_info.t
+
+module Legacy : sig
+  module Legacy_block_info : sig
+    (** The maximum number of predecessors stored per block. *)
+    val max_predecessors : int
+
+    (** The type for storing the block's info. *)
+    type t = {
+      offset : int;  (** offset in the file *)
+      predecessors : Block_hash.t list;  (** predecessors of the block *)
+    }
+  end
+
+  include
+    Index.S with type key = Block_hash.t and type value = Legacy_block_info.t
+end

@@ -55,7 +55,7 @@ type t
     If a timeout is triggered, the whole [bootstrap_pipeline] is
     canceled.*)
 val create :
-  ?notify_new_block:(Store.Block.t -> unit) ->
+  ?notify_new_block:(Block_validator.new_block -> unit) ->
   block_header_timeout:Time.System.Span.t ->
   block_operations_timeout:Time.System.Span.t ->
   Block_validator.t ->

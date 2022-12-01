@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-crypto
   tezos-rpc
   lwt-watcher
   tezos-shell-services
@@ -17,6 +18,7 @@
   (:standard)
   -open Tezos_base
   -open Tezos_base.TzPervasives
+  -open Tezos_crypto
   -open Tezos_shell_services
   -open Tezos_validation
   -open Tezos_context_ops

@@ -41,7 +41,9 @@ type shell_header = {
           then lexicographically. It represents the claimed fitness of the
           chain ending in this block. *)
   context : Tezos_crypto.Context_hash.t;
-      (** Hash of the state of the context after application of this block. *)
+      (** Hash of the state of the context either before or after
+          application of this block depending on the protocol
+          environment's [expected_context_hash] value. *)
 }
 
 val shell_header_encoding : shell_header Data_encoding.t

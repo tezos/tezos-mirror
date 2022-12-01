@@ -157,7 +157,7 @@ type t = block_store
 
     A block key may represent an invalid block (wrong hash and/or
     offset) as it is not ensured to be valid by construction.*)
-type key = Block of (Tezos_crypto.Block_hash.t * int)
+type key = Block of (Block_hash.t * int)
 
 (** The status of the merging thread *)
 type merge_status = Not_running | Running | Merge_failed of tztrace
@@ -181,8 +181,16 @@ val mem : block_store -> key -> bool tzresult Lwt.t
 (** [get_hash block_store key] retrieves the hash corresponding to the
    given [key] in [block_store]. Return [None] if the block is
    unknown. *)
-val get_hash :
-  block_store -> key -> Tezos_crypto.Block_hash.t option tzresult Lwt.t
+val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
+
+(** [resulting_context_hash block_store ~expect_predecessor_context key]
+    retrieves the resulting context hash from the block application,
+    corresponding to the given [key]. *)
+val resulting_context_hash :
+  block_store ->
+  expect_predecessor_context:bool ->
+  key ->
+  Context_hash.t option tzresult Lwt.t
 
 (** [read_block ~read_metadata block_store key] reads the block [key]
    in [block_store] if present. Return [None] if the block is
@@ -197,9 +205,11 @@ val read_block :
 val read_block_metadata :
   block_store -> key -> Block_repr.metadata option tzresult Lwt.t
 
-(** [store_block block_store block] stores the [block] in the current
-   [RW] floating store. *)
-val store_block : block_store -> Block_repr.t -> unit tzresult Lwt.t
+(** [store_block block_store block resulting_context_hash] stores the
+    [block] in the current [RW] floating store with its associated
+    [resulting_context_hash]. *)
+val store_block :
+  block_store -> Block_repr.t -> Context_hash.t -> unit tzresult Lwt.t
 
 (** In this faked implementation, the caboose is always equal to the genesis block. *)
 val caboose : block_store -> Store_types.block_descriptor Lwt.t

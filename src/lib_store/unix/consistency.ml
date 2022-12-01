@@ -166,9 +166,7 @@ let check_consistency chain_dir genesis =
   let*! genesis_block = Stored_data.get genesis_data in
   let* () =
     fail_unless
-      (Tezos_crypto.Block_hash.equal
-         (Block_repr.hash genesis_block)
-         genesis.Genesis.block)
+      (Block_hash.equal (Block_repr.hash genesis_block) genesis.Genesis.block)
       (Inconsistent_genesis
          {expected = genesis.block; got = Block_repr.hash genesis_block})
   in
@@ -316,7 +314,7 @@ let fix_head chain_dir block_store genesis_block =
            cemented block known. *)
         if
           cemented_block_files <> []
-          && Tezos_crypto.Block_hash.equal
+          && Block_hash.equal
                (Block_repr.hash genesis_block)
                (Block_repr.hash floating_head)
         then
@@ -740,11 +738,11 @@ let check_block_protocol_hash context_index ~expected block =
   protect @@ fun () ->
   let*! ctxt = Context.checkout_exn context_index (Block_repr.context block) in
   let*! got = Context.get_protocol ctxt in
-  return Tezos_crypto.Protocol_hash.(got = expected)
+  return Protocol_hash.(got = expected)
 
 (** Look into the cemented store for the lowest block with an
     associated proto level that is above the savepoint. *)
-let find_activation_block_in_cemented block_store ~savepoint_level ~proto_level
+let find_activation_blocks_in_cemented block_store ~savepoint_level ~proto_level
     =
   let open Lwt_result_syntax in
   let cemented_store = Block_store.cemented_block_store block_store in
@@ -843,23 +841,27 @@ let find_activation_block_in_cemented block_store ~savepoint_level ~proto_level
         in
         failwith "find_activation_block_in_cemented: cannot read cemented cycle")
       (function
-        | Found block -> return_some block
+        | Found block ->
+            let* next_block =
+              read_cemented_block_by_level (Int32.succ (Block_repr.level block))
+            in
+            return_some (block, next_block)
         | exn ->
             tzfail
               (Inconsistent_cemented_file
                  (Naming.file_path cycle.file, Printexc.to_string exn)))
 
-let find_activation_block_in_floating block_store ~head ~savepoint_level
+let find_activation_blocks_in_floating block_store ~head ~savepoint_level
     ~proto_level =
   let open Lwt_result_syntax in
-  let rec loop block_proto_level block =
+  let rec loop block_proto_level succ block =
     if Compare.Int32.(Block_repr.level block <= savepoint_level) then
       let* () =
         fail_unless
           (Block_repr.proto_level block = proto_level)
           (Corrupted_store (Cannot_find_activation_block proto_level))
       in
-      return block
+      return (block, succ)
     else
       let* predecessor_opt =
         Block_store.read_block
@@ -878,43 +880,22 @@ let find_activation_block_in_floating block_store ~head ~savepoint_level
           predecessor_proto_level < block_proto_level
           && block_proto_level = proto_level)
       then (* Found *)
-        return block
+        return (block, succ)
       else (* Continue *)
-        loop predecessor_proto_level predecessor
+        loop predecessor_proto_level block predecessor
   in
-  loop (Block_repr.proto_level head) head
+  loop (Block_repr.proto_level head) head head
 
-let craft_activation_block context_index block =
-  let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let* commit_info =
-    Lwt.catch
-      (fun () ->
-        let* tup =
-          Context.retrieve_commit_info context_index (Block_repr.header block)
-        in
-        return_some (Protocol_levels.commit_info_of_tuple tup))
-      (fun _ -> return_none)
-  in
-  let*! protocol =
-    let*! ctxt =
-      Context.checkout_exn context_index (Block_repr.context block)
-    in
-    Context.get_protocol ctxt
-  in
-  return
-    {Protocol_levels.block = Block_repr.descriptor block; protocol; commit_info}
-
-let find_lowest_block_with_proto_level block_store ~head ~savepoint_level
+let find_two_lowest_block_with_proto_level block_store ~head ~savepoint_level
     proto_level =
   let open Lwt_result_syntax in
-  let* activation_block =
-    find_activation_block_in_cemented block_store ~savepoint_level ~proto_level
+  let* activation_blocks =
+    find_activation_blocks_in_cemented block_store ~savepoint_level ~proto_level
   in
-  match activation_block with
+  match activation_blocks with
   | Some b -> return b
   | None ->
-      find_activation_block_in_floating
+      find_activation_blocks_in_floating
         block_store
         ~head
         ~savepoint_level
@@ -931,11 +912,12 @@ let find_lowest_block_with_proto_level block_store ~head ~savepoint_level
    - block store is valid and available,
    - head is valid and available.
    - savepoint is valid and available. *)
-let fix_protocol_levels chain_dir block_store context_index
+let fix_protocol_levels chain_dir block_store context_index genesis
     ~savepoint:(savepoint_hash, _) ~head =
   let open Lwt_result_syntax in
   (* Attempt to recover with the previous protocol table. *)
-  let*! (stored_protocol_levels : 'a Protocol_levels.t) =
+  let*! (stored_protocol_levels :
+          Protocol_levels.protocol_info Protocol_levels.t) =
     let*! r = Stored_data.load (Naming.protocol_levels_file chain_dir) in
     match r with
     | Error _ -> Lwt.return Protocol_levels.empty
@@ -960,9 +942,9 @@ let fix_protocol_levels chain_dir block_store context_index
       (fun invalid_protocol_levels proto_level ->
         match Protocol_levels.find_opt proto_level stored_protocol_levels with
         | None -> return (proto_level :: invalid_protocol_levels)
-        | Some activation_block -> (
+        | Some proto_info -> (
             let activation_block_level =
-              snd activation_block.Protocol_levels.block
+              snd proto_info.Protocol_levels.activation_block
             in
             let level_to_read =
               if
@@ -992,7 +974,7 @@ let fix_protocol_levels chain_dir block_store context_index
                 let* protocol_matches =
                   check_block_protocol_hash
                     context_index
-                    ~expected:activation_block.protocol
+                    ~expected:proto_info.protocol
                     b
                 in
                 if protocol_matches then return invalid_protocol_levels
@@ -1022,24 +1004,64 @@ let fix_protocol_levels chain_dir block_store context_index
   let* fixed_protocol_levels =
     List.fold_left_es
       (fun fixed_protocol_levels invalid_proto_level ->
-        let* b =
-          find_lowest_block_with_proto_level
+        (* We need the activation block and its successor. The
+           successor is used when the protocol uses the predecessor's
+           context semantics to retrieve the context to checkout. *)
+        let* lowest, succ_lowest =
+          find_two_lowest_block_with_proto_level
             block_store
             ~head
             ~savepoint_level:(Block_repr.level savepoint)
             invalid_proto_level
         in
-        let* activation_block = craft_activation_block context_index b in
+        let is_genesis = Block_repr.hash lowest = genesis.Genesis.block in
+        (* We fail when the successor of the activation block has a
+           different protocol which should not happen in most cases
+           unless a protocol activates right after an existing
+           one. This is to make sure we are able to retrieve the
+           activation block's context through the protocol's
+           semantics. *)
+        let* () =
+          fail_unless
+            (is_genesis
+            || Compare.Int.(
+                 Block_repr.proto_level lowest
+                 = Block_repr.proto_level succ_lowest))
+            (Corrupted_store (Cannot_find_activation_block invalid_proto_level))
+        in
+        let*! protocol =
+          let*! ctxt =
+            if is_genesis then
+              Context.checkout_exn context_index (Block_repr.context lowest)
+            else
+              (* The successor of the lowest has the same protocol
+                 committed as the lowest and it will be correct
+                 whether the context hash semantics is the current's
+                 or the predecessor's resulting context. *)
+              Context.checkout_exn
+                context_index
+                (Block_repr.context succ_lowest)
+          in
+          Context.get_protocol ctxt
+        in
+        (* Protocol above savepoints should be registered *)
+        let* (module Proto) = Registered_protocol.get_result protocol in
         let*! () =
           Store_events.(
-            emit
-              restore_protocol_activation
-              (invalid_proto_level, activation_block.protocol))
+            emit restore_protocol_activation (invalid_proto_level, protocol))
+        in
+        let proto_info =
+          {
+            Protocol_levels.protocol;
+            activation_block = Block_repr.descriptor lowest;
+            expect_predecessor_context =
+              Proto.expected_context_hash = Predecessor_resulting_context;
+          }
         in
         return
           (Protocol_levels.add
              invalid_proto_level
-             activation_block
+             proto_info
              fixed_protocol_levels))
       correct_protocol_levels
       invalid_proto_levels
@@ -1104,7 +1126,7 @@ let fix_chain_state chain_dir block_store ~head ~cementing_highwatermark
   let* () =
     Stored_data.write_file
       (Naming.invalid_blocks_file chain_dir)
-      Tezos_crypto.Block_hash.Map.empty
+      Block_hash.Map.empty
   in
   let* () =
     Stored_data.write_file (Naming.forked_chains_file chain_dir) forked_chains
@@ -1145,12 +1167,12 @@ let infer_history_mode chain_dir block_store genesis caboose savepoint =
   in
   let history_mode =
     (* Caboose is not genesis: we sure are in rolling*)
-    if not (Tezos_crypto.Block_hash.equal (fst caboose) genesis.Genesis.block)
-    then History_mode.Rolling offset
+    if not (Block_hash.equal (fst caboose) genesis.Genesis.block) then
+      History_mode.Rolling offset
     else if
       (* Caboose is genesis and savepoint is not genesis: we can be in
          both rolling and full. We choose full as the less destructive. *)
-      not (Tezos_crypto.Block_hash.equal (fst savepoint) genesis.block)
+      not (Block_hash.equal (fst savepoint) genesis.block)
     then Full offset
     else if
       (* Caboose is genesis and savepoint is genesis and there are as
@@ -1261,7 +1283,13 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
       savepoint
   in
   let* protocol_levels =
-    fix_protocol_levels chain_dir block_store context_index ~savepoint ~head
+    fix_protocol_levels
+      chain_dir
+      block_store
+      context_index
+      genesis
+      ~savepoint
+      ~head
   in
   let* () =
     fix_chain_state
@@ -1273,7 +1301,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
       ~savepoint
       ~caboose
       ~alternate_heads:[]
-      ~forked_chains:Tezos_crypto.Chain_id.Map.empty
+      ~forked_chains:Chain_id.Map.empty
       ~protocol_levels
       ~chain_config
       ~genesis

@@ -46,6 +46,7 @@ module Request = struct
         peer : P2p_peer_id.t option;
         (* The peer who sent the block if it was not injected locally. *)
         block : Store.Block.t;
+        resulting_context_hash : Tezos_crypto.Context_hash.t;
       }
         -> (update, error trace) t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
@@ -154,7 +155,7 @@ let check_and_update_synchronisation_state w (hash, block) peer_id : unit Lwt.t
   else Lwt.return_unit
 
 (* Called for every validated block. *)
-let notify_new_block w peer block =
+let notify_new_block w peer {Block_validator.block; resulting_context_hash} =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
@@ -165,7 +166,9 @@ let notify_new_block w peer block =
     nv.parameters.parent ;
   Lwt_watcher.notify nv.valid_block_input block ;
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
-  Worker.Queue.push_request_now w (Validated {peer; block})
+  Worker.Queue.push_request_now
+    w
+    (Validated {peer; block; resulting_context_hash})
 
 let with_activated_peer_validator w peer_id f =
   let open Lwt_syntax in
@@ -194,18 +197,30 @@ let with_activated_peer_validator w peer_id f =
       | Worker_types.Launching _ ->
           return_ok_unit)
 
-let may_update_protocol_level chain_store ~block =
+let may_update_protocol_level chain_store block resulting_context_hash =
   let open Lwt_result_syntax in
   let* pred = Store.Block.read_predecessor chain_store block in
   let prev_proto_level = Store.Block.proto_level pred in
   let new_proto_level = Store.Block.proto_level block in
   if Compare.Int.(prev_proto_level < new_proto_level) then
-    let* context = Store.Block.context chain_store block in
-    let*! new_protocol = Context_ops.get_protocol context in
+    let context_index =
+      Store.context_index (Store.Chain.global_store chain_store)
+    in
+    let* resulting_context =
+      protect (fun () ->
+          let*! c =
+            Context_ops.checkout_exn context_index resulting_context_hash
+          in
+          return c)
+    in
+    let*! new_protocol = Context_ops.get_protocol resulting_context in
+    let* (module NewProto) = Registered_protocol.get_result new_protocol in
     Store.Chain.may_update_protocol_level
       chain_store
       ~pred
       ~protocol_level:new_proto_level
+      ~expect_predecessor_context:
+        (NewProto.expected_context_hash = Predecessor_resulting_context)
       (block, new_protocol)
   else return_unit
 
@@ -449,7 +464,7 @@ let may_synchronise_context synchronisation_state chain_store =
   else Lwt.return_unit
 
 let on_validation_request w peer start_testchain active_chains spawn_child block
-    =
+    resulting_context_hash =
   let open Lwt_result_syntax in
   let*! () =
     Option.iter_s
@@ -475,7 +490,9 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
         return Ignored_head
     | Some previous ->
         let*! () = broadcast_head w ~previous block in
-        let* () = may_update_protocol_level chain_store ~block in
+        let* () =
+          may_update_protocol_level chain_store block resulting_context_hash
+        in
         let*! () =
           if start_testchain then
             may_switch_test_chain w active_chains spawn_child block
@@ -555,7 +572,7 @@ let on_request (type a b) w start_testchain active_chains spawn_child
   Prometheus.Counter.inc_one
     nv.parameters.metrics.worker_counters.worker_request_count ;
   match req with
-  | Request.Validated {peer; block} ->
+  | Request.Validated {peer; block; resulting_context_hash} ->
       on_validation_request
         w
         peer
@@ -563,6 +580,7 @@ let on_request (type a b) w start_testchain active_chains spawn_child
         active_chains
         spawn_child
         block
+        resulting_context_hash
   | Request.Notify_branch (peer_id, locator) ->
       on_notify_branch w peer_id locator
   | Request.Notify_head (peer_id, hash, header, mempool) ->

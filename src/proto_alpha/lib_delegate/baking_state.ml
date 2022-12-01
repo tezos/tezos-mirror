@@ -112,6 +112,7 @@ type prequorum = {
 type block_info = {
   hash : Tezos_crypto.Block_hash.t;
   shell : Block_header.shell_header;
+  resulting_context_hash : Tezos_crypto.Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
@@ -175,6 +176,7 @@ let block_info_encoding =
     (fun {
            hash;
            shell;
+           resulting_context_hash;
            payload_hash;
            payload_round;
            round;
@@ -187,29 +189,30 @@ let block_info_encoding =
          } ->
       ( ( hash,
           shell,
+          resulting_context_hash,
           payload_hash,
           payload_round,
           round,
           protocol,
           next_protocol,
           prequorum,
-          List.map Operation.pack quorum,
-          payload ),
-        live_blocks ))
+          List.map Operation.pack quorum ),
+        (payload, live_blocks) ))
     (fun ( ( hash,
              shell,
+             resulting_context_hash,
              payload_hash,
              payload_round,
              round,
              protocol,
              next_protocol,
              prequorum,
-             quorum,
-             payload ),
-           live_blocks ) ->
+             quorum ),
+           (payload, live_blocks) ) ->
       {
         hash;
         shell;
+        resulting_context_hash;
         payload_hash;
         payload_round;
         round;
@@ -224,15 +227,17 @@ let block_info_encoding =
        (obj10
           (req "hash" Tezos_crypto.Block_hash.encoding)
           (req "shell" Block_header.shell_header_encoding)
+          (req "resulting_context_hash" Tezos_crypto.Context_hash.encoding)
           (req "payload_hash" Block_payload_hash.encoding)
           (req "payload_round" Round.encoding)
           (req "round" Round.encoding)
           (req "protocol" Tezos_crypto.Protocol_hash.encoding)
           (req "next_protocol" Tezos_crypto.Protocol_hash.encoding)
           (req "prequorum" (option prequorum_encoding))
-          (req "quorum" (list (dynamic_size Operation.encoding)))
-          (req "payload" Operation_pool.payload_encoding))
-       (obj1 (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
+          (req "quorum" (list (dynamic_size Operation.encoding))))
+       (obj2
+          (req "payload" Operation_pool.payload_encoding)
+          (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult
@@ -437,13 +442,163 @@ let event_encoding =
         (fun tk -> Timeout tk);
     ]
 
-(* Disk state *)
+(* Legacy disk state support: this will only be used when migrating
+   from a baker using the previous format to the new one and will
+   happen once. *)
+
+type legacy_block_info = {
+  legacy_hash : Tezos_crypto.Block_hash.t;
+  legacy_shell : Block_header.shell_header;
+  legacy_payload_hash : Block_payload_hash.t;
+  legacy_payload_round : Round.t;
+  legacy_round : Round.t;
+  legacy_protocol : Tezos_crypto.Protocol_hash.t;
+  legacy_next_protocol : Tezos_crypto.Protocol_hash.t;
+  legacy_prequorum : prequorum option;
+  legacy_quorum : Kind.endorsement operation list;
+  legacy_payload : Operation_pool.payload;
+  legacy_live_blocks : Tezos_crypto.Block_hash.Set.t;
+}
+
+let legacy_block_info_encoding : legacy_block_info Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun ({
+            legacy_hash;
+            legacy_shell;
+            legacy_payload_hash;
+            legacy_payload_round;
+            legacy_round;
+            legacy_protocol;
+            legacy_next_protocol;
+            legacy_prequorum;
+            legacy_quorum;
+            legacy_payload;
+            legacy_live_blocks;
+          } :
+           legacy_block_info) ->
+      ( ( legacy_hash,
+          legacy_shell,
+          legacy_payload_hash,
+          legacy_payload_round,
+          legacy_round,
+          legacy_protocol,
+          legacy_next_protocol,
+          legacy_prequorum,
+          List.map Operation.pack legacy_quorum,
+          legacy_payload ),
+        legacy_live_blocks ))
+    (fun ( ( legacy_hash,
+             legacy_shell,
+             legacy_payload_hash,
+             legacy_payload_round,
+             legacy_round,
+             legacy_protocol,
+             legacy_next_protocol,
+             legacy_prequorum,
+             legacy_quorum,
+             legacy_payload ),
+           legacy_live_blocks ) ->
+      {
+        legacy_hash;
+        legacy_shell;
+        legacy_payload_hash;
+        legacy_payload_round;
+        legacy_round;
+        legacy_protocol;
+        legacy_next_protocol;
+        legacy_prequorum;
+        legacy_quorum =
+          List.filter_map Operation_pool.unpack_endorsement legacy_quorum;
+        legacy_payload;
+        legacy_live_blocks;
+      })
+    (merge_objs
+       (obj10
+          (req "hash" Tezos_crypto.Block_hash.encoding)
+          (req "shell" Block_header.shell_header_encoding)
+          (req "payload_hash" Block_payload_hash.encoding)
+          (req "payload_round" Round.encoding)
+          (req "round" Round.encoding)
+          (req "protocol" Tezos_crypto.Protocol_hash.encoding)
+          (req "next_protocol" Tezos_crypto.Protocol_hash.encoding)
+          (req "prequorum" (option prequorum_encoding))
+          (req "quorum" (list (dynamic_size Operation.encoding)))
+          (req "payload" Operation_pool.payload_encoding))
+       (obj1 (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
+
+type legacy_proposal = {
+  legacy_block : legacy_block_info;
+  legacy_predecessor : legacy_block_info;
+}
+
+let legacy_proposal_encoding =
+  let open Data_encoding in
+  conv
+    (fun {legacy_block; legacy_predecessor} ->
+      (legacy_block, legacy_predecessor))
+    (fun (legacy_block, legacy_predecessor) ->
+      {legacy_block; legacy_predecessor})
+    (obj2
+       (req "block" legacy_block_info_encoding)
+       (req "predecessor" legacy_block_info_encoding))
+
+type legacy_endorsable_payload = {
+  legacy_proposal : legacy_proposal;
+  prequorum : prequorum;
+}
+
+let legacy_endorsable_payload_encoding =
+  let open Data_encoding in
+  conv
+    (fun {legacy_proposal; prequorum} -> (legacy_proposal, prequorum))
+    (fun (legacy_proposal, prequorum) -> {legacy_proposal; prequorum})
+    (obj2
+       (req "proposal" legacy_proposal_encoding)
+       (req "prequorum" prequorum_encoding))
+
+type legacy_state_data = {
+  level_data : int32;
+  locked_round_data : locked_round option;
+  legacy_endorsable_payload_data : legacy_endorsable_payload option;
+}
+
+let legacy_state_data_encoding =
+  let open Data_encoding in
+  conv
+    (fun {level_data; locked_round_data; legacy_endorsable_payload_data} ->
+      (level_data, locked_round_data, legacy_endorsable_payload_data))
+    (fun (level_data, locked_round_data, legacy_endorsable_payload_data) ->
+      {level_data; locked_round_data; legacy_endorsable_payload_data})
+    (obj3
+       (req "level" int32)
+       (req "locked_round" (option locked_round_encoding))
+       (req "endorsable_payload" (option legacy_endorsable_payload_encoding)))
 
 type state_data = {
   level_data : int32;
   locked_round_data : locked_round option;
   endorsable_payload_data : endorsable_payload option;
 }
+
+let update_legacy_state_data raw_data =
+  (* "Upgrade" the file format by dumping the legacy
+     endorsable data. It is sound as the new baker
+     cannot start (i.e. load the preexisting state)
+     until the new protocol activates.
+
+     Note: the new encoding is not backward compatible
+     (unless the endorsable_payload_data is [None]). *)
+  let legacy_state_data =
+    Data_encoding.Binary.of_string_exn legacy_state_data_encoding raw_data
+  in
+  {
+    level_data = legacy_state_data.level_data;
+    locked_round_data = None;
+    endorsable_payload_data = None;
+  }
+
+(* Disk state *)
 
 let state_data_encoding =
   let open Data_encoding in
@@ -570,11 +725,12 @@ let load_endorsable_data cctxt location =
             ~mode:Input
             filename
             (fun channel ->
-              Lwt_io.read channel >>= fun bytes ->
-              Lwt.return
-                (Data_encoding.Binary.of_bytes_exn
-                   state_data_encoding
-                   (Bytes.unsafe_of_string bytes)))
+              Lwt_io.read channel >>= fun str ->
+              match
+                Data_encoding.Binary.of_string_opt state_data_encoding str
+              with
+              | Some state_data -> Lwt.return state_data
+              | None -> Lwt.return (update_legacy_state_data str))
           >>= return_some)
 
 let may_load_endorsable_data state =

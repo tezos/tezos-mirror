@@ -53,9 +53,7 @@
 
 type failure_kind =
   | Nothing_to_reconstruct
-  | Context_hash_mismatch of
-      Block_header.t * Tezos_crypto.Context_hash.t * Tezos_crypto.Context_hash.t
-  | Cannot_read_block_hash of Tezos_crypto.Block_hash.t
+  | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
 
 type error += Reconstruction_failure of failure_kind

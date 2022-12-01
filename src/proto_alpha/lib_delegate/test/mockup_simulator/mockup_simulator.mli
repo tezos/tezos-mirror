@@ -29,6 +29,7 @@ type block = {
   protocol_data : Protocol.Alpha_context.Block_header.protocol_data;
   raw_protocol_data : Bytes.t;
   operations : Mockup.M.Block_services.operation list list;
+  resulting_context_hash : Tezos_crypto.Context_hash.t;
 }
 
 (** Chain is a list of blocks. *)

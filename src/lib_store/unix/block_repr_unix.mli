@@ -63,7 +63,7 @@ val prune_raw_block_bytes : bytes -> int
 
 (** [raw_get_block_hash block_buffer] introspects the hash of the
     block contained in [block_buffer]. *)
-val raw_get_block_hash : bytes -> Tezos_crypto.Block_hash.t
+val raw_get_block_hash : bytes -> Block_hash.t
 
 (** [raw_get_block_level block_buffer] introspects the level of the
     block contained in [block_buffer]. *)
@@ -71,10 +71,15 @@ val raw_get_block_level : bytes -> int32
 
 (** [raw_get_block_predecessor block_buffer] introspects the
     predecessor's hash of the block contained in [block_buffer]. *)
-val raw_get_block_predecessor : bytes -> Tezos_crypto.Block_hash.t
+val raw_get_block_predecessor : bytes -> Block_hash.t
 
 (** [raw_get_last_allowed_fork_level block_buffer] introspects the
     last allowed fork level of the block's metadata contained in
     [block_buffer] if there is any. Returns [None] if no metadata is
     present. *)
 val raw_get_last_allowed_fork_level : bytes -> int -> int32 option
+
+(** [raw_get_context block_buffer] introspects the
+    context of the block contained in
+    [block_buffer]. *)
+val raw_get_context : bytes -> Context_hash.t

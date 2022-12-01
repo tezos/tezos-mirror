@@ -59,58 +59,49 @@ end
 
 module Account = struct
   type t = {
-    pkh : Tezos_crypto.Signature.Public_key_hash.t;
-    pk : Tezos_crypto.Signature.Public_key.t;
-    sk : Tezos_crypto.Signature.Secret_key.t;
+    pkh : Signature.Public_key_hash.t;
+    pk : Signature.Public_key.t;
+    sk : Signature.Secret_key.t;
   }
 
   let pp fmt {pkh; pk; sk} =
     Format.fprintf
       fmt
       "pkh: %a@ pk: %a@ nsk: %a"
-      Tezos_crypto.Signature.Public_key_hash.pp
+      Signature.Public_key_hash.pp
       pkh
-      Tezos_crypto.Signature.Public_key.pp
+      Signature.Public_key.pp
       pk
-      Tezos_crypto.Signature.Secret_key.pp
+      Signature.Secret_key.pp
       sk
 
   type account = t
 
-  let known_accounts = Tezos_crypto.Signature.Public_key_hash.Table.create 17
+  let known_accounts = Signature.Public_key_hash.Table.create 17
 
   let new_account ?seed () =
-    let pkh, pk, sk = Tezos_crypto.Signature.generate_key ?seed () in
+    let pkh, pk, sk = Signature.generate_key ?seed () in
     let account = {pkh; pk; sk} in
-    Tezos_crypto.Signature.Public_key_hash.Table.add known_accounts pkh account ;
+    Signature.Public_key_hash.Table.add known_accounts pkh account ;
     account
 
   let add_account ({pkh; _} as account) =
-    Tezos_crypto.Signature.Public_key_hash.Table.replace
-      known_accounts
-      pkh
-      account
+    Signature.Public_key_hash.Table.replace known_accounts pkh account
 
   let activator_account = new_account ()
 
   let find pkh =
     let open Lwt_result_syntax in
-    match
-      Tezos_crypto.Signature.Public_key_hash.Table.find known_accounts pkh
-    with
+    match Signature.Public_key_hash.Table.find known_accounts pkh with
     | Some v -> return v
-    | None ->
-        failwith
-          "Missing account: %a"
-          Tezos_crypto.Signature.Public_key_hash.pp
-          pkh
+    | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
   let find_alternate pkh =
     let exception Found of t in
     try
-      Tezos_crypto.Signature.Public_key_hash.Table.iter
+      Signature.Public_key_hash.Table.iter
         (fun pkh' account ->
-          if not (Tezos_crypto.Signature.Public_key_hash.equal pkh pkh') then
+          if not (Signature.Public_key_hash.equal pkh pkh') then
             raise (Found account))
         known_accounts ;
       raise Not_found
@@ -136,9 +127,7 @@ module Account = struct
 
   let new_commitment ?seed () =
     let open Lwt_result_syntax in
-    let pkh, pk, sk =
-      Tezos_crypto.Signature.generate_key ?seed ~algo:Ed25519 ()
-    in
+    let pkh, pk, sk = Signature.generate_key ?seed ~algo:Ed25519 () in
     let unactivated_account = {pkh; pk; sk} in
     let open Commitment in
     let pkh = match pkh with Ed25519 pkh -> pkh | _ -> assert false in
@@ -243,11 +232,7 @@ let get_next_baker_excluding rpc_ctxt excludes block =
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.find
       (fun {Plugin.RPC.Baking_rights.delegate; _} ->
-        not
-          (List.mem
-             ~equal:Tezos_crypto.Signature.Public_key_hash.equal
-             delegate
-             excludes))
+        not (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -289,7 +274,7 @@ module Forge = struct
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash
-      ~proto_level =
+      ~proto_level ~pred_resulting_context_hash =
     Tezos_base.Block_header.
       {
         level;
@@ -299,7 +284,7 @@ module Forge = struct
         operations_hash;
         proto_level;
         validation_passes = List.length Main.validation_passes;
-        context = Tezos_crypto.Context_hash.zero (* to update later *);
+        context = pred_resulting_context_hash;
       }
 
   let set_seed_nonce_hash seed_nonce_hash {baker; shell; contents} =
@@ -316,14 +301,15 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Tezos_crypto.Signature.sign
+      Signature.sign
         ~watermark:Block_header.(to_watermark (Block_header chain_id))
         delegate.sk
         unsigned_bytes
     in
     Block_header.{shell; protocol_data = {contents; signature}} |> return
 
-  let forge_header rpc_ctxt ?(policy = By_round 0) ?timestamp ~operations pred =
+  let forge_header rpc_ctxt ?(policy = By_round 0) ?timestamp ~operations pred
+      pred_resulting_context_hash =
     let open Lwt_result_syntax in
     let predecessor_round =
       match Fitness.from_raw (Store.Block.fitness pred) with
@@ -351,9 +337,9 @@ module Forge = struct
       | {expected_commitment = false; _} -> None
     in
     let operations_hash =
-      Tezos_crypto.Operation_list_list_hash.compute
+      Operation_list_list_hash.compute
         (List.map
-           Tezos_crypto.Operation_list_hash.compute
+           Operation_list_hash.compute
            (List.map (List.map Operation.hash_packed) operations))
     in
     let shell =
@@ -364,6 +350,7 @@ module Forge = struct
         ~fitness
         ~operations_hash
         ~proto_level
+        ~pred_resulting_context_hash
     in
     let contents =
       make_contents
@@ -426,9 +413,9 @@ let default_accounts =
   let open Account in
   let to_account (pkh, pk, sk) =
     {
-      pkh = Tezos_crypto.Signature.Public_key_hash.of_b58check_exn pkh;
-      pk = Tezos_crypto.Signature.Public_key.of_b58check_exn pk;
-      sk = Tezos_crypto.Signature.Secret_key.of_b58check_exn sk;
+      pkh = Signature.Public_key_hash.of_b58check_exn pkh;
+      pk = Signature.Public_key.of_b58check_exn pk;
+      sk = Signature.Secret_key.of_b58check_exn sk;
     }
   in
   let accounts = List.map to_account initial_accounts in
@@ -455,9 +442,9 @@ let patch_context ctxt ~json =
       predecessor = Test_utils.genesis.block;
       timestamp = Test_utils.genesis.time;
       validation_passes = 0;
-      operations_hash = Tezos_crypto.Operation_list_list_hash.empty;
+      operations_hash = Operation_list_list_hash.empty;
       fitness = [];
-      context = Tezos_crypto.Context_hash.zero;
+      context = Context_hash.zero;
     }
   in
   let proto_params =
@@ -465,7 +452,7 @@ let patch_context ctxt ~json =
   in
   let* ctxt = Context_ops.add ctxt ["version"] (Bytes.of_string "genesis") in
   let* ctxt = Context_ops.add ctxt protocol_param_key proto_params in
-  let* r = Main.init Tezos_crypto.Chain_id.zero ctxt shell in
+  let* r = Main.init Chain_id.zero ctxt shell in
   match r with
   | Error e -> failwith "%a" Environment.Error_monad.pp_trace e
   | Ok {context; _} -> return_ok context
@@ -507,9 +494,10 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = Main.finalize_validation validation_state in
   Main.finalize_application application_state shell_header
 
-let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
+let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
+    pred pred_resulting_context_hash =
   let open Lwt_result_syntax in
-  let* rpc_ctxt = make_rpc_context ~chain_id ctxt pred in
+  let* rpc_ctxt = make_rpc_context ~chain_id pred_resulting_ctxt pred in
   let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
       ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
     let*! f =
@@ -529,36 +517,39 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
         return r)
   in
   let* {shell; contents; baker} =
-    Forge.forge_header rpc_ctxt ?policy ~operations pred
+    Forge.forge_header
+      rpc_ctxt
+      ?policy
+      ~operations
+      pred
+      pred_resulting_context_hash
   in
-  let protocol_data =
-    {Block_header.contents; signature = Tezos_crypto.Signature.zero}
-  in
-  let*! context =
+  let protocol_data = {Block_header.contents; signature = Signature.zero} in
+  let*! ctxt =
     match Store.Block.block_metadata_hash pred with
-    | None -> Lwt.return ctxt
-    | Some hash -> Context_ops.add_predecessor_block_metadata_hash ctxt hash
+    | None -> Lwt.return pred_resulting_ctxt
+    | Some hash ->
+        Context_ops.add_predecessor_block_metadata_hash pred_resulting_ctxt hash
   in
   let*! ctxt =
     match Store.Block.all_operations_metadata_hash pred with
-    | None -> Lwt.return context
-    | Some hash -> Context_ops.add_predecessor_ops_metadata_hash context hash
+    | None -> Lwt.return ctxt
+    | Some hash -> Context_ops.add_predecessor_ops_metadata_hash ctxt hash
   in
-  let predecessor_context = ctxt in
   let* element_of_key =
     element_of_key
       ~chain_id
-      ~predecessor_context
+      ~predecessor_context:ctxt
       ~predecessor_timestamp:(Store.Block.timestamp pred)
       ~predecessor_level:(Store.Block.level pred)
       ~predecessor_fitness:(Store.Block.fitness pred)
       ~predecessor:(Store.Block.hash pred)
       ~timestamp:shell.timestamp
   in
-  let* predecessor_context =
+  let* pred_ctxt =
     Tezos_protocol_environment.Context.load_cache
       (Store.Block.hash pred)
-      predecessor_context
+      ctxt
       `Lazy
       element_of_key
   in
@@ -567,7 +558,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       let open Environment.Error_monad in
       let* vstate =
         begin_validation_and_application
-          predecessor_context
+          pred_ctxt
           chain_id
           (Construction
              {
@@ -599,7 +590,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   in
   let validation = {validation with max_operations_ttl} in
   let context = Shell_context.unwrap_disk_context validation.context in
-  let*! context_hash =
+  let*! resulting_context_hash =
     Context.commit ~time:shell.timestamp ?message:validation.message context
   in
   let block_header_metadata =
@@ -616,7 +607,6 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       hashes
   in
   let contents = {contents with payload_hash} in
-  let shell = {shell with context = context_hash} in
   let* header = Forge.sign_header ~chain_id {baker; shell; contents} in
   let protocol_data =
     Data_encoding.Binary.to_bytes_exn
@@ -624,7 +614,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       header.protocol_data
   in
   let block_hash_metadata =
-    Some (Tezos_crypto.Block_metadata_hash.hash_bytes [block_header_metadata])
+    Some (Block_metadata_hash.hash_bytes [block_header_metadata])
   in
   let block_header =
     {Tezos_base.Block_header.shell = header.shell; protocol_data}
@@ -632,8 +622,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let operations_metadata_hashes =
     Some
       (List.map
-         (List.map (fun r ->
-              Tezos_crypto.Operation_metadata_hash.hash_bytes [r]))
+         (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
          (WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])))
   in
   return
@@ -641,21 +630,31 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       block_header_metadata,
       block_hash_metadata,
       operations_metadata_hashes,
+      resulting_context_hash,
       validation )
 
 let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     ?(operations = empty_operations) pred =
   let open Lwt_result_syntax in
-  let* ctxt = Store.Block.context chain_store pred in
+  let* pred_resulting_ctxt = Store.Block.context chain_store pred in
+  let* pred_resulting_context_hash =
+    Store.Block.resulting_context_hash chain_store pred
+  in
   let chain_id = Store.Chain.chain_id chain_store in
   let* ( block_header,
          block_header_metadata,
          block_metadata_hash,
          ops_metadata_hashes,
+         resulting_context_hash,
          validation ) =
-    apply ctxt chain_id ~policy ~operations pred
+    apply
+      pred_resulting_ctxt
+      chain_id
+      ~policy
+      ~operations
+      pred
+      pred_resulting_context_hash
   in
-  let context_hash = block_header.shell.context in
   let ops_metadata =
     let operations_metadata =
       WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])
@@ -676,7 +675,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     {
       Tezos_validation.Block_validation.validation_store =
         {
-          context_hash;
+          resulting_context_hash;
           timestamp = block_header.shell.timestamp;
           message = validation.Tezos_protocol_environment.message;
           max_operations_ttl = validation.max_operations_ttl;
@@ -684,6 +683,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         };
       block_metadata = (block_header_metadata, block_metadata_hash);
       ops_metadata;
+      shell_header_hash = Block_validation.Shell_header_hash.zero;
     }
   in
   let operations =
@@ -716,7 +716,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
         return b
   | None ->
       let h = Tezos_base.Block_header.hash block_header in
-      Format.eprintf "block %a already stored@." Tezos_crypto.Block_hash.pp h ;
+      Format.eprintf "block %a already stored@." Block_hash.pp h ;
       Store.Block.read_block chain_store h
 
 let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =

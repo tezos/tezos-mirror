@@ -26,7 +26,7 @@
 (** {1 Global types used in the store library} *)
 
 (** The type used to describe a block pointer i.e. its hash and level. *)
-type block_descriptor = Tezos_crypto.Block_hash.t * int32
+type block_descriptor = Block_hash.t * int32
 
 (** Encoding for {!block_descriptor}. *)
 val block_descriptor_encoding : block_descriptor Data_encoding.t
@@ -54,8 +54,7 @@ val invalid_block_encoding : invalid_block Data_encoding.t
 
 (** Module [Block_lru_cache] implements a lwt LRU cache map indexed by
     block hashes. *)
-module Block_lru_cache :
-  Aches_lwt.Lache.MAP_OPTION with type key = Tezos_crypto.Block_hash.t
+module Block_lru_cache : Aches_lwt.Lache.MAP_OPTION with type key = Block_hash.t
 
 (** Module [Protocol_levels] represents an associative map of protocol
     levels to corresponding blocks which supposedly activate new
@@ -64,79 +63,52 @@ module Block_lru_cache :
 module Protocol_levels : sig
   include Map.S with type key = int
 
-  (** The type representing a subset of the commit information. These
-      are used to easily check that a given [Tezos_crypto.Context_hash.t], with the
-      associated context not present on disk, is consistent.  It is
-      used to verify that an announced protocol is indeed the one that
-      was committed on disk. Fields are:
-      - [author] is the commit's author;
-      - [message] is the commit's message;
-      - [test_chain_status] is the status of the test chain at commit
-        time;
-      - [data_merkle_root] is the merkle root of the context's data
-        main node;
-      - [parents_contexts] are the context hashes of this commit's
-        parents.
+  (** The type for protocol info.
 
-      This structure should be populated with the result of
-      {!Tezos_context.Context.retrieve_commit_info}. The consistency
-      check is done by
-      {!Tezos_context.Context.check_protocol_commit_consistency} when
-      a context in imported in the leger state, for example, when
-      importing a snapshot. *)
-  type commit_info = {
-    author : string;
-    message : string;
-    test_chain_status : Test_chain_status.t;
-    predecessor_block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash :
-      Tezos_crypto.Operation_metadata_list_list_hash.t option;
-    data_merkle_root : Tezos_crypto.Context_hash.t;
-    parents_contexts : Tezos_crypto.Context_hash.t list;
-  }
-
-  val commit_info_of_tuple :
-    Tezos_crypto.Protocol_hash.t
-    * string
-    * string
-    * Time.Protocol.t
-    * Test_chain_status.t
-    * Tezos_crypto.Context_hash.t
-    * Tezos_crypto.Block_metadata_hash.t option
-    * Tezos_crypto.Operation_metadata_list_list_hash.t option
-    * Tezos_crypto.Context_hash.t list ->
-    commit_info
-
-  (** Encoding for {!commit_info}. *)
-  val commit_info_encoding : commit_info Data_encoding.t
-
-  (** The type for activation blocks.
-
-      An activation block refers to a block which activated a new
-     protocol [N+1]. Thus, the block header related to that activation
-     block will have a protocol level which differs from its
-     predecessor. As this block aims to activate a new protocol, the
-     [next_protocol] and [protocol] fields from the metadata differs:
-     [next_protocol] refers to the hash of the activated protocol. As
-     a consequence, this block handled by protocol [N] and is the last
-     block of that protocol.
-
-
-      {b WARNING.} Commit information are optional to allow
-     retro-compatibility: the LMDB legacy store does not contain such
-     information. Thus, populating the protocol levels' map while
-     upgrading the storage would prevent us from storing an activation
-     block which is used to retrieve the [protocol] to load, and
-     therefore, being unable to decode stored blocks. In the future,
-     when a sufficient number of nodes have fully migrated, we can
-     stitch the missing commit information by hard-coding them,
-     allowing us to remove the option. *)
-  type activation_block = {
-    block : block_descriptor;
-    protocol : Tezos_crypto.Protocol_hash.t;
-    commit_info : commit_info option;
+    [expect_predecessor_context] is a flag which reflects what is
+    referenced by the context hash of a block, depending on its
+    protocol. If the flag is true, the block contains the predecessors
+    context (context before the application of the block). Otherwise,
+    it contains the resulting context hash of the application of the
+    block. An activation block refers to a block which activated a new
+    protocol [N+1]. Thus, the block header related to that activation
+    block will have a protocol level which differs from its
+    predecessor. As this block aims to activate a new protocol, the
+    [next_protocol] and [protocol] fields from the metadata differs:
+    [next_protocol] refers to the hash of the activated protocol. As a
+    consequence, this block handled by protocol [N] and is the last
+    block of that protocol.
+*)
+  type protocol_info = {
+    protocol : Protocol_hash.t;
+    activation_block : block_descriptor;
+    expect_predecessor_context : bool;
   }
 
   (** Encoding for the protocol level's association map. *)
-  val encoding : activation_block t Data_encoding.t
+  val encoding : protocol_info t Data_encoding.t
+
+  module Legacy : sig
+    type commit_info = {
+      author : string;
+      message : string;
+      test_chain_status : Test_chain_status.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
+      data_merkle_root : Context_hash.t;
+      parents_contexts : Context_hash.t list;
+    }
+
+    type activation_block = {
+      block : block_descriptor;
+      protocol : Protocol_hash.t;
+      commit_info : commit_info option;
+    }
+
+    include Map.S with type key = int
+
+    (** Encoding for the protocol level's association map. *)
+    val encoding : activation_block t Data_encoding.t
+  end
 end

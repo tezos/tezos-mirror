@@ -126,7 +126,7 @@ type t = {
   chain_db : Distributed_db.chain_db;
   locator : Block_locator.t;
   block_validator : Block_validator.t;
-  notify_new_block : Store.Block.t -> unit;
+  notify_new_block : Block_validator.new_block -> unit;
   fetched_headers :
     (Tezos_crypto.Block_hash.t * Block_header.t) list Lwt_pipe.Bounded.t;
   fetched_blocks :

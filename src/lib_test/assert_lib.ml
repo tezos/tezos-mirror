@@ -44,10 +44,11 @@ module Crypto = struct
     let pp ppf st =
       Format.fprintf
         ppf
-        "%a (%ld)"
+        "@[<v 2>%a@ %a@]"
         Tezos_crypto.Block_hash.pp
         (Tezos_base.Block_header.hash st)
-        st.shell.level
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct Tezos_base.Block_header.encoding st)
     in
     Assert.equal ?loc ?msg ~pp ~eq st1 st2
 

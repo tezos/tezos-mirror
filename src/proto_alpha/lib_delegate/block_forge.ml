@@ -67,7 +67,7 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
 (* Build the block header : mimics node prevalidation *)
 let finalize_block_header shell_header timestamp validation_result
     operations_hash predecessor_block_metadata_hash
-    predecessor_ops_metadata_hash =
+    predecessor_ops_metadata_hash predecessor_resulting_context =
   let {Tezos_protocol_environment.context; fitness; message; _} =
     validation_result
   in
@@ -96,6 +96,11 @@ let finalize_block_header shell_header timestamp validation_result
   | None -> Lwt.return context)
   >>= fun context ->
   let context = Context_ops.hash ~time:timestamp ?message context in
+  (* For the time being, we still fully build the block while we build
+     confidence to fully unplug the baker validation. The resulting
+     context hash is ignored as it is not necessary to craft a block.
+     See: https://gitlab.com/tezos/tezos/-/issues/4285 *)
+  ignore context ;
   let header =
     Tezos_base.Block_header.
       {
@@ -104,7 +109,7 @@ let finalize_block_header shell_header timestamp validation_result
         validation_passes;
         operations_hash;
         fitness;
-        context;
+        context = predecessor_resulting_context;
       }
   in
   return header
@@ -235,6 +240,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         operations_hash
         pred_block_metadata_hash
         pred_op_metadata_hash
+        predecessor_block.resulting_context_hash
       >>=? fun shell_header ->
       let operations = List.map (List.map convert_operation) operations in
       let payload_hash =
@@ -342,6 +348,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         operations_hash
         pred_block_metadata_hash
         pred_op_metadata_hash
+        predecessor_block.resulting_context_hash
       >>=? fun shell_header ->
       let operations = List.map (List.map convert_operation) operations in
       return (shell_header, operations, payload_hash)

@@ -109,7 +109,6 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
     | None -> `Alias (`Checkpoint, 0)
     | Some hash -> `Hash (hash, 0)
   in
-  (*FIXME test over Raw formats as well *)
   let* () =
     Snapshots.export
       ~snapshot_path
@@ -160,7 +159,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
         | Some hash ->
             Assert.equal
               ~msg:("export with given hash: " ^ test_descr)
-              ~eq:Tezos_crypto.Block_hash.equal
+              ~eq:Block_hash.equal
               (Store.Block.hash head')
               hash ;
             Lwt.return head'
@@ -168,7 +167,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
             let*! checkpoint = Store.Chain.checkpoint chain_store in
             Assert.equal
               ~msg:("export checkpoint: " ^ test_descr)
-              ~eq:Tezos_crypto.Block_hash.equal
+              ~eq:Block_hash.equal
               (Store.Block.hash head')
               (fst checkpoint) ;
             Lwt.return head'
@@ -255,7 +254,7 @@ let check_baking_continuity ~test_descr ~exported_chain_store
   Assert.equal
     ~msg:("checkpoint equality: " ^ test_descr)
     ~pp:(fun ppf (hash, level) ->
-      Format.fprintf ppf "%a (%ld)" Tezos_crypto.Block_hash.pp hash level)
+      Format.fprintf ppf "%a (%ld)" Block_hash.pp hash level)
     checkpoint
     checkpoint' ;
   return_unit

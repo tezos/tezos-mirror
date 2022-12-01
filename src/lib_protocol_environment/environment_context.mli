@@ -234,4 +234,14 @@ type rpc_context = {
   context : Context.t;
 }
 
+(** Type of semantics defining the context's hash present in a block
+    header. *)
+type header_context_hash_semantics =
+  | Resulting_context
+      (** The block header must contain the hash of the context
+          resulting of the block's application. *)
+  | Predecessor_resulting_context
+      (** The block header must contain the hash of the context
+          resulting of its predecessor block application. *)
+
 val err_implementation_mismatch : expected:string -> got:string -> 'a

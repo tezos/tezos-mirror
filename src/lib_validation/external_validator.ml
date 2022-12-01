@@ -51,8 +51,8 @@ module Events = struct
       ~level:Debug
       ~name:"dynload_protocol"
       ~msg:"dynamic loading of protocol {protocol}"
-      ~pp1:Tezos_crypto.Protocol_hash.pp
-      ("protocol", Tezos_crypto.Protocol_hash.encoding)
+      ~pp1:Protocol_hash.pp
+      ("protocol", Protocol_hash.encoding)
 
   let validation_request =
     declare_1
@@ -60,8 +60,7 @@ module Events = struct
       ~level:Debug
       ~name:"validation_request"
       ~msg:"validating block {block}"
-      ~pp1:(fun fmt header ->
-        Tezos_crypto.Block_hash.pp fmt (Block_header.hash header))
+      ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
   let precheck_request =
@@ -70,8 +69,8 @@ module Events = struct
       ~level:Debug
       ~name:"precheck_request"
       ~msg:"prechecking block {hash}"
-      ~pp1:Tezos_crypto.Block_hash.pp
-      ("hash", Tezos_crypto.Block_hash.encoding)
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
 
   let commit_genesis_request =
     declare_1
@@ -79,8 +78,8 @@ module Events = struct
       ~level:Debug
       ~name:"commit_genesis_request"
       ~msg:"committing genesis block {genesis}"
-      ~pp1:Tezos_crypto.Block_hash.pp
-      ("genesis", Tezos_crypto.Block_hash.encoding)
+      ~pp1:Block_hash.pp
+      ("genesis", Block_hash.encoding)
 
   let initialization_request =
     declare_0
@@ -105,8 +104,8 @@ module Events = struct
       ~level:Debug
       ~name:"context_gc_request"
       ~msg:"garbage collecting context below {context_hash}"
-      ~pp1:Tezos_crypto.Context_hash.pp
-      ("context_hash", Tezos_crypto.Context_hash.encoding)
+      ~pp1:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
 
   let termination_request =
     declare_0
@@ -127,8 +126,8 @@ let load_protocol proto protocol_root =
   else
     let cmxs_file =
       protocol_root
-      // Tezos_crypto.Protocol_hash.to_short_b58check proto
-      // Format.asprintf "protocol_%a.cmxs" Tezos_crypto.Protocol_hash.pp proto
+      // Protocol_hash.to_short_b58check proto
+      // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
     in
     let*! () = Events.(emit dynload_protocol proto) in
     match Dynlink.loadfile_private cmxs_file with
@@ -247,7 +246,7 @@ let run ~readonly input output =
         let*! () =
           External_validation.send
             output
-            (Error_monad.result_encoding Tezos_crypto.Context_hash.encoding)
+            (Error_monad.result_encoding Context_hash.encoding)
             commit
         in
         loop cache None
@@ -258,6 +257,7 @@ let run ~readonly input output =
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
           max_operations_ttl;
           should_precheck;
@@ -267,16 +267,17 @@ let run ~readonly input output =
         let*! block_application_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
-                let pred_context_hash =
-                  predecessor_block_header.shell.context
+                let*! o =
+                  Context.checkout
+                    context_index
+                    predecessor_resulting_context_hash
                 in
-                let*! o = Context.checkout context_index pred_context_hash in
                 match o with
                 | Some c -> return (Shell_context.wrap_disk_context c)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
-                         pred_context_hash))
+                         predecessor_resulting_context_hash))
           in
           let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
@@ -291,13 +292,14 @@ let run ~readonly input output =
               predecessor_block_metadata_hash;
               predecessor_ops_metadata_hash;
               predecessor_context;
+              predecessor_resulting_context_hash;
             }
           in
-          let predecessor_context = predecessor_block_header.shell.context in
           let cache =
             match cache with
             | None -> `Load
-            | Some cache -> `Inherited (cache, predecessor_context)
+            | Some cache ->
+                `Inherited (cache, predecessor_resulting_context_hash)
           in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.apply
@@ -321,7 +323,11 @@ let run ~readonly input output =
           | Error _ as err -> (err, cache)
           | Ok {result; cache} ->
               ( Ok result,
-                Some {context_hash = block_header.shell.context; cache} )
+                Some
+                  {
+                    context_hash = result.validation_store.resulting_context_hash;
+                    cache;
+                  } )
         in
         let*! () =
           External_validation.send
@@ -342,14 +348,16 @@ let run ~readonly input output =
           predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
         } ->
         let*! block_preapplication_result =
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
-                let pred_context_hash = predecessor_shell_header.context in
                 let*! context =
-                  Context.checkout context_index pred_context_hash
+                  Context.checkout
+                    context_index
+                    predecessor_resulting_context_hash
                 in
                 match context with
                 | Some context ->
@@ -357,7 +365,7 @@ let run ~readonly input output =
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
-                         pred_context_hash))
+                         predecessor_resulting_context_hash))
           in
           let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
@@ -377,6 +385,7 @@ let run ~readonly input output =
                 ~predecessor_max_operations_ttl
                 ~predecessor_block_metadata_hash
                 ~predecessor_ops_metadata_hash
+                ~predecessor_resulting_context_hash
                 operations)
         in
         let*! cachable_result =
@@ -406,6 +415,7 @@ let run ~readonly input output =
           chain_id;
           predecessor_block_header;
           predecessor_block_hash;
+          predecessor_resulting_context_hash;
           header;
           operations;
           hash;
@@ -417,7 +427,7 @@ let run ~readonly input output =
                 let*! o =
                   Context.checkout
                     context_index
-                    predecessor_block_header.shell.context
+                    predecessor_resulting_context_hash
                 in
                 match o with
                 | Some context ->
@@ -425,19 +435,20 @@ let run ~readonly input output =
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
-                         predecessor_block_header.shell.context))
+                         predecessor_resulting_context_hash))
           in
           let cache =
             match cache with
             | None -> `Lazy
             | Some cache ->
-                `Inherited (cache, predecessor_block_header.shell.context)
+                `Inherited (cache, predecessor_resulting_context_hash)
           in
           Block_validation.precheck
             ~chain_id
             ~predecessor_block_header
             ~predecessor_block_hash
             ~predecessor_context
+            ~predecessor_resulting_context_hash
             ~cache
             header
             operations

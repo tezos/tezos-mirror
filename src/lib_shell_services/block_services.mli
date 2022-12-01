@@ -219,6 +219,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     unit ->
     Tezos_crypto.Block_metadata_hash.t tzresult Lwt.t
 
+  val resulting_context_hash :
+    #simple ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    Tezos_crypto.Context_hash.t tzresult Lwt.t
+
   module Header : sig
     val shell_header :
       #simple ->
@@ -513,6 +520,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     val protocols :
       ([`GET], prefix, prefix, unit, unit, protocols) Tezos_rpc.Service.t
+
+    val resulting_context_hash :
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Tezos_crypto.Context_hash.t )
+      Tezos_rpc.Service.t
 
     module Header : sig
       val shell_header :

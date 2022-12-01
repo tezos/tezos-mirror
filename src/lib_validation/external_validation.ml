@@ -37,48 +37,49 @@ type parameters = {
 type request =
   | Init
   | Validate of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
-      predecessor_block_metadata_hash :
-        Tezos_crypto.Block_metadata_hash.t option;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
-        Tezos_crypto.Operation_metadata_list_list_hash.t option;
+        Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
       max_operations_ttl : int;
       should_precheck : bool;
       simulate : bool;
     }
   | Preapply of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       timestamp : Time.Protocol.t;
       protocol_data : bytes;
-      live_blocks : Tezos_crypto.Block_hash.Set.t;
-      live_operations : Tezos_crypto.Operation_hash.Set.t;
+      live_blocks : Block_hash.Set.t;
+      live_operations : Operation_hash.Set.t;
       predecessor_shell_header : Block_header.shell_header;
-      predecessor_hash : Tezos_crypto.Block_hash.t;
+      predecessor_hash : Block_hash.t;
       predecessor_max_operations_ttl : int;
-      predecessor_block_metadata_hash :
-        Tezos_crypto.Block_metadata_hash.t option;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
       predecessor_ops_metadata_hash :
-        Tezos_crypto.Operation_metadata_list_list_hash.t option;
+        Operation_metadata_list_list_hash.t option;
+      predecessor_resulting_context_hash : Context_hash.t;
       operations : Operation.t list list;
     }
   | Precheck of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
-      predecessor_block_hash : Tezos_crypto.Block_hash.t;
+      predecessor_block_hash : Block_hash.t;
+      predecessor_resulting_context_hash : Context_hash.t;
       header : Block_header.t;
       operations : Operation.t list list;
-      hash : Tezos_crypto.Block_hash.t;
+      hash : Block_hash.t;
     }
-  | Commit_genesis of {chain_id : Tezos_crypto.Chain_id.t}
+  | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
-      chain_id : Tezos_crypto.Chain_id.t;
-      context_hash : Tezos_crypto.Context_hash.t;
+      chain_id : Chain_id.t;
+      context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {context_hash : Tezos_crypto.Context_hash.t}
+  | Context_garbage_collection of {context_hash : Context_hash.t}
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t
@@ -89,42 +90,38 @@ let request_pp ppf = function
       Format.fprintf
         ppf
         "block validation %a for chain %a"
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         (Block_header.hash block_header)
-        Tezos_crypto.Chain_id.pp_short
+        Chain_id.pp_short
         chain_id
   | Preapply {predecessor_hash; chain_id; _} ->
       Format.fprintf
         ppf
         "preapply block ontop of %a for chain %a"
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         predecessor_hash
-        Tezos_crypto.Chain_id.pp_short
+        Chain_id.pp_short
         chain_id
   | Precheck {hash; _} ->
-      Format.fprintf
-        ppf
-        "precheck block %a"
-        Tezos_crypto.Block_hash.pp_short
-        hash
+      Format.fprintf ppf "precheck block %a" Block_hash.pp_short hash
   | Commit_genesis {chain_id} ->
       Format.fprintf
         ppf
         "commit genesis block for chain %a"
-        Tezos_crypto.Chain_id.pp_short
+        Chain_id.pp_short
         chain_id
   | Fork_test_chain {forked_header; _} ->
       Format.fprintf
         ppf
         "test chain fork on block %a"
-        Tezos_crypto.Block_hash.pp_short
+        Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
   | Context_garbage_collection {context_hash} ->
       Format.fprintf
         ppf
         "garbage collecting context below %a"
-        Tezos_crypto.Context_hash.pp
+        Context_hash.pp
         context_hash
   | Reconfigure_event_logging _ ->
       Format.fprintf ppf "reconfigure event logging"
@@ -184,16 +181,13 @@ let case_validate tag =
   case
     tag
     ~title:"validate"
-    (obj9
-       (req "chain_id" Tezos_crypto.Chain_id.encoding)
+    (obj10
+       (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "pred_header" (dynamic_size Block_header.encoding))
-       (opt
-          "pred_block_metadata_hash"
-          Tezos_crypto.Block_metadata_hash.encoding)
-       (opt
-          "pred_ops_metadata_hash"
-          Tezos_crypto.Operation_metadata_list_list_hash.encoding)
+       (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
+       (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
+       (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "max_operations_ttl" int31)
        (req "operations" (list (list (dynamic_size Operation.encoding))))
        (req "should_precheck" bool)
@@ -206,6 +200,7 @@ let case_validate tag =
             predecessor_block_header;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
+            predecessor_resulting_context_hash;
             max_operations_ttl;
             operations;
             should_precheck;
@@ -217,6 +212,7 @@ let case_validate tag =
               predecessor_block_header,
               predecessor_block_metadata_hash,
               predecessor_ops_metadata_hash,
+              predecessor_resulting_context_hash,
               max_operations_ttl,
               operations,
               should_precheck,
@@ -227,6 +223,7 @@ let case_validate tag =
            predecessor_block_header,
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
+           predecessor_resulting_context_hash,
            max_operations_ttl,
            operations,
            should_precheck,
@@ -238,6 +235,7 @@ let case_validate tag =
           predecessor_block_header;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           max_operations_ttl;
           operations;
           should_precheck;
@@ -251,21 +249,21 @@ let case_preapply tag =
     ~title:"preapply"
     (merge_objs
        (obj10
-          (req "chain_id" Tezos_crypto.Chain_id.encoding)
+          (req "chain_id" Chain_id.encoding)
           (req "timestamp" Time.Protocol.encoding)
           (req "protocol_data" bytes)
-          (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)
-          (req "live_operations" Tezos_crypto.Operation_hash.Set.encoding)
+          (req "live_blocks" Block_hash.Set.encoding)
+          (req "live_operations" Operation_hash.Set.encoding)
           (req "predecessor_shell_header" Block_header.shell_header_encoding)
-          (req "predecessor_hash" Tezos_crypto.Block_hash.encoding)
+          (req "predecessor_hash" Block_hash.encoding)
           (req "predecessor_max_operations_ttl" int31)
-          (opt
-             "predecessor_block_metadata_hash"
-             Tezos_crypto.Block_metadata_hash.encoding)
+          (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
           (opt
              "predecessor_ops_metadata_hash"
-             Tezos_crypto.Operation_metadata_list_list_hash.encoding))
-       (obj1 (req "operations" (list (list (dynamic_size Operation.encoding))))))
+             Operation_metadata_list_list_hash.encoding))
+       (obj2
+          (req "predecessor_resulting_context_hash" Context_hash.encoding)
+          (req "operations" (list (list (dynamic_size Operation.encoding))))))
     (function
       | Preapply
           {
@@ -279,6 +277,7 @@ let case_preapply tag =
             predecessor_max_operations_ttl;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
+            predecessor_resulting_context_hash;
             operations;
           } ->
           Some
@@ -292,7 +291,7 @@ let case_preapply tag =
                 predecessor_max_operations_ttl,
                 predecessor_block_metadata_hash,
                 predecessor_ops_metadata_hash ),
-              operations )
+              (predecessor_resulting_context_hash, operations) )
       | _ -> None)
     (fun ( ( chain_id,
              timestamp,
@@ -304,7 +303,7 @@ let case_preapply tag =
              predecessor_max_operations_ttl,
              predecessor_block_metadata_hash,
              predecessor_ops_metadata_hash ),
-           operations ) ->
+           (predecessor_resulting_context_hash, operations) ) ->
       Preapply
         {
           chain_id;
@@ -317,6 +316,7 @@ let case_preapply tag =
           predecessor_max_operations_ttl;
           predecessor_block_metadata_hash;
           predecessor_ops_metadata_hash;
+          predecessor_resulting_context_hash;
           operations;
         })
 
@@ -325,12 +325,13 @@ let case_precheck tag =
   case
     tag
     ~title:"precheck"
-    (obj6
-       (req "chain_id" Tezos_crypto.Chain_id.encoding)
+    (obj7
+       (req "chain_id" Chain_id.encoding)
        (req "predecessor_block_header" (dynamic_size Block_header.encoding))
-       (req "predecessor_block_hash" Tezos_crypto.Block_hash.encoding)
+       (req "predecessor_block_hash" Block_hash.encoding)
+       (req "predecessor_resulting_context_hash" Context_hash.encoding)
        (req "header" (dynamic_size Block_header.encoding))
-       (req "hash" Tezos_crypto.Block_hash.encoding)
+       (req "hash" Block_hash.encoding)
        (req "operations" (list (list (dynamic_size Operation.encoding)))))
     (function
       | Precheck
@@ -338,6 +339,7 @@ let case_precheck tag =
             chain_id;
             predecessor_block_header;
             predecessor_block_hash;
+            predecessor_resulting_context_hash;
             header;
             operations;
             hash;
@@ -346,6 +348,7 @@ let case_precheck tag =
             ( chain_id,
               predecessor_block_header,
               predecessor_block_hash,
+              predecessor_resulting_context_hash,
               header,
               hash,
               operations )
@@ -353,6 +356,7 @@ let case_precheck tag =
     (fun ( chain_id,
            predecessor_block_header,
            predecessor_block_hash,
+           predecessor_resulting_context_hash,
            header,
            hash,
            operations ) ->
@@ -361,6 +365,7 @@ let case_precheck tag =
           chain_id;
           predecessor_block_header;
           predecessor_block_hash;
+          predecessor_resulting_context_hash;
           header;
           operations;
           hash;
@@ -371,7 +376,7 @@ let case_context_gc tag =
   case
     tag
     ~title:"context_gc"
-    (obj1 (req "context_hash" Tezos_crypto.Context_hash.encoding))
+    (obj1 (req "context_hash" Context_hash.encoding))
     (function
       | Context_garbage_collection {context_hash} -> Some context_hash
       | _ -> None)
@@ -391,15 +396,15 @@ let request_encoding =
       case
         (Tag 2)
         ~title:"commit_genesis"
-        (obj1 (req "chain_id" Tezos_crypto.Chain_id.encoding))
+        (obj1 (req "chain_id" Chain_id.encoding))
         (function Commit_genesis {chain_id} -> Some chain_id | _ -> None)
         (fun chain_id -> Commit_genesis {chain_id});
       case
         (Tag 3)
         ~title:"fork_test_chain"
         (obj3
-           (req "chain_id" Tezos_crypto.Chain_id.encoding)
-           (req "context_hash" Tezos_crypto.Context_hash.encoding)
+           (req "chain_id" Chain_id.encoding)
+           (req "context_hash" Context_hash.encoding)
            (req "forked_header" Block_header.encoding))
         (function
           | Fork_test_chain {chain_id; context_hash; forked_header} ->

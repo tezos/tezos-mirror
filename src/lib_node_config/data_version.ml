@@ -49,10 +49,12 @@ module Version = struct
     let c = Int.compare v1.major v2.major in
     if c <> 0 then c else Int.compare v1.minor v2.minor
 
+  let ( < ) v1 v2 = compare v1 v2 < 0
+
   let equal v1 v2 = compare v1 v2 = 0
 
   let make ~major ~minor =
-    if major < 0 || minor < 0 then
+    if Compare.Int.(major < 0 || minor < 0) then
       invalid_arg
         (Printf.sprintf
            "Version.make: version number cannot be negative: %d.%d"
@@ -97,13 +99,12 @@ end
  *  - (0.)0.7 : new store metadata representation
  *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0)
  *  - 1.0     : context upgrade (upgrade to irmin.3.3)
- *  - 2.0     : introduce context GC (upgrade to irmin.3.4) *)
+ *  - 2.0     : introduce context GC (upgrade to irmin.3.4)
+ *  - 3.0     : change blocks' context hash semantics *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
    hardcoded rules.*)
-let current_version = Version.make ~major:2 ~minor:0
-
 let v_0_6 = Version.make ~major:0 ~minor:6
 
 let v_0_7 = Version.make ~major:0 ~minor:7
@@ -111,6 +112,12 @@ let v_0_7 = Version.make ~major:0 ~minor:7
 let v_0_8 = Version.make ~major:0 ~minor:8
 
 let v_1_0 = Version.make ~major:1 ~minor:0
+
+let v_2_0 = Version.make ~major:2 ~minor:0
+
+let v_3_0 = Version.make ~major:3 ~minor:0
+
+let current_version = v_3_0
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -127,17 +134,29 @@ let upgradable_data_version =
     let*! () = Context.close ctxt in
     return_unit
   in
+  let v_3_0_upgrade ~data_dir genesis =
+    let store_dir = store_dir data_dir in
+    Store.v_3_0_upgrade ~store_dir genesis
+  in
   [
     ( v_0_6,
-      fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
-        v_1_0_upgrade ~data_dir );
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        let* () = v_1_0_upgrade ~data_dir in
+        v_3_0_upgrade ~data_dir genesis );
     ( v_0_7,
-      fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
-        v_1_0_upgrade ~data_dir );
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        let* () = v_1_0_upgrade ~data_dir in
+        v_3_0_upgrade ~data_dir genesis );
     ( v_0_8,
-      fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
-        v_1_0_upgrade ~data_dir );
-    (v_1_0, fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit);
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        let* () = v_1_0_upgrade ~data_dir in
+        v_3_0_upgrade ~data_dir genesis );
+    ( v_1_0,
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        v_3_0_upgrade ~data_dir genesis );
+    ( v_2_0,
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        v_3_0_upgrade ~data_dir genesis );
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -423,7 +442,7 @@ let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
           let*! () = Events.(emit aborting_upgrade e) in
           Lwt.return (Error e))
 
-let ensure_data_dir ?(mode = Is_compatible) data_dir =
+let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =
   let open Lwt_result_syntax in
   let* o = ensure_data_dir ~mode data_dir in
   match o with
@@ -432,18 +451,20 @@ let ensure_data_dir ?(mode = Is_compatible) data_dir =
       (* Enable automatic upgrade to avoid users to manually upgrade. *)
   | Some (version, _)
     when Version.(
-           equal version v_1_0 || equal version v_0_6 || equal version v_0_7
-           || equal version v_0_8) ->
+           equal version v_2_0 || equal version v_1_0 || equal version v_0_6
+           || equal version v_0_7 || equal version v_0_8) ->
       let* () =
-        upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
+        upgrade_data_dir ~data_dir genesis ~chain_name:() ~sandbox_parameters:()
       in
       let*! () =
         Events.(emit finished_upgrading_node (version, current_version))
       in
       return_unit
-  | Some (version, _) ->
+  | Some (version, _) when Version.(version < current_version) ->
       tzfail
         (Data_dir_needs_upgrade {expected = current_version; actual = version})
+  | Some (version, _) ->
+      tzfail (Invalid_data_dir_version (current_version, version))
 
 let upgrade_status data_dir =
   let open Lwt_result_syntax in

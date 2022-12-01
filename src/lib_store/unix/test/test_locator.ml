@@ -37,11 +37,11 @@ module Assert = Lib_test.Assert
 (** Basic blocks *)
 
 let genesis_hash =
-  Tezos_crypto.Block_hash.of_b58check_exn
+  Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol =
-  Tezos_crypto.Protocol_hash.of_b58check_exn
+  Protocol_hash.of_b58check_exn
     "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let proto =
@@ -89,7 +89,7 @@ let init_chain ?(history_mode = History_mode.Archive) base_dir =
 let zero = Bytes.create 0
 
 (* adds n blocks on top of an initialized chain *)
-let make_empty_chain chain_store n : Tezos_crypto.Block_hash.t Lwt.t =
+let make_empty_chain chain_store n : Block_hash.t Lwt.t =
   let open Lwt_result_syntax in
   let*! genesis = Store.Block.read_block_opt chain_store genesis_hash in
   let genesis = WithExceptions.Option.get ~loc:__LOC__ genesis in
@@ -101,7 +101,7 @@ let make_empty_chain chain_store n : Tezos_crypto.Block_hash.t Lwt.t =
     Context_ops.commit ~time:header.shell.timestamp empty_context
   in
   let header = {header with shell = {header.shell with context}} in
-  let context_hash = empty_context_hash in
+  let resulting_context_hash = empty_context_hash in
   let message = None in
   let max_operations_ttl = 0 in
   let rec loop lvl pred =
@@ -118,7 +118,7 @@ let make_empty_chain chain_store n : Tezos_crypto.Block_hash.t Lwt.t =
         {
           Block_validation.validation_store =
             {
-              context_hash;
+              resulting_context_hash;
               timestamp = header.shell.timestamp;
               message;
               max_operations_ttl;
@@ -126,6 +126,7 @@ let make_empty_chain chain_store n : Tezos_crypto.Block_hash.t Lwt.t =
             };
           block_metadata = (zero, None);
           ops_metadata = Block_validation.No_metadata_hash [];
+          shell_header_hash = Block_validation.Shell_header_hash.zero;
         }
       in
       let* _ =
@@ -159,7 +160,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
   let genesis_header = {header with shell = {header.shell with context}} in
   let empty_result =
     {
-      Block_validation.context_hash = context;
+      Block_validation.resulting_context_hash = context;
       timestamp = Time.Protocol.epoch;
       message = None;
       max_operations_ttl = 0;
@@ -191,8 +192,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
       in
       let block_metadata = zero in
       let block_metadata_hash =
-        Option.some
-        @@ Tezos_crypto.Block_metadata_hash.hash_bytes [block_metadata]
+        Option.some @@ Block_metadata_hash.hash_bytes [block_metadata]
       in
       (* make some cycles *)
       let last_allowed_fork_level =
@@ -204,6 +204,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
             {empty_result with last_allowed_fork_level};
           block_metadata = (zero, block_metadata_hash);
           ops_metadata = Block_validation.No_metadata_hash [];
+          shell_header_hash = Block_validation.Shell_header_hash.zero;
         }
       in
       let* o =
@@ -223,6 +224,7 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
             Store.Chain.may_update_protocol_level
               chain_store
               ~protocol_level:proto_level
+              ~expect_predecessor_context:true
               (b, genesis_protocol)
           in
           loop remaining_fork_points (lvl + 1) header
@@ -268,8 +270,8 @@ let rec repeat f n =
 (* ----------------------------------------------------- *)
 
 (* returns the predecessor at distance one, reading the header *)
-let linear_predecessor chain_store (bh : Tezos_crypto.Block_hash.t) :
-    Tezos_crypto.Block_hash.t option Lwt.t =
+let linear_predecessor chain_store (bh : Block_hash.t) :
+    Block_hash.t option Lwt.t =
   let open Lwt_syntax in
   let* b = Store.Block.read_block_opt chain_store bh in
   let b = WithExceptions.Option.get ~loc:__LOC__ b in
@@ -277,8 +279,8 @@ let linear_predecessor chain_store (bh : Tezos_crypto.Block_hash.t) :
   match o with None -> None | Some pred -> Some (Store.Block.hash pred)
 
 (* returns the predecessors at distance n, traversing all n intermediate blocks *)
-let linear_predecessor_n chain_store (bh : Tezos_crypto.Block_hash.t)
-    (distance : int) : Tezos_crypto.Block_hash.t option Lwt.t =
+let linear_predecessor_n chain_store (bh : Block_hash.t) (distance : int) :
+    Block_hash.t option Lwt.t =
   let open Lwt_syntax in
   (* let _ = Printf.printf "LP: %4i " distance; print_block_h chain bh in *)
   if distance < 1 then invalid_arg "distance<1"
@@ -418,7 +420,7 @@ let bench_locator base_dir =
     @@ List.iter2
          ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
          (fun hn ho ->
-           if not (Tezos_crypto.Block_hash.equal hn ho) then
+           if not (Block_hash.equal hn ho) then
              Assert.fail_msg "Invalid locator %i" max_size)
          l_exp
          l_lin
@@ -592,13 +594,13 @@ let test_protocol_locator base_dir =
       in
       Assert.assert_true
         "last block in locator is the checkpoint"
-        (Tezos_crypto.Block_hash.equal last_hash caboose_hash) ;
+        (Block_hash.equal last_hash caboose_hash) ;
       let first_hash =
         (WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt steps).block
       in
       Assert.assert_true
         "first block in locator is the head"
-        (Tezos_crypto.Block_hash.equal first_hash head_hash) ;
+        (Block_hash.equal first_hash head_hash) ;
       return_unit
 
 let wrap n f =

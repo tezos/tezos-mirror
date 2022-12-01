@@ -179,6 +179,13 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           ~block:block_key
           ()
       in
+      let* resulting_context_hash =
+        Tezos_shell_services.Block_services.Empty.resulting_context_hash
+          rpc_context
+          ~chain
+          ~block:block_key
+          ()
+      in
       let* protocols =
         get_protocols ?expected_protocol rpc_context chain block_key
       in
@@ -197,7 +204,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         }
       in
       let* initial_context =
-        Proxy_environment.initial_context ctx block_header.context
+        Proxy_environment.initial_context ctx resulting_context_hash
       in
       let mapped_directory =
         Tezos_rpc.Directory.map

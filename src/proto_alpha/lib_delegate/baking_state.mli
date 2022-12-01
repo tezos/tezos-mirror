@@ -58,6 +58,7 @@ type prequorum = {
 type block_info = {
   hash : Tezos_crypto.Block_hash.t;
   shell : Block_header.shell_header;
+  resulting_context_hash : Tezos_crypto.Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;

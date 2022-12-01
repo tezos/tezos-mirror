@@ -161,7 +161,7 @@ module Term = struct
             Lwt.return data_dir
         | None -> Lwt.return node_config.data_dir
       in
-      let* () = Data_version.ensure_data_dir data_dir in
+      let* () = Data_version.ensure_data_dir genesis data_dir in
       let context_dir = Data_version.context_dir data_dir in
       let store_dir = Data_version.store_dir data_dir in
       let* block =
@@ -228,7 +228,7 @@ module Term = struct
         let*! () =
           if existing_data_dir then
             (* Remove only context and store if the import directory
-                   was previously existing. *)
+               was previously existing. *)
             let*! () =
               Lwt_utils_unix.remove_dir (Data_version.store_dir data_dir)
             in
@@ -239,7 +239,7 @@ module Term = struct
         let*! lock_file_exists = Lwt_unix.file_exists lock_file in
         if lock_file_exists then Lwt_unix.unlink lock_file else Lwt.return_unit
       in
-      let* () = Data_version.ensure_data_dir ~mode:Is_bare data_dir in
+      let* () = Data_version.ensure_data_dir ~mode:Is_bare genesis data_dir in
       (* Lock only on snapshot import *)
       Lwt_lock_file.try_with_lock
         ~when_locked:(fun () ->

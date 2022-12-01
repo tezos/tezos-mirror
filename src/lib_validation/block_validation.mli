@@ -30,7 +30,7 @@
     the protocol. *)
 
 type validation_store = {
-  context_hash : Tezos_crypto.Context_hash.t;
+  resulting_context_hash : Context_hash.t;
   timestamp : Time.Protocol.t;
   message : string option;
   max_operations_ttl : int;
@@ -47,7 +47,7 @@ val may_patch_protocol :
 
 val update_testchain_status :
   Tezos_protocol_environment.Context.t ->
-  predecessor_hash:Tezos_crypto.Block_hash.t ->
+  predecessor_hash:Block_hash.t ->
   Time.Protocol.t ->
   Tezos_protocol_environment.Context.t Lwt.t
 
@@ -56,14 +56,11 @@ val update_testchain_status :
     increases from [before] to [after]. Otherwise, an
     [Invalid_protocol_environment_transition] error is returned. *)
 val check_proto_environment_version_increasing :
-  Tezos_crypto.Block_hash.t ->
-  Protocol.env_version ->
-  Protocol.env_version ->
-  unit tzresult
+  Block_hash.t -> Protocol.env_version -> Protocol.env_version -> unit tzresult
 
 (** [init_test_chain] must only be called on a forking block. *)
 val init_test_chain :
-  Tezos_crypto.Chain_id.t ->
+  Chain_id.t ->
   Tezos_protocol_environment.Context.t ->
   Block_header.t ->
   Block_header.t tzresult Lwt.t
@@ -74,12 +71,16 @@ val operation_metadata_encoding : operation_metadata Data_encoding.t
 
 type ops_metadata =
   | No_metadata_hash of operation_metadata list list
-  | Metadata_hash of
-      (operation_metadata * Tezos_crypto.Operation_metadata_hash.t) list list
+  | Metadata_hash of (operation_metadata * Operation_metadata_hash.t) list list
+
+module Shell_header_hash : S.HASH
 
 type result = {
+  shell_header_hash : Shell_header_hash.t;
+      (** This field is used as a (local) unique identifier for blocks
+          in order to implement the preapply cache mechanism. *)
   validation_store : validation_store;
-  block_metadata : bytes * Tezos_crypto.Block_metadata_hash.t option;
+  block_metadata : bytes * Block_metadata_hash.t option;
   ops_metadata : ops_metadata;
 }
 
@@ -96,23 +97,24 @@ val preapply_result_encoding :
 (** [check_liveness live_blocks live_operations hash ops] checks
     there is no duplicate operation and that is not out-of-date *)
 val check_liveness :
-  live_blocks:Tezos_crypto.Block_hash.Set.t ->
-  live_operations:Tezos_crypto.Operation_hash.Set.t ->
-  Tezos_crypto.Block_hash.t ->
+  live_blocks:Block_hash.Set.t ->
+  live_operations:Operation_hash.Set.t ->
+  Block_hash.t ->
   Operation.t list list ->
   unit tzresult
 
 type apply_environment = {
   max_operations_ttl : int;  (** time to live of an operation *)
-  chain_id : Tezos_crypto.Chain_id.t;  (** chain_id of the current branch *)
+  chain_id : Chain_id.t;  (** chain_id of the current branch *)
   predecessor_block_header : Block_header.t;
       (** header of the predecessor block being validated *)
   predecessor_context : Tezos_protocol_environment.Context.t;
       (** context associated to the predecessor block *)
-  predecessor_block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
+  predecessor_resulting_context_hash : Context_hash.t;
+      (** predecessor block resulting context hash *)
+  predecessor_block_metadata_hash : Block_metadata_hash.t option;
       (** hash of block header metadata of the predecessor block *)
-  predecessor_ops_metadata_hash :
-    Tezos_crypto.Operation_metadata_list_list_hash.t option;
+  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
       (** hash of operation metadata of the predecessor block *)
   user_activated_upgrades : User_activated.upgrades;
       (** user activated upgrades *)
@@ -146,38 +148,40 @@ val apply :
   apply_result tzresult Lwt.t
 
 (** [precheck chain_id ~predecessor_block_header
-   ~predecessor_block_hash ~predecessor_context ~cache header ops]
-   gets the protocol [P] of the context of the predecessor block and
-   calls successively:
+    ~predecessor_block_hash ~predecessor_context
+    ~predecessor_resulting_context_hash ~cache header ops] gets the
+    protocol [P] of the context of the predecessor block and calls
+    successively:
    1. [P.begin_validate]
    2. [P.validate_operation]
    3. [P.finalize_validation] *)
 val precheck :
-  chain_id:Tezos_crypto.Chain_id.t ->
+  chain_id:Chain_id.t ->
   predecessor_block_header:Block_header.t ->
-  predecessor_block_hash:Tezos_crypto.Block_hash.t ->
+  predecessor_block_hash:Block_hash.t ->
   predecessor_context:Tezos_protocol_environment.Context.t ->
+  predecessor_resulting_context_hash:Context_hash.t ->
   cache:Tezos_protocol_environment.Context.source_of_cache ->
   Block_header.t ->
   Operation.t list list ->
   unit tzresult Lwt.t
 
 val preapply :
-  chain_id:Tezos_crypto.Chain_id.t ->
+  chain_id:Chain_id.t ->
   user_activated_upgrades:Tezos_base.User_activated.upgrades ->
   user_activated_protocol_overrides:Tezos_base.User_activated.protocol_overrides ->
   operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   timestamp:Time.Protocol.t ->
   protocol_data:bytes ->
-  live_blocks:Tezos_crypto.Block_hash.Set.t ->
-  live_operations:Tezos_crypto.Operation_hash.Set.t ->
+  live_blocks:Block_hash.Set.t ->
+  live_operations:Operation_hash.Set.t ->
   predecessor_context:Tezos_protocol_environment.Context.t ->
+  predecessor_resulting_context_hash:Context_hash.t ->
   predecessor_shell_header:Block_header.shell_header ->
-  predecessor_hash:Tezos_crypto.Block_hash.t ->
+  predecessor_hash:Block_hash.t ->
   predecessor_max_operations_ttl:int ->
-  predecessor_block_metadata_hash:Tezos_crypto.Block_metadata_hash.t option ->
-  predecessor_ops_metadata_hash:
-    Tezos_crypto.Operation_metadata_list_list_hash.t option ->
+  predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
   Operation.t list list ->
   ((Block_header.shell_header * error Preapply_result.t list)
   * (apply_result * Tezos_protocol_environment.Context.t))
@@ -187,14 +191,12 @@ val preapply :
 (** Hypothesis: we assume that the given block has already been
                 validated -- E.g. by calling [precheck]. *)
 val recompute_metadata :
-  chain_id:Tezos_crypto.Chain_id.t ->
+  chain_id:Chain_id.t ->
   predecessor_block_header:Block_header.t ->
   predecessor_context:Tezos_protocol_environment.Context.t ->
-  predecessor_block_metadata_hash:Tezos_crypto.Block_metadata_hash.t option ->
-  predecessor_ops_metadata_hash:
-    Tezos_crypto.Operation_metadata_list_list_hash.t option ->
+  predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
   block_header:Block_header.t ->
   operations:Operation.t trace trace ->
   cache:Tezos_protocol_environment.Context.source_of_cache ->
-  ((bytes * Tezos_crypto.Block_metadata_hash.t option) * ops_metadata) tzresult
-  Lwt.t
+  ((bytes * Block_metadata_hash.t option) * ops_metadata) tzresult Lwt.t

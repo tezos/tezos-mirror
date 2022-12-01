@@ -28,9 +28,8 @@ open Store_errors
 type contents = {
   header : Block_header.t;
   operations : Operation.t list list;
-  block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
-  operations_metadata_hashes :
-    Tezos_crypto.Operation_metadata_hash.t list list option;
+  block_metadata_hash : Block_metadata_hash.t option;
+  operations_metadata_hashes : Operation_metadata_hash.t list list option;
 }
 
 type metadata = {
@@ -50,14 +49,14 @@ type legacy_metadata = {
 }
 
 type legacy_block = {
-  legacy_hash : Tezos_crypto.Block_hash.t;
+  legacy_hash : Block_hash.t;
   legacy_contents : contents;
   mutable legacy_metadata : legacy_metadata option;
       (* allows updating metadata field when loading cemented metadata *)
 }
 
 type block = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   contents : contents;
   mutable metadata : metadata option;
       (* allows updating metadata field when loading cemented metadata *)
@@ -75,7 +74,7 @@ let create_genesis_block ~genesis context =
       timestamp = genesis.Genesis.time;
       fitness = [];
       validation_passes = 0;
-      operations_hash = Tezos_crypto.Operation_list_list_hash.empty;
+      operations_hash = Operation_list_list_hash.empty;
       context;
     }
   in
@@ -117,10 +116,10 @@ let contents_encoding =
        (obj4
           (req "header" (dynamic_size Block_header.encoding))
           (req "operations" (list (list (dynamic_size Operation.encoding))))
-          (opt "block_metadata_hash" Tezos_crypto.Block_metadata_hash.encoding)
+          (opt "block_metadata_hash" Block_metadata_hash.encoding)
           (opt
              "operations_metadata_hashes"
-             (list (list Tezos_crypto.Operation_metadata_hash.encoding))))
+             (list (list Operation_metadata_hash.encoding))))
 
 let metadata_encoding : metadata Data_encoding.t =
   let open Data_encoding in
@@ -203,7 +202,7 @@ let encoding =
        (dynamic_size
           ~kind:`Uint30
           (obj3
-             (req "hash" Tezos_crypto.Block_hash.encoding)
+             (req "hash" Block_hash.encoding)
              (req "contents" contents_encoding)
              (varopt "metadata" metadata_encoding)))
 
@@ -218,7 +217,7 @@ let legacy_encoding =
        (dynamic_size
           ~kind:`Uint30
           (obj3
-             (req "legacy_hash" Tezos_crypto.Block_hash.encoding)
+             (req "legacy_hash" Block_hash.encoding)
              (req "legacy_contents" contents_encoding)
              (varopt "legacy_metadata" legacy_metadata_encoding)))
 
@@ -282,11 +281,10 @@ let check_block_consistency ?genesis_hash ?pred_block block =
   let result_hash = Block_header.hash block_header in
   let* () =
     fail_unless
-      (Tezos_crypto.Block_hash.equal block_hash result_hash
+      (Block_hash.equal block_hash result_hash
       ||
       match genesis_hash with
-      | Some genesis_hash ->
-          Tezos_crypto.Block_hash.equal block_hash genesis_hash
+      | Some genesis_hash -> Block_hash.equal block_hash genesis_hash
       | None -> false)
       (Inconsistent_block_hash
          {
@@ -300,7 +298,7 @@ let check_block_consistency ?genesis_hash ?pred_block block =
     | None -> return_unit
     | Some pred_block ->
         fail_unless
-          (Tezos_crypto.Block_hash.equal (hash pred_block) (predecessor block)
+          (Block_hash.equal (hash pred_block) (predecessor block)
           && Compare.Int32.(level block = Int32.succ (level pred_block)))
           (Inconsistent_block_predecessor
              {
@@ -311,14 +309,14 @@ let check_block_consistency ?genesis_hash ?pred_block block =
              })
   in
   let computed_operations_hash =
-    Tezos_crypto.Operation_list_list_hash.compute
+    Operation_list_list_hash.compute
       (List.map
-         Tezos_crypto.Operation_list_hash.compute
+         Operation_list_hash.compute
          (List.map (List.map Operation.hash) (operations block)))
   in
   let* () =
     fail_unless
-      (Tezos_crypto.Operation_list_list_hash.equal
+      (Operation_list_list_hash.equal
          computed_operations_hash
          (operations_hash block))
       (Store_errors.Inconsistent_operations_hash

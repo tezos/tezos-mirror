@@ -23,14 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type block_descriptor = Tezos_crypto.Block_hash.t * int32
+type block_descriptor = Block_hash.t * int32
 
 let block_descriptor_encoding =
   let open Data_encoding in
-  tup2 Tezos_crypto.Block_hash.encoding int32
+  tup2 Block_hash.encoding int32
 
 let pp_block_descriptor fmt (hash, level) =
-  Format.fprintf fmt "%a (level: %ld)" Tezos_crypto.Block_hash.pp hash level
+  Format.fprintf fmt "%a (level: %ld)" Block_hash.pp hash level
 
 type chain_config = {
   history_mode : History_mode.t;
@@ -61,7 +61,7 @@ let invalid_block_encoding =
 
 module Block_lru_cache =
   Aches_lwt.Lache.Make_option
-    (Aches.Rache.Transfer (Aches.Rache.LRU) (Tezos_crypto.Block_hash))
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
 module Protocol_levels = struct
   include Map.Make (struct
@@ -70,105 +70,116 @@ module Protocol_levels = struct
     let compare = Compare.Int.compare
   end)
 
-  type commit_info = {
-    author : string;
-    message : string;
-    test_chain_status : Test_chain_status.t;
-    predecessor_block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash :
-      Tezos_crypto.Operation_metadata_list_list_hash.t option;
-    data_merkle_root : Tezos_crypto.Context_hash.t;
-    parents_contexts : Tezos_crypto.Context_hash.t list;
+  type protocol_info = {
+    protocol : Protocol_hash.t;
+    activation_block : block_descriptor;
+    expect_predecessor_context : bool;
   }
 
-  let commit_info_of_tuple
-      ( _protocol_hash,
-        author,
-        message,
-        _timestamp,
-        test_chain_status,
-        data_merkle_root,
-        predecessor_block_metadata_hash,
-        predecessor_ops_metadata_hash,
-        parents_contexts ) =
-    {
-      author;
-      message;
-      test_chain_status;
-      data_merkle_root;
-      predecessor_block_metadata_hash;
-      predecessor_ops_metadata_hash;
-      parents_contexts;
-    }
-
-  let commit_info_encoding =
+  let protocol_info_encoding =
     let open Data_encoding in
     conv
-      (fun {
-             author;
-             message;
-             test_chain_status;
-             data_merkle_root;
-             predecessor_block_metadata_hash;
-             predecessor_ops_metadata_hash;
-             parents_contexts;
-           } ->
-        ( author,
-          message,
-          test_chain_status,
-          data_merkle_root,
-          predecessor_block_metadata_hash,
-          predecessor_ops_metadata_hash,
-          parents_contexts ))
-      (fun ( author,
-             message,
-             test_chain_status,
-             data_merkle_root,
-             predecessor_block_metadata_hash,
-             predecessor_ops_metadata_hash,
-             parents_contexts ) ->
-        {
-          author;
-          message;
-          test_chain_status;
-          data_merkle_root;
-          predecessor_block_metadata_hash;
-          predecessor_ops_metadata_hash;
-          parents_contexts;
-        })
-      (obj7
-         (req "author" string)
-         (req "message" string)
-         (req "test_chain_status" Test_chain_status.encoding)
-         (req "data_merkle_root" Tezos_crypto.Context_hash.encoding)
-         (opt
-            "predecessor_block_metadata_hash"
-            Tezos_crypto.Block_metadata_hash.encoding)
-         (opt
-            "predecessor_ops_metadata_hash"
-            Tezos_crypto.Operation_metadata_list_list_hash.encoding)
-         (req "parents_contexts" (list Tezos_crypto.Context_hash.encoding)))
-
-  type activation_block = {
-    block : block_descriptor;
-    protocol : Tezos_crypto.Protocol_hash.t;
-    commit_info : commit_info option;
-  }
-
-  let activation_block_encoding =
-    let open Data_encoding in
-    conv
-      (fun {block; protocol; commit_info} -> (block, protocol, commit_info))
-      (fun (block, protocol, commit_info) -> {block; protocol; commit_info})
+      (fun {protocol; activation_block; expect_predecessor_context} ->
+        (protocol, activation_block, expect_predecessor_context))
+      (fun (protocol, activation_block, expect_predecessor_context) ->
+        {protocol; activation_block; expect_predecessor_context})
       (obj3
-         (req "block" block_descriptor_encoding)
-         (req "protocol" Tezos_crypto.Protocol_hash.encoding)
-         (opt "commit_info" commit_info_encoding))
+         (req "protocol" Protocol_hash.encoding)
+         (req "activation_block" block_descriptor_encoding)
+         (req "expect_predecessor_context" bool))
 
   let encoding =
     Data_encoding.conv
       (fun map -> bindings map)
       (fun bindings ->
         List.fold_left (fun map (k, v) -> add k v map) empty bindings)
-      Data_encoding.(list (tup2 uint8 activation_block_encoding))
+      Data_encoding.(list (tup2 uint8 protocol_info_encoding))
+
+  module Legacy = struct
+    type commit_info = {
+      author : string;
+      message : string;
+      test_chain_status : Test_chain_status.t;
+      predecessor_block_metadata_hash : Block_metadata_hash.t option;
+      predecessor_ops_metadata_hash :
+        Operation_metadata_list_list_hash.t option;
+      data_merkle_root : Context_hash.t;
+      parents_contexts : Context_hash.t list;
+    }
+
+    let commit_info_encoding =
+      let open Data_encoding in
+      conv
+        (fun {
+               author;
+               message;
+               test_chain_status;
+               data_merkle_root;
+               predecessor_block_metadata_hash;
+               predecessor_ops_metadata_hash;
+               parents_contexts;
+             } ->
+          ( author,
+            message,
+            test_chain_status,
+            data_merkle_root,
+            predecessor_block_metadata_hash,
+            predecessor_ops_metadata_hash,
+            parents_contexts ))
+        (fun ( author,
+               message,
+               test_chain_status,
+               data_merkle_root,
+               predecessor_block_metadata_hash,
+               predecessor_ops_metadata_hash,
+               parents_contexts ) ->
+          {
+            author;
+            message;
+            test_chain_status;
+            data_merkle_root;
+            predecessor_block_metadata_hash;
+            predecessor_ops_metadata_hash;
+            parents_contexts;
+          })
+        (obj7
+           (req "author" string)
+           (req "message" string)
+           (req "test_chain_status" Test_chain_status.encoding)
+           (req "data_merkle_root" Context_hash.encoding)
+           (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+           (opt
+              "predecessor_ops_metadata_hash"
+              Operation_metadata_list_list_hash.encoding)
+           (req "parents_contexts" (list Context_hash.encoding)))
+
+    type activation_block = {
+      block : block_descriptor;
+      protocol : Protocol_hash.t;
+      commit_info : commit_info option;
+    }
+
+    include Map.Make (struct
+      type t = int
+
+      let compare = Compare.Int.compare
+    end)
+
+    let legacy_activation_block_encoding =
+      let open Data_encoding in
+      conv
+        (fun {block; protocol; commit_info} -> (block, protocol, commit_info))
+        (fun (block, protocol, commit_info) -> {block; protocol; commit_info})
+        (obj3
+           (req "block" block_descriptor_encoding)
+           (req "protocol" Protocol_hash.encoding)
+           (opt "commit_info" commit_info_encoding))
+
+    let encoding =
+      Data_encoding.conv
+        (fun map -> bindings map)
+        (fun bindings ->
+          List.fold_left (fun map (k, v) -> add k v map) empty bindings)
+        Data_encoding.(list (tup2 uint8 legacy_activation_block_encoding))
+  end
 end

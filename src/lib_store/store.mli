@@ -184,7 +184,7 @@ type chain_store
     chains and instantiate testchain's sub chain stores, for all
     chains contained in the store. The chain store created is based on
     the [genesis] provided. Its chain identifier will be computed
-    using the {!Tezos_crypto.Tezos_crypto.Chain_id.of_block_hash} function.
+    using the {!Chain_id.of_block_hash} function.
 
     @param patch_context the handle called when initializing the
     context. It usually is passed when creating a sandboxed chain.
@@ -213,9 +213,7 @@ val init :
   ?patch_context:
     (Tezos_protocol_environment.Context.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
-  ?commit_genesis:
-    (chain_id:Tezos_crypto.Chain_id.t ->
-    Tezos_crypto.Context_hash.t tzresult Lwt.t) ->
+  ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
   ?block_cache_limit:int ->
@@ -267,13 +265,11 @@ val all_chain_stores : store -> chain_store list Lwt.t
 
 (** [get_chain_store global_store chain_id] returns the initialized
     chain store in [global_store] associated to [chain_id]. *)
-val get_chain_store :
-  store -> Tezos_crypto.Chain_id.t -> chain_store tzresult Lwt.t
+val get_chain_store : store -> Chain_id.t -> chain_store tzresult Lwt.t
 
 (** [get_chain_store_opt global_store chain_id] optional version of
     [get_chain_store]. *)
-val get_chain_store_opt :
-  store -> Tezos_crypto.Chain_id.t -> chain_store option Lwt.t
+val get_chain_store_opt : store -> Chain_id.t -> chain_store option Lwt.t
 
 val make_pp_store : store -> (Format.formatter -> unit -> unit) Lwt.t
 
@@ -307,49 +303,41 @@ module Block : sig
   (** [is_known_valid chain_store bh] tests that the block [bh] is
       known and valid in [chain_store] (i.e. the block is present in
       the block store). *)
-  val is_known_valid : chain_store -> Tezos_crypto.Block_hash.t -> bool Lwt.t
+  val is_known_valid : chain_store -> Block_hash.t -> bool Lwt.t
 
   (** [is_known_invalid chain_store bh] tests that the block [bh] is
       invalid in [chain_store] (i.e. the block is present in the
       invalid blocks file). *)
-  val is_known_invalid : chain_store -> Tezos_crypto.Block_hash.t -> bool Lwt.t
+  val is_known_invalid : chain_store -> Block_hash.t -> bool Lwt.t
 
   (** [is_known_prechecked chain_store bh] tests that the block [bh]
       is prechecked in [chain_store] (i.e. the block is present in the
       prechecked block cache). *)
-  val is_known_prechecked :
-    chain_store -> Tezos_crypto.Block_hash.t -> bool Lwt.t
+  val is_known_prechecked : chain_store -> Block_hash.t -> bool Lwt.t
 
   (** [is_known chain_store bh] tests that the block [bh] is either
       known valid or known invalid in [chain_store]. *)
-  val is_known : chain_store -> Tezos_crypto.Block_hash.t -> bool Lwt.t
+  val is_known : chain_store -> Block_hash.t -> bool Lwt.t
 
   (** [is_genesis chain_store bh] tests that the block [bh] is the
       genesis initialized in [chain_store]. *)
-  val is_genesis : chain_store -> Tezos_crypto.Block_hash.t -> bool
+  val is_genesis : chain_store -> Block_hash.t -> bool
 
   (** [validity chain_store bh] computes the
       {!Block_locator.validity} ([Unknown], [Known_valid] or
       [Known_invalid]) for the block [bh] in [chain_store]. *)
-  val validity :
-    chain_store -> Tezos_crypto.Block_hash.t -> Block_locator.validity Lwt.t
+  val validity : chain_store -> Block_hash.t -> Block_locator.validity Lwt.t
 
   (** [read_block chain_store ?distance bh] tries to read in the
       [chain_store] the block [bh] or the predecessing block at the
       offset [distance] of [bh]. By default, [distance] is 0.*)
   val read_block :
-    chain_store ->
-    ?distance:int ->
-    Tezos_crypto.Block_hash.t ->
-    block tzresult Lwt.t
+    chain_store -> ?distance:int -> Block_hash.t -> block tzresult Lwt.t
 
   (** [read_block_opt chain_store ?distance bh] optional version of
       [read_block]. *)
   val read_block_opt :
-    chain_store ->
-    ?distance:int ->
-    Tezos_crypto.Block_hash.t ->
-    block option Lwt.t
+    chain_store -> ?distance:int -> Block_hash.t -> block option Lwt.t
 
   (** [read_block_by_level chain_store level] reads in the
       [chain_store] the block at [level]. The block retrieved will be
@@ -371,16 +359,13 @@ module Block : sig
   val read_block_metadata :
     ?distance:int ->
     chain_store ->
-    Tezos_crypto.Block_hash.t ->
+    Block_hash.t ->
     metadata option tzresult Lwt.t
 
   (** [read_block_metadata_opt ?distance chain_store bh] same as
       [read_block_metadata] but returns [None] in case of errors. *)
   val read_block_metadata_opt :
-    ?distance:int ->
-    chain_store ->
-    Tezos_crypto.Block_hash.t ->
-    metadata option Lwt.t
+    ?distance:int -> chain_store -> Block_hash.t -> metadata option Lwt.t
 
   (** [get_block_metadata chain_store block] reads in the
       [chain_store] the metadata associated to the [block]. Returns
@@ -405,7 +390,7 @@ module Block : sig
   (** [read_predecessor_of_hash chain_store bh] reads in [chain_store]
       the predecessor's block of [bh]. *)
   val read_predecessor_of_hash :
-    chain_store -> Tezos_crypto.Block_hash.t -> block tzresult Lwt.t
+    chain_store -> Block_hash.t -> block tzresult Lwt.t
 
   (** [read_ancestor_hash chain_store ~distance bh] retrieves in the
       [chain_store] the hash of the ancestor of the block [bh] at
@@ -413,31 +398,28 @@ module Block : sig
   val read_ancestor_hash :
     chain_store ->
     distance:int ->
-    Tezos_crypto.Block_hash.t ->
-    Tezos_crypto.Block_hash.t option tzresult Lwt.t
+    Block_hash.t ->
+    Block_hash.t option tzresult Lwt.t
 
   (** [read_ancestor_hash_opt chain_store ~distance bh] same as
       [read_ancestor_hash] but returns [None] on errors. *)
   val read_ancestor_hash_opt :
-    chain_store ->
-    distance:int ->
-    Tezos_crypto.Block_hash.t ->
-    Tezos_crypto.Block_hash.t option Lwt.t
+    chain_store -> distance:int -> Block_hash.t -> Block_hash.t option Lwt.t
 
   (** [read_ancestor_opt chain_store block] optional version of
       [read_ancestor]. *)
   val read_predecessor_of_hash_opt :
-    chain_store -> Tezos_crypto.Block_hash.t -> block option Lwt.t
+    chain_store -> Block_hash.t -> block option Lwt.t
 
   (** [read_prechecked_block chain_store bh] tries to read in the
       [chain_store]'s prechecked block cache the block [bh].*)
   val read_prechecked_block :
-    chain_store -> Tezos_crypto.Block_hash.t -> block tzresult Lwt.t
+    chain_store -> Block_hash.t -> block tzresult Lwt.t
 
   (** [read_prechecked_block_opt chain_store bh] optional version of
       [read_prechecked_block].*)
   val read_prechecked_block_opt :
-    chain_store -> Tezos_crypto.Block_hash.t -> block option Lwt.t
+    chain_store -> Block_hash.t -> block option Lwt.t
 
   (** [store_block chain_store ~block_header ~operations
      validation_result] stores in [chain_store] the block with its
@@ -463,13 +445,22 @@ module Block : sig
       its [block_header] and [operations]. *)
   val store_prechecked_block :
     chain_store ->
-    hash:Tezos_crypto.Block_hash.t ->
+    hash:Block_hash.t ->
     block_header:Block_header.t ->
     operations:Operation.t trace trace ->
     unit tzresult Lwt.t
 
-  (** [context_exn chain_store block] checkouts the context of the
-      [block]. *)
+  (** [resulting_context_hash chain_store block] returns the resulting
+      context hash of the [block]. This context depends on the
+      [block]'s protocol associated semantics, i.e., it can either be
+      the one contained in its block header or the stored result of
+      its application. *)
+  val resulting_context_hash :
+    chain_store -> block -> Context_hash.t tzresult Lwt.t
+
+  (** [context_exn chain_store block] checkouts the {b resulting}
+      context of the [block] which may differ from its block header's
+      one depending on the block's associated protocol semantics. *)
   val context_exn :
     chain_store -> block -> Tezos_protocol_environment.Context.t Lwt.t
 
@@ -493,50 +484,46 @@ module Block : sig
   val testchain_status :
     chain_store ->
     block ->
-    (Test_chain_status.t * Tezos_crypto.Block_hash.t option) tzresult Lwt.t
+    (Test_chain_status.t * Block_hash.t option) tzresult Lwt.t
 
   (** [protocol_hash_exn chain_store block] reads the protocol
       associated to [block] in its associated context. Fails when the
       context is unknown. *)
-  val protocol_hash_exn :
-    chain_store -> block -> Tezos_crypto.Protocol_hash.t Lwt.t
+  val protocol_hash_exn : chain_store -> block -> Protocol_hash.t Lwt.t
 
   (** [protocol_hash chain_store block] error monad version of
       [protocol_hash_exn]. *)
-  val protocol_hash :
-    chain_store -> block -> Tezos_crypto.Protocol_hash.t tzresult Lwt.t
+  val protocol_hash : chain_store -> block -> Protocol_hash.t tzresult Lwt.t
 
   (** [read_invalid_block_opt chain_store bh] reads in the
       [chain_store] the invalid block [bh] if it exists. *)
   val read_invalid_block_opt :
-    chain_store -> Tezos_crypto.Block_hash.t -> invalid_block option Lwt.t
+    chain_store -> Block_hash.t -> invalid_block option Lwt.t
 
   (** [read_invalid_blocks chain_store] returns the map of all invalid
       blocks of [chain_store]. *)
-  val read_invalid_blocks :
-    chain_store -> invalid_block Tezos_crypto.Block_hash.Map.t Lwt.t
+  val read_invalid_blocks : chain_store -> invalid_block Block_hash.Map.t Lwt.t
 
   (** [mark_invalid chain_store bh ~level errors] stores the block
       [bh] at [level] with the given [errors]. Fails when trying to
       mark the genesis block as invalid. *)
   val mark_invalid :
     chain_store ->
-    Tezos_crypto.Block_hash.t ->
+    Block_hash.t ->
     level:int32 ->
     error list ->
     unit tzresult Lwt.t
 
   (** [unmark_invalid chain_store bh] unmarks invalid the block [bh]
       in the [chain_store]. *)
-  val unmark_invalid :
-    chain_store -> Tezos_crypto.Block_hash.t -> unit tzresult Lwt.t
+  val unmark_invalid : chain_store -> Block_hash.t -> unit tzresult Lwt.t
 
   (** [descriptor block] returns the pair (hash x level) of [block]. *)
   val descriptor : block -> block_descriptor
 
   (** {3 Block field accessors} *)
 
-  val hash : block -> Tezos_crypto.Block_hash.t
+  val hash : block -> Block_hash.t
 
   val header : block -> Block_header.t
 
@@ -548,30 +535,30 @@ module Block : sig
 
   val proto_level : block -> int
 
-  val predecessor : block -> Tezos_crypto.Block_hash.t
+  val predecessor : block -> Block_hash.t
 
   val timestamp : block -> Time.Protocol.t
 
   val validation_passes : block -> int
 
-  val operations_hash : block -> Tezos_crypto.Operation_list_list_hash.t
+  val operations_hash : block -> Operation_list_list_hash.t
 
   val fitness : block -> Fitness.t
 
-  val context_hash : block -> Tezos_crypto.Context_hash.t
+  val context_hash : block -> Context_hash.t
 
   val protocol_data : block -> bytes
 
-  val block_metadata_hash : block -> Tezos_crypto.Block_metadata_hash.t option
+  val block_metadata_hash : block -> Block_metadata_hash.t option
 
   val operations_metadata_hashes :
-    block -> Tezos_crypto.Operation_metadata_hash.t list list option
+    block -> Operation_metadata_hash.t list list option
 
   val operations_metadata_hashes_path :
-    block -> int -> Tezos_crypto.Operation_metadata_hash.t list option
+    block -> int -> Operation_metadata_hash.t list option
 
   val all_operations_metadata_hash :
-    block -> Tezos_crypto.Operation_metadata_list_list_hash.t option
+    block -> Operation_metadata_list_list_hash.t option
 
   (** {3 Block metadata field accessors} *)
 
@@ -589,21 +576,16 @@ module Block : sig
   (** [operations_path block nth] computes the [nth] operations list
       of [block] along with the hash of all operations. *)
   val operations_path :
-    block ->
-    int ->
-    Operation.t list * Tezos_crypto.Operation_list_list_hash.path
+    block -> int -> Operation.t list * Operation_list_list_hash.path
 
   (** [operations_hashes_path block nth] computes the [nth] operations
       hash list of [block] along with the hash of all operations. *)
   val operations_hashes_path :
-    block ->
-    int ->
-    Tezos_crypto.Operation_hash.t list
-    * Tezos_crypto.Operation_list_list_hash.path
+    block -> int -> Operation_hash.t list * Operation_list_list_hash.path
 
   (** [all_operation_hashes block] computes the hash of all operations
       in [block]. *)
-  val all_operation_hashes : block -> Tezos_crypto.Operation_hash.t list list
+  val all_operation_hashes : block -> Operation_hash.t list list
 end
 
 (** The module for handling chain-related operations such as setting
@@ -627,7 +609,7 @@ module Chain : sig
   val global_store : chain_store -> store
 
   (** [chain_id chain_store] returns chain id of [chain_store]. *)
-  val chain_id : chain_store -> Tezos_crypto.Chain_id.t
+  val chain_id : chain_store -> Chain_id.t
 
   (** [chain_dir chain_store] returns the path of directory of
       [chain_store].*)
@@ -741,16 +723,12 @@ module Chain : sig
       which might happen when a new head concurrently arrives just
       before this operation being called. *)
   val set_mempool :
-    chain_store ->
-    head:Tezos_crypto.Block_hash.t ->
-    Mempool.t ->
-    unit tzresult Lwt.t
+    chain_store -> head:Block_hash.t -> Mempool.t -> unit tzresult Lwt.t
 
   (** [live_blocks chain_store] returns the set of previously computed
       live blocks for the current_head's [chain_store]. *)
   val live_blocks :
-    chain_store ->
-    (Tezos_crypto.Block_hash.Set.t * Tezos_crypto.Operation_hash.Set.t) Lwt.t
+    chain_store -> (Block_hash.Set.t * Operation_hash.Set.t) Lwt.t
 
   (** [compute_live_blocks ~block chain_store] computes the set of
       live blocks and live operations relative to [block]. Does nothing
@@ -762,8 +740,7 @@ module Chain : sig
   val compute_live_blocks :
     chain_store ->
     block:Block.t ->
-    (Tezos_crypto.Block_hash.Set.t * Tezos_crypto.Operation_hash.Set.t) tzresult
-    Lwt.t
+    (Block_hash.Set.t * Operation_hash.Set.t) tzresult Lwt.t
 
   (** [set_head chain_store block] promotes the [block] as head of the
       [chain_store] and triggers an asynchronous store merge if a
@@ -864,7 +841,7 @@ module Chain : sig
 
   (** [testchain_forked_block testchain] returns the hash of the forked
      block of its parent chain.*)
-  val testchain_forked_block : testchain -> Tezos_crypto.Block_hash.t
+  val testchain_forked_block : testchain -> Block_hash.t
 
   (** [testchain_store testchain] returns the chain store associated
       to this [testchain]. *)
@@ -878,11 +855,11 @@ module Chain : sig
       registers this chain in the set of activated testchains.  *)
   val fork_testchain :
     chain_store ->
-    testchain_id:Tezos_crypto.Chain_id.t ->
+    testchain_id:Chain_id.t ->
     forked_block:Block.t ->
-    genesis_hash:Tezos_crypto.Block_hash.t ->
+    genesis_hash:Block_hash.t ->
     genesis_header:Block_header.t ->
-    test_protocol:Tezos_crypto.Protocol_hash.t ->
+    test_protocol:Protocol_hash.t ->
     expiration:Time.Protocol.t ->
     testchain tzresult Lwt.t
 
@@ -893,45 +870,58 @@ module Chain : sig
 
   (** {2 Chain's protocols} *)
 
+  (** [find_protocol_info chain_store ~protocol_level] returns the
+     protocol info associated to the given [protocol_level]. *)
+  val find_protocol_info :
+    t -> protocol_level:int -> Protocol_levels.protocol_info option Lwt.t
+
   (** [find_activation_block chain_store ~protocol_level] returns the
       block that activated the protocol of level [protocol_level]. *)
   val find_activation_block :
-    chain_store ->
-    protocol_level:int ->
-    Protocol_levels.activation_block option Lwt.t
+    chain_store -> protocol_level:int -> block_descriptor option Lwt.t
 
   (** [find_protocol chain_store ~protocol_level] returns the protocol
       with the level [protocol_level]. *)
   val find_protocol :
-    chain_store ->
-    protocol_level:int ->
-    Tezos_crypto.Protocol_hash.t option Lwt.t
+    chain_store -> protocol_level:int -> Protocol_hash.t option Lwt.t
+
+  (** [expects_predecessor_context_hash chain_store proto_level]
+      returns whether or not a protocol requires the context hash of a
+      block to target resulting context of it's predecessor. This
+      depends on the environment of each protocol.*)
+  val expect_predecessor_context_hash :
+    chain_store -> protocol_level:int -> bool tzresult Lwt.t
 
   (** [all_protocol_levels chain_store] returns all the protocols
       registered in [chain_store]. *)
   val all_protocol_levels :
-    chain_store -> Protocol_levels.activation_block Protocol_levels.t Lwt.t
+    chain_store -> Protocol_levels.protocol_info Protocol_levels.t Lwt.t
 
   (** [may_update_protocol_level chain_store ?pred ?protocol_level
-      (block, ph)] updates the protocol level for the protocol [ph] in
-      [chain_store] with the activation [block]. If [pred] is not
-      provided, it reads the [block]'s predecessor and check that the
-      [block]'s protocol level is increasing compared to its
-      predecessor. If [protocol_level] is provided, we use this value
-      instead of the protocol level found in [block]. If a previous
-      entry is found, it overwrites it. *)
+      ~expect_predecessor_context (block, ph)] updates the protocol
+      level for the protocol [ph] in [chain_store] with the activation
+      [block]. If [pred] is not provided, it reads the [block]'s
+      predecessor and check that the [block]'s protocol level is
+      increasing compared to its predecessor. If [protocol_level] is
+      provided, we use this value instead of the protocol level found
+      in [block]. If a previous entry is found, it overwrites it. The
+      [expect_predecessor_context] argument specifies which context
+      hash semantics should be used. *)
   val may_update_protocol_level :
     chain_store ->
     ?pred:Block.block ->
     ?protocol_level:int ->
-    Block.block * Tezos_crypto.Protocol_hash.t ->
+    expect_predecessor_context:bool ->
+    Block.block * Protocol_hash.t ->
     unit tzresult Lwt.t
 
-  (** [may_update_ancestor_protocol_level chain_store ~head] tries to
-     find the activation block of the [head]'s protocol, checks that
-     its an ancestor and tries to update it if that's not the case. If
-     the registered activation block is not reachable (already
-     pruned), this function does nothing. *)
+  (** [may_update_ancestor_protocol_level chain_store ~head
+      ~expect_predecessor_context] tries to find the activation block
+      of the [head]'s protocol, checks that its an ancestor and tries
+      to update it if that's not the case. If the registered
+      activation block is not reachable (already pruned), this
+      function does nothing. The [expect_predecessor_context] argument
+      specifies which context hash semantics should be used. *)
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
@@ -951,8 +941,8 @@ module Chain : sig
       in [chain_store]. *)
   val set_rpc_directory :
     chain_store ->
-    protocol_hash:Tezos_crypto.Protocol_hash.t ->
-    next_protocol_hash:Tezos_crypto.Protocol_hash.t ->
+    protocol_hash:Protocol_hash.t ->
+    next_protocol_hash:Protocol_hash.t ->
     (chain_store * Block.t) Tezos_rpc.Directory.t ->
     unit Lwt.t
 
@@ -960,7 +950,7 @@ module Chain : sig
       [callback] that may be triggered during a block store merge in
       order to garbage-collect old contexts. *)
   val register_gc_callback :
-    chain_store -> (Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t) -> unit
+    chain_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
 end
 
 (** [global_block_watcher global_store] instantiates a new block
@@ -972,15 +962,15 @@ val global_block_watcher :
 module Protocol : sig
   (** [mem global_store ph] checks the existence of the protocol [ph]
       in [global_store]. *)
-  val mem : store -> Tezos_crypto.Protocol_hash.t -> bool
+  val mem : store -> Protocol_hash.t -> bool
 
   (** [all global_store ph] returns the set of all stored protocol in
       [global_store]. *)
-  val all : store -> Tezos_crypto.Protocol_hash.Set.t
+  val all : store -> Protocol_hash.Set.t
 
   (** [read global_store ph] reads the protocol [ph] from the
       [global_store]. Returns [None] if it does not exist. *)
-  val read : store -> Tezos_crypto.Protocol_hash.t -> Protocol.t option Lwt.t
+  val read : store -> Protocol_hash.t -> Protocol.t option Lwt.t
 
   (** [store global_store ph protocol] stores the [protocol] under the
       hash [ph] in the [global_store]. Returns [None] if it already
@@ -989,22 +979,16 @@ module Protocol : sig
       {b Warning} No hash check is made, the caller must be careful
       when storing protocols. *)
   val store :
-    store ->
-    Tezos_crypto.Protocol_hash.t ->
-    Protocol.t ->
-    Tezos_crypto.Protocol_hash.t option Lwt.t
+    store -> Protocol_hash.t -> Protocol.t -> Protocol_hash.t option Lwt.t
 
   (** [store_raw global_store ph bytes] raw version of [store]. *)
   val store_raw :
-    store ->
-    Tezos_crypto.Protocol_hash.t ->
-    bytes ->
-    Tezos_crypto.Protocol_hash.t option Lwt.t
+    store -> Protocol_hash.t -> bytes -> Protocol_hash.t option Lwt.t
 
   (** [protocol_watcher global_store] instantiates a new protocol
       watcher in [global_store]. *)
   val protocol_watcher :
-    store -> Tezos_crypto.Protocol_hash.t Lwt_stream.t * Lwt_watcher.stopper
+    store -> Protocol_hash.t Lwt_stream.t * Lwt_watcher.stopper
 end
 
 (** The utility module used to traverse the chain. *)
@@ -1039,6 +1023,8 @@ module Chain_traversal : sig
     to_block:Block.t ->
     (Block.t * Block.t list) Lwt.t
 end
+
+val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
 (**/**)
 

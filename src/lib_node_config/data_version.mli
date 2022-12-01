@@ -56,10 +56,12 @@ val default_peers_file_name : string
 *)
 type ensure_mode = Exists | Is_bare | Is_compatible
 
-(** [ensure_data_dir ~mode] ensures that a directory is valid with
-   regards to the given [mode]. See [ensure_mode] for the mode's
-   properties. By default, the mode is set to [Is_compatible]. *)
-val ensure_data_dir : ?mode:ensure_mode -> string -> unit tzresult Lwt.t
+(** [ensure_data_dir ~mode genesis data_dir] ensures that a directory
+    is valid with regards to the given [mode]. See [ensure_mode] for
+    the mode's properties. By default, the mode is set to
+    [Is_compatible]. *)
+val ensure_data_dir :
+  ?mode:ensure_mode -> Genesis.t -> string -> unit tzresult Lwt.t
 
 (** Upgrade data directory from an older version.
 

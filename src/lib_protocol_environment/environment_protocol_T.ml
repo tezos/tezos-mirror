@@ -249,6 +249,8 @@ module type PROTOCOL = sig
 
   val environment_version : Protocol.env_version
 
+  val expected_context_hash : header_context_hash_semantics
+
   val begin_validation :
     Context.t ->
     Tezos_crypto.Chain_id.t ->

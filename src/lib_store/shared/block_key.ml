@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_crypto.Block_hash
+include Block_hash
 
 let hash_size = 31
 
@@ -31,13 +31,13 @@ let t =
   let open Repr in
   map
     (bytes_of (`Fixed hash_size))
-    (fun b -> Tezos_crypto.Block_hash.of_bytes_exn b)
-    (fun bh -> Tezos_crypto.Block_hash.to_bytes bh)
+    (fun b -> Block_hash.of_bytes_exn b)
+    (fun bh -> Block_hash.to_bytes bh)
 
-let encode bh = Tezos_crypto.Block_hash.to_string bh
+let encode bh = Block_hash.to_string bh
 
-let encoded_size = Tezos_crypto.Block_hash.size (* in bytes *)
+let encoded_size = Block_hash.size (* in bytes *)
 
 let decode str off =
   let str = String.sub str off encoded_size in
-  Tezos_crypto.Block_hash.of_string_exn str
+  Block_hash.of_string_exn str

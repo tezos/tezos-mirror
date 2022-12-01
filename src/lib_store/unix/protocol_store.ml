@@ -25,11 +25,10 @@
 
 type t = {
   protocol_store_dir : [`Protocol_dir] Naming.directory;
-  mutable protocols : Tezos_crypto.Protocol_hash.Set.t;
+  mutable protocols : Protocol_hash.Set.t;
 }
 
-let mem t protocol_hash =
-  Tezos_crypto.Protocol_hash.Set.mem protocol_hash t.protocols
+let mem t protocol_hash = Protocol_hash.Set.mem protocol_hash t.protocols
 
 let all {protocols; _} = protocols
 
@@ -48,8 +47,7 @@ let raw_store store protocol_hash bytes =
     in
     let* () = Lwt_utils_unix.write_bytes fd bytes in
     let* _ = Lwt_utils_unix.safe_close fd in
-    store.protocols <-
-      Tezos_crypto.Protocol_hash.Set.add protocol_hash store.protocols ;
+    store.protocols <- Protocol_hash.Set.add protocol_hash store.protocols ;
     Lwt.return_some protocol_hash
 
 let store store protocol_hash protocol =
@@ -80,12 +78,11 @@ let init store_dir =
     Lwt.try_bind
       (fun () -> Lwt_unix.readdir dir)
       (fun file ->
-        match Tezos_crypto.Protocol_hash.of_b58check_opt file with
-        | Some protocol_hash ->
-            loop (Tezos_crypto.Protocol_hash.Set.add protocol_hash set)
+        match Protocol_hash.of_b58check_opt file with
+        | Some protocol_hash -> loop (Protocol_hash.Set.add protocol_hash set)
         | None -> loop set)
       (function End_of_file -> Lwt.return set | _ -> loop set)
   in
-  let* protocols = loop Tezos_crypto.Protocol_hash.Set.empty in
+  let* protocols = loop Protocol_hash.Set.empty in
   let* () = Lwt_unix.closedir dir in
   Lwt.return {protocol_store_dir; protocols}

@@ -806,35 +806,6 @@ module type TEZOS_CONTEXT = sig
 
   val add_predecessor_ops_metadata_hash :
     context -> Tezos_crypto.Operation_metadata_list_list_hash.t -> context Lwt.t
-
-  val retrieve_commit_info :
-    index ->
-    Block_header.t ->
-    (Tezos_crypto.Protocol_hash.t
-    * string
-    * string
-    * Time.Protocol.t
-    * Test_chain_status.t
-    * Tezos_crypto.Context_hash.t
-    * Tezos_crypto.Block_metadata_hash.t option
-    * Tezos_crypto.Operation_metadata_list_list_hash.t option
-    * Tezos_crypto.Context_hash.t list)
-    tzresult
-    Lwt.t
-
-  val check_protocol_commit_consistency :
-    expected_context_hash:Tezos_crypto.Context_hash.t ->
-    given_protocol_hash:Tezos_crypto.Protocol_hash.t ->
-    author:string ->
-    message:string ->
-    timestamp:Time.Protocol.t ->
-    test_chain_status:Test_chain_status.t ->
-    predecessor_block_metadata_hash:Tezos_crypto.Block_metadata_hash.t option ->
-    predecessor_ops_metadata_hash:
-      Tezos_crypto.Operation_metadata_list_list_hash.t option ->
-    data_merkle_root:Tezos_crypto.Context_hash.t ->
-    parents_contexts:Tezos_crypto.Context_hash.t list ->
-    bool Lwt.t
 end
 
 (** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.

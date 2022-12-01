@@ -834,6 +834,8 @@ struct
     let set_log_message_consumer _ = ()
 
     let environment_version = Protocol.V0
+
+    let expected_context_hash = Resulting_context
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.Context.t)

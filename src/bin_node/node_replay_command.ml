@@ -227,7 +227,13 @@ let replay_one_block strict main_chain_store validator_process block =
   if Store.Block.level block <= savepoint_level then
     tzfail Cannot_replay_below_savepoint
   else
-    let expected_context_hash = Store.Block.context_hash block in
+    let* protocol = Store.Block.protocol_hash main_chain_store block in
+    let* (module Proto) = Registered_protocol.get_result protocol in
+    let* expected_context_hash =
+      if Proto.expected_context_hash = Resulting_context then
+        return (Store.Block.context_hash block)
+      else Store.Block.resulting_context_hash main_chain_store block
+    in
     let* metadata = Store.Block.get_block_metadata main_chain_store block in
     let expected_block_receipt_bytes = Store.Block.block_metadata metadata in
     let expected_operation_receipts =
@@ -256,11 +262,12 @@ let replay_one_block strict main_chain_store validator_process block =
         (not
            (Tezos_crypto.Context_hash.equal
               expected_context_hash
-              result.validation_store.context_hash))
+              result.validation_store.resulting_context_hash))
         (fun () ->
           let*! () =
             Event.(strict_emit ~strict inconsistent_context_hash)
-              (expected_context_hash, result.validation_store.context_hash)
+              ( expected_context_hash,
+                result.validation_store.resulting_context_hash )
           in
           return_unit)
     in
@@ -271,8 +278,6 @@ let replay_one_block strict main_chain_store validator_process block =
       when_
         (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
         (fun () ->
-          let* protocol = Store.Block.protocol_hash main_chain_store block in
-          let* (module Proto) = Registered_protocol.get_result protocol in
           let to_json block =
             Data_encoding.Json.construct Proto.block_header_metadata_encoding
             @@ Data_encoding.Binary.of_bytes_exn
@@ -436,7 +441,11 @@ let replay ~singleprocess ~strict (config : Config_file.t) blocks =
 
 let run ?verbosity ~singleprocess ~strict (config : Config_file.t) blocks =
   let open Lwt_result_syntax in
-  let* () = Data_version.ensure_data_dir config.data_dir in
+  let* () =
+    Data_version.ensure_data_dir
+      config.blockchain_network.genesis
+      config.data_dir
+  in
   Lwt_lock_file.try_with_lock
     ~when_locked:(fun () ->
       failwith "Data directory is locked by another process")

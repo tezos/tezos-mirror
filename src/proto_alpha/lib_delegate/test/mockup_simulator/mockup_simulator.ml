@@ -28,6 +28,7 @@ type block = {
   protocol_data : Protocol.Alpha_context.Block_header.protocol_data;
   raw_protocol_data : Bytes.t;
   operations : Mockup.M.Block_services.operation list list;
+  resulting_context_hash : Tezos_crypto.Context_hash.t;
 }
 
 type chain = block list
@@ -321,6 +322,11 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
           shell = x.rpc_context.block_header;
           protocol_data = x.protocol_data;
         }
+
+    let resulting_context_hash
+        (block : Tezos_shell_services.Block_services.block) :
+        Tezos_crypto.Context_hash.t tzresult Lwt.t =
+      locate_block state block >>=? fun x -> return x.resulting_context_hash
 
     let operations block =
       locate_block state block >>=? fun x -> return x.operations
@@ -628,7 +634,13 @@ let rec process_block state block_hash (block_header : Block_header.t)
       get_predecessor () >>=? fun predecessor ->
       head state >>=? fun head ->
       reconstruct_context predecessor.rpc_context operations block_header
-      >>=? fun ({context; _}, _) ->
+      >>=? fun ({context; message; _}, _) ->
+      let resulting_context_hash =
+        Tezos_context_ops.Context_ops.hash
+          ~time:block_header.shell.timestamp
+          ?message
+          context
+      in
       let rpc_context =
         Tezos_protocol_environment.
           {context; block_hash; block_header = block_header.shell}
@@ -661,6 +673,7 @@ let rec process_block state block_hash (block_header : Block_header.t)
           protocol_data;
           raw_protocol_data = block_header.protocol_data;
           operations;
+          resulting_context_hash;
         }
       in
       let predecessor_hash = block_header.Block_header.shell.predecessor in
@@ -679,7 +692,7 @@ let rec process_block state block_hash (block_header : Block_header.t)
         new_block ;
       Tezos_crypto.Context_hash.Table.replace
         state.ctxt_table
-        rpc_context.Tezos_protocol_environment.block_header.context
+        resulting_context_hash
         rpc_context ;
       if
         Fitness.(
@@ -746,6 +759,7 @@ let create_fake_node_state ~i ~live_depth
       protocol_data;
       raw_protocol_data = block_header0.protocol_data;
       operations = [[]; []; []; []];
+      resulting_context_hash = block_header0.shell.context;
     }
   in
   let chain0 = [genesis0] in
