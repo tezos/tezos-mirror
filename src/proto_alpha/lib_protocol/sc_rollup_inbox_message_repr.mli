@@ -62,8 +62,9 @@ type internal_inbox_message =
       (** Internal message put at the beginning of each inbox's level. *)
   | End_of_level  (** Internal message put at the end of each inbox's level. *)
   | Info_per_level of {
-      timestamp : Time.t;
-          (** Timestamp of the block where this message is pushed. *)
+      predecessor_timestamp : Time.t;
+          (** Timestamp of the predecessor block where this message is
+              pushed. *)
       predecessor : Block_hash.t;
           (** Predecessor of the block this message is pushed. *)
     }

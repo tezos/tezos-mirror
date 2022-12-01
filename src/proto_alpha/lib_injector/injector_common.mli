@@ -54,6 +54,22 @@ val reorg_encoding : 'a Data_encoding.t -> 'a reorg Data_encoding.t
 
 type block_info := Alpha_block_services.block_info
 
+type shell_header := Block_header.shell_header
+
+(** [fetch_tezos_shell_header ~find_in_cache cctxt hash] returns [Some
+    shell_header] given a block hash. Looks for the block using [find_in_cache]
+    first, and fetches it from the L1 node otherwise. Returns [None] if no such
+    block hash exists. [find_in_cache] should be from an instance of
+    {!Aches_lwt.Lache.MAP_RESULT}. *)
+val fetch_tezos_shell_header :
+  find_in_cache:
+    (Tezos_crypto.Block_hash.t ->
+    (Tezos_crypto.Block_hash.t -> shell_header option Lwt.t) ->
+    shell_header option Lwt.t) ->
+  #full ->
+  Tezos_crypto.Block_hash.t ->
+  shell_header tzresult Lwt.t
+
 (** [fetch_tezos_block ~find_in_cache cctxt hash] returns [Some block_info]
     given a block hash. Looks for the block using [find_in_cache] first, and
     fetches it from the L1 node otherwise. Returns [None] if no such block hash

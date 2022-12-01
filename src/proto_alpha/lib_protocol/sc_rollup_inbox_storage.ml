@@ -142,14 +142,15 @@ let finalize_inbox_level ctxt =
           err) ;
       return ctxt
 
-let add_info_per_level ~timestamp ~predecessor ctxt =
+let add_info_per_level ~predecessor ctxt =
   let open Lwt_syntax in
   let* res =
     let open Lwt_result_syntax in
+    let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
     let witness = Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt in
     let*? witness =
       Sc_rollup_inbox_repr.add_info_per_level_no_history
-        ~timestamp
+        ~predecessor_timestamp
         ~predecessor
         witness
     in
@@ -174,12 +175,15 @@ let add_info_per_level ~timestamp ~predecessor ctxt =
           err) ;
       return ctxt
 
-let init_inbox ~timestamp ~predecessor ctxt =
+let init_inbox ~predecessor ctxt =
   let open Lwt_syntax in
   let* res =
     let open Lwt_result_syntax in
     let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
-    let*? inbox = Sc_rollup_inbox_repr.genesis ~timestamp ~predecessor level in
+    let predecessor_timestamp = Raw_context.predecessor_timestamp ctxt in
+    let*? inbox =
+      Sc_rollup_inbox_repr.genesis ~predecessor_timestamp ~predecessor level
+    in
     let* ctxt = Store.Inbox.init ctxt inbox in
     return ctxt
   in
@@ -205,8 +209,9 @@ module Internal_for_tests = struct
   let add_end_of_level ctxt =
     add_internal_message ctxt Sc_rollup_inbox_message_repr.End_of_level
 
-  let add_info_per_level ctxt timestamp predecessor =
+  let add_info_per_level ctxt predecessor_timestamp predecessor =
     add_internal_message
       ctxt
-      (Sc_rollup_inbox_message_repr.Info_per_level {timestamp; predecessor})
+      (Sc_rollup_inbox_message_repr.Info_per_level
+         {predecessor_timestamp; predecessor})
 end

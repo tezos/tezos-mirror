@@ -63,7 +63,10 @@ type internal_inbox_message =
     }
   | Start_of_level
   | End_of_level
-  | Info_per_level of {timestamp : Time.t; predecessor : Block_hash.t}
+  | Info_per_level of {
+      predecessor_timestamp : Time.t;
+      predecessor : Block_hash.t;
+    }
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
@@ -102,14 +105,14 @@ let internal_inbox_message_encoding =
         ~title:"Info_per_level"
         (obj3
            (kind "info_per_level")
-           (req "timestamp" Time.encoding)
+           (req "predecessor_timestamp" Time.encoding)
            (req "predecessor" Block_hash.encoding))
         (function
-          | Info_per_level {timestamp; predecessor} ->
-              Some ((), timestamp, predecessor)
+          | Info_per_level {predecessor_timestamp; predecessor} ->
+              Some ((), predecessor_timestamp, predecessor)
           | _ -> None)
-        (fun ((), timestamp, predecessor) ->
-          Info_per_level {timestamp; predecessor});
+        (fun ((), predecessor_timestamp, predecessor) ->
+          Info_per_level {predecessor_timestamp; predecessor});
     ]
 
 type t = Internal of internal_inbox_message | External of string

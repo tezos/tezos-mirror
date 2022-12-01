@@ -35,7 +35,7 @@ module type S = sig
   type level_position = Start | Middle | End
 
   type info_per_level = {
-    timestamp : Timestamp.time;
+    predecessor_timestamp : Timestamp.time;
     predecessor : Tezos_crypto.Block_hash.t;
   }
 

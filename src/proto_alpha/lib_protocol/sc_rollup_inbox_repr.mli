@@ -229,7 +229,7 @@ val serialized_proof_encoding : serialized_proof Data_encoding.t
     otherwise, it might miss some internal inputs.
  *)
 val add_all_messages :
-  timestamp:Time.t ->
+  predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   History.t ->
   t ->
@@ -338,7 +338,7 @@ val init_witness_no_history : Sc_rollup_inbox_merkelized_payload_hashes_repr.t
 
 (** [add_info_per_level_no_history] adds the input [Info_per_level]. *)
 val add_info_per_level_no_history :
-  timestamp:Time.t ->
+  predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   Sc_rollup_inbox_merkelized_payload_hashes_repr.t ->
   Sc_rollup_inbox_merkelized_payload_hashes_repr.t tzresult
@@ -353,7 +353,10 @@ val finalize_inbox_level_no_history :
     given [level] with: SOL, Info_per_level {timestamp; predecessor} and EOL
     inside. *)
 val genesis :
-  timestamp:Time.t -> predecessor:Block_hash.t -> Raw_level_repr.t -> t tzresult
+  predecessor_timestamp:Time.t ->
+  predecessor:Block_hash.t ->
+  Raw_level_repr.t ->
+  t tzresult
 
 module Internal_for_tests : sig
   (** [produce_inclusion_proof history a b] exploits [history] to produce

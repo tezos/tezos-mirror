@@ -306,7 +306,6 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~migration_balance_updates
         ~migration_operation_results
         ~predecessor_level:predecessor_raw_level
-        ~predecessor_timestamp
         ~predecessor_hash
         ~predecessor_fitness
 
