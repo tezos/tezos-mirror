@@ -61,6 +61,10 @@ val of_z : Z.t -> t
 
 val to_z : t -> Z.t
 
+(** [size_in_bytes tick] is the size in bytes of [tick]'s internal
+    representation. This function is used by the gas model. *)
+val size_in_bytes : t -> int
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
