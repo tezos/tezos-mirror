@@ -48,6 +48,7 @@ let initial_tree ?(max_tick = default_max_tick)
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in
   let* tree = empty_tree () in
+  let* tree = Wasm.initial_state tree in
   let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
   let* tree =
     Wasm.install_boot_sector ~ticks_per_snapshot:max_tick_Z boot_sector tree

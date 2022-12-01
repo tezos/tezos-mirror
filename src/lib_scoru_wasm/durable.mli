@@ -124,6 +124,11 @@ val hash : t -> key -> Tezos_crypto.Context_hash.t option Lwt.t
 *)
 val hash_exn : t -> key -> Tezos_crypto.Context_hash.t Lwt.t
 
+(** [set_value_exn durable key str] installs the value [str] in
+    [durable] under [key], replacing any previous contents under this
+    key without fetching it. *)
+val set_value_exn : t -> ?edit_readonly:bool -> key -> string -> t Lwt.t
+
 (** [write_value ?edit_readonly durable key offset bytes] writes
     [bytes] to [key], starting at the given [offset].
 

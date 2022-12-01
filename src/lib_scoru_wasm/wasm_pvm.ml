@@ -204,29 +204,38 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* tree = T.remove tree ["wasm"] in
     Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
-  let install_boot_sector ~ticks_per_snapshot bs tree =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4240
-       We cannot manipulate the durable storage at this point, because
-       the `durable` directory is empty. *)
-    let reboot_flag = Tezos_lazy_containers.Chunked_byte_vector.of_string "" in
-    let bs = Tezos_lazy_containers.Chunked_byte_vector.of_string bs in
+  let initial_state empty_tree =
+    let version = Tezos_lazy_containers.Chunked_byte_vector.of_string "2.0.0" in
     Tree_encoding_runner.encode
       Tezos_tree_encoding.(
-        tup3
-          ~flatten:true
-          (* We set the reboot flag in the durable storage to allow a
-             reboot to the evaluation phase once the collection of the
-             first inbox is done.
+        scope ["durable"; "readonly"; "wasm_version"; "@"] chunked_byte_vector)
+      version
+      empty_tree
 
-             After this, the flag is set by the PVM state machine
-             itself (in [compute_step]). *)
-          (scope
-             ["durable"; "kernel"; "env"; "reboot"; "@"]
-             chunked_byte_vector)
-          (scope ["durable"; "kernel"; "boot.wasm"; "@"] chunked_byte_vector)
-          (value ["pvm"; "max_nb_ticks"] Data_encoding.n))
-      (reboot_flag, bs, ticks_per_snapshot)
-      tree
+  let install_boot_sector ~ticks_per_snapshot bs tree =
+    let open Lwt_syntax in
+    let open Tezos_tree_encoding in
+    let* durable =
+      Tree_encoding_runner.decode (scope ["durable"] Durable.encoding) tree
+    in
+    let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot" in
+    let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm" in
+    let* durable = Durable.set_value_exn durable reboot_flag_key "" in
+    let* durable = Durable.set_value_exn durable kernel_key bs in
+    let pvm : pvm_state =
+      {
+        last_input_info = None;
+        current_tick = Z.zero;
+        reboot_counter = Z.succ Constants.maximum_reboots_per_input;
+        durable;
+        buffers = Tezos_webassembly_interpreter.Eval.buffers ();
+        tick_state = Collect;
+        last_top_level_call = Z.zero;
+        max_nb_ticks = ticks_per_snapshot;
+        maximum_reboots_per_input = Constants.maximum_reboots_per_input;
+      }
+    in
+    encode pvm tree
 
   let compute_step_many ?builtins ?stop_at_snapshot ~max_steps tree =
     let open Lwt.Syntax in
