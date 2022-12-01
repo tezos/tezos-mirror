@@ -23,7 +23,7 @@ depends: [
   "uri" { >= "3.1.0" }
   "tezos-hacl"
   "tezos-stdlib-unix"
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
 ]
 build: [

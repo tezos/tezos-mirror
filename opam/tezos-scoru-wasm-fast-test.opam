@@ -20,7 +20,7 @@ depends: [
   "tezos-test-helpers" {with-test}
   "tezos-scoru-wasm" {with-test}
   "tezos-scoru-wasm-fast" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [

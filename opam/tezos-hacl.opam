@@ -20,7 +20,7 @@ depends: [
   "zarith" { with-test & >= "1.12" & < "1.13" }
   "zarith_stubs_js" {with-test}
   "data-encoding" { with-test & >= "0.7.1" & < "1.0.0" }
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
 ]
 conflicts: [

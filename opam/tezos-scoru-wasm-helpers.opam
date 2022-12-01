@@ -18,7 +18,7 @@ depends: [
   "tezos-test-helpers"
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
-  "qcheck-alcotest" { >= "0.18" }
+  "qcheck-alcotest" { >= "0.20" }
   "alcotest-lwt" { >= "1.5.0" }
   "tezt" { >= "3.0.0" }
   "tezos-webassembly-interpreter-extra"

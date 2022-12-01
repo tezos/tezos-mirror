@@ -20,7 +20,7 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-benchmark-016-PtMumbai" {with-test}
   "tezos-benchmark-type-inference-016-PtMumbai" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
   "tezt" { with-test & >= "3.0.0" }
   "tezos-context" {with-test}
