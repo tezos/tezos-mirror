@@ -149,7 +149,11 @@ module Inner = struct
   module Encoding = struct
     open Data_encoding
 
-    let fr_encoding = conv Bls12_381.Fr.to_bytes Bls12_381.Fr.of_bytes_exn bytes
+    let fr_encoding =
+      conv
+        Bls12_381.Fr.to_bytes
+        Bls12_381.Fr.of_bytes_exn
+        (Fixed.bytes Bls12_381.Fr.size_in_bytes)
 
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/3391
 
@@ -548,6 +552,12 @@ module Inner = struct
         shards
     in
     Ok n_poly
+
+  let encoded_share_size t =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
+       Improve shard size computation *)
+    let share_scalar_len = t.n / t.number_of_shards in
+    (share_scalar_len * Scalar.size_in_bytes) + 4
 
   let polynomial_from_shards t shards =
     let open Result_syntax in

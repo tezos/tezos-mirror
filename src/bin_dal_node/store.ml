@@ -37,6 +37,8 @@ let slot_header_store = "slot_header_store"
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
+let shard_store_path = "shard_store"
+
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
   Irmin.Info.Default.v ~author:"DAL Node" ~message date
@@ -46,6 +48,7 @@ let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 (** Store context *)
 type node_store = {
   slots_store : t;
+  shard_store : Shard_store.t;
   slot_headers_store : Slot_headers_store.t;
   slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
@@ -63,8 +66,9 @@ let init config =
   let slots_watcher = Lwt_watcher.create_input () in
   let* repo = Repo.v (Irmin_pack.config dir) in
   let* slots_store = main repo in
+  let* shard_store = Shard_store.init shard_store_path in
   let* () = Event.(emit store_is_ready ()) in
-  Lwt.return {slots_store; slots_watcher; slot_headers_store}
+  Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
 
 module Legacy_paths : sig
   val slot_by_commitment : string -> string list
