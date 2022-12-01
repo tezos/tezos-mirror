@@ -68,6 +68,8 @@ let main () =
       "size_has_tickets_model";
       "compare_tickets";
       "list_key_values";
+      "skip_list_next";
+      "skip_list_hash";
     ]
   in
   Lwt_list.iter_s
