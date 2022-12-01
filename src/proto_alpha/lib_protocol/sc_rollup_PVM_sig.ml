@@ -545,6 +545,10 @@ module type S = sig
     Sc_rollup_dissection_chunk_repr.t list ->
     unit tzresult
 
+  (** [get_current_level state] returns the current level of the [state],
+      returns [None] if it is not possible to compute the level. *)
+  val get_current_level : state -> Raw_level_repr.t option Lwt.t
+
   module Internal_for_tests : sig
     (** [insert_failure state] corrupts the PVM state. This is used in
         the loser mode of the rollup node. *)

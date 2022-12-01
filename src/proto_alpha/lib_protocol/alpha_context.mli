@@ -3583,6 +3583,8 @@ module Sc_rollup : sig
         Dissection_chunk.t list ->
         unit tzresult
 
+      val get_current_level : state -> Raw_level.t option Lwt.t
+
       module Internal_for_tests : sig
         val insert_failure : state -> state Lwt.t
       end

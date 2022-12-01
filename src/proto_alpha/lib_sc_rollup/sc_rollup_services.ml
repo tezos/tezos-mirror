@@ -453,6 +453,13 @@ module Global = struct
         ~output:Sc_rollup.State_hash.encoding
         (path / "state_hash")
 
+    let state_current_level =
+      Tezos_rpc.Service.get_service
+        ~description:"Retrieve the current level of a PVM"
+        ~query:Tezos_rpc.Query.empty
+        ~output:(Data_encoding.option Raw_level.encoding)
+        (path / "state_current_level")
+
     type state_value_query = {key : string}
 
     let state_value_query : state_value_query Tezos_rpc.Query.t =
