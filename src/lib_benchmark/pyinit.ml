@@ -41,15 +41,13 @@ let handle_python_error msg closure =
       Stdlib.failwith s
 
 let pyinit () =
-  let interpreter =
-    if Sys.file_exists "venv/bin/python3" then "venv/bin/python3"
-    else if Sys.file_exists "/usr/bin/python3" then "/usr/bin/python3"
-    else Stdlib.failwith "python3 interpreter not found"
-  in
   if not (Py.is_initialized ()) then (
-    Printf.eprintf "Initializing python... " ;
-    Py.initialize ~interpreter ~version:3 () ;
-    Printf.eprintf "Done.\n%!")
+    Printf.eprintf "Initializing python... \n%!" ;
+    Py.initialize ~version:3 () ;
+    Format.eprintf
+      "Python library used: (%a)\n%!"
+      Format.(pp_print_option pp_print_string)
+      (Py.get_library_filename ()))
 
 let numpy () =
   pyinit () ;
