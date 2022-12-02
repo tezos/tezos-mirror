@@ -337,7 +337,7 @@ let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
 let tar = external_lib "tar" V.True
 
-let tar_unix = external_lib "tar-unix" V.(exactly "2.0.0")
+let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 
 let tezos_rust_lib =
   opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.2")
