@@ -80,6 +80,7 @@ type argument =
   | Media_type of media_type  (** [--media-type] *)
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
   | Metrics_addr of string  (** [--metrics-addr] *)
+  | Cors_origin of string  (** [--cors-origin] *)
 
 (** Tezos node states. *)
 type t
