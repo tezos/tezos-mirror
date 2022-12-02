@@ -57,7 +57,7 @@ type key = Writeable of string list | Readonly of string list
 
 (* A key is bounded to 250 bytes, including the implicit '/durable' prefix.
    Additionally, values are implicitly appended with '_'. **)
-let max_key_length = 250 - String.length "/durable" - String.length "/_"
+let max_key_length = 250 - String.length "/durable" - String.length "/@"
 
 let key_of_string_exn s =
   if String.length s > max_key_length then raise (Invalid_key s) ;
@@ -167,6 +167,15 @@ let hash_exn tree key =
 
 (* The maximum size of bytes allowed to be read/written at once. *)
 let max_store_io_size = 4096L
+
+let set_value_exn tree ?(edit_readonly = false) key str =
+  if not edit_readonly then assert_key_writeable key ;
+  let key = to_value_key @@ key_contents key in
+  let encoding = E.scope key E.chunked_byte_vector in
+  Runner.encode
+    encoding
+    (Tezos_lazy_containers.Chunked_byte_vector.of_string str)
+    tree
 
 let write_value_exn tree ?(edit_readonly = false) key offset bytes =
   if not edit_readonly then assert_key_writeable key ;

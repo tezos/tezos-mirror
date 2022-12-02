@@ -227,17 +227,18 @@ let test_output () =
 
   let*! dummy = Context.init "/tmp" in
   let dummy_context = Context.empty dummy in
-  let*! (empty_tree : Wasm.tree) = Test_encodings_util.empty_tree () in
+  let (empty_tree : Wasm.tree) = Context.Tree.empty dummy_context in
   let parsed = Parse.string_to_module modul in
   let parsed =
     match parsed.it with Script.Textual m -> m | _ -> assert false
   in
   let*! boot_sector = Encode.encode parsed in
+  let*! tree = Wasm.initial_state empty_tree in
   let*! tree =
     Wasm.install_boot_sector
       ~ticks_per_snapshot:Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
       boot_sector
-      empty_tree
+      tree
   in
   let*! tree =
     Wasm.Internal_for_tests.set_max_nb_ticks (Z.of_int64 50_000_000L) tree

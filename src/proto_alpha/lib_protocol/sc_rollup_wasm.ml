@@ -115,7 +115,7 @@ module V2_0_0 = struct
   *)
   let reference_initial_state_hash =
     Sc_rollup_repr.State_hash.of_b58check_exn
-      "scs11pDQTn37TBnWgQAiCPdMAcQPiXARjg9ZZVmLx26sZwxeSxovE5"
+      "scs11anfGzGUHWbxyaDhYPPE7nntNegMvCFTBcGXuoa3ATg6Mnirwe"
 
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
@@ -256,10 +256,7 @@ module V2_0_0 = struct
 
     open Monad
 
-    let initial_state ~empty =
-      let open Lwt_syntax in
-      let* state = Tree.add empty ["wasm-version"] (Bytes.of_string "2.0.0") in
-      Lwt.return state
+    let initial_state ~empty = WASM_machine.initial_state empty
 
     let install_boot_sector state boot_sector =
       WASM_machine.install_boot_sector ~ticks_per_snapshot boot_sector state

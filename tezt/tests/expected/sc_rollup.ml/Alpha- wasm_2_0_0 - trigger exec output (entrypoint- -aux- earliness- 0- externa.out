@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.00104
+    Fee to the baker: ꜩ0.001045
     Expected counter: 1
     Gas limit: 2810
     Storage limit: 6540 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.00104
-      payload fees(the block proposer) ....... +ꜩ0.00104
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001045
+      payload fees(the block proposer) ....... +ꜩ0.001045
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: bytes
@@ -58,9 +58,9 @@ This sequence of operations was run:
       Consumed gas: 1000.072
 
 
-./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300003b9706ac79824f1d5ceefeabf693dc19f08c6d8282d4ca9de6ff2fab8bfdfb7c3b9706ac79824f1d5ceefeabf693dc19f08c6d8282d4ca9de6ff2fab8bfdfb7c860764757261626c65d0ce5cc5f103ff929b2677918ae37b9e1bf12e734e48f54c3f555420a6bbabcda10370766dd0cbd48d020fa6649223c1596e09675166c7725ed3a72f755a73fb4209d83d214c03746167c00800000004536f6d650576616c7565810370766d8107627566666572738205696e707574820468656164c00100066c656e677468c00100066f75747075748308636f6e74656e7473890130820468656164c00100066c656e677468c001000131820468656164c00100066c656e677468c001000132820468656164c00100066c656e677468c001000133820468656164c00100066c656e677468c001000134820468656164c00100066c656e677468c0010001358308636f6e74656e7473810130c02800000024000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b00000000036175780468656164c00100066c656e677468c001010136820468656164c00100066c656e677468c001000137820468656164c00100066c656e677468c001000138820468656164c00100066c656e677468c001000468656164c00400000000066c656e677468c00400000009047761736dd0411548aca38800ec15c66c2821e0b870407e83da9552b9555bfa84ac5e473ebf0c7761736d2d76657273696f6ec81cf6aea5145d63f931339b1cfae95f1a749637f32dcdfbf2464f417076dfc63b3b9706ac79824f1d5ceefeabf693dc19f08c6d8282d4ca9de6ff2fab8bfdfb7c0000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
+./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300002d6016a018a58e963e7bada825eac1b7133c5e6919374cc38dc750ee6159a96c2d6016a018a58e963e7bada825eac1b7133c5e6919374cc38dc750ee6159a96c850764757261626c65d09aecf89f24640ded702927c7fec3e159017ce1d5bb410d3b832841cf24c1aeec0370766dd0cbd48d020fa6649223c1596e09675166c7725ed3a72f755a73fb4209d83d214c03746167c00800000004536f6d650576616c7565810370766d8107627566666572738205696e707574820468656164c00100066c656e677468c00100066f75747075748308636f6e74656e7473890130820468656164c00100066c656e677468c001000131820468656164c00100066c656e677468c001000132820468656164c00100066c656e677468c001000133820468656164c00100066c656e677468c001000134820468656164c00100066c656e677468c0010001358308636f6e74656e7473810130c02800000024000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b00000000036175780468656164c00100066c656e677468c001010136820468656164c00100066c656e677468c001000137820468656164c00100066c656e677468c001000138820468656164c00100066c656e677468c001000468656164c00400000000066c656e677468c00400000009047761736dd0411548aca38800ec15c66c2821e0b870407e83da9552b9555bfa84ac5e473ebf2d6016a018a58e963e7bada825eac1b7133c5e6919374cc38dc750ee6159a96c0000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 5932.434 units (will add 100 for safety)
+Estimated gas: 5924.522 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -71,19 +71,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001553
+    Fee to the baker: ꜩ0.001506
     Expected counter: 2
-    Gas limit: 6033
+    Gas limit: 6025
     Storage limit: 25 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001553
-      payload fees(the block proposer) ....... +ꜩ0.001553
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001506
+      payload fees(the block proposer) ....... +ꜩ0.001506
     Smart contract output message execution:
       Address: [SC_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract output message execution was successfully applied
       Paid storage size diff: 5 bytes
-      Consumed gas: 4729.295
+      Consumed gas: 4721.383
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00125
         storage fees ........................... +ꜩ0.00125
