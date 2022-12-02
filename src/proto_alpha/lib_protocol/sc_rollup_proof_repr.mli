@@ -200,9 +200,9 @@ module type PVM_with_context_and_state = sig
         confirmed slots. *)
     val confirmed_slots_history : Dal_slot_repr.History.t
 
-    (** A bounded cache of Dal confirmed slots skip list's cells. Used to
-        to build inclusion proofs. *)
-    val history_cache : Dal_slot_repr.History.History_cache.t
+    (** A function to retrieve a history from an underlying cache. *)
+    val get_history :
+      Dal_slot_repr.History.hash -> Dal_slot_repr.History.t option Lwt.t
 
     (** In case we expect to generate an input proof that is a DAL page
         confirmation, we should provide via [page_info] the information of the

@@ -230,7 +230,9 @@ module Make (Interpreter : Interpreter.S) :
       module Dal_with_history = struct
         let confirmed_slots_history = dal_slots_history
 
-        let history_cache = dal_slots_history_cache
+        let get_history ptr =
+          Dal.Slots_history.History_cache.find ptr dal_slots_history_cache
+          |> Lwt.return
 
         let dal_attestation_lag = dal_attestation_lag
 

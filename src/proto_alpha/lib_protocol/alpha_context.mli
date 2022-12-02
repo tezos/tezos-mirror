@@ -3056,6 +3056,8 @@ module Dal : sig
   module Slots_history : sig
     type t
 
+    type hash
+
     (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3766
        Do we need to export this? *)
     val genesis : t
@@ -3064,7 +3066,10 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
-    module History_cache : Bounded_history_repr.S
+    val hash : t -> hash
+
+    module History_cache :
+      Bounded_history_repr.S with type key = hash and type value = t
 
     val add_confirmed_slot_headers_no_cache :
       t -> Slot.Header.t list -> t tzresult
@@ -3874,7 +3879,8 @@ module Sc_rollup : sig
       module Dal_with_history : sig
         val confirmed_slots_history : Dal.Slots_history.t
 
-        val history_cache : Dal.Slots_history.History_cache.t
+        val get_history :
+          Dal.Slots_history.hash -> Dal.Slots_history.t option Lwt.t
 
         val page_info : (Dal.Page.content * Dal.Page.proof) option
 

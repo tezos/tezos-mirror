@@ -272,8 +272,8 @@ module Dal_proofs = struct
     else return_none
 
   let produce ~metadata ~dal_attestation_lag ~commit_level dal_parameters
-      page_id ~page_info confirmed_slots_history history_cache =
-    let open Result_syntax in
+      page_id ~page_info ~get_history confirmed_slots_history =
+    let open Lwt_result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
@@ -286,8 +286,8 @@ module Dal_proofs = struct
           dal_parameters
           page_id
           ~page_info
+          ~get_history
           confirmed_slots_history
-          history_cache
       in
       return
         ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
@@ -401,7 +401,8 @@ module type PVM_with_context_and_state = sig
   module Dal_with_history : sig
     val confirmed_slots_history : Dal_slot_repr.History.t
 
-    val history_cache : Dal_slot_repr.History.History_cache.t
+    val get_history :
+      Dal_slot_repr.History.hash -> Dal_slot_repr.History.t option Lwt.t
 
     val page_info :
       (Dal_slot_repr.Page.content * Dal_slot_repr.Page.proof) option
@@ -480,9 +481,8 @@ let produce ~metadata pvm_and_state commit_inbox_level =
           ~commit_level:commit_inbox_level
           page_id
           ~page_info
+          ~get_history
           confirmed_slots_history
-          history_cache
-        |> Lwt.return
   in
   let input_given =
     Option.bind

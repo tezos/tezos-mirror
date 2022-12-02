@@ -149,12 +149,12 @@ struct
       produces a proof from the given information and verifies the produced result,
       if any. The result of each step is checked with [check_produce_result] and
       [check_verify_result], respectively. *)
-  let produce_and_verify_proof ~check_produce ?check_verify skip_list cache
-      ~page_info ~page_id =
+  let produce_and_verify_proof ~check_produce ?check_verify ~get_history
+      skip_list ~page_info ~page_id =
     let open Lwt_result_syntax in
-    let res =
-      Hist.produce_proof params ~page_info page_id skip_list cache
-      |> Environment.wrap_tzresult
+    let*! res =
+      Hist.produce_proof params ~page_info page_id ~get_history skip_list
+      |> Lwt.map Environment.wrap_tzresult
     in
     let* () = check_produce res page_info in
     match check_verify with

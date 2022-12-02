@@ -119,8 +119,9 @@ end) : sig
       (bytes option tzresult ->
       (bytes * Cryptobox.page_proof) option ->
       (unit, tztrace) result Lwt.t) ->
+    get_history:
+      (Dal_slot_repr.History.hash -> Dal_slot_repr.History.t option Lwt.t) ->
     Dal_slot_repr.History.t ->
-    Dal_slot_repr.History.History_cache.t ->
     page_info:(bytes * Cryptobox.page_proof) option ->
     page_id:Dal_slot_repr.Page.t ->
     (unit, tztrace) result Lwt.t
