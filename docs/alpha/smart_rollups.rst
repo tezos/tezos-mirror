@@ -1271,7 +1271,7 @@ Glossary
 
 #. **Refutation period**: At the end of each commitment period, a
    period of two weeks starts to allow any commitment related to
-   this commitment period to be published.
+   this commitment period to be challenged.
 
 #. **Staker**: An implicit account that has made a deposit on a
    commitment.
