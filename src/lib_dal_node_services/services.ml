@@ -38,17 +38,36 @@ type 'rpc service =
     ; output : 'output >
 
 module Types = struct
-  (* Declaration of types used as inputs and/or outputs *)
-  type slot_id = {slot_level : int32; slot_index : int32}
+  type level = int32
 
-  (* Associated encodings of the types *)
+  type slot_index = int
+
+  (* Declaration of types used as inputs and/or outputs. *)
+  type slot_id = {slot_level : level; slot_index : slot_index}
+
+  type header_attestation_status =
+    [`Waiting_for_attestations | `Attested | `Unattested]
+
+  type header_status = [`Not_selected | `Unseen | header_attestation_status]
+
+  let header_attestation_status_to_string = function
+    | `Waiting_for_attestations -> "waiting_for_attestations"
+    | `Attested -> "attested"
+    | `Unattested -> "unattested"
+
+  let header_status_to_string = function
+    | `Not_selected -> "not_selected"
+    | `Unseen -> "unseen"
+    | #header_attestation_status as e -> header_attestation_status_to_string e
 
   let slot_id_encoding =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4396
+        Reuse protocol encodings. *)
     let open Data_encoding in
     conv
       (fun {slot_level; slot_index} -> (slot_level, slot_index))
       (fun (slot_level, slot_index) -> {slot_level; slot_index})
-      (obj2 (req "slot_level" int32) (req "slot_index" int32))
+      (obj2 (req "slot_level" int32) (req "slot_index" uint8))
 
   let slot_content = Data_encoding.bytes
 end
