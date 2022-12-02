@@ -55,11 +55,9 @@ Codec manual
 Node manual
 ===========
 
-The command line of the Tezos node is not currently documented as an HTML page, but rather in Unix manual format. You can also obtain it by running ``octez-node --help``, which gives the following result:
-
-.. include:: ../api/octez-node.txt
-   :literal:
-
-The manual above briefly shows the available node commands.
+The command line of the Tezos node is not currently documented as an HTML page, but rather in Unix manual format. You can also obtain it by running ``octez-node --help``, which gives the manual below.
+This manual briefly shows the available node commands.
 Each command accepts its own set of options and arguments, that you can discover by running ``octez-node <command> --help``.
 For more details on the node invocation and configuration, see see :doc:`../user/node-configuration`.
+
+.. include:: ../api/octez-node.txt
