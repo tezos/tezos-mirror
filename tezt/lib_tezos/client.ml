@@ -895,6 +895,30 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     client
   |> Process.check ?expect_failure
 
+let spawn_call ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
+    ?entrypoint ?arg ~destination ~source client =
+  spawn_command ?log_output ?endpoint ?hooks client
+  @@ ["--wait"; wait]
+  @ ["call"; destination; "from"; source]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "entrypoint" Fun.id entrypoint
+  @ optional_arg "arg" Fun.id arg
+
+let call ?hooks ?log_output ?endpoint ?wait ?burn_cap ?entrypoint ?arg
+    ~destination ~source client =
+  spawn_call
+    ?hooks
+    ?log_output
+    ?endpoint
+    ?wait
+    ?burn_cap
+    ?entrypoint
+    ?arg
+    ~destination
+    ~source
+    client
+  |> Process.check
+
 let multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
     ?gas_limit ?storage_limit ?counter ?(simulation = false) ?(force = false)
     ~giver ~json_batch client =
