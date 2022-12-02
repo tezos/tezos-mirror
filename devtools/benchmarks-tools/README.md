@@ -20,7 +20,6 @@ On the reference machine, the benchmarks directory should look like this:
   - cronjob.sh
   - run_all_benchmarks_on_latest_master.sh
   - rustup-init.sh
-  - zcash_params
   - snoop_results/
       - _snoop_<DATE>_<COMMIT>/
           - benchmark_results/
@@ -45,7 +44,7 @@ On the reference machine, the benchmarks directory should look like this:
 
 - `cronjob.sh` is the main script run by Cron. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
 - `run_all_benchmarks_on_latest_master.sh` is the script actually launching the benchmarks and called by `cronjob.sh`. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
-- `rustup-init.sh` and `zcash_params` handle some external dependencies. How to maintain these files is under discussion.
+- `rustup-init.sh` handles some external dependencies. How to maintain this file is under discussion.
 - `snoop_results` contains the result of the benchmarks, with one sub-directory per benchmark run.
   - `STARTED` and `SUCCESS` are marker files that can be used by human beings to have a quick look at the benchmarks process status (they contain the PID).
   - Other files are created by being moved from other locations, as described below.
