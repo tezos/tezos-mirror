@@ -218,9 +218,10 @@ module Make (Interpreter : Interpreter.S) :
         match res with Ok data -> return @@ Some data | Error _ -> return None
 
       module Inbox_with_history = struct
-        let history = snapshot_history
-
         let inbox = snapshot
+
+        let get_history inbox_hash =
+          Sc_rollup.Inbox.History.find inbox_hash snapshot_history |> Lwt.return
 
         let get_payloads_history =
           Store.Payloads_histories.get node_ctxt.Node_context.store

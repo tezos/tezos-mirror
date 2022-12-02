@@ -636,11 +636,10 @@ let verify_inclusion_proof inclusion_proof snapshot_history_proof =
   in
   return target
 
-let produce_inclusion_proof history inbox_snapshot l =
-  let open Result_syntax in
-  let deref ptr = History.find ptr history in
+let produce_inclusion_proof deref inbox_snapshot l =
+  let open Lwt_result_syntax in
   let compare {hash = _; level} = Raw_level_repr.compare level l in
-  let result = Skip_list.search ~deref ~compare ~cell:inbox_snapshot in
+  let*! result = Skip_list.Lwt.search ~deref ~compare ~cell:inbox_snapshot in
   match result with
   | Skip_list.{rev_path; last_cell = Found history_proof} ->
       return (List.rev rev_path, history_proof)
@@ -677,10 +676,10 @@ let verify_proof (l, n) inbox_snapshot {inclusion_proof; message_proof} =
         let message_counter = Z.zero in
         return_some Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
 
-let produce_proof ~get_payloads_history history inbox_snapshot (l, n) =
+let produce_proof ~get_payloads_history ~get_history inbox_snapshot (l, n) =
   let open Lwt_result_syntax in
-  let*? inclusion_proof, history_proof =
-    produce_inclusion_proof history inbox_snapshot l
+  let* inclusion_proof, history_proof =
+    produce_inclusion_proof get_history inbox_snapshot l
   in
   let level_proof = Skip_list.content history_proof in
   let* ({payload; proof = _} as message_proof) =

@@ -3403,7 +3403,7 @@ module Sc_rollup : sig
       get_payloads_history:
         (Inbox_merkelized_payload_hashes.Hash.t ->
         Inbox_merkelized_payload_hashes.History.t Lwt.t) ->
-      History.t ->
+      get_history:(Hash.t -> history_proof option Lwt.t) ->
       history_proof ->
       Raw_level.t * Z.t ->
       (proof * inbox_message option) tzresult Lwt.t
@@ -3427,10 +3427,10 @@ module Sc_rollup : sig
 
     module Internal_for_tests : sig
       val produce_inclusion_proof :
-        History.t ->
+        (Hash.t -> history_proof option Lwt.t) ->
         history_proof ->
         Raw_level.t ->
-        (inclusion_proof * history_proof) tzresult
+        (inclusion_proof * history_proof) tzresult Lwt.t
 
       val serialized_proof_of_string : string -> serialized_proof
 
@@ -3864,7 +3864,7 @@ module Sc_rollup : sig
       module Inbox_with_history : sig
         val inbox : Inbox.history_proof
 
-        val history : Inbox.History.t
+        val get_history : Inbox.Hash.t -> Inbox.history_proof option Lwt.t
 
         val get_payloads_history :
           Inbox_merkelized_payload_hashes.Hash.t ->
