@@ -93,61 +93,107 @@ type 'ret continuation = unit -> 'ret tzresult
    This function checks whether or not a type can be used for a rollup. *)
 let rec validate_ty :
     type a ac ret.
-    (a, ac) Script_typed_ir.ty -> ret continuation -> ret tzresult =
- fun ty k ->
+    (a, ac) Script_typed_ir.ty ->
+    a Script_typed_ir.entrypoints_node ->
+    ret continuation ->
+    ret tzresult =
+ fun ty {nested = nested_entrypoints; at_node} k ->
   let open Script_typed_ir in
-  match ty with
-  (* Valid primitive types. *)
-  | Unit_t -> (k [@ocaml.tailcall]) ()
-  | Int_t -> (k [@ocaml.tailcall]) ()
-  | Nat_t -> (k [@ocaml.tailcall]) ()
-  | Signature_t -> (k [@ocaml.tailcall]) ()
-  | String_t -> (k [@ocaml.tailcall]) ()
-  | Bytes_t -> (k [@ocaml.tailcall]) ()
-  | Key_hash_t -> (k [@ocaml.tailcall]) ()
-  | Key_t -> (k [@ocaml.tailcall]) ()
-  | Timestamp_t -> (k [@ocaml.tailcall]) ()
-  | Address_t -> (k [@ocaml.tailcall]) ()
-  | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
-  | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
-  | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
-  | Bool_t -> (k [@ocaml.tailcall]) ()
-  | Never_t -> (k [@ocaml.tailcall]) ()
-  | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) ()
-  | Chain_id_t -> (k [@ocaml.tailcall]) ()
-  (* Valid collection types. *)
-  | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty k
-  | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty k
-  | Option_t (ty, _, _) -> (validate_ty [@ocaml.tailcall]) ty k
-  | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty k
-  | Pair_t (ty1, ty2, _, _) -> (validate_two_tys [@ocaml.tailcall]) ty1 ty2 k
-  | Union_t (ty1, ty2, _, _) -> (validate_two_tys [@ocaml.tailcall]) ty1 ty2 k
-  | Map_t (key_ty, val_ty, _) ->
-      (validate_two_tys [@ocaml.tailcall]) key_ty val_ty k
-  (* Invalid types. *)
-  | Mutez_t -> error Sc_rollup_invalid_parameters_type
-  | Big_map_t (_key_ty, _val_ty, _) -> error Sc_rollup_invalid_parameters_type
-  | Contract_t _ -> error Sc_rollup_invalid_parameters_type
-  | Sapling_transaction_t _ -> error Sc_rollup_invalid_parameters_type
-  | Sapling_transaction_deprecated_t _ ->
+  match at_node with
+  | Some {name = _; original_type_expr = _} ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
+         We currently don't support entrypoints as the entrypoint information
+         for L1 to L2 messages is not propagated to the rollup. *)
       error Sc_rollup_invalid_parameters_type
-  | Sapling_state_t _ -> error Sc_rollup_invalid_parameters_type
-  | Operation_t -> error Sc_rollup_invalid_parameters_type
-  | Chest_t -> error Sc_rollup_invalid_parameters_type
-  | Chest_key_t -> error Sc_rollup_invalid_parameters_type
-  | Lambda_t (_, _, _) -> error Sc_rollup_invalid_parameters_type
+  | None -> (
+      match ty with
+      (* Valid primitive types. *)
+      | Unit_t -> (k [@ocaml.tailcall]) ()
+      | Int_t -> (k [@ocaml.tailcall]) ()
+      | Nat_t -> (k [@ocaml.tailcall]) ()
+      | Signature_t -> (k [@ocaml.tailcall]) ()
+      | String_t -> (k [@ocaml.tailcall]) ()
+      | Bytes_t -> (k [@ocaml.tailcall]) ()
+      | Key_hash_t -> (k [@ocaml.tailcall]) ()
+      | Key_t -> (k [@ocaml.tailcall]) ()
+      | Timestamp_t -> (k [@ocaml.tailcall]) ()
+      | Address_t -> (k [@ocaml.tailcall]) ()
+      | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
+      | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
+      | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
+      | Bool_t -> (k [@ocaml.tailcall]) ()
+      | Never_t -> (k [@ocaml.tailcall]) ()
+      | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) ()
+      | Chain_id_t -> (k [@ocaml.tailcall]) ()
+      (* Valid collection types. *)
+      | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+      | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+      | Option_t (ty, _, _) ->
+          (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+      | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+      | Pair_t (ty1, ty2, _, _) ->
+          (* Entrypoints may not be nested in pairs, hence the no_entrypoints
+             value. *)
+          (validate_two_tys [@ocaml.tailcall])
+            ty1
+            ty2
+            no_entrypoints
+            no_entrypoints
+            k
+      | Union_t (ty1, ty2, _, _) ->
+          let entrypoints_l, entrypoints_r =
+            match nested_entrypoints with
+            | Entrypoints_None -> (no_entrypoints, no_entrypoints)
+            | Entrypoints_Union {left; right} -> (left, right)
+          in
+          (validate_two_tys [@ocaml.tailcall])
+            ty1
+            ty2
+            entrypoints_l
+            entrypoints_r
+            k
+      | Map_t (key_ty, val_ty, _) ->
+          (* Entrypoints may not be nested in maps, hence the no_entrypoints
+             value. *)
+          (validate_two_tys [@ocaml.tailcall])
+            key_ty
+            val_ty
+            no_entrypoints
+            no_entrypoints
+            k
+      (* Invalid types. *)
+      | Mutez_t -> error Sc_rollup_invalid_parameters_type
+      | Big_map_t (_key_ty, _val_ty, _) ->
+          error Sc_rollup_invalid_parameters_type
+      | Contract_t _ -> error Sc_rollup_invalid_parameters_type
+      | Sapling_transaction_t _ -> error Sc_rollup_invalid_parameters_type
+      | Sapling_transaction_deprecated_t _ ->
+          error Sc_rollup_invalid_parameters_type
+      | Sapling_state_t _ -> error Sc_rollup_invalid_parameters_type
+      | Operation_t -> error Sc_rollup_invalid_parameters_type
+      | Chest_t -> error Sc_rollup_invalid_parameters_type
+      | Chest_key_t -> error Sc_rollup_invalid_parameters_type
+      | Lambda_t (_, _, _) -> error Sc_rollup_invalid_parameters_type)
 
 and validate_two_tys :
     type a ac b bc ret.
     (a, ac) Script_typed_ir.ty ->
     (b, bc) Script_typed_ir.ty ->
+    a Script_typed_ir.entrypoints_node ->
+    b Script_typed_ir.entrypoints_node ->
     ret continuation ->
     ret tzresult =
- fun ty1 ty2 k ->
-  (validate_ty [@ocaml.tailcall]) ty1 (fun () ->
-      (validate_ty [@ocaml.tailcall]) ty2 k)
+ fun ty1 ty2 entrypoints1 entrypoints2 k ->
+  (validate_ty [@ocaml.tailcall]) ty1 entrypoints1 (fun () ->
+      (validate_ty [@ocaml.tailcall]) ty2 entrypoints2 k)
 
-let validate_parameters_ty ctxt parameters_ty =
+let validate_parameters_ty :
+    type a ac.
+    context ->
+    (a, ac) Script_typed_ir.ty ->
+    a Script_typed_ir.entrypoints_node ->
+    context tzresult =
+ fun ctxt parameters_ty entrypoints ->
   let open Result_syntax in
   let* ctxt =
     Gas.consume
@@ -155,7 +201,7 @@ let validate_parameters_ty ctxt parameters_ty =
       (Sc_rollup_costs.is_valid_parameters_ty_cost
          ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
   in
-  let+ () = validate_ty parameters_ty ok in
+  let+ () = validate_ty parameters_ty entrypoints ok in
   ctxt
 
 let validate_untyped_parameters_ty ctxt parameters_ty =
@@ -164,14 +210,22 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
      [parse_parameter_ty_and_entrypoints] restricts to [passable] types
      (everything but operations), which is OK since [validate_ty] constraints
      the type further. *)
-  let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints = _}, ctxt =
+  let* ( Ex_parameter_ty_and_entrypoints
+           {
+             arg_type;
+             entrypoints =
+               {Script_typed_ir.root = entrypoint; original_type_expr = _};
+           },
+         ctxt ) =
     Script_ir_translator.parse_parameter_ty_and_entrypoints
       ctxt
       ~legacy:false
       (Micheline.root parameters_ty)
   in
-  (* Check that the type is valid for rollups. *)
-  validate_parameters_ty ctxt arg_type
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
+     We currently don't support entrypoints as the entrypoint information
+     for L1 to L2 messages is not propagated to the rollup. *)
+  validate_parameters_ty ctxt arg_type entrypoint
 
 let check_origination_proof (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollup.PVM.implementation) boot_sector
@@ -199,7 +253,6 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
     in
     validate_untyped_parameters_ty ctxt parameters_ty
   in
-
   let*? origination_proof =
     Sc_rollup.Proof.unserialize_pvm_step ~pvm origination_proof
   in
@@ -225,11 +278,16 @@ let to_transaction_operation ctxt ~source
   (* Validate the type of the parameters. Only types that can be transferred
      from Layer 1 to Layer 2 are permitted.
 
-     In principal we could allow different types to be passed to the rollup and
+     In principle, we could allow different types to be passed to the rollup and
      from the rollup. In order to avoid confusion, and given that we don't
      have any use case where they differ, we keep these sets identical.
+
+     We don't check whether the type contains any entrypoints at this stage.
+     It has already been done during origination.
   *)
-  let* ctxt = validate_parameters_ty ctxt parameters_ty in
+  let* ctxt =
+    validate_parameters_ty ctxt parameters_ty Script_typed_ir.no_entrypoints
+  in
   let operation =
     Script_typed_ir.Transaction_to_smart_contract
       {

@@ -852,6 +852,7 @@ let test_originating_with_invalid_types () =
       "sapling_state 2";
       "sapling_transaction 2";
       "lambda string nat";
+      "or (nat %deposit) (string %name)";
     ]
     |> List.iter_es assert_fails_for_type
   in
@@ -991,7 +992,6 @@ let test_originating_with_valid_type () =
     "or nat string";
     "map string int";
     "map (option (pair nat string)) (list (ticket nat))";
-    "or (nat %deposit) (string %name)";
   ]
   |> List.iter_es assert_parameters_ty
 
