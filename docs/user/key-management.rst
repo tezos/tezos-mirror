@@ -20,12 +20,13 @@ The solutions provided to strengthen the security of the default key management 
   + sign user operations (e.g. transfers) interactively on the wallet
   + automatically sign baking operations, such as (pre-)endorsements, more securely.
 
-- If you don't have a hardware wallet:
+- If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
 
-  + The option ``--encrypted`` of the client offers a first protection for storing your keys.
-  + A separate signer daemon allows to decouple the client and baker from the signing process.
-    In particular, this allows executing a remote signer, placed on a different machine than the client and/or the baker, perhaps less exposed to attacks.
-    As the keys only need to be accessible to the signer, they can also benefit from the lesser exposure.
+- A separate signer daemon allows to decouple the client and baker from the signing process.
+
+  In particular, this allows executing the signer remotely (that is, on a different machine than the client and/or the baker), perhaps less exposed to attacks.
+
+  As the keys only need to be accessible to the signer, they can also benefit from the lesser exposure. Even better (and recommended), a remote signer can be combined with a hardware wallet connected to the same machine as the signer.
 
 These solutions are detailed in the rest of this page.
 
