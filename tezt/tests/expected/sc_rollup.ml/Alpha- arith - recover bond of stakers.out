@@ -35,7 +35,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 12 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
-Estimated gas: 7842.075 units (will add 100 for safety)
+Estimated gas: 8528.079 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -46,13 +46,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001115
+    Fee to the baker: ꜩ0.001183
     Expected counter: 2
-    Gas limit: 7943
+    Gas limit: 8629
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001115
-      payload fees(the block proposer) ....... +ꜩ0.001115
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001183
+      payload fees(the block proposer) ....... +ꜩ0.001183
     Smart contract rollup commitment publishing:
       Address: [SMART_ROLLUP_HASH]
       Commitment:
@@ -61,7 +61,7 @@ This sequence of operations was run:
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 7842.075
+      Consumed gas: 8528.079
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 14
       Balance updates:
@@ -71,7 +71,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 12 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
-Estimated gas: 7612.051 units (will add 100 for safety)
+Estimated gas: 8298.055 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -82,13 +82,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001092
+    Fee to the baker: ꜩ0.00116
     Expected counter: 1
-    Gas limit: 7713
+    Gas limit: 8399
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001092
-      payload fees(the block proposer) ....... +ꜩ0.001092
+      [PUBLIC_KEY_HASH] ... -ꜩ0.00116
+      payload fees(the block proposer) ....... +ꜩ0.00116
     Smart contract rollup commitment publishing:
       Address: [SMART_ROLLUP_HASH]
       Commitment:
@@ -97,7 +97,7 @@ This sequence of operations was run:
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 7612.051
+      Consumed gas: 8298.055
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 14
       Balance updates:
@@ -135,7 +135,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none recover bond of '[PUBLIC_KEY_HASH]' for sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' --fee 1
 Node is bootstrapped.
-Estimated gas: 4350.470 units (will add 100 for safety)
+Estimated gas: 5445.472 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -148,7 +148,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ1
     Expected counter: 4
-    Gas limit: 4451
+    Gas limit: 5546
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ1
@@ -160,12 +160,12 @@ This sequence of operations was run:
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... -ꜩ10000
         [PUBLIC_KEY_HASH] ...................................................... +ꜩ10000
-      Consumed gas: 4350.470
+      Consumed gas: 5445.472
 
 
 ./octez-client --wait none recover bond of '[PUBLIC_KEY_HASH]' for sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' --fee 1
 Node is bootstrapped.
-Estimated gas: 4350.470 units (will add 100 for safety)
+Estimated gas: 5445.472 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -178,7 +178,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ1
     Expected counter: 5
-    Gas limit: 4451
+    Gas limit: 5546
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ1
@@ -190,5 +190,5 @@ This sequence of operations was run:
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... -ꜩ10000
         [PUBLIC_KEY_HASH] ...................................................... +ꜩ10000
-      Consumed gas: 4350.470
+      Consumed gas: 5445.472
 

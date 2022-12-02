@@ -1525,10 +1525,15 @@ let apply_manager_operation :
       let open Sc_rollup.Refutation_storage in
       let player = source in
       (match refutation with
-      | None ->
-          start_game ctxt rollup ~player ~opponent >>=? fun ctxt ->
-          return (None, ctxt)
-      | Some refutation -> game_move ctxt rollup ~player ~opponent refutation)
+      | Start {player_commitment_hash; opponent_commitment_hash} ->
+          start_game
+            ctxt
+            rollup
+            ~player:(player, player_commitment_hash)
+            ~opponent:(opponent, opponent_commitment_hash)
+          >>=? fun ctxt -> return (None, ctxt)
+      | Move {step; choice} ->
+          game_move ctxt rollup ~player ~opponent ~step ~choice)
       >>=? fun (game_result, ctxt) ->
       (match game_result with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])

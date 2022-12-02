@@ -3967,7 +3967,12 @@ module Sc_rollup : sig
       | Dissection of dissection_chunk list
       | Proof of Proof.serialized Proof.t
 
-    type refutation = {choice : Tick.t; step : step}
+    type refutation =
+      | Start of {
+          player_commitment_hash : Commitment.Hash.t;
+          opponent_commitment_hash : Commitment.Hash.t;
+        }
+      | Move of {choice : Tick.t; step : step}
 
     val refutation_encoding : refutation Data_encoding.t
 
@@ -3997,8 +4002,8 @@ module Sc_rollup : sig
       Inbox.history_proof ->
       Dal.Slots_history.t ->
       start_level:Raw_level.t ->
-      parent:Commitment.t ->
-      child:Commitment.t ->
+      parent_commitment:Commitment.t ->
+      defender_commitment:Commitment.t ->
       refuter:Staker.t ->
       defender:Staker.t ->
       default_number_of_sections:int ->
@@ -4011,7 +4016,8 @@ module Sc_rollup : sig
       stakers:Index.t ->
       Metadata.t ->
       t ->
-      refutation ->
+      step:step ->
+      choice:Tick.t ->
       (game_result, t) Either.t tzresult Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level.t}
@@ -4097,8 +4103,8 @@ module Sc_rollup : sig
     val start_game :
       context ->
       t ->
-      player:public_key_hash ->
-      opponent:public_key_hash ->
+      player:public_key_hash * Commitment.Hash.t ->
+      opponent:public_key_hash * Commitment.Hash.t ->
       context tzresult Lwt.t
 
     val game_move :
@@ -4106,7 +4112,8 @@ module Sc_rollup : sig
       t ->
       player:Staker.t ->
       opponent:Staker.t ->
-      Game.refutation ->
+      step:Game.step ->
+      choice:Tick.t ->
       (Game.game_result option * context) tzresult Lwt.t
 
     val get_timeout :
@@ -4706,7 +4713,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup.t;
       opponent : Sc_rollup.Staker.t;
-      refutation : Sc_rollup.Game.refutation option;
+      refutation : Sc_rollup.Game.refutation;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {

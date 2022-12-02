@@ -706,8 +706,8 @@ let generate_sc_rollup_refute =
   let open QCheck2.Gen in
   let* opponent = random_pkh in
   let+ rollup = random_sc_rollup in
-  let refutation : Sc_rollup.Game.refutation option =
-    Some {choice = Sc_rollup.Tick.initial; step = Dissection []}
+  let refutation : Sc_rollup.Game.refutation =
+    Sc_rollup.Game.Move {choice = Sc_rollup.Tick.initial; step = Dissection []}
   in
   Sc_rollup_refute {rollup; opponent; refutation}
 

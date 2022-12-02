@@ -528,7 +528,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
-      refutation : Sc_rollup_game_repr.refutation option;
+      refutation : Sc_rollup_game_repr.refutation;
     }
       -> Kind.sc_rollup_refute manager_operation
       (** [Sc_rollup_refute { rollup; opponent; refutation }] makes a move
