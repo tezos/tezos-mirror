@@ -129,3 +129,14 @@ val get_slot_commitment_proof :
   ; params : unit * Cryptobox.commitment
   ; query : unit >
   service
+
+(** Return the accepted commitment associated to the given slot index and
+    published at the given level, if any. *)
+val get_commitment_by_published_level_and_index :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Cryptobox.commitment
+  ; prefix : unit
+  ; params : (unit * Types.level) * Types.slot_index
+  ; query : unit >
+  service
