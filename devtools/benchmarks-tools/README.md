@@ -60,3 +60,12 @@ On the reference machine, the benchmarks directory should look like this:
 - `anomalies` logs some events that prevent the benchmarks from being run correctly. For instance if the processes are triggered while the previous haven't completed yet.
 
 `cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but we only know their final destination after fetching the most recent `master` commit.
+
+## Cleaning up after a failure
+
+If the benchmark processes failed, some cleaning up is needed before the next run.
+* Remove `current_run_dir`: the file indicates that benchmark processes are still running. This is not mandatory since the file will be overwritten by the next run, but it can confuse humans checking the benchmarks status if it is kept.
+* Move `cron_res` and `cron_res_errors` to their benchmark results directory: they are log files of a specific run, they're supposed to go into the latter's directory. It should be in `snoop_results/_snoop_<DATE>_<COMMIT>`; the directory can be created if it does not exist.  
+  In particular, `cron_res` really needs to be moved or deleted, as the next run will check its absence at the very beginning of the benchmark processes.
+* Similarly, move results, i.e. `tezos/_snoop/{benchmark,inference}_results`, to their benchmark results directory: `snoop_results/_snoop_<DATE>_<COMMIT>`. This needs to be done too, otherwise the next run will simply reuse these results.
+* Finally, upload results to `s3` if this was the cause of the failure: it could happen because of a network error for instance. The commands to run can be found in `run_all_benchmarks_on_latest_master.sh`.

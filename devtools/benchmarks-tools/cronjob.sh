@@ -35,7 +35,7 @@
 TODAY=$(date +"%Y%m%d_%H%M")
 
 anomaly() {
-  date +"[%Y-%m-%d %T] $1." >> anomalies;
+  date +"[%Y-%m-%d %T] $1. Remember to clean up when you're done: remove current_run_dir, and move cron_res, cron_res_errors, tezos/_snoop/*_results to the corresponding sub-directory of snoop_results." >> anomalies;
   exit 1
 }
 
