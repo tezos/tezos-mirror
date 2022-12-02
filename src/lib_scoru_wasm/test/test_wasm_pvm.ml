@@ -1458,6 +1458,46 @@ let test_scheduling_one_inbox () = test_scheduling_multiple_inboxes [10]
 let test_scheduling_five_inboxes () =
   test_scheduling_multiple_inboxes [10; 5; 15; 8; 2]
 
+(* Module only outputting one message. *)
+let output_only_module message =
+  Format.sprintf
+    {|
+(module
+ (import "smart_rollup_core" "write_output"
+         (func $write_output (param i32 i32) (result i32)))
+ (data (i32.const 100) "%s")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+       (call $write_output (i32.const 100) (i32.const %d))
+       (drop)
+       )
+)|}
+    message
+    (String.length message)
+
+(* Test helper that loads inputs and runs a kernel and test the outboxes after
+   each yield of the PVM, up to [max_level]. *)
+let eval_and_test_outboxes_gen test_outbox max_level tree =
+  let open Lwt_syntax in
+  let rec go curr_level tree =
+    let* tree = set_empty_inbox_step curr_level tree in
+    let* tree = eval_until_input_requested tree in
+
+    (* The PVM shouldn't be stuck, it only outputs one message. *)
+    let* status = Wasm.Internal_for_tests.get_tick_state tree in
+    assert (not @@ is_stuck status) ;
+
+    (* Lets check the outboxes are consistent and all exist. *)
+    let* buffer = Wasm.Internal_for_tests.get_output_buffer tree in
+    let* () = test_outbox buffer curr_level in
+
+    (* Take another round of evaluation. *)
+    if curr_level >= max_level then return_unit
+    else go (Int32.succ curr_level) tree
+  in
+  go 0l tree
+
 let test_outboxes_at_each_level () =
   let open Lwt_syntax in
   let open Tezos_webassembly_interpreter.Output_buffer in
@@ -1471,50 +1511,62 @@ let test_outboxes_at_each_level () =
     else check_outboxes buffer (Int32.pred outbox_level)
   in
 
-  let rec step_inboxes curr_level max_level tree =
-    let* tree = set_empty_inbox_step curr_level tree in
-    let* tree = eval_until_input_requested tree in
-
-    (* The PVM shouldn't be stuck, it only outputs one message. *)
-    let* status = Wasm.Internal_for_tests.get_tick_state tree in
-    assert (not @@ is_stuck status) ;
-
-    (* Lets check the outboxes are consistent and all exist. *)
-    let* buffer = Wasm.Internal_for_tests.get_output_buffer tree in
-    assert (
-      Outboxes.num_elements buffer
-      = Int32.succ curr_level (* One for each level, including 0 *)) ;
-    let* () = check_outboxes buffer curr_level in
-
-    (* Take another round of evaluation. *)
-    if curr_level = max_level then return_unit
-    else step_inboxes (Int32.succ curr_level) max_level tree
-  in
-
-  let module_ =
-    Format.sprintf
-      {|
-(module
- (import "smart_rollup_core" "write_output"
-         (func $write_output (param i32 i32) (result i32)))
- (data (i32.const 100) "%s")
- (memory 1)
- (export "mem" (memory 0))
- (func (export "kernel_run")
-       (call $write_output (i32.const 100) (i32.const %d))
-       (drop)
-       )
-)|}
-      output_message
-      (String.length output_message)
-  in
   let* tree =
     initial_tree
       ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false
-      module_
+      (output_only_module output_message)
   in
-  let* () = step_inboxes 0l 5l tree in
+  let* () = eval_and_test_outboxes_gen check_outboxes 5l tree in
+  return_ok_unit
+
+let test_outbox_validity_period () =
+  let open Lwt_syntax in
+  let open Tezos_webassembly_interpreter.Output_buffer in
+  let output_message = "output_message" in
+
+  let outbox_validity_period = 2l in
+
+  (* Check each outboxes: if the level offset of the output buffer is below the
+     currently asked level, the message should be available. If it not
+     available, this implies the level is outdsated, and the outbox level is
+     below the output buffer's offset *)
+  let rec check_outbox buffer outbox_level =
+    Lwt.catch
+      (fun () ->
+        let* message =
+          get_message buffer {outbox_level; message_index = Z.zero}
+        in
+        let level_is_not_outdated =
+          Option.fold
+            ~none:false
+            ~some:(fun first_level -> first_level <= outbox_level)
+            (first_level buffer)
+        in
+        assert (
+          message = Bytes.of_string output_message && level_is_not_outdated) ;
+        if outbox_level <= 0l then return_unit
+        else check_outbox buffer (Int32.pred outbox_level))
+      (fun exn ->
+        let level_is_outdated =
+          Option.fold
+            ~none:false
+            ~some:(fun first_level -> first_level > outbox_level)
+            (first_level buffer)
+        in
+        assert (level_is_outdated && exn = Outdated_level) ;
+        if outbox_level <= 0l then return_unit
+        else check_outbox buffer (Int32.pred outbox_level))
+  in
+
+  let* tree =
+    initial_tree
+      ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
+      ~from_binary:false
+      ~outbox_validity_period
+      (output_only_module output_message)
+  in
+  let* () = eval_and_test_outboxes_gen check_outbox 5l tree in
   return_ok_unit
 
 let tests =
@@ -1605,4 +1657,8 @@ let tests =
       "Test outboxes are created at each level"
       `Quick
       test_outboxes_at_each_level;
+    tztest
+      "Test outbox validity period clean-up"
+      `Quick
+      test_outbox_validity_period;
   ]

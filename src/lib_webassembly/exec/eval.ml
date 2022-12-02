@@ -416,8 +416,11 @@ type config = {
 
 let frame inst locals = {inst; locals}
 
-let buffers ?(input = Input_buffer.alloc ()) ?(output = Output_buffer.alloc ())
-    () =
+let default_output_buffer () =
+  Output_buffer.alloc ~last_level:(Some 0l) ~validity_period:10l
+
+let buffers ?(input = Input_buffer.alloc ())
+    ?(output = default_output_buffer ()) () =
   {input; output}
 
 let config host_funcs ?frame_arity inst vs es =
@@ -1595,7 +1598,7 @@ let reveal_step reveal module_reg payload =
 (* Functions & Constants *)
 
 let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
-    ?(output = Output_buffer.alloc ()) ?(durable = Durable_storage.empty)
+    ?(output = default_output_buffer ()) ?(durable = Durable_storage.empty)
     host_funcs (func : func_inst) (vs : value list) :
     (Durable_storage.t * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in

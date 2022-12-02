@@ -117,6 +117,11 @@ module V2_0_0 : sig
       see #3590 for more pointers *)
   val ticks_per_snapshot : Z.t
 
+  (* The number of outboxes to keep, which is for a period of two weeks. For a
+     block time of 30 seconds, this equals to 2 * 60 * 24 * 14 = 40_320
+     blocks. *)
+  val outbox_validity_period : int32
+
   (** The hash requested by the WASM PVM if it cannot decode the input
       provided by the WASM kernel, that is, if the bytes value cannot
       be decoded with {!Sc_rollup_reveal_hash.encoding}. *)

@@ -3675,6 +3675,8 @@ module Sc_rollup : sig
   module Wasm_2_0_0PVM : sig
     val ticks_per_snapshot : Z.t
 
+    val outbox_validity_period : int32
+
     val well_known_reveal_preimage : string
 
     val well_known_reveal_hash : Sc_rollup_reveal_hash.t

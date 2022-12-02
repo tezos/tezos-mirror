@@ -64,11 +64,15 @@ module type S = sig
       is hard-coded in the protocol. *)
   val initial_state : tree -> tree Lwt.t
 
-  (** [install_boot_sector ~ticks_per_snapshot payload tree] installs
-      the [payload] passed as an argument in [tree] so that it is
+  (** [install_boot_sector ~ticks_per_snapshot ~output_validity_period payload
+      tree] installs the [payload] passed as an argument in [tree] so that it is
       interpreted as the kernel to be used by the PVM. *)
   val install_boot_sector :
-    ticks_per_snapshot:Z.t -> string -> tree -> tree Lwt.t
+    ticks_per_snapshot:Z.t ->
+    outbox_validity_period:int32 ->
+    string ->
+    tree ->
+    tree Lwt.t
 
   (** [get_output output state] returns the payload associated with the given
       output. The result is meant to be deserialized using

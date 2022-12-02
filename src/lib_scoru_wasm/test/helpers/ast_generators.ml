@@ -646,16 +646,28 @@ let output_info_gen =
 let output_buffer_gen =
   let* l = list_size (int_range 0 10) int in
   let outboxes =
-    List.map
-      (fun _ ->
-        generate1
-        @@ map
-             (fun a ->
-               Output_buffer.Messages.(of_immutable @@ Vector.of_list a))
-             (list (map Bytes.of_string string)))
+    List.fold_left
+      (fun outboxes i ->
+        let messages =
+          generate1
+          @@ map
+               (fun a ->
+                 Output_buffer.Messages.(of_immutable @@ Vector.of_list a))
+               (list (map Bytes.of_string string))
+        in
+        Output_buffer.Outboxes.Map.Map.add (Int32.of_int i) messages outboxes)
+      Output_buffer.Outboxes.Map.Map.empty
       l
   in
-  return Output_buffer.Outboxes.(of_immutable @@ Vector.of_list outboxes)
+  let* last_level = option (map Int32.of_int (int_range 0 10)) in
+  let* validity_period = map Int32.of_int (int_range 0 10) in
+  return
+    Output_buffer.
+      {
+        outboxes = Outboxes.(create ~values:outboxes ());
+        last_level;
+        validity_period;
+      }
 
 let label_gen ~module_reg =
   let* label_arity = option (Int32.of_int <$> small_nat) in

@@ -312,11 +312,8 @@ let patch_reboot_flag durable =
   | _ -> return durable
 
 (** Every time the kernel yields, we reset the input buffer. *)
-let clean_up_buffers buffers =
+let clean_up_input_buffer buffers =
   let open Tezos_webassembly_interpreter in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4188
-     After a certain number of levels, messages posted in the outbox
-     need to be clean-up. *)
   function
   | Forcing_yield | Yielding -> Input_buffer.reset buffers.Eval.input | _ -> ()
 
@@ -332,7 +329,7 @@ let compute_step pvm_state =
   let reboot_counter = next_reboot_counter pvm_state status in
   let* durable = patch_too_many_reboot_flag durable status in
   let* durable = patch_reboot_flag durable status in
-  let () = clean_up_buffers pvm_state.buffers status in
+  let () = clean_up_input_buffer pvm_state.buffers status in
   let pvm_state =
     {
       pvm_state with
@@ -418,6 +415,12 @@ let compute_step_many ?builtins:_ ?(stop_at_snapshot = false) ~max_steps
         && ((not stop_at_snapshot) || pvm_state.tick_state <> Snapshot)))
     pvm_state
 
+let update_output_buffer pvm_state level =
+  let output_buffer = pvm_state.buffers.Wasm.Eval.output in
+  if Wasm.Output_buffer.is_initialized output_buffer then
+    Wasm.Output_buffer.move_outbox_forward output_buffer
+  else Wasm.Output_buffer.initialize_outbox output_buffer level
+
 let set_input_step input_info message pvm_state =
   let open Lwt_syntax in
   let open Wasm_pvm_state in
@@ -441,9 +444,7 @@ let set_input_step input_info message pvm_state =
         match Pvm_input_kind.from_raw_input message with
         | Internal End_of_level -> Padding
         | Internal Start_of_level ->
-            Wasm.Output_buffer.ensure_outbox_at_level
-              pvm_state.buffers.Wasm.Eval.output
-              raw_level ;
+            update_output_buffer pvm_state raw_level ;
             Collect
         | _ -> Collect)
     | Stuck _ -> Lwt.return pvm_state.tick_state

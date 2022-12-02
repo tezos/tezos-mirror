@@ -237,6 +237,7 @@ let test_output () =
   let*! tree =
     Wasm.install_boot_sector
       ~ticks_per_snapshot:Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
+      ~outbox_validity_period:Sc_rollup_wasm.V2_0_0.outbox_validity_period
       boot_sector
       tree
   in
@@ -257,14 +258,14 @@ let test_output () =
   let*! final_tree = eval_until_input_requested tree in
   let*! output = Wasm.Internal_for_tests.get_output_buffer final_tree in
   let* last_outbox_level =
-    match Tezos_webassembly_interpreter.Output_buffer.get_last_level output with
+    match output.Tezos_webassembly_interpreter.Output_buffer.last_level with
     | Some level -> return level
     | None -> failwith "The PVM output buffer does not contain any outbox."
   in
   let*! last_outbox =
-    Tezos_webassembly_interpreter.Output_buffer.Outboxes.get
-      last_outbox_level
+    Tezos_webassembly_interpreter.Output_buffer.get_outbox
       output
+      last_outbox_level
   in
   let* end_of_level_message_index =
     match Output_buffer.get_outbox_last_message_index last_outbox with

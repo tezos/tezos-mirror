@@ -315,4 +315,6 @@ val config :
   admin_instr Vector.t ->
   config
 
+val default_output_buffer : unit -> output_inst
+
 val buffers : ?input:input_inst -> ?output:output_inst -> unit -> buffers

@@ -47,7 +47,11 @@ module Make
   val initial_state : Tree.tree -> Tree.tree Lwt.t
 
   val install_boot_sector :
-    ticks_per_snapshot:Z.t -> string -> Tree.tree -> Tree.tree Lwt.t
+    ticks_per_snapshot:Z.t ->
+    outbox_validity_period:int32 ->
+    string ->
+    Tree.tree ->
+    Tree.tree Lwt.t
 
   val compute_step : Tree.tree -> Tree.tree Lwt.t
 
