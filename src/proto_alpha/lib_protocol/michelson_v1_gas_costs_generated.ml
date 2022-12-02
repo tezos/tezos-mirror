@@ -98,10 +98,11 @@ let cost_N_IAnd_nat size1 size2 =
 
 (* model N_IAnd_bytes *)
 (* Allocates [min size1 size2] *)
+(* fun size1 -> fun size2 -> (34.8914840649 + (0.398826813115 * (min size1 size2))) *)
 let cost_N_IAnd_bytes size1 size2 =
   let open S_syntax in
   let v0 = S.safe_int (Compare.Int.min size1 size2) in
-  S.safe_int 30 + (v0 lsr 1)
+  S.safe_int 35 + (v0 lsr 1)
 
 (* model N_IBalance *)
 let cost_N_IBalance = S.safe_int 10
@@ -117,36 +118,32 @@ let cost_N_IBlake2b size =
 let cost_N_IBytes_size = S.safe_int 10
 
 (* model N_IByte_nat *)
-(* fun size -> (66.8357335892 + (2.26239804697 * size)) *)
-(* Allocate [size] bytes *)
+(* fun size -> (73.6648173983 + (2.97857716538 * size)) *)
 let cost_N_IBytes_nat size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 70 + (v0 lsl 1) + (v0 lsr 2)
+  S.safe_int 75 + (v0 lsl 1) + v0
 
 (* model N_INat_bytes *)
-(* fun size -> (27.7373924021 + (2.22456674632 * size)) *)
-(* Allocates [size] bytes *)
+(* fun size -> (41.2414840649 + (2.47956362254 * size)) *)
 let cost_N_INat_bytes size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 30 + (v0 lsl 1)
+  S.safe_int 45 + (v0 lsl 1) + (v0 lsr 1)
 
 (* model N_IBytes_int *)
-(* fun size -> (67.2231916885 + (2.29117132926 * size)) *)
-(* Allocates [size] bytes *)
+(* fun size -> (87.7348173983 + (3.04617929025 * size)) *)
 let cost_N_IBytes_int size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 70 + (v0 lsl 1) + (v0 lsr 2)
+  S.safe_int 90 + (v0 lsl 1) + v0
 
 (* model N_IInt_bytes *)
-(* fun size -> (26.6345701541 + (2.24766891219 * size)) *)
-(* Allocates [size] bytes *)
+(* fun size -> (17.8814840649 + (2.57086493257 * size)) *)
 let cost_N_IInt_bytes size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 30 + (v0 lsl 1)
+  S.safe_int 20 + (v0 lsl 1) + (v0 lsr 1)
 
 (* model N_ICar *)
 let cost_N_ICar = S.safe_int 10
@@ -179,12 +176,11 @@ let cost_N_ICheck_signature_secp256k1 size =
   S.safe_int 51_600 + (v0 + (v0 lsr 3))
 
 (* model N_ICheck_signature_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
+(* fun size -> (1566529.36815 + (2.94695684559 * size)) *)
 let cost_N_ICheck_signature_bls size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 7_567_000 + (v0 + (v0 lsr 3))
+  S.safe_int 1_570_000 + (v0 lsl 1) + v0
 
 (* model N_IComb *)
 (* Approximating 3.531001 x term *)
@@ -430,21 +426,23 @@ let cost_N_ILsr_nat size =
 
 (* model N_ILsl_bytes *)
 (* Allocates [size + shift / 8] bytes *)
+(* fun size1 -> fun size2 -> ((63.0681507316 + (0.667539714647 * size1)) + (0. * size2)) *)
 let cost_N_ILsl_bytes size shift =
   let open S_syntax in
   let v1 = S.safe_int size in
   let v0 = S.safe_int shift in
-  S.safe_int 70 + (v1 lsr 1) + (v0 lsr 4)
+  S.safe_int 65 + (v1 lsr 1) + (v1 lsr 2) + (v0 lsr 4)
 
 (* model N_ILsr_bytes *)
 (* Allocates [max 0 (size - shift / 8)] bytes *)
+(* fun size1 -> fun size2 -> let q = (size1 - (size2 * 0.125)) in (53.9248173983 + (0.658785032381 * (if (0 < q) then q else 0))) *)
 let cost_N_ILsr_bytes size shift =
   let q = size - (shift lsr 3) in
   let open S.Syntax in
-  if Compare.Int.(q < 0) then S.safe_int 70
+  if Compare.Int.(q < 0) then S.safe_int 55
   else
     let v0 = S.safe_int q in
-    S.safe_int 70 + (v0 lsr 1)
+    S.safe_int 55 + (v0 lsr 1) + (v0 lsr 2)
 
 (* model N_ILt *)
 let cost_N_ILt = S.safe_int 10
@@ -608,10 +606,11 @@ let cost_N_IOr_nat = cost_linear_op_int
 
 (* model N_IOr_bytes *)
 (* Allocates [max size1 size2] bytes *)
+(* fun size1 -> fun size2 -> (32.5381507316 + (0.232425212131 * (max size1 size2))) *)
 let cost_N_IOr_bytes size1 size2 =
   let open S_syntax in
   let v0 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 30 + (v0 lsr 1)
+  S.safe_int 35 + (v0 lsr 1)
 
 (* model N_IPairing_check_bls12_381 *)
 (* when benchmarking, compile bls12-381 without ADX *)
@@ -740,10 +739,11 @@ let cost_N_IXor_nat = cost_linear_op_int
 
 (* model N_IXor_bytes *)
 (* Allocates [max size1 size2] bytes *)
+(* fun size1 -> fun size2 -> (34.0581507316 + (0.232374371286 * (max size1 size2))) *)
 let cost_N_IXor_bytes size1 size2 =
   let open S_syntax in
   let v0 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 30 + (v0 lsr 1)
+  S.safe_int 35 + (v0 lsr 1)
 
 (* model N_KCons *)
 let cost_N_KCons = S.safe_int 10
