@@ -25,6 +25,15 @@
 
 (** This module provides an implementation of the skip list data structure. *)
 
+(** Basic signature for a monad. *)
+module type MONAD = sig
+  type 'a t
+
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+
+  val return : 'a -> 'a t
+end
+
 (** A skip list represents a sequence of values. There are three main
     differences between these [skip list]s and OCaml standard [list]s:
 
@@ -96,37 +105,6 @@ module type S = sig
     'content ->
     ('content, 'ptr) cell
 
-  (** [find ~deref ~cell_ptr ~target_index] returns [Some cell] where [cell] is
-      the cell at position [target_index]. This is done by dereferencing the last
-      pointer of the path returned by {!back_path}. *)
-  val find :
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    cell_ptr:'ptr ->
-    target_index:Z.t ->
-    ('content, 'ptr) cell option
-
-  (** [back_path ~deref ~cell_ptr ~target_index] returns [Some path]
-      where [path] is a sequence of back pointers to traverse to go
-      from [cell_ptr] to the cell at position [target_index] in the
-      sequence denoted by [(deref, cell_ptr)]. *)
-  val back_path :
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    cell_ptr:'ptr ->
-    target_index:Z.t ->
-    'ptr list option
-
-  (** [valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path]
-      returns [true] iff [path] is a valid and minimal path from
-      [cell_ptr] to [target_ptr] in the skip list denoted by
-      [(deref, cell_ptr)]. *)
-  val valid_back_path :
-    equal_ptr:('ptr -> 'ptr -> bool) ->
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    cell_ptr:'ptr ->
-    target_ptr:'ptr ->
-    'ptr list ->
-    bool
-
   type ('ptr, 'content) search_cell_result =
     | Found of ('ptr, 'content) cell
     | Nearest of {
@@ -147,7 +125,42 @@ module type S = sig
     ('ptr, 'content) search_result ->
     unit
 
-  (** [search ~deref ~compare ~cell] allows to find a cell of the skip
+  module type MONADIC = sig
+    (** Type of results for monadic functions. *)
+    type 'a result
+
+    (** [find ~deref ~cell_ptr ~target_index] returns [Some cell] where [cell] is
+      the cell at position [target_index]. This is done by dereferencing the last
+      pointer of the path returned by {!back_path}. *)
+    val find :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_index:Z.t ->
+      ('content, 'ptr) cell option result
+
+    (** [back_path ~deref ~cell_ptr ~target_index] returns [Some path]
+      where [path] is a sequence of back pointers to traverse to go
+      from [cell_ptr] to the cell at position [target_index] in the
+      sequence denoted by [(deref, cell_ptr)]. *)
+    val back_path :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_index:Z.t ->
+      'ptr list option result
+
+    (** [valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path]
+      returns [true] iff [path] is a valid and minimal path from
+      [cell_ptr] to [target_ptr] in the skip list denoted by
+      [(deref, cell_ptr)]. *)
+    val valid_back_path :
+      equal_ptr:('ptr -> 'ptr -> bool) ->
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_ptr:'ptr ->
+      'ptr list ->
+      bool result
+
+    (** [search ~deref ~compare ~cell] allows to find a cell of the skip
      list according to its content. This function assumes that the
      content of the cells is in increasing order according to the
      ordering defined by the function [compare]. In other words, this
@@ -191,11 +204,21 @@ module type S = sig
      is logarithmic. Consequently, since there is a direct pointer
      from [up] to [lower], the passe to [lower] is also
      logarithmic. *)
-  val search :
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    compare:('content -> int) ->
-    cell:('content, 'ptr) cell ->
-    ('content, 'ptr) search_result
+    val search :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      compare:('content -> int) ->
+      cell:('content, 'ptr) cell ->
+      ('content, 'ptr) search_result result
+  end
+
+  (** Functions in the empty monad are accessible directly. *)
+  include MONADIC with type 'a result := 'a
+
+  (** This module contains functions in the {!Lwt} monad. *)
+  module Lwt : MONADIC with type 'a result := 'a Lwt.t
+
+  (** This functor can be used to build monadic functions for the skip list. *)
+  module Make_monadic (M : MONAD) : MONADIC with type 'a result := 'a M.t
 end
 
 module Make (_ : sig
