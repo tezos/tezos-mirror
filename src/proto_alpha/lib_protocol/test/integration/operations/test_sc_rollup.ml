@@ -2586,10 +2586,6 @@ let tests =
       `Quick
       test_originating_with_valid_type;
     Tztest.tztest
-      "originating with invalid types"
-      `Quick
-      test_originating_with_invalid_types;
-    Tztest.tztest
       "originating with invalid boot sector proof"
       `Quick
       test_originating_with_invalid_boot_sector_proof;
@@ -2610,10 +2606,6 @@ let tests =
        binary tree"
       `Quick
       (test_originating_with_wrong_tree ~alter_binary_bit:true);
-    Tztest.tztest
-      "originating with valid type"
-      `Quick
-      test_originating_with_valid_type;
     Tztest.tztest
       "single transaction atomic batch"
       `Quick
