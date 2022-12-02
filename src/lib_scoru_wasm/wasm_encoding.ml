@@ -1218,15 +1218,16 @@ let outboxes_encoding =
 let output_buffer_encoding =
   let open Output_buffer in
   conv
-    (fun (outboxes, last_level, validity_period) ->
-      {outboxes; last_level; validity_period})
-    (fun {outboxes; last_level; validity_period} ->
-      (outboxes, last_level, validity_period))
-    (tup3
+    (fun (outboxes, last_level, validity_period, message_limit) ->
+      {outboxes; last_level; validity_period; message_limit})
+    (fun {outboxes; last_level; validity_period; message_limit} ->
+      (outboxes, last_level, validity_period, message_limit))
+    (tup4
        ~flatten:false
        (scope ["outboxes"] outboxes_encoding)
        (value_option ["last_level"] Data_encoding.int32)
-       (value ["validity_period"] Data_encoding.int32))
+       (value ["validity_period"] Data_encoding.int32)
+       (value ["message_limit"] Data_encoding.z))
 
 let config_encoding ~host_funcs =
   conv

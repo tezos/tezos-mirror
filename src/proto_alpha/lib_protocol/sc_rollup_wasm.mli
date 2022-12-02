@@ -122,6 +122,11 @@ module V2_0_0 : sig
      blocks. *)
   val outbox_validity_period : int32
 
+  (* Maximum number of outbox messages per level.
+
+     Equals to {Constants_parametric_repr.max_outbox_messages_per_level}. *)
+  val outbox_message_limit : Z.t
+
   (** The hash requested by the WASM PVM if it cannot decode the input
       provided by the WASM kernel, that is, if the bytes value cannot
       be decoded with {!Sc_rollup_reveal_hash.encoding}. *)

@@ -7,6 +7,8 @@ exception Non_initialized_outbox
 
 exception Already_initialized_outbox
 
+exception Invalid_outbox_limit
+
 exception Full_outbox
 
 exception Outdated_level
@@ -25,6 +27,7 @@ type t = {
   outboxes : bytes Messages.t Outboxes.t;
   mutable last_level : int32 option;
   validity_period : int32;
+  message_limit : Z.t;  (** Limit of messages per outbox *)
 }
 
 let level_range buffer =
@@ -42,10 +45,10 @@ let get_outbox_last_message_index messages =
 
 (** Predicates on the outboxes *)
 
-let is_outbox_full outbox =
+let is_outbox_full message_limit outbox =
   match get_outbox_last_message_index outbox with
   | Some last_message_index ->
-      Z.Compare.(last_message_index = Z.of_int32 Int32.max_int)
+      Z.Compare.(last_message_index >= Z.pred message_limit)
   | None -> false
 
 let is_outbox_available buffer level =
@@ -66,7 +69,7 @@ let allocate_outbox buffer level =
 
 (** [alloc ~validity_period ~last_level] allocates a new output_buffer. If
     [last_level] is [Some level], the corresponding outbox is allocated. *)
-let alloc ~validity_period ~last_level =
+let alloc ~validity_period ~message_limit ~last_level =
   let buffer =
     {
       outboxes = Outboxes.create ();
@@ -74,6 +77,7 @@ let alloc ~validity_period ~last_level =
       last_level
       (* Note that the last_level is not always known. At the origination of the
          of a kernel the level is not known yet. *);
+      message_limit;
     }
   in
   match last_level with
@@ -134,7 +138,7 @@ let push_message buffer msg =
       (* The outbox exists, we check it can contain more messages and append the
          new message. *)
       let+ last_outbox = Outboxes.get last_level buffer.outboxes in
-      if is_outbox_full last_outbox then raise Full_outbox
+      if is_outbox_full buffer.message_limit last_outbox then raise Full_outbox
       else
         let new_message_index = Messages.append msg last_outbox in
         {outbox_level = last_level; message_index = new_message_index}

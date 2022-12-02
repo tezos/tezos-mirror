@@ -639,14 +639,19 @@ let pp_outboxes out map =
     (Output_buffer.Outboxes.Map.loaded_bindings map)
 
 let pp_output_buffer out
-    ({outboxes; last_level; validity_period} : Output_buffer.t) =
+    ({outboxes; last_level; validity_period; message_limit} : Output_buffer.t) =
   Format.fprintf
     out
-    "@[<v 2>{outboxes = %a;@;last_level = %s;@;validity_period = %ld;@;}@]"
+    "@[<v 2>{outboxes = %a;@;\
+     last_level = %s;@;\
+     validity_period = %ld;@;\
+     message_limit = %s;@;\
+     }@]"
     pp_outboxes
     (Output_buffer.Outboxes.snapshot outboxes)
     (match last_level with Some l -> Int32.to_string l | None -> "None")
     validity_period
+    (Z.to_string message_limit)
 
 let pp_buffers out Eval.{input; output} =
   Format.fprintf

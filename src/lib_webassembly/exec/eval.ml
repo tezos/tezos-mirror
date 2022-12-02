@@ -416,8 +416,13 @@ type config = {
 
 let frame inst locals = {inst; locals}
 
+let output_buffer_message_limit = Z.of_int32 100_000l
+
 let default_output_buffer () =
-  Output_buffer.alloc ~last_level:(Some 0l) ~validity_period:10l
+  Output_buffer.alloc
+    ~last_level:(Some 0l)
+    ~validity_period:10l
+    ~message_limit:output_buffer_message_limit
 
 let buffers ?(input = Input_buffer.alloc ())
     ?(output = default_output_buffer ()) () =
