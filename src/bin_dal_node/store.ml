@@ -71,13 +71,15 @@ let init config =
   Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
 
 module Legacy_paths : sig
-  val slot_by_commitment : string -> string list
+  type path = string list
 
-  val slot_id_by_commitment : string -> Services.Types.slot_id -> string trace
+  val slot_by_commitment : string -> path
 
-  val slot_shards_by_commitment : string -> string trace
+  val slot_id_by_commitment : string -> Services.Types.slot_id -> path
 
-  val slot_shard_by_commitment : string -> int -> string trace
+  val slot_shards_by_commitment : string -> path
+
+  val slot_shard_by_commitment : string -> int -> path
 end = struct
   module Path_internals = struct
     type internal = [`Internal]
@@ -139,6 +141,8 @@ end = struct
       path prefix acc
   end
 
+  type path = string list
+
   let slot_by_commitment c = Path_internals.(data_path @@ slot_by_commitment c)
 
   let slot_id_by_commitment c slot_id =
@@ -185,4 +189,28 @@ module Legacy = struct
     let path = Legacy_paths.slot_by_commitment commitment_b58 in
     let* res_opt = find node_store.slots_store path in
     Option.map Bytes.of_string res_opt |> Lwt.return
+
+  let legacy_add_slot_headers ~block_hash slot_headers node_store =
+    let slot_headers_store = node_store.slot_headers_store in
+    List.iter_s
+      (fun (slot_header, status) ->
+        match status with
+        | Dal_plugin.Succeeded ->
+            let Dal_plugin.{slot_index; commitment; _} = slot_header in
+            Slot_headers_store.add
+              slot_headers_store
+              ~primary_key:block_hash
+              ~secondary_key:slot_index
+              commitment
+        | Dal_plugin.Failed ->
+            (* This function is only supposed to add successfully applied slot
+               headers. Anyway, this piece of code will be removed once fully
+               implementing the new DAL API. *)
+            Lwt.return_unit)
+      slot_headers
+
+  let add_slot_headers ~block_level:_ ~block_hash slot_headers node_store =
+    (* Saving slots headers with the new storage layout will be added in the
+       next MR. *)
+    legacy_add_slot_headers ~block_hash slot_headers node_store
 end

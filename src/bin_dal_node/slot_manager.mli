@@ -64,3 +64,13 @@ val find_slot :
   Store.node_store ->
   Cryptobox.commitment ->
   (slot, [> `Not_found]) result Lwt.t
+
+(** [store_slot_headers ~block_level ~block_hash slot_headers node_store] stores
+    [slot_headers] onto the [node_store] associated to the given [block_hash]
+    baked at level [block_level]. *)
+val store_slot_headers :
+  block_level:int32 ->
+  block_hash:Tezos_crypto.Block_hash.t ->
+  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+  Store.node_store ->
+  unit Lwt.t

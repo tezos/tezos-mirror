@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type operation_application_result = Succeeded | Failed
+
+type slot_header = {
+  published_level : int32;
+  slot_index : int;
+  commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
+}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -35,7 +43,7 @@ module type T = sig
   val get_published_slot_headers :
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
+    (slot_header * operation_application_result) list tzresult Lwt.t
 
   module RPC : sig
     val rpc_services :

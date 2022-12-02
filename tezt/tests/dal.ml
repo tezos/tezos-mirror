@@ -793,7 +793,8 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot node client dal_node source index content =
+let publish_and_store_slot ?(fee = 1_200) node client dal_node source index
+    content =
   let* slot_commitment, proof = split_slot dal_node client content in
   let commitment =
     Cryptobox.Commitment.of_b58check_opt slot_commitment
@@ -804,24 +805,33 @@ let publish_and_store_slot node client dal_node source index content =
       Cryptobox.Commitment_proof.encoding
       (`String proof)
   in
-  let* _ =
-    publish_slot ~source ~fee:1_200 ~index ~commitment ~proof node client
-  in
+  let* _ = publish_slot ~source ~fee ~index ~commitment ~proof node client in
   return (index, slot_commitment)
 
 let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
     client dal_node =
-  let publish = publish_and_store_slot node client dal_node in
+  let publish ?fee = publish_and_store_slot ?fee node client dal_node in
   let* slot0 = publish Constant.bootstrap1 0 "test0" in
   let* slot1 = publish Constant.bootstrap2 1 "test1" in
-  let* slot2 = publish Constant.bootstrap3 4 "test4" in
+  let* slot2_a = publish Constant.bootstrap3 4 ~fee:1_200 "test4_a" in
+  let* slot2_b = publish Constant.bootstrap4 4 ~fee:1_200 "test4_b" in
+  let* slot2_c = publish Constant.bootstrap5 4 ~fee:1_350 "test4_c" in
+  (* slot2_a and slot2_b will be included as failed, slot2_c has better fees for
+     slot 4. We decide to have two failed slots instead of just one to better
+     test some internal aspects of failed slots headers recoding (i.e. having a
+     collection of data instead of just one). *)
+  ignore slot2_a ;
+  ignore slot2_b ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7049
+     Retrieve successfull & failed slots with GET /slots/<commitment>/headers
+     in MR !7049. *)
   let* () = Client.bake_for_and_wait client in
   let* _level = Node.wait_for_level node 1 in
   let* block = RPC.call node (RPC.get_chain_block_hash ()) in
   let* slot_headers =
     RPC.call dal_node (Rollup.Dal.RPC.stored_slot_headers block)
   in
-  Check.(slot_headers = [slot0; slot1; slot2])
+  Check.(slot_headers = [slot0; slot1; slot2_c])
     Check.(list (tuple2 int string))
     ~error_msg:
       "Published header is different from stored header (current = %L, \

@@ -89,3 +89,6 @@ let find_slot node_store commitment =
   match slot_opt with
   | None -> fail `Not_found
   | Some slot_content -> return slot_content
+
+let store_slot_headers ~block_level ~block_hash slot_headers node_store =
+  Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store

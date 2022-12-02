@@ -94,11 +94,3 @@ val save_shards :
   Cryptobox.commitment ->
   Cryptobox.share Cryptobox.IntMap.t ->
   unit tzresult Lwt.t
-
-(** [store_slot_headers store block_hash slot_headers] stores [slot_headers]
-    onto the [store] associated to the given [block_hash] *)
-val store_slot_headers :
-  Slot_headers_store.t ->
-  Tezos_crypto.Block_hash.t ->
-  (int * Cryptobox.commitment) list ->
-  unit Lwt.t
