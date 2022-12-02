@@ -20,7 +20,7 @@ depends: [
   "ezjsonm" { >= "1.1.0" }
   "lwt" { >= "5.6.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
-  "uri" { >= "2.2.0" }
+  "uri" { >= "3.1.0" }
   "tezos-hacl"
   "tezos-stdlib-unix"
   "qcheck-alcotest" { with-test & >= "0.18" }

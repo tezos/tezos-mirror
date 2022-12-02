@@ -20,7 +20,7 @@ depends: [
   "tezos-proxy"
   "tezos-client-base-unix"
   "tezos-signer-backends"
-  "uri" { >= "2.2.0" }
+  "uri" { >= "3.1.0" }
   "tezos-client-014-PtKathma"
   "tezos-baking-014-PtKathma-commands"
   "tezos-protocol-plugin-014-PtKathma"

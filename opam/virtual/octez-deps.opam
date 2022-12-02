@@ -15,7 +15,7 @@ depends: [
   "astring"
   "base-unix"
   "bigstring"
-  "bigstringaf" { >= "0.2.0" }
+  "bigstringaf" { >= "0.5.0" }
   "bisect_ppx" { >= "2.7.0" }
   "bls12-381" { >= "5.0.0" & < "5.1.0" }
   "bls12-381-signature" { = "1.0.0" }
@@ -25,14 +25,14 @@ depends: [
   "caqti-lwt"
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
-  "cohttp-lwt-unix" { >= "2.2.0" }
+  "cohttp-lwt-unix" { >= "4.0.0" }
   "conf-libev"
   "conf-rust"
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "digestif" { >= "0.7.3" }
+  "digestif" { >= "0.9.0" }
   "dune-configurator"
   "ezjsonm" { >= "1.1.0" }
   "fmt" { >= "0.8.7" }
@@ -48,7 +48,7 @@ depends: [
   "irmin-pack" { >= "3.4.3" & < "3.5.0" }
   "js_of_ocaml" { >= "4.0.0" & < "5.0.0" }
   "js_of_ocaml-lwt" { >= "4.0.0" & < "5.0.0" }
-  "json-data-encoding" { >= "0.11" & < "0.13" }
+  "json-data-encoding" { >= "0.12" & < "0.13" }
   "ledgerwallet-tezos" { >= "0.3.0" }
   "logs"
   "lwt" { >= "5.6.0" }
@@ -56,7 +56,7 @@ depends: [
   "lwt-exit"
   "lwt-watcher" { = "0.2" }
   "lwt_log"
-  "mtime" { >= "1.0.0" }
+  "mtime" { >= "1.2.0" }
   "num"
   "ocaml-migrate-parsetree"
   "ocamlformat" { = "0.21.0" }
@@ -79,7 +79,7 @@ depends: [
   "pyml"
   "qcheck-alcotest" { >= "0.18" }
   "qcheck-core"
-  "re" { >= "1.7.2" }
+  "re" { >= "1.9.0" }
   "resto" { >= "1.0" }
   "resto-acl" { >= "1.0" }
   "resto-cohttp" { >= "1.0" }
@@ -95,8 +95,8 @@ depends: [
   "tezos-plompiler" { >= "1.0.1" & < "2.0.0" }
   "tezos-plonk" { >= "1.0.1" & < "2.0.0" }
   "tezos-rust-libs" { = "1.2" }
-  "tls" { >= "0.10" }
-  "uri" { >= "2.2.0" }
+  "tls" { >= "0.13.0" }
+  "uri" { >= "3.1.0" }
   "uutf"
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"

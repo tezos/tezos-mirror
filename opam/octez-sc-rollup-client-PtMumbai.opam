@@ -20,7 +20,7 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-protocol-016-PtMumbai"
   "tezos-sc-rollup-016-PtMumbai"
-  "uri" { >= "2.2.0" }
+  "uri" { >= "3.1.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
