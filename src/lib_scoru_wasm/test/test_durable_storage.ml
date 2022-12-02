@@ -975,7 +975,7 @@ let test_durable_invalid_keys () =
   in
   let* _ =
     assert_invalid_key (fun () ->
-        Lwt.return @@ Durable.key_of_string_exn "/invalid_/key")
+        Lwt.return @@ Durable.key_of_string_exn "/invalid@/key")
   in
   let* _ =
     assert_invalid_key (fun () ->

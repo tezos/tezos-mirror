@@ -67,7 +67,7 @@ let key_of_string_exn s =
     | _ -> raise (Invalid_key s)
   in
   let assert_valid_char = function
-    | '.' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> ()
+    | '.' | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' -> ()
     | _ -> raise (Invalid_key s)
   in
   let all_steps_valid =
@@ -84,7 +84,7 @@ let key_of_string_exn s =
 let key_of_string_opt s =
   try Some (key_of_string_exn s) with Invalid_key _ -> None
 
-(** We append all values with '_', which is an invalid key-character w.r.t.
+(** We append all values with '@', which is an invalid key-character w.r.t.
     external use.
 
     This ensures that an external user is prevented from accidentally writing a
@@ -92,7 +92,9 @@ let key_of_string_opt s =
     chunked_byte_vector to "/a/length", where "/a/length" previously existed as
     part of another chunked_byte_vector encoding.)
 *)
-let to_value_key k = List.append k ["_"]
+let value_marker = "@"
+
+let to_value_key k = List.append k [value_marker]
 
 let assert_key_writeable = function
   | Readonly _ -> raise Readonly_value
@@ -141,7 +143,7 @@ let subtree_name_at tree key index =
   let* list = T.list ~offset:index ~length:1 subtree [] in
   let nth = List.nth list 0 in
   match nth with
-  | Some ("_", _) -> Lwt.return ""
+  | Some (step, _) when Compare.String.(step = value_marker) -> Lwt.return ""
   | Some (step, _) -> Lwt.return step
   | None -> raise (Index_too_large index)
 

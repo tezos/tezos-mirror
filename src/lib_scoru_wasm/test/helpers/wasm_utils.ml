@@ -269,7 +269,7 @@ let make_durable list_key_vals =
   let* tree = empty_tree () in
   let* tree =
     Tree_encoding_runner.encode
-      (Tezos_tree_encoding.value ["durable"; "_"; "keep_me"] Data_encoding.bool)
+      (Tezos_tree_encoding.value ["durable"; "@"; "keep_me"] Data_encoding.bool)
       true
       tree
   in
