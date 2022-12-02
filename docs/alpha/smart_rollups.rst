@@ -694,7 +694,7 @@ the next inbox are being loaded. The inputs that were not consumed by
 kernel from yielding by writing arbitrary data under the path
 ``/kernel/env/reboot`` in its durable storage. In such a case (known
 as reboot), ``kernel_run`` is called again, without dropping unread
-inputs. This value is removed between each call of ``kernel_run``,
+inputs. The value at ``/kernel/env/reboot`` is removed between each call of ``kernel_run``,
 and the ``kernel_run`` function can postpone yielding at most 1,000
 reboots for each Tezos level.
 
