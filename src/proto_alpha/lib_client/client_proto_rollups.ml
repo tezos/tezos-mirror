@@ -81,11 +81,11 @@ module ScRollup = struct
     open Tezos_context_memory
 
     module Tree = struct
-      include Context.Tree
+      include Context_binary.Tree
 
-      type tree = Context.tree
+      type tree = Context_binary.tree
 
-      type t = Context.t
+      type t = Context_binary.t
 
       type key = string list
 
@@ -99,18 +99,18 @@ module ScRollup = struct
     let hash_tree _ = assert false
 
     let verify_proof p f =
-      Lwt.map Result.to_option (Context.verify_tree_proof p f)
+      Lwt.map Result.to_option (Context_binary.verify_tree_proof p f)
 
     let produce_proof context state step =
       let open Lwt_syntax in
-      let* context = Context.add_tree context [] state in
-      let* h = Context.commit ~time:Time.Protocol.epoch context in
-      let index = Context.index context in
-      let* context = Context.checkout_exn index h in
+      let* context = Context_binary.add_tree context [] state in
+      let* h = Context_binary.commit ~time:Time.Protocol.epoch context in
+      let index = Context_binary.index context in
+      let* context = Context_binary.checkout_exn index h in
       match Tree.kinded_key state with
       | Some k ->
-          let index = Context.index context in
-          let* p = Context.produce_tree_proof index k step in
+          let index = Context_binary.index context in
+          let* p = Context_binary.produce_tree_proof index k step in
           return (Some p)
       | None -> return None
 
@@ -124,7 +124,7 @@ module ScRollup = struct
     let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
     let proof_encoding =
-      Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
+      Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
       .tree_proof_encoding
   end
 
@@ -148,11 +148,26 @@ module ScRollup = struct
       (Environment.Wasm_2_0_0.Make)
       (In_memory_context)
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
+     Extracted and adapted from {!Tezos_context_memory}. *)
+  let make_empty_context ?(root = "/tmp") () =
+    let open Lwt_syntax in
+    let context_promise =
+      let+ index = Tezos_context_memory.Context_binary.init root in
+      Tezos_context_memory.Context_binary.empty index
+    in
+    match Lwt.state context_promise with
+    | Lwt.Return result -> result
+    | Lwt.Fail exn -> raise exn
+    | Lwt.Sleep ->
+        (* The in-memory context should never block *)
+        assert false
+
   let origination_proof_exn ~boot_sector kind =
     let aux = function
       | Sc_rollup.Kind.Example_arith ->
           let open Lwt_result_syntax in
-          let context = Tezos_context_memory.make_empty_context () in
+          let context = make_empty_context () in
           let* proof =
             Arith_pvm.produce_origination_proof context boot_sector
           in
@@ -162,7 +177,7 @@ module ScRollup = struct
           return proof
       | Sc_rollup.Kind.Wasm_2_0_0 ->
           let open Lwt_result_syntax in
-          let context = Tezos_context_memory.make_empty_context () in
+          let context = make_empty_context () in
           let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
           let*? proof =
             Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof

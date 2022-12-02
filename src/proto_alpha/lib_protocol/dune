@@ -49,6 +49,7 @@
   Bitset
   Bounded_history_repr
   Skip_list_repr
+  Context_binary_proof
   Michelson_v1_primitives
   Slot_repr
   Tez_repr
@@ -324,6 +325,7 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   skip_list_repr.ml skip_list_repr.mli
+  context_binary_proof.ml context_binary_proof.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
@@ -584,6 +586,7 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   skip_list_repr.ml skip_list_repr.mli
+  context_binary_proof.ml context_binary_proof.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli
@@ -849,6 +852,7 @@
   bitset.ml bitset.mli
   bounded_history_repr.ml bounded_history_repr.mli
   skip_list_repr.ml skip_list_repr.mli
+  context_binary_proof.ml context_binary_proof.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
   tez_repr.ml tez_repr.mli

@@ -33,9 +33,9 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.63
 
 
-./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300006f95ea5b3e9f70013edb89d9a39ee9666a8b8388d733f8ea1f7e3a119eb8c8de6f95ea5b3e9f70013edb89d9a39ee9666a8b8388d733f8ea1f7e3a119eb8c8de900b626f6f745f736563746f72c8baff5f78423676a25d9cd27a412dd932327b9b3e1cc26e754a36410a5efbf7b404636f6465d0d3ba29c544461a2288af2c689a1e460b2194b7ca43d9119fd860a99ef9526c2f0d63757272656e745f6c6576656cc8410f4b37e654840462790217e1c16d8e58eb3d00359ecf0354401d8c8235f187116576616c756174696f6e5f726573756c74c8eda4dcfc891aa48bb021d3ed729b7efc072bfccb367c623f60ed227bc4de490518696e7465726e616c5f6d6573736167655f636f756e746572c8a7ab892baf0a78f9dd880bfbc8dadfcc9aeef9dd1a96652f38678f48391698b00c6c657865725f627566666572c83d74bfd402a0ddcbb4191936d06a813faf4bb78074d99edea947dad189aeaacd0f6d6573736167655f636f756e746572c8fdba9c9eaf85805b298818a3a591547ee7ab9f0e8cb55dd8b535e20498fe1880086d65746164617461c8281aa0d07cc2e6d0380db2abd7a5d06b9d4a370e633cd45444bbd6a626d6c8c50c6e6578745f6d657373616765c8bf64cb3e98695617de52722a0f83ea006d66011d689999ce49cc1de2aeb57775066f7574707574810130c805639510aee988ab3152135cb7851c3eb7d8e19f3b0b5d61a761107951ded1dd0e6f75747075745f636f756e746572c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293d0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293d0e70617273696e675f726573756c74c8eda4dcfc891aa48bb021d3ed729b7efc072bfccb367c623f60ed227bc4de490505737461636bd0ea0b71581cf3b3263274851515fd06b757312f45494fc5ca9900bd8577e20fc306737461747573c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293d047469636bc871d82235ddfbecfdab79788934de4f5aa160db3449fec881b1b46f1c49e94aea6f95ea5b3e9f70013edb89d9a39ee9666a8b8388d733f8ea1f7e3a119eb8c8de0000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
+./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x030002b1f35f2d01c0bc700669980bd694b97b17675776d8cd43ca12a91763c7cc8ad0b1f35f2d01c0bc700669980bd694b97b17675776d8cd43ca12a91763c7cc8ad000100007d0030170000382066f7574707574810130c805639510aee988ab3152135cb7851c3eb7d8e19f3b0b5d61a761107951ded1dd0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c020a45397b8f487765933d13b41a0c94367c331b8e181d108f7366fd8724de3cbc06cebd770767d6e9e746e42e5b2c772092c7874983cd57a5a7d57128ad2a26eb7b1f35f2d01c0bc700669980bd694b97b17675776d8cd43ca12a91763c7cc8ad00000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 5969.758 units (will add 100 for safety)
+Estimated gas: 5879.286 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -46,19 +46,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001773
+    Fee to the baker: ꜩ0.001238
     Expected counter: 1
-    Gas limit: 6070
+    Gas limit: 5980
     Storage limit: 25 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001773
-      payload fees(the block proposer) ....... +ꜩ0.001773
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001238
+      payload fees(the block proposer) ....... +ꜩ0.001238
     Smart contract output message execution:
       Address: [SC_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract output message execution was successfully applied
       Paid storage size diff: 5 bytes
-      Consumed gas: 4766.619
+      Consumed gas: 4676.147
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00125
         storage fees ........................... +ꜩ0.00125

@@ -32,9 +32,17 @@ let originated_rollup op =
   in
   Contract.Internal_for_tests.originated_contract nonce
 
-module In_memory_context = struct
-  open Tezos_context_memory
+module Make_in_memory_context (Context : sig
+  type tree
 
+  include
+    Tezos_context_sigs.Context.TEZOS_CONTEXT
+      with type memory_context_tree := tree
+       and type tree := tree
+       and type value_key = Tezos_crypto.Context_hash.t
+       and type node_key = Tezos_crypto.Context_hash.t
+end) =
+struct
   module Tree = struct
     include Context.Tree
 
@@ -78,9 +86,14 @@ module In_memory_context = struct
   let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
   let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
     .tree_proof_encoding
 end
+
+module In_memory_context =
+  Make_in_memory_context (Tezos_context_memory.Context_binary)
+module Wrong_in_memory_context =
+  Make_in_memory_context (Tezos_context_memory.Context)
 
 module Arith_pvm :
   Sc_rollup.PVM.S
@@ -91,6 +104,15 @@ module Arith_pvm :
       Tezos_context_memory.Context.Proof.t =
   Sc_rollup.ArithPVM.Make (In_memory_context)
 
+module Wrong_arith_pvm :
+  Sc_rollup.PVM.S
+    with type context = Wrong_in_memory_context.Tree.t
+     and type state = Wrong_in_memory_context.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t =
+  Sc_rollup.ArithPVM.Make (Wrong_in_memory_context)
+
 module Wasm_pvm :
   Sc_rollup.PVM.S
     with type context = In_memory_context.Tree.t
@@ -100,21 +122,65 @@ module Wasm_pvm :
       Tezos_context_memory.Context.Proof.t =
   Sc_rollup.Wasm_2_0_0PVM.Make (Environment.Wasm_2_0_0.Make) (In_memory_context)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
+   Extracted and adapted from {!Tezos_context_memory}. *)
+let make_empty_context ?(root = "/tmp") () =
+  let open Lwt_syntax in
+  let context_promise =
+    let+ index = Tezos_context_memory.Context_binary.init root in
+    Tezos_context_memory.Context_binary.empty index
+  in
+  match Lwt.state context_promise with
+  | Lwt.Return result -> result
+  | Lwt.Fail exn -> raise exn
+  | Lwt.Sleep ->
+      (* The in-memory context should never block *)
+      assert false
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4386
+   Extracted and adapted from {!Tezos_context_memory}. *)
+let make_empty_tree =
+  let dummy_context = make_empty_context ~root:"dummy" () in
+  fun () -> Tezos_context_memory.Context_binary.Tree.empty dummy_context
+
 let origination_proof ~boot_sector = function
   | Sc_rollup.Kind.Example_arith ->
       let open Lwt_syntax in
-      let context = Tezos_context_memory.make_empty_context () in
+      let context = make_empty_context () in
       let+ proof = Arith_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
   | Sc_rollup.Kind.Wasm_2_0_0 ->
       let open Lwt_syntax in
-      let context = Tezos_context_memory.make_empty_context () in
+      let context = make_empty_context () in
       let+ proof = Wasm_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Wasm_pvm) proof
+
+(** [wrong_arith_origination_proof ~alter_binary_bit ~boot_sector]
+    returns a serialized proof computed with a Arith PVM using 32-ary
+    trees.
+
+    If [alter_binary_bit] is set to true, the resulting proof lies
+    about the arity of its trees. *)
+let wrong_arith_origination_proof ~alter_binary_bit ~boot_sector =
+  let open Lwt_syntax in
+  let context = Tezos_context_memory.make_empty_context () in
+  let+ proof = Wrong_arith_pvm.produce_origination_proof context boot_sector in
+  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+  let proof =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4386 This should
+       be exposed more cleanly in the Tezos context libraries.
+
+       Basically, the 2nd bit of the `version` field is set to 1 to
+       signal a proof for a [Context_binary] tree.*)
+    if alter_binary_bit then {proof with version = proof.version land 0b10}
+    else proof
+  in
+  WithExceptions.Result.get_ok ~loc:__LOC__
+  @@ Sc_rollup.Proof.serialize_pvm_step ~pvm:(module Arith_pvm) proof
 
 let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
     Sc_rollup.Proof.serialized tzresult Lwt.t =
@@ -128,7 +194,7 @@ let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
 let genesis_commitment ~boot_sector ~origination_level = function
   | Sc_rollup.Kind.Example_arith ->
       let open Lwt_syntax in
-      let context = Tezos_context_memory.make_empty_context () in
+      let context = make_empty_context () in
       let* proof = Arith_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
       let genesis_state_hash = Arith_pvm.proof_stop_state proof in
@@ -137,7 +203,7 @@ let genesis_commitment ~boot_sector ~origination_level = function
           genesis_commitment ~origination_level ~genesis_state_hash)
   | Sc_rollup.Kind.Wasm_2_0_0 ->
       let open Lwt_syntax in
-      let context = Tezos_context_memory.make_empty_context () in
+      let context = make_empty_context () in
       let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
       let genesis_state_hash = Wasm_pvm.proof_stop_state proof in

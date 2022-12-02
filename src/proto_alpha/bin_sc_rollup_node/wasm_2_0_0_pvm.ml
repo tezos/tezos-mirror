@@ -40,7 +40,7 @@ module Wasm_2_0_0_proof_format =
     end)
     (struct
       let proof_encoding =
-        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
+        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
         .tree_proof_encoding
     end)
 

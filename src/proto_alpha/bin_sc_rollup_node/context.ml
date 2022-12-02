@@ -26,17 +26,23 @@
 open Protocol
 open Alpha_context
 open Store_sigs
-module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
+module Context_encoding = Tezos_context_encoding.Context_binary
+
+(* We shadow [Tezos_context_encoding] to prevent accidentally using
+   [Tezos_context_encoding.Context] instead of
+   [Tezos_context_encoding.Context_binary] during a future
+   refactoring.*)
+module Tezos_context_encoding = struct end
+
+module Maker = Irmin_pack_unix.Maker (Context_encoding.Conf)
 
 module IStore = struct
-  include Maker.Make (Tezos_context_encoding.Context.Schema)
-  module Schema = Tezos_context_encoding.Context.Schema
+  include Maker.Make (Context_encoding.Schema)
+  module Schema = Context_encoding.Schema
 end
 
 module IStoreTree =
-  Tezos_context_helpers.Context.Make_tree
-    (Tezos_context_encoding.Context.Conf)
-    (IStore)
+  Tezos_context_helpers.Context.Make_tree (Context_encoding.Conf) (IStore)
 
 type tree = IStore.tree
 
@@ -120,9 +126,7 @@ end) (Proof_encoding : sig
 end) =
 struct
   module IStoreProof =
-    Tezos_context_helpers.Context.Make_proof
-      (IStore)
-      (Tezos_context_encoding.Context.Conf)
+    Tezos_context_helpers.Context.Make_proof (IStore) (Context_encoding.Conf)
 
   module Tree = struct
     include IStoreTree
