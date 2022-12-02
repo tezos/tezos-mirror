@@ -32,7 +32,7 @@ let parse_input_csv file : csv_input_table =
   let first_line = String.split_on_char ',' (input_line chan) in
   let second_line = String.split_on_char ',' (input_line chan) in
   assert (List.length first_line = List.length second_line) ;
-  List.map2 (fun constant value -> (constant, value)) first_line second_line
+  List.combine first_line second_line
 
 let () =
   assert (Array.length Sys.argv = 3) ;
