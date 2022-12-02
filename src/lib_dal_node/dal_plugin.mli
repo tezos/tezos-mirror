@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type operation_application_result =
+  | Succeeded
+      (** The associated operation is included in a block and successfully
+          applied. *)
+  | Failed
+      (** The associated operation is included in a block but its application was
+          not successful (failed, backtracked or skipped). *)
+
 (** Information extracted from DAL slots headers operations included in L1
     blocks. Each slot header is made of an L1 level for which it is published,
     the slot's index and commitment. *)
@@ -44,7 +52,7 @@ module type T = sig
   val get_published_slot_headers :
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    slot_header list tzresult Lwt.t
+    (slot_header * operation_application_result) list tzresult Lwt.t
 
   module RPC : sig
     val rpc_services :

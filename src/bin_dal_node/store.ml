@@ -193,7 +193,7 @@ module Legacy = struct
   let legacy_add_slot_headers ~block_hash slot_headers node_store =
     let slot_headers_store = node_store.slot_headers_store in
     List.iter_s
-      (fun slot_header ->
+      (fun (slot_header, _status) ->
         let Dal_plugin.{slot_index; commitment; _} = slot_header in
         Slot_headers_store.add
           slot_headers_store

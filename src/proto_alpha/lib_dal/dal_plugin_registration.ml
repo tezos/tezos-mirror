@@ -32,6 +32,12 @@ module Plugin = struct
     let* constants = Protocol.Constants_services.all cpctxt (chain, block) in
     return constants.parametric.dal.cryptobox_parameters
 
+  (* Turn the given value of type {!Protocol.Apply_operation_result.operation_result}
+     into a value of type {!Dal_plugin.operation_application_result}. *)
+  let status_of_result = function
+    | Protocol.Apply_operation_result.Applied _ -> Dal_plugin.Succeeded
+    | _ -> Dal_plugin.Failed
+
   let get_published_slot_headers block ctxt =
     let open Lwt_result_syntax in
     let open Protocol.Alpha_context in
@@ -44,23 +50,27 @@ module Plugin = struct
         ()
     in
     let apply_internal acc ~source:_ _op _res = acc in
-    let apply (type kind) acc ~source:_ (op : kind manager_operation) _res =
+    let apply (type kind) acc ~source:_ (op : kind manager_operation)
+        (result : (kind, _, _) Protocol.Apply_operation_result.operation_result)
+        =
       match op with
-      | Dal_publish_slot_header slot_header -> slot_header.header :: acc
+      | Dal_publish_slot_header slot_header ->
+          (slot_header.header, status_of_result result) :: acc
       | _ -> acc
     in
     Layer1_services.(
       process_manager_operations [] block.operations {apply; apply_internal})
-    |> List.map_es (fun slot ->
+    |> List.map_es (fun (slot, status) ->
            return
              Dal_plugin.
-               {
-                 published_level =
-                   Raw_level.to_int32 slot.Dal.Slot.Header.id.published_level;
-                 slot_index =
-                   Dal.Slot_index.to_int slot.Dal.Slot.Header.id.index;
-                 commitment = slot.Dal.Slot.Header.commitment;
-               })
+               ( {
+                   published_level =
+                     Raw_level.to_int32 slot.Dal.Slot.Header.id.published_level;
+                   slot_index =
+                     Dal.Slot_index.to_int slot.Dal.Slot.Header.id.index;
+                   commitment = slot.Dal.Slot.Header.commitment;
+                 },
+                 status ))
 
   module RPC = RPC
 end
