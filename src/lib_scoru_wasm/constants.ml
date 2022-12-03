@@ -56,3 +56,8 @@ let stuck_flag_key = Durable.key_of_string_exn "/readonly/kernel/env/stuck"
 
 let too_many_reboot_flag_key =
   Durable.key_of_string_exn "/readonly/kernel/env/too_many_reboot"
+
+(* The path to where the WASM PVM exposes the remaining reboots a
+   kernel can do with a given inbox. *)
+let reboot_counter_key =
+  Durable.key_of_string_exn "/readonly/kernel/env/reboot_counter"
