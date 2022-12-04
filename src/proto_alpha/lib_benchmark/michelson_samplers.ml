@@ -65,7 +65,6 @@ type type_name =
   | `TKey
   | `TTimestamp
   | `TAddress
-  | `TTx_rollup_l2_address
   | `TBool
   | `TPair
   | `TUnion
@@ -98,7 +97,6 @@ type atomic_type_name =
   | `TKey
   | `TTimestamp
   | `TAddress
-  | `TTx_rollup_l2_address
   | `TBool
   | `TSapling_transaction
   | `TSapling_transaction_deprecated
@@ -139,7 +137,6 @@ let all_atomic_type_names : atomic_type_name array =
     `TKey;
     `TTimestamp;
     `TAddress;
-    `TTx_rollup_l2_address;
     `TBool;
     `TSapling_transaction;
     `TSapling_transaction_deprecated;
@@ -178,7 +175,6 @@ type comparable_type_name =
   | `TTimestamp
   | `TChain_id
   | `TAddress
-  | `TTx_rollup_l2_address
   | `TPair
   | `TUnion
   | `TOption ]
@@ -204,7 +200,6 @@ let all_comparable_atomic_type_names : 'a comparable_and_atomic array =
     `TTimestamp;
     `TChain_id;
     `TAddress;
-    `TTx_rollup_l2_address;
   |]
 
 type 'a comparable_and_non_atomic = 'a
@@ -298,7 +293,6 @@ end)
       | `TBytes -> Ex_ty bytes_t
       | `TBool -> Ex_ty bool_t
       | `TAddress -> Ex_ty address_t
-      | `TTx_rollup_l2_address -> Ex_ty tx_rollup_l2_address_t
       | `TTimestamp -> Ex_ty timestamp_t
       | `TKey_hash -> Ex_ty key_hash_t
       | `TMutez -> Ex_ty mutez_t
@@ -323,7 +317,6 @@ end)
       | `TBytes -> Ex_comparable_ty bytes_t
       | `TBool -> Ex_comparable_ty bool_t
       | `TAddress -> Ex_comparable_ty address_t
-      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_t
       | `TTimestamp -> Ex_comparable_ty timestamp_t
       | `TKey_hash -> Ex_comparable_ty key_hash_t
       | `TMutez -> Ex_comparable_ty mutez_t
@@ -502,10 +495,6 @@ end)
         Alpha_context.Contract.originated_encoding
         string
 
-    let tx_rollup rng_state =
-      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
-      Data_encoding.Binary.of_string_exn Alpha_context.Tx_rollup.encoding string
-
     let sc_rollup rng_state =
       let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
       Data_encoding.Binary.of_string_exn
@@ -589,26 +578,7 @@ end)
                  destination
                  entrypoint)
           else generate_any_type_contract arg_ty
-      | Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _) ->
-          let* b = Base_samplers.uniform_bool in
-          if b then
-            let* tx_rollup = tx_rollup in
-            let destination = Alpha_context.Destination.Tx_rollup tx_rollup in
-            let entrypoint = Alpha_context.Entrypoint.deposit in
-            return
-              (Typed_contract.Internal_for_tests.typed_exn
-                 arg_ty
-                 destination
-                 entrypoint)
-          else generate_any_type_contract arg_ty
       | _ -> generate_any_type_contract arg_ty
-
-    let tx_rollup_l2_address rng_state =
-      let seed =
-        Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
-      in
-      let pkh, _pk, _sk = Tezos_crypto.Bls.generate_key ~seed () in
-      Tx_rollup_l2_address.Indexable.value pkh
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
@@ -634,7 +604,6 @@ end)
         | Timestamp_t -> Michelson_base.timestamp
         | Bool_t -> Base_samplers.uniform_bool
         | Address_t -> address
-        | Tx_rollup_l2_address_t -> tx_rollup_l2_address
         | Pair_t (left_t, right_t, _, _) ->
             M.(
               let* left_v = value left_t in
@@ -661,6 +630,9 @@ end)
         | Bls12_381_g2_t -> generate_bls12_381_g2
         | Bls12_381_fr_t -> generate_bls12_381_fr
         | Ticket_t (contents_ty, _) -> generate_ticket contents_ty
+        | Tx_rollup_l2_address_t ->
+            fail_sampling
+              "Michelson_samplers: tx_rollup_l2_address is deprecated"
         | Sapling_transaction_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"

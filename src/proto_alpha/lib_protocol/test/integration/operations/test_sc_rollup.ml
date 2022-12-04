@@ -993,7 +993,6 @@ let test_originating_with_valid_type () =
     "bls12_381_g2";
     "bool";
     "never";
-    "tx_rollup_l2_address";
     "chain_id";
     "ticket string";
     "set nat";

@@ -159,7 +159,7 @@ let constants_mainnet =
     cache_sampler_state_cycles = 8;
     tx_rollup =
       {
-        enable = true;
+        enable = false;
         (* Based on how storage burn is implemented for
            transaction rollups, this means that a rollup operator
            can create 100 inboxes (40 bytes per inbox) before

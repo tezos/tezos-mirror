@@ -983,7 +983,7 @@ let prepare_first_block ~level ~timestamp ctxt =
       let tx_rollup =
         Constants_parametric_repr.
           {
-            enable = c.tx_rollup.enable;
+            enable = false;
             origination_size = c.tx_rollup.origination_size;
             hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
             hard_size_limit_per_message =

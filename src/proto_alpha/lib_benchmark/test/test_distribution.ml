@@ -22,7 +22,6 @@ let pp_type_name fmtr (t : type_name) =
   | `TTicket -> "ticket"
   | `TMap -> "map"
   | `TAddress -> "address"
-  | `TTx_rollup_l2_address -> "tx_rollup_l2_address"
   | `TContract -> "contract"
   | `TBls12_381_fr -> "bls12_381_fr"
   | `TSapling_transaction -> "sapling_transaction"
@@ -65,7 +64,7 @@ let rec tnames_of_type :
   | Script_typed_ir.Key_t -> `TKey :: acc
   | Script_typed_ir.Timestamp_t -> `TTimestamp :: acc
   | Script_typed_ir.Address_t -> `TAddress :: acc
-  | Script_typed_ir.Tx_rollup_l2_address_t -> `TTx_rollup_l2_address :: acc
+  | Script_typed_ir.Tx_rollup_l2_address_t -> assert false
   | Script_typed_ir.Bool_t -> `TBool :: acc
   | Script_typed_ir.Pair_t (lty, rty, _, _) ->
       tnames_of_type lty (tnames_of_type rty (`TPair :: acc))

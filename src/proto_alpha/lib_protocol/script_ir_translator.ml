@@ -617,7 +617,7 @@ let rec parse_ty :
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt address_t
     | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
-        if Constants.tx_rollup_enable ctxt then
+        if Constants.tx_rollup_enable ctxt || legacy then
           check_type_annot loc annot >|? fun () ->
           return ctxt tx_rollup_l2_address_t
         else error @@ Tx_rollup_addresses_disabled loc
@@ -2041,7 +2041,9 @@ let rec parse_data :
   | Chain_id_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | Address_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
   | Tx_rollup_l2_address_t, expr ->
-      Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
+      if Constants.tx_rollup_enable ctxt || legacy then
+        Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
+      else tzfail (Deprecated_instruction T_tx_rollup_l2_address)
   | Contract_t (arg_ty, _), expr ->
       traced
         ( parse_address ctxt expr >>?= fun (address, ctxt) ->

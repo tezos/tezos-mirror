@@ -166,10 +166,7 @@ let () =
     ~title:"Tx rollup is disabled"
     ~description:"Cannot originate a tx rollup as it is disabled."
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Cannot apply a tx rollup operation as it is disabled. This feature \
-         will be enabled in a future proposal")
+      Format.fprintf ppf "Cannot apply a tx rollup operation as it is disabled.")
     Data_encoding.unit
     (function Tx_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Tx_rollup_feature_disabled) ;
