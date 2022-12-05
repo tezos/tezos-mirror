@@ -35,7 +35,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send sc rollup message 'hex:["3337204b543153364537793463703851657451516a555467784d646f6d706a4b66386f7377675525617578"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1000.086 units (will add 100 for safety)
+Estimated gas: 1001.339 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -48,14 +48,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000386
     Expected counter: 1
-    Gas limit: 1101
+    Gas limit: 1102
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000386
       payload fees(the block proposer) ....... +ꜩ0.000386
     Smart contract rollup messages submission
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1000.086
+      Consumed gas: 1001.373
 
 
 ./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x03000262068a20f091ef7410f9ad45aaa9a76b5f3f1c7514a6616343b6d079cd02b5c962068a20f091ef7410f9ad45aaa9a76b5f3f1c7514a6616343b6d079cd02b5c900100007d0030170000382066f7574707574810130c805639510aee988ab3152135cb7851c3eb7d8e19f3b0b5d61a761107951ded1dd0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c020a45397b8f487765933d13b41a0c94367c331b8e181d108f7366fd8724de3cbc0341f98e2e09c8e648e2ad9572b9a0a6c2fadeb87e5334650a4e0bb0abefd5f4962068a20f091ef7410f9ad45aaa9a76b5f3f1c7514a6616343b6d079cd02b5c90000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10

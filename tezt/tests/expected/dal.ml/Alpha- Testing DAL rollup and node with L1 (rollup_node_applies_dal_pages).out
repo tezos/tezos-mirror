@@ -53,7 +53,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send sc rollup message '["dal:3:0:0","dal:3:1:0"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1000.036 units (will add 100 for safety)
+Estimated gas: 1002.500 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -66,14 +66,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000365
     Expected counter: 2
-    Gas limit: 1101
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000365
       payload fees(the block proposer) ....... +ꜩ0.000365
     Smart contract rollup messages submission
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1000.036
+      Consumed gas: 1002.610
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/sc_rollups/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
@@ -82,7 +82,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send sc rollup message '[" 99 3 "," dal:3:1:0 "," dal:3:1:1 "," dal:3:0:0 "," dal:3:0:2 "," dal:2:1:0 "," dal:5:1:0 "," dal:3:10000:0 "," dal:3:0:100000 "," dal:3:-10000:0 "," dal:3:0:-100000 "," dal:3:expecting_integer:0 "," dal:3:0:expecting_integer "," dal:1002147483647:1:1 ","   + + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1000.450 units (will add 100 for safety)
+Estimated gas: 1021.270 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -93,16 +93,16 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000624
+    Fee to the baker: ꜩ0.000626
     Expected counter: 3
-    Gas limit: 1101
+    Gas limit: 1122
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000624
-      payload fees(the block proposer) ....... +ꜩ0.000624
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000626
+      payload fees(the block proposer) ....... +ꜩ0.000626
     Smart contract rollup messages submission
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1000.450
+      Consumed gas: 1021.532
 
 
 ./octez-sc-rollup-client-alpha get state value for vars/value --block head

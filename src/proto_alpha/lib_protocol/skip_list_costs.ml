@@ -29,7 +29,7 @@ module S = Saturation_repr
 (* fun size -> (41.51416897 * (log2 (1 + size))) *)
 let model_next ~length =
   let open S.Syntax in
-  let length = S.safe_int length in
+  let length = S.safe_z length in
   S.safe_int 42 * log2 (S.safe_int 1 + length)
 
 (* model model_hash_cell *)
@@ -37,4 +37,11 @@ let model_next ~length =
 let model_hash_cell ~backpointers_count =
   let open S.Syntax in
   let backpointers_count = S.safe_int backpointers_count in
+  S.safe_int 614 + (S.safe_int 34 * backpointers_count)
+
+(* model model_hash_cell *)
+(* fun size -> (614.246755643 + (33.7098924139 * size)) *)
+let model_hash_cell_computed_backpointers_count ~index =
+  let open S.Syntax in
+  let backpointers_count = log2 (S.safe_z index) in
   S.safe_int 614 + (S.safe_int 34 * backpointers_count)

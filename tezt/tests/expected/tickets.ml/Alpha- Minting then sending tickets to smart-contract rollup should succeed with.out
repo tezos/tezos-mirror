@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[SC_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4511.774 units (will add 100 for safety)
+Estimated gas: 4513.154 units (will add 100 for safety)
 Estimated storage: 132 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000758
     Expected counter: 3
-    Gas limit: 4612
+    Gas limit: 4614
     Storage limit: 152 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000758
@@ -40,7 +40,7 @@ This sequence of operations was run:
           Parameter: { Pair 0x01fd32c99a7029e62387c85d6e9394626ecbcaa97700 (Pair "Ticket2" 1) ;
                        Pair 0x01fd32c99a7029e62387c85d6e9394626ecbcaa97700 (Pair "Ticket" 1) }
           This transaction was successfully applied
-          Consumed gas: 1007.639
+          Consumed gas: 1009.053
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string

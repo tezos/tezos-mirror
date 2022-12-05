@@ -128,12 +128,21 @@ let assert_timeout_result ?game_status incr =
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
 let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
-    ?(timeout_period_in_blocks = 10) tup =
+    ?(timeout_period_in_blocks = 10) ?hard_gas_limit_per_operation
+    ?hard_gas_limit_per_block tup =
   Context.init_with_constants_gen
     tup
     {
       Context.default_test_constants with
       consensus_threshold = 0;
+      hard_gas_limit_per_operation =
+        Option.value
+          hard_gas_limit_per_operation
+          ~default:Context.default_test_constants.hard_gas_limit_per_operation;
+      hard_gas_limit_per_block =
+        Option.value
+          hard_gas_limit_per_block
+          ~default:Context.default_test_constants.hard_gas_limit_per_block;
       sc_rollup =
         {
           Context.default_test_constants.sc_rollup with
@@ -1720,7 +1729,14 @@ let test_insufficient_ticket_balances () =
        output)
 
 let test_inbox_max_number_of_messages_per_level () =
-  let* block, (account1, account2) = context_init Context.T2 in
+  let* block, (account1, account2) =
+    (* set sort of unlimited gas or we are going to hit gas exhaustion. *)
+    context_init
+      ~hard_gas_limit_per_operation:(Gas.Arith.integral_of_int_exn 100_000_000)
+      ~hard_gas_limit_per_block:
+        (Gas.Arith.integral_of_int_exn Int.(max_int / 1000))
+      Context.T2
+  in
   let* block, _rollup = sc_originate block account1 "unit" in
   let max_number_of_messages_per_level =
     Constants.sc_rollup_max_number_of_messages_per_level
@@ -1730,7 +1746,9 @@ let test_inbox_max_number_of_messages_per_level () =
   let messages =
     List.repeat (Z.to_int max_number_of_messages_per_level) "foo"
   in
-  let* op = Op.sc_rollup_add_messages (I incr) account1 messages in
+  let* op =
+    Op.sc_rollup_add_messages ~gas_limit:Max (I incr) account1 messages
+  in
   let* incr = Incremental.add_operation ~check_size:false incr op in
   (* This break the limit *)
   let* op = Op.sc_rollup_add_messages (I incr) account2 ["foo"] in
