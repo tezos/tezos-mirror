@@ -71,13 +71,33 @@ Node
 - **Breaking change**: bumped the node's storage version to
   ``3.0``. This new version changes the store's representation
   required by the new protocol's semantics. Upgrading to this new
-  version is automatic and irreversible.
+  version is automatic and irreversible. (MR :gl: `!6835`)
 
 - **Breaking change**: bumped the snapshot version to ``5``. This
   version changes internal snapshot file representation to include
   more information required by the new protocol's semantics. Snapshots
   of version ``4`` exported with previous versions of Octez can still
   be imported. Snapshots of version ``5`` are not backward compatible.
+  (MR :gl: `!6835`)
+
+- Upon receiving a new non-manager operation that conflicts with a
+  previously validated operation, the mempool may now replace the old
+  operation with the new one, depending on both operations' content
+  and hash. This behavior was already in place for manager operations,
+  and has simply be extended to non-manager operations. It should help
+  all mempools converge toward the same set of accepted operations,
+  regardless of the order in which the operations were
+  received. (MR :gl: `!6749`)
+
+- Changed the id and message of the error when the mempool rejects a
+  new operation because it already contains a preferred conflicting
+  operation. Changed the id and message of the error associated with
+  an operation that is removed from the mempool to make room for a
+  better conflicting operation. (MR :gl: `!6749`)
+
+- Fixed a minor bug that caused the mempool to accept a manager
+  operation that conflicts with an already present ``drain_delegate``
+  operation. (MR :gl: `!6749`)
 
 - Removed the compatibility with storage snapshots of version ``2``
   and ``3``. These snapshot versions from Octez 12 cannot be imported
@@ -111,7 +131,7 @@ Baker
   the user directly removes the file
   ``<client-dir>/<chain_id>_baker_state``. On mainnet, this will have
   no effect as when the new protocol activates, previous bakers will
-  be permanently idle.
+  be permanently idle. (MR :gl: `!6835`)
 
 - Fixed an issue where the baker would keep files opened longer than
   necessary causing unexpected out of space errors making the baker
