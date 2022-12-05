@@ -152,21 +152,21 @@ let finalisation ctxt =
       Dal.Slot.finalize_pending_slot_headers ctxt
       >|=? fun (ctxt, attestation) -> (ctxt, Some attestation))
 
+let compute_committee ctxt level =
+  assert_dal_feature_enabled ctxt >>?= fun () ->
+  let pkh_from_tenderbake_slot slot =
+    Stake_distribution.slot_owner ctxt level slot
+    >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
+  in
+  (* This committee is cached because it is the one we will use
+     for the validation of the DAL attestations. *)
+  Alpha_context.Dal.Attestation.compute_committee ctxt pkh_from_tenderbake_slot
+
 let initialisation ctxt ~level =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled
     ctxt
     ~default:(fun ctxt -> return ctxt)
     (fun ctxt ->
-      let pkh_from_tenderbake_slot slot =
-        Stake_distribution.slot_owner ctxt level slot
-        >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
-      in
-      (* This committee is cached because it is the one we will use
-         for the validation of the DAL attestations. *)
-      let* committee =
-        Alpha_context.Dal.Attestation.compute_committee
-          ctxt
-          pkh_from_tenderbake_slot
-      in
-      return (Alpha_context.Dal.Attestation.init_committee ctxt committee))
+      let+ committee = compute_committee ctxt level in
+      Alpha_context.Dal.Attestation.init_committee ctxt committee)

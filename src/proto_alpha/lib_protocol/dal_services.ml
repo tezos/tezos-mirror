@@ -37,13 +37,7 @@ let shards ctxt ~level =
   let open Dal.Attestation in
   assert_dal_feature_enabled ctxt >>?= fun () ->
   let level = Level.from_raw ctxt level in
-  let pkh_from_tenderbake_slot slot =
-    Stake_distribution.slot_owner ctxt level slot
-    >|=? fun (ctxt, consensus_key) -> (ctxt, consensus_key.delegate)
-  in
   (* We do not cache this committee. This function being used by RPCs
      to know the DAL committee at some particular level. *)
-  let* committee =
-    Dal.Attestation.compute_committee ctxt pkh_from_tenderbake_slot
-  in
-  Signature.Public_key_hash.Map.bindings committee.pkh_to_shards |> return
+  let+ committee = Dal_apply.compute_committee ctxt level in
+  Signature.Public_key_hash.Map.bindings committee.pkh_to_shards
