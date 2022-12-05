@@ -31,12 +31,26 @@ CHAN=C04HZHR11DW
 # messages as the gas-benchmarks-reports bot.
 TOK="$(cat "$HOME"/slack_token)"
 
+# To test this script without polluting the Slack channel, it is possible to
+# deactivate Slack messaging by setting the environment variable
+# DISABLE_SLACK_MESSAGING to any non-empty string.
+
 slack() {
-    curl -X POST -H 'Authorization: Bearer '"$TOK" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"$CHAN\",\"text\":\"$1\"}" https://tezos-dev.slack.com/api/chat.postMessage
+    if [ "$DISABLE_SLACK_MESSAGING" = "" ]
+    then
+        curl -X POST -H 'Authorization: Bearer '"$TOK" -H 'Content-type: application/json; charset=utf-8' --data "{\"channel\":\"$CHAN\",\"text\":\"$1\"}" https://tezos-dev.slack.com/api/chat.postMessage
+    else
+        echo "Message \"$1\" would be sent on Slack but Slack messaging has been disabled."
+    fi
 }
 
 slack_send_file() {
-    curl -F file=@"$1" -F "initial_comment=$2" -F channels="$CHAN" -F token="$TOK" https://tezos-dev.slack.com/api/files.upload
+    if [ "$DISABLE_SLACK_MESSAGING" = "" ]
+    then
+        curl -F file=@"$1" -F "initial_comment=$2" -F channels="$CHAN" -F token="$TOK" https://tezos-dev.slack.com/api/files.upload
+    else
+        echo "File \"$1\" would be sent on Slack with message \"$2\" but Slack messaging has been disabled."
+    fi
 }
 
 OCTEZ_DIR="/data/redbull/tezos"
