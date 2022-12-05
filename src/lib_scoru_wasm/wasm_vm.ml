@@ -141,7 +141,12 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
            })
   | Decode m ->
       let* kernel = Durable.find_value_exn durable Constants.kernel_key in
-      let* m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
+      let* m =
+        Tezos_webassembly_interpreter.Decode.module_step
+          ~allow_floats:false
+          kernel
+          m
+      in
       return (Decode m)
   | Link {ast_module; externs; imports_offset}
     when link_finished ast_module imports_offset ->

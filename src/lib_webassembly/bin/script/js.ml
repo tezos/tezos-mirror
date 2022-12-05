@@ -717,6 +717,7 @@ let of_command mods cmd =
           | Textual m -> Lwt.return m
           | Encoded (_, bytes) ->
               Decode.decode
+                ~allow_floats:true
                 ~name:"binary"
                 ~bytes:(Chunked_byte_vector.of_string bytes)
           | Quoted (_, s) -> unquote (Parse.string_to_module s)

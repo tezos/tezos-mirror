@@ -121,6 +121,7 @@ let extract_interpreter_error exn =
   (* The locations are removed during encoding, they won't be usable in practice. *)
   | Binary_exn.Decode_error.Error (_, explanation)
   | Binary_exn.Encode_error.Error (_, explanation)
+  | Binary_exn.Floating_point.Error (_, explanation)
   | Valid.Invalid (_, explanation)
   | Eval.Link (_, explanation)
   | Eval.Trap (_, explanation)
