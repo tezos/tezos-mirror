@@ -831,7 +831,7 @@ let cost_play _game refutation =
          balanced binary tree of this size (with a maximal size of
          leaves since the hashing of internal nodes can be neglected.
 
-         We also consider the largest tick known. At the time writing
+         We also consider the largest tick known. At the time of writing
          this comment, the largest tick is the origination tick of the
          PVM. If we assume that the origination has been done with a
          kernel of maximum size, and we also assume that most of the
@@ -839,7 +839,7 @@ let cost_play _game refutation =
          consider, again, that the cost of hashing dominates
          everything else.
 
-         We multiply this number by 10 by security.
+         We multiply this number by 10 for extra safety.
 
          At the time of writing this comment, this leads to 372940
          mgas for the proof wellformedness verification and 372940
