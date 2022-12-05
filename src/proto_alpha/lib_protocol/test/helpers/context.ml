@@ -432,12 +432,13 @@ module Sc_rollup = struct
       ()
 
   let ongoing_games_for_staker ctxt sc_rollup staker =
-    Environment.RPC_context.make_call1
+    Environment.RPC_context.make_call2
       Plugin.RPC.Sc_rollup.S.ongoing_refutation_games
       rpc_ctxt
       ctxt
       sc_rollup
       staker
+      ()
       ()
 end
 

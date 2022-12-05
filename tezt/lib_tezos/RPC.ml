@@ -765,11 +765,10 @@ let get_chain_block_context_sc_rollups_all ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "all"]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_games ?(chain = "main")
-    ?(block = "head") ~staker sc_rollup () =
+let get_chain_block_context_sc_rollups_sc_rollup_games_with_staker
+    ?(chain = "main") ?(block = "head") ~staker sc_rollup () =
   make
     GET
-    ~query_string:[("staker", staker)]
     [
       "chains";
       chain;
@@ -779,7 +778,8 @@ let get_chain_block_context_sc_rollups_sc_rollup_games ?(chain = "main")
       "sc_rollups";
       "sc_rollup";
       sc_rollup;
-      "games";
+      "games_with_staker";
+      staker;
     ]
     Fun.id
 
