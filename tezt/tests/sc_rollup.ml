@@ -2192,7 +2192,8 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
   in
   unit
 
-let test_reinject_failed_commitment ~kind =
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4373 *)
+let _test_reinject_failed_commitment ~kind =
   let commitment_period = 3 in
   test_full_scenario
     ~kind
@@ -3693,7 +3694,9 @@ let register ~kind ~protocols =
     test_consecutive_commitments
     protocols
     ~kind ;
-  test_reinject_failed_commitment protocols ~kind ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
+     Uncomment this test as soon as the issue done.
+     test_reinject_failed_commitment protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message

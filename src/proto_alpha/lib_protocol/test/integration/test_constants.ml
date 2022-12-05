@@ -142,15 +142,22 @@ let test_sc_rollup_commitment_storage_size () =
   in
   (* commitment stake count is encoded in Int32, but is not exposed here *)
   let commitment_stake_count = 300l in
+  let commitment_count_per_level = 3l in
   let commitment_stake_count_bytes =
     Data_encoding.Binary.to_bytes_exn Data_encoding.int32 commitment_stake_count
+  in
+  let commitment_count_per_level_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Data_encoding.int32
+      commitment_count_per_level
   in
   Assert.equal_int
     ~loc:__LOC__
     Sc_rollup_stake_storage.commitment_storage_size_in_bytes
     (Bytes.length commitment_bytes
     + Bytes.length level_bytes
-    + Bytes.length commitment_stake_count_bytes)
+    + Bytes.length commitment_stake_count_bytes
+    + Bytes.length commitment_count_per_level_bytes)
 
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)

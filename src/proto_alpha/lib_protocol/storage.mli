@@ -828,17 +828,24 @@ module Sc_rollup : sig
       level of publication of the first commitment. This is used to compute the
       curfew for a given rollup and inbox level.
 
-      The storage size is bounded for each rollup by 
-  
+      The storage size is bounded for each rollup by
+
                           [max_lookahead / commitment_period]
 
-      Since the storage is cleaned when commitments are cemented, this storage 
+      Since the storage is cleaned when commitments are cemented, this storage
       space is only temporarily bought by stakers with their deposits.
   *)
   module Commitment_first_publication_level :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Raw_level_repr.t
        and type value = Raw_level_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** This storage contains number of commitments with a particular inbox level *)
+  module Commitment_count_per_inbox_level :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Raw_level_repr.t
+       and type value = int32
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   module Commitment_added :

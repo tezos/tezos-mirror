@@ -2492,78 +2492,6 @@ let test_curfew () =
   let* _incr = Incremental.add_operation ~expect_apply_failure incr publish4 in
   return_unit
 
-(** [test_curfew_is_clean] makes sure that the curfew-related storage is cleaned
-    when a commitment is cemented. *)
-let test_curfew_is_clean () =
-  let open Lwt_result_syntax in
-  let* block, account1, rollup = init_and_originate Context.T1 "unit" in
-  let find_first_publication_level block inbox_level =
-    let* alpha_ctxt = Block.to_alpha_ctxt block in
-    let raw_ctxt = Alpha_context.Internal_for_tests.to_raw alpha_ctxt in
-    let rollup =
-      Data_encoding.Binary.(
-        to_bytes_exn Alpha_context.Sc_rollup.Address.encoding rollup
-        |> of_bytes_exn Protocol.Sc_rollup_repr.Address.encoding)
-    in
-    let inbox_level =
-      Data_encoding.Binary.(
-        to_bytes_exn Raw_level.encoding inbox_level
-        |> of_bytes_exn Raw_level_repr.encoding)
-    in
-    let* _raw_ctxt, first_publication_level =
-      Storage.Sc_rollup.Commitment_first_publication_level.find
-        (raw_ctxt, rollup)
-        inbox_level
-      >|= Environment.wrap_tzresult
-    in
-    return first_publication_level
-  in
-  let* constants = Context.get_constants (B block) in
-  let challenge_window =
-    constants.parametric.sc_rollup.challenge_window_in_blocks
-  in
-  let commitment_period =
-    constants.parametric.sc_rollup.commitment_period_in_blocks
-  in
-  let* block = Block.bake_n commitment_period block in
-  let* commitment = dummy_commitment (B block) rollup in
-  let* operation = Op.sc_rollup_publish (B block) account1 rollup commitment in
-  let* first_publication_level =
-    find_first_publication_level block commitment.inbox_level
-  in
-  let* () =
-    match first_publication_level with
-    | Some _x ->
-        failwith "The storage should be empty before the first publication."
-    | None -> return_unit
-  in
-  let* block = Block.bake ~operation block in
-  let* () =
-    let* first_publication_level =
-      find_first_publication_level block commitment.inbox_level
-    in
-    match first_publication_level with
-    | Some x ->
-        assert (
-          Int32.equal block.header.shell.level @@ Raw_level_repr.to_int32 x) ;
-        return_unit
-    | None -> failwith "The level of publication is expected to exist"
-  in
-  let* block = Block.bake_n challenge_window block in
-  let* cement_op =
-    let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
-    Op.sc_rollup_cement (B block) account1 rollup hash
-  in
-  let* block = Block.bake block ~operation:cement_op in
-  let* first_publication_level =
-    find_first_publication_level block commitment.inbox_level
-  in
-  match first_publication_level with
-  | Some _x ->
-      failwith
-        "The storage should have been cleaned when commitment is cemented"
-  | None -> return_unit
-
 (** [test_curfew_period_is_started_only_after_first_publication checks that
     publishing the first commitment of a given [inbox_level] after
     [inbox_level + challenge_window] is still possible. *)
@@ -2582,6 +2510,49 @@ let test_curfew_period_is_started_only_after_first_publication () =
   let* commitment = dummy_commitment (B block) rollup in
   let* operation = Op.sc_rollup_publish (B block) account1 rollup commitment in
   let* _block = Block.bake ~operation block in
+  return_unit
+
+let test_offline_staker_does_not_prevent_cementation () =
+  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let contract1, contract2 = contracts in
+  let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
+  (* A publishes a commitment on C1. *)
+  let* commitment1 = dummy_commitment (B ctxt) rollup in
+  let* operation = Op.sc_rollup_publish (B ctxt) contract1 rollup commitment1 in
+  let* b = Block.bake ~operation ctxt in
+
+  (* We cement C1. *)
+  let* constants = Context.get_constants (B b) in
+  let* b =
+    Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
+  in
+  let hash = Sc_rollup.Commitment.hash_uncarbonated commitment1 in
+  let* cement_op = Op.sc_rollup_cement (B b) contract1 rollup hash in
+  let* b = Block.bake ~operation:cement_op b in
+
+  (* A now goes offline, B takes over. *)
+  let* commitment2 = dummy_commitment (B b) rollup in
+  let commitment2 =
+    {
+      commitment2 with
+      predecessor = hash;
+      inbox_level = Raw_level.of_int32_exn 61l;
+    }
+  in
+  let* operation2 =
+    Op.sc_rollup_publish (B ctxt) contract2 rollup commitment2
+  in
+  let* b = bake_blocks_until_inbox_level b commitment2 in
+  let* b = Block.bake ~operation:operation2 b in
+
+  (* We cement C2. *)
+  let* constants = Context.get_constants (B b) in
+  let* b =
+    Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
+  in
+  let hash = Sc_rollup.Commitment.hash_uncarbonated commitment2 in
+  let* cement_op = Op.sc_rollup_cement (B b) contract2 rollup hash in
+  let* _b = Block.bake ~operation:cement_op b in
   return_unit
 
 let tests =
@@ -2712,12 +2683,12 @@ let tests =
       test_zero_tick_commitment_fails;
     Tztest.tztest "check the curfew functionality" `Quick test_curfew;
     Tztest.tztest
-      "check the curfew storage is cleaned after cement"
-      `Quick
-      test_curfew_is_clean;
-    Tztest.tztest
       "check that a commitment can be published after the inbox_level + \
        challenge window is passed."
       `Quick
       test_curfew_period_is_started_only_after_first_publication;
+    Tztest.tztest
+      "An offline staker should not prevent cementation"
+      `Quick
+      test_offline_staker_does_not_prevent_cementation;
   ]

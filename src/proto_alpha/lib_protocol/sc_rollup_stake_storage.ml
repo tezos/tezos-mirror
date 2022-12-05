@@ -258,13 +258,38 @@ let deallocate_commitment_metadata ctxt rollup node =
   let open Lwt_result_syntax in
   if Commitment_hash.(node = zero) then return ctxt
   else
+    let* ctxt, commitment = Store.Commitments.get (ctxt, rollup) node in
     let* ctxt, _size_freed =
       Store.Commitment_added.remove_existing (ctxt, rollup) node
     in
     let* ctxt, _size_freed =
       Store.Commitment_stake_count.remove_existing (ctxt, rollup) node
     in
-    return ctxt
+    let* ctxt, count =
+      Store.Commitment_count_per_inbox_level.get
+        (ctxt, rollup)
+        commitment.inbox_level
+    in
+    if Compare.Int32.(count = 1l) then
+      let* ctxt, _size_freed =
+        Store.Commitment_count_per_inbox_level.remove_existing
+          (ctxt, rollup)
+          commitment.inbox_level
+      in
+      let+ ctxt, _size_freed =
+        Store.Commitment_first_publication_level.remove_existing
+          (ctxt, rollup)
+          commitment.inbox_level
+      in
+      ctxt
+    else
+      let+ ctxt, _size_freed, _was_bound =
+        Store.Commitment_count_per_inbox_level.add
+          (ctxt, rollup)
+          commitment.inbox_level
+          (Int32.pred count)
+      in
+      ctxt
 
 let deallocate ctxt rollup node =
   let open Lwt_result_syntax in
@@ -307,8 +332,9 @@ let increase_commitment_stake_count ctxt rollup node =
 (* 77 for Commitments entry
    + 4 for Commitment_stake_count entry
    + 4 for Commitment_added entry
+   + 4 for Commitment_count_per_level in case if this level didn't exist before, 0 otherwise
    + 0 for Staker_count_update entry *)
-let commitment_storage_size_in_bytes = 85
+let commitment_storage_size_in_bytes = 89
 
 let refine_stake ctxt rollup staker staked_on commitment =
   let open Lwt_result_syntax in
@@ -340,8 +366,28 @@ let refine_stake ctxt rollup staker staked_on commitment =
     if Commitment_hash.(node = staked_on) then (
       (* Previously staked commit found:
          Insert new commitment if not existing *)
-      let* ctxt, commitment_size_diff, _was_bound =
+      let* ctxt, commitment_size_diff, commit_existed =
         Store.Commitments.add (ctxt, rollup) new_hash commitment
+      in
+      let* ctxt, commitment_count_per_level_size_diff, inbox_level_existed =
+        if commit_existed then return (ctxt, 0, true)
+        else
+          let* ctxt, count_opt =
+            Store.Commitment_count_per_inbox_level.find
+              (ctxt, rollup)
+              commitment.inbox_level
+          in
+          match count_opt with
+          | None ->
+              Store.Commitment_count_per_inbox_level.add
+                (ctxt, rollup)
+                commitment.inbox_level
+                1l
+          | Some v ->
+              Store.Commitment_count_per_inbox_level.add
+                (ctxt, rollup)
+                commitment.inbox_level
+                (Int32.succ v)
       in
       let level = (Raw_context.current_level ctxt).level in
       let* commitment_added_size_diff, commitment_added_level, ctxt =
@@ -360,10 +406,15 @@ let refine_stake ctxt rollup staker staked_on commitment =
       let size_diff =
         commitment_size_diff + commitment_added_size_diff
         + stake_count_size_diff + staker_count_diff
+        + commitment_count_per_level_size_diff
       in
-      let expected_size_diff = commitment_storage_size_in_bytes in
-      (* First submission adds [commitment_storage_size_in_bytes] to storage.
+      (* First submission adds [commitment_storage_size_in_bytes] or
+         [commitment_storage_size_in_bytes] - 4 byes to storage,
+         depending on existence commitment with the same level.
          Later submission adds 0 due to content-addressing. *)
+      let expected_size_diff =
+        commitment_storage_size_in_bytes - if inbox_level_existed then 4 else 0
+      in
       assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
       return (new_hash, commitment_added_level, ctxt)
       (* See WARNING above. *))
@@ -424,12 +475,14 @@ let cement_commitment ctxt rollup new_lcc =
       Commitment_hash.(new_lcc_commitment.predecessor <> old_lcc)
       Sc_rollup_parent_not_lcc
   in
-  let* new_lcc_stake_count, ctxt =
-    get_commitment_stake_count ctxt rollup new_lcc
+  let* ctxt, commitment_count_for_inbox_level =
+    Store.Commitment_count_per_inbox_level.get
+      (ctxt, rollup)
+      new_lcc_commitment.inbox_level
   in
   let* () =
     fail_when
-      Compare.Int32.(total_staker_count <> new_lcc_stake_count)
+      Compare.Int32.(commitment_count_for_inbox_level <> 1l)
       Sc_rollup_disputed
   in
   let* ctxt, new_lcc_added =
@@ -461,11 +514,6 @@ let cement_commitment ctxt rollup new_lcc =
      [max_number_of_cemented_commitments], if such exist.
   *)
   let* ctxt = deallocate_commitment_metadata ctxt rollup old_lcc in
-  let* ctxt, _freed_size =
-    Store.Commitment_first_publication_level.remove_existing
-      (ctxt, rollup)
-      new_lcc_commitment.inbox_level
-  in
   (* Decrease max_number_of_stored_cemented_commitments by one because
      we start counting commitments from old_lcc, rather than from new_lcc. *)
   let num_commitments_to_keep =

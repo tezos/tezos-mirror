@@ -1,8 +1,8 @@
 
 ./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 2709.909 units (will add 100 for safety)
-Estimated storage: 6520 bytes added (will add 20 for safety)
+Estimated gas: 3169.941 units (will add 100 for safety)
+Estimated storage: 6532 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,30 +12,30 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000629
+    Fee to the baker: ꜩ0.000675
     Expected counter: 1
-    Gas limit: 2810
-    Storage limit: 6540 bytes
+    Gas limit: 3270
+    Storage limit: 6552 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000629
-      payload fees(the block proposer) ....... +ꜩ0.000629
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000675
+      payload fees(the block proposer) ....... +ꜩ0.000675
     Smart contract rollup origination:
       Kind: arith
       Parameter type: string
       Boot sector Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 2709.909
-      Storage size: 6520 bytes
+      Consumed gas: 3169.941
+      Storage size: 6532 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.63
-        storage fees ........................... +ꜩ1.63
+        [PUBLIC_KEY_HASH] ... -ꜩ1.633
+        storage fees ........................... +ꜩ1.633
 
 
 ./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 4 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
-Estimated gas: 6461.751 units (will add 100 for safety)
+Estimated gas: 6921.767 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -46,13 +46,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000998
+    Fee to the baker: ꜩ0.001044
     Expected counter: 1
-    Gas limit: 6562
+    Gas limit: 7022
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000998
-      payload fees(the block proposer) ....... +ꜩ0.000998
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001044
+      payload fees(the block proposer) ....... +ꜩ0.001044
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
@@ -61,7 +61,7 @@ This sequence of operations was run:
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 6461.751
+      Consumed gas: 6921.767
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 5
       Balance updates:
@@ -71,7 +71,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 4 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 2
 Node is bootstrapped.
-Estimated gas: 6461.743 units (will add 100 for safety)
+Estimated gas: 7151.767 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -82,13 +82,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000998
+    Fee to the baker: ꜩ0.001067
     Expected counter: 1
-    Gas limit: 6562
+    Gas limit: 7252
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000998
-      payload fees(the block proposer) ....... +ꜩ0.000998
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001067
+      payload fees(the block proposer) ....... +ꜩ0.001067
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
@@ -97,7 +97,7 @@ This sequence of operations was run:
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 2
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 6461.743
+      Consumed gas: 7151.767
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 6
       Balance updates:
@@ -107,7 +107,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none timeout dispute on sc rollup '[SC_ROLLUP_HASH]' with '[PUBLIC_KEY_HASH]' from bootstrap1
 Node is bootstrapped.
-Estimated gas: 6460.926 units (will add 100 for safety)
+Estimated gas: 7151.104 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -118,19 +118,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000964
+    Fee to the baker: ꜩ0.001033
     Expected counter: 2
-    Gas limit: 6561
+    Gas limit: 7252
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000964
-      payload fees(the block proposer) ....... +ꜩ0.000964
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001033
+      payload fees(the block proposer) ....... +ꜩ0.001033
     Smart contract rollup refutation timeout:
       Address: [SC_ROLLUP_HASH]
       First staker (Alice): [PUBLIC_KEY_HASH]
       Second staker (Bob): [PUBLIC_KEY_HASH]
       This smart contract rollup refutation timeout was successfully applied
-      Consumed gas: 6460.926
+      Consumed gas: 7151.104
       Refutation game status: Game ended: [PUBLIC_KEY_HASH] lost because: timeout
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... -ꜩ10000
