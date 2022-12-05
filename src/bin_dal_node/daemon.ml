@@ -134,9 +134,13 @@ module Handler = struct
       match Node_context.get_status ctxt with
       | Starting -> return_unit
       | Ready {plugin = (module Plugin); _} ->
-          let* slot_headers =
-            Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
+          let* block_info =
+            Plugin.block_info
+              cctxt
+              ~block:(`Hash (block_hash, 0))
+              ~metadata:`Always
           in
+          let* slot_headers = Plugin.get_published_slot_headers block_info in
           let*! () =
             Slot_manager.store_slot_headers
               ~block_level:header.shell.level

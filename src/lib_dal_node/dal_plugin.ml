@@ -52,8 +52,7 @@ module type T = sig
     Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
+    block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
   module RPC : sig

@@ -49,17 +49,9 @@ module Plugin = struct
     | Protocol.Apply_operation_result.Applied _ -> Dal_plugin.Succeeded
     | _ -> Dal_plugin.Failed
 
-  let get_published_slot_headers block ctxt =
+  let get_published_slot_headers (block : block_info) =
     let open Lwt_result_syntax in
     let open Protocol.Alpha_context in
-    let cpctxt = new Protocol_client_context.wrap_full ctxt in
-    let* block =
-      Protocol_client_context.Alpha_block_services.info
-        cpctxt
-        ~block
-        ~metadata:`Always
-        ()
-    in
     let apply_internal acc ~source:_ _op _res = acc in
     let apply (type kind) acc ~source:_ (op : kind manager_operation)
         (result : (kind, _, _) Protocol.Apply_operation_result.operation_result)
