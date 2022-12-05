@@ -754,6 +754,30 @@ val set_delegate :
   t ->
   unit Runnable.process
 
+(** Run [octez-client call <destination> from <src>] *)
+val call_contract :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  destination:string ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [call_contract], but do not wait for the process to exit. *)
+val spawn_call_contract :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  destination:string ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  t ->
+  Process.t
+
 (** Run [octez-client reveal key for <src>]. *)
 val reveal :
   ?endpoint:endpoint ->
@@ -2078,7 +2102,11 @@ val register_key :
 (** Get contract storage for a contract. Returns a Micheline expression
     representing the storage as a string. *)
 val contract_storage :
-  ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
+  ?hooks:Process.hooks ->
+  ?unparsing_mode:normalize_mode ->
+  string ->
+  t ->
+  string Lwt.t
 
 (** Get contract code for a contract. Returns a Micheline expression
     representing the code as a string. *)

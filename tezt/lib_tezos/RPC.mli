@@ -166,6 +166,14 @@ val get_chain_block_helper_complete :
 val get_chain_block_helper_round :
   ?chain:string -> ?block:string -> unit -> int t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/liquidity_baking/cpmm_address]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_liquidity_baking_cpmm_address :
+  ?chain:string -> ?block:string -> unit -> string t
+
 (** RPC: [GET /network/peers] *)
 val get_network_peers : (string * JSON.t) list t
 
