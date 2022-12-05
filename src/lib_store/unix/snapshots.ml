@@ -710,9 +710,59 @@ type block_data = {
   predecessor_header : Block_header.t;
   predecessor_block_metadata_hash : Block_metadata_hash.t option;
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
+  resulting_context_hash : Context_hash.t;
 }
 
 let block_data_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           block_header;
+           operations;
+           predecessor_header;
+           predecessor_block_metadata_hash;
+           predecessor_ops_metadata_hash;
+           resulting_context_hash;
+         } ->
+      ( operations,
+        block_header,
+        predecessor_header,
+        predecessor_block_metadata_hash,
+        predecessor_ops_metadata_hash,
+        resulting_context_hash ))
+    (fun ( operations,
+           block_header,
+           predecessor_header,
+           predecessor_block_metadata_hash,
+           predecessor_ops_metadata_hash,
+           resulting_context_hash ) ->
+      {
+        block_header;
+        operations;
+        predecessor_header;
+        predecessor_block_metadata_hash;
+        predecessor_ops_metadata_hash;
+        resulting_context_hash;
+      })
+    (obj6
+       (req "operations" (list (list (dynamic_size Operation.encoding))))
+       (req "block_header" (dynamic_size Block_header.encoding))
+       (req "predecessor_header" (dynamic_size Block_header.encoding))
+       (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+       (opt
+          "predecessor_ops_metadata_hash"
+          Operation_metadata_list_list_hash.encoding)
+       (req " resulting_context_hash" Context_hash.encoding))
+
+type legacy_block_data = {
+  block_header : Block_header.t;
+  operations : Operation.t list list;
+  predecessor_header : Block_header.t;
+  predecessor_block_metadata_hash : Block_metadata_hash.t option;
+  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
+}
+
+let legacy_block_data_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -1325,6 +1375,7 @@ module type EXPORTER = sig
     predecessor_block_metadata_hash:Block_metadata_hash.t option ->
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     export_block:Store.Block.t ->
+    resulting_context_hash:Context_hash.t ->
     unit Lwt.t
 
   val dump_context :
@@ -1400,7 +1451,7 @@ module Raw_exporter : EXPORTER = struct
       }
 
   let write_block_data t ~predecessor_header ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash ~export_block =
+      ~predecessor_ops_metadata_hash ~export_block ~resulting_context_hash =
     let open Lwt_syntax in
     let block_data =
       {
@@ -1409,6 +1460,7 @@ module Raw_exporter : EXPORTER = struct
         predecessor_header;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
+        resulting_context_hash;
       }
     in
     let bytes =
@@ -1645,7 +1697,7 @@ module Tar_exporter : EXPORTER = struct
       }
 
   let write_block_data t ~predecessor_header ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash ~export_block =
+      ~predecessor_ops_metadata_hash ~export_block ~resulting_context_hash =
     let block_data =
       {
         block_header = Store.Block.header export_block;
@@ -1653,6 +1705,7 @@ module Tar_exporter : EXPORTER = struct
         predecessor_header;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
+        resulting_context_hash;
       }
     in
     let bytes =
@@ -2340,9 +2393,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let* pred_resulting_context =
         Store.Block.resulting_context_hash chain_store pred_block
       in
+      let* resulting_context_hash =
+        Store.Block.resulting_context_hash chain_store export_block
+      in
       return
         ( export_mode,
           export_block,
+          resulting_context_hash,
           pred_block,
           pred_resulting_context,
           protocol_levels,
@@ -2350,6 +2407,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     let* ( export_mode,
            export_block,
+           resulting_context_hash,
            pred_block,
            pred_resulting_context,
            protocol_levels,
@@ -2363,6 +2421,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return
       ( export_mode,
         export_block,
+        resulting_context_hash,
         pred_block,
         pred_resulting_context,
         protocol_levels,
@@ -2430,9 +2489,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           let* pred_resulting_context =
             Store.Block.resulting_context_hash chain_store pred_block
           in
+          let* resulting_context_hash =
+            Store.Block.resulting_context_hash chain_store export_block
+          in
           return
             ( export_mode,
               export_block,
+              resulting_context_hash,
               pred_block,
               pred_resulting_context,
               protocol_levels,
@@ -2447,6 +2510,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     let* ( export_mode,
            export_block,
+           resulting_context_hash,
            pred_block,
            pred_resulting_context,
            protocol_levels,
@@ -2494,6 +2558,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return
       ( export_mode,
         export_block,
+        resulting_context_hash,
         pred_block,
         pred_resulting_context,
         protocol_levels,
@@ -2527,6 +2592,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       protect (fun () ->
           let* ( export_mode,
                  export_block,
+                 resulting_context_hash,
                  pred_block,
                  pred_resulting_context,
                  protocol_levels,
@@ -2563,6 +2629,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               ~predecessor_block_metadata_hash
               ~predecessor_ops_metadata_hash
               ~export_block
+              ~resulting_context_hash
           in
           let* written_context_elements =
             Exporter.dump_context
@@ -2842,7 +2909,39 @@ module Raw_importer : IMPORTER = struct
     let*! block_data = Lwt_utils_unix.read_file file in
     match Data_encoding.Binary.of_string_opt block_data_encoding block_data with
     | Some block_data -> return block_data
-    | None -> tzfail (Cannot_read {kind = `Block_data; path = file})
+    | None -> (
+        let* is_legacy = Version.is_legacy t.version in
+        let* res =
+          if is_legacy then
+            Data_encoding.Binary.of_string_opt
+              legacy_block_data_encoding
+              block_data
+            |> Option.map
+                 (fun
+                   {
+                     block_header;
+                     operations;
+                     predecessor_header;
+                     predecessor_block_metadata_hash;
+                     predecessor_ops_metadata_hash;
+                   }
+                 ->
+                   {
+                     block_header;
+                     operations;
+                     predecessor_header;
+                     predecessor_block_metadata_hash;
+                     predecessor_ops_metadata_hash;
+                     resulting_context_hash = Context_hash.zero;
+                   })
+            |> return
+          else
+            return
+            @@ Data_encoding.Binary.of_string_opt block_data_encoding block_data
+        in
+        match res with
+        | Some v -> return v
+        | None -> tzfail (Cannot_read {kind = `Block_data; path = file}))
 
   let restore_context t context_index ~expected_context_hash
       ~nb_context_elements ~in_memory ~progress_display_mode =
@@ -3148,17 +3247,38 @@ module Tar_importer : IMPORTER = struct
     let filename =
       Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
     in
-    let* o =
-      let*! o = Onthefly.load_from_filename t.tar ~filename in
-      match o with
-      | Some str -> (
-          match Data_encoding.Binary.of_string_opt block_data_encoding str with
-          | Some metadata -> return_some metadata
-          | None -> return_none)
-      | None -> return_none
-    in
+    let*! o = Onthefly.load_from_filename t.tar ~filename in
     match o with
-    | Some metadata -> return metadata
+    | Some str -> (
+        let* is_legacy = Version.is_legacy t.version in
+        let* res =
+          if is_legacy then
+            Data_encoding.Binary.of_string_opt legacy_block_data_encoding str
+            |> Option.map
+                 (fun
+                   {
+                     block_header;
+                     operations;
+                     predecessor_header;
+                     predecessor_block_metadata_hash;
+                     predecessor_ops_metadata_hash;
+                   }
+                 ->
+                   {
+                     block_header;
+                     operations;
+                     predecessor_header;
+                     predecessor_block_metadata_hash;
+                     predecessor_ops_metadata_hash;
+                     resulting_context_hash = Context_hash.zero;
+                   })
+            |> return
+          else
+            return @@ Data_encoding.Binary.of_string_opt block_data_encoding str
+        in
+        match res with
+        | Some v -> return v
+        | None -> tzfail (Cannot_read {kind = `Block_data; path = filename}))
     | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
 
   let restore_context t context_index ~expected_context_hash
@@ -3566,23 +3686,21 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     Event.(emit import_loading ())
 
-  let check_context_hash_consistency ~expect_predecessor_context
-      validation_store block_header =
-    (* FIXME: provide the resulting block context in the snapshot and
-       check against it when the [expect_predecessor_context]
-       semantics is used. *)
+  let check_context_hash_consistency ~expected_context_hash validation_store =
     fail_unless
-      (expect_predecessor_context
-      || Context_hash.equal
-           validation_store
-             .Tezos_validation.Block_validation.resulting_context_hash
-           block_header.Block_header.shell.context)
+      (Context_hash.equal
+         validation_store.Block_validation.resulting_context_hash
+         expected_context_hash
+      || (* This is needed as the former snapshot's version does not
+            provide enough data to perform this check with the new
+            context hash semantics (a block header contains the
+            predecessor's context hash). In that particular case, we
+            are not able to perform this validity check. *)
+      Context_hash.equal expected_context_hash Context_hash.zero)
       (Inconsistent_context_hash
          {
-           expected = block_header.Block_header.shell.context;
-           got =
-             validation_store
-               .Tezos_validation.Block_validation.resulting_context_hash;
+           expected = expected_context_hash;
+           got = validation_store.Block_validation.resulting_context_hash;
          })
 
   let restore_and_apply_context snapshot_importer protocol_levels
@@ -3600,6 +3718,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let* ({
             block_header;
+            resulting_context_hash;
             operations;
             predecessor_header;
             predecessor_block_metadata_hash;
@@ -3626,7 +3745,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         (Inconsistent_imported_block
            (block_header_hash, snapshot_metadata.block_hash))
     in
-    let expected_context_hash, expect_predecessor_context =
+    let imported_context_hash =
       match
         Protocol_levels.find
           predecessor_header.shell.proto_level
@@ -3635,29 +3754,23 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | None -> Stdlib.failwith "unknown protocol"
       | Some {Protocol_levels.expect_predecessor_context; _} ->
           if expect_predecessor_context then
-            (block_header.Block_header.shell.context, expect_predecessor_context)
-          else
-            ( predecessor_header.Block_header.shell.context,
-              expect_predecessor_context )
+            block_header.Block_header.shell.context
+          else predecessor_header.Block_header.shell.context
     in
-    let predecessor_resulting_context_hash = expected_context_hash in
-    (* Restore context *)
     let* () =
       Importer.restore_context
         snapshot_importer
         context_index
-        ~expected_context_hash
+        ~expected_context_hash:imported_context_hash
         ~nb_context_elements:snapshot_metadata.context_elements
         ~in_memory
         ~progress_display_mode
     in
     let* predecessor_context =
-      let*! o =
-        Context.checkout context_index predecessor_resulting_context_hash
-      in
+      let*! o = Context.checkout context_index imported_context_hash in
       match o with
       | Some ch -> return ch
-      | None -> tzfail (Inconsistent_context predecessor_resulting_context_hash)
+      | None -> tzfail (Inconsistent_context imported_context_hash)
     in
     let predecessor_context =
       Tezos_shell_context.Shell_context.wrap_disk_context predecessor_context
@@ -3669,7 +3782,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         chain_id;
         predecessor_block_header = predecessor_header;
         predecessor_context;
-        predecessor_resulting_context_hash;
+        predecessor_resulting_context_hash = imported_context_hash;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         user_activated_upgrades;
@@ -3699,9 +3812,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let* () =
       check_context_hash_consistency
-        ~expect_predecessor_context
+        ~expected_context_hash:resulting_context_hash
         block_validation_result.validation_store
-        block_header
     in
     return (block_data, genesis_ctxt_hash, block_validation_result)
 
