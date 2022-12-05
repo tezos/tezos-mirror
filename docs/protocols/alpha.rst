@@ -20,14 +20,15 @@ It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
 - Provide only modern bytes and string combinators in environment data encoding.
   (MR :gl:`!6919`)
 
+- Update Plonk in Environment V7 and V8. (MR :gl:`!6925`)
+
+- Remove Plonk from Environment V6. (MR :gl:`!6952`)
+
 Michelson opcodes for logical operations on bytes
 -------------------------------------------------
 
 Michelson opcodes ``AND``, ``OR``, ``XOR``, ``NOT``, ``LSL`` and ``LSR``
 now support ``bytes``. (MR :gl:`!6055`)
-
-Michelson opcodes for logical operations on bytes
--------------------------------------------------
 
 - Michelson opcodes ``NAT``, ``INT`` and ``BYTES`` for bytes-int and bytes-nat
   conversions. (MR :gl:`!6681`)
@@ -42,13 +43,16 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6676`, :gl:`!6698`, :gl:`!6507`, :gl:`!6879`, :gl:`!6860`, :gl:`!6716`,
 :gl:`!6468`, :gl:`!6857`, :gl:`!6652`, :gl:`!6913`, :gl:`!6838`, :gl:`!6914`,
 :gl:`!6717`, :gl:`!6560`, :gl:`!6891`, :gl:`!6726`, :gl:`!6935`, :gl:`!6951`,
-:gl:`!6946`, :gl:`!6954`, :gl:`!6942`, :gl:`!6963`)
+:gl:`!6946`, :gl:`!6954`, :gl:`!6942`, :gl:`!6963`, :gl:`!5741`, :gl:`!6974`,
+:gl:`!7013`, :gl:`!7015`, :gl:`!6980`, :gl:`!6993`, :gl:`!6949`, :gl:`!6930`,
+:gl:`!6991`, :gl:`!6955`, :gl:`!6937`, :gl:`!7010`, :gl:`!7027`, :gl:`!7034`,
+:gl:`!7045`, :gl:`!7036`, :gl:`!6987`, :gl:`!7016`, :gl:`!6380`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
 Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!6047`,
-:gl:`!6884`, :gl:`!6836`, :gl:`!6855`)
+:gl:`!6884`, :gl:`!6836`, :gl:`!6855`, :gl:`!6839`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
@@ -56,7 +60,7 @@ Data Availability Layer (ongoing)
 Distribution of rollup operations data off-chain. (MRs :gl:`!6174`, :gl:`!6388`,
 :gl:`!6527`, :gl:`!6505`, :gl:`!6553`, :gl:`!6685`, :gl:`!6470`, :gl:`!6643`,
 :gl:`!6704`, :gl:`!6683`, :gl:`!6702`, :gl:`!6728`, :gl:`!5905`, :gl:`!6762`,
-:gl:`!6703`, :gl:`!6796`, :gl:`!6821`, :gl:`!6852`, :gl:`!6811`)
+:gl:`!6703`, :gl:`!6796`, :gl:`!6821`, :gl:`!6852`, :gl:`!6811`, :gl:`!6887`)
 
 Breaking Changes
 ----------------
@@ -89,7 +93,8 @@ Minor Changes
 
 - Give a positive gas cost to the ``BALANCE`` instruction. (MR :gl:`!6564`)
 
-- Enable transferring tickets between implicit accounts. (MR :gl:`!6108`)
+- Enable transferring tickets to/from implicit accounts. (MRs :gl:`!6108`,
+  :gl:`!6490`, :gl:`!6867`)
 
 Internal
 --------
@@ -131,3 +136,5 @@ Internal
 - Use let-bindings in ticket-accounting module. (MR :gl:`!6770`)
 
 - Use condensed syntax modules in protocol. (MRs :gl:`!6844`, :gl:`!6864`)
+
+- Do not fully parse head fitness in ``Mempool.init``. (MR :gl:`!7000`)
