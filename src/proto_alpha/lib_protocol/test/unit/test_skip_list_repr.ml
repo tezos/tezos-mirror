@@ -181,9 +181,12 @@ struct
     aux 0
 
   let check_path i j back_path_fn =
+    let open Lwt_result_syntax in
     let l = nlist basis i in
-    match back_path_fn l i j with
-    | None -> fail (err (Printf.sprintf "There must be path from %d to %d" i j))
+    let*! path = back_path_fn l i j in
+    match path with
+    | None ->
+        tzfail (err (Printf.sprintf "There must be path from %d to %d" i j))
     | Some path ->
         let len = List.length path in
         let log_basis x =
@@ -267,6 +270,7 @@ struct
         | _ -> assert false)
 
   let check_invalid_search_paths i =
+    let open Lwt_result_syntax in
     let l = nlist basis i in
     let rec aux j =
       if i <= j then return ()
@@ -292,11 +296,11 @@ struct
                 (* In that case, we check the path returned by search
                    is above the target. *)
                 match rev_path with
-                | [] -> fail (err (Printf.sprintf "unexpected empty path"))
+                | [] -> tzfail (err (Printf.sprintf "unexpected empty path"))
                 | head :: _ ->
                     if Compare.Int.(content head > t) then return ()
                     else
-                      fail
+                      tzfail
                         (err
                            (Printf.sprintf
                               "Invariant for 'No_exact_or_lower_ptr' broken")))
@@ -309,7 +313,7 @@ struct
             | {last_cell = Found _; _} ->
                 (* Because we search for a cell that which is not in
                    the list, if the cell was found, we fail. *)
-                fail
+                tzfail
                   (err
                      (Printf.sprintf
                         "There should be no search path connecting %d to a \
@@ -330,7 +334,8 @@ let test_skip_list_nat_check_path (basis, i, j) =
   let module M = TestNat (struct
     let basis = basis
   end) in
-  M.check_path i j M.back_path
+  let back_path list start stop = Lwt.return (M.back_path list start stop) in
+  M.check_path i j back_path
 
 let test_skip_list_nat_check_find (basis, i, j) =
   let module M = TestNat (struct
@@ -384,6 +389,7 @@ let test_minimal_back_path () =
        cases)
 
 let test_search_non_minimal_back_path () =
+  let open Lwt_result_syntax in
   let basis = 2 in
   let module M = TestNat (struct
     let basis = basis
@@ -454,8 +460,8 @@ let test_skip_list_nat_check_path_with_search (basis, i, j) =
               let x = M.content cell in
               (x - 10) / 2)
             rev_path
-          |> Option.some
-      | _result -> None)
+          |> Lwt.return_some
+      | _result -> Lwt.return_none)
 
 let test_skip_list_nat_check_invalid_path_with_search (basis, i) =
   let module M = TestNat (struct

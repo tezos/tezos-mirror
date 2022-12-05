@@ -550,6 +550,8 @@ let get_payloads_history payloads_histories witness =
   |> WithExceptions.Option.get ~loc:__LOC__
   |> Lwt.return
 
+let get_history history i = Sc_rollup.Inbox.History.find i history |> Lwt.return
+
 let fill_inbox ~inbox history payloads_histories payloads_per_levels =
   let open Result_syntax in
   let rec aux payloads_histories history inbox = function

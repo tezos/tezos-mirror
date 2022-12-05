@@ -416,26 +416,35 @@ let test_inclusion_proofs_depending_on_history_capacity
           history.")
   in
   let proof s v =
-    let open Result_syntax in
-    let v = v |> Environment.wrap_tzresult in
-    match v with
+    let open Lwt_result_syntax in
+    let*! v = v in
+    match Environment.wrap_tzresult v with
     | Ok v -> return v
-    | Error _ -> fail [err (s ^ ": Expecting some inclusion proof.")]
+    | Error _ -> tzfail (err (s ^ ": Expecting some inclusion proof."))
   in
-  (* Producing inclusion proofs using history1 and history2 should succeeed.
+  let get_history history inbox = History.find inbox history |> Lwt.return in
+  (* Producing inclusion proofs using history1 and history2 should succeed.
      But, we should not be able to produce any proof with history0 as bound
      is 0. *)
-  let ip0 =
-    I.Internal_for_tests.produce_inclusion_proof history0 hp pred_level_of_hp
-    |> Environment.wrap_tzresult
+  let*! ip0 =
+    I.Internal_for_tests.produce_inclusion_proof
+      (get_history history0)
+      hp
+      pred_level_of_hp
   in
-  let*? ip1, hp1' =
+  let* ip1, hp1' =
     proof "history1"
-    @@ I.Internal_for_tests.produce_inclusion_proof history1 hp pred_level_of_hp
+    @@ I.Internal_for_tests.produce_inclusion_proof
+         (get_history history1)
+         hp
+         pred_level_of_hp
   in
-  let*? ip2, hp2' =
+  let* ip2, hp2' =
     proof "history2"
-    @@ I.Internal_for_tests.produce_inclusion_proof history2 hp pred_level_of_hp
+    @@ I.Internal_for_tests.produce_inclusion_proof
+         (get_history history2)
+         hp
+         pred_level_of_hp
   in
   let* () =
     fail_unless

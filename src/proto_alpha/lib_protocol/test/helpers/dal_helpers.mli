@@ -55,6 +55,12 @@ end) : sig
 
   (** Helper functions. *)
 
+  (** Retrieves the history from a given cache. *)
+  val get_history :
+    Dal_slot_repr.History.History_cache.t ->
+    Dal_slot_repr.History.hash ->
+    Dal_slot_repr.History.t option Lwt.t
+
   (** Returns the slot's polynomial from the given slot's data. *)
   val dal_mk_polynomial_from_slot : bytes -> Cryptobox.polynomial tzresult
 

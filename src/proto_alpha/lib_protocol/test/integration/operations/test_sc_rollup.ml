@@ -2260,7 +2260,7 @@ let input_included ~snapshot ~full_history_inbox (l, n) =
   let* proof, _ =
     Sc_rollup.Inbox.produce_proof
       ~get_payloads_history:(get_payloads_history payloads_histories)
-      history
+      ~get_history:(get_history history)
       history_proof
       (l, n)
     >|= Environment.wrap_tzresult
