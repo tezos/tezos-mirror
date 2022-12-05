@@ -112,6 +112,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Contract_entrypoints.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
   Contract_hash_with_origination.register ~protocols ;
+  Contract_non_regressions.register protocols ;
   Contract_opcodes.register ~protocols ;
   Contract_typecheck.register ~protocols ;
   Contract_mini_scenarios.register ~protocols ;
