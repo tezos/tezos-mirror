@@ -37,3 +37,18 @@ let unit_case_incr title value id =
     (fun () -> value)
 
 let union_incr cases = Data_encoding.union (List.mapi ( |> ) cases)
+
+module Little_endian = struct
+  let int32 =
+    Data_encoding.(
+      splitted
+        ~binary:
+          (conv
+             (fun x ->
+               let buffer = Bytes.create 4 in
+               Bytes.set_int32_le buffer 0 x ;
+               buffer)
+             (fun buffer -> Bytes.get_int32_le buffer 0)
+             (Fixed.bytes 4))
+        ~json:int32)
+end

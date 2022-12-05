@@ -628,6 +628,19 @@ let build_snapshot_wasm_state_from_set_input
       0L
       ""
   in
+  (* Entering a new collecting phase, the reboot counter is the succ
+     of max reboot (to authorize the reboot after the collecting
+     phase). *)
+  let* durable =
+    Durable.set_value_exn
+      ~edit_readonly:true
+      durable
+      Constants.reboot_counter_key
+      Data_encoding.(
+        Binary.to_string_exn
+          Data_encoding_utils.Little_endian.int32
+          Int32.(succ (Z.to_int32 Constants.maximum_reboots_per_input)))
+  in
   Test_encodings_util.Tree_encoding_runner.encode
     (Tezos_tree_encoding.scope ["durable"] Durable.encoding)
     durable

@@ -311,6 +311,32 @@ let patch_reboot_flag durable =
       Durable.(write_value_exn durable Constants.reboot_flag_key 0L "")
   | _ -> return durable
 
+(** When rebooting, we update the new [reboot_counter] exposed to the
+    kernel.  *)
+let patch_reboot_counter durable reboot_counter =
+  let open Lwt_syntax in
+  function
+  | Running | Failing -> return durable
+  | Reboot | Forcing_yield | Yielding ->
+      (* Deleting first allows to not have to fetch the previous
+         contents, which is a full chunks. This reduces the size of
+         the resulting proof. *)
+      let* durable =
+        Durable.delete ~edit_readonly:true durable Constants.reboot_counter_key
+      in
+      Durable.write_value_exn
+        ~edit_readonly:true
+        durable
+        Constants.reboot_counter_key
+        0L
+        (* We use a standard encoding of a 32-bit integers, instead of
+           the ad-hoc Z encoding, to make the life of the kernel
+           developers easier. *)
+        Data_encoding.(
+          Binary.to_string_exn
+            Data_encoding_utils.Little_endian.int32
+            (Z.to_int32 reboot_counter))
+
 (** Every time the kernel yields, we reset the input buffer. *)
 let clean_up_input_buffer buffers =
   let open Tezos_webassembly_interpreter in
@@ -329,6 +355,7 @@ let compute_step pvm_state =
   let reboot_counter = next_reboot_counter pvm_state status in
   let* durable = patch_too_many_reboot_flag durable status in
   let* durable = patch_reboot_flag durable status in
+  let* durable = patch_reboot_counter durable reboot_counter status in
   let () = clean_up_input_buffer pvm_state.buffers status in
   let pvm_state =
     {

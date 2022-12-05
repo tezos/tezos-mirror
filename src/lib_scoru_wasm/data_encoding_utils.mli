@@ -44,3 +44,7 @@ val unit_case_incr : string -> 'a -> 'a case_incr
 (** [union_incr cases] creates a data encoding like [Data_encoding.union] for
     [case_incr] items. *)
 val union_incr : 'a case_incr list -> 'a Data_encoding.t
+
+module Little_endian : sig
+  val int32 : int32 Data_encoding.t
+end
