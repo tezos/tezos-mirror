@@ -41,6 +41,10 @@ val lookup_opt :
       SCORU WASM PVM. *)
 val all : Tezos_webassembly_interpreter.Host_funcs.registry
 
+(** [all_debug] contains the same functions as [all], with the alternative
+    implementation of [write_debug]. *)
+val all_debug : Tezos_webassembly_interpreter.Host_funcs.registry
+
 exception Bad_input
 
 (** A durable key was given by the kernel with a longer-than-allowed length. *)
