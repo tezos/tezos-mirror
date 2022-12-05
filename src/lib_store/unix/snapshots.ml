@@ -2750,9 +2750,9 @@ module type IMPORTER = sig
     snapshot_path:string ->
     dst_store_dir:[`Store_dir] Naming.directory ->
     Chain_id.t ->
-    t Lwt.t
+    t tzresult Lwt.t
 
-  val load_snapshot_header : t -> snapshot_header tzresult Lwt.t
+  val snapshot_header : t -> snapshot_header
 
   val load_block_data : t -> block_data tzresult Lwt.t
 
@@ -2791,6 +2791,8 @@ end
 
 module Raw_importer : IMPORTER = struct
   type t = {
+    version : Version.t;
+    metadata : metadata;
     snapshot_dir : [`Snapshot_dir] Naming.directory;
     snapshot_cemented_dir : [`Cemented_blocks_dir] Naming.directory;
     snapshot_protocol_dir : [`Protocol_dir] Naming.directory;
@@ -2800,15 +2802,29 @@ module Raw_importer : IMPORTER = struct
     dst_chain_dir : [`Chain_dir] Naming.directory;
   }
 
+  let load_snapshot_header ~snapshot_path =
+    let (module Loader) =
+      (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
+    in
+    Loader.load_snapshot_header ~snapshot_path
+
+  let snapshot_header {version; metadata; _} = (version, metadata)
+
   let init ~snapshot_path ~dst_store_dir chain_id =
+    let open Lwt_result_syntax in
     let snapshot_dir = Naming.snapshot_dir ~snapshot_path () in
     let snapshot_cemented_dir = Naming.cemented_blocks_dir snapshot_dir in
     let snapshot_protocol_dir = Naming.protocol_store_dir snapshot_dir in
     let dst_chain_dir = Naming.chain_dir dst_store_dir chain_id in
     let dst_cemented_dir = Naming.cemented_blocks_dir dst_chain_dir in
     let dst_protocol_dir = Naming.protocol_store_dir dst_store_dir in
-    Lwt.return
+    let* version, metadata =
+      load_snapshot_header ~snapshot_path:(snapshot_dir |> Naming.(dir_path))
+    in
+    return
       {
+        version;
+        metadata;
         snapshot_dir;
         snapshot_cemented_dir;
         snapshot_protocol_dir;
@@ -2817,13 +2833,6 @@ module Raw_importer : IMPORTER = struct
         dst_store_dir;
         dst_chain_dir;
       }
-
-  let load_snapshot_header t =
-    let (module Loader) =
-      (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
-    in
-    Loader.load_snapshot_header
-      ~snapshot_path:Naming.(t.snapshot_dir |> dir_path)
 
   let load_block_data t =
     let open Lwt_result_syntax in
@@ -3067,6 +3076,8 @@ end
 
 module Tar_importer : IMPORTER = struct
   type t = {
+    version : Version.t;
+    metadata : metadata;
     snapshot_file : [`Snapshot_file] Naming.file;
     snapshot_tar : [`Tar_archive] Naming.directory;
     snapshot_cemented_blocks_dir : [`Cemented_blocks_dir] Naming.directory;
@@ -3079,8 +3090,16 @@ module Tar_importer : IMPORTER = struct
     files : Onthefly.file list;
   }
 
+  let load_snapshot_header ~snapshot_path =
+    let (module Loader) =
+      (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
+    in
+    Loader.load_snapshot_header ~snapshot_path
+
+  let snapshot_header {version; metadata; _} = (version, metadata)
+
   let init ~snapshot_path ~dst_store_dir chain_id =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let snapshot_dir =
       Naming.snapshot_dir ~snapshot_path:(Filename.dirname snapshot_path) ()
     in
@@ -3096,10 +3115,15 @@ module Tar_importer : IMPORTER = struct
     let dst_chain_dir = Naming.chain_dir dst_store_dir chain_id in
     let dst_cemented_dir = Naming.cemented_blocks_dir dst_chain_dir in
     let dst_protocol_dir = Naming.protocol_store_dir dst_store_dir in
-    let* tar = Onthefly.open_in ~file:(Naming.file_path snapshot_file) in
-    let* files = Onthefly.list_files tar in
-    Lwt.return
+    let* version, metadata =
+      load_snapshot_header ~snapshot_path:(snapshot_file |> Naming.(file_path))
+    in
+    let*! tar = Onthefly.open_in ~file:(Naming.file_path snapshot_file) in
+    let*! files = Onthefly.list_files tar in
+    return
       {
+        version;
+        metadata;
         snapshot_file;
         snapshot_tar;
         snapshot_cemented_blocks_dir;
@@ -3110,13 +3134,6 @@ module Tar_importer : IMPORTER = struct
         tar;
         files;
       }
-
-  let load_snapshot_header t =
-    let (module Loader) =
-      (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
-    in
-    Loader.load_snapshot_header
-      ~snapshot_path:Naming.(t.snapshot_file |> file_path)
 
   let load_block_data t =
     let open Lwt_result_syntax in
@@ -3392,8 +3409,6 @@ end
 module type Snapshot_importer = sig
   type t
 
-  val read_snapshot_header : t -> snapshot_header tzresult Lwt.t
-
   val import :
     snapshot_path:string ->
     ?patch_context:
@@ -3420,8 +3435,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let init = Importer.init
 
   let close = Importer.close
-
-  let read_snapshot_header = Importer.load_snapshot_header
 
   let restore_cemented_blocks ?(check_consistency = true) ~dst_chain_dir
       ~genesis_hash ~progress_display_mode snapshot_importer =
@@ -3694,7 +3707,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ~in_memory ~progress_display_mode (genesis : Genesis.t) =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-    let*! snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
+    let* snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
     let dst_store_dir = Naming.dir_path dst_store_dir in
     let* () =
       fail_when
@@ -3722,8 +3735,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         (Sys.file_exists snapshot_path)
         (Snapshot_file_not_found snapshot_path)
     in
-    let* snapshot_header = Importer.load_snapshot_header snapshot_importer in
-    let snapshot_version, snapshot_metadata = snapshot_header in
+    let ((snapshot_version, snapshot_metadata) as snapshot_header) =
+      Importer.snapshot_header snapshot_importer
+    in
     let* () =
       fail_unless
         (Version.is_supported snapshot_version)
