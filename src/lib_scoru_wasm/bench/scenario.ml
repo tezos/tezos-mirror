@@ -85,9 +85,16 @@ type 'a action = 'a run_state -> 'a run_state Lwt.t
 
 type scenario_step = {label : string; action : tree action}
 
-type scenario = {name : string; kernel : string; actions : scenario_step list}
+type scenario = {
+  name : string;
+  kernel : string;
+  actions : scenario_step list;
+  ignore : bool;
+}
 
-let make_scenario name kernel actions = {name; kernel; actions}
+let make_scenario name kernel actions = {name; kernel; actions; ignore = false}
+
+let ignore_scenario scenario = {scenario with ignore = true}
 
 let make_scenario_step (label : string) (action : tree action) = {label; action}
 
@@ -178,7 +185,8 @@ let run_scenario ?(verbose = false) ~benchmark scenario =
     let* info = lift_lookup Wasm.get_info run_state in
     return (add_final_info time info.current_tick run_state.benchmark)
   in
-  Exec.run scenario.kernel apply_scenario
+  if not scenario.ignore then Exec.run scenario.kernel apply_scenario
+  else return benchmark
 
 let run_scenarios ?(verbose = true) ?(totals = true) ?(irmin = true) filename
     scenarios =

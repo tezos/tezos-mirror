@@ -146,10 +146,13 @@ let () =
        ~irmin:false
        (filename ())
        [
-         scenario_unreachable_kernel;
-         scenario_computation_kernel;
-         scenario_tx_kernel_deposit_then_withdraw_to_same_address_no_sig;
-         scenario_tx_kernel_deposit_then_withdraw_to_same_address_sig;
+         Scenario.ignore_scenario scenario_unreachable_kernel;
+         Scenario.ignore_scenario scenario_computation_kernel;
+         Scenario.ignore_scenario
+           scenario_tx_kernel_deposit_then_withdraw_to_same_address_no_sig;
+         Scenario.ignore_scenario
+           scenario_tx_kernel_deposit_then_withdraw_to_same_address_sig;
          scenario_tx_kernel_deposit_transfer_withdraw;
-         scenario_tx_kernel_deposit_transfer_withdraw_many_transfers;
+         Scenario.ignore_scenario
+           scenario_tx_kernel_deposit_transfer_withdraw_many_transfers;
        ]

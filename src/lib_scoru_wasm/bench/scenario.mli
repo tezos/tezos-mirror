@@ -47,6 +47,11 @@ val make_scenario_step : string -> Wasm.tree action -> scenario_step
       - a list of [actions] *)
 val make_scenario : string -> string -> scenario_step list -> scenario
 
+(** [ignore_scenario scenario] returns a scenario that will be ignored during a
+     run. Can be used to reproduce part of run, ignoring some parts without
+      having to delete anything. *)
+val ignore_scenario : scenario -> scenario
+
 (** action corresponding to one top level call of PVM *)
 val exec_loop : Wasm.tree action
 
