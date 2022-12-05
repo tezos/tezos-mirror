@@ -602,7 +602,7 @@ let alternate_write_debug_impl durable memories src num_bytes =
   let open Lwt.Syntax in
   let* memory = retrieve_memory memories in
   let* result = Aux.read_mem ~memory ~src ~num_bytes in
-  Printf.printf "DEBUG: %s\n" result ;
+  Format.printf "DEBUG: %s\n%!" result ;
   Lwt.return (durable, [])
 
 (* [write_debug] accepts a pointer to the start of a sequence of
