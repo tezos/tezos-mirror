@@ -2890,37 +2890,44 @@ module Raw_importer : IMPORTER = struct
       Naming.(snapshot_protocol_levels_file t.snapshot_dir |> encoded_file_path)
     in
     let*! table_bytes = Lwt_utils_unix.read_file protocol_tbl_filename in
-    match
-      Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
-    with
-    | Some table -> return table
-    | None -> (
-        (* Try with legacy's encoding *)
+    let* res =
+      let* is_legacy = Version.is_legacy t.version in
+      if is_legacy then
+        (* Use the legacy encoding *)
         match
           Data_encoding.Binary.of_string_opt
             Protocol_levels.Legacy.encoding
             table_bytes
         with
         | Some table ->
-            Protocol_levels.Legacy.fold_es
-              (fun proto_level activation_block map ->
-                let protocol_info =
-                  {
-                    Protocol_levels.protocol =
-                      activation_block.Protocol_levels.Legacy.protocol;
-                    activation_block = activation_block.block;
-                    (* Only snapshot with legacy semantics will have
-                       legacy encoding. *)
-                    expect_predecessor_context = false;
-                  }
-                in
-                return (Protocol_levels.add proto_level protocol_info map))
-              table
-              Protocol_levels.empty
-        | None ->
-            tzfail
-              (Cannot_read
-                 {kind = `Protocol_table; path = protocol_tbl_filename}))
+            let* res =
+              Protocol_levels.Legacy.fold_es
+                (fun proto_level activation_block map ->
+                  let protocol_info =
+                    {
+                      Protocol_levels.protocol =
+                        activation_block.Protocol_levels.Legacy.protocol;
+                      activation_block = activation_block.block;
+                      (* Only snapshot with legacy semantics will have
+                         legacy encoding. *)
+                      expect_predecessor_context = false;
+                    }
+                  in
+                  return (Protocol_levels.add proto_level protocol_info map))
+                table
+                Protocol_levels.empty
+            in
+            return_some res
+        | None -> return_none
+      else
+        Data_encoding.Binary.of_string_opt Protocol_levels.encoding table_bytes
+        |> return
+    in
+    match res with
+    | Some v -> return v
+    | None ->
+        tzfail
+          (Cannot_read {kind = `Protocol_table; path = protocol_tbl_filename})
 
   let load_and_validate_protocol_filenames t =
     let open Lwt_result_syntax in
@@ -3183,44 +3190,45 @@ module Tar_importer : IMPORTER = struct
     in
     match o with
     | Some str -> (
-        let res =
-          Data_encoding.Binary.read_opt
-            Protocol_levels.encoding
-            str
-            0
-            (String.length str)
-        in
-        match res with
-        | Some (_ofs, res) -> return res
-        | None -> (
-            (* Try with legacy's encoding *)
+        let* res =
+          let* is_legacy = Version.is_legacy t.version in
+          if is_legacy then
+            (* Use the legacy encoding *)
             match
-              Data_encoding.Binary.read_opt
+              Data_encoding.Binary.of_string_opt
                 Protocol_levels.Legacy.encoding
                 str
-                0
-                (String.length str)
             with
-            | Some (_ofs, table) ->
-                Protocol_levels.Legacy.fold_es
-                  (fun proto_level activation_block map ->
-                    let protocol_info =
-                      {
-                        Protocol_levels.protocol =
-                          activation_block.Protocol_levels.Legacy.protocol;
-                        activation_block = activation_block.block;
-                        (* Only snapshot with legacy semantics will have
-                           legacy encoding. *)
-                        expect_predecessor_context = false;
-                      }
-                    in
-                    return (Protocol_levels.add proto_level protocol_info map))
-                  table
-                  Protocol_levels.empty
-            | None ->
-                tzfail
-                  (Cannot_read
-                     {kind = `Protocol_table; path = protocol_tbl_filename})))
+            | Some table ->
+                let* res =
+                  Protocol_levels.Legacy.fold_es
+                    (fun proto_level activation_block map ->
+                      let protocol_info =
+                        {
+                          Protocol_levels.protocol =
+                            activation_block.Protocol_levels.Legacy.protocol;
+                          activation_block = activation_block.block;
+                          (* Only snapshot with legacy semantics will have
+                             legacy encoding. *)
+                          expect_predecessor_context = false;
+                        }
+                      in
+                      return (Protocol_levels.add proto_level protocol_info map))
+                    table
+                    Protocol_levels.empty
+                in
+                return_some res
+            | None -> return_none
+          else
+            Data_encoding.Binary.of_string_opt Protocol_levels.encoding str
+            |> return
+        in
+        match res with
+        | Some v -> return v
+        | None ->
+            tzfail
+              (Cannot_read
+                 {kind = `Protocol_table; path = protocol_tbl_filename}))
     | None ->
         tzfail
           (Cannot_read {kind = `Protocol_table; path = protocol_tbl_filename})
