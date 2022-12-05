@@ -1,4 +1,4 @@
-Version 15.0
+Version 15.1
 ============
 
 Version 15.0 contains a new version (V7)
@@ -13,6 +13,19 @@ full or rolling history mode. Thanks to it, the size taken on disk is
 no longer proportional to the time since the node is running because
 the states of the chains below the savepoint (by default 6 cycles) are
 erased.
+
+Version 15.1 fixes a bug that would cause the bootstrap pipeline to apply a
+block without prechecking it first, when the active protocol is Lima.
+
+.. warning::
+
+  The nature of this bug would prevent the correct operation of the
+  :doc:`Lima<../lima/protocol>` protocol
+  (due to activate on Tezos Mainnet on block
+  `#2,981,889 <https://tzstats.com/2981889>`__)
+  with earlier Octez versions, including Octez v15.0.
+
+  As a result, we **strongly recommend** to upgrade to Octez v15.1 or later instead.
 
 .. warning::
 
@@ -36,13 +49,13 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v15.0
+  git checkout v15.1
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v15.0`` Docker images of Tezos.
+If you are using Docker instead, use the ``v15.1`` Docker images of Tezos.
 
 Then upgrade your storage by following the instructions in `Context Pruning Requirements`_.
 
@@ -65,5 +78,6 @@ for the first time, to ensure that the context can be pruned.
 Changelog
 ---------
 
+- `Version 15.1 <../CHANGES.html#version-15-1>`_
 - `Version 15.0 <../CHANGES.html#version-15-0>`_
 - `Version 15.0-rc1 <../CHANGES.html#version-15-0-rc1>`_
