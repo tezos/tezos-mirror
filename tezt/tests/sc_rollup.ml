@@ -567,9 +567,10 @@ let test_stakers_commitments ~kind =
   let* {commitment_period_in_blocks; _} =
     get_sc_rollup_constants tezos_client
   in
-  (* Bake commitment_period_in_blocks blocks in order prevent commitment being posted for future inbox_level *)
+  (* Bake commitment_period_in_blocks blocks in order prevent commitment being
+     posted for future inbox_level *)
   let* () =
-    repeat commitment_period_in_blocks (fun () ->
+    repeat (commitment_period_in_blocks + 1) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* commitment_1 =
@@ -581,7 +582,7 @@ let test_stakers_commitments ~kind =
       tezos_client
   in
   let* () =
-    repeat commitment_period_in_blocks (fun () ->
+    repeat (commitment_period_in_blocks + 1) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* commitment_2 =
@@ -2516,7 +2517,7 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
   (* Bake commitment_period_in_blocks blocks in order prevent commitment being
      posted for future inbox_level *)
   let* () =
-    repeat commitment_period_in_blocks (fun () ->
+    repeat (commitment_period_in_blocks + 1) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* commit_hash =
@@ -2528,7 +2529,7 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
       tezos_client
   in
   let* () =
-    repeat (commitment_period_in_blocks + 1) (fun () ->
+    repeat (commitment_period_in_blocks + 2) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* _commit_hash =
@@ -2781,7 +2782,7 @@ let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
     (* Compute the inbox level for which we'd like to commit *)
     let inbox_level = starting_level + (commitment_period_in_blocks * depth) in
     (* d is the delta between the target inbox level and the current level *)
-    let d = inbox_level - Node.get_level node in
+    let d = inbox_level - Node.get_level node + 1 in
     (* Bake sufficiently many blocks to be able to commit for the desired inbox
        level. We may actually bake no blocks if d <= 0 *)
     let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
@@ -3121,7 +3122,7 @@ let test_refutation_reward_and_punishment ~kind =
   let starting_level = Node.get_level node in
   let inbox_level = starting_level + commitment_period_in_blocks in
   (* d is the delta between the target inbox level and the current level *)
-  let d = inbox_level - Node.get_level node in
+  let d = inbox_level - Node.get_level node + 1 in
   (* Bake sufficiently many blocks to be able to commit for the desired inbox
      level. We may actually bake no blocks if d <= 0 *)
   let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
@@ -3589,7 +3590,7 @@ let test_messages_processed_by_commitment ~kind =
       description = "checks messages processed during a commitment period";
     }
     ~kind
-  @@ fun sc_rollup_node sc_rollup_client sc_rollup _node client ->
+  @@ fun _protocol sc_rollup_node sc_rollup_client sc_rollup _node client ->
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
   let* genesis_info =
