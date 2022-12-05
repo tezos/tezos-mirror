@@ -225,10 +225,10 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-(** [produce ~metadata pvm_and_state inbox_context inbox_history commit_level]
-    will construct a full refutation game proof out of the [state] given
-    in [pvm_and_state].  It uses the [inbox] if necessary to provide
-    input in the proof. If the input is above or at [commit_level] it
+(** [produce ~metadata pvm_and_state inbox_context inbox_history
+    commit_inbox_level] will construct a full refutation game proof out of
+    the [state] given in [pvm_and_state].  It uses the [inbox] if necessary to
+    provide input in the proof. If the input is above or at [commit_level] it
     will block it, and produce a proof that the PVM is blocked. If
     the input requested is a reveal the proof production will also
     fail.
@@ -251,3 +251,15 @@ val produce :
   (module PVM_with_context_and_state) ->
   Raw_level_repr.t ->
   serialized t tzresult Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Export internal [cut_at_level] function. See the docstring in the
+      implementation file for more information. *)
+  val cut_at_level :
+    origination_level:Raw_level_repr.t ->
+    commit_inbox_level:Raw_level_repr.t ->
+    Sc_rollup_PVM_sig.input ->
+    Sc_rollup_PVM_sig.input option
+end

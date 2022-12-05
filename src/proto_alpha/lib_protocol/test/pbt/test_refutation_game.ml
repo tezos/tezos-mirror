@@ -1460,7 +1460,7 @@ let gen_game ~p1_strategy ~p2_strategy =
     Raw_level.to_int32 genesis_info.level |> Int32.to_int
   in
   let start_level = origination_level + 1 in
-  let max_level = start_level + commitment_period - 1 in
+  let max_level = start_level + commitment_period in
   let* payloads_per_levels =
     gen_arith_pvm_payloads_for_levels ~start_level ~max_level
   in
@@ -1717,6 +1717,50 @@ let test_perfect_against_eol_hater =
 let test_perfect_against_info_hater =
   test_game ~p1_strategy:Perfect ~p2_strategy:Info_hater ()
 
+(* This test will behave as a regression test. *)
+let test_cut_at_level =
+  let open QCheck2 in
+  Test.make
+    ~name:"cut at level properly cuts"
+    ~print:(fun (origination_level, commit_inbox_level, input_level) ->
+      Format.asprintf
+        "origination_level: %a, commit_inbox_level: %a, input_level: %a"
+        Raw_level_repr.pp
+        origination_level
+        Raw_level_repr.pp
+        commit_inbox_level
+        Raw_level_repr.pp
+        input_level)
+    Gen.(
+      let level =
+        map
+          (fun i -> Raw_level_repr.of_int32_exn (Int32.of_int i))
+          (0 -- 1_000_000)
+      in
+      triple level level level)
+    (fun (origination_level, commit_inbox_level, input_level) ->
+      let input : Sc_rollup_PVM_sig.input =
+        Inbox_message
+          {
+            inbox_level = input_level;
+            message_counter = Z.zero;
+            payload = Sc_rollup_inbox_message_repr.unsafe_of_string "foo";
+          }
+      in
+      let input_cut =
+        Sc_rollup_proof_repr.Internal_for_tests.cut_at_level
+          ~origination_level
+          ~commit_inbox_level
+          input
+      in
+      let should_be_none =
+        Raw_level_repr.(
+          input_level <= origination_level || commit_inbox_level < input_level)
+      in
+      match input_cut with
+      | Some _input -> not should_be_none
+      | None -> should_be_none)
+
 let tests =
   ( "Refutation",
     qcheck_wrap
@@ -1731,6 +1775,7 @@ let tests =
         test_perfect_against_sol_hater;
         test_perfect_against_eol_hater;
         test_perfect_against_info_hater;
+        test_cut_at_level;
       ] )
 
 (** {2 Entry point} *)

@@ -190,21 +190,20 @@ let stop_of_pvm_step (type state proof output)
   let (module P) = pvm in
   P.proof_stop_state proof
 
-(* This takes an [input] and checks if it is at or above the given level,
+(* This takes an [input] and checks if it is above the given level,
    and if it is at or below the origination level for this rollup.
    It returns [None] if this is the case.
 
-   We use this to check that the PVM proof is obeying [commit_level]
-   correctly---if the message obtained from the inbox proof is at or
-   above [commit_level] the [input_given] in the PVM proof should be
-   [None]. *)
-let cut_at_level ~origination_level ~commit_level
+   We use this to check that the PVM proof is obeying [commit_inbox_level]
+   correctly---if the message obtained from the inbox proof is above
+   [commit_inbox_level] the [input_given] in the PVM proof should be [None]. *)
+let cut_at_level ~origination_level ~commit_inbox_level
     (input : Sc_rollup_PVM_sig.input) =
   match input with
   | Inbox_message {inbox_level = input_level; _} ->
       if
         Raw_level_repr.(
-          input_level <= origination_level || commit_level <= input_level)
+          input_level <= origination_level || commit_inbox_level < input_level)
       then None
       else Some input
   | Reveal _data -> Some input
@@ -298,7 +297,7 @@ end
 
 let valid (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
-    snapshot commit_level dal_snapshot dal_parameters ~dal_attestation_lag
+    snapshot commit_inbox_level dal_snapshot dal_parameters ~dal_attestation_lag
     (proof : proof t) =
   let open Lwt_result_syntax in
   let (module P) = pvm in
@@ -330,14 +329,14 @@ let valid (type state proof output)
           ~metadata
           dal_parameters
           ~dal_attestation_lag
-          ~commit_level
+          ~commit_level:commit_inbox_level
           page_id
           dal_snapshot
           proof
         |> Lwt.return
   in
   let input =
-    Option.bind input (cut_at_level ~origination_level ~commit_level)
+    Option.bind input (cut_at_level ~origination_level ~commit_inbox_level)
   in
   let* input_requested = P.verify_proof input proof.pvm_step in
   let* () =
@@ -411,7 +410,7 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-let produce ~metadata pvm_and_state commit_level =
+let produce ~metadata pvm_and_state commit_inbox_level =
   let open Lwt_result_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let open P in
@@ -476,7 +475,7 @@ let produce ~metadata pvm_and_state commit_level =
           ~metadata
           dal_parameters
           ~dal_attestation_lag
-          ~commit_level
+          ~commit_level:commit_inbox_level
           page_id
           ~page_info
           confirmed_slots_history
@@ -484,8 +483,14 @@ let produce ~metadata pvm_and_state commit_level =
         |> Lwt.return
   in
   let input_given =
-    Option.bind input_given (cut_at_level ~origination_level ~commit_level)
+    Option.bind
+      input_given
+      (cut_at_level ~origination_level ~commit_inbox_level)
   in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
   let*? pvm_step = serialize_pvm_step ~pvm:(module P) pvm_step_proof in
   return {pvm_step; input_proof}
+
+module Internal_for_tests = struct
+  let cut_at_level = cut_at_level
+end
