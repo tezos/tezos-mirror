@@ -616,8 +616,6 @@ module Version = struct
     | Some _ -> return_false
 end
 
-let current_version = Version.current_version
-
 (* The [default_index_log_size] defines the default maximal value for
    the log_size, used by the index for storing in memory values, while
    importing a snapshot. The current limit of 30M aims to target
@@ -1387,7 +1385,7 @@ module Raw_exporter : EXPORTER = struct
       Naming.snapshot_version_file snapshot_tmp_dir |> Naming.file_path
     in
     let version_json =
-      Data_encoding.Json.construct Version.encoding current_version
+      Data_encoding.Json.construct Version.encoding Version.current_version
     in
     let* () = Lwt_utils_unix.Json.write_file version_file version_json in
     return
@@ -1622,7 +1620,7 @@ module Tar_exporter : EXPORTER = struct
       Naming.snapshot_version_file snapshot_tmp_dir |> Naming.file_path
     in
     let version_json =
-      Data_encoding.Json.construct Version.encoding current_version
+      Data_encoding.Json.construct Version.encoding Version.current_version
     in
     let* () = Lwt_utils_unix.Json.write_file version_file version_json in
     let*! () =

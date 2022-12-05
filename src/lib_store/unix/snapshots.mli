@@ -139,9 +139,6 @@ type error +=
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Wrong_snapshot_file of {filename : string}
 
-(** Current version of snapshots *)
-val current_version : int
-
 type snapshot_format = Tar | Raw
 
 val pp_snapshot_format : Format.formatter -> snapshot_format -> unit
