@@ -77,6 +77,10 @@ module Types : sig
   (** The slot header was successfully included in a block. see
       {!header_attestation_status} for more details. *)
 
+  (** DAL node can track one or many profiles that correspond to various modes 
+      that the DAL node would operate in *)
+  type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+
   val slot_id_encoding : slot_id Data_encoding.t
 
   (** Return the string representation for values of type
@@ -85,6 +89,8 @@ module Types : sig
 
   (** Return the string representation for values of type {!header_status}. *)
   val header_status_to_string : header_status -> string
+
+  val profile_encoding : profile Data_encoding.t
 end
 
 (** Add the given slot in the node if not already present. The corresponding

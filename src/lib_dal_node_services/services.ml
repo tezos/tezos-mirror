@@ -50,6 +50,10 @@ module Types = struct
 
   type header_status = [`Not_selected | `Unseen | header_attestation_status]
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4442
+     Add missing profiles. *)
+  type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+
   (* Auxiliary functions.  *)
 
   let header_attestation_status_to_string = function
@@ -74,6 +78,22 @@ module Types = struct
       (obj2 (req "slot_level" int32) (req "slot_index" uint8))
 
   let slot_encoding = Data_encoding.bytes
+
+  let profile_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Attestor with pkh"
+          (Tag 0)
+          (obj2
+             (req "kind" (constant "attestor"))
+             (req
+                "public_key_hash"
+                Tezos_crypto.Signature.Public_key_hash.encoding))
+          (function Attestor attest -> Some ((), attest))
+          (function (), attest -> Attestor attest);
+      ]
 end
 
 let post_slots :
