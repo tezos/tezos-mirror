@@ -508,7 +508,7 @@ let test_filter_internal_message () =
   let* () =
     let dummy_address =
       Sc_rollup_repr.Address.of_b58check_exn
-        "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+        "sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctGkmso"
     in
     let* internal_transfer = dummy_internal_transfer dummy_address in
     let input =

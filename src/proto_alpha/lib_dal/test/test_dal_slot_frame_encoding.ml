@@ -77,10 +77,10 @@ let assert_equal_list_rollups ~loc msg =
     (Format.pp_print_list Sc_rollup.Address.pp)
 
 let sc_rollup_1 =
-  Sc_rollup.Address.of_b58check_exn "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+  Sc_rollup.Address.of_b58check_exn "sr1BAwv191dVYeZg44ZxVy8dFwfRQKW6bSqc"
 
 let sc_rollup_2 =
-  Sc_rollup.Address.of_b58check_exn "scr1VAWKSdtzLy2LUarsowyAVwrmC1vmXduF3"
+  Sc_rollup.Address.of_b58check_exn "sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctGkmso"
 
 let slot_frame_encoding_size_correct_single_v0 () =
   let open Lwt_result_syntax in

@@ -558,13 +558,13 @@ let test_parse_address () =
   (* scr1% (empty entrypoint) *)
   wrap_error_lwt
     (Lwt.return
-       (Destination.of_b58check "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"))
+       (Destination.of_b58check "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG"))
   >>=? fun scr1 ->
   test_parse_data
     __LOC__
     ctxt
     address_t
-    (String (-1, "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"))
+    (String (-1, "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG"))
     {destination = scr1; entrypoint = Entrypoint.default}
   >>=? fun ctxt ->
   (* scr1% (default entrypoint) *)
@@ -572,7 +572,7 @@ let test_parse_address () =
     __LOC__
     ctxt
     address_t
-    (String (-1, "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF%"))
+    (String (-1, "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG%"))
     {destination = scr1; entrypoint = Entrypoint.default}
   >|=? fun (_ctxt : context) -> ()
 

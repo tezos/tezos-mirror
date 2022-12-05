@@ -164,10 +164,10 @@ let transfer ?expect_apply_failure b ~from ~to_ ~param ~entrypoint =
 
 (* Tests *)
 
-(* Test parsing a [contract] with a badly formatted scr1 address. *)
+(* Test parsing a [contract] with a badly formatted sr1 address. *)
 let test_transfer_to_bad_sc_rollup_address () =
   let* b, c, contract, _rollup = context_init "unit" in
-  let not_an_sc_rollup_address = {|"scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyL"|} in
+  let not_an_sc_rollup_address = {|"sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctDamso"|} in
   let* (_b : Block.t) =
     transfer
       b
@@ -194,7 +194,7 @@ let test_transfer_to_bad_sc_rollup_address () =
 (* Now, the address is well-formatted but the rollup does not exist. *)
 let test_transfer_to_unknown_sc_rollup_address () =
   let* b, c, contract, _rollup = context_init "unit" in
-  let unknown_sc_rollup_address = {|"scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"|} in
+  let unknown_sc_rollup_address = {|"sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctGkmso"|} in
   let* (_b : Block.t) =
     transfer
       b
