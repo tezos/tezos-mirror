@@ -511,7 +511,8 @@ module Dry_run = struct
     let amount = Tez.zero in
     let burn_cap = Tez.of_int 10 in
     let prg =
-      "file:./tezt/tests/contracts/proto_alpha/large_flat_contract.tz"
+      Michelson_script.(
+        find ["mini_scenarios"; "large_flat_contract"] protocol |> path)
     in
 
     Log.info
@@ -600,16 +601,14 @@ module Signatures = struct
       ~tags:["client"; "signature"; "check"; "bls"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
-    let prg = "file:./tezt/tests/contracts/proto_alpha/check_signature.tz" in
-    let contract = "check_sig_contract" in
-    let* _hash =
-      Client.originate_contract
-        ~alias:contract
+    let* contract, _hash =
+      Client.originate_contract_at
         ~amount:Tez.zero
         ~src:Constant.bootstrap2.alias
         ~burn_cap:(Tez.of_int 10)
-        ~prg
         client
+        ["mini_scenarios"; "check_signature"]
+        protocol
     in
     Log.info "Generating new accounts" ;
     let* accounts =

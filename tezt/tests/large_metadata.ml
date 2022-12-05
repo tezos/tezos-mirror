@@ -139,16 +139,16 @@ let setup_node ~limit protocol =
      when failing. This contract always fails with a byte sequence
      full of zeros. If the parameter n is less than 2 then the length
      of the error message is 2 bytes, otherwise it is 2^n bytes. See
-     "file:./tezt/tests/contracts/proto_alpha/large_error.tz" *)
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"large_error"
+     [michelson_test_scripts/mini_scenarios/large_error.tz]. *)
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/large_error.tz"
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
       client
+      ["mini_scenarios"; "large_error"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   return (contract_id, client, node)

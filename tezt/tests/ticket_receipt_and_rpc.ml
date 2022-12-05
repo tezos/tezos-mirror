@@ -100,37 +100,35 @@ let test_ticket_receipt_and_rpc =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* kt_a =
-    Client.originate_contract
-      ~alias:"tickets_create_and_send.tz"
+  let* _alias, kt_a =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/tickets_create_and_send.tz"
       ~init:"{}"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "tickets_create_and_send"]
+      protocol
   in
-  let* kt_b =
-    Client.originate_contract
-      ~alias:"tickets_store_fst_and_rely_snd.tz"
+  let* _alias, kt_b =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:
-        "file:./tezt/tests/contracts/proto_alpha/tickets_store_fst_and_rely_snd.tz"
       ~init:"None"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "tickets_store_fst_and_rely_snd"]
+      protocol
   in
-  let* kt_c =
-    Client.originate_contract
-      ~alias:"tickets_receive_and_store.tz"
+  let* _alias, kt_c =
+    Client.originate_contract_at
       ~amount:Tez.one
       ~src:"bootstrap1"
-      ~prg:
-        "file:./tezt/tests/contracts/proto_alpha/tickets_receive_and_store.tz"
       ~init:"None"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "tickets_receive_and_store"]
+      protocol
   in
   let tz_a = Constant.bootstrap2 in
   let* () =

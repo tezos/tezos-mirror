@@ -847,13 +847,6 @@ let get_ticket_hash_from_deposit (d : Tx_rollup_node.Inbox.message) : string =
 let get_ticket_hash_from_deposit_json inbox =
   JSON.(inbox |=> 0 |-> "message" |-> "deposit" |-> "ticket_hash" |> as_string)
 
-let choose_deposit_contract_by_protocol ~protocol =
-  match protocol with
-  | Protocol.Lima | Alpha ->
-      "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-  | _ ->
-      "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz"
-
 (* Checks that the a ticket can be transfered from the L1 to the rollup. *)
 let test_ticket_deposit_from_l1_to_l2 =
   Protocol.register_test
@@ -875,15 +868,15 @@ let test_ticket_deposit_from_l1_to_l2 =
           ~wallet_dir:(Client.base_dir client)
           tx_node
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
+      let* _alias, contract_id =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
+          ["mini_scenarios"; "tx_rollup_deposit"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info
@@ -1042,15 +1035,15 @@ let test_l2_to_l2_transaction =
           ~wallet_dir:(Client.base_dir client)
           tx_node
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
+      let* _alias, contract_id =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
+          ["mini_scenarios"; "tx_rollup_deposit"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info
@@ -1251,15 +1244,15 @@ let get_ticket_hash_from_op op =
     for a list of destination in [dests]. *)
 let make_deposit ~protocol ~source ~tx_rollup_hash ~tx_node ~client
     ?(dests = []) ~tickets_amount dest =
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"rollup_deposit"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:source
-      ~prg:(choose_deposit_contract_by_protocol ~protocol)
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
       client
+      ["mini_scenarios"; "tx_rollup_deposit"]
+      protocol
   in
   let* level = Client.level client in
   let* () = Client.bake_for_and_wait client in
@@ -2393,15 +2386,15 @@ let test_round_trip ~title ?before_init
       let* block = RPC.Client.call client @@ RPC.get_chain_block () in
       check_l1_block_contains_dispatch block ;
       Log.info "Originate contract to withdraw tickets" ;
-      let* withdraw_contract =
-        Client.originate_contract
-          ~alias:"withdraw_contract"
+      let* _alias, withdraw_contract =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:originator
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_withdraw.tz"
           ~init:"None"
           ~burn_cap:Tez.one
           client
+          ["mini_scenarios"; "tickets_receive_and_store"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info "Transfer the tickets to withdraw contract" ;
@@ -2874,15 +2867,15 @@ let test_origination_deposit_same_block =
       let* node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
+      let* _alias, contract_id =
+        Client.originate_contract_at
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
+          ["mini_scenarios"; "tx_rollup_deposit"]
+          protocol
       in
       let* () = Client.bake_for_and_wait client in
       Log.info

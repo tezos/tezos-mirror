@@ -1249,6 +1249,58 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
         client_output
   | Some hash -> return hash
 
+let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
+    ?burn_cap ?gas_limit ?dry_run ~amount ~src client name protocol =
+  let alias =
+    match List.rev name with
+    | [] -> Test.fail "name must not be an empty list"
+    | last :: _ -> last
+  in
+  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  let process =
+    spawn_originate_contract
+      ?hooks
+      ?log_output
+      ?endpoint
+      ?wait
+      ?init
+      ?burn_cap
+      ?gas_limit
+      ?dry_run
+      ~alias
+      ~amount
+      ~src
+      ~prg
+      client
+  in
+  (alias, process)
+
+let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
+    ?gas_limit ?dry_run ~amount ~src client name protocol =
+  let alias =
+    match List.rev name with
+    | [] -> Test.fail "name must not be an empty list"
+    | last :: _ -> last
+  in
+  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  let* res =
+    originate_contract
+      ?hooks
+      ?log_output
+      ?endpoint
+      ?wait
+      ?init
+      ?burn_cap
+      ?gas_limit
+      ?dry_run
+      ~alias
+      ~amount
+      ~src
+      ~prg
+      client
+  in
+  Lwt.return (alias, res)
+
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
@@ -1390,6 +1442,22 @@ let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
   @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
 
+let spawn_run_script_at ?hooks ?balance ?self_address ?source ?payer ~storage
+    ~input client script_name protocol =
+  let prg =
+    Michelson_script.find script_name protocol |> Michelson_script.path
+  in
+  spawn_run_script
+    ?hooks
+    ?balance
+    ?self_address
+    ?source
+    ?payer
+    ~prg
+    ~storage
+    ~input
+    client
+
 let stresstest_estimate_gas ?endpoint client =
   let* output =
     spawn_command ?endpoint client ["stresstest"; "estimate"; "gas"]
@@ -1461,6 +1529,20 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
       Test.fail
         "Cannot extract new storage from client_output: %s"
         client_output
+
+let run_script_at ?hooks ?balance ?self_address ?source ?payer ~storage ~input
+    client name protocol =
+  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  run_script
+    ?hooks
+    ?balance
+    ?self_address
+    ?source
+    ?payer
+    ~storage
+    ~input
+    ~prg
+    client
 
 let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
     =

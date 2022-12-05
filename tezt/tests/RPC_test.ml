@@ -143,7 +143,7 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
   unit
 
 (* Test the contracts RPC. *)
-let test_contracts _test_mode_tag _protocol ?endpoint client =
+let test_contracts _test_mode_tag protocol ?endpoint client =
   let test_implicit_contract contract_id =
     let* _ =
       RPC.Client.call ?endpoint ~hooks client
@@ -309,29 +309,29 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
   in
   (* A smart contract without any big map or entrypoints *)
   Log.info "Test simple originated contract" ;
-  let* originated_contract_simple =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
+  let* _alias, originated_contract_simple =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_simple in
   (* A smart contract with a big map and entrypoints *)
   Log.info "Test advanced originated contract" ;
-  let* originated_contract_advanced =
-    Client.originate_contract
-      ~alias:"originated_contract_advanced"
+  let* _alias, originated_contract_advanced =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_entrypoints.tz"
       ~init:"Pair { Elt \"dup\" 0 } { Elt \"dup\" 1 ; Elt \"test\" 5 }"
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "big_map_entrypoints"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_advanced in
@@ -1118,7 +1118,7 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   in
   unit
 
-let test_deprecated _test_mode_tag _protocol ?endpoint client =
+let test_deprecated _test_mode_tag protocol ?endpoint client =
   let check_rpc_not_found rpc =
     let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
     Process.check_error
@@ -1148,15 +1148,15 @@ let test_deprecated _test_mode_tag _protocol ?endpoint client =
          ]
   in
 
-  let* originated_account =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
+  let* _alias, originated_account =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   let* () =
     Lwt_list.iter_s

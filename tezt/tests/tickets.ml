@@ -33,16 +33,6 @@
 
 let hooks = Tezos_regression.hooks
 
-let protocol_dependent_path protocol contract =
-  let directory_name =
-    match protocol with
-    (* We use separate contracts because we introduced a backward incompatible change
-       for tickets in Lima: https://gitlab.com/tezos/tezos/-/merge_requests/5963/ *)
-    | Protocol.Alpha | Lima -> "proto_alpha"
-    | Kathmandu -> "proto_current_mainnet"
-  in
-  sf "file:./tezt/tests/contracts/%s/%s" directory_name contract
-
 let test_create_and_remove_tickets =
   Protocol.register_regression_test
     ~__FILE__
@@ -50,16 +40,16 @@ let test_create_and_remove_tickets =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"add_clear_tickets.tz"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:(Tez.of_int 200)
       ~src:"bootstrap1"
-      ~prg:(protocol_dependent_path protocol "add_clear_tickets.tz")
       ~init:"{}"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "add_clear_tickets"]
+      protocol
   in
   let* () =
     (* Add ticket with payload (Pair 1 "A") *)
@@ -123,28 +113,27 @@ let test_send_tickets_in_big_map =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* receive_contract_hash =
-    Client.originate_contract
-      ~alias:"receive_tickets_in_big_map.tz"
+  let* _receive_contract_alias, receive_contract_hash =
+    Client.originate_contract_at
       ~amount:(Tez.of_int 200)
       ~src:"bootstrap1"
-      ~prg:
-        "file:./tezt/tests/contracts/proto_alpha/receive_tickets_in_big_map.tz"
       ~init:"{}"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "receive_tickets_in_big_map"]
+      protocol
   in
-  let* send_contract_hash =
-    Client.originate_contract
-      ~alias:"send_tickets_in_big_map.tz"
+  let* _alias_contract_hash, send_contract_hash =
+    Client.originate_contract_at
       ~amount:(Tez.of_int 200)
       ~src:"bootstrap1"
-      ~prg:(protocol_dependent_path protocol "send_tickets_in_big_map.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "send_tickets_in_big_map"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -186,16 +175,16 @@ let test_send_tickets_to_implicit_account =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -231,16 +220,16 @@ let test_send_tickets_to_implicit_account_non_zero_amount =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.one
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send_with_tez.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send_with_tez"]
+      protocol
   in
   let* tez_before = Client.get_balance_for ~account:ticketer client in
   let* () =
@@ -279,27 +268,27 @@ let test_send_tickets_to_implicit_with_wrong_type =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.one
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "send_ticket_list.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "send_ticket_list"]
+      protocol
   in
-  let* blackhole =
-    Client.originate_contract
-      ~alias:"blackhole"
+  let* _alias, blackhole =
+    Client.originate_contract_at
       ~amount:Tez.one
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_list_blackhole.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_list_blackhole"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -332,38 +321,38 @@ let test_ticket_transfer_commutative =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
-  let* bag =
-    Client.originate_contract
-      ~alias:"bag"
+  let* _alias, bag =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_bag.tz")
       ~init:"{}"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_bag"]
+      protocol
   in
-  let* blackhole =
-    Client.originate_contract
-      ~alias:"blackhole"
+  let* _alias, blackhole =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_blackhole.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_blackhole"]
+      protocol
   in
   (* 1. ticket minter contract -> bootstrap1 (originated -> implicit) *)
   let* () =
@@ -495,27 +484,27 @@ let test_ticket_transfer_from_storage_to_implicit =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
-  let* bag =
-    Client.originate_contract
-      ~alias:"bag"
+  let* _alias, bag =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_bag_implicit.tz")
       ~init:"{}"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_bag_implicit"]
+      protocol
   in
   (* ticketer -> bootstrap1 *)
   let* () =
@@ -616,16 +605,16 @@ let test_zero_ticket_rejection =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -661,16 +650,16 @@ let test_zero_ticket_rejection =
       ~expect_failure:true
       client
   in
-  let* bag =
-    Client.originate_contract
-      ~alias:"bag"
+  let* _alias, bag =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_bag.tz")
       ~init:"{}"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_bag"]
+      protocol
   in
   let*! () =
     Client.transfer_tickets
@@ -696,16 +685,16 @@ let test_ticket_overdraft_rejection =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -732,16 +721,16 @@ let test_ticket_overdraft_rejection =
       ~hooks
       client
   in
-  let* bag =
-    Client.originate_contract
-      ~alias:"bag"
+  let* _alias, bag =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_bag.tz")
       ~init:"{}"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_bag"]
+      protocol
   in
   let*! () =
     Client.transfer_tickets
@@ -768,16 +757,16 @@ let test_ticket_of_wrong_type_rejection =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -815,27 +804,27 @@ let test_originated_implicit_can_be_equipotent =
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_send.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_send"]
+      protocol
   in
-  let* blackhole =
-    Client.originate_contract
-      ~alias:"blackhole"
+  let* _alias, blackhole =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "tickets_blackhole.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       ~hooks
       client
+      ["mini_scenarios"; "tickets_blackhole"]
+      protocol
   in
   let* () =
     Client.transfer
@@ -894,15 +883,15 @@ let test_send_tickets_to_sc_rollup =
   let* _node, client, sc_rollup =
     setup_sc_enabled_node protocol ~parameters_ty:"list (ticket string)"
   in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "send_ticket_list_multiple.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "send_ticket_list_multiple"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () =
@@ -930,15 +919,15 @@ let test_send_tickets_from_storage_to_sc_rollup =
   let* _node, client, sc_rollup =
     setup_sc_enabled_node protocol ~parameters_ty:"list (ticket string)"
   in
-  let* ticketer =
-    Client.originate_contract
-      ~alias:"ticketer"
+  let* _alias, ticketer =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:(protocol_dependent_path protocol "send_tickets_from_storage.tz")
       ~init:"{}"
       ~burn_cap:Tez.one
       client
+      ["mini_scenarios"; "send_tickets_from_storage"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () =

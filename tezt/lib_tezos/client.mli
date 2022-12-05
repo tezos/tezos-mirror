@@ -951,6 +951,47 @@ val spawn_originate_contract :
   t ->
   Process.t
 
+(** Originates the contract with name [n] for a given protocol [p].
+
+    This function passes [n] and [p] to [Contract.find]. See the documentation
+    there for more info.
+
+    Returns a pair [(alias, res)] where [alias] is a value which can be used to
+    identify the originated contract, and [res] is the originated contract hash.
+*)
+val originate_contract_at :
+  ?hooks:Process.hooks ->
+  ?log_output:bool ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?init:string ->
+  ?burn_cap:Tez.t ->
+  ?gas_limit:int ->
+  ?dry_run:bool ->
+  amount:Tez.t ->
+  src:string ->
+  t ->
+  string list ->
+  Protocol.t ->
+  (string * string) Lwt.t
+
+(** Same as [originate_contract_at], but do not wait for the process to exit. *)
+val spawn_originate_contract_at :
+  ?hooks:Process.hooks ->
+  ?log_output:bool ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?init:string ->
+  ?burn_cap:Tez.t ->
+  ?gas_limit:int ->
+  ?dry_run:bool ->
+  amount:Tez.t ->
+  src:string ->
+  t ->
+  string list ->
+  Protocol.t ->
+  string * Process.t
+
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)
 type stresstest_contract_parameters = {
@@ -1109,6 +1150,42 @@ val spawn_run_script :
   storage:string ->
   input:string ->
   t ->
+  Process.t
+
+(** Run [octez-client run script .. on storage .. and input ..] on the script
+    name [n] for a given protocol [p].
+
+    This function passes [n] and [p] to [Contract.find]. See the documentation
+    there for more info.
+
+    Returns the new storage as a string.
+
+    Fails if the new storage cannot be extracted from the output. *)
+val run_script_at :
+  ?hooks:Process.hooks ->
+  ?balance:Tez.t ->
+  ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
+  storage:string ->
+  input:string ->
+  t ->
+  string list ->
+  Protocol.t ->
+  string Lwt.t
+
+(** Same as [run_script_at] but do not wait for the process to exit. *)
+val spawn_run_script_at :
+  ?hooks:Process.hooks ->
+  ?balance:Tez.t ->
+  ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
+  storage:string ->
+  input:string ->
+  t ->
+  string list ->
+  Protocol.t ->
   Process.t
 
 (** Run [octez-client register global constant value from src].

@@ -37,15 +37,15 @@ let test_increase_paid_storage =
     ~tags:["storage"; "paid_storage"; "increase_paid_storage"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
-  let* contract =
-    Client.originate_contract
-      ~alias:"originated_contract_simple"
+  let* _alias, contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
       ~init:"Some \"initial storage\""
       ~burn_cap:Tez.(of_int 3)
       client
+      ["mini_scenarios"; "str_id"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let payer = Constant.bootstrap2.alias in

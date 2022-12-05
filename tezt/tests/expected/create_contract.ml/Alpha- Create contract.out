@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup --wait none originate contract originate_contract.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/originate_contract.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract originate_contract transferring 200 from bootstrap1 running michelson_test_scripts/mini_scenarios/originate_contract.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1428.677 units (will add 100 for safety)
 Estimated storage: 350 bytes added (will add 20 for safety)
@@ -51,7 +51,7 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... +ꜩ200
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as originate_contract.tz.
+Contract memorized as originate_contract.
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg Unit
 Node is bootstrapped.

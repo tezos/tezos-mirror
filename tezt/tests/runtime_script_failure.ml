@@ -40,15 +40,14 @@ let check_client_force =
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol_and_wait ~protocol client in
-  let* contract_id =
-    Client.originate_contract
-      ~alias:"always_fails"
+  let* _alias, contract_id =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/always_fails.tz"
-      ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
       client
+      ["mini_scenarios"; "always_fails"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   let* () =

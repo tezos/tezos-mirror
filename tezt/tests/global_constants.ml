@@ -35,14 +35,14 @@ let test_large_flat_contract =
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let* _ =
-    Client.originate_contract
-      ~alias:"large_flat_contract"
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/large_flat_contract.tz"
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 9999999)
       client
+      ["mini_scenarios"; "large_flat_contract"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   return ()
@@ -141,15 +141,15 @@ let test_entrypoint_expansion =
   in
   let* () = Client.bake_for_and_wait client in
   (* Register a contract that uses the expression. *)
-  let* contract =
-    Client.originate_contract
-      ~alias:"entrypoints_contract"
+  let* _alias, contract =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"./tezt/tests/contracts/proto_alpha/constant_entrypoints.tz"
       ~init:"0x0054048627dedcf810b65da3ac50dfd068427615d7"
       ~burn_cap:Tez.(of_int 9999999)
       client
+      ["mini_scenarios"; "constant_entrypoints"]
+      protocol
   in
   let* () = Client.bake_for_and_wait client in
   (* Get the entrypoints. *)

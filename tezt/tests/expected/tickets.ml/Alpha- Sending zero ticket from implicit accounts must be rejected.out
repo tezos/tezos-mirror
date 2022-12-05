@@ -1,5 +1,5 @@
 
-./octez-client --mode mockup --wait none originate contract ticketer transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/tickets_send.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract tickets_send transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/tickets_send_016.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1441.228 units (will add 100 for safety)
 Estimated storage: 415 bytes added (will add 20 for safety)
@@ -56,7 +56,7 @@ This sequence of operations was run:
           storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as ticketer.
+Contract memorized as tickets_send.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[PUBLIC_KEY_HASH]" 1'
 Node is bootstrapped.
@@ -110,7 +110,7 @@ This sequence of operations was run:
 ./octez-client --mode mockup get ticket balance for bootstrap1 with ticketer '[CONTRACT_HASH]' and type string and content '"Ticket"'
 1
 
-./octez-client --mode mockup --wait none originate contract bag transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/tickets_bag.tz --init '{}' --burn-cap 1
+./octez-client --mode mockup --wait none originate contract tickets_bag transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/tickets_bag_016.tz --init '{}' --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1446.306 units (will add 100 for safety)
 Estimated storage: 451 bytes added (will add 20 for safety)
@@ -167,7 +167,7 @@ This sequence of operations was run:
           storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
-Contract memorized as bag.
+Contract memorized as tickets_bag.
 
 ./octez-client --mode mockup --wait none transfer 0 tickets from bootstrap1 to '[CONTRACT_HASH]' with entrypoint save and contents '"Ticket"' and type string and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Fatal error:
