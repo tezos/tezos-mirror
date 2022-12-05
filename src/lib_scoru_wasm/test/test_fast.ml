@@ -325,6 +325,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set =
         Wasm_utils.Wasm_fast.compute_step_many
           ~builtins
           ~stop_at_snapshot:true
+          ~debug_flag:false
           ~max_steps:Int64.max_int
           tree
       in

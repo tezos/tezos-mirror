@@ -31,6 +31,7 @@ include (Wasm_vm : Wasm_vm_sig.S)
 let compute_until_snapshot ~max_steps pvm_state =
   Wasm_vm.compute_step_many_until
     ~max_steps
+    ~debug_flag:false
     (fun pvm_state ->
       Lwt.return
       @@
@@ -56,8 +57,8 @@ let compute_fast builtins pvm_state =
   (pvm_state, Z.to_int64 ticks)
 
 let rec compute_step_many accum_ticks ?builtins
-    ?(after_fast_exec = fun () -> ()) ?(stop_at_snapshot = false) ~max_steps
-    pvm_state =
+    ?(after_fast_exec = fun () -> ()) ?(stop_at_snapshot = false) ?debug_flag
+    ~max_steps pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
   let eligible_for_fast_exec =
@@ -65,7 +66,12 @@ let rec compute_step_many accum_ticks ?builtins
   in
   let backup pvm_state =
     let+ pvm_state, ticks =
-      Wasm_vm.compute_step_many ?builtins ~stop_at_snapshot ~max_steps pvm_state
+      Wasm_vm.compute_step_many
+        ?builtins
+        ~stop_at_snapshot
+        ?debug_flag
+        ~max_steps
+        pvm_state
     in
     (pvm_state, Int64.add accum_ticks ticks)
   in
@@ -84,6 +90,7 @@ let rec compute_step_many accum_ticks ?builtins
                 ~builtins
                 ~stop_at_snapshot
                 ~after_fast_exec
+                ?debug_flag
                 ~max_steps
                 pvm_state
             else Lwt.return (pvm_state, accum_ticks)
