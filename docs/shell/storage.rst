@@ -4,9 +4,9 @@ The storage layer
 
 This document explains the inner workings of the storage layer of the
 Tezos shell. The storage layer is responsible for aggregating blocks
-(along with their respective ledger state) and operations (along with
-their associated metadata). It is composed of two main parts: the
-:ref:`store<store_component>` and the
+(along with their respective ledger state) and operations within
+blocks (along with their associated metadata). It is composed of two
+main components: the :ref:`store<store_component>` and the
 :ref:`context<context_component>`.
 
 .. _store_component:
@@ -20,7 +20,7 @@ store also handles the chain's current state: current head, invalid
 blocks, active test chains, etc. The store component is designed to
 handle concurrent accesses to the data. Both a mutex and a lockfile
 are present to prevent concurrent access to critical sections. The
-store also manages the :ref:`context<context_component>` and handles
+store also provides an accessor to the :ref:`context<context_component>` and handles
 its initialization, but it is not responsible to commit contexts
 on-disk. This is done by the :doc:`validator<validation>` component.
 
@@ -29,58 +29,63 @@ mode<../user/history_modes>` that can be either *Archive*, *Full* or
 *Rolling*. Depending on the chosen history mode, some data will be
 pruned while the chain is growing. In *Full* mode, all blocks that are
 part of the chain are kept but their associated metadata below a
-certain threshold are discarded. In *Rolling* mode, blocks under a certain
-threshold are discarded entirely. *Full* and *Rolling* may take a
-number of additional cycles to increase or decrease that threshold.
+certain threshold are discarded. In *Rolling* mode, blocks under a
+certain threshold are discarded entirely. *Full* and *Rolling* may
+take a number of additional cycles to increase or decrease that
+threshold.
 
 .. _lafl:
 
-To decide whether a block should be pruned or not, the store uses the latest
-head's metadata that contains the **last allowed fork level**. This threshold
-specifies that the local chain cannot be reorganized below it.
-When a protocol validation returns a change to this value,
-it means that a cycle has completed. Then, the store retrieves all the
-blocks from ``(head-1).last_allowed_fork_level + 1`` to
-``head.last_allowed_fork_level``, which contain all the blocks of a
+To decide whether a block should be pruned or not, the store uses the
+latest head's metadata that contains the **last allowed fork
+level**. This threshold specifies that the local chain cannot be
+reorganized below it.  When a protocol validation returns a changed
+value for it, it means that a cycle has completed. Then, the store
+retrieves all the blocks from ``(head-1).last_allowed_fork_level + 1``
+to ``head.last_allowed_fork_level``, which contain all the blocks of a
 completed cycle that cannot be reorganized anymore, and trims the
 potential branches in the process to yield a linear history.
 
 When an un-reorganizable former cycle is retrieved, it is then
-**archived** in what is called the *cemented cycles*. This process is
-called a **merge** and is performed asynchronously. Depending on
-which history mode is ran and on the amount of additional cycles,
-blocks and/or their associated metadata present in these cemented
-cycles may or may not be preserved. For instance, if the history mode
-is *Archive*, every block and metadata are preserved, if *Full* with 5
-additional cycles is given, all the cemented cycles will be present
-but only the five most recent cemented cycles will have some metadata
-kept, lastly, if *Rolling* with 0 additional cycles, no cemented
-cycles will be preserved.
+archived in what is called the *cemented cycles*. This process is
+called a **merge** and is performed asynchronously. Depending on which
+history mode is ran and on the amount of additional cycles, blocks
+and/or their associated metadata present in these cemented cycles may
+or may not be preserved. For instance, if the history mode is
+*Archive*, every block is preserved, with all its metadata. If it is
+*Full* with 5 additional cycles, all the cemented cycles will be
+present but only the 10 most recent cemented cycles will have some
+metadata kept (that is, *5 + 5 = 10* as the
+:ref:`PRESERVED_CYCLES<ps_constants>` protocol parameter, which on
+Mainnet is currently set to 5 cycles, forces the node to keep at least
+these cycles). Finally, if it is set to *Rolling* with 0 additional
+cycles, only 5 cycles (the :ref:`PRESERVED_CYCLES <ps_constants>`
+ones) with metadata will be kept.
 
-Depending on its history mode, the store maintains two specific
-values:
+The store maintains two specific variables, whose values depend on the
+history mode:
 
-- The *caboose* which represents the lowest block known by the
-  store that may or may not possess metadata. In *Archive* and *Full*
-  mode, this would always be the genesis block.
+- The *caboose*, which represents the oldest block known by the
+  store. The latter block may or may not have its metadata in
+  store. In *Archive* and *Full* mode, this would always be the
+  genesis block.
 
 - The *savepoint* which indicates the lowest block known by the store
   that possesses metadata.
 
-The *checkpoint* is also a special value that indicates the block
-that must be part of the chain. This special block may be in the
-future.  Setting a future checkpoint on a fresh node before
-bootstrapping adds protection in case of eclipse attacks where a set
-of malicious peers will advertise a wrong chain. When the store
-reaches the level of a manually defined checkpoint, it will make sure
-that this is indeed the expected block or will stop the
-bootstrap. When the checkpoint is unset or reached, the store will
-maintain the following invariant: ``checkpoint ≥
-head.last_allowed_fork_level``.
+The *checkpoint* is also a special value that indicates one block that
+must be part of the chain. This special block may be in the future.
+Setting a future checkpoint on a fresh node before bootstrapping adds
+protection in case of eclipse attacks where a set of malicious peers
+will advertise a wrong chain. When the store reaches the level of a
+manually defined checkpoint, it will make sure that this is indeed the
+expected block or will stop the bootstrap. When the checkpoint is
+unset or reached, the store will maintain the following invariant:
+``checkpoint ≥ head.last_allowed_fork_level``.
 
 To access those values, it is possible, while the node is running, to
 call the RPC ``/chains/main/checkpoint`` to retrieve the checkpoint,
-savepoint, caboose and its history mode.
+savepoint, caboose and the history mode.
 
 The store also has the capability to reconstruct its blocks' metadata
 by replaying every block and operation present and repopulating the
@@ -139,8 +144,10 @@ Context
 The context is a versioned key/value store that associates for each
 block a view of its ledger state. The versioning uses concepts similar
 to `Git <https://git-scm.com/>`_. The current implementation is using
-`irmin <https://github.com/mirage/irmin>`_ as backend and abstracted
-by the ``lib_context`` library.
+`Irmin <https://github.com/mirage/irmin>`_ as a backend, and its API
+is accessible via the abstractions provided by the ``lib_context``
+library.
+
 
 The abstraction provides generic accessors/modifiers: ``set``,
 ``get``, ``del``, etc. manipulating a concrete context object and
@@ -179,4 +186,4 @@ commas such as `TEZOS_CONTEXT="v, variable=value"`):
 - "lru-size": number of entries stored in the Irmin's LRU cache
   (default `5_000`)
 - "indexing-strategy": strategy for indexing object (default
-  `minimal`)
+  `minimal`; it is not recommended to use another value)
