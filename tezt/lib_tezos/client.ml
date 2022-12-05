@@ -1315,7 +1315,8 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
   | Some hash -> return hash
 
 let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
-    ?burn_cap ?gas_limit ?dry_run ?prefix ~amount ~src client name protocol =
+    ?burn_cap ?gas_limit ?dry_run ?force ?prefix ~amount ~src client name
+    protocol =
   let alias =
     match List.rev name with
     | [] -> Test.fail "name must not be an empty list"
@@ -1334,6 +1335,7 @@ let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
       ?burn_cap
       ?gas_limit
       ?dry_run
+      ?force
       ~alias
       ~amount
       ~src
@@ -1343,7 +1345,7 @@ let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
   (alias, process)
 
 let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
-    ?gas_limit ?dry_run ?prefix ~amount ~src client name protocol =
+    ?gas_limit ?dry_run ?force ?prefix ~amount ~src client name protocol =
   let alias =
     match List.rev name with
     | [] -> Test.fail "name must not be an empty list"
@@ -1362,6 +1364,7 @@ let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
       ?burn_cap
       ?gas_limit
       ?dry_run
+      ?force
       ~alias
       ~amount
       ~src
