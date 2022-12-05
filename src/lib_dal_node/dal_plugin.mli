@@ -45,6 +45,19 @@ type slot_header = {
 module type T = sig
   module Proto : Registered_protocol.T
 
+  type block_info
+
+  (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
+      [block] in [ctxt] for the given [chain]. Block's metadata are included or
+      skipped depending on the value of [metadata]. This is a wrapper on top of
+      {!Protocol_client_context.Alpha_block_services.info}.  *)
+  val block_info :
+    ?chain:Tezos_shell_services.Block_services.chain ->
+    ?block:Tezos_shell_services.Block_services.block ->
+    metadata:[`Always | `Never] ->
+    Client_context.full ->
+    block_info tzresult Lwt.t
+
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->

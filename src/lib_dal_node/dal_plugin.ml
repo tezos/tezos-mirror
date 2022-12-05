@@ -36,6 +36,15 @@ type slot_header = {
 module type T = sig
   module Proto : Registered_protocol.T
 
+  type block_info
+
+  val block_info :
+    ?chain:Tezos_shell_services.Block_services.chain ->
+    ?block:Tezos_shell_services.Block_services.block ->
+    metadata:[`Always | `Never] ->
+    Client_context.full ->
+    block_info tzresult Lwt.t
+
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
