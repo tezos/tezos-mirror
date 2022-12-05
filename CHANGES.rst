@@ -68,11 +68,6 @@ Node
   of ``octez-node`` and that was already used internally (and that was
   not usable on its own).
 
-- Fixed a bug that caused the bootstrap pipeline to apply a block without
-  prechecking it first. This issue only occurs for recent protocols (i.e., Lima
-  and later) where the validation of a block is dissociated from its
-  application. (MR :gl:`!7014`)
-
 - **Breaking change**: bumped the node's storage version to
   ``3.0``. This new version changes the store's representation
   required by the new protocol's semantics. Upgrading to this new
