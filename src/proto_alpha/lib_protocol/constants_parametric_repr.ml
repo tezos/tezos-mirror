@@ -30,6 +30,7 @@ type dal = {
   number_of_slots : int;
   attestation_lag : int;
   availability_threshold : int;
+  blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
 
@@ -42,30 +43,35 @@ let dal_encoding =
            attestation_lag;
            availability_threshold;
            cryptobox_parameters;
+           blocks_per_epoch;
          } ->
       ( ( feature_enable,
           number_of_slots,
           attestation_lag,
-          availability_threshold ),
+          availability_threshold,
+          blocks_per_epoch ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              number_of_slots,
              attestation_lag,
-             availability_threshold ),
+             availability_threshold,
+             blocks_per_epoch ),
            cryptobox_parameters ) ->
       {
         feature_enable;
         number_of_slots;
         attestation_lag;
         availability_threshold;
+        blocks_per_epoch;
         cryptobox_parameters;
       })
     (merge_objs
-       (obj4
+       (obj5
           (req "feature_enable" bool)
           (req "number_of_slots" int16)
           (req "attestation_lag" int16)
-          (req "availability_threshold" int16))
+          (req "availability_threshold" int16)
+          (req "blocks_per_epoch" int32))
        Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as

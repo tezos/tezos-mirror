@@ -1016,6 +1016,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             number_of_slots = c.dal.number_of_slots;
             attestation_lag = c.dal.endorsement_lag;
             availability_threshold = c.dal.availability_threshold;
+            blocks_per_epoch = 32l;
             cryptobox_parameters;
           }
       in

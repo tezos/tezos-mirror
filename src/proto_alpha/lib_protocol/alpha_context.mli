@@ -794,6 +794,7 @@ module Constants : sig
       number_of_slots : int;
       attestation_lag : int;
       availability_threshold : int;
+      blocks_per_epoch : int32;
       cryptobox_parameters : Dal.parameters;
     }
 
