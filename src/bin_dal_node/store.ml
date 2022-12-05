@@ -80,6 +80,17 @@ module Legacy_paths : sig
   val slot_shards_by_commitment : string -> path
 
   val slot_shard_by_commitment : string -> int -> path
+
+  val successfully_included_slot_header_in_l1 :
+    published_level:Services.Types.level ->
+    slot_index:Services.Types.slot_index ->
+    path * path
+
+  val other_slot_header_in_l1 :
+    published_level:Services.Types.level ->
+    slot_index:Services.Types.slot_index ->
+    commitment:string ->
+    path
 end = struct
   module Path_internals = struct
     type internal = [`Internal]
@@ -113,13 +124,37 @@ end = struct
       mk_leaf
         ~is_collection:false
         (slot_ids_by_commitment commitment)
-        [Int32.to_string slot_level; Int32.to_string slot_index]
+        [Int32.to_string slot_level; Int.to_string slot_index]
 
     let slot_shards_by_commitment commitment =
       mk_internal (slot_by_commitment commitment) "shards"
 
     let slot_shard_by_commitment commitment index =
       mk_leaf (slot_shards_by_commitment commitment) [string_of_int index]
+
+    let included_slot_header_in_l1 level slot_index =
+      let mk a b = mk_internal b a in
+      mk "levels" root
+      |> mk (Int32.to_string level)
+      |> mk "slot_index"
+      |> mk (string_of_int slot_index)
+
+    let successfully_included_slot_header_in_l1 published_level slot_index =
+      let shared =
+        mk_internal
+          (included_slot_header_in_l1 published_level slot_index)
+          "accepted"
+      in
+      ( mk_leaf ~is_collection:false shared ["commitment"],
+        mk_leaf ~is_collection:false shared ["status"] )
+
+    let other_slot_header_in_l1 published_level slot_index commitment =
+      mk_leaf
+        ~is_collection:false
+        (mk_internal
+           (included_slot_header_in_l1 published_level slot_index)
+           "others")
+        [commitment]
 
     let data_path (type a) (p : a path) =
       let rec path (p : internal path) acc =
@@ -153,6 +188,18 @@ end = struct
 
   let slot_shards_by_commitment c =
     Path_internals.(data_path @@ slot_shards_by_commitment c)
+
+  let successfully_included_slot_header_in_l1 ~published_level ~slot_index =
+    let commitment, status =
+      Path_internals.successfully_included_slot_header_in_l1
+        published_level
+        slot_index
+    in
+    Path_internals.(data_path @@ commitment, data_path @@ status)
+
+  let other_slot_header_in_l1 ~published_level ~slot_index ~commitment =
+    Path_internals.(
+      data_path @@ other_slot_header_in_l1 published_level slot_index commitment)
 end
 
 module Legacy = struct
@@ -190,6 +237,8 @@ module Legacy = struct
     let* res_opt = find node_store.slots_store path in
     Option.map Bytes.of_string res_opt |> Lwt.return
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4383
+     Remove legacy code once migration to new API is done. *)
   let legacy_add_slot_headers ~block_hash slot_headers node_store =
     let slot_headers_store = node_store.slot_headers_store in
     List.iter_s
@@ -210,7 +259,50 @@ module Legacy = struct
       slot_headers
 
   let add_slot_headers ~block_level:_ ~block_hash slot_headers node_store =
-    (* Saving slots headers with the new storage layout will be added in the
-       next MR. *)
-    legacy_add_slot_headers ~block_hash slot_headers node_store
+    let open Lwt_syntax in
+    let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
+    let slots_store = node_store.slots_store in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
+       Handle reorgs. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
+       Handle statuses evolution. *)
+    List.iter_s
+      (fun (slot_header, status) ->
+        let Dal_plugin.{slot_index; commitment; published_level} =
+          slot_header
+        in
+        let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
+        match status with
+        | Dal_plugin.Succeeded ->
+            let commitment_path, status_path =
+              Legacy_paths.successfully_included_slot_header_in_l1
+                ~published_level
+                ~slot_index
+            in
+            let* () =
+              set
+                ~msg:"add_slot_headers:success:commitment"
+                slots_store
+                commitment_path
+                commitment_b58
+            in
+            set
+              ~msg:"add_slot_headers:success:status"
+              slots_store
+              status_path
+              (Services.Types.header_attestation_status_to_string
+                 `Waiting_for_attestations)
+        | Dal_plugin.Failed ->
+            let path =
+              Legacy_paths.other_slot_header_in_l1
+                ~published_level
+                ~slot_index
+                ~commitment:commitment_b58
+            in
+            set
+              ~msg:"add_slot_headers:others:status"
+              slots_store
+              path
+              (Services.Types.header_status_to_string `Not_selected))
+      slot_headers
 end
