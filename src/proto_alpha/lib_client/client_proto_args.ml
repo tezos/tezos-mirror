@@ -927,7 +927,7 @@ module Sc_rollup_params = struct
     let from_text s =
       return (fun (Sc_rollup.PVM.Packed (module R)) ->
           R.parse_boot_sector s |> function
-          | None -> failwith "Invalid boot sector"
+          | None -> failwith "Invalid kernel"
           | Some boot_sector -> return boot_sector)
     in
     file_or_text_parameter ~from_text ()

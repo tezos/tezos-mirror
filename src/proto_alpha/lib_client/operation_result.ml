@@ -321,7 +321,7 @@ let pp_manager_operation_content (type kind) source ppf
         "Smart contract rollup origination:@,\
          Kind: %a@,\
          Parameter type: %a@,\
-         Boot sector Blake2B hash: '%a'"
+         Kernel Blake2B hash: '%a'"
         Sc_rollup.Kind.pp
         kind
         pp_micheline_from_lazy_expr
