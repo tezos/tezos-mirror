@@ -94,17 +94,16 @@ let read_input () =
     Host_funcs.Aux.read_input
       ~input_buffer
       ~memory
-      ~level_offset:4l
-      ~id_offset:10l
+      ~info_addr:4l
       ~dst:50l
       ~max_bytes:36000l
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5l) ;
-  let* m = Memory.load_bytes memory 4l 1 in
-  assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 10l 1 in
-  assert (m = "\002") ;
+  let* m = Memory.load_bytes memory 4l 4 in
+  assert (m = "\002\000\000\000") ;
+  let* m = Memory.load_bytes memory 8l 4 in
+  assert (m = "\002\000\000\000") ;
   let* m = Memory.load_bytes memory 50l 5 in
   assert (m = "hello") ;
   Lwt.return @@ Result.return_unit
@@ -119,41 +118,12 @@ let read_input_no_messages () =
     Host_funcs.Aux.read_input
       ~input_buffer
       ~memory
-      ~level_offset:4l
-      ~id_offset:10l
+      ~info_addr:4l
       ~dst:50l
       ~max_bytes:36000l
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 0l) ;
-  Lwt.return @@ Result.return_unit
-
-let read_input_too_large () =
-  let open Lwt.Syntax in
-  let lim = Types.(MemoryType {min = 100l; max = Some 1000l}) in
-  let memory = Memory.alloc lim in
-  let input_buffer = Input_buffer.alloc () in
-  let* () =
-    Input_buffer.enqueue
-      input_buffer
-      {
-        raw_level = 2l;
-        message_counter = Z.of_int 2;
-        payload = Bytes.make 5000 '\000';
-      }
-  in
-  assert (Input_buffer.num_elements input_buffer = Z.one) ;
-  let* result =
-    Host_funcs.Aux.read_input
-      ~input_buffer
-      ~memory
-      ~level_offset:4l
-      ~id_offset:10l
-      ~dst:50l
-      ~max_bytes:36000l
-  in
-  assert (Input_buffer.num_elements input_buffer = Z.zero) ;
-  assert (result = Host_funcs.Error.(code Input_output_too_large)) ;
   Lwt.return @@ Result.return_unit
 
 let test_host_fun () =
@@ -175,9 +145,7 @@ let test_host_fun () =
       module_inst.memories
   in
   let module_inst = {module_inst with memories} in
-  let values =
-    Values.[Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l)]
-  in
+  let values = Values.[Num (I32 4l); Num (I32 50l); Num (I32 3600l)] in
 
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
@@ -195,10 +163,10 @@ let test_host_fun () =
   let* module_inst = Instance.resolve_module_ref module_reg module_key in
   let* memory = Lazy_vector.Int32Vector.get 0l module_inst.memories in
   assert (Input_buffer.num_elements input = Z.zero) ;
-  let* m = Memory.load_bytes memory 4l 1 in
-  assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 10l 1 in
-  assert (m = "\002") ;
+  let* m = Memory.load_bytes memory 4l 4 in
+  assert (m = "\002\000\000\000") ;
+  let* m = Memory.load_bytes memory 8l 4 in
+  assert (m = "\002\000\000\000") ;
   let* m = Memory.load_bytes memory 50l 5 in
   assert (m = "hello") ;
   assert (result = Values.[Num (I32 5l)]) ;
@@ -209,6 +177,5 @@ let tests =
     tztest "Write input" `Quick write_input;
     tztest "Read input" `Quick read_input;
     tztest "Read input no messages" `Quick read_input_no_messages;
-    tztest "Read input too large" `Quick read_input_too_large;
     tztest "Host read input" `Quick test_host_fun;
   ]

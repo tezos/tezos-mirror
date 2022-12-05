@@ -132,8 +132,7 @@ module Aux : sig
     val read_input :
       input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
       memory:memory ->
-      level_offset:int32 ->
-      id_offset:int32 ->
+      info_addr:int32 ->
       dst:int32 ->
       max_bytes:int32 ->
       int32 Lwt.t

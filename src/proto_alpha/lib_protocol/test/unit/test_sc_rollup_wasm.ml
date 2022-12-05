@@ -166,7 +166,6 @@ let make_transactions () =
 let test_output () =
   let open Lwt_result_syntax in
   let level_offset = 20 in
-  let id_offset = 40 in
   let dst = 60 in
   let max_bytes = 3600 in
   let dst_without_header = dst + 2 in
@@ -174,52 +173,45 @@ let test_output () =
     Format.sprintf
       {|
         (module
-          (type (;0;) (func (param i32 i32 i32 i32 i32) (result i32)))
           (type $t0 (func (param i32 i32) (result i32)))
-          (type $t3 (func (param i32 i32 i32 i32) (result i32)))
+          (type $t3 (func (param i32 i32 i32) (result i32)))
           (import "smart_rollup_core" "read_input" (func $read_input (type $t3)))
           (import "smart_rollup_core" "write_output" (func $write_output (type $t0)))
+          (memory 1)
+          (export "memory" (memory 0))
           (func (export "kernel_run")
             (local $size i32)
             (local.set $size (call $read_input
-                             (i32.const %d)
-                             (i32.const %d)
-                             (i32.const %d)
-                             (i32.const %d)))
+                                   (i32.const %d)
+                                   (i32.const %d)
+                                   (i32.const %d)))
             (call $write_output (i32.const %d)
                                 (i32.sub (local.get $size) (i32.const 2)))
             (local.set $size (call $read_input
-                             (i32.const %d)
-                             (i32.const %d)
-                             (i32.const %d)
-                             (i32.const %d)))
+                                   (i32.const %d)
+                                   (i32.const %d)
+                                   (i32.const %d)))
             (call $write_output (i32.const %d)
                                 (i32.sub (local.get $size) (i32.const 2)))
             (local.set $size (call $read_input
-                             (i32.const %d)
-                             (i32.const %d)
-                             (i32.const %d)
-                             (i32.const %d)))
+                                   (i32.const %d)
+                                   (i32.const %d)
+                                   (i32.const %d)))
             (call $write_output (i32.const %d)
                                 (local.get $size))
             drop)
-          (memory (;0;) 17)
-          (export "memory" (memory 0))
           )
 
     |}
       level_offset
-      id_offset
       dst
       max_bytes
       dst_without_header
       level_offset
-      id_offset
       dst
       max_bytes
       dst_without_header
       level_offset
-      id_offset
       dst
       max_bytes
       dst_without_header

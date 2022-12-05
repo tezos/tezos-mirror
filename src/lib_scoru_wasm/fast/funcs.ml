@@ -91,14 +91,13 @@ let make (module Builtins : Builtins.S) state =
 
   let read_input =
     fn
-      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
-      (fun level_offset id_offset dst max_bytes ->
+      (i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun info_addr dst max_bytes ->
         with_mem @@ fun memory ->
         Host_funcs.Aux.read_input
           ~input_buffer:state.buffers.input
           ~memory
-          ~level_offset
-          ~id_offset
+          ~info_addr
           ~dst
           ~max_bytes)
   in

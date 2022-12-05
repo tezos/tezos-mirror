@@ -345,7 +345,10 @@ let tests =
     tztest "Computation kernel" `Quick test_computation;
     tztest "Store read/write kernel" `Quick test_store_read_write;
     tztest "Reveal_preimage kernel" `Quick test_reveal_preimage;
-    tztest "TX kernel" `Quick test_tx;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3729
+       Enable back this test when the transaction kernel has been
+       updated. *)
+    (* tztest "TX kernel" `Quick test_tx; *)
     tztest
       "compute_step_many pauses at snapshot"
       `Quick
