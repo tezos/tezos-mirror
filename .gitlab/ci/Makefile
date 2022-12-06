@@ -42,9 +42,6 @@ test-pytest-check-regression-files:
 
 .PHONY: test-tezt
 test-tezt:
-ifndef TESTS
-	$(error TESTS is undefined)
-endif
 	cd ${CI_PROJECT_DIR} && \
 		dune exec tezt/tests/main.exe -- ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 4 --retry 1 && \
 		./scripts/ci/merge_coverage.sh
