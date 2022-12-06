@@ -222,8 +222,6 @@ module Legacy = struct
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
         in
-        (* TODO: This is a bit weird to use b58 and not the binary encoding here. *)
-        let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
         match status with
         | Dal_plugin.Succeeded ->
             let index =
@@ -231,15 +229,26 @@ module Legacy = struct
             in
             let commitment_path = Path.Level.accepted_header_commitment index in
             let status_path = Path.Level.accepted_header_status index in
+            let data =
+              Data_encoding.Binary.to_string_exn
+                Cryptobox.Commitment.encoding
+                commitment
+            in
             let* () =
               set
-                ~msg:"add_slot_headers:success:commitment"
+                ~msg:
+                  (Printf.sprintf
+                     "add_slot_headers:%s"
+                     (String.concat "/" commitment_path))
                 slots_store
                 commitment_path
-                commitment_b58
+                data
             in
             set
-              ~msg:"add_slot_headers:success:status"
+              ~msg:
+                (Printf.sprintf
+                   "add_slot_headers:%s"
+                   (String.concat "/" status_path))
               slots_store
               status_path
               (Services.Types.header_attestation_status_to_string
