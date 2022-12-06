@@ -58,6 +58,11 @@ let has_stuck_flag durable =
   let+ stuck = Durable.(find_value durable Constants.stuck_flag_key) in
   Option.is_some stuck
 
+let has_upgrade_error_flag durable =
+  let open Lwt_syntax in
+  let+ error = Durable.(find_value durable Constants.upgrade_error_flag_key) in
+  Option.is_some error
+
 let mark_for_reboot {reboot_counter; durable; _} =
   let open Lwt_syntax in
   let+ has_reboot_flag = has_reboot_flag durable in
@@ -113,6 +118,14 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
             durable
             Constants.kernel_fallback_key
             Constants.kernel_key
+        in
+        let* durable =
+          Durable.write_value_exn
+            ~edit_readonly:true
+            durable
+            Constants.upgrade_error_flag_key
+            0L
+            ""
         in
         return ~durable Padding
       else return ~status:Failing (Stuck (No_fallback_kernel cause))
@@ -249,10 +262,19 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
       let* has_stuck_flag = has_stuck_flag durable in
-      if has_stuck_flag then
-        let* durable = Durable.(delete durable Constants.stuck_flag_key) in
-        return ~durable Padding
-      else return Padding
+      let* durable =
+        if has_stuck_flag then
+          Durable.(delete ~edit_readonly:true durable Constants.stuck_flag_key)
+        else Lwt.return durable
+      in
+      let* has_upgrade_error_flag = has_upgrade_error_flag durable in
+      let* durable =
+        if has_upgrade_error_flag then
+          Durable.(
+            delete ~edit_readonly:true durable Constants.upgrade_error_flag_key)
+        else Lwt.return durable
+      in
+      return ~durable Padding
   | Eval {config; module_reg} ->
       (* Continue execution. *)
       let store = Durable.to_storage durable in

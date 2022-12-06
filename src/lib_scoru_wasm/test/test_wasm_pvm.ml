@@ -1073,8 +1073,7 @@ let test_reveal_upgrade_kernel_ok () =
   let*! () = assert_fallback_kernel tree @@ Some preimage in
   return_unit
 
-let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error:_
-    invalid_kernel () =
+let test_reveal_upgrade_kernel_fallsback_on_error ~binary invalid_kernel () =
   let open Lwt_result_syntax in
   let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
   (* Let's first init the tree to compute. *)
@@ -1133,9 +1132,25 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error:_
   let*! state_after_second_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
+  let has_upgrade_error_flag tree =
+    let*! durable = wrap_as_durable_storage tree in
+    let durable = Durable.of_storage_exn durable in
+    let*! found_error =
+      Durable.find_value durable Constants.upgrade_error_flag_key
+    in
+    Lwt.return_ok @@ Option.is_some found_error
+  in
+  (* The pvm should have an upgrade error, but not be stuck *)
   assert (not @@ is_stuck state_after_second_message) ;
+  let* has_upgrade_error = has_upgrade_error_flag tree in
+  assert has_upgrade_error ;
+  (* The kernel is set to the fallback one *)
   let*! () = assert_kernel tree @@ Some modul in
   let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* The next evaluation should delete the upgrade error. *)
+  let* tree = run_installer tree 3l in
+  let* has_upgrade_error = has_upgrade_error_flag tree in
+  assert (not has_upgrade_error) ;
   return_unit
 
 let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
@@ -1627,14 +1642,12 @@ let tests =
       `Quick
       (test_reveal_upgrade_kernel_fallsback_on_error
          ~binary:true
-         ~error:`Decode
          "INVALID WASM!!!");
     tztest
       "Test kernel upgrade fallsback on linking error"
       `Quick
       (test_reveal_upgrade_kernel_fallsback_on_error
          ~binary:false
-         ~error:`Link
          {|
 (module
  (import "invalid_module" "write_debug"
@@ -1645,7 +1658,6 @@ let tests =
       `Quick
       (test_reveal_upgrade_kernel_fallsback_on_error
          ~binary:false
-         ~error:`Init
          "(module (memory 1))");
     tztest
       "Test scheduling with 10 inputs in a unique inbox"
