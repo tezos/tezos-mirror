@@ -388,6 +388,10 @@ val play :
   refutation ->
   (game_result, t) Either.t tzresult Lwt.t
 
+(** [cost_play game refutation] returns the gas cost of [play] applied with [game]
+    and [refutation]. *)
+val cost_play : t -> refutation -> Gas_limit_repr.cost
+
 (** A type that represents the number of blocks left for players to play. Each
     player has her timeout value. `timeout` is expressed in the number of
     blocks.
@@ -405,10 +409,6 @@ type timeout = {
 }
 
 val timeout_encoding : timeout Data_encoding.t
-
-(** [cost_play game refutation] returns the gas cost of [play] applied with [game]
-    and [refutation]. *)
-val cost_play : t -> refutation -> Gas_limit_repr.cost
 
 module Internal_for_tests : sig
   (** Checks that the tick count chosen by the current move is one of
