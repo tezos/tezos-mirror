@@ -550,6 +550,13 @@ let max_priority_arg =
     (Tezos_clic.parameter (fun _ s ->
          try return (int_of_string s) with _ -> fail (Bad_max_priority s)))
 
+let timelock_locked_value_arg =
+  Tezos_clic.arg
+    ~long:"timelock-locked-valuec"
+    ~placeholder:"timelock-locked"
+    ~doc:"Timelock RSA group modulus"
+    string_parameter
+
 let default_minimal_fees =
   match Tez.of_mutez 100L with None -> assert false | Some t -> t
 
