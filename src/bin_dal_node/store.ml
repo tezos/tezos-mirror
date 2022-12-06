@@ -70,92 +70,94 @@ let init config =
   let* () = Event.(emit store_is_ready ()) in
   Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
 
-module Path : sig
-  type t = string list
-
-  module Commitment : sig
-    val slot : Cryptobox.commitment -> Path.t
-
-    val headers : Cryptobox.commitment -> Path.t
-
-    val header : Cryptobox.commitment -> Services.Types.slot_id -> Path.t
-
-    val shards : Cryptobox.commitment -> Path.t
-
-    type shard_index := int
-
-    val shard : Cryptobox.commitment -> shard_index -> Path.t
-  end
-
-  module Level : sig
-    val accepted_header_commitment : Services.Types.slot_id -> Path.t
-
-    val accepted_header_status : Services.Types.slot_id -> Path.t
-
-    val other_header_status :
-      Services.Types.slot_id -> Cryptobox.commitment -> Path.t
-  end
-end = struct
-  type t = string list
-
-  let ( / ) b a = a :: b
-
-  module Commitment = struct
-    let root = ["commitments"]
-
-    (* FIXME: should be indexed by the cryptographic constants
-       'slot_size'. *)
-    let slot commitment =
-      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-      root / commitment_repr / "slot"
-
-    let headers commitment =
-      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-      root / commitment_repr / "headers"
-
-    let header commitment index =
-      let open Services.Types in
-      let prefix = headers commitment in
-      prefix / Int32.to_string index.slot_level / Int.to_string index.slot_index
-
-    let shards commitment =
-      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-      root / commitment_repr / "shards"
-
-    (* FIXME: should be indexed by the cryptographic constants
-       'number of shards' and 'redundant factor'. *)
-    let shard commitment index =
-      let prefix = headers commitment in
-      prefix / Int.to_string index
-  end
-
-  module Level = struct
-    let root = ["levels"]
-
-    let headers index =
-      let open Services.Types in
-      root / Int32.to_string index.slot_level / Int.to_string index.slot_index
-
-    let accepted_header index =
-      let prefix = headers index in
-      prefix / "accepted"
-
-    let accepted_header_commitment index =
-      let prefix = accepted_header index in
-      prefix / "commitment"
-
-    let accepted_header_status index =
-      let prefix = accepted_header index in
-      prefix / "status"
-
-    let other_header_status index commitment =
-      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-      let prefix = headers index in
-      prefix / "others" / commitment_repr / "status"
-  end
-end
-
 module Legacy = struct
+  module Path : sig
+    type t = string list
+
+    module Commitment : sig
+      val slot : Cryptobox.commitment -> Path.t
+
+      val headers : Cryptobox.commitment -> Path.t
+
+      val header : Cryptobox.commitment -> Services.Types.slot_id -> Path.t
+
+      val shards : Cryptobox.commitment -> Path.t
+
+      type shard_index := int
+
+      val shard : Cryptobox.commitment -> shard_index -> Path.t
+    end
+
+    module Level : sig
+      val accepted_header_commitment : Services.Types.slot_id -> Path.t
+
+      val accepted_header_status : Services.Types.slot_id -> Path.t
+
+      val other_header_status :
+        Services.Types.slot_id -> Cryptobox.commitment -> Path.t
+    end
+  end = struct
+    type t = string list
+
+    let ( / ) b a = a :: b
+
+    module Commitment = struct
+      let root = ["commitments"]
+
+      (* FIXME: should be indexed by the cryptographic constants
+         'slot_size'. *)
+      let slot commitment =
+        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+        root / commitment_repr / "slot"
+
+      let headers commitment =
+        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+        root / commitment_repr / "headers"
+
+      let header commitment index =
+        let open Services.Types in
+        let prefix = headers commitment in
+        prefix
+        / Int32.to_string index.slot_level
+        / Int.to_string index.slot_index
+
+      let shards commitment =
+        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+        root / commitment_repr / "shards"
+
+      (* FIXME: should be indexed by the cryptographic constants
+         'number of shards' and 'redundant factor'. *)
+      let shard commitment index =
+        let prefix = shards commitment in
+        prefix / Int.to_string index
+    end
+
+    module Level = struct
+      let root = ["levels"]
+
+      let headers index =
+        let open Services.Types in
+        root / Int32.to_string index.slot_level / Int.to_string index.slot_index
+
+      let accepted_header index =
+        let prefix = headers index in
+        prefix / "accepted"
+
+      let accepted_header_commitment index =
+        let prefix = accepted_header index in
+        prefix / "commitment"
+
+      let accepted_header_status index =
+        let prefix = accepted_header index in
+        prefix / "status"
+
+      let other_header_status index commitment =
+        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+        let prefix = headers index in
+        prefix / "others" / commitment_repr / "status"
+    end
+  end
+
   let encode enc v =
     Data_encoding.Binary.to_string enc v
     |> Result.map_error (fun e ->
