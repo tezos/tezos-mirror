@@ -122,7 +122,7 @@ val cement_commitment :
 
     May fail with:
     {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}}
 
 *)
 val is_staker :
