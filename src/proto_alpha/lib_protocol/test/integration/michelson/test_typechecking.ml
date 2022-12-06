@@ -821,65 +821,6 @@ let test_parse_contract_data_for_unit_rollup () =
   in
   return ()
 
-(** Test [parse_contract_data] for rollup with entrypoints in type. *)
-let test_parse_contract_data_for_rollup_with_entrypoints () =
-  let open Lwt_result_syntax in
-  let* block, (contract, _) = context_init_with_sc_rollup_enabled T2 in
-  let* block, rollup =
-    sc_originate block contract "or (pair %add nat nat) (unit %reset)"
-  in
-  let rollup_destination = Sc_rollup.Address.to_b58check rollup in
-  let* incr = Incremental.begin_construction block in
-  let ctxt = Incremental.alpha_ctxt incr in
-  let* ctxt, typed_contract =
-    let*? (Script_typed_ir.Ty_ex_c nat_pair) =
-      Environment.wrap_tzresult Script_typed_ir.(pair_t (-1) nat_t nat_t)
-    in
-    wrap_error_lwt
-    @@ Script_ir_translator.parse_contract_data
-         ctxt
-         (-1)
-         nat_pair
-         (Destination.Sc_rollup rollup)
-         ~entrypoint:(Entrypoint.of_string_strict_exn "add")
-  in
-  let destination = Script_typed_ir.Typed_contract.destination typed_contract in
-  let entrypoint = Script_typed_ir.Typed_contract.entrypoint typed_contract in
-  (* Check that the destinations match. *)
-  let* () =
-    Assert.equal_string
-      ~loc:__LOC__
-      (Destination.to_b58check destination)
-      rollup_destination
-  in
-  (* Check that entrypoints match. *)
-  let* () =
-    Assert.equal_string ~loc:__LOC__ (Entrypoint.to_string entrypoint) "add"
-  in
-  let* _ctxt, typed_contract =
-    wrap_error_lwt
-    @@ Script_ir_translator.parse_contract_data
-         ctxt
-         (-1)
-         Script_typed_ir.unit_t
-         (Destination.Sc_rollup rollup)
-         ~entrypoint:(Entrypoint.of_string_strict_exn "reset")
-  in
-  let destination = Script_typed_ir.Typed_contract.destination typed_contract in
-  let entrypoint = Script_typed_ir.Typed_contract.entrypoint typed_contract in
-  (* Check that the destinations match. *)
-  let* () =
-    Assert.equal_string
-      ~loc:__LOC__
-      (Destination.to_b58check destination)
-      rollup_destination
-  in
-  (* Check that entrypoints match. *)
-  let* () =
-    Assert.equal_string ~loc:__LOC__ (Entrypoint.to_string entrypoint) "reset"
-  in
-  return ()
-
 (** Test that [parse_contract_data] for rollup with invalid type fails. *)
 let test_parse_contract_data_for_rollup_with_invalid_type () =
   let open Lwt_result_syntax in
@@ -971,11 +912,7 @@ let tests =
       `Quick
       test_parse_contract_data_for_unit_rollup;
     Tztest.tztest
-      "test parse contract data for rollup with entrypoint"
-      `Quick
-      test_parse_contract_data_for_rollup_with_entrypoints;
-    Tztest.tztest
-      "test parse contract data for rollup with entrypoint"
+      "test parse contract data for rollup with entrypoint invalid type"
       `Quick
       test_parse_contract_data_for_rollup_with_invalid_type;
     Tztest.tztest

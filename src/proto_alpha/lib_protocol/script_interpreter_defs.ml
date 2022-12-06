@@ -38,7 +38,7 @@ open Script_typed_ir
 open Script_ir_translator
 open Local_gas_counter
 
-type error += Rollup_invalid_transaction_amount
+type error += Rollup_invalid_transaction_amount | Rollup_invalid_entrypoint
 
 let () =
   register_error_kind
@@ -53,7 +53,19 @@ let () =
       Format.pp_print_string ppf "Transaction amount to a rollup must be zero.")
     Data_encoding.unit
     (function Rollup_invalid_transaction_amount -> Some () | _ -> None)
-    (fun () -> Rollup_invalid_transaction_amount)
+    (fun () -> Rollup_invalid_transaction_amount) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.rollup_invalid_entrypoint"
+    ~title:"Only the default entrypoint is allowed for rollups"
+    ~description:"Rollups only support transactions to the default entrypoint."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "Rollups only support transactions to the default entrypoint.")
+    Data_encoding.unit
+    (function Rollup_invalid_entrypoint -> Some () | _ -> None)
+    (fun () -> Rollup_invalid_entrypoint)
 
 (*
 
@@ -591,6 +603,11 @@ let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
 let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     ~parameters_ty ~parameters =
   error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  >>?= fun () ->
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
+     We currently don't support entrypoints as the entrypoint information
+     for L1 to L2 messages is not propagated to the rollup. *)
+  error_unless (Entrypoint.is_default entrypoint) Rollup_invalid_entrypoint
   >>?= fun () ->
   unparse_data ctxt Optimized parameters_ty parameters
   >|=? fun (unparsed_parameters, ctxt) ->

@@ -264,12 +264,8 @@ let test_transfer_non_zero_amount () =
 
 (* Use the correct type through an entrypoint but with a non-zero amount. *)
 let test_transfer_non_zero_amount_via_entrypoint () =
-  let* b, c, contract, rollup =
-    context_init "or (int %use_this_one) (unit %not_that_one)"
-  in
-  let param =
-    Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup ^ "%use_this_one")
-  in
+  let* b, c, contract, rollup = context_init "int" in
+  let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* (_b : Block.t) =
     transfer
       b

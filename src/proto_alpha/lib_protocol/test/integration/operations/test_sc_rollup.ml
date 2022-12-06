@@ -852,6 +852,7 @@ let test_originating_with_invalid_types () =
       "sapling_state 2";
       "sapling_transaction 2";
       "lambda string nat";
+      "or (nat %deposit) (string %name)";
     ]
     |> List.iter_es assert_fails_for_type
   in
@@ -991,7 +992,6 @@ let test_originating_with_valid_type () =
     "or nat string";
     "map string int";
     "map (option (pair nat string)) (list (ticket nat))";
-    "or (nat %deposit) (string %name)";
   ]
   |> List.iter_es assert_parameters_ty
 
@@ -2586,10 +2586,6 @@ let tests =
       `Quick
       test_originating_with_valid_type;
     Tztest.tztest
-      "originating with invalid types"
-      `Quick
-      test_originating_with_invalid_types;
-    Tztest.tztest
       "originating with invalid boot sector proof"
       `Quick
       test_originating_with_invalid_boot_sector_proof;
@@ -2610,10 +2606,6 @@ let tests =
        binary tree"
       `Quick
       (test_originating_with_wrong_tree ~alter_binary_bit:true);
-    Tztest.tztest
-      "originating with valid type"
-      `Quick
-      test_originating_with_valid_type;
     Tztest.tztest
       "single transaction atomic batch"
       `Quick
