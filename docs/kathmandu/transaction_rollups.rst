@@ -593,7 +593,7 @@ rollup node is to prepare its configuration file.
 
 .. code:: sh
 
-    tezos-tx-rollup-node-014-PtKathma init ${mode} config \
+    octez-tx-rollup-node-PtKathma init ${mode} config \
           for ${tx_rollup_address_or_name} \
           --data-dir ${data_dir} \
           --rpc-addr ${rpc_address} \
@@ -664,7 +664,7 @@ For instance,
 
 .. code:: sh
 
-    tezos-tx-rollup-node-014-PtKathma init batcher config for ${rollup}  \
+    octez-tx-rollup-node-PtKathma init batcher config for ${rollup}  \
           --data-dir /tmp/tx-node \
           --rpc-addr ${rollup_node_rpc_server_address} \
           --batch-signer ${batcher}
@@ -680,7 +680,7 @@ Once the configuration is ready, starting the rollup node is as simple as
 
 .. code:: sh
 
-    tezos-tx-rollup-node-014-PtKathma --endpoint ${tezos_node_address} \
+    octez-tx-rollup-node-PtKathma --endpoint ${tezos_node_address} \
           run ${mode} for ${rollup_address_or_name} \
           --data-dir ${data_dir} \
           [--allow-deposit]
@@ -819,7 +819,7 @@ the ``get balance`` command can be used.
 
 .. code:: sh
 
-    tezos-tx-rollup-client-014-PtKathma get balance for alice of ${ticket_hash}
+    octez-tx-rollup-client-PtKathma get balance for alice of ${ticket_hash}
 
 .. note::
 
@@ -830,7 +830,7 @@ To transfer a ticket to another address on the layer-2, the
 
 .. code:: sh
 
-    tezos-tx-rollup-client-014-PtKathma transfer ${qty} \
+    octez-tx-rollup-client-PtKathma transfer ${qty} \
           of ${ticket_hash} \
           from ${src} to ${dst} \
           [--endpoint ${tx_rollup_node_address}]
@@ -848,7 +848,7 @@ block, one can use the following command.
 
 .. code:: sh
 
-    tezos-tx-rollup-client-014-PtKathma get block ${block_id}
+    octez-tx-rollup-client-PtKathma get block ${block_id}
 
 where ``block_id`` can either be ``head`` (the latest rollup block), a
 level (0, 1, etc.), or a Tezos block hash.
@@ -858,7 +858,7 @@ rollup, and to inject it back in the layer-1.
 
 .. code:: sh
 
-    tezos-tx-rollup-client-014-PtKathma withdraw ${qty} of ${ticket_hash} from ${l2_src} to ${l1_dst}
+    octez-tx-rollup-client-PtKathma withdraw ${qty} of ${ticket_hash} from ${l2_src} to ${l1_dst}
 
 Similarly to the ``transfer`` command, ``l2_src`` has to be an alias
 to a BLS pair of keys, while ``l1_dst`` can either be an alias or an
@@ -890,7 +890,7 @@ To retrieve the values of ``micheline_contents``, ``ty`` and
 
 .. code:: sh
 
-    tezos-tx-rollup-client-014-PtKathma rpc get "/context/head/tickets/${ticket_hash}"
+    octez-tx-rollup-client-PtKathma rpc get "/context/head/tickets/${ticket_hash}"
 
 Besides, the entrypoint ``ep`` of ``sc_dst`` needs to expect a
 ``ticket ty`` as its input.

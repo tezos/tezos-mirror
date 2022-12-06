@@ -173,8 +173,8 @@ Python testing and execution framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
-framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
-``octez-node`` and ``octez-client``, to perform integration testing
+framework, combined with :doc:`a Python wrapper <python_testing_framework>`
+around ``octez-node`` and ``octez-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
 and endorser.
 

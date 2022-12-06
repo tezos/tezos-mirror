@@ -43,7 +43,7 @@ By default, the sandbox starts from the `genesis` block at level 0, and the
 sandbox's active protocol is the `Genesis protocol`. Once the sandbox is
 started, the Alpha protocol can be activated by invoking the command::
 
-  $ tezos-activate-alpha
+  $ octez-activate-alpha
 
 This command inserts a new block after which the active protocol is the Alpha
 protocol. From this point on, making the chain progress is straightforward
@@ -366,11 +366,11 @@ fresh test folder every time we want to perform the migration.
 
 For instance, the following commands import a context from the snapshot file
 ``~/snapshot-mainnet.rolling``
-into the folder ``/tmp/mainnet``,
+into the folder ``/tmp/octez-node-mainnet``,
 and generate an identity in the same folder::
 
-  $ ./octez-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/tezos-node-mainnet
-  $ ./octez-node identity generate --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/octez-node-mainnet
+  $ ./octez-node identity generate --data-dir /tmp/octez-node-mainnet
 
 The ``./octez-node snapshot import`` command accepts an option
 ``--block <block_hash>`` that instructs the command to check that the hash of
@@ -393,7 +393,7 @@ keys actually encode the same bytes as their corresponding public keys. By
 adding to the yes-wallet the existing accounts of Mainnet bakers, we would have
 enough rights to bake blocks at will. We can do so by running::
 
-  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
+  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/octez-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 This command creates a yes-wallet and places its folder in the
 system's temp directory (in our example, ``/tmp``) as given by the path argument
@@ -407,7 +407,7 @@ power), you can also use the ``--staking-share`` option to provide a
 limit. For instance, the first largest bakers with an accumulated
 stake of at least 75 percent can be kept with::
 
-  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only --staking-share 75
+  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/octez-node-mainnet in /tmp/yes-wallet --active-bakers-only --staking-share 75
 
 .. note::
    Prior to switching to the Tenderbake consensus algorithm it was
@@ -457,14 +457,14 @@ was taken, we can use::
 In the latter case both the context and the yes-wallet folder will be placed in
 the system's temp directory. In our example the temp directory is ``/tmp``, and
 the context and yes-wallet would be placed in paths
-``/tmp/tezos-node-mainnet`` and ``/tmp/yes-wallet``
+``/tmp/octez-node-mainnet`` and ``/tmp/yes-wallet``
 respectively.
 
 If the script detects that the yes-wallet folder already exists int ``/tmp``,
 then it will clean it by removing spurious files ``/tmp/yes-wallet/blocks`` and
 ``/tmp/yes-wallet/wallet_locks``, and it will not create a new yes-wallet
 folder. If the script detects that the folder
-``/tmp/tezos-node-mainnet`` already exists, or if the developer
+``/tmp/octez-node-mainnet`` already exists, or if the developer
 passes the path of a folder instead of the path of a snapshot file, then the
 script will use the corresponding folder as the original folder, and will not
 import a new context.
@@ -495,7 +495,7 @@ We can also start the client::
 
   $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
-Instead of command ``tezos-activate-alpha``, the sandboxed client script
+Instead of command ``octez-activate-alpha``, the sandboxed client script
 ``src/bin_client/octez-init-sandboxed-client.sh`` now accepts a command
 ``tezos-activate-XXX-<short_hash>`` that activates the predecessor protocol with
 version number ``XXX`` and short hash ``<short_hash>``. In our example, the
@@ -543,10 +543,10 @@ unchanged, and every time we want to run the test, we will copy its contents to
 a fresh test folder. In our example, we can do this by taking advantage of an
 environment variable ``test-directory`` and the tool ``mktemp`` as follows::
 
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "octez-node-mainnet-XXXX") && cp -r "/tmp/octez-node-mainnet/." "$test_directory"
 
 This command creates a fresh test folder in the system's temp directory (in our
-example ``/tmp``) whose name is ``tezos-node-mainnet-XXXX``,
+example ``/tmp``) whose name is ``octez-node-mainnet-XXXX``,
 where the ``XXXX`` are four random alphanumerical characters, and sets the
 environment variable ``test-directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
@@ -593,7 +593,7 @@ can do this with the following command::
 Then we repeat the commands above in order to create a fresh test folder, and to
 copy the context of the original folder into the test folder. In our example::
 
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "octez-node-mainnet-XXXX") && cp -r "/tmp/octez-node-mainnet/." "$test_directory"
 
 Now we run the node in the test folder by invoking::
 
@@ -713,13 +713,13 @@ invoking the following eight commands)::
   $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344
   $ ./scripts/patch-yes_node.sh
   $ make
-  $ ./octez-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
-  $ ./octez-node identity generate --data-dir /tmp/tezos-node-mainnet
-  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
+  $ ./octez-node snapshot import ~/mainnet.rolling --data-dir /tmp/octez-node-mainnet
+  $ ./octez-node identity generate --data-dir /tmp/octez-node-mainnet
+  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/octez-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 Copy original folder into test folder::
 
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "octez-node-mainnet-XXXX") && cp -r "/tmp/octez-node-mainnet/." "$test_directory"
 
 Run the node`::
 
@@ -749,7 +749,7 @@ test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
 ``/tmp/yes-wallet/blocks``::
 
   $ rm -rf "$test_directory" && rm -f /tmp/yes-wallet/{blocks,wallet_lock};
-  $ test_directory=$(mktemp -d -t "tezos-node-mainnet-XXXX") && cp -r "/tmp/tezos-node-mainnet/." "$test_directory"
+  $ test_directory=$(mktemp -d -t "octez-node-mainnet-XXXX") && cp -r "/tmp/octez-node-mainnet/." "$test_directory"
 
 Run the node::
 
@@ -854,14 +854,14 @@ that the option ``-v`` is not required when specifying a log file).
 Each time the automatic test is run, Tezt creates a temporary folder under the
 system's temp directory with name ``tezt-XXXXXX``, where the ``XXXXXX`` are six
 random decimal figures. The content of the original context folder is copied on
-the fly in the test folder ``tezt-XXXXXX/tezos-node-test``, and a yes-wallet
+the fly in the test folder ``tezt-XXXXXX/octez-node-test``, and a yes-wallet
 folder is created on the fly in ``tezt-XXXXXX/yes-wallet``. The option
 ``--keep-temp`` in the command above keeps the temporary folder for the
 developer to be able to inspect the storage after the migration has been
 performed. Assume the temporary folder in our example is ``/tmp/tezt-526039``,
 the developer can start the node with the migrated context by invoking::
 
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/octez-node-test --rpc-addr localhost &
 
 Once the node is up, it is possible to inspect the storage by using the Tezos
 client and/or the RPCs. New blocks can be baked with any of the accounts
@@ -912,7 +912,7 @@ Run the migration test::
 
 Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
 
-  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/octez-node-test --rpc-addr localhost &
 
 Use the client, to manually inspect the storage, or for example to bake new
 blocks with the following command::
@@ -922,7 +922,7 @@ blocks with the following command::
 To test again, kill the node::
 
   $ fg
-  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/octez-node-test --rpc-addr localhost
   ^C
 
 And run the migration test::

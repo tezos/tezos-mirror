@@ -3394,7 +3394,7 @@ data include not only a description of the action to perform but also
 the address of the multisig contract and a counter that gets
 incremented at each successful call to the contract.
 
-The multisig commands of :ref:`Tezos command line client <client_manual_alpha>`
+The multisig commands of :ref:`Octez command line client <client_manual_alpha>`
 use this
 smart contract. Moreover, `functional correctness of this contract has
 been verified

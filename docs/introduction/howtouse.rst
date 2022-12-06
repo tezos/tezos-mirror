@@ -29,7 +29,7 @@ After a successful compilation, you should have the following binaries:
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.
-For instance, ``octez-baker-014-PtKathma`` is the baker
+For instance, ``octez-baker-PtKathma`` is the baker
 for the Kathmandu protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
@@ -38,7 +38,7 @@ The ``octez-node`` daemon is not suffixed by any protocol name, because it is in
 Read The Manual
 ---------------
 
-All the Tezos binaries provide the ``--help`` option to display information about their usage, including the available options and the possible parameters.
+All the Octez binaries provide the ``--help`` option to display information about their usage, including the available options and the possible parameters.
 
 Additionally, most of the above binaries (i.e., all but the node, the validator, and the compiler) provide a textual manual that can be obtained with the command ``man``,
 whose verbosity can be increased with ``-v``, for example::
@@ -71,7 +71,7 @@ To see the usage of one specific command, you may also type the command without 
         Usage:
           [...]
 
-.. _tezos_client_protocol:
+.. _octez_client_protocol:
 
 To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
 
@@ -81,7 +81,7 @@ Note that you can get the list of protocols known to the client with::
 
     octez-client list understood protocols
 
-The full command line documentation of the Tezos binaries supporting the ``man`` command is also available
+The full command line documentation of the Octez binaries supporting the ``man`` command is also available
 online: :doc:`../shell/cli-commands`.
 
 Node
@@ -248,7 +248,7 @@ Putting together all the above instructions, you may want to run a node as follo
 Client
 ------
 
-Tezos client can be used to interact with the node, it can query its
+Octez client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
 For example, after starting your node you can check if it has finished
 synchronizing (see :doc:`../shell/sync`) using::

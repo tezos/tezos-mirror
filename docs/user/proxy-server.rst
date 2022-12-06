@@ -78,7 +78,7 @@ Then upgrade the node to protocol alpha:
 
 ::
 
-    $ tezos-activate-alpha
+    $ octez-activate-alpha
     $ octez-client bake for bootstrap1
 
 To avoid warnings being printed in upcoming commands (optional):

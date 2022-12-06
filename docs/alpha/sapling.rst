@@ -485,7 +485,7 @@ unshielding.
    # set up the sandbox
    ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
    eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
-   tezos-activate-alpha
+   octez-activate-alpha
 
    # originate the contract with its initial empty sapling storage,
    # bake a block to include it.

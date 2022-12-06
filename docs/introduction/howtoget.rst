@@ -164,16 +164,16 @@ the Alpha protocol.
 
 You can open a new shell session and run ``docker ps`` in it, to display all the available containers, e.g.::
 
-    8f3638fae48c  docker.io/tezos/tezos:latest  tezos-node            3 minutes ago  Up 3 minutes ago   0.0.0.0:8732->8732/tcp, 0.0.0.0:9732->9732/tcp  node-alpha
-    8ba4d6077e2d  docker.io/tezos/tezos:latest  tezos-baker --liq...  3 minutes ago  Up 31 seconds ago                                                  baker-alpha
-    3ee7fcbc2158  docker.io/tezos/tezos:latest  tezos-accuser         3 minutes ago  Up 35 seconds ago                                                  accuser-alpha
+    8f3638fae48c  docker.io/tezos/tezos:latest  octez-node            3 minutes ago  Up 3 minutes ago   0.0.0.0:8732->8732/tcp, 0.0.0.0:9732->9732/tcp  node-alpha
+    8ba4d6077e2d  docker.io/tezos/tezos:latest  octez-baker --liq...  3 minutes ago  Up 31 seconds ago                                                  baker-alpha
+    3ee7fcbc2158  docker.io/tezos/tezos:latest  octez-accuser         3 minutes ago  Up 35 seconds ago                                                  accuser-alpha
 
 
-The node's RPC interface will be available on localhost and can be queried with ``tezos-client``.
+The node's RPC interface will be available on localhost and can be queried with ``octez-client``.
 
 ::
 
-    docker exec node-alpha tezos-client rpc list
+    docker exec node-alpha octez-client rpc list
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -310,7 +310,7 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
 
    The command ``eval $(opam env)`` sets up required environment
    variables. OPAM will suggest to add it in your rc file. If, at any
-   point, you get an error like ``tezos-something: command not
+   point, you get an error like ``octez-something: command not
    found``, first thing to try is to (re)run ``eval $(opam
    env --switch $ocaml_version)`` (replace ``$ocaml_version`` with its value
    in ``scripts/version.sh``) to see if it fixes the problem.

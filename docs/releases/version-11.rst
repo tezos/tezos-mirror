@@ -31,7 +31,7 @@ To update from sources::
 
 If you are using Docker instead, use the ``v11.1`` Docker images of Tezos.
 
-If you are installing Octez using Opam, note that the required
+If you are installing Tezos using Opam, note that the required
 OCaml version is now 4.12.1. This means that you need to create a
 new switch with ``opam switch create 4.12.1`` before you run ``opam install tezos``.
 

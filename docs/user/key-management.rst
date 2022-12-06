@@ -163,7 +163,7 @@ In our home server we can generate a new key pair (or import one from a
 :ref:`Ledger<ledger>`) and launch a signer that signs operations using these
 keys.
 To select the ``tcp`` signing scheme, one has to launch ``octez-signer`` with the ``socket`` argument, as shown below.
-The new keys are stored by the signer in ``$HOME/.tezos-signer`` in the same format
+The new keys are stored by the signer in ``$HOME/.octez-signer`` in the same format
 as ``octez-client``.
 On our internet-facing virtual private server, called "vps" here, we can then import a key with the address
 of the signer.
@@ -171,7 +171,7 @@ of the signer.
 ::
 
    home~$ octez-signer gen keys alice
-   home~$ cat ~/.tezos-signer/public_key_hashs
+   home~$ cat ~/.octez-signer/public_key_hashs
    [ { "name": "alice", "value": "tz1abc..." } ]
    home~$ octez-signer launch socket signer -a home
 
@@ -238,7 +238,7 @@ client to authenticate before signing any operation.
 
 First we create a new key on the *vps* and then import it as an
 authorized key on *home* where it is stored under
-``.tezos-signer/authorized_keys`` (similarly to ``ssh``).
+``.octez-signer/authorized_keys`` (similarly to ``ssh``).
 Note that this key is only used to authenticate the client to the
 signer and it is not used as a Tezos account.
 
