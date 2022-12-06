@@ -269,4 +269,6 @@ module Internal_for_tests : sig
   val store_list_size : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_get_nth_key : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val write_debug : Tezos_webassembly_interpreter.Instance.func_inst
 end

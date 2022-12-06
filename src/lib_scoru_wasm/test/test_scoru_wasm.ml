@@ -50,5 +50,6 @@ let () =
       ("Reveal", Test_reveal.tests);
       ("Fast Execution", Test_fast.tests);
       ("Fast Execution cache", Test_fast_cache.tests);
+      ("Debug", Test_debug.tests);
     ]
   |> Lwt_main.run

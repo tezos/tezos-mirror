@@ -260,6 +260,7 @@ val invoke :
   ?input:Input_buffer.t ->
   ?output:Output_buffer.t ->
   ?durable:Durable_storage.t ->
+  ?init:bool ->
   Host_funcs.registry ->
   func_inst ->
   value list ->

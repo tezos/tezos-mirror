@@ -98,16 +98,21 @@ let extract_error durable = function
   | Error error -> Lwt.return (durable, Error.code error)
   | Ok res -> Lwt.return res
 
-let retrieve_memory memories =
-  let crash_with msg = raise (Eval.Crash (Source.no_region, msg)) in
+let check_memory memories =
+  let crash_with msg = Error (Eval.Crash (Source.no_region, msg)) in
   match memories with
   | Host_funcs.No_memories_during_init ->
       crash_with "host functions must not access memory during initialisation"
   | Host_funcs.Available_memories memories
     when Vector.num_elements memories = 1l ->
-      Vector.get 0l memories
+      Ok memories
   | Host_funcs.Available_memories _ ->
       crash_with "caller module must have exactly 1 memory instance"
+
+let retrieve_memory memories =
+  match check_memory memories with
+  | Ok memories -> Vector.get 0l memories
+  | Error exn -> raise exn
 
 type read_input_info = {level : int32; id : int32}
 
@@ -589,7 +594,10 @@ let write_debug_type =
 (** [write_debug] is a noop.
   Switch manually to _alternative_write_debug_impl for printing de debug info
   *)
-let write_debug_impl durable _memories _src _num_bytes = Lwt.return (durable, [])
+let write_debug_impl durable memories _src _num_bytes =
+  match check_memory memories with
+  | Ok _ -> Lwt.return (durable, [])
+  | Error exn -> raise exn
 
 (* [alternate_write_debug_impl] may be used to replace the default
    [write_debug_impl] implementation when debugging the PVM/kernel, and
@@ -1088,4 +1096,6 @@ module Internal_for_tests = struct
 
   let store_get_nth_key =
     Func.HostFunc (store_get_nth_key_type, store_get_nth_key_name)
+
+  let write_debug = Func.HostFunc (write_debug_type, write_debug_name)
 end
