@@ -253,6 +253,82 @@ let test_bad_export () =
       stuck) ;
   return_unit
 
+let test_float32_type () =
+  let open Lwt_result_syntax in
+  let*! state =
+    initial_tree
+      {|
+        (module
+          (memory 1)
+          (export "mem" (memory 0))
+          (func (export "kernel_run")
+            (local $f f32)
+            (unreachable)
+          )
+        )
+    |}
+  in
+  let*! state = eval_until_input_requested state in
+  let*! state = set_empty_inbox_step 0l state in
+  let+ stuck, _ = eval_until_stuck state in
+  Format.printf "%a\n%!" pp_state (Stuck stuck) ;
+  assert (
+    check_error
+      ~expected_kind:`Decode
+      ~expected_reason:"float instructions are forbidden"
+      stuck)
+
+let test_float64_type () =
+  let open Lwt_result_syntax in
+  let*! state =
+    initial_tree
+      {|
+        (module
+          (memory 1)
+          (export "mem" (memory 0))
+          (func (export "kernel_run")
+            (local $f f64)
+            (unreachable)
+          )
+        )
+    |}
+  in
+  let*! state = eval_until_input_requested state in
+  let*! state = set_empty_inbox_step 0l state in
+  let+ stuck, _ = eval_until_stuck state in
+  Format.printf "%a\n%!" pp_state (Stuck stuck) ;
+  assert (
+    check_error
+      ~expected_kind:`Decode
+      ~expected_reason:"float instructions are forbidden"
+      stuck)
+
+let test_float_value () =
+  let open Lwt_result_syntax in
+  let*! state =
+    initial_tree
+      {|
+        (module
+          (memory 1)
+          (export "mem" (memory 0))
+          (func (export "kernel_run")
+            (local $f i32)
+            (local.set $f (f32.const 1.1))
+            (unreachable)
+          )
+        )
+    |}
+  in
+  let*! state = eval_until_input_requested state in
+  let*! state = set_empty_inbox_step 0l state in
+  let+ stuck, _ = eval_until_stuck state in
+  Format.printf "%a\n%!" pp_state (Stuck stuck) ;
+  assert (
+    check_error
+      ~expected_kind:`Decode
+      ~expected_reason:"float instructions are forbidden"
+      stuck)
+
 let tests =
   [
     tztest "init requires memory 0 export" `Quick test_memory0_export;
@@ -267,4 +343,7 @@ let tests =
       "Check `kernel_run` not being a function error"
       `Quick
       test_bad_export;
+    tztest "32 bits float types are forbidden" `Quick test_float32_type;
+    tztest "64 bits float types are forbidden" `Quick test_float64_type;
+    tztest "float values are forbidden" `Quick test_float_value;
   ]

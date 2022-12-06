@@ -751,6 +751,7 @@ let definition mode x_opt def =
             | Textual m -> Lwt.return m
             | Encoded (_, bytes) ->
                 Decode.decode
+                  ~allow_floats:true
                   ~name:""
                   ~bytes:(Chunked_byte_vector.of_string bytes)
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
@@ -764,6 +765,7 @@ let definition mode x_opt def =
             | Encoded (_, bytes) ->
                 let* m =
                   Decode.decode
+                    ~allow_floats:true
                     ~name:""
                     ~bytes:(Chunked_byte_vector.of_string bytes)
                 in
