@@ -874,50 +874,6 @@ class TestView:
             originate(client, session, path, '4', 0)
 
 
-@pytest.mark.incremental
-@pytest.mark.contract
-class TestChainId:
-    def test_chain_id_opcode(self, client: Client, session: dict):
-        path = os.path.join(CONTRACT_PATH, 'opcodes', 'chain_id.tz')
-        originate(client, session, path, 'Unit', 0)
-        client.call('bootstrap2', "chain_id", [])
-        utils.bake(client, bake_for='bootstrap5')
-
-    def test_chain_id_authentication_origination(self, client: Client, session):
-        path = os.path.join(
-            CONTRACT_PATH, 'mini_scenarios', 'authentication.tz'
-        )
-        pubkey = IDENTITIES['bootstrap1']['public']
-        originate(client, session, path, f'Pair 0 "{pubkey}"', 1000)
-        utils.bake(client, bake_for='bootstrap5')
-
-    def test_chain_id_authentication_first_run(
-        self, client: Client, session: dict
-    ):
-        destination = IDENTITIES['bootstrap2']['identity']
-        operation = (
-            '{DROP; NIL operation; '
-            + f'PUSH address "{destination}"; '
-            + 'CONTRACT unit; ASSERT_SOME; PUSH mutez 1000; UNIT; '
-            + 'TRANSFER_TOKENS; CONS}'
-        )
-        chain_id = client.rpc('get', 'chains/main/chain_id')
-        contract_address = session['contract']
-        packed = client.pack(
-            f'Pair (Pair "{chain_id}" "{contract_address}") '
-            + f'(Pair {operation} 0)',
-            'pair (pair chain_id address)'
-            + '(pair (lambda unit (list operation)) nat)',
-        )
-        signature = client.sign_bytes_of_string(packed, "bootstrap1")
-        client.call(
-            'bootstrap2',
-            'authentication',
-            ['--arg', f'Pair {operation} \"{signature}\"'],
-        )
-        utils.bake(client, bake_for='bootstrap5')
-
-
 @pytest.mark.contract
 class TestScriptHashMultiple:
     """Test octez-client hash script with diffent number and type of
