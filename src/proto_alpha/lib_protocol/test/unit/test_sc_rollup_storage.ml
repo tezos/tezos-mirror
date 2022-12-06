@@ -295,17 +295,21 @@ let assert_kinds_are_equal ~loc x y =
     x
     y
 
-(* Artificially advance current level to make stake refinement possible *)
+(* Artificially advance current level to make stake refinement possible.
+   The commitment can be posted after the inbox level commited. For example,
+   if you post a commitment for the inbox level 32, you will be able to
+   publish the commitment at level 33.
+*)
 let advance_level_for_commitment ctxt (commitment : Commitment_repr.t) =
   let cur_level = Level_storage.(current ctxt).level in
-  if cur_level >= commitment.inbox_level then ctxt
+  if cur_level > commitment.inbox_level then ctxt
   else
-    Raw_context.Internal_for_tests.add_level
-      ctxt
-      (Int32.to_int
-      @@ Int32.sub
-           (Raw_level_repr.to_int32 commitment.inbox_level)
-           (Raw_level_repr.to_int32 cur_level))
+    let offset =
+      let open Raw_level_repr in
+      let open Int32 in
+      succ @@ sub (to_int32 commitment.inbox_level) (to_int32 cur_level)
+    in
+    Raw_context.Internal_for_tests.add_level ctxt (Int32.to_int offset)
 
 let advance_level_n_refine_stake ctxt rollup staker ?staked_on commitment =
   let ctxt = advance_level_for_commitment ctxt commitment in
@@ -485,24 +489,39 @@ let number_of_ticks_exn n =
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
 let valid_inbox_level ctxt =
-  let root_level = Raw_level_repr.to_int32 Level_storage.(current ctxt).level in
+  let root_level = Level_storage.(current ctxt).level in
   let commitment_freq =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
   fun i ->
-    Raw_level_repr.of_int32_exn
-      (Int32.add root_level (Int32.mul (Int32.of_int commitment_freq) i))
+    Raw_level_repr.add
+      root_level
+      Int32.(to_int (mul (of_int commitment_freq) i))
 
-let produce_and_refine ctxt ~number_of_commitments ?(start_at_level = 1l)
+(** A more precise version of {!valid_inbox_level}. Not used everywhere
+    as it requires more information than {!valid_inbox_level} and is in
+    the lwt tzresult monad. *)
+let proper_valid_inbox_level (ctxt, rollup) i =
+  let+ _, {level = genesis_level; _} =
+    Sc_rollup_storage.genesis_info ctxt rollup
+  in
+  let commitment_freq =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
+  in
+  Raw_level_repr.add genesis_level (commitment_freq * i)
+
+let produce_and_refine ctxt ~number_of_commitments ?(start_at_level = 1)
     ~predecessor staker rollup =
+  let inbox_level = proper_valid_inbox_level (ctxt, rollup) in
   let rec aux ctxt n l predecessor result =
     if n = 0 then return @@ (List.rev result, ctxt)
     else
+      let* inbox_level = inbox_level l in
       let commitment =
         Commitment_repr.
           {
             predecessor;
-            inbox_level = valid_inbox_level ctxt 1l;
+            inbox_level;
             number_of_ticks = number_of_ticks_exn 1232909L;
             compressed_state = Sc_rollup_repr.State_hash.zero;
           }
@@ -510,7 +529,7 @@ let produce_and_refine ctxt ~number_of_commitments ?(start_at_level = 1l)
       let* c, _level, ctxt =
         advance_level_n_refine_stake ctxt rollup staker commitment
       in
-      aux ctxt (n - 1) (Int32.succ l) c (c :: result)
+      aux ctxt (n - 1) (l + 1) c (c :: result)
   in
   aux ctxt number_of_commitments start_at_level predecessor []
 
@@ -766,7 +785,7 @@ let test_refine_commitment_fails_on_commitment_from_future () =
          inbox_level = Raw_level_repr.of_int32_exn 31l;
        })
 
-let test_refine_commitment_with_inbox_equal_current () =
+let test_refine_commitment_with_inbox_greater_than_current () =
   let* ctxt, rollup, genesis_hash, staker =
     originate_rollup_and_deposit_with_one_staker ()
   in
@@ -784,10 +803,11 @@ let test_refine_commitment_with_inbox_equal_current () =
   let ctxt =
     Raw_context.Internal_for_tests.add_level
       ctxt
-      (Int32.to_int
-      @@ Int32.sub
-           (Raw_level_repr.to_int32 commitment.inbox_level)
-           (Raw_level_repr.to_int32 cur_level))
+      Int32.(
+        to_int @@ succ
+        @@ sub
+             (Raw_level_repr.to_int32 commitment.inbox_level)
+             (Raw_level_repr.to_int32 cur_level))
   in
   let* ctxt =
     lift
@@ -2543,9 +2563,10 @@ let tests =
       `Quick
       test_refine_commitment_fails_on_commitment_from_future;
     Tztest.tztest
-      "staking on commitment with inbox level equal to current level is allowed"
+      "staking on commitment with inbox level greater than the current level \
+       is allowed"
       `Quick
-      test_refine_commitment_with_inbox_equal_current;
+      test_refine_commitment_with_inbox_greater_than_current;
     Tztest.tztest "stake then publish" `Quick test_deposit_then_publish;
     Tztest.tztest "publish with no rollup" `Quick test_publish_missing_rollup;
     Tztest.tztest

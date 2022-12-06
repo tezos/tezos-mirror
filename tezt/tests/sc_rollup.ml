@@ -567,9 +567,10 @@ let test_stakers_commitments ~kind =
   let* {commitment_period_in_blocks; _} =
     get_sc_rollup_constants tezos_client
   in
-  (* Bake commitment_period_in_blocks blocks in order prevent commitment being posted for future inbox_level *)
+  (* Bake commitment_period_in_blocks blocks in order prevent commitment being
+     posted for future inbox_level *)
   let* () =
-    repeat commitment_period_in_blocks (fun () ->
+    repeat (commitment_period_in_blocks + 1) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* commitment_1 =
@@ -581,7 +582,7 @@ let test_stakers_commitments ~kind =
       tezos_client
   in
   let* () =
-    repeat commitment_period_in_blocks (fun () ->
+    repeat (commitment_period_in_blocks + 1) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* commitment_2 =
@@ -2513,9 +2514,10 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
   let* predecessor, _ =
     last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
   in
-  (* Bake commitment_period_in_blocks blocks in order prevent commitment being posted for future inbox_level *)
+  (* Bake commitment_period_in_blocks blocks in order prevent commitment being
+     posted for future inbox_level *)
   let* () =
-    repeat commitment_period_in_blocks (fun () ->
+    repeat (commitment_period_in_blocks + 1) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* commit_hash =
@@ -2527,7 +2529,7 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
       tezos_client
   in
   let* () =
-    repeat (commitment_period_in_blocks + 1) (fun () ->
+    repeat (commitment_period_in_blocks + 2) (fun () ->
         Client.bake_for_and_wait tezos_client)
   in
   let* _commit_hash =
@@ -2780,7 +2782,7 @@ let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
     (* Compute the inbox level for which we'd like to commit *)
     let inbox_level = starting_level + (commitment_period_in_blocks * depth) in
     (* d is the delta between the target inbox level and the current level *)
-    let d = inbox_level - Node.get_level node in
+    let d = inbox_level - Node.get_level node + 1 in
     (* Bake sufficiently many blocks to be able to commit for the desired inbox
        level. We may actually bake no blocks if d <= 0 *)
     let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
@@ -3120,7 +3122,7 @@ let test_refutation_reward_and_punishment ~kind =
   let starting_level = Node.get_level node in
   let inbox_level = starting_level + commitment_period_in_blocks in
   (* d is the delta between the target inbox level and the current level *)
-  let d = inbox_level - Node.get_level node in
+  let d = inbox_level - Node.get_level node + 1 in
   (* Bake sufficiently many blocks to be able to commit for the desired inbox
      level. We may actually bake no blocks if d <= 0 *)
   let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
@@ -3580,6 +3582,57 @@ let test_rpcs ~kind =
   in
   unit
 
+let test_messages_processed_by_commitment ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["commitment"; "evaluation"];
+      description = "checks messages processed during a commitment period";
+    }
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup_client sc_rollup _node client ->
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let store_commitment_level =
+    init_level + commitment_period_in_blocks + block_finality_time
+  in
+  (* Bake enough blocks so [sc_rollup_node] posts a commitment. *)
+  let* () =
+    repeat (commitment_period_in_blocks + block_finality_time) (fun () ->
+        Client.bake_for_and_wait client)
+  in
+  (* Wait until the [sc_rollup_node] store the commitment. *)
+  let* (_ : int) =
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      store_commitment_level
+  in
+  let* _, {inbox_level; _}, _ =
+    let*! stored_commitment_opt =
+      Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+    in
+    match stored_commitment_opt with
+    | Some stored_commitment -> return stored_commitment
+    | None -> failwith "The rollup node should have stored a commitment by now"
+  in
+
+  let*! current_level =
+    Sc_rollup_client.state_current_level
+      ~block:(string_of_int inbox_level)
+      sc_rollup_client
+  in
+  Check.((current_level = inbox_level) int)
+    ~error_msg:
+      "The rollup node should process all the levels of a commitment period, \
+       expected %L, got %R" ;
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -3750,7 +3803,8 @@ let register ~kind ~protocols =
     ~entrypoint:"aux"
     ~message_kind:`External
     protocols
-    ~kind
+    ~kind ;
+  test_messages_processed_by_commitment ~kind protocols
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind

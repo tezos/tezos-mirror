@@ -63,7 +63,7 @@ This sequence of operations was run:
       This smart contract rollup commitment publishing was successfully applied
       Consumed gas: 6921.767
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
-      Commitment published at level: 5
+      Commitment published at level: 6
       Balance updates:
         [PUBLIC_KEY_HASH] ....................................................... -ꜩ10000
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ10000
@@ -99,7 +99,7 @@ This sequence of operations was run:
       This smart contract rollup commitment publishing was successfully applied
       Consumed gas: 7151.767
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
-      Commitment published at level: 6
+      Commitment published at level: 7
       Balance updates:
         [PUBLIC_KEY_HASH] ....................................................... -ꜩ10000
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ10000

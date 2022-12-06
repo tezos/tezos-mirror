@@ -1007,6 +1007,8 @@ type strategy =
   | SOL_hater  (** A SOL hater will not execute the SOL input. *)
   | EOL_hater  (** A EOL hater will not execute the EOL input. *)
   | Info_hater  (** A Info per level hater will corrupt the infos. *)
+  | Nostalgic
+      (** A nostalgic player will execute messages at origination level. *)
 
 let pp_strategy fmt = function
   | Random -> Format.pp_print_string fmt "Random"
@@ -1017,6 +1019,7 @@ let pp_strategy fmt = function
   | SOL_hater -> Format.pp_print_string fmt "SOL hater"
   | EOL_hater -> Format.pp_print_string fmt "EOL hater"
   | Info_hater -> Format.pp_print_string fmt "Info per level hater"
+  | Nostalgic -> Format.pp_print_string fmt "Nostalgic"
 
 type player = {
   pkh : Tezos_crypto.Signature.Public_key_hash.t;
@@ -1190,7 +1193,7 @@ module Player_client = struct
         return (tick, our_states, new_payloads_per_levels)
     | Info_hater ->
         let* corrupt_at_l = 0 -- List.length payloads_per_levels in
-        let dumb_timestamp = Time_repr.of_seconds 42L in
+        let dumb_timestamp = Timestamp.of_seconds 42L in
         let dumb_predecessor = Tezos_crypto.Block_hash.zero in
 
         let new_payloads_per_levels =
@@ -1204,6 +1207,20 @@ module Player_client = struct
                 }
               else payloads_per_level)
             payloads_per_levels
+        in
+        let _state, tick, our_states = eval_inputs new_payloads_per_levels in
+        return (tick, our_states, new_payloads_per_levels)
+    | Nostalgic ->
+        (* [payloads_per_levels] starts at [orignation_level + 1], the nostalgic
+           player will execute messages at [origination_level]. *)
+        let* messages =
+          small_list (gen_arith_pvm_messages ~gen_size:(pure 0))
+        in
+        let payloads_at_origination =
+          Sc_rollup_helpers.wrap_messages metadata.origination_level messages
+        in
+        let new_payloads_per_levels =
+          payloads_at_origination :: payloads_per_levels
         in
         let _state, tick, our_states = eval_inputs new_payloads_per_levels in
         return (tick, our_states, new_payloads_per_levels)
@@ -1460,7 +1477,7 @@ let gen_game ~p1_strategy ~p2_strategy =
     Raw_level.to_int32 genesis_info.level |> Int32.to_int
   in
   let start_level = origination_level + 1 in
-  let max_level = start_level + commitment_period - 1 in
+  let max_level = start_level + commitment_period in
   let* payloads_per_levels =
     gen_arith_pvm_payloads_for_levels ~start_level ~max_level
   in
@@ -1627,7 +1644,7 @@ let test_wasm_dissection name kind =
 (** Create a test of [p1_strategy] against [p2_strategy]. One of them
     must be a {!Perfect} player, otherwise, we do not care about which
     cheater wins. *)
-let test_game ~p1_strategy ~p2_strategy () =
+let test_game ?(count = 100) ~p1_strategy ~p2_strategy () =
   let name =
     Format.asprintf
       "%a against %a"
@@ -1653,7 +1670,7 @@ let test_game ~p1_strategy ~p2_strategy () =
         pp_player_client
         p2_client
         (if p1_start then "p1" else "p2"))
-    ~count:100
+    ~count
     ~name
     ~gen:(gen_game ~p1_strategy ~p2_strategy)
     (fun ( block,
@@ -1717,6 +1734,53 @@ let test_perfect_against_eol_hater =
 let test_perfect_against_info_hater =
   test_game ~p1_strategy:Perfect ~p2_strategy:Info_hater ()
 
+let test_perfect_against_nostalgic =
+  test_game ~p1_strategy:Perfect ~p2_strategy:Nostalgic ~count:5 ()
+
+(* This test will behave as a regression test. *)
+let test_cut_at_level =
+  let open QCheck2 in
+  Test.make
+    ~name:"cut at level properly cuts"
+    ~print:(fun (origination_level, commit_inbox_level, input_level) ->
+      Format.asprintf
+        "origination_level: %a, commit_inbox_level: %a, input_level: %a"
+        Raw_level_repr.pp
+        origination_level
+        Raw_level_repr.pp
+        commit_inbox_level
+        Raw_level_repr.pp
+        input_level)
+    Gen.(
+      let level =
+        map
+          (fun i -> Raw_level_repr.of_int32_exn (Int32.of_int i))
+          (0 -- 1_000_000)
+      in
+      triple level level level)
+    (fun (origination_level, commit_inbox_level, input_level) ->
+      let input : Sc_rollup_PVM_sig.input =
+        Inbox_message
+          {
+            inbox_level = input_level;
+            message_counter = Z.zero;
+            payload = Sc_rollup_inbox_message_repr.unsafe_of_string "foo";
+          }
+      in
+      let input_cut =
+        Sc_rollup_proof_repr.Internal_for_tests.cut_at_level
+          ~origination_level
+          ~commit_inbox_level
+          input
+      in
+      let should_be_none =
+        Raw_level_repr.(
+          input_level <= origination_level || commit_inbox_level < input_level)
+      in
+      match input_cut with
+      | Some _input -> not should_be_none
+      | None -> should_be_none)
+
 let tests =
   ( "Refutation",
     qcheck_wrap
@@ -1731,6 +1795,8 @@ let tests =
         test_perfect_against_sol_hater;
         test_perfect_against_eol_hater;
         test_perfect_against_info_hater;
+        test_perfect_against_nostalgic;
+        test_cut_at_level;
       ] )
 
 (** {2 Entry point} *)

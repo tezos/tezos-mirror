@@ -89,6 +89,11 @@ val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Runnable.process
 val state_hash :
   ?hooks:Process.hooks -> ?block:string -> t -> string Runnable.process
 
+(** [state_current_level ?block client] gets the corresponding PVM state current
+    level for the [block] (default ["head"]). *)
+val state_current_level :
+  ?hooks:Process_hooks.t -> ?block:string -> t -> int Runnable.process
+
 (** [state_value ?block client key] gets the corresponding PVM state value
     mapped to [key] for the [block] (default ["head"]). *)
 val state_value :

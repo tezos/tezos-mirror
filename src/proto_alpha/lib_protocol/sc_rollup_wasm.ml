@@ -661,6 +661,11 @@ module V2_0_0 = struct
              dissection)
           WASM_invalid_dissection_distribution
 
+    let get_current_level state =
+      let open Lwt_syntax in
+      let+ res = result_of get_last_message_read state in
+      Option.map fst res
+
     module Internal_for_tests = struct
       let insert_failure state =
         let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in

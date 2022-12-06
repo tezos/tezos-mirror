@@ -223,7 +223,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let current_level = (Raw_context.current_level ctxt).level in
   let* () =
     fail_unless
-      Raw_level_repr.(commitment.Commitment.inbox_level <= current_level)
+      Raw_level_repr.(commitment.Commitment.inbox_level < current_level)
       (Sc_rollup_commitment_from_future
          {current_level; inbox_level = commitment.inbox_level})
   in

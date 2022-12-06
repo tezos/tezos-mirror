@@ -333,6 +333,15 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     return hash
 
   let () =
+    Block_directory.register0
+      Sc_rollup_services.Global.Block.state_current_level
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let* state = get_state node_ctxt block in
+    let*! current_level = PVM.get_current_level state in
+    return current_level
+
+  let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.state_value
     @@ fun (node_ctxt, block) {key} () ->
     let open Lwt_result_syntax in
