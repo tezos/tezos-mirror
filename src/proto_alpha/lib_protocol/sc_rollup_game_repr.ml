@@ -833,11 +833,15 @@ let cost_play _game refutation =
 
          We also consider the largest tick known. At the time of writing
          this comment, the largest tick is the origination tick of the
-         PVM. If we assume that the origination has been done with a
-         kernel of maximum size, and we also assume that most of the
-         computation cost to import this kernel in the PVM, we simply
-         consider, again, that the cost of hashing dominates
-         everything else.
+         PVM.
+
+         If we assume the following worst-case for origination tick:
+         - the origination has been done with a kernel of maximum size, and
+         - most of the computation cost is consumed by importing this kernel
+           in the PVM,
+
+         We can simply consider, again, that the cost of hashing the imported
+         kernel dominates everything else.
 
          We multiply this number by 10 for extra safety.
 
