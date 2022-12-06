@@ -113,6 +113,13 @@ module Index : sig
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
+
+  (** [slots_range ~lower ~upper] returns the list of slots indexes between
+      [lower] and [upper].
+
+      If [lower] is negative or [upper] is bigger than [max_value], the function
+      returns {!Invalid_slot_index}. *)
+  val slots_range : lower:int -> upper:int -> t list tzresult
 end
 
 module Header : sig

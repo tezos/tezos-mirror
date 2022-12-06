@@ -111,6 +111,12 @@ module Index = struct
   let compare = Compare.Int.compare
 
   let equal = Compare.Int.equal
+
+  let slots_range ~lower ~upper =
+    let open Result_syntax in
+    let* () = check_is_in_range lower in
+    let* () = check_is_in_range upper in
+    return Misc.(lower --> upper)
 end
 
 module Header = struct

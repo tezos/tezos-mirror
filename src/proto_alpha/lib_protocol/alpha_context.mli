@@ -2929,6 +2929,8 @@ module Dal : sig
     val compare : t -> t -> int
 
     val equal : t -> t -> bool
+
+    val slots_range : lower:int -> upper:int -> t list tzresult
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and
