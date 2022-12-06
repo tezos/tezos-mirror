@@ -516,7 +516,7 @@ let () =
     (fun () -> Sc_rollup_zero_tick_commitment) ;
   let description = "Maximal number of parallel games reached" in
   register_error_kind
-    `Permanent
+    `Temporary
     ~id:"Sc_rollup_maximal_number_of_parallel_games_reached"
     ~title:description
     ~pp:(fun ppf staker ->
