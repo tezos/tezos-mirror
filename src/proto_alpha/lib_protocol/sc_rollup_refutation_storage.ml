@@ -423,6 +423,9 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
         let* ctxt, _, _ =
           Store.Game.remove ((ctxt, rollup), stakers.alice) stakers.bob
         in
+        let* ctxt, _, _ =
+          Store.Game.remove ((ctxt, rollup), stakers.bob) stakers.alice
+        in
         let* ctxt, balance_updates_loser =
           Stake_storage.remove_staker ctxt rollup losing_staker
         in
