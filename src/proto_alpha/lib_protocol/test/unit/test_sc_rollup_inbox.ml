@@ -330,10 +330,10 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
     Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
-  let*? proof, node_old_level_messages =
-    lift
+  let* proof, node_old_level_messages =
+    lift_lwt
     @@ Inbox.Internal_for_tests.produce_inclusion_proof
-         node_inbox.history
+         (Sc_rollup_helpers.get_history node_inbox.history)
          node_inbox_snapshot
          level
   in
@@ -359,10 +359,10 @@ let test_inclusion_proof_verification (payloads_per_levels, level) =
     Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
-  let*? proof, _node_old_level_messages =
-    lift
+  let* proof, _node_old_level_messages =
+    lift_lwt
     @@ Inbox.Internal_for_tests.produce_inclusion_proof
-         node_inbox.history
+         (Sc_rollup_helpers.get_history node_inbox.history)
          node_inbox_snapshot
          level
   in
@@ -395,7 +395,7 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
          ~get_payloads_history:
            (Sc_rollup_helpers.get_payloads_history
               node_inbox.payloads_histories)
-         node_inbox.history
+         ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
          node_inbox_snapshot
          (level, message_counter)
   in
@@ -451,7 +451,7 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
     lift_lwt
     @@ Inbox.produce_proof
          ~get_payloads_history
-         node_inbox.history
+         ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
          node_inbox_snapshot
          (level, message_counter)
   in

@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type MONAD = sig
+  type 'a t
+
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+
+  val return : 'a -> 'a t
+end
+
 module type S = sig
   type ('content, 'ptr) cell
 
@@ -61,26 +69,6 @@ module type S = sig
     'content ->
     ('content, 'ptr) cell
 
-  val find :
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    cell_ptr:'ptr ->
-    target_index:Z.t ->
-    ('content, 'ptr) cell option
-
-  val back_path :
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    cell_ptr:'ptr ->
-    target_index:Z.t ->
-    'ptr list option
-
-  val valid_back_path :
-    equal_ptr:('ptr -> 'ptr -> bool) ->
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    cell_ptr:'ptr ->
-    target_ptr:'ptr ->
-    'ptr list ->
-    bool
-
   type ('ptr, 'content) search_cell_result =
     | Found of ('ptr, 'content) cell
     | Nearest of {
@@ -101,11 +89,41 @@ module type S = sig
     ('ptr, 'content) search_result ->
     unit
 
-  val search :
-    deref:('ptr -> ('content, 'ptr) cell option) ->
-    compare:('content -> int) ->
-    cell:('content, 'ptr) cell ->
-    ('content, 'ptr) search_result
+  module type MONADIC = sig
+    type 'a result
+
+    val find :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_index:Z.t ->
+      ('content, 'ptr) cell option result
+
+    val back_path :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_index:Z.t ->
+      'ptr list option result
+
+    val valid_back_path :
+      equal_ptr:('ptr -> 'ptr -> bool) ->
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_ptr:'ptr ->
+      'ptr list ->
+      bool result
+
+    val search :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      compare:('content -> int) ->
+      cell:('content, 'ptr) cell ->
+      ('content, 'ptr) search_result result
+  end
+
+  include MONADIC with type 'a result := 'a
+
+  module Lwt : MONADIC with type 'a result := 'a Lwt.t
+
+  module Make_monadic (M : MONAD) : MONADIC with type 'a result := 'a M.t
 end
 
 module Make (Parameters : sig
@@ -294,73 +312,6 @@ end) : S = struct
     in
     binary_search 0 (length cell.back_pointers - 1)
 
-  let rev_back_path ~deref ~cell_ptr ~target_index =
-    let open Option_syntax in
-    let* cell = deref cell_ptr in
-    let powers = list_powers cell in
-    let rec aux path ptr =
-      let path = ptr :: path in
-      let* cell = deref ptr in
-      let index = cell.index in
-      if Compare.Z.(target_index = index) then return path
-      else if Compare.Z.(target_index > index) then fail
-      else
-        let* best_idx = best_skip cell target_index powers in
-        let* ptr = back_pointer cell best_idx in
-        aux path ptr
-    in
-    aux [] cell_ptr
-
-  let find ~deref ~cell_ptr ~target_index =
-    let open Option_syntax in
-    let* rev_back_path = rev_back_path ~deref ~cell_ptr ~target_index in
-    let* cell_ptr = List.hd rev_back_path in
-    deref cell_ptr
-
-  let back_path ~deref ~cell_ptr ~target_index =
-    let open Option_syntax in
-    let+ rev_back_path = rev_back_path ~deref ~cell_ptr ~target_index in
-    List.rev rev_back_path
-
-  let mem equal x l =
-    let open FallbackArray in
-    let n = length l in
-    let rec aux idx =
-      if Compare.Int.(idx >= n) then false
-      else
-        match get l idx with
-        | None -> aux (idx + 1)
-        | Some y -> if equal x y then true else aux (idx + 1)
-    in
-    aux 0
-
-  let assume_some o f = match o with None -> false | Some x -> f x
-
-  let valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path =
-    assume_some (deref target_ptr) @@ fun target ->
-    assume_some (deref cell_ptr) @@ fun cell ->
-    let target_index = index target
-    and cell_index = index cell
-    and powers = list_powers cell in
-    let rec valid_path index cell_ptr path =
-      match (cell_ptr, path) with
-      | final_cell, [] ->
-          equal_ptr target_ptr final_cell && Compare.Z.(index = target_index)
-      | cell_ptr, cell_ptr' :: path ->
-          assume_some (deref cell_ptr) @@ fun cell ->
-          assume_some (deref cell_ptr') @@ fun cell' ->
-          mem equal_ptr cell_ptr' cell.back_pointers
-          && assume_some (best_skip cell target_index powers) @@ fun best_idx ->
-             assume_some (back_pointer cell best_idx) @@ fun best_ptr ->
-             let minimal = equal_ptr best_ptr cell_ptr' in
-             let index' = cell'.index in
-             minimal && valid_path index' cell_ptr' path
-    in
-    match path with
-    | [] -> false
-    | first_cell_ptr :: path ->
-        equal_ptr first_cell_ptr cell_ptr && valid_path cell_index cell_ptr path
-
   type ('ptr, 'content) search_cell_result =
     | Found of ('ptr, 'content) cell
     | Nearest of {
@@ -379,7 +330,7 @@ end) : S = struct
     Format.pp_print_list ~pp_sep:Format.pp_print_space pp_cell
 
   let pp_search_cell_result ~pp_cell fmt = function
-    | Found ptr -> Format.fprintf fmt "Found(%a)" pp_cell ptr
+    | Found cell -> Format.fprintf fmt "Found(%a)" pp_cell cell
     | Nearest {lower; upper} ->
         Format.fprintf
           fmt
@@ -400,94 +351,236 @@ end) : S = struct
       (pp_search_cell_result ~pp_cell)
       last_cell
 
-  let search (type ptr) ~(deref : ptr -> ('content, ptr) cell option) ~compare
-      ~cell =
-    let ( = ), ( < ), ( > ) = Compare.Int.(( = ), ( < ), ( > )) in
-    (* Given a cell, to compute the minimal path, we need to find the
-       good back-pointer. This is done linearly with respect to the
-       number of back-pointers. This number of back-pointers is
-       logarithmic with respect to the number of non-empty
-       inboxes. The complexity is consequently in O(log_2^2(n)). Since
-       in practice, [n < 2^32], we have at most [1000] calls. Besides,
-       the recursive function is tail recursive.
+  module type MONADIC = sig
+    type 'a result
 
-       The linear search could be turned into a dichotomy search if
-       necessary. But since this piece of code won't be used in a
-       carbonated function, we prefer to keep a simple implementation
-       for the moment. *)
-    let rec aux rev_path cell ix =
-      (* Below, we call the [target] the cell for which [compare target = 0]. *)
+    val find :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_index:Z.t ->
+      ('content, 'ptr) cell option result
 
-      (* Invariant:
+    val back_path :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_index:Z.t ->
+      'ptr list option result
 
-         - compare cell > target
-         - ix >= 0
-         - if cell <> genesis => ix < List.length (back_pointers cell)
-         - \exists path' rev_path = cell:path'
-      *)
-      let back_pointers_length = FallbackArray.length cell.back_pointers in
-      if back_pointers_length = 0 then
-        (* [cell] is the genesis cell. *)
-        {rev_path; last_cell = No_exact_or_lower_ptr}
-      else
-        let candidate_ptr =
-          match back_pointer cell ix with
-          | None ->
-              (* At this point we have [cell <> genesis]. Consequently,
-                 thanks to the invariant of this function, we have [ix
-                 < List.length (back_pointers cell)]. Consequently, the
-                 call to [back_pointer] cannot fail. *)
-              assert false
-          | Some candidate_ptr -> candidate_ptr
-        in
-        match deref candidate_ptr with
-        | None ->
-            (* If we cannot dereference a pointer, We stop the search
-               and returns the current path. *)
-            {rev_path; last_cell = Deref_returned_none}
-        | Some next_cell -> (
-            let comparison = compare next_cell.content in
-            if comparison = 0 then
-              (* We have found the target.*)
-              let rev_path = next_cell :: rev_path in
-              {rev_path; last_cell = Found next_cell}
-            else if comparison > 0 then
-              if ix < back_pointers_length - 1 then
-                (* There might be a short path by dereferencing the next pointer. *)
-                aux rev_path cell (ix + 1)
-              else
-                (* The last pointer is still above the target. We are on the good track, *)
-                let rev_path = next_cell :: rev_path in
-                aux rev_path next_cell 0
-            else if ix = 0 then
-              (* We found a cell lower than the target. *)
-              (* The first back pointers gives a cell below the target *)
-              let rev_path = next_cell :: rev_path in
-              {
-                rev_path;
-                last_cell = Nearest {lower = next_cell; upper = Some cell};
-              }
+    val valid_back_path :
+      equal_ptr:('ptr -> 'ptr -> bool) ->
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      cell_ptr:'ptr ->
+      target_ptr:'ptr ->
+      'ptr list ->
+      bool result
+
+    val search :
+      deref:('ptr -> ('content, 'ptr) cell option result) ->
+      compare:('content -> int) ->
+      cell:('content, 'ptr) cell ->
+      ('content, 'ptr) search_result result
+  end
+
+  module Make_monadic (M : MONAD) : MONADIC with type 'a result := 'a M.t =
+  struct
+    module Monad_syntax = struct
+      include M
+
+      let ( let* ) = bind
+
+      module Option = struct
+        let (return [@ocaml.inline "always"]) = fun x -> M.return (Some x)
+
+        let ( let* ) lo f =
+          M.bind lo (function None -> M.return None | Some x -> f x)
+
+        let ( let*? ) o f = match o with Some x -> f x | None -> M.return None
+      end
+    end
+
+    let rev_back_path ~deref ~cell_ptr ~target_index =
+      let open Monad_syntax.Option in
+      let* cell = deref cell_ptr in
+      let powers = list_powers cell in
+      let rec aux path ptr =
+        let path = ptr :: path in
+        let* cell = deref ptr in
+        let index = cell.index in
+        if Compare.Z.(target_index = index) then return path
+        else if Compare.Z.(target_index > index) then M.return None
+        else
+          let*? best_idx = best_skip cell target_index powers in
+          let*? ptr = back_pointer cell best_idx in
+          aux path ptr
+      in
+      aux [] cell_ptr
+
+    let find ~deref ~cell_ptr ~target_index =
+      let open Monad_syntax.Option in
+      let* rev_back_path = rev_back_path ~deref ~cell_ptr ~target_index in
+      let*? cell_ptr = List.hd rev_back_path in
+      deref cell_ptr
+
+    let back_path ~deref ~cell_ptr ~target_index =
+      let open Monad_syntax.Option in
+      let* rev_back_path = rev_back_path ~deref ~cell_ptr ~target_index in
+      return (List.rev rev_back_path)
+
+    let mem equal x l =
+      let open FallbackArray in
+      let n = length l in
+      let rec aux idx =
+        if Compare.Int.(idx >= n) then false
+        else
+          match get l idx with
+          | None -> aux (idx + 1)
+          | Some y -> if equal x y then true else aux (idx + 1)
+      in
+      aux 0
+
+    let assume_some o f =
+      let open Monad_syntax in
+      let* o = o in
+      match o with None -> return false | Some x -> f x
+
+    let valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path =
+      let open Monad_syntax in
+      assume_some (deref target_ptr) @@ fun target ->
+      assume_some (deref cell_ptr) @@ fun cell ->
+      let target_index = index target
+      and cell_index = index cell
+      and powers = list_powers cell in
+      let rec valid_path index cell_ptr path =
+        match (cell_ptr, path) with
+        | final_cell, [] ->
+            return
+              (equal_ptr target_ptr final_cell
+              && Compare.Z.(index = target_index))
+        | cell_ptr, cell_ptr' :: path ->
+            assume_some (deref cell_ptr) @@ fun cell ->
+            assume_some (deref cell_ptr') @@ fun cell' ->
+            if mem equal_ptr cell_ptr' cell.back_pointers then return true
             else
-              (* We found a cell lower than the target. *)
-              (* The previous pointer was actually the good one. *)
-              let good_candidate_ptr =
-                match back_pointer cell (ix - 1) with
-                | None -> assert false
-                | Some candidate_ptr -> candidate_ptr
-              in
-              match deref good_candidate_ptr with
-              | None ->
-                  (* We already dereferenced this pointer before. *)
-                  assert false
-              | Some good_next_cell ->
-                  let rev_path = good_next_cell :: rev_path in
-                  aux rev_path good_next_cell 0)
-    in
-    let comparison = compare cell.content in
-    if Compare.Int.(comparison = 0) then
-      (* Particular case where the target is the start cell. *)
-      {rev_path = [cell]; last_cell = Found cell}
-    else if Compare.Int.(comparison < 0) then
-      {rev_path = [cell]; last_cell = Nearest {lower = cell; upper = None}}
-    else aux [cell] cell 0
+              assume_some (M.return @@ best_skip cell target_index powers)
+              @@ fun best_idx ->
+              assume_some (M.return @@ back_pointer cell best_idx)
+              @@ fun best_ptr ->
+              let minimal = equal_ptr best_ptr cell_ptr' in
+              if minimal then return true
+              else
+                let index' = cell'.index in
+                valid_path index' cell_ptr' path
+      in
+      match path with
+      | [] -> return false
+      | first_cell_ptr :: path ->
+          if equal_ptr first_cell_ptr cell_ptr then return true
+          else valid_path cell_index cell_ptr path
+
+    let search (type ptr) ~(deref : ptr -> ('content, ptr) cell option M.t)
+        ~compare ~cell =
+      let open Monad_syntax in
+      let ( = ), ( < ), ( > ) = Compare.Int.(( = ), ( < ), ( > )) in
+      (* Given a cell, to compute the minimal path, we need to find the
+         good back-pointer. This is done linearly with respect to the
+         number of back-pointers. This number of back-pointers is
+         logarithmic with respect to the number of non-empty
+         inboxes. The complexity is consequently in O(log_2^2(n)). Since
+         in practice, [n < 2^32], we have at most [1000] calls. Besides,
+         the recursive function is tail recursive.
+
+         The linear search could be turned into a dichotomy search if
+         necessary. But since this piece of code won't be used in a
+         carbonated function, we prefer to keep a simple implementation
+         for the moment. *)
+      let rec aux rev_path cell ix =
+        (* Below, we call the [target] the cell for which [compare target = 0]. *)
+
+        (* Invariant:
+
+           - compare cell > target
+           - ix >= 0
+           - if cell <> genesis => ix < List.length (back_pointers cell)
+           - \exists path' rev_path = cell:path'
+        *)
+        let back_pointers_length = FallbackArray.length cell.back_pointers in
+        if back_pointers_length = 0 then
+          (* [cell] is the genesis cell. *)
+          return {rev_path; last_cell = No_exact_or_lower_ptr}
+        else
+          let candidate_ptr =
+            match back_pointer cell ix with
+            | None ->
+                (* At this point we have [cell <> genesis]. Consequently,
+                   thanks to the invariant of this function, we have [ix
+                   < List.length (back_pointers cell)]. Consequently, the
+                   call to [back_pointer] cannot fail. *)
+                assert false
+            | Some candidate_ptr -> candidate_ptr
+          in
+          let* derefed = deref candidate_ptr in
+          match derefed with
+          | None ->
+              (* If we cannot dereference a pointer, We stop the search
+                 and returns the current path. *)
+              return {rev_path; last_cell = Deref_returned_none}
+          | Some next_cell -> (
+              let comparison = compare next_cell.content in
+              if comparison = 0 then
+                (* We have found the target.*)
+                let rev_path = next_cell :: rev_path in
+                return {rev_path; last_cell = Found next_cell}
+              else if comparison > 0 then
+                if ix < back_pointers_length - 1 then
+                  (* There might be a short path by dereferencing the next pointer. *)
+                  aux rev_path cell (ix + 1)
+                else
+                  (* The last pointer is still above the target. We are on the good track, *)
+                  let rev_path = next_cell :: rev_path in
+                  aux rev_path next_cell 0
+              else if ix = 0 then
+                (* We found a cell lower than the target. *)
+                (* The first back pointers gives a cell below the target *)
+                let rev_path = next_cell :: rev_path in
+                return
+                  {
+                    rev_path;
+                    last_cell = Nearest {lower = next_cell; upper = Some cell};
+                  }
+              else
+                (* We found a cell lower than the target. *)
+                (* The previous pointer was actually the good one. *)
+                let good_candidate_ptr =
+                  match back_pointer cell (ix - 1) with
+                  | None -> assert false
+                  | Some candidate_ptr -> candidate_ptr
+                in
+                let* derefed = deref good_candidate_ptr in
+                match derefed with
+                | None ->
+                    (* We already dereferenced this pointer before. *)
+                    assert false
+                | Some good_next_cell ->
+                    let rev_path = good_next_cell :: rev_path in
+                    aux rev_path good_next_cell 0)
+      in
+      let comparison = compare cell.content in
+      if Compare.Int.(comparison = 0) then
+        (* Particular case where the target is the start cell. *)
+        return {rev_path = [cell]; last_cell = Found cell}
+      else if Compare.Int.(comparison < 0) then
+        return
+          {rev_path = [cell]; last_cell = Nearest {lower = cell; upper = None}}
+      else aux [cell] cell 0
+  end
+
+  include Make_monadic (struct
+    type 'a t = 'a
+
+    let (bind [@ocaml.inline "always"]) = ( |> )
+
+    let[@ocaml.inline always] return x = x
+  end)
+
+  module Lwt = Make_monadic (Lwt)
 end

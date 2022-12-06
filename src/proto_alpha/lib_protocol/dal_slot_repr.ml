@@ -376,7 +376,7 @@ module History = struct
       return @@ next ~prev_cell ~prev_cell_ptr elt
 
     let search ~deref ~cell ~target_id =
-      search ~deref ~cell ~compare:(fun slot ->
+      Lwt.search ~deref ~cell ~compare:(fun slot ->
           Header.compare_slot_id slot.Header.id target_id)
   end
 
@@ -389,9 +389,9 @@ module History = struct
 
     (* A pointer to a cell is the hash of its content and all the back
        pointers. *)
-    type ptr = Pointer_hash.t
+    type hash = Pointer_hash.t
 
-    type history = (content, ptr) Skip_list.cell
+    type history = (content, hash) Skip_list.cell
 
     type t = history
 
@@ -407,7 +407,7 @@ module History = struct
 
     let genesis : t = Skip_list.genesis Header.zero
 
-    let hash_skip_list_cell cell =
+    let hash cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
       Data_encoding.Binary.to_bytes_exn Header.encoding current_slot
@@ -415,7 +415,7 @@ module History = struct
       |> Pointer_hash.hash_bytes
 
     let pp_history fmt (history : history) =
-      let history_hash = hash_skip_list_cell history in
+      let history_hash = hash history in
       Format.fprintf
         fmt
         "@[hash : %a@;%a@]"
@@ -442,7 +442,7 @@ module History = struct
 
     let add_confirmed_slot_header (t, cache) slot_header =
       let open Result_syntax in
-      let prev_cell_ptr = hash_skip_list_cell t in
+      let prev_cell_ptr = hash t in
       let* cache = History_cache.remember prev_cell_ptr t cache in
       let* new_cell = Skip_list.next ~prev_cell:t ~prev_cell_ptr slot_header in
       return (new_cell, cache)
@@ -762,39 +762,41 @@ module History = struct
                  page_size = Bytes.length data;
                }
 
-    let produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache =
-      let open Result_syntax in
+    let produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
+        =
+      let open Lwt_result_syntax in
       let Page.{slot_id; page_index = _} = page_id in
-      let deref ptr = History_cache.find ptr hist_cache in
       (* We search for a slot whose ID is equal to target_id. *)
-      let search_result =
-        Skip_list.search ~deref ~target_id:slot_id ~cell:slots_hist
+      let*! search_result =
+        Skip_list.search ~deref:get_history ~target_id:slot_id ~cell:slots_hist
       in
       match (page_info, search_result.Skip_list.last_cell) with
       | _, Deref_returned_none ->
-          proof_error
-            "Skip_list.search returned 'Deref_returned_none': Slots history \
-             cache is ill-formed or has too few entries."
+          tzfail
+          @@ dal_proof_error
+               "Skip_list.search returned 'Deref_returned_none': Slots history \
+                cache is ill-formed or has too few entries."
       | _, No_exact_or_lower_ptr ->
-          proof_error
-            "Skip_list.search returned 'No_exact_or_lower_ptr', while it is \
-             initialized with a min elt (slot zero)."
+          tzfail
+          @@ dal_proof_error
+               "Skip_list.search returned 'No_exact_or_lower_ptr', while it is \
+                initialized with a min elt (slot zero)."
       | Some (page_data, page_proof), Found target_cell ->
           (* The slot to which the page is supposed to belong is found. *)
           let Header.{id; commitment} = Skip_list.content target_cell in
           (* We check that the slot is not the dummy slot. *)
-          let* () =
+          let*? () =
             error_when
               Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
               (dal_proof_error
                  "Skip_list.search returned 'Found <zero_slot>': No existence \
                   proof should be constructed with the slot zero.")
           in
-          let* () =
+          let*? () =
             check_page_proof dal_params page_proof page_data page_id commitment
           in
           let inc_proof = List.rev search_result.Skip_list.rev_path in
-          let* () =
+          let*? () =
             error_when
               (List.is_empty inc_proof)
               (dal_proof_error "The inclusion proof cannot be empty")
@@ -818,7 +820,7 @@ module History = struct
             match search_result.Skip_list.rev_path with
             | [] -> assert false (* Not reachable *)
             | prev :: rev_next_inc_proof ->
-                let* () =
+                let*? () =
                   error_unless
                     (equal_history prev prev_cell)
                     (dal_proof_error
@@ -830,35 +832,37 @@ module History = struct
           return
             (Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof}, None)
       | None, Found _ ->
-          proof_error
-            "The page ID's slot is confirmed, but no page content and proof \
-             are provided."
+          tzfail
+          @@ dal_proof_error
+               "The page ID's slot is confirmed, but no page content and proof \
+                are provided."
       | Some _, Nearest _ ->
-          proof_error
-            "The page ID's slot is not confirmed, but page content and proof \
-             are provided."
+          tzfail
+          @@ dal_proof_error
+               "The page ID's slot is not confirmed, but page content and \
+                proof are provided."
 
-    let produce_proof dal_params page_id ~page_info slots_hist hist_cache =
-      let open Result_syntax in
+    let produce_proof dal_params page_id ~page_info ~get_history slots_hist =
+      let open Lwt_result_syntax in
       let* proof_repr, page_data =
-        produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache
+        produce_proof_repr dal_params page_id ~page_info ~get_history slots_hist
       in
-      let* serialized_proof = serialize_proof proof_repr in
+      let*? serialized_proof = serialize_proof proof_repr in
       return (serialized_proof, page_data)
 
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
        [snapshot] to [target]. *)
     let verify_inclusion_proof inc_proof ~src:snapshot ~dest:target =
-      let assoc = List.map (fun c -> (hash_skip_list_cell c, c)) inc_proof in
+      let assoc = List.map (fun c -> (hash c, c)) inc_proof in
       let path = List.split assoc |> fst in
       let deref =
         let open Map.Make (Pointer_hash) in
         let map = of_seq (List.to_seq assoc) in
         fun ptr -> find_opt ptr map
       in
-      let snapshot_ptr = hash_skip_list_cell snapshot in
-      let target_ptr = hash_skip_list_cell target in
+      let snapshot_ptr = hash snapshot in
+      let target_ptr = hash target in
       error_unless
         (Skip_list.valid_back_path
            ~equal_ptr:Pointer_hash.equal
@@ -945,9 +949,7 @@ module History = struct
                     match prev_cell_pointer with
                     | None -> false
                     | Some prev_ptr ->
-                        Pointer_hash.equal
-                          prev_ptr
-                          (hash_skip_list_cell prev_cell))
+                        Pointer_hash.equal prev_ptr (hash prev_cell))
                     (dal_proof_error
                        "verify_proof_repr: invalid next_inc_proof")
                 in

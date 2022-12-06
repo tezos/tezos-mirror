@@ -318,7 +318,7 @@ val verify_proof :
   proof ->
   Sc_rollup_PVM_sig.inbox_message option tzresult
 
-(** [produce_proof get_payloads_history history inbox (level, counter)]
+(** [produce_proof ~get_payloads_history ~get_history inbox (level, counter)]
     creates an inbox proof proving the first message after the index [counter]
     at location [level]. This will fail if the [get_payloads_history] given
     doesn't have sufficient data (it needs to be run on an with a full
@@ -327,7 +327,7 @@ val produce_proof :
   get_payloads_history:
     (Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t ->
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t Lwt.t) ->
-  History.t ->
+  get_history:(Hash.t -> history_proof option Lwt.t) ->
   history_proof ->
   Raw_level_repr.t * Z.t ->
   (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
@@ -359,13 +359,13 @@ val genesis :
   t tzresult
 
 module Internal_for_tests : sig
-  (** [produce_inclusion_proof history a b] exploits [history] to produce
-      a self-contained proof that [a] is an older version of [b]. *)
+  (** [produce_inclusion_proof get_history a b] exploits [get_history]
+      to produce a self-contained proof that [a] is an older version of [b]. *)
   val produce_inclusion_proof :
-    History.t ->
+    (Hash.t -> history_proof option Lwt.t) ->
     history_proof ->
     Raw_level_repr.t ->
-    (inclusion_proof * history_proof) tzresult
+    (inclusion_proof * history_proof) tzresult Lwt.t
 
   (** Allows to create a dumb {!serialized_proof} from a string, instead of
       serializing a proof with {!to_serialized_proof}. *)

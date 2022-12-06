@@ -1321,9 +1321,9 @@ let build_proof ~player_client start_tick (game : Game.t) =
     let reveal _ = assert false
 
     module Inbox_with_history = struct
-      let history = history
-
       let inbox = history_proof
+
+      let get_history inbox = Inbox.History.find inbox history |> Lwt.return
 
       let get_payloads_history = get_payloads_history
     end
@@ -1333,7 +1333,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
     module Dal_with_history = struct
       let confirmed_slots_history = Dal.Slots_history.genesis
 
-      let history_cache = Dal.Slots_history.History_cache.empty ~capacity:0L
+      let get_history _hash = Lwt.return_none
 
       let page_info = None
 

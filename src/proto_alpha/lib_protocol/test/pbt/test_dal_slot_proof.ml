@@ -142,7 +142,7 @@ struct
         | Some (page_info, page_id) ->
             produce_and_verify_proof
               last_cell
-              last_cache
+              ~get_history:(get_history last_cache)
               ~page_info
               ~page_id
               ~check_produce

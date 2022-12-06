@@ -134,10 +134,10 @@ struct
     let page_id = mk_page_id published_level index P.Index.zero in
     produce_and_verify_proof
       genesis_history
-      genesis_history_cache
-      (* values of level and slot index are equal to slot zero. We would get a
-         page confirmation proof. But, no proof that confirms the existence of a page
-         in slot [zero] is possible. *)
+      ~get_history:(get_history genesis_history_cache)
+        (* values of level and slot index are equal to slot zero. We would get a
+           page confirmation proof. But, no proof that confirms the existence of a page
+           in slot [zero] is possible. *)
       ~page_info:None
       ~page_id
       ~check_produce:(slot_confirmed_but_page_data_not_provided ~__LOC__)
@@ -155,7 +155,7 @@ struct
     let page_id = mk_page_id level sindex P.Index.zero in
     produce_and_verify_proof
       genesis_history
-      genesis_history_cache
+      ~get_history:(get_history genesis_history_cache)
       ~page_info:None
       ~page_id
       ~check_produce:(successful_check_produce_result ~__LOC__ `Unconfirmed)
@@ -179,7 +179,7 @@ struct
     let*? page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof
       skip_list
-      cache
+      ~get_history:(get_history cache)
       ~page_info
       ~page_id
       ?check_verify

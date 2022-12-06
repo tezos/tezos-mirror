@@ -218,9 +218,10 @@ module Make (Interpreter : Interpreter.S) :
         match res with Ok data -> return @@ Some data | Error _ -> return None
 
       module Inbox_with_history = struct
-        let history = snapshot_history
-
         let inbox = snapshot
+
+        let get_history inbox_hash =
+          Sc_rollup.Inbox.History.find inbox_hash snapshot_history |> Lwt.return
 
         let get_payloads_history =
           Store.Payloads_histories.get node_ctxt.Node_context.store
@@ -229,7 +230,9 @@ module Make (Interpreter : Interpreter.S) :
       module Dal_with_history = struct
         let confirmed_slots_history = dal_slots_history
 
-        let history_cache = dal_slots_history_cache
+        let get_history ptr =
+          Dal.Slots_history.History_cache.find ptr dal_slots_history_cache
+          |> Lwt.return
 
         let dal_attestation_lag = dal_attestation_lag
 

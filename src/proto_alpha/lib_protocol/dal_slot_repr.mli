@@ -237,11 +237,17 @@ module History : sig
        confirmed slot headers. *)
   type t
 
+  (** Type of hashes of history. *)
+  type hash
+
   (** Encoding of the datatype. *)
   val encoding : t Data_encoding.t
 
   (** First cell of this skip list. *)
   val genesis : t
+
+  (** Returns the hash of an history. *)
+  val hash : t -> hash
 
   (** The [History_cache.t] structure is basically a bounded lookup table of
       {!t} skip lists. (See {!Bounded_history_repr.S}). In the L1 layer, the
@@ -250,7 +256,8 @@ module History : sig
       to participate in all potential refutation games occurring during the
       challenge period. Indeed, the successive recent skip-lists stored in
       the cache are needed to produce proofs involving slots' pages. *)
-  module History_cache : Bounded_history_repr.S
+  module History_cache :
+    Bounded_history_repr.S with type key = hash and type value = t
 
   (** [add_confirmed_slots hist cache slot_headers] updates the given structure
       [hist] with the list of [slot_headers]. The given [cache] is also updated to
@@ -289,12 +296,12 @@ module History : sig
   (** Encoding for {!proof}. *)
   val proof_encoding : proof Data_encoding.t
 
-  (** Pretty-printer for {!proof}. If [serialized] is [false] it will print 
+  (** Pretty-printer for {!proof}. If [serialized] is [false] it will print
       the abstracted proof representation, otherwise if it's [true] it will
       print the serialized version of the proof (i.e. a sequence of bytes). *)
   val pp_proof : serialized:bool -> Format.formatter -> proof -> unit
 
-  (** [produce_proof dal_parameters page_id page_info slots_hist hist_cache]
+  (** [produce_proof dal_parameters page_id page_info ~get_history slots_hist]
       produces a proof that either:
       - there exists a confirmed slot in the skip list that contains
         the page identified by [page_id] whose data and slot inclusion proof
@@ -315,9 +322,9 @@ module History : sig
     parameters ->
     Page.t ->
     page_info:(Page.content * Page.proof) option ->
+    get_history:(hash -> t option Lwt.t) ->
     t ->
-    History_cache.t ->
-    (proof * Page.content option) tzresult
+    (proof * Page.content option) tzresult Lwt.t
 
   (** [verify_proof dal_params page_id snapshot proof] verifies that the given
       [proof] is a valid proof to show that either:

@@ -3056,6 +3056,8 @@ module Dal : sig
   module Slots_history : sig
     type t
 
+    type hash
+
     (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3766
        Do we need to export this? *)
     val genesis : t
@@ -3064,7 +3066,10 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
-    module History_cache : Bounded_history_repr.S
+    val hash : t -> hash
+
+    module History_cache :
+      Bounded_history_repr.S with type key = hash and type value = t
 
     val add_confirmed_slot_headers_no_cache :
       t -> Slot.Header.t list -> t tzresult
@@ -3403,7 +3408,7 @@ module Sc_rollup : sig
       get_payloads_history:
         (Inbox_merkelized_payload_hashes.Hash.t ->
         Inbox_merkelized_payload_hashes.History.t Lwt.t) ->
-      History.t ->
+      get_history:(Hash.t -> history_proof option Lwt.t) ->
       history_proof ->
       Raw_level.t * Z.t ->
       (proof * inbox_message option) tzresult Lwt.t
@@ -3427,10 +3432,10 @@ module Sc_rollup : sig
 
     module Internal_for_tests : sig
       val produce_inclusion_proof :
-        History.t ->
+        (Hash.t -> history_proof option Lwt.t) ->
         history_proof ->
         Raw_level.t ->
-        (inclusion_proof * history_proof) tzresult
+        (inclusion_proof * history_proof) tzresult Lwt.t
 
       val serialized_proof_of_string : string -> serialized_proof
 
@@ -3864,7 +3869,7 @@ module Sc_rollup : sig
       module Inbox_with_history : sig
         val inbox : Inbox.history_proof
 
-        val history : Inbox.History.t
+        val get_history : Inbox.Hash.t -> Inbox.history_proof option Lwt.t
 
         val get_payloads_history :
           Inbox_merkelized_payload_hashes.Hash.t ->
@@ -3874,7 +3879,8 @@ module Sc_rollup : sig
       module Dal_with_history : sig
         val confirmed_slots_history : Dal.Slots_history.t
 
-        val history_cache : Dal.Slots_history.History_cache.t
+        val get_history :
+          Dal.Slots_history.hash -> Dal.Slots_history.t option Lwt.t
 
         val page_info : (Dal.Page.content * Dal.Page.proof) option
 
