@@ -1853,6 +1853,24 @@ module Sc_rollup = struct
         let encoding = Raw_level_repr.encoding
       end)
 
+  module Game_info_versioned =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["refutation_game_info"]
+         end))
+         (Make_index (Sc_rollup_game_repr.Hash))
+      (struct
+        type t = Sc_rollup_game_repr.versioned
+
+        let encoding = Sc_rollup_game_repr.versioned_encoding
+      end)
+
+  module Game_info = struct
+    include Game_info_versioned
+    include Make_versioned (Sc_rollup_game_repr) (Game_info_versioned)
+  end
+
   module Games_per_staker =
     Make_indexed_subcontext
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -1861,7 +1879,7 @@ module Sc_rollup = struct
          end))
          (Public_key_hash_index)
 
-  module Game_versioned =
+  module Game =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Games_per_staker.Raw_context)
          (struct
@@ -1869,21 +1887,10 @@ module Sc_rollup = struct
          end))
          (Public_key_hash_index)
       (struct
-        type t = Sc_rollup_game_repr.versioned
+        type t = Sc_rollup_game_repr.Hash.t
 
-        let encoding = Sc_rollup_game_repr.versioned_encoding
+        let encoding = Sc_rollup_game_repr.Hash.encoding
       end)
-
-  module Game :
-    Indexed_carbonated_data_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Sc_rollup_game_repr.t
-       and type t =
-        (Raw_context.t * Sc_rollup_repr.t) * Signature.Public_key_hash.t =
-  struct
-    include Game_versioned
-    include Make_versioned (Sc_rollup_game_repr) (Game_versioned)
-  end
 
   module Game_timeout =
     Make_indexed_carbonated_data_storage

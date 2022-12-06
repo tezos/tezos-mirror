@@ -80,7 +80,12 @@ let get_ongoing_game ctxt rollup staker1 staker2 =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make staker1 staker2 in
   let* ctxt, game =
-    Store.Game.find ((ctxt, rollup), stakers.alice) stakers.bob
+    let* ctxt, game_hash =
+      Store.Game.find ((ctxt, rollup), stakers.alice) stakers.bob
+    in
+    match game_hash with
+    | None -> return (ctxt, None)
+    | Some game_hash -> Store.Game_info.find (ctxt, rollup) game_hash
   in
   let answer = Option.map (fun game -> (game, stakers)) game in
   return (answer, ctxt)
@@ -202,36 +207,49 @@ let get_conflict_point ctxt rollup staker1 staker2 =
 let get_game ctxt rollup stakers =
   let open Lwt_result_syntax in
   let open Sc_rollup_game_repr.Index in
-  let* ctxt, game =
+  let* ctxt, game_hash =
     Store.Game.find ((ctxt, rollup), stakers.alice) stakers.bob
   in
-  match game with
-  | Some g -> return (g, ctxt)
+  match game_hash with
   | None -> tzfail Sc_rollup_no_game
+  | Some game_hash -> (
+      let* ctxt, game = Store.Game_info.find (ctxt, rollup) game_hash in
+      match game with
+      | Some game -> return (game, game_hash, ctxt)
+      | None -> tzfail Sc_rollup_no_game)
 
 let create_game ctxt rollup stakers game =
   let open Lwt_result_syntax in
   let open Sc_rollup_game_repr.Index in
+  let game_hash = Sc_rollup_game_repr.hash_uncarbonated game in
+  let* ctxt, _ = Store.Game_info.init (ctxt, rollup) game_hash game in
   let* ctxt, _ =
-    Store.Game.init ((ctxt, rollup), stakers.alice) stakers.bob game
+    Store.Game.init ((ctxt, rollup), stakers.alice) stakers.bob game_hash
   in
   (*
      We assume that {!Store} implements a form of maximal sharing so
      that [game] is actually shared between the two entries.
   *)
   let* ctxt, _ =
-    Store.Game.init ((ctxt, rollup), stakers.bob) stakers.alice game
+    Store.Game.init ((ctxt, rollup), stakers.bob) stakers.alice game_hash
   in
   return ctxt
 
-let update_game ctxt rollup stakers new_game =
+let update_game ctxt rollup stakers previous_game_hash new_game =
   let open Lwt_result_syntax in
   let open Sc_rollup_game_repr.Index in
-  let* ctxt, _storage_diff =
-    Store.Game.update ((ctxt, rollup), stakers.alice) stakers.bob new_game
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game_info.remove (ctxt, rollup) previous_game_hash
+  in
+  let new_game_hash = Sc_rollup_game_repr.hash_uncarbonated new_game in
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game_info.add (ctxt, rollup) new_game_hash new_game
   in
   let* ctxt, _storage_diff =
-    Store.Game.update ((ctxt, rollup), stakers.bob) stakers.alice new_game
+    Store.Game.update ((ctxt, rollup), stakers.alice) stakers.bob new_game_hash
+  in
+  let* ctxt, _storage_diff =
+    Store.Game.update ((ctxt, rollup), stakers.bob) stakers.alice new_game_hash
   in
   return ctxt
 
@@ -343,7 +361,7 @@ let check_stakes ctxt rollup (stakers : Sc_rollup_game_repr.Index.t) =
 let game_move ctxt rollup ~player ~opponent refutation =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make player opponent in
-  let* game, ctxt = get_game ctxt rollup stakers in
+  let* game, game_hash, ctxt = get_game ctxt rollup stakers in
   let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
   let* () =
     fail_unless
@@ -373,7 +391,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
       match move_result with
       | Either.Left game_result -> return (Some game_result, ctxt)
       | Either.Right new_game ->
-          let* ctxt = update_game ctxt rollup stakers new_game in
+          let* ctxt = update_game ctxt rollup stakers game_hash new_game in
           let* ctxt = update_timeout ctxt rollup game stakers in
           return (None, ctxt))
 
@@ -389,7 +407,7 @@ let get_timeout ctxt rollup stakers =
 let timeout ctxt rollup stakers =
   let open Lwt_result_syntax in
   let level = (Raw_context.current_level ctxt).level in
-  let* game, ctxt = get_game ctxt rollup stakers in
+  let* game, _game_hash, ctxt = get_game ctxt rollup stakers in
   let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) stakers in
   let* () =
     let block_left_before_timeout =

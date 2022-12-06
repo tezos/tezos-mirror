@@ -854,13 +854,19 @@ module Sc_rollup : sig
        and type value = Raw_level_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** Refutation games are indexed by the rollup, by the first staker, and
-      by the second staker. The order follows the lexical order to make sure
-      a game is never duplicated. *)
+  module Game_info :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_game_repr.Hash.t
+       and type value = Sc_rollup_game_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Refutation games are indexed by the rollup, by the one staker, and
+      by its opponent staker. Hence, each game appears twice. This is
+      convenient to quickly compute the opponents of a given staker. *)
   module Game :
     Indexed_carbonated_data_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Sc_rollup_game_repr.t
+       and type value = Sc_rollup_game_repr.Hash.t
        and type t =
         (Raw_context.t * Sc_rollup_repr.t) * Signature.Public_key_hash.t
 
