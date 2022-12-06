@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type bytes booting with  --burn-cap 9999999
+./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type bytes with kernel  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3169.941 units (will add 100 for safety)
 Estimated storage: 6532 bytes added (will add 20 for safety)
@@ -22,11 +22,11 @@ This sequence of operations was run:
     Smart contract rollup origination:
       Kind: arith
       Parameter type: bytes
-      Boot sector Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
+      Kernel Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
       This smart contract rollup origination was successfully applied
       Consumed gas: 3169.941
       Storage size: 6532 bytes
-      Address: [SC_ROLLUP_HASH]
+      Address: [SMART_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1.633
@@ -58,7 +58,7 @@ This sequence of operations was run:
       Consumed gas: 1001.373
 
 
-./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x03000232728bd7982ad47ab6f59971181ebb3f3f57762cba56ab8ba0a53b5df3c256f832728bd7982ad47ab6f59971181ebb3f3f57762cba56ab8ba0a53b5df3c256f800100007d0030170000382066f7574707574810130c805639510aee988ab3152135cb7851c3eb7d8e19f3b0b5d61a761107951ded1dd0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0c94a7d88406cd132dab72d630166c726359f3367a007a915db26b0052147caebc0341f98e2e09c8e648e2ad9572b9a0a6c2fadeb87e5334650a4e0bb0abefd5f4932728bd7982ad47ab6f59971181ebb3f3f57762cba56ab8ba0a53b5df3c256f80000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
+./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x03000232728bd7982ad47ab6f59971181ebb3f3f57762cba56ab8ba0a53b5df3c256f832728bd7982ad47ab6f59971181ebb3f3f57762cba56ab8ba0a53b5df3c256f800100007d0030170000382066f7574707574810130c805639510aee988ab3152135cb7851c3eb7d8e19f3b0b5d61a761107951ded1dd0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0c94a7d88406cd132dab72d630166c726359f3367a007a915db26b0052147caebc0341f98e2e09c8e648e2ad9572b9a0a6c2fadeb87e5334650a4e0bb0abefd5f4932728bd7982ad47ab6f59971181ebb3f3f57762cba56ab8ba0a53b5df3c256f80000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
 Node is bootstrapped.
 Estimated gas: 5879.286 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
@@ -79,7 +79,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... -ꜩ0.001217
       payload fees(the block proposer) ....... +ꜩ0.001217
     Smart contract output message execution:
-      Address: [SC_ROLLUP_HASH]
+      Address: [SMART_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract output message execution was successfully applied
       Paid storage size diff: 5 bytes

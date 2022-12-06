@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
+./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string with kernel  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3169.941 units (will add 100 for safety)
 Estimated storage: 6532 bytes added (will add 20 for safety)
@@ -22,11 +22,11 @@ This sequence of operations was run:
     Smart contract rollup origination:
       Kind: arith
       Parameter type: string
-      Boot sector Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
+      Kernel Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
       This smart contract rollup origination was successfully applied
       Consumed gas: 3169.941
       Storage size: 6532 bytes
-      Address: [SC_ROLLUP_HASH]
+      Address: [SMART_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1.633

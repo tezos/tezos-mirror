@@ -47,9 +47,9 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... +1
 
 
-./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[SC_ROLLUP_HASH]"'
+./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[SMART_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4870.321 units (will add 100 for safety)
+Estimated gas: 4870.301 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -60,23 +60,23 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000798
+    Fee to the baker: ꜩ0.000797
     Expected counter: 4
     Gas limit: 4971
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000798
-      payload fees(the block proposer) ....... +ꜩ0.000798
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000797
+      payload fees(the block proposer) ....... +ꜩ0.000797
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
       To: [CONTRACT_HASH]
       Entrypoint: send
-      Parameter: "[SC_ROLLUP_HASH]"
+      Parameter: "[SMART_ROLLUP_HASH]"
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 220 bytes
-      Consumed gas: 3861.302
+      Consumed gas: 3861.282
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
@@ -92,7 +92,7 @@ This sequence of operations was run:
         Internal Transaction:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
-          To: [SC_ROLLUP_HASH]
+          To: [SMART_ROLLUP_HASH]
           Parameter: { Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket2" 1) ;
                        Pair 0x017a1d05251a570ed6e6e5af81f60883b857f8664500 (Pair "Ticket" 1) }
           This transaction was successfully applied
@@ -102,10 +102,10 @@ This sequence of operations was run:
             Content type: string
             Content: "Ticket"
             Account updates:
-              [SC_ROLLUP_HASH] ... +1
+              [SMART_ROLLUP_HASH] ... +1
             Ticketer: [CONTRACT_HASH]
             Content type: string
             Content: "Ticket2"
             Account updates:
-              [SC_ROLLUP_HASH] ... +1
+              [SMART_ROLLUP_HASH] ... +1
 
