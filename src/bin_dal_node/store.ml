@@ -75,7 +75,7 @@ module Legacy = struct
     type t = string list
 
     module Commitment : sig
-      val slot : Cryptobox.commitment -> Path.t
+      val slot : Cryptobox.commitment -> slot_size:int -> Path.t
 
       val headers : Cryptobox.commitment -> Path.t
 
@@ -85,7 +85,12 @@ module Legacy = struct
 
       type shard_index := int
 
-      val shard : Cryptobox.commitment -> shard_index -> Path.t
+      val shard :
+        Cryptobox.commitment ->
+        redundancy_factor:int ->
+        number_of_shards:int ->
+        shard_index ->
+        Path.t
     end
 
     module Level : sig
@@ -104,11 +109,9 @@ module Legacy = struct
     module Commitment = struct
       let root = ["commitments"]
 
-      (* FIXME: should be indexed by the cryptographic constants
-         'slot_size'. *)
-      let slot commitment =
+      let slot commitment ~slot_size =
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / "slot"
+        root / commitment_repr / Int.to_string slot_size / "slot"
 
       let headers commitment =
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
@@ -125,11 +128,12 @@ module Legacy = struct
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
         root / commitment_repr / "shards"
 
-      (* FIXME: should be indexed by the cryptographic constants
-         'number of shards' and 'redundant factor'. *)
-      let shard commitment index =
+      let shard commitment ~redundancy_factor ~number_of_shards index =
         let prefix = shards commitment in
-        prefix / Int.to_string index
+        let parameters_repr =
+          Printf.sprintf "%d-%d" redundancy_factor number_of_shards
+        in
+        prefix / "parameters" / parameters_repr / "index" / Int.to_string index
     end
 
     module Level = struct
@@ -164,10 +168,11 @@ module Legacy = struct
   let decode encoding string =
     Data_encoding.Binary.of_string_opt encoding string
 
-  let add_slot_by_commitment node_store slot commitment =
+  let add_slot_by_commitment node_store cryptobox slot commitment =
     let open Lwt_syntax in
-    let path = Path.Commitment.slot commitment in
-    let encoded_slot = encode_exn Data_encoding.bytes slot in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let path = Path.Commitment.slot commitment ~slot_size in
+    let encoded_slot = encode_exn (Data_encoding.Fixed.bytes slot_size) slot in
     let* () = set ~msg:"Slot stored" node_store.slots_store path encoded_slot in
     let* () = Event.(emit stored_slot_content commitment) in
     Lwt_watcher.notify node_store.slots_watcher commitment ;
@@ -176,18 +181,22 @@ module Legacy = struct
   let associate_slot_id_with_commitment node_store commitment slot_id =
     let open Lwt_syntax in
     let path = Path.Commitment.header commitment slot_id in
+    (* The path allows to reconstruct the data. *)
     let* () = set ~msg:"Slot id stored" node_store.slots_store path "" in
     return_unit
 
-  let exists_slot_by_commitment node_store commitment =
-    let path = Path.Commitment.slot commitment in
+  let exists_slot_by_commitment node_store cryptobox commitment =
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let path = Path.Commitment.slot commitment ~slot_size in
     mem node_store.slots_store path
 
-  let find_slot_by_commitment node_store commitment =
+  let find_slot_by_commitment node_store cryptobox commitment =
     let open Lwt_syntax in
-    let path = Path.Commitment.slot commitment in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let path = Path.Commitment.slot commitment ~slot_size in
     let* res_opt = find node_store.slots_store path in
-    Option.bind res_opt (decode Data_encoding.bytes) |> Lwt.return
+    Option.bind res_opt (decode (Data_encoding.Fixed.bytes slot_size))
+    |> Lwt.return
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4383
      Remove legacy code once migration to new API is done. *)

@@ -39,17 +39,17 @@ module Slots_handlers = struct
 
   let patch_slot ctxt commitment () slot_id =
     call_handler
-      (fun store _cryptobox ->
+      (fun store cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.add_slot_id store commitment slot_id in
+        let*! r = Slot_manager.add_slot_id store cryptobox commitment slot_id in
         match r with Ok () -> return_some () | Error `Not_found -> return_none)
       ctxt
 
   let get_slot_content ctxt commitment () () =
     call_handler
-      (fun store _cryptobox ->
+      (fun store cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.find_slot store commitment in
+        let*! r = Slot_manager.find_slot store cryptobox commitment in
         match r with Ok s -> return_some s | Error `Not_found -> return_none)
       ctxt
 
@@ -59,7 +59,7 @@ module Slots_handlers = struct
         let open Lwt_result_syntax in
         (* This handler may be costly: We need to recompute the
            polynomial and then compute the proof. *)
-        let*! slot = Slot_manager.find_slot store commitment in
+        let*! slot = Slot_manager.find_slot store cryptobox commitment in
         match slot with
         | Error `Not_found -> return_none
         | Ok slot -> (
