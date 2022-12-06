@@ -44,9 +44,9 @@ let assert_bond_id_result_equal ~loc =
     ( = )
 
 let test_destruct_sc_bond_id_repr () =
-  let sc_rollup_address1 = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF" in
-  let sc_rollup_address2 = "scr1Ew52VCdi6nF1JuokRGMqfmSeiAEXymW2m" in
-  let invalid_sc_rollup_address = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyF" in
+  let sc_rollup_address1 = "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG" in
+  let sc_rollup_address2 = "sr1JtMTWShgi1jLrqeHohMwLYiGizpsyWzXJ" in
+  let invalid_sc_rollup_address = "sr1RWAV26caoU7oVMvetUPMt8CqvGmKtA8BO" in
   let destruct = Bond_id_repr.Internal_for_test.destruct in
   let sc_bond id =
     match Sc_rollup_repr.Address.of_b58check_opt id with
@@ -122,8 +122,8 @@ let test_roundtrip () =
   in
   let tx_rollup_address1 = "txr1UTQm2gtoVJNvJRGfwora8GmM7D5dnEcdb" in
   let tx_rollup_address2 = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi" in
-  let sc_rollup_address1 = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF" in
-  let sc_rollup_address2 = "scr1Ew52VCdi6nF1JuokRGMqfmSeiAEXymW2m" in
+  let sc_rollup_address1 = "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG" in
+  let sc_rollup_address2 = "sr1JtMTWShgi1jLrqeHohMwLYiGizpsyWzXJ" in
   let* () = rountrip_test __LOC__ tx_rollup_address1 in
   let* () = rountrip_test __LOC__ tx_rollup_address2 in
   let* () = rountrip_test __LOC__ sc_rollup_address1 in

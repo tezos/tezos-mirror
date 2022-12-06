@@ -26,11 +26,11 @@
 (*****************************************************************************)
 
 module Address = struct
-  let prefix = "scr1"
+  let prefix = "sr1"
 
-  let encoded_size = 37
+  let encoded_size = 36
 
-  let decoded_prefix = "\001\118\132\217" (* "scr1(37)" decoded from base 58. *)
+  let decoded_prefix = "\006\124\117" (* "sr1(36)" decoded from base 58. *)
 
   module H =
     Blake2B.Make

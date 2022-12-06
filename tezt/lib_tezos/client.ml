@@ -2061,8 +2061,8 @@ module Sc_rollup = struct
           "of";
           "type";
           parameters_ty;
-          "booting";
           "with";
+          "kernel";
           boot_sector;
         ]
       @ optional_arg "burn-cap" Tez.to_string burn_cap)

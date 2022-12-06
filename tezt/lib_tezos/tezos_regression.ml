@@ -50,7 +50,7 @@ let replace_variables string =
       ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
       ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
       ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
-      ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
+      ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
       ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
       (* Ports are non-deterministic when using -j. *)

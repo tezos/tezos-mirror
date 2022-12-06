@@ -40,7 +40,7 @@
 
 *)
 
-(** A smart-contract rollup has an address starting with "scr1". *)
+(** A smart rollup has an address starting with "sr1". *)
 module Address : sig
   include S.HASH
 

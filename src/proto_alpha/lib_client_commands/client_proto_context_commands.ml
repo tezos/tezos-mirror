@@ -3269,10 +3269,10 @@ let commands_rw () =
              "The interface of the smart-contract rollup including its \
               entrypoints and their signatures."
            data_parameter
-      @@ prefixes ["booting"; "with"]
+      @@ prefixes ["with"; "kernel"]
       @@ param
-           ~name:"boot_sector"
-           ~desc:"The initialization state for the smart-contract rollup."
+           ~name:"kernel"
+           ~desc:"The kernel for the smart-contract rollup."
            Sc_rollup_params.boot_sector_parameter
       @@ stop)
       (fun ( fee,

@@ -75,11 +75,10 @@ let liquidity_baking_dex = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 let tx_rollup_address = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi"
 
 (* The following address has been extracted like this:
-     - turn [sc_rollup_enable] to [true] in [src/proto_alpha/parameters/test-parameters.json]
-     - [./octez-client -M mockup create mockup --protocol-constants src/proto_alpha/parameters/test-parameters.json]
-     - [./octez-client -M mockup originate sc rollup from bootstrap1 of kind arith booting with '' --burn-cap 2]
+     - [dune exec tezt/tests/main.exe -- -verbose --file sc_rollup.ml
+        sc_rollup list]
 *)
-let sc_rollup_address = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+let sc_rollup_address = "sr1BAwv191dVYeZg44ZxVy8dFwfRQKW6bSqc"
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3731
    Explain how this address was computed *)

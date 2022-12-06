@@ -1987,13 +1987,6 @@ module Sc_rollup = struct
         ~output:Sc_rollup.State_hash.encoding
         RPC_path.(path_sc_rollup / "initial_pvm_state_hash")
 
-    let boot_sector =
-      RPC_service.get_service
-        ~description:"Boot sector of smart-contract rollup"
-        ~query:RPC_query.empty
-        ~output:Data_encoding.(string Plain)
-        RPC_path.(path_sc_rollup / "boot_sector")
-
     let genesis_info =
       RPC_service.get_service
         ~description:
