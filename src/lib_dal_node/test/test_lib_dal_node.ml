@@ -39,11 +39,7 @@ let make_cb () =
     Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
       ~slot_size:parameters.slot_size
   in
-  let () =
-    match Cryptobox.load_parameters initialisation_parameters with
-    | Ok () -> ()
-    | Error _ -> assert false
-  in
+  Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
   match Cryptobox.make parameters with
   | Ok cryptobox -> (cryptobox, parameters)
   | Error (`Fail str) -> Stdlib.failwith ("DAL INIT ERROR: " ^ str)

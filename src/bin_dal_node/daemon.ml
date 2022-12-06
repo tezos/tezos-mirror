@@ -57,16 +57,13 @@ let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
   let open Cryptobox in
   let open Lwt_result_syntax in
   let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
-  let* initialisation_parameters =
-    if unsafe_srs then
-      return
-      @@ Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-           ~slot_size:parameters.slot_size
-    else
-      let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      Cryptobox.initialisation_parameters_from_files ~g1_path ~g2_path
+  let srs_size = if unsafe_srs then Some parameters.slot_size else None in
+  let* () =
+    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
+    Cryptobox.Config.init_dal
+      ~find_srs_files
+      Cryptobox.Config.{activated = true; srs_size}
   in
-  let*? () = Cryptobox.load_parameters initialisation_parameters in
   match Cryptobox.make parameters with
   | Ok cryptobox -> return cryptobox
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]

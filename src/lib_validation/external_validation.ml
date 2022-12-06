@@ -32,6 +32,7 @@ type parameters = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
+  dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 type request =
@@ -139,6 +140,7 @@ let parameters_encoding =
            user_activated_protocol_overrides;
            operation_metadata_size_limit;
            sandbox_parameters;
+           dal_config;
          } ->
       ( context_root,
         protocol_root,
@@ -146,14 +148,16 @@ let parameters_encoding =
         user_activated_upgrades,
         user_activated_protocol_overrides,
         operation_metadata_size_limit,
-        sandbox_parameters ))
+        sandbox_parameters,
+        dal_config ))
     (fun ( context_root,
            protocol_root,
            genesis,
            user_activated_upgrades,
            user_activated_protocol_overrides,
            operation_metadata_size_limit,
-           sandbox_parameters ) ->
+           sandbox_parameters,
+           dal_config ) ->
       {
         context_root;
         protocol_root;
@@ -162,8 +166,9 @@ let parameters_encoding =
         user_activated_protocol_overrides;
         operation_metadata_size_limit;
         sandbox_parameters;
+        dal_config;
       })
-    (obj7
+    (obj8
        (req "context_root" string)
        (req "protocol_root" string)
        (req "genesis" Genesis.encoding)
@@ -174,7 +179,8 @@ let parameters_encoding =
        (req
           "operation_metadata_size_limit"
           Shell_limits.operation_metadata_size_limit_encoding)
-       (opt "sandbox_parameters" json))
+       (opt "sandbox_parameters" json)
+       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding))
 
 let case_validate tag =
   let open Data_encoding in

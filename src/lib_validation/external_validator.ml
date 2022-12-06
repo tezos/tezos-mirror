@@ -171,23 +171,28 @@ let handshake input output =
     (inconsistent_handshake "bad magic")
 
 let init ~readonly input =
-  let open Lwt_syntax in
-  let* () = Events.(emit initialization_request ()) in
-  let* {
-         context_root;
-         protocol_root;
-         sandbox_parameters;
-         genesis;
-         user_activated_upgrades;
-         user_activated_protocol_overrides;
-         operation_metadata_size_limit;
-       } =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit initialization_request ()) in
+  let*! {
+          context_root;
+          protocol_root;
+          sandbox_parameters;
+          genesis;
+          user_activated_upgrades;
+          user_activated_protocol_overrides;
+          operation_metadata_size_limit;
+          dal_config;
+        } =
     External_validation.recv input External_validation.parameters_encoding
+  in
+  let* () =
+    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
+    Tezos_crypto_dal.Cryptobox.Config.init_dal ~find_srs_files dal_config
   in
   let sandbox_parameters =
     Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in
-  let* context_index =
+  let*! context_index =
     Context.init
       ~patch_context:(fun ctxt ->
         let open Lwt_result_syntax in
@@ -199,7 +204,7 @@ let init ~readonly input =
       ~readonly
       context_root
   in
-  Lwt.return
+  return
     ( context_index,
       protocol_root,
       genesis,
@@ -210,12 +215,12 @@ let init ~readonly input =
 let run ~readonly input output =
   let open Lwt_result_syntax in
   let* () = handshake input output in
-  let*! ( context_index,
-          protocol_root,
-          genesis,
-          user_activated_upgrades,
-          user_activated_protocol_overrides,
-          operation_metadata_size_limit ) =
+  let* ( context_index,
+         protocol_root,
+         genesis,
+         user_activated_upgrades,
+         user_activated_protocol_overrides,
+         operation_metadata_size_limit ) =
     init ~readonly input
   in
   let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)

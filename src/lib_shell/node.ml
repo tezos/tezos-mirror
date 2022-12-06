@@ -135,6 +135,7 @@ type config = {
   target : (Tezos_crypto.Block_hash.t * int32) option;
   disable_mempool : bool;
   enable_testchain : bool;
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 (* These protocols are linked with the node and
@@ -212,6 +213,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       target;
       disable_mempool;
       enable_testchain;
+      dal;
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
   let open Lwt_result_syntax in
@@ -265,6 +267,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
                protocol_root;
                process_path = Sys.executable_name;
                sandbox_parameters;
+               dal_config = dal;
              })
       in
       let commit_genesis ~chain_id =

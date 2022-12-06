@@ -83,23 +83,9 @@ include
 
 (** The primitives exposed in this modules require some
    preprocessing. This preprocessing generates data from an unknown
-   secret. For the security of those primtives, it is important that
+   secret. For the security of those primitives, it is important that
    the secret is unknown. *)
 type initialisation_parameters
-
-(** [initialisation_parameters_from_files ~g1_path ~g2_path] allows to
-   load initialisation_parameters from files [g1_path] and
-   [g2_path]. It is important that every time those primitives are
-   used, they are used with the very same initialisation
-   parameters. To ensure this property, an integrity check is run.
-
-   This function can take several seconds to run. *)
-val initialisation_parameters_from_files :
-  g1_path:string ->
-  g2_path:string ->
-  initialisation_parameters Error_monad.tzresult Lwt.t
-
-val load_parameters : initialisation_parameters -> unit Error_monad.tzresult
 
 module Commitment : sig
   include COMMITMENT with type t = commitment
@@ -226,4 +212,45 @@ module Internal_for_tests : sig
      from test frameworks where tests with various parameters could be
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
+end
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4380
+
+   This configuration module is currently used by each process that
+   needs to initialize DAL. Given that in the default case [init_dal]
+   may take several seconds, it would be better to call this function
+   only once. *)
+
+(** node parameters for the DAL. *)
+module Config : sig
+  type t = {
+    activated : bool;
+        (** [true] if the DAL is activated ([false] by default). This may have
+        an impact on the loading time of the node. *)
+    srs_size : int option;
+        (** If [None] (the default), the srs is read from the srs
+        files. This is the value expected for production. For testing
+        purposes, we may want to compute the srs instead but this is
+        unsafe. In that case, a size must be specified. *)
+  }
+
+  val encoding : t Data_encoding.t
+
+  (** The default configuration is [{activated = false; srs_size = None}]. *)
+  val default : t
+
+  (** [init_dal find_trusted_setup_files config] initializes the DAL
+     according to the dal configuration [config].
+
+      When [config.srs_size = None], [init_dal] loads
+     [initialisation_parameters] from the files at the paths provided
+     by [find_trusted_setup_files ()]. It is important that every time
+     the primitives above are used, they are used with the very same
+     initialization parameters. (To ensure this property, an integrity
+     check is run.) In this case, [init_dal] can take several seconds
+     to run. *)
+  val init_dal :
+    find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
+    t ->
+    unit Error_monad.tzresult Lwt.t
 end

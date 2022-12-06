@@ -53,6 +53,7 @@ type validator_kind =
       protocol_root : string;
       process_path : string;
       sandbox_parameters : Data_encoding.json option;
+      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
     }
       -> validator_kind
 

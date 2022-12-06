@@ -380,15 +380,6 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
           (fun x -> x);
       ])
 
-type dal = {activated : bool; srs_size : int option}
-
-let dal_encoding : dal Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {activated; srs_size} -> (activated, srs_size))
-    (fun (activated, srs_size) -> {activated; srs_size})
-    (obj2 (req "activated" bool) (req "srs_size" (option int31)))
-
 type t = {
   data_dir : string;
   disable_config_validation : bool;
@@ -399,7 +390,7 @@ type t = {
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
-  dal : dal;
+  dal : Tezos_crypto_dal.Cryptobox.Config.t;
 }
 
 and p2p = {
@@ -452,8 +443,6 @@ let default_rpc =
 
 let default_disable_config_validation = false
 
-let default_dal : dal = {activated = false; srs_size = None}
-
 let default_config =
   {
     data_dir = default_data_dir;
@@ -465,7 +454,7 @@ let default_config =
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
     metrics_addr = [];
-    dal = default_dal;
+    dal = Tezos_crypto_dal.Cryptobox.Config.default;
   }
 
 let p2p =
@@ -770,8 +759,8 @@ let encoding =
           ~description:
             "USE FOR TESTING PURPOSE ONLY. Configuration for the \
              data-availibility layer"
-          dal_encoding
-          default_dal))
+          Tezos_crypto_dal.Cryptobox.Config.encoding
+          Tezos_crypto_dal.Cryptobox.Config.default))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
@@ -1134,22 +1123,3 @@ let bootstrap_peers config =
   Option.value
     ~default:config.blockchain_network.default_bootstrap_peers
     config.p2p.bootstrap_peers
-
-let init_dal dal_config =
-  let open Lwt_result_syntax in
-  if dal_config.activated then
-    let open Tezos_crypto_dal.Cryptobox in
-    let* initialisation_parameters =
-      match dal_config.srs_size with
-      | None ->
-          let*? g1_path, g2_path =
-            Tezos_base.Dal_srs.find_trusted_setup_files ()
-          in
-          initialisation_parameters_from_files ~g1_path ~g2_path
-      | Some slot_size ->
-          return
-            (Internal_for_tests.initialisation_parameters_from_slot_size
-               ~slot_size)
-    in
-    Lwt.return (load_parameters initialisation_parameters)
-  else return_unit

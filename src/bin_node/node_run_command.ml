@@ -335,6 +335,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       target;
       enable_testchain = config.p2p.enable_testchain;
       disable_mempool = config.p2p.disable_mempool;
+      dal = config.dal;
     }
   in
   let* () =
@@ -499,8 +500,6 @@ let init_zcash () =
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
 
-let init_dal dal_config = Config_file.init_dal dal_config
-
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Config_file.t) =
@@ -536,7 +535,10 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
-  let* () = init_dal config.dal in
+  let* () =
+    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
+    Tezos_crypto_dal.Cryptobox.Config.init_dal ~find_srs_files config.dal
+  in
   let*! node =
     init_node
       ?sandbox
