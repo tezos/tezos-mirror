@@ -533,6 +533,33 @@ module Dal = struct
         }
   end
 
+  module Committee = struct
+    type member = {attestor : string; first_shard_index : int; power : int}
+
+    type t = member list
+
+    let typ =
+      let open Check in
+      list
+      @@ convert
+           (fun {attestor; first_shard_index; power} ->
+             (attestor, first_shard_index, power))
+           (tuple3 string int int)
+
+    let at_level node ~level =
+      let* json =
+        RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
+      in
+      return
+      @@ List.map
+           (fun json ->
+             let pkh = JSON.(json |=> 0 |> as_string) in
+             let first_shard_index = JSON.(json |=> 1 |=> 0 |> as_int) in
+             let power = JSON.(json |=> 1 |=> 1 |> as_int) in
+             {attestor = pkh; first_shard_index; power})
+           (JSON.as_list json)
+  end
+
   let pad n message =
     let padding = String.make n '\000' in
     message ^ padding

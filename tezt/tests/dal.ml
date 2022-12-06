@@ -310,6 +310,48 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
+let test_one_committee_per_epoch _protocol _parameters _cryptobox node _client
+    _bootstrap_key =
+  let* blocks_per_epoch =
+    let* json = RPC.(call node @@ get_chain_block_context_constants ()) in
+    return @@ JSON.(json |-> "dal_parametric" |-> "blocks_per_epoch" |> as_int)
+  in
+  let* current_level =
+    RPC.(call node @@ get_chain_block_helper_current_level ())
+  in
+  (* The test assumes we are at a level when an epoch starts. And
+     that is indeed the case. *)
+  assert (current_level.cycle_position = 0) ;
+  let* first_committee =
+    Rollup.Dal.Committee.at_level node ~level:current_level.level
+  in
+  (* We iterate through (the committees at) levels [current_level +
+     offset], with [offset] from 1 to [blocks_per_epoch]. At offset 0
+     we have the [first_committee] (first in the current epoch). The
+     committees at offsets 1 to [blocks_per_epoch - 1] should be the
+     same as the one at offset 0, the one at [blocks_per_epoch] (first
+     in the next epoch) should be different. *)
+  let rec iter offset =
+    if offset > blocks_per_epoch then unit
+    else
+      let level = current_level.level + offset in
+      let* committee = Rollup.Dal.Committee.at_level node ~level in
+      if offset < blocks_per_epoch then (
+        Check.((first_committee = committee) Rollup.Dal.Committee.typ)
+          ~error_msg:
+            "Unexpected different DAL committees at first level: %L, versus \
+             current level: %R" ;
+        unit)
+      else if offset = blocks_per_epoch then (
+        Check.((first_committee = committee) Rollup.Dal.Committee.typ)
+          ~error_msg:
+            "Unexpected equal DAL committees at first levels in subsequent \
+             epochs: %L and %R" ;
+        unit)
+      else iter (offset + 1)
+  in
+  iter 1
+
 let publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof node
     client =
   let level =
@@ -1627,6 +1669,10 @@ let register ~protocols =
     ~dal_enable:false
     "feature_flag_is_disabled"
     test_feature_flag
+    protocols ;
+  scenario_with_layer1_node
+    "one_committee_per_epoch"
+    test_one_committee_per_epoch
     protocols ;
 
   (* Tests with layer1 and dal nodes *)

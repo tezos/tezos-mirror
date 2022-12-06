@@ -328,4 +328,12 @@ module Dal : sig
 
     val to_string : Cryptobox.commitment -> string
   end
+
+  module Committee : sig
+    type t
+
+    val typ : t Check.typ
+
+    val at_level : Node.t -> level:int -> t Lwt.t
+  end
 end
