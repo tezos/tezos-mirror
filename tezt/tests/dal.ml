@@ -1549,7 +1549,13 @@ let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
      sending the L1 message that will trigger the failure. This
      ensures that the failure handler can access the status code
      of the rollup node even after it has terminated. *)
-  let expect_failure = Sc_rollup_node.wait_for_failure_handler sc_rollup_node in
+  let expect_failure =
+    let node_process = Option.get @@ Sc_rollup_node.process sc_rollup_node in
+    Process.check_error
+      ~exit_code:1
+      ~msg:(rex "Could not open file containing preimage of reveal hash")
+      node_process
+  in
   let* _level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
@@ -1559,7 +1565,7 @@ let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
       ["hash:" ^ errorneous_hash]
       ~alter_final_msg:(fun s -> "text:" ^ s)
   in
-  expect_failure ()
+  expect_failure
 
 let test_dal_node_imports_dac_member =
   Protocol.register_test
