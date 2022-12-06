@@ -1843,7 +1843,7 @@ module Sc_rollup = struct
          (struct
            let name = ["refutation_game_info"]
          end))
-         (Make_index (Sc_rollup_game_repr.Hash))
+         (Make_index (Sc_rollup_game_repr.Index))
       (struct
         type t = Sc_rollup_game_repr.versioned
 
@@ -1871,9 +1871,9 @@ module Sc_rollup = struct
          end))
          (Public_key_hash_index)
       (struct
-        type t = Sc_rollup_game_repr.Hash.t
+        type t = Sc_rollup_game_repr.Index.t
 
-        let encoding = Sc_rollup_game_repr.Hash.encoding
+        let encoding = Sc_rollup_game_repr.Index.encoding
       end)
 
   module Game_timeout =

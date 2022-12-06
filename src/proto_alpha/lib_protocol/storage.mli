@@ -856,7 +856,7 @@ module Sc_rollup : sig
 
   module Game_info :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_game_repr.Hash.t
+      with type key = Sc_rollup_game_repr.Index.t
        and type value = Sc_rollup_game_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
@@ -866,7 +866,7 @@ module Sc_rollup : sig
   module Game :
     Indexed_carbonated_data_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Sc_rollup_game_repr.Hash.t
+       and type value = Sc_rollup_game_repr.Index.t
        and type t =
         (Raw_context.t * Sc_rollup_repr.t) * Signature.Public_key_hash.t
 
