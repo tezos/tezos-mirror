@@ -25,9 +25,11 @@
 
 type operation_application_result = Succeeded | Failed
 
+type slot_index = int
+
 type slot_header = {
   published_level : int32;
-  slot_index : int;
+  slot_index : slot_index;
   commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
 }
 

@@ -31,12 +31,14 @@ type operation_application_result =
       (** The associated operation is included in a block but its application was
           not successful (failed, backtracked or skipped). *)
 
+type slot_index = int
+
 (** Information extracted from DAL slots headers operations included in L1
     blocks. Each slot header is made of an L1 level for which it is published,
     the slot's index and commitment. *)
 type slot_header = {
   published_level : int32;
-  slot_index : int;
+  slot_index : slot_index;
   commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
 }
 
