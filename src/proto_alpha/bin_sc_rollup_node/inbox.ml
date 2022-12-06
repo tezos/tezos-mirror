@@ -145,10 +145,11 @@ let get_messages Node_context.{l1_ctxt; _} head =
         block.operations
         {apply; apply_internal})
   in
-  let ({timestamp; predecessor; _} : Block_header.shell_header) =
-    block.header.shell
+  let ({predecessor; _} : Block_header.shell_header) = block.header.shell in
+  let* {timestamp = predecessor_timestamp; _} =
+    Layer1.fetch_tezos_shell_header l1_ctxt predecessor
   in
-  return (List.rev rev_messages, timestamp, predecessor)
+  return (List.rev rev_messages, predecessor_timestamp, predecessor)
 
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
@@ -161,7 +162,7 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages ~timestamp ~predecessor inbox history messages =
+let add_messages ~predecessor_timestamp ~predecessor inbox history messages =
   let open Lwt_result_syntax in
   lift
   @@ let*? ( messages_history,
@@ -170,7 +171,7 @@ let add_messages ~timestamp ~predecessor inbox history messages =
              _witness,
              messages_with_protocol_internal_messages ) =
        Sc_rollup.Inbox.add_all_messages
-         ~timestamp
+         ~predecessor_timestamp
          ~predecessor
          history
          inbox
@@ -211,7 +212,7 @@ let process_head (node_ctxt : _ Node_context.t)
         return (Context.empty node_ctxt.context)
       else Node_context.checkout_context node_ctxt predecessor.hash
     in
-    let* collected_messages, timestamp, predecessor_hash =
+    let* collected_messages, predecessor_timestamp, predecessor_hash =
       get_messages node_ctxt head_hash
     in
     let*! () =
@@ -226,7 +227,7 @@ let process_head (node_ctxt : _ Node_context.t)
            inbox,
            messages_with_protocol_internal_messages ) =
       add_messages
-        ~timestamp
+        ~predecessor_timestamp
         ~predecessor:predecessor_hash
         inbox
         history

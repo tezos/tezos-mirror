@@ -72,6 +72,12 @@ val get_predecessor : t -> head -> head tzresult Lwt.t
 (** [shutdown store] properly shut the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
 
+(** [fetch_tezos_shell_header l1_ctxt hash] returns the block shell header of
+    [hash]. Looks for the block in the blocks cache first, and fetches it from
+    the L1 node otherwise. *)
+val fetch_tezos_shell_header :
+  t -> Tezos_crypto.Block_hash.t -> Block_header.shell_header tzresult Lwt.t
+
 (** [fetch_tezos_block l1_ctxt hash] returns a block info given a block hash.
     Looks for the block in the blocks cache first, and fetches it from the L1
     node otherwise. *)

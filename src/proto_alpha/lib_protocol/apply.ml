@@ -2664,7 +2664,6 @@ let begin_application ctxt chain_id ~migration_balance_updates
   in
   let*! ctxt =
     Sc_rollup.Inbox.add_info_per_level
-      ~timestamp:block_header.shell.timestamp
       ~predecessor:block_header.shell.predecessor
       ctxt
   in
@@ -2723,10 +2722,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
   let*! ctxt =
-    Sc_rollup.Inbox.add_info_per_level
-      ~timestamp
-      ~predecessor:predecessor_hash
-      ctxt
+    Sc_rollup.Inbox.add_info_per_level ~predecessor:predecessor_hash ctxt
   in
   let mode =
     Full_construction
@@ -2755,9 +2751,8 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     }
 
 let begin_partial_construction ctxt chain_id ~migration_balance_updates
-    ~migration_operation_results ~predecessor_level ~predecessor_timestamp
-    ~predecessor_hash ~(predecessor_fitness : Fitness.raw) :
-    application_state tzresult Lwt.t =
+    ~migration_operation_results ~predecessor_level ~predecessor_hash
+    ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
   let open Lwt_result_syntax in
   let toggle_vote = Liquidity_baking.LB_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
@@ -2769,14 +2764,8 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
        not have an impact on the simulation of the following smart rollup
        operations.
     *)
-    let minimal_block_delay = Constants.minimal_block_delay ctxt in
-    let*? timestamp =
-      Timestamp.(predecessor_timestamp +? minimal_block_delay)
-    in
     let predecessor = predecessor_hash in
-    let*! ctxt =
-      Sc_rollup.Inbox.add_info_per_level ~timestamp ~predecessor ctxt
-    in
+    let*! ctxt = Sc_rollup.Inbox.add_info_per_level ~predecessor ctxt in
     return ctxt
   in
   let mode = Partial_construction {predecessor_level; predecessor_fitness} in

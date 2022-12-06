@@ -241,13 +241,29 @@ let shutdown state =
   state.stopper () ;
   Lwt.return_unit
 
+(** [fetch_tezos_block l1_ctxt hash] returns a block shell header of
+    [hash]. Looks for the block in the blocks cache first, and fetches it from
+    the L1 node otherwise. *)
+let fetch_tezos_shell_header l1_ctxt hash =
+  trace (Cannot_find_block hash)
+  @@ fetch_tezos_shell_header
+       l1_ctxt.cctxt
+       hash
+       ~find_in_cache:(fun h fetch_by_rpc ->
+         let res =
+           Blocks_cache.bind l1_ctxt.blocks_cache h (function
+               | Some block_info -> Lwt.return_some block_info.header.shell
+               | None -> Lwt.return_none)
+         in
+         match res with Some lwt -> lwt | None -> fetch_by_rpc h)
+
 (** [fetch_tezos_block l1_ctxt hash] returns a block info given a block
     hash. Looks for the block in the blocks cache first, and fetches it from the
     L1 node otherwise. *)
 let fetch_tezos_block l1_ctxt hash =
   trace (Cannot_find_block hash)
-  @@ fetch_tezos_block l1_ctxt.cctxt hash ~find_in_cache:(fun h mk ->
-         Blocks_cache.bind_or_put l1_ctxt.blocks_cache h mk Lwt.return)
+  @@ fetch_tezos_block l1_ctxt.cctxt hash ~find_in_cache:(fun h fetch_by_rpc ->
+         Blocks_cache.bind_or_put l1_ctxt.blocks_cache h fetch_by_rpc Lwt.return)
 
 let nth_predecessor l1_state n block =
   let open Lwt_result_syntax in

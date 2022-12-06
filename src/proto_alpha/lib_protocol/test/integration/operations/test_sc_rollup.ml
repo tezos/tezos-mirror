@@ -2234,15 +2234,23 @@ let test_refute_invalid_metadata () =
   in
   assert_refute_result ~game_status:expected_game_status incr
 
-let full_history_inbox (timestamp, predecessor) all_external_messages =
+let full_history_inbox (predecessor_timestamp, predecessor)
+    all_external_messages =
   let open Sc_rollup_helpers in
   let payloads_per_levels =
     List.map
-      (fun ((timestamp, predecessor), level, external_messages) ->
-        wrap_messages ~timestamp ~predecessor level external_messages)
+      (fun ((predecessor_timestamp, predecessor), level, external_messages) ->
+        wrap_messages
+          ~predecessor_timestamp
+          ~predecessor
+          level
+          external_messages)
       all_external_messages
   in
-  Sc_rollup_helpers.construct_inbox ~timestamp ~predecessor payloads_per_levels
+  Sc_rollup_helpers.construct_inbox
+    ~predecessor_timestamp
+    ~predecessor
+    payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Sc_rollup_helpers in
@@ -2284,22 +2292,26 @@ let test_automatically_added_internal_messages () =
   in
 
   let info_per_block (block : Block.t) =
-    let header = block.header.shell in
-    (header.timestamp, header.predecessor)
+    (block.header.shell.timestamp, block.hash)
   in
 
   (* Create the first block. *)
   let* block, account = context_init Context.T1 in
-  let level_zero_info = info_per_block block in
 
+  let level_zero_info =
+    ( Time.Protocol.epoch,
+      Tezos_crypto.Block_hash.of_b58check_exn
+        "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU" )
+  in
+
+  let level_one_info = info_per_block block in
   (* Bake a second block. *)
   let* block = Block.bake block in
-  let level_one_info = info_per_block block in
 
+  let level_two_info = info_per_block block in
   (* Bake a third block where a message is added. *)
   let* operation = Op.sc_rollup_add_messages (B block) account ["foo"] in
   let* block = Block.bake ~operation block in
-  let level_two_info = info_per_block block in
 
   let* inbox = Context.Sc_rollup.inbox (B block) in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
@@ -2324,11 +2336,11 @@ let test_automatically_added_internal_messages () =
   in
 
   (* Assert Info_per_level is at position 1. *)
-  let timestamp, predecessor = level_two_info in
+  let predecessor_timestamp, predecessor = level_two_info in
   let info_per_level =
     Sc_rollup_helpers.make_info_per_level
       ~inbox_level:level_two
-      ~timestamp
+      ~predecessor_timestamp
       ~predecessor
   in
   let* () =

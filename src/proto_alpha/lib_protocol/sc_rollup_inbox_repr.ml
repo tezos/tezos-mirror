@@ -735,21 +735,26 @@ let init_witness_no_history =
          Adding [SOL] without the history could remove the result monad here. *)
       assert false
 
-let add_info_per_level ~timestamp ~predecessor payloads_history witness =
+let add_info_per_level ~predecessor_timestamp ~predecessor payloads_history
+    witness =
   let open Result_syntax in
   let* info_per_level =
     Sc_rollup_inbox_message_repr.(
-      serialize (Internal (Info_per_level {timestamp; predecessor})))
+      serialize (Internal (Info_per_level {predecessor_timestamp; predecessor})))
   in
   add_protocol_internal_message info_per_level payloads_history witness
 
-let add_info_per_level_no_history ~timestamp ~predecessor witness =
+let add_info_per_level_no_history ~predecessor_timestamp ~predecessor witness =
   let open Result_syntax in
   let no_payloads_history =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.no_history
   in
   let* _payloads_history, witness =
-    add_info_per_level ~timestamp ~predecessor no_payloads_history witness
+    add_info_per_level
+      ~predecessor_timestamp
+      ~predecessor
+      no_payloads_history
+      witness
   in
   return witness
 
@@ -774,7 +779,8 @@ let finalize_inbox_level_no_history inbox witness =
   in
   return inbox
 
-let add_all_messages ~timestamp ~predecessor history inbox messages =
+let add_all_messages ~predecessor_timestamp ~predecessor history inbox messages
+    =
   let open Result_syntax in
   let* payloads = List.map_e Sc_rollup_inbox_message_repr.serialize messages in
   let payloads_history =
@@ -786,7 +792,11 @@ let add_all_messages ~timestamp ~predecessor history inbox messages =
   (* Add [SOL] and [Info_per_level]. *)
   let* payloads_history, witness = init_witness payloads_history in
   let* payloads_history, witness =
-    add_info_per_level ~timestamp ~predecessor payloads_history witness
+    add_info_per_level
+      ~predecessor_timestamp
+      ~predecessor
+      payloads_history
+      witness
   in
 
   let* payloads_history, witness =
@@ -803,14 +813,16 @@ let add_all_messages ~timestamp ~predecessor history inbox messages =
   let messages =
     let open Sc_rollup_inbox_message_repr in
     let sol = Internal Start_of_level in
-    let info_per_level = Internal (Info_per_level {timestamp; predecessor}) in
+    let info_per_level =
+      Internal (Info_per_level {predecessor_timestamp; predecessor})
+    in
     let eol = Internal End_of_level in
     [sol; info_per_level] @ messages @ [eol]
   in
 
   return (payloads_history, history, inbox, witness, messages)
 
-let genesis ~timestamp ~predecessor level =
+let genesis ~predecessor_timestamp ~predecessor level =
   let open Result_syntax in
   let no_payloads_history =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.no_history
@@ -818,7 +830,7 @@ let genesis ~timestamp ~predecessor level =
   (* 1. Add [SOL] and [Info_per_level]. *)
   let witness = init_witness_no_history in
   let* witness =
-    add_info_per_level_no_history ~timestamp ~predecessor witness
+    add_info_per_level_no_history ~predecessor_timestamp ~predecessor witness
   in
 
   (* 2. Add [EOL]. *)

@@ -35,7 +35,7 @@ module type S = sig
   type level_position = Start | Middle | End
 
   type info_per_level = {
-    timestamp : Timestamp.time;
+    predecessor_timestamp : Timestamp.time;
     predecessor : Tezos_crypto.Block_hash.t;
   }
 
@@ -73,7 +73,7 @@ module Make (Interpreter : Interpreter.S) :
   type level_position = Start | Middle | End
 
   type info_per_level = {
-    timestamp : Timestamp.time;
+    predecessor_timestamp : Timestamp.time;
     predecessor : Tezos_crypto.Block_hash.t;
   }
 
@@ -87,19 +87,11 @@ module Make (Interpreter : Interpreter.S) :
     info_per_level : info_per_level;
   }
 
-  let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) hash =
+  let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
     let open Lwt_result_syntax in
-    let* block = Layer1.fetch_tezos_block node_ctxt.l1_ctxt hash in
-    let ({timestamp; predecessor; _} : Block_header.shell_header) =
-      block.header.shell
-    in
-    let Constants.Parametric.{minimal_block_delay; _} =
-      node_ctxt.protocol_constants.Constants.parametric
-    in
-    let*? timestamp =
-      Environment.wrap_tzresult @@ Timestamp.(timestamp +? minimal_block_delay)
-    in
-    return {timestamp; predecessor}
+    let* block_info = Layer1.fetch_tezos_block node_ctxt.l1_ctxt predecessor in
+    let predecessor_timestamp = block_info.header.shell.timestamp in
+    return {predecessor_timestamp; predecessor}
 
   let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
@@ -175,10 +167,10 @@ module Make (Interpreter : Interpreter.S) :
     in
     let messages =
       if sim.level_position = Start then
-        let {timestamp; predecessor} = sim.info_per_level in
+        let {predecessor_timestamp; predecessor} = sim.info_per_level in
         let open Sc_rollup.Inbox_message in
         Internal Start_of_level
-        :: Internal (Info_per_level {timestamp; predecessor})
+        :: Internal (Info_per_level {predecessor_timestamp; predecessor})
         :: messages
       else messages
     in

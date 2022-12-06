@@ -80,7 +80,7 @@ let populate_inboxes level history inbox inboxes list_of_messages =
         let* payloads_history, history, inbox, witness, _messages =
           Environment.wrap_tzresult
           @@ add_all_messages
-               ~timestamp:Time.Protocol.epoch
+               ~predecessor_timestamp:Time.Protocol.epoch
                ~predecessor:Tezos_crypto.Block_hash.zero
                history
                inbox
@@ -151,7 +151,7 @@ let setup_node_inbox_with_messages list_of_messages f =
         let*? payloads_history, history, inbox, witness, _messages =
           Environment.wrap_tzresult
           @@ add_all_messages
-               ~timestamp:Time.Protocol.epoch
+               ~predecessor_timestamp:Time.Protocol.epoch
                ~predecessor:Tezos_crypto.Block_hash.zero
                history
                inbox

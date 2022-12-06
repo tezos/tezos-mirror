@@ -259,9 +259,10 @@ let make_eol ~inbox_level ~message_counter =
   let payload = make_internal_inbox_message End_of_level in
   make_input ~inbox_level ~message_counter payload
 
-let make_info_per_level ~inbox_level ~timestamp ~predecessor =
+let make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor =
   let payload =
-    make_internal_inbox_message (Info_per_level {timestamp; predecessor})
+    make_internal_inbox_message
+      (Info_per_level {predecessor_timestamp; predecessor})
   in
   make_input ~inbox_level ~message_counter:Z.one payload
 
@@ -296,7 +297,8 @@ type payloads_per_level = {
   messages : string list;  (** List of external messages. *)
   payloads : Sc_rollup.Inbox_message.serialized list;
       (** List of external serialized messages. *)
-  timestamp : Time.Protocol.t;  (** Timestamp of the [Info_per_level]. *)
+  predecessor_timestamp : Time.Protocol.t;
+      (** predecessor timestamp of the [Info_per_level]. *)
   predecessor : Tezos_crypto.Block_hash.t;
       (** Predecessor of the [Info_per_level]. *)
   level : Raw_level.t;
@@ -323,10 +325,10 @@ let pp_message fmt {input; message} =
     input
     (match message with
     | `SOL -> "SOL"
-    | `Info_per_level (timestamp, block_hash) ->
+    | `Info_per_level (predecessor_timestamp, block_hash) ->
         Format.asprintf
           "Info_per_level (%s, %a)"
-          (Timestamp.to_notation timestamp)
+          (Timestamp.to_notation predecessor_timestamp)
           Tezos_crypto.Block_hash.pp
           block_hash
     | `Message msg -> msg
@@ -342,12 +344,12 @@ let strs_to_inputs inbox_level messages =
     messages
 
 (** Transform the list of all inputs the PVM should read. *)
-let make_inputs timestamp predecessor messages inbox_level =
+let make_inputs predecessor_timestamp predecessor messages inbox_level =
   (* SOL is at index 0. *)
   let sol = make_sol ~inbox_level in
   (* Info_per_level is at index 1. *)
   let info_per_level =
-    make_info_per_level ~inbox_level ~timestamp ~predecessor
+    make_info_per_level ~inbox_level ~predecessor_timestamp ~predecessor
   in
   (* External inputs start at index 2. *)
   let external_inputs =
@@ -367,17 +369,17 @@ let make_inputs timestamp predecessor messages inbox_level =
   in
   [sol; info_per_level] @ external_inputs @ [eol]
 
-(** Wrap messages, timestamp and predecessor of a level into a
+(** Wrap messages, predecessor_timestamp and predecessor of a level into a
     [payloads_per_level] .*)
-let wrap_messages ?(timestamp = Timestamp.of_seconds 0L)
+let wrap_messages ?(predecessor_timestamp = Timestamp.of_seconds 0L)
     ?(predecessor = Tezos_crypto.Block_hash.zero) level messages :
     payloads_per_level =
   let payloads = List.map make_external_inbox_message messages in
-  let inputs = make_inputs timestamp predecessor messages level in
-  {payloads; timestamp; predecessor; messages; level; inputs}
+  let inputs = make_inputs predecessor_timestamp predecessor messages level in
+  {payloads; predecessor_timestamp; predecessor; messages; level; inputs}
 
-let make_empty_level ?timestamp ?predecessor level =
-  wrap_messages ?timestamp ?predecessor level []
+let make_empty_level ?predecessor_timestamp ?predecessor level =
+  wrap_messages ?predecessor_timestamp ?predecessor level []
 
 let gen_payloads_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
@@ -552,7 +554,14 @@ let fill_inbox ~inbox history payloads_histories payloads_per_levels =
   let open Result_syntax in
   let rec aux payloads_histories history inbox = function
     | [] -> return (payloads_histories, history, inbox)
-    | ({payloads = _; timestamp; predecessor; messages; level = _; inputs = _} :
+    | ({
+         payloads = _;
+         predecessor_timestamp;
+         predecessor;
+         messages;
+         level = _;
+         inputs = _;
+       } :
         payloads_per_level)
       :: rst ->
         let messages =
@@ -563,7 +572,7 @@ let fill_inbox ~inbox history payloads_histories payloads_per_levels =
         let* payloads_history, history, inbox, _witness, _messages =
           Environment.wrap_tzresult
           @@ Sc_rollup.Inbox.add_all_messages
-               ~timestamp
+               ~predecessor_timestamp
                ~predecessor
                history
                inbox
@@ -584,12 +593,15 @@ let fill_inbox ~inbox history payloads_histories payloads_per_levels =
   aux payloads_histories history inbox payloads_per_levels
 
 let construct_inbox ?(inbox_creation_level = Raw_level.(root))
-    ?(with_histories = true) ?(timestamp = Time.Protocol.epoch)
+    ?(with_histories = true) ?(predecessor_timestamp = Time.Protocol.epoch)
     ?(predecessor = Tezos_crypto.Block_hash.zero) payloads_per_levels =
   let inbox =
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Environment.wrap_tzresult
-    @@ Sc_rollup.Inbox.genesis ~timestamp ~predecessor inbox_creation_level
+    @@ Sc_rollup.Inbox.genesis
+         ~predecessor_timestamp
+         ~predecessor
+         inbox_creation_level
   in
   let history =
     let capacity = if with_histories then 10000L else 0L in
@@ -638,13 +650,13 @@ let list_of_inputs_from_list_of_messages
 let dumb_init level =
   WithExceptions.Result.get_ok ~loc:__LOC__
   @@ Sc_rollup.Inbox.genesis
-       ~timestamp:Time.Protocol.epoch
+       ~predecessor_timestamp:Time.Protocol.epoch
        ~predecessor:Tezos_crypto.Block_hash.zero
        level
 
 let dumb_init_repr level =
   WithExceptions.Result.get_ok ~loc:__LOC__
   @@ Sc_rollup_inbox_repr.genesis
-       ~timestamp:Time.Protocol.epoch
+       ~predecessor_timestamp:Time.Protocol.epoch
        ~predecessor:Tezos_crypto.Block_hash.zero
        level

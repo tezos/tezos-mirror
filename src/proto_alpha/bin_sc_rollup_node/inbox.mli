@@ -68,7 +68,7 @@ val start : unit -> unit Lwt.t
 (** [add_messages ~timestamp ~predecessor inbox history messages] adds
     [messages] to the [inbox] using {Inbox.add_all_messages}. *)
 val add_messages :
-  timestamp:Timestamp.time ->
+  predecessor_timestamp:Timestamp.time ->
   predecessor:Tezos_crypto.Block_hash.t ->
   Inbox.t ->
   Inbox.History.t ->

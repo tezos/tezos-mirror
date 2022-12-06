@@ -959,6 +959,9 @@ let construct_inbox_proto block list_of_messages contract =
   let* block, infos_per_level =
     List.fold_left_es
       (fun ((block : Block.t), acc) ({messages; _} : payloads_per_level) ->
+        let predecessor = block.hash in
+        let predecessor_timestamp = block.header.shell.timestamp in
+
         let* block =
           match messages with
           | [] ->
@@ -972,11 +975,7 @@ let construct_inbox_proto block list_of_messages contract =
               return block
         in
 
-        let predecessor = block.header.shell.predecessor in
-        let* ctxt = Context.(to_alpha_ctxt (B block)) in
-        let timestamp = Timestamp.current ctxt in
-
-        let acc = (timestamp, predecessor) :: acc in
+        let acc = (predecessor_timestamp, predecessor) :: acc in
 
         return (block, acc))
       (block, [])
@@ -1202,7 +1201,7 @@ module Player_client = struct
               if l = corrupt_at_l then
                 {
                   payloads_per_level with
-                  timestamp = dumb_timestamp;
+                  predecessor_timestamp = dumb_timestamp;
                   predecessor = dumb_predecessor;
                 }
               else payloads_per_level)
@@ -1488,8 +1487,8 @@ let gen_game ~p1_strategy ~p2_strategy =
 
   let payloads_per_levels =
     Stdlib.List.map2
-      (fun payloads_per_level (timestamp, predecessor) ->
-        {payloads_per_level with timestamp; predecessor})
+      (fun payloads_per_level (predecessor_timestamp, predecessor) ->
+        {payloads_per_level with predecessor_timestamp; predecessor})
       payloads_per_levels
       infos_per_level
   in

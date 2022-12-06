@@ -121,12 +121,16 @@ let gen_payloads_for_level ?(inbox_creation_level = 0) () =
     let+ level = inbox_creation_level + 1 -- 100_000 in
     Raw_level.of_int32_exn (Int32.of_int level)
   in
-  let+ timestamp =
+  let+ predecessor_timestamp =
     let+ seconds = 0 -- 1_000_000 in
     Time.Protocol.of_seconds (Int64.of_int seconds)
   in
   let predecessor = Tezos_crypto.Block_hash.zero in
-  Sc_rollup_helpers.wrap_messages ~timestamp ~predecessor level messages
+  Sc_rollup_helpers.wrap_messages
+    ~predecessor_timestamp
+    ~predecessor
+    level
+    messages
 
 let gen_payloads_for_levels ?(inbox_creation_level = 0) ~max_level () =
   Sc_rollup_helpers.gen_payloads_for_levels
@@ -491,14 +495,14 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   return_unit
 
 let test_messages_are_correctly_added_in_history
-    Sc_rollup_helpers.{timestamp; predecessor; messages; _} =
+    Sc_rollup_helpers.{predecessor_timestamp; predecessor; messages; _} =
   let open Lwt_result_syntax in
   let inbox = Sc_rollup_helpers.dumb_init Raw_level.root in
   let messages = List.map (fun message -> Message.External message) messages in
   let*? payloads_history, _history, _inbox, witness, messages =
     lift
     @@ Inbox.add_all_messages
-         ~timestamp
+         ~predecessor_timestamp
          ~predecessor
          (Inbox.History.empty ~capacity:0L)
          inbox
