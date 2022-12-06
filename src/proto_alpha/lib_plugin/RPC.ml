@@ -2411,7 +2411,9 @@ module Dal = struct
 
     let shards =
       RPC_service.get_service
-        ~description:"Get the shard assignements for a given level"
+        ~description:
+          "Get the shard assignements for a given level (the default is the \
+           current level)"
         ~query:shards_query
         ~output:
           Data_encoding.(
@@ -2433,7 +2435,7 @@ module Dal = struct
 
   let register_shards () =
     Registration.register0 ~chunked:true S.shards @@ fun ctxt level () ->
-    let level = Option.value level ~default:(Raw_level.of_int32_exn 0l) in
+    let level = Option.value level ~default:(Level.current ctxt).level in
     Dal_services.shards ctxt ~level
 
   let register () =
