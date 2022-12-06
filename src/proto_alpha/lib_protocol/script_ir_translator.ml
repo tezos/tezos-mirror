@@ -605,13 +605,9 @@ let rec parse_ty :
     | Prim (loc, T_key_hash, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt key_hash_t
     | Prim (loc, T_chest_key, [], annot) ->
-        if legacy then
-          check_type_annot loc annot >|? fun () -> return ctxt chest_key_t
-        else error (Deprecated_instruction T_chest_key)
+        check_type_annot loc annot >|? fun () -> return ctxt chest_key_t
     | Prim (loc, T_chest, [], annot) ->
-        if legacy then
-          check_type_annot loc annot >|? fun () -> return ctxt chest_t
-        else error (Deprecated_instruction T_chest)
+        check_type_annot loc annot >|? fun () -> return ctxt chest_t
     | Prim (loc, T_timestamp, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt timestamp_t
     | Prim (loc, T_address, [], annot) ->
@@ -4347,10 +4343,8 @@ and parse_instr :
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
-      if legacy then
-        let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
-        typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
-      else tzfail (Deprecated_instruction I_OPEN_CHEST)
+      let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
+      typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
       check_packable ~legacy loc data >>?= fun () ->

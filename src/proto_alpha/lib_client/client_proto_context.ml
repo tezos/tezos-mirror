@@ -503,24 +503,8 @@ let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
 
-let check_for_timelock code =
-  let open Tezos_micheline.Micheline in
-  let rec has_timelock_opcodes = function
-    | Prim (_, (Script.T_chest | T_chest_key | I_OPEN_CHEST), _, _) -> true
-    | Seq (_, exprs) | Prim (_, _, exprs, _) ->
-        List.exists has_timelock_opcodes exprs
-    | Int _ | String _ | Bytes _ -> false
-  in
-  has_timelock_opcodes (root code)
-
-let build_origination_operation ?(allow_timelock = false) ?fee ?gas_limit
-    ?storage_limit ~initial_storage ~code ~delegate ~balance () =
-  (if (not allow_timelock) && check_for_timelock code then
-   failwith
-     "Origination of contracts containing time lock related instructions is \
-      disabled in the client because of a vulnerability."
-  else return_unit)
-  >>=? fun () ->
+let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
+    ~code ~delegate ~balance () =
   (* With the change of making implicit accounts delegatable, the following
      3 arguments are being defaulted before they can be safely removed. *)
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage)
@@ -542,7 +526,6 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~delegate
     ~initial_storage ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
   build_origination_operation
-    ~allow_timelock:false
     ?fee
     ?gas_limit
     ?storage_limit
