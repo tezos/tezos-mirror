@@ -259,6 +259,87 @@ However, this setup **does not guarantee confidentiality**: an eavesdropper can
 see the transactions that you sign (on a public blockchain this may be less of a concern).
 In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt your traffic.
 
+.. _consensus_key:
+
+Consensus Key
+-------------
+
+.. note::
+
+   Consensus key is available starting with the Tezos L protocol.
+
+By default, the baker's key, also called manager key, is used to sign in the consensus protocol, i.e. signing blocks while baking,
+and signing consensus operations (preendorsements and endorsements).
+
+A delegate may elect instead to choose a dedicated key: the consensus key. It can then be changed without redelegation.
+
+It also allows establishment of baking operations in an environment where access is not ultimately guaranteed:
+for example, a cloud platform providing hosted Key Management Systems (KMS) where the private key is
+generated within the system and can never be downloaded by the operator. The delegate can designate
+such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
+
+However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus key may sign a
+Drain operation to transfer the delegate's free balance to an arbitrary account.
+
+As a consequence, the consensus key should be treated with equal care as the manager key.
+
+Registering a Consensus Key
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A consensus key can be changed at any point.
+
+The operation is signed by the manager key and does not require the consensus private key to be accessible by the client.
+
+However the public key must be known by the client. It can be imported with the command::
+
+   tezos-client import public key consensus unencrypted:edpk...
+
+The command to update the consensus key is::
+
+   tezos-client set consensus key for <mgr> to consensus
+
+The update becomes active after `PRESERVED_CYCLES + 1` cycles. We therefore distinguish
+the active consensus key and the pending consensus keys.
+The active consensus key is by default the delegate’s manager key, which cannot change.
+
+However, it is also possible to register as a delegate and immediately set the consensus key::
+
+   tezos-client register key <mgr> as delegate with consensus key <key>
+
+There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
+A subsequent update within the same cycle takes precedences over the initial one.
+
+Baking With a Consensus Key
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In your baker's command, replace the delegate's manager key alias with the consenus key alias::
+
+   tezos-baker-0XX-Psxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
+
+While transitioning from the delegate's manager key, it is possible to pass the alias for both delegate's manager key and consensus key.
+The delegate will seamlessly keep baking when the transition happens::
+
+   tezos-baker-0XX-Psxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+
+Draining a Manager's Account With its Consensus Key
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This operation immediately transfers all the spendable balance of the `baker_pkh`’s implicit account into the `destination_pkh` implicit account::
+
+   tezos-client drain delegate <baker_pkh> to <destination_pkh> with <consensus_pkh>
+
+If the destination is the consensus key account, this can be simplified to::
+
+   tezos-client drain delegate <baker_pkh> to <consensus_pkh>
+
+The active consensus key is the signer for this operation, therefore the private key associated to the consensus key must be available
+in the wallet of the client typing the command. The delegate's private key needs not be present.
+
+`drain delegate` has no effect on the frozen balance.
+
+A fixed fraction of the drained delegate’s spendable balance is transferred as fees to the baker that includes the operation,
+i.e. the maximum between 1 tez or 1% of the spendable balance.
+
 .. _activate_fundraiser_account:
 
 Getting keys for fundraiser accounts
