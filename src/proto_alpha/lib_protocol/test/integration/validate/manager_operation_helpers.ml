@@ -1116,6 +1116,11 @@ let mk_sc_rollup_execute_outbox_message (oinfos : operation_req) (infos : infos)
 let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let* sc_rollup = sc_rollup_of infos.ctxt.sc_rollup in
+  let source, staker =
+    match contract_of (get_source infos) with
+    | Implicit staker as source -> (source, staker)
+    | _ -> assert false
+  in
   Op.sc_rollup_recover_bond
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit
@@ -1123,8 +1128,9 @@ let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of (get_source infos))
+    source
     sc_rollup
+    staker
 
 let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
   let published_level =

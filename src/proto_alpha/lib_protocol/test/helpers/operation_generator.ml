@@ -730,8 +730,9 @@ let generate_sc_rollup_execute_outbox_message =
 
 let generate_sc_rollup_recover_bond =
   let open QCheck2.Gen in
+  let* staker = random_pkh in
   let+ sc_rollup = random_sc_rollup in
-  Sc_rollup_recover_bond {sc_rollup}
+  Sc_rollup_recover_bond {sc_rollup; staker}
 
 (** {By Kind Operation Generator} *)
 

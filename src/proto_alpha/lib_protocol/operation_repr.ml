@@ -467,6 +467,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup_repr.t;
+      staker : Signature.public_key_hash;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
@@ -1293,12 +1294,19 @@ module Encoding = struct
         {
           tag = sc_rollup_operation_recover_bond_tag;
           name = "sc_rollup_recover_bond";
-          encoding = obj1 (req "rollup" Sc_rollup_repr.Address.encoding);
+          encoding =
+            obj2
+              (req "rollup" Sc_rollup_repr.Address.encoding)
+              (req "staker" Signature.Public_key_hash.encoding);
           select =
             (function
             | Manager (Sc_rollup_recover_bond _ as op) -> Some op | _ -> None);
-          proj = (function Sc_rollup_recover_bond {sc_rollup} -> sc_rollup);
-          inj = (fun sc_rollup -> Sc_rollup_recover_bond {sc_rollup});
+          proj =
+            (function
+            | Sc_rollup_recover_bond {sc_rollup; staker} -> (sc_rollup, staker));
+          inj =
+            (fun (sc_rollup, staker) ->
+              Sc_rollup_recover_bond {sc_rollup; staker});
         }
   end
 

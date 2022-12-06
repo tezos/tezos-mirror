@@ -1481,7 +1481,7 @@ let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
 
 let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~src_pk ~src_sk ~fee_parameter ~sc_rollup () =
+    ~src_pk ~src_sk ~fee_parameter ~sc_rollup ~staker () =
   let contents :
       Kind.sc_rollup_recover_bond Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager
@@ -1489,7 +1489,7 @@ let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_recover_bond {sc_rollup}))
+         (Sc_rollup_recover_bond {sc_rollup; staker}))
   in
   (* TODO/Fixme: https://gitlab.com/tezos/tezos/-/issues/2609
      Decide if we should enforce ~successor_level:true for simulation.

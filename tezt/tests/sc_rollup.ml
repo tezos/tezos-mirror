@@ -1870,7 +1870,7 @@ let attempt_withdraw_stake =
   let check_eq_int a b =
     Check.((a = b) int ~error_msg:"expected value %L, got %R")
   in
-  fun ?expect_failure ~sc_rollup client ->
+  fun ?expect_failure ~sc_rollup ?staker client ->
     (* placehoders *)
     (* TODO/Fixme:
         - Shoud provide the rollup operator key (bootstrap1_key) as an
@@ -1884,12 +1884,14 @@ let attempt_withdraw_stake =
       JSON.(constants |-> "sc_rollup_stake_amount" |> as_int)
     in
     let recover_bond_fee = 1_000_000 in
+    let staker = Option.value ~default:bootstrap1_key staker in
     let inject_op () =
       Client.Sc_rollup.submit_recover_bond
         ~hooks
         ~rollup:sc_rollup
         ~src:bootstrap1_key
         ~fee:(Tez.of_mutez_int recover_bond_fee)
+        ~staker
         client
     in
     match expect_failure with

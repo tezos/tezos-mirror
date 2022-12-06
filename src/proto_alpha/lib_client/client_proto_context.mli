@@ -968,6 +968,7 @@ val sc_rollup_recover_bond :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   sc_rollup:Sc_rollup.t ->
+  staker:public_key_hash ->
   unit ->
   (Tezos_crypto.Operation_hash.t
   * Kind.sc_rollup_recover_bond Kind.manager contents

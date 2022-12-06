@@ -1659,7 +1659,7 @@ module Sc_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [octez-client submit sc rollup recover bond to <sc_rollup> from <src>]. *)
+  (** Run [octez-client submit sc rollup recover bond of <staker> for <sc_rollup> from <src>]. *)
   val submit_recover_bond :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1668,6 +1668,7 @@ module Sc_rollup : sig
     ?hooks:Process.hooks ->
     rollup:string ->
     src:string ->
+    staker:string ->
     t ->
     unit Runnable.process
 
