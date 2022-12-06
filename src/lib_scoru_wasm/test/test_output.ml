@@ -75,8 +75,7 @@ let test_aux_write_output () =
     Host_funcs.Aux.read_input
       ~input_buffer
       ~memory
-      ~level_offset:4l
-      ~id_offset:10l
+      ~info_addr:4l
       ~dst:50l
       ~max_bytes:36000l
   in
@@ -128,9 +127,7 @@ let test_write_host_fun () =
       module_inst.memories
   in
   let module_inst = {module_inst with memories} in
-  let values =
-    Values.[Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l)]
-  in
+  let values = Values.[Num (I32 4l); Num (I32 50l); Num (I32 3600l)] in
 
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in

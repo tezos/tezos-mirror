@@ -109,7 +109,7 @@ let test_imports () =
       {|
         (module
           (import "%s" "%s"
-            (func $%s (param i32 i32 i32 i32) (result i32)))
+            (func $%s (param i32 i32 i32) (result i32)))
           (memory 1)
           (export "mem"(memory 0))
           (func (export "kernel_run")

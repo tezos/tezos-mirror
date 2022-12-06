@@ -1,6 +1,6 @@
 (module
 
- (type $read_t (func (param i32 i32 i32 i32) (result i32)))
+ (type $read_t (func (param i32 i32 i32) (result i32)))
  (type $write_t (func (param i32 i32) (result i32)))
  (type $store_w_t (func (param i32 i32 i32 i32 i32) (result i32)))
 
@@ -59,30 +59,33 @@
  (func $write_message (param $input_offset i32) (param $size i32)
        (local $internal i32)
        (local $external i32)
-       (local $input_header i32)
+       (local $message_tag i32)
+       (local $internal_transfer_tag i32)
        (local $payload_size i32)
 
-       (local.set $internal (i32.load16_u (i32.const 124)))
        (local.set $external (i32.load8_u (i32.const 126)))
-       (local.set $input_header
+       (local.set $internal (i32.load16_u (i32.const 124)))
+       (local.set $message_tag
+                  (i32.load8_u (local.get $input_offset)))
+       (local.set $internal_transfer_tag
                   (i32.load16_u (local.get $input_offset)))
        (local.set $payload_size
                   (call $internal_payload_size (local.get $size)))
 
        (if
-        (i32.eq (local.get $input_header) (local.get $internal))
+        (i32.eq (local.get $message_tag) (local.get $external))
         (then
-         (call $write_output ;;See comment for the internal message representation
-               (i32.add (local.get $input_offset) (i32.const 7))
-               (local.get $payload_size))
+         (call $write_output
+               (i32.add (local.get $input_offset) (i32.const 1)) ;;Remove the header
+               (i32.sub (local.get $size) (i32.const 1))) ;;Size without the header
          (drop))
         (else
          (if
-          (i32.eq (local.get $input_header) (local.get $external))
+          (i32.eq (local.get $internal_transfer_tag) (local.get $internal))
           (then
-           (call $write_output
-                 (i32.add (local.get $input_offset) (i32.const 1)) ;;Remove the header
-                 (i32.sub (local.get $size) (i32.const 1))) ;;Size without the header
+           (call $write_output ;;See comment for the internal message representation
+                 (i32.add (local.get $input_offset) (i32.const 7))
+                 (local.get $payload_size))
            (drop))
           )
          )
@@ -92,8 +95,7 @@
  (func (export "kernel_run")
        (local $size i32)
        (local.set $size (call $read_input
-                              (i32.const 220) ;; level_offset
-                              (i32.const 240) ;; id_offset
+                              (i32.const 220) ;; info_addr
                               (i32.const 260) ;; dst
                               (i32.const 3600))) ;; max_bytes
 

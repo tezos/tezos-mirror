@@ -109,6 +109,17 @@ let retrieve_memory memories =
   | Host_funcs.Available_memories _ ->
       crash_with "caller module must have exactly 1 memory instance"
 
+type read_input_info = {level : int32; id : int32}
+
+let read_input_info_encoding =
+  let open Data_encoding in
+  conv
+    (function {level; id} -> (level, id))
+    (fun (level, id) -> {level; id})
+    (obj2
+       (req "level" Data_encoding_utils.Little_endian.int32)
+       (req "id" Data_encoding_utils.Little_endian.int32))
+
 module Aux = struct
   module type S = sig
     type memory
@@ -137,8 +148,7 @@ module Aux = struct
     val read_input :
       input_buffer:Input_buffer.t ->
       memory:memory ->
-      level_offset:int32 ->
-      id_offset:int32 ->
+      info_addr:int32 ->
       dst:int32 ->
       max_bytes:int32 ->
       int32 Lwt.t
@@ -258,9 +268,6 @@ module Aux = struct
 
       let store_bytes mem addr data =
         guard @@ fun () -> M.store_bytes mem addr data
-
-      let store_num mem addr offset value =
-        guard @@ fun () -> M.store_num mem addr offset value
     end
 
     let load_key_from_memory key_offset key_length memory =
@@ -271,8 +278,7 @@ module Aux = struct
         let* key = M.load_bytes memory key_offset key_length in
         guard (fun () -> Lwt.return (Durable.key_of_string_exn key))
 
-    let read_input ~input_buffer ~memory ~level_offset ~id_offset ~dst
-        ~max_bytes =
+    let read_input ~input_buffer ~memory ~info_addr ~dst ~max_bytes =
       let open Lwt_result_syntax in
       let*! res =
         Lwt.catch
@@ -281,18 +287,25 @@ module Aux = struct
               Input_buffer.dequeue input_buffer
             in
             let input_size = Bytes.length payload in
-            let* () =
-              if input_size > input_output_max_size then
-                fail Error.Input_output_too_large
-              else return_unit
+            let input_size =
+              if
+                Tezos_webassembly_interpreter.I32.le_u
+                  max_bytes
+                  (Int32.of_int input_size)
+              then Int32.to_int max_bytes
+              else input_size
             in
-            let payload =
-              Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
-            in
+            (* [input_size] is at most 4,096 bytes (enforced by the protocol),
+               so [Bytes.sub] won't raise an exception. *)
+            let payload = Bytes.sub payload 0 input_size in
             let* () = M.store_bytes memory dst (Bytes.to_string payload) in
-            let* () = M.store_num memory level_offset 0l (I32 raw_level) in
             let* () =
-              M.store_num memory id_offset 0l (I64 (Z.to_int64 message_counter))
+              M.store_bytes
+                memory
+                info_addr
+                (Data_encoding.Binary.to_string_exn
+                   read_input_info_encoding
+                   {level = raw_level; id = Z.to_int32 message_counter})
             in
             return (Int32.of_int input_size))
           (fun exn ->
@@ -523,8 +536,7 @@ let value i = Values.(Num (I32 i))
 
 let read_input_type =
   let input_types =
-    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
-    |> Vector.of_list
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type] |> Vector.of_list
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
@@ -537,20 +549,13 @@ let read_input =
       let open Lwt.Syntax in
       match inputs with
       | [
-       Values.(Num (I32 level_offset));
-       Values.(Num (I32 id_offset));
+       Values.(Num (I32 info_addr));
        Values.(Num (I32 dst));
        Values.(Num (I32 max_bytes));
       ] ->
           let* memory = retrieve_memory memories in
           let* x =
-            Aux.read_input
-              ~input_buffer
-              ~memory
-              ~level_offset
-              ~id_offset
-              ~dst
-              ~max_bytes
+            Aux.read_input ~input_buffer ~memory ~info_addr ~dst ~max_bytes
           in
           Lwt.return (durable, [value x])
       | _ -> raise Bad_input)
