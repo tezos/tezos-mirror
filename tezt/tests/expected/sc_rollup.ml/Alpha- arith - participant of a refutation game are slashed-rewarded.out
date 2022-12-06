@@ -46,13 +46,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001044
+    Fee to the baker: ꜩ0.001023
     Expected counter: 1
     Gas limit: 7022
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001044
-      payload fees(the block proposer) ....... +ꜩ0.001044
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001023
+      payload fees(the block proposer) ....... +ꜩ0.001023
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
@@ -82,13 +82,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001067
+    Fee to the baker: ꜩ0.001046
     Expected counter: 1
     Gas limit: 7252
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001067
-      payload fees(the block proposer) ....... +ꜩ0.001067
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001046
+      payload fees(the block proposer) ....... +ꜩ0.001046
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
@@ -118,13 +118,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001033
+    Fee to the baker: ꜩ0.001012
     Expected counter: 2
     Gas limit: 7252
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001033
-      payload fees(the block proposer) ....... +ꜩ0.001033
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001012
+      payload fees(the block proposer) ....... +ꜩ0.001012
     Smart contract rollup refutation timeout:
       Address: [SC_ROLLUP_HASH]
       First staker (Alice): [PUBLIC_KEY_HASH]

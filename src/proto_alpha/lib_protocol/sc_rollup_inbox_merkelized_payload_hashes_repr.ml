@@ -116,7 +116,7 @@ let merkelized_and_payload_encoding =
         merkelized;
         payload = Sc_rollup_inbox_message_repr.unsafe_of_string payload;
       })
-    (merge_objs encoding (obj1 (req "payload" (string Plain))))
+    (merge_objs encoding (obj1 (req "payload" (string Hex))))
 
 module History = struct
   include

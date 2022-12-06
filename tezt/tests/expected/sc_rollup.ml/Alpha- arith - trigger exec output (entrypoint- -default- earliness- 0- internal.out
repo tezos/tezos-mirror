@@ -46,13 +46,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001242
+    Fee to the baker: ꜩ0.001221
     Expected counter: 1
     Gas limit: 5980
     Storage limit: 25 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001242
-      payload fees(the block proposer) ....... +ꜩ0.001242
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001221
+      payload fees(the block proposer) ....... +ꜩ0.001221
     Smart contract output message execution:
       Address: [SC_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]

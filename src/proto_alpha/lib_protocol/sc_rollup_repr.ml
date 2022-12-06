@@ -112,31 +112,6 @@ let description =
   "A smart contract rollup is identified by a base58 address starting with "
   ^ Address.prefix
 
-type error += (* `Permanent *) Invalid_sc_rollup_address of string
-
-let error_description =
-  Format.sprintf
-    "A smart contract rollup address must be a valid hash starting with '%s'."
-    Address.prefix
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"rollup.invalid_smart_contract_rollup_address"
-    ~title:"Invalid smart contract rollup address"
-    ~pp:(fun ppf x ->
-      Format.fprintf ppf "Invalid smart contract rollup address %S" x)
-    ~description:error_description
-    (obj1 (req "address" (string Plain)))
-    (function Invalid_sc_rollup_address loc -> Some loc | _ -> None)
-    (fun loc -> Invalid_sc_rollup_address loc)
-
-let of_b58check s =
-  match Base58.decode s with
-  | Some (Address.Data hash) -> ok hash
-  | _ -> Error (Format.sprintf "Invalid_sc_rollup_address %s" s)
-
 let pp = Address.pp
 
 let encoding =
@@ -145,19 +120,13 @@ let encoding =
     "rollup_address"
     ~title:"A smart contract rollup address"
     ~description
-    (conv_with_guard Address.to_b58check of_b58check (string Plain))
+    Address.encoding
 
 let rpc_arg =
-  let construct = Address.to_b58check in
-  let destruct hash =
-    Result.map_error (fun _ -> error_description) (of_b58check hash)
-  in
-  RPC_arg.make
+  RPC_arg.like
+    Address.rpc_arg
     ~descr:"A smart contract rollup address."
-    ~name:"sc_rollup_address"
-    ~construct
-    ~destruct
-    ()
+    "sc_rollup_address"
 
 let in_memory_size (_ : t) =
   let open Cache_memory_helpers in

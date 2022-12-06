@@ -314,7 +314,7 @@ let level_tree_proof_encoding =
        (req
           "proof"
           Sc_rollup_inbox_merkelized_payload_hashes_repr.proof_encoding)
-       (opt "payload" (string Plain)))
+       (opt "payload" (string Hex)))
 
 let add_protocol_internal_message payload payloads_history witness =
   Sc_rollup_inbox_merkelized_payload_hashes_repr.add_payload
