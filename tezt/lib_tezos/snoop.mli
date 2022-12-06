@@ -139,6 +139,7 @@ type tag =
   | Tickets
   | Big_map
   | Skip_list
+  | Sc_rollup
 
 type list_mode = All | Any | Exactly
 
