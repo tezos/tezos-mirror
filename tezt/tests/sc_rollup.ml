@@ -2806,6 +2806,13 @@ let test_refutation protocols ~kind =
           ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], []));
           ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], []));
           ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35]));
+          ("parallel_games_0", (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], []));
+          ( "parallel_games_1",
+            ( ["3 0 0"; "3 0 1"; "3 0 0"; "7 2 0"; "5 0 0"; "6 0 0"],
+              inputs_for 10,
+              200,
+              [],
+              [] ) );
         ]
     | "wasm_2_0_0" ->
         [
@@ -2821,6 +2828,19 @@ let test_refutation protocols ~kind =
           ("pvm_proof_2", (["7 7 22_000_002_000"], inputs_for 10, 80, [], []));
           (* During padding *)
           ("pvm_proof_3", (["7 7 22_010_000_000"], inputs_for 10, 80, [], []));
+          ( "parallel_games_0",
+            (["4 0 0"; "5 7 11_000_000_001"], inputs_for 10, 80, [], []) );
+          ( "parallel_games_1",
+            ( [
+                "4 0 0";
+                "7 7 22_000_002_000";
+                "7 7 22_000_002_000";
+                "7 7 22_010_000_000";
+              ],
+              inputs_for 10,
+              80,
+              [],
+              [] ) );
         ]
     | _ -> assert false
   in
