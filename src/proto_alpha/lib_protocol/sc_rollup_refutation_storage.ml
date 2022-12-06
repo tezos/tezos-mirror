@@ -76,34 +76,26 @@ let update_timeout ctxt rollup (game : Sc_rollup_game_repr.t) idx =
   let* ctxt, _ = Store.Game_timeout.update (ctxt, rollup) idx new_timeout in
   return ctxt
 
-let get_ongoing_game ctxt rollup staker1 staker2 =
-  let open Lwt_result_syntax in
-  let stakers = Sc_rollup_game_repr.Index.make staker1 staker2 in
-  let* ctxt, game =
-    let* ctxt, game_hash =
-      Store.Game.find ((ctxt, rollup), stakers.alice) stakers.bob
-    in
-    match game_hash with
-    | None -> return (ctxt, None)
-    | Some game_hash -> Store.Game_info.find (ctxt, rollup) game_hash
-  in
-  let answer = Option.map (fun game -> (game, stakers)) game in
-  return (answer, ctxt)
-
-let opponents ctxt rollup staker =
-  Store.Game.keys_unaccounted ((ctxt, rollup), staker)
-
 let get_ongoing_games_for_staker ctxt rollup staker =
   let open Lwt_result_syntax in
-  let*! opponents = opponents ctxt rollup staker in
-  List.fold_left_es
-    (fun (games, ctxt) opponent ->
-      let* game, ctxt = get_ongoing_game ctxt rollup staker opponent in
-      match game with
-      | None -> return (games, ctxt)
-      | Some game -> return (game :: games, ctxt))
-    ([], ctxt)
-    opponents
+  let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
+  let* ctxt, games =
+    List.fold_left_es
+      (fun (ctxt, games) (opponent, game_hash) ->
+        let* ctxt, answer = Store.Game_info.find (ctxt, rollup) game_hash in
+        match answer with
+        | None ->
+            (* A hash in [Store.Game] is always present in [Store.Game_info]. *)
+            assert false
+        | Some game ->
+            let games =
+              (game, Sc_rollup_game_repr.Index.make staker opponent) :: games
+            in
+            return (ctxt, games))
+      (ctxt, [])
+      entries
+  in
+  return (games, ctxt)
 
 (** [goto_inbox_level ctxt rollup inbox_level commit] Follows the predecessors of [commit] until it
     arrives at the exact [inbox_level]. The result is the commit hash at the given inbox level. *)
