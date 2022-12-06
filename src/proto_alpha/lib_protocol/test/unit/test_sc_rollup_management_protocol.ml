@@ -188,14 +188,20 @@ let test_encode_decode_external_inbox_message () =
   let* () = assert_prefix "A" in
   let* () = assert_prefix "0123456789" in
   let* () = assert_prefix (String.init 256 (Fun.const 'A')) in
+  let assert_encoding_success message =
+    let inbox_message = Sc_rollup.Inbox_message.External message in
+    let*! res = check_encode_decode_inbox_message inbox_message in
+    assert (Result.is_ok res) ;
+    return_unit
+  in
   let assert_encoding_failure message =
     let inbox_message = Sc_rollup.Inbox_message.External message in
     let*! res = check_encode_decode_inbox_message inbox_message in
     assert_encoding_failure ~loc:__LOC__ res
   in
   let max_msg_size = Constants_repr.sc_rollup_message_size_limit in
-  let message = String.init max_msg_size (Fun.const 'A') in
-  let* () = assert_encoding_failure message in
+  let message = String.init (max_msg_size - 1) (Fun.const 'A') in
+  let* () = assert_encoding_success message in
   let message = String.init max_msg_size (Fun.const 'b') in
   let* () = assert_encoding_failure message in
   assert_encoding_failure message

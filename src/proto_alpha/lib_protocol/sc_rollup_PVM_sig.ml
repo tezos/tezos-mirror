@@ -116,7 +116,7 @@ let reveal_data_encoding =
             "raw_data"
             (check_size
                Constants_repr.sc_rollup_message_size_limit
-               (string Hex))))
+               Variable.(string Hex))))
       (function Raw_data m -> Some ((), m) | _ -> None)
       (fun ((), m) -> Raw_data m)
   and case_metadata =
