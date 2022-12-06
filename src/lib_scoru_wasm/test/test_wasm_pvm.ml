@@ -794,7 +794,7 @@ let test_unkown_host_function_truncated () =
   (* The final reason for being stuck should be truncated after
      [Wasm_pvm_errors.messages_maximum_size]. *)
   let reason = String.sub reason 0 Wasm_pvm_errors.messages_maximum_size in
-  assert (is_stuck ~step:`Link ~reason state) ;
+  assert (is_stuck ~step:`No_fallback_link ~reason state) ;
   return_unit
 
 let test_bulk_noops () =
@@ -1073,8 +1073,8 @@ let test_reveal_upgrade_kernel_ok () =
   let*! () = assert_fallback_kernel tree @@ Some preimage in
   return_unit
 
-let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error invalid_kernel
-    () =
+let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error:_
+    invalid_kernel () =
   let open Lwt_result_syntax in
   let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
   (* Let's first init the tree to compute. *)
@@ -1087,63 +1087,53 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error invalid_kernel
   (* At this point, the kernel should be installed, but not as fallback *)
   let*! () = assert_kernel tree @@ Some modul in
   let*! () = assert_fallback_kernel tree None in
-  (* Run the kernel, it should request a preimage reveal *)
-  let*! tree = set_empty_inbox_step 0l tree in
-  let*! tree = eval_until_input_requested tree in
-  (* At this point, the kernel should be installed, including as fallback *)
-  let*! () = assert_kernel tree @@ Some modul in
-  let*! () = assert_fallback_kernel tree @@ Some modul in
-  (* Check that reveal is requested *)
-  let*! state_after_first_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  assert (not @@ is_stuck state_after_first_message) ;
-  let*! info = Wasm.get_info tree in
-  let* () =
-    let open Wasm_pvm_state in
-    match info.Wasm_pvm_state.input_request with
-    | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
-        (* The PVM has reached a point where it’s asking for some
-           preimage. Since the memory is left blank, we are looking
-           for the zero hash *)
-        let zero_hash = String.make 33 '\000' in
-        assert (hash = zero_hash) ;
-        return_unit
-    | No_input_required | Input_required | Reveal_required _ -> assert false
-  in
   let*! preimage =
     if binary then Lwt.return invalid_kernel else wat2wasm invalid_kernel
   in
-  let*! tree = Wasm.reveal_step (Bytes.of_string preimage) tree in
-  let*! tree = eval_until_input_requested tree in
-  let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
-  assert (not @@ is_stuck state_after_reveal) ;
-  (* At this point, the new_kernel should be installed, the old as fallback *)
-  let*! () = assert_kernel tree @@ Some preimage in
-  let*! () = assert_fallback_kernel tree @@ Some modul in
-  (* run until proper input requested *)
-  let*! tree = eval_until_input_requested tree in
-  let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
-  assert (not @@ is_stuck state_after_reveal) ;
-  (* At this point, the new_kernel should be installed, including as fallback *)
-  let*! () = assert_kernel tree @@ Some preimage in
-  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* Run the kernel, it should request a preimage reveal *)
+  let run_installer tree level =
+    let*! tree = set_empty_inbox_step level tree in
+    let*! tree = eval_until_input_requested tree in
+    (* At this point, the kernel should be installed, including as fallback *)
+    let*! () = assert_kernel tree @@ Some modul in
+    let*! () = assert_fallback_kernel tree @@ Some modul in
+    (* Check that reveal is requested *)
+    let*! state_after_first_message =
+      Wasm.Internal_for_tests.get_tick_state tree
+    in
+    assert (not @@ is_stuck state_after_first_message) ;
+    let*! info = Wasm.get_info tree in
+    let* () =
+      let open Wasm_pvm_state in
+      match info.Wasm_pvm_state.input_request with
+      | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
+          (* The PVM has reached a point where it’s asking for some
+             preimage. Since the memory is left blank, we are looking
+             for the zero hash *)
+          let zero_hash = String.make 33 '\000' in
+          assert (hash = zero_hash) ;
+          return_unit
+      | No_input_required | Input_required | Reveal_required _ -> assert false
+    in
+    let*! tree = Wasm.reveal_step (Bytes.of_string preimage) tree in
+    let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
+    assert (not @@ is_stuck state_after_reveal) ;
+    let*! tree = eval_until_input_requested tree in
+    let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
+    assert (not @@ is_stuck state_after_reveal) ;
+    (* At this point, the new_kernel should be installed, including as fallback *)
+    let*! () = assert_kernel tree @@ Some preimage in
+    let*! () = assert_fallback_kernel tree @@ Some modul in
+    Lwt.return_ok tree
+  in
+  let* tree = run_installer tree 0l in
   (* run with new input, this should be the new kernel *)
   let*! tree = set_empty_inbox_step 2l tree in
   let*! tree = eval_until_input_requested tree in
   let*! state_after_second_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
-  (* The pvm should be temporarily stuck *)
-  assert (is_stuck ~step:error state_after_second_message) ;
-  (* The kernel is set to the invalid one *)
-  let*! () = assert_kernel tree @@ Some preimage in
-  let*! () = assert_fallback_kernel tree @@ Some modul in
-  (* Running the kernel one more tick should result in fallback *)
-  let*! tree = Wasm.compute_step tree in
-  let*! post_stuck_state = Wasm.Internal_for_tests.get_tick_state tree in
-  assert (not @@ is_stuck post_stuck_state) ;
-  (* The kernel is set to the invalid one *)
+  assert (not @@ is_stuck state_after_second_message) ;
   let*! () = assert_kernel tree @@ Some modul in
   let*! () = assert_fallback_kernel tree @@ Some modul in
   return_unit

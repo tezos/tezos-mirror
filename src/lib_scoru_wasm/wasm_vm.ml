@@ -386,6 +386,10 @@ let compute_step pvm_state =
 
 let input_request pvm_state =
   match pvm_state.tick_state with
+  | Stuck (Decode_error _ | Init_error _ | Link_error _) ->
+      (* These stuck states are recovered on the next tick by
+         the fallback mechanism. *)
+      Wasm_pvm_state.No_input_required
   | Stuck _ -> Wasm_pvm_state.Input_required
   | Snapshot -> Wasm_pvm_state.No_input_required
   | Collect -> Wasm_pvm_state.Input_required

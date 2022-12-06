@@ -237,8 +237,20 @@ let check_error ?expected_kind ?expected_reason error =
   match (expected_kind, error) with
   | Some `Decode, Wasm_pvm_errors.Decode_error {explanation; _} ->
       check_reason explanation
+  | ( Some `No_fallback_decode,
+      Wasm_pvm_errors.No_fallback_kernel
+        (Wasm_pvm_errors.Decode_cause {explanation; _}) ) ->
+      check_reason explanation
   | Some `Init, Init_error {explanation; _} -> check_reason explanation
+  | ( Some `No_fallback_init,
+      Wasm_pvm_errors.No_fallback_kernel
+        (Wasm_pvm_errors.Init_cause {explanation; _}) ) ->
+      check_reason explanation
   | Some `Link, Link_error explanation -> check_reason (Some explanation)
+  | ( Some `No_fallback_link,
+      Wasm_pvm_errors.No_fallback_kernel
+        (Wasm_pvm_errors.Link_cause explanation) ) ->
+      check_reason (Some explanation)
   | Some `Eval, Eval_error {explanation; _} -> check_reason explanation
   | Some `Invalid_state, Invalid_state explanation ->
       check_reason (Some explanation)

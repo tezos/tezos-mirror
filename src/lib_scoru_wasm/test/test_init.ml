@@ -38,7 +38,7 @@ let test_memory0_export () =
   let* stuck, _ = eval_until_stuck bad_module_tree in
   assert (
     check_error
-      ~expected_kind:`Init
+      ~expected_kind:`No_fallback_init
       ~expected_reason:"Module must export memory 0"
       stuck) ;
 
@@ -92,7 +92,7 @@ let test_module_name_size () =
   let* stuck, _ = eval_until_stuck bad_module_tree in
   assert (
     check_error
-      ~expected_kind:`Decode
+      ~expected_kind:`No_fallback_decode
       ~expected_reason:"Names cannot exceed 512 bytes"
       stuck) ;
   let*! good_module_tree = initial_tree (build_module 512) in
@@ -136,6 +136,12 @@ let test_imports () =
         ~module_name:bad_module_name
         ~item_name:bad_item_name
     in
+    let expected_error =
+      match expected_error with
+      | Wasm_pvm_errors.(Link_error e) ->
+          Wasm_pvm_errors.(No_fallback_kernel (Link_cause e))
+      | _ -> assert false
+    in
     if stuck = expected_error then return_unit
     else failwith "Unexpected stuck state!"
   in
@@ -152,6 +158,12 @@ let test_imports () =
         `Item
         ~module_name:good_module_name
         ~item_name:bad_item_name
+    in
+    let expected_error =
+      match expected_error with
+      | Wasm_pvm_errors.(Link_error e) ->
+          Wasm_pvm_errors.(No_fallback_kernel (Link_cause e))
+      | _ -> assert false
     in
     if stuck = expected_error then return_unit
     else failwith "Unexpected stuck state!"
@@ -192,7 +204,7 @@ let test_host_func_start_restriction () =
   let+ stuck, _ = eval_until_stuck state in
   assert (
     check_error
-      ~expected_kind:`Init
+      ~expected_kind:`No_fallback_init
       ~expected_reason:
         "host functions must not access memory during initialisation"
       stuck)
@@ -274,7 +286,7 @@ let test_float32_type () =
   Format.printf "%a\n%!" pp_state (Stuck stuck) ;
   assert (
     check_error
-      ~expected_kind:`Decode
+      ~expected_kind:`No_fallback_decode
       ~expected_reason:"float instructions are forbidden"
       stuck)
 
@@ -299,7 +311,7 @@ let test_float64_type () =
   Format.printf "%a\n%!" pp_state (Stuck stuck) ;
   assert (
     check_error
-      ~expected_kind:`Decode
+      ~expected_kind:`No_fallback_decode
       ~expected_reason:"float instructions are forbidden"
       stuck)
 
@@ -325,7 +337,7 @@ let test_float_value () =
   Format.printf "%a\n%!" pp_state (Stuck stuck) ;
   assert (
     check_error
-      ~expected_kind:`Decode
+      ~expected_kind:`No_fallback_decode
       ~expected_reason:"float instructions are forbidden"
       stuck)
 
