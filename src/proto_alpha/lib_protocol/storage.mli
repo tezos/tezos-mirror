@@ -860,7 +860,7 @@ module Sc_rollup : sig
        and type value = Sc_rollup_game_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** Refutation games are indexed by the rollup, by the one staker, and
+  (** Refutation games are indexed by the rollup, by one staker, and
       by its opponent staker. Hence, each game appears twice. This is
       convenient to quickly compute the opponents of a given staker. *)
   module Game :
