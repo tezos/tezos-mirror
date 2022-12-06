@@ -158,15 +158,16 @@ module Legacy = struct
     end
   end
 
-  let encode enc v =
-    Data_encoding.Binary.to_string enc v
-    |> Result.map_error (fun e ->
-           [Tezos_base.Data_encoding_wrapper.Encoding_error e])
+  let encode_exn encoding value =
+    Data_encoding.Binary.to_string_exn encoding value
+
+  let decode encoding string =
+    Data_encoding.Binary.of_string_opt encoding string
 
   let add_slot_by_commitment node_store slot commitment =
     let open Lwt_syntax in
     let path = Path.Commitment.slot commitment in
-    let encoded_slot = Bytes.to_string slot in
+    let encoded_slot = encode_exn Data_encoding.bytes slot in
     let* () = set ~msg:"Slot stored" node_store.slots_store path encoded_slot in
     let* () = Event.(emit stored_slot_content commitment) in
     Lwt_watcher.notify node_store.slots_watcher commitment ;
@@ -186,7 +187,7 @@ module Legacy = struct
     let open Lwt_syntax in
     let path = Path.Commitment.slot commitment in
     let* res_opt = find node_store.slots_store path in
-    Option.map Bytes.of_string res_opt |> Lwt.return
+    Option.bind res_opt (decode Data_encoding.bytes) |> Lwt.return
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4383
      Remove legacy code once migration to new API is done. *)
