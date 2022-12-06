@@ -396,7 +396,9 @@ let input_request pvm_state =
   | _ -> Wasm_pvm_state.No_input_required
 
 let is_top_level_padding pvm_state =
-  eval_has_finished pvm_state.tick_state && not (is_time_for_snapshot pvm_state)
+  match pvm_state.tick_state with
+  | Padding -> not @@ is_time_for_snapshot pvm_state
+  | _ -> false
 
 let measure_executed_ticks (transition : pvm_state -> pvm_state Lwt.t)
     (initial_state : pvm_state) : (pvm_state * int64) Lwt.t =
