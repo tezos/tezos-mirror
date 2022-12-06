@@ -1,9 +1,8 @@
 # You can set these variables from the command line.
 SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
-SPHINXPROJ    = Tezos
 SOURCEDIR     = .
-TMPDOCDIR        = /tmp/tezosdoc
+TMPDOCDIR        = /tmp/octezdoc
 BUILDDIR      = _build
 TOPBUILDDIR   = ../_build/default
 
@@ -22,8 +21,8 @@ kathmandu_long = PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg
 lima_long     = PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-kathmandu_short = 014-PtKathma
-lima_short    = 015-PtLimaPt
+kathmandu_short = PtKathma
+lima_short    = PtLimaPt
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -203,4 +202,4 @@ lint: pylint pycodestyle lint_black
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html kathmandu/tezos-*.html lima/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt active/octez-*.html kathmandu/octez-*.html lima/octez-*.html alpha/octez-*.html

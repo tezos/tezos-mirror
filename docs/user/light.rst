@@ -104,7 +104,7 @@ Then upgrade the node to protocol alpha:
 
 ::
 
-    $ tezos-activate-alpha  # Triggers output in terminal of first node
+    $ octez-activate-alpha  # Triggers output in terminal of first node
     $ octez-client bake for bootstrap1  # Triggers output in terminal of first node
 
 To avoid warnings being printed in upcoming commands (optional):

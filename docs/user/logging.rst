@@ -203,7 +203,7 @@ Environment Variables
 The logging framework can be configured with environment variables
 before starting the node. Those variables work on all the code using the
 ``tezos-stdlib-unix`` library as long as ``Internal_event_unix.init`` is
-called; this should include *all* the regular ``tezos-*`` binaries.
+called; this should include *all* the regular ``octez-*`` binaries.
 
 -  ``TEZOS_EVENTS_CONFIG`` must be a whitespace-separated list of URIs:
 

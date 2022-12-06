@@ -101,7 +101,7 @@ Node
   sections: ``validator.chain``, ``validator.peer``, ``prevalidator``
   and ``validator.block``. Section ``node.chain_validator`` is merged
   into ``validator.chain`` for consistency reasons. Those events see
-  their JSON reprensentation shortened, with no duplicated
+  their JSON representation shortened, with no duplicated
   information. e.g.  ``validator.peer`` events were named
   ``validator.peer.v0`` at top-level and had an ``event`` field with a
   ``name`` field containing the actual event name, for example

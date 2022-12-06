@@ -1,11 +1,11 @@
-tezos-baker.html
-tezos-accuser.html
-tezos-endorser.html
-tezos-client.html
-/api/tezos-snoop.html
-/api/tezos-codec.html
-/api/tezos-admin-client.html
-/api/tezos-signer.html
+octez-baker.html
+octez-accuser.html
+octez-endorser.html
+octez-client.html
+/api/octez-snoop.html
+/api/octez-codec.html
+/api/octez-admin-client.html
+/api/octez-signer.html
 
 /alpha/rpc.rst
 /shell/rpc.rst

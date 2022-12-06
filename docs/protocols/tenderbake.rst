@@ -275,19 +275,19 @@ The baker daemon takes the same options as in Hangzhou.
 Client
 ------
 
-The command ``tezos-client bake for`` has been changed:
+The command ``octez-client bake for`` has been changed:
 
 - It takes a (possibly empty) list of delegate references. It then bakes a block and (pre)endorses this block, using the rights of all the specified delegates. When the list is empty is does so for all delegates whose secret keys are known.
 - It performs a full consensus round: it "proposes" a block (that is, it injects a block candidate), it preendorses the block, and it endorses the block, if possible.
 
 The following commands have been added:
 
-- ``tezos-client propose for``: forge and inject a candidate block (a `proposal`).
+- ``octez-client propose for``: forge and inject a candidate block (a `proposal`).
 
-- ``tezos-client preendorse for``: forge and inject a preendorsement operation.
+- ``octez-client preendorse for``: forge and inject a preendorsement operation.
 
-- ``tezos-client endorse for``: forge and inject an endorsement operation.
+- ``octez-client endorse for``: forge and inject an endorsement operation.
 
-- ``tezos-client set deposits limit for <src> to <deposits_limit>``: sets the deposits limit for a registered delegate.
+- ``octez-client set deposits limit for <src> to <deposits_limit>``: sets the deposits limit for a registered delegate.
 
-- ``tezos-client unset deposits limit for <src>``: remove the deposits limit of a registered delegate.
+- ``octez-client unset deposits limit for <src>``: remove the deposits limit of a registered delegate.

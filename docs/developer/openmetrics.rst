@@ -61,7 +61,7 @@ source - using adequate values:
 
 ::
 
-  - job_name: 'tezos-metrics'
+  - job_name: 'octez-metrics'
       scheme: http
       static_configs:
         - targets: ['localhost:9091']
