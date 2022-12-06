@@ -3295,8 +3295,8 @@ module Unsafe = struct
 
   let restore_from_snapshot ?(notify = fun () -> Lwt.return_unit) store_dir
       ~genesis ~genesis_context_hash ~floating_blocks_stream
-      ~new_head_with_metadata ~new_head_resulting_context_hash ~protocol_levels
-      ~history_mode =
+      ~new_head_with_metadata ~new_head_resulting_context_hash
+      ~predecessor_header ~protocol_levels ~history_mode =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
@@ -3384,13 +3384,36 @@ module Unsafe = struct
       Block_store.load chain_dir ~genesis_block ~readonly:false
     in
     (* Store the floating (in the correct order!) *)
-    (* No context under the head will be accessible: we do not need
-       to store consistent resulting_context_hash *)
+    let predecessor_block_hash = Block_header.hash predecessor_header in
     let*! () =
       Lwt_stream.iter_s
         (fun block ->
-          let*! _ =
-            Block_store.store_block block_store block Context_hash.zero
+          let hash = Block_repr.hash block in
+          let*! (_ : unit tzresult) =
+            (* Depending on the block's context hash semantic, we
+               store the right context hash for the predecessor of
+               the imported block so that the invariant which states
+               that the savepoint can be the target of a snapshot
+               export is maintained. This is needed only when the
+               block contains the resulting context hash.
+               For other blocks, and as their contexts won't be
+               accessible, we do not need to store consistent
+               resulting context hash. *)
+            if Block_hash.equal predecessor_block_hash hash then
+              let predecessor_context_hash =
+                match
+                  Protocol_levels.find
+                    predecessor_header.shell.proto_level
+                    protocol_levels
+                with
+                | None -> Stdlib.failwith "unknown protocol"
+                | Some {Protocol_levels.expect_predecessor_context; _} ->
+                    if expect_predecessor_context then
+                      Block_repr.context new_head_with_metadata
+                    else predecessor_header.Block_header.shell.context
+              in
+              Block_store.store_block block_store block predecessor_context_hash
+            else Block_store.store_block block_store block Context_hash.zero
           in
           notify ())
         floating_blocks_stream

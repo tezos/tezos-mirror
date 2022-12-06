@@ -4007,6 +4007,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~new_head_with_metadata
             ~new_head_resulting_context_hash:
               validation_store.resulting_context_hash
+            ~predecessor_header:block_data.predecessor_header
             ~protocol_levels
             ~history_mode)
     in
