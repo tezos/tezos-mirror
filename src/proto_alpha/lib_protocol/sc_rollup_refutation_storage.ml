@@ -209,6 +209,43 @@ let get_game ctxt rollup stakers =
   | Some g -> return (g, ctxt)
   | None -> tzfail Sc_rollup_no_game
 
+let create_game ctxt rollup stakers game =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr.Index in
+  let* ctxt, _ =
+    Store.Game.init ((ctxt, rollup), stakers.alice) stakers.bob game
+  in
+  (*
+     We assume that {!Store} implements a form of maximal sharing so
+     that [game] is actually shared between the two entries.
+  *)
+  let* ctxt, _ =
+    Store.Game.init ((ctxt, rollup), stakers.bob) stakers.alice game
+  in
+  return ctxt
+
+let update_game ctxt rollup stakers new_game =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr.Index in
+  let* ctxt, _storage_diff =
+    Store.Game.update ((ctxt, rollup), stakers.alice) stakers.bob new_game
+  in
+  let* ctxt, _storage_diff =
+    Store.Game.update ((ctxt, rollup), stakers.bob) stakers.alice new_game
+  in
+  return ctxt
+
+let remove_game ctxt rollup stakers =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr.Index in
+  let* ctxt, _, _ =
+    Store.Game.remove ((ctxt, rollup), stakers.alice) stakers.bob
+  in
+  let* ctxt, _, _ =
+    Store.Game.remove ((ctxt, rollup), stakers.bob) stakers.alice
+  in
+  return ctxt
+
 (** [start_game ctxt rollup refuter defender] initialises the game or
     if it already exists fails with `Sc_rollup_game_already_started`.
 
@@ -285,16 +322,7 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
       ~defender
       ~default_number_of_sections
   in
-  let* ctxt, _ =
-    Store.Game.init ((ctxt, rollup), stakers.alice) stakers.bob game
-  in
-  (*
-     We assume that {!Store} implements a form of maximal sharing so
-     that [game] is actually shared between the two entries.
-  *)
-  let* ctxt, _ =
-    Store.Game.init ((ctxt, rollup), stakers.bob) stakers.alice game
-  in
+  let* ctxt = create_game ctxt rollup stakers game in
   let* ctxt, _ =
     Store.Game_timeout.init (ctxt, rollup) stakers (initial_timeout ctxt)
   in
@@ -345,12 +373,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
       match move_result with
       | Either.Left game_result -> return (Some game_result, ctxt)
       | Either.Right new_game ->
-          let* ctxt, _ =
-            Store.Game.update
-              ((ctxt, rollup), stakers.alice)
-              stakers.bob
-              new_game
-          in
+          let* ctxt = update_game ctxt rollup stakers new_game in
           let* ctxt = update_timeout ctxt rollup game stakers in
           return (None, ctxt))
 
@@ -420,12 +443,7 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
           if Signature.Public_key_hash.(alice = loser) then bob else alice
         in
         let* ctxt, balance_updates_winner = reward ctxt winning_staker in
-        let* ctxt, _, _ =
-          Store.Game.remove ((ctxt, rollup), stakers.alice) stakers.bob
-        in
-        let* ctxt, _, _ =
-          Store.Game.remove ((ctxt, rollup), stakers.bob) stakers.alice
-        in
+        let* ctxt = remove_game ctxt rollup stakers in
         let* ctxt, balance_updates_loser =
           Stake_storage.remove_staker ctxt rollup losing_staker
         in
