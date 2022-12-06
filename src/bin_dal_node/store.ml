@@ -70,136 +70,89 @@ let init config =
   let* () = Event.(emit store_is_ready ()) in
   Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
 
-module Legacy_paths : sig
-  type path = string list
+module Path : sig
+  type t = string list
 
-  val slot_by_commitment : string -> path
+  module Commitment : sig
+    val slot : Cryptobox.commitment -> Path.t
 
-  val slot_id_by_commitment : string -> Services.Types.slot_id -> path
+    val headers : Cryptobox.commitment -> Path.t
 
-  val slot_shards_by_commitment : string -> path
+    val header : Cryptobox.commitment -> Services.Types.slot_id -> Path.t
 
-  val slot_shard_by_commitment : string -> int -> path
+    val shards : Cryptobox.commitment -> Path.t
 
-  val successfully_included_slot_header_in_l1 :
-    published_level:Services.Types.level ->
-    slot_index:Services.Types.slot_index ->
-    path * path
+    type shard_index := int
 
-  val other_slot_header_in_l1 :
-    published_level:Services.Types.level ->
-    slot_index:Services.Types.slot_index ->
-    commitment:string ->
-    path
-end = struct
-  module Path_internals = struct
-    type internal = [`Internal]
-
-    type any = [internal | `Any]
-
-    type _ path =
-      | Root : string -> internal path
-      | Internal : {prefix : internal path; ext : string} -> internal path
-      | Leaf : {
-          prefix : internal path;
-          ext : string list;
-          is_collection : bool;
-        }
-          -> any path
-
-    let root = Root "slots"
-
-    let mk_internal prefix ext = Internal {prefix; ext}
-
-    let mk_leaf ?(is_collection = true) prefix ext =
-      Leaf {prefix; ext; is_collection}
-
-    let slot_by_commitment commitment = mk_internal root commitment
-
-    let slot_ids_by_commitment commitment =
-      mk_internal (slot_by_commitment commitment) "slot_ids"
-
-    let slot_id_by_commitment commitment slot_id =
-      let {Services.Types.slot_level; slot_index} = slot_id in
-      mk_leaf
-        ~is_collection:false
-        (slot_ids_by_commitment commitment)
-        [Int32.to_string slot_level; Int.to_string slot_index]
-
-    let slot_shards_by_commitment commitment =
-      mk_internal (slot_by_commitment commitment) "shards"
-
-    let slot_shard_by_commitment commitment index =
-      mk_leaf (slot_shards_by_commitment commitment) [string_of_int index]
-
-    let included_slot_header_in_l1 level slot_index =
-      let mk a b = mk_internal b a in
-      mk "levels" root
-      |> mk (Int32.to_string level)
-      |> mk "slot_index"
-      |> mk (string_of_int slot_index)
-
-    let successfully_included_slot_header_in_l1 published_level slot_index =
-      let shared =
-        mk_internal
-          (included_slot_header_in_l1 published_level slot_index)
-          "accepted"
-      in
-      ( mk_leaf ~is_collection:false shared ["commitment"],
-        mk_leaf ~is_collection:false shared ["status"] )
-
-    let other_slot_header_in_l1 published_level slot_index commitment =
-      mk_leaf
-        ~is_collection:false
-        (mk_internal
-           (included_slot_header_in_l1 published_level slot_index)
-           "others")
-        [commitment]
-
-    let data_path (type a) (p : a path) =
-      let rec path (p : internal path) acc =
-        match p with
-        | Root s -> s :: acc
-        | Internal {prefix; ext} -> path prefix (ext :: acc)
-      in
-      let prefix, is_collection, ext =
-        match p with
-        | (Root _ | Internal _) as p -> ((p : internal path), false, None)
-        | Leaf {prefix; ext; is_collection} -> (prefix, is_collection, Some ext)
-      in
-      let acc =
-        match (ext, is_collection) with
-        | None, _ -> ["data"]
-        | Some ext, true -> "data" :: ext
-        | Some ext, false -> ext @ ["data"]
-      in
-      path prefix acc
+    val shard : Cryptobox.commitment -> shard_index -> Path.t
   end
 
-  type path = string list
+  module Level : sig
+    val accepted_header_commitment : Services.Types.slot_id -> Path.t
 
-  let slot_by_commitment c = Path_internals.(data_path @@ slot_by_commitment c)
+    val accepted_header_status : Services.Types.slot_id -> Path.t
 
-  let slot_id_by_commitment c slot_id =
-    Path_internals.(data_path @@ slot_id_by_commitment c slot_id)
+    val other_header_status :
+      Services.Types.slot_id -> Cryptobox.commitment -> Path.t
+  end
+end = struct
+  type t = string list
 
-  let slot_shard_by_commitment c index =
-    Path_internals.(data_path @@ slot_shard_by_commitment c index)
+  let ( / ) b a = a :: b
 
-  let slot_shards_by_commitment c =
-    Path_internals.(data_path @@ slot_shards_by_commitment c)
+  module Commitment = struct
+    let root = ["commitments"]
 
-  let successfully_included_slot_header_in_l1 ~published_level ~slot_index =
-    let commitment, status =
-      Path_internals.successfully_included_slot_header_in_l1
-        published_level
-        slot_index
-    in
-    Path_internals.(data_path @@ commitment, data_path @@ status)
+    (* FIXME: should be indexed by the cryptographic constants
+       'slot_size'. *)
+    let slot commitment =
+      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+      root / commitment_repr / "slot"
 
-  let other_slot_header_in_l1 ~published_level ~slot_index ~commitment =
-    Path_internals.(
-      data_path @@ other_slot_header_in_l1 published_level slot_index commitment)
+    let headers commitment =
+      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+      root / commitment_repr / "headers"
+
+    let header commitment index =
+      let open Services.Types in
+      let prefix = headers commitment in
+      prefix / Int32.to_string index.slot_level / Int.to_string index.slot_index
+
+    let shards commitment =
+      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+      root / commitment_repr / "shards"
+
+    (* FIXME: should be indexed by the cryptographic constants
+       'number of shards' and 'redundant factor'. *)
+    let shard commitment index =
+      let prefix = headers commitment in
+      prefix / Int.to_string index
+  end
+
+  module Level = struct
+    let root = ["levels"]
+
+    let headers index =
+      let open Services.Types in
+      root / Int32.to_string index.slot_level / Int.to_string index.slot_index
+
+    let accepted_header index =
+      let prefix = headers index in
+      prefix / "accepted"
+
+    let accepted_header_commitment index =
+      let prefix = accepted_header index in
+      prefix / "commitment"
+
+    let accepted_header_status index =
+      let prefix = accepted_header index in
+      prefix / "status"
+
+    let other_header_status index commitment =
+      let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
+      let prefix = headers index in
+      prefix / "others" / commitment_repr / "status"
+  end
 end
 
 module Legacy = struct
@@ -210,30 +163,26 @@ module Legacy = struct
 
   let add_slot_by_commitment node_store slot commitment =
     let open Lwt_syntax in
-    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
-    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    let path = Path.Commitment.slot commitment in
     let encoded_slot = Bytes.to_string slot in
     let* () = set ~msg:"Slot stored" node_store.slots_store path encoded_slot in
-    let* () = Event.(emit stored_slot_content commitment_b58) in
+    let* () = Event.(emit stored_slot_content commitment) in
     Lwt_watcher.notify node_store.slots_watcher commitment ;
     return_unit
 
   let associate_slot_id_with_commitment node_store commitment slot_id =
     let open Lwt_syntax in
-    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
-    let path = Legacy_paths.slot_id_by_commitment commitment_b58 slot_id in
+    let path = Path.Commitment.header commitment slot_id in
     let* () = set ~msg:"Slot id stored" node_store.slots_store path "" in
     return_unit
 
   let exists_slot_by_commitment node_store commitment =
-    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
-    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    let path = Path.Commitment.slot commitment in
     mem node_store.slots_store path
 
   let find_slot_by_commitment node_store commitment =
     let open Lwt_syntax in
-    let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
-    let path = Legacy_paths.slot_by_commitment commitment_b58 in
+    let path = Path.Commitment.slot commitment in
     let* res_opt = find node_store.slots_store path in
     Option.map Bytes.of_string res_opt |> Lwt.return
 
@@ -271,14 +220,15 @@ module Legacy = struct
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
         in
+        (* TODO: This is a bit weird to use b58 and not the binary encoding here. *)
         let commitment_b58 = Cryptobox.Commitment.to_b58check commitment in
         match status with
         | Dal_plugin.Succeeded ->
-            let commitment_path, status_path =
-              Legacy_paths.successfully_included_slot_header_in_l1
-                ~published_level
-                ~slot_index
+            let index =
+              Services.Types.{slot_level = published_level; slot_index}
             in
+            let commitment_path = Path.Level.accepted_header_commitment index in
+            let status_path = Path.Level.accepted_header_status index in
             let* () =
               set
                 ~msg:"add_slot_headers:success:commitment"
@@ -293,12 +243,10 @@ module Legacy = struct
               (Services.Types.header_attestation_status_to_string
                  `Waiting_for_attestations)
         | Dal_plugin.Failed ->
-            let path =
-              Legacy_paths.other_slot_header_in_l1
-                ~published_level
-                ~slot_index
-                ~commitment:commitment_b58
+            let index =
+              Services.Types.{slot_level = published_level; slot_index}
             in
+            let path = Path.Level.other_header_status index commitment in
             set
               ~msg:"add_slot_headers:others:status"
               slots_store

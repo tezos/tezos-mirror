@@ -31,4 +31,4 @@ let stored_slot_content =
     ~name:"stored_slot_content"
     ~msg:"Slot stored: commitment {commitment}"
     ~level:Notice
-    ("commitment", Data_encoding.string)
+    ("commitment", Cryptobox.Commitment.encoding)
