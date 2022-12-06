@@ -1628,14 +1628,6 @@ module Sc_rollup = struct
           key ->
           value option ->
           (Raw_context.t * int * bool) tzresult Lwt.t
-
-        val is_empty : context -> bool Lwt.t
-
-        val list_key_values :
-          ?offset:int ->
-          ?length:int ->
-          context ->
-          (Raw_context.t * (key * value) list) tzresult Lwt.t
       end) =
   struct
     include Data_storage
@@ -1661,14 +1653,6 @@ module Sc_rollup = struct
 
     let add_or_remove ctxt key value =
       add_or_remove ctxt key (Option.map Versioned_value.to_versioned value)
-
-    let list_key_values ?offset ?length ctxt =
-      let open Lwt_result_syntax in
-      let* ctxt, values = list_key_values ?offset ?length ctxt in
-      let values =
-        List.map (fun (k, v) -> (k, Versioned_value.of_versioned v)) values
-      in
-      return (ctxt, values)
   end
 
   module PVM_kind =
