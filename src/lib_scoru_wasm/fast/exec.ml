@@ -28,6 +28,8 @@ open Tezos_scoru_wasm
 module Wasmer = Tezos_wasmer
 module Lazy_containers = Tezos_lazy_containers
 
+include (Wasm_vm : Wasm_vm_sig.S)
+
 let store =
   Lazy.from_fun @@ fun () ->
   let engine = Wasmer.Engine.create Wasmer.Config.{compiler = SINGLEPASS} in
@@ -73,7 +75,8 @@ let compute builtins durable buffers =
 
   Wasmer.Instance.delete instance ;
 
+  let* durable = Wasm_vm.patch_flags_on_eval_successful host_state.durable in
   (* TODO: #4283
      The module is cached, but the cash is never cleaned.
      This is the point where it was scrubed before.*)
-  Lwt.return host_state.durable
+  Lwt.return durable

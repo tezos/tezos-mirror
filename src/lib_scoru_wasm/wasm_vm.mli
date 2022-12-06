@@ -49,6 +49,11 @@ val compute_step_many_until :
     finished successfully. *)
 val eval_has_finished : tick_state -> bool
 
+(** [patch_flags_on_eval_successful durable] clears flags set by
+    previous attempted runs of kernel_run. Once an evaluation has
+    succeeded, these can be safely deleted. *)
+val patch_flags_on_eval_successful : Durable.t -> Durable.t Lwt.t
+
 (** [should_compute pvm_state] probes whether it is possible to continue with
     more computational steps. *)
 val should_compute : pvm_state -> bool

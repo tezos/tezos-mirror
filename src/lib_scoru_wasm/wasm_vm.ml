@@ -63,6 +63,24 @@ let has_upgrade_error_flag durable =
   let+ error = Durable.(find_value durable Constants.upgrade_error_flag_key) in
   Option.is_some error
 
+let patch_flags_on_eval_successful durable =
+  let open Lwt_syntax in
+  (* We have an empty set of admin instructions, but need to wait until we can restart *)
+  let* has_stuck_flag = has_stuck_flag durable in
+  let* durable =
+    if has_stuck_flag then
+      Durable.(delete ~edit_readonly:true durable Constants.stuck_flag_key)
+    else Lwt.return durable
+  in
+  let* has_upgrade_error_flag = has_upgrade_error_flag durable in
+  let+ durable =
+    if has_upgrade_error_flag then
+      Durable.(
+        delete ~edit_readonly:true durable Constants.upgrade_error_flag_key)
+    else Lwt.return durable
+  in
+  durable
+
 let mark_for_reboot {reboot_counter; durable; _} =
   let open Lwt_syntax in
   let+ has_reboot_flag = has_reboot_flag durable in
@@ -261,19 +279,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       return ~durable Padding
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
-      let* has_stuck_flag = has_stuck_flag durable in
-      let* durable =
-        if has_stuck_flag then
-          Durable.(delete ~edit_readonly:true durable Constants.stuck_flag_key)
-        else Lwt.return durable
-      in
-      let* has_upgrade_error_flag = has_upgrade_error_flag durable in
-      let* durable =
-        if has_upgrade_error_flag then
-          Durable.(
-            delete ~edit_readonly:true durable Constants.upgrade_error_flag_key)
-        else Lwt.return durable
-      in
+      let* durable = patch_flags_on_eval_successful durable in
       return ~durable Padding
   | Eval {config; module_reg} ->
       (* Continue execution. *)
