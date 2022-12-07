@@ -58,6 +58,29 @@ let has_stuck_flag durable =
   let+ stuck = Durable.(find_value durable Constants.stuck_flag_key) in
   Option.is_some stuck
 
+let has_upgrade_error_flag durable =
+  let open Lwt_syntax in
+  let+ error = Durable.(find_value durable Constants.upgrade_error_flag_key) in
+  Option.is_some error
+
+let patch_flags_on_eval_successful durable =
+  let open Lwt_syntax in
+  (* We have an empty set of admin instructions, but need to wait until we can restart *)
+  let* has_stuck_flag = has_stuck_flag durable in
+  let* durable =
+    if has_stuck_flag then
+      Durable.(delete ~edit_readonly:true durable Constants.stuck_flag_key)
+    else Lwt.return durable
+  in
+  let* has_upgrade_error_flag = has_upgrade_error_flag durable in
+  let+ durable =
+    if has_upgrade_error_flag then
+      Durable.(
+        delete ~edit_readonly:true durable Constants.upgrade_error_flag_key)
+    else Lwt.return durable
+  in
+  durable
+
 let mark_for_reboot {reboot_counter; durable; _} =
   let open Lwt_syntax in
   let+ has_reboot_flag = has_reboot_flag durable in
@@ -113,6 +136,14 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
             durable
             Constants.kernel_fallback_key
             Constants.kernel_key
+        in
+        let* durable =
+          Durable.write_value_exn
+            ~edit_readonly:true
+            durable
+            Constants.upgrade_error_flag_key
+            0L
+            ""
         in
         return ~durable Padding
       else return ~status:Failing (Stuck (No_fallback_kernel cause))
@@ -248,11 +279,8 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       return ~durable Padding
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
-      let* has_stuck_flag = has_stuck_flag durable in
-      if has_stuck_flag then
-        let* durable = Durable.(delete durable Constants.stuck_flag_key) in
-        return ~durable Padding
-      else return Padding
+      let* durable = patch_flags_on_eval_successful durable in
+      return ~durable Padding
   | Eval {config; module_reg} ->
       (* Continue execution. *)
       let store = Durable.to_storage durable in
@@ -386,6 +414,10 @@ let compute_step pvm_state =
 
 let input_request pvm_state =
   match pvm_state.tick_state with
+  | Stuck (Decode_error _ | Init_error _ | Link_error _) ->
+      (* These stuck states are recovered on the next tick by
+         the fallback mechanism. *)
+      Wasm_pvm_state.No_input_required
   | Stuck _ -> Wasm_pvm_state.Input_required
   | Snapshot -> Wasm_pvm_state.No_input_required
   | Collect -> Wasm_pvm_state.Input_required
@@ -396,7 +428,9 @@ let input_request pvm_state =
   | _ -> Wasm_pvm_state.No_input_required
 
 let is_top_level_padding pvm_state =
-  eval_has_finished pvm_state.tick_state && not (is_time_for_snapshot pvm_state)
+  match pvm_state.tick_state with
+  | Padding -> not @@ is_time_for_snapshot pvm_state
+  | _ -> false
 
 let measure_executed_ticks (transition : pvm_state -> pvm_state Lwt.t)
     (initial_state : pvm_state) : (pvm_state * int64) Lwt.t =
