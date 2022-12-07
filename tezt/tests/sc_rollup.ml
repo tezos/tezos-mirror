@@ -1870,26 +1870,19 @@ let attempt_withdraw_stake =
   let check_eq_int a b =
     Check.((a = b) int ~error_msg:"expected value %L, got %R")
   in
-  fun ?expect_failure ~sc_rollup ?staker client ->
-    (* placehoders *)
-    (* TODO/Fixme:
-        - Shoud provide the rollup operator key (bootstrap1_key) as an
-          argument to scenarios.
-    *)
-    let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-    let* constants =
-      RPC.Client.call ~hooks client @@ RPC.get_chain_block_context_constants ()
-    in
-    let recover_bond_unfreeze =
-      JSON.(constants |-> "sc_rollup_stake_amount" |> as_int)
-    in
+  fun ?expect_failure
+      ~sc_rollup
+      ~sc_rollup_stake_amount
+      ?(check_liquid_balance = true)
+      ?(src = Constant.bootstrap1.public_key_hash)
+      ?(staker = Constant.bootstrap1.public_key_hash)
+      client ->
     let recover_bond_fee = 1_000_000 in
-    let staker = Option.value ~default:bootstrap1_key staker in
     let inject_op () =
       Client.Sc_rollup.submit_recover_bond
         ~hooks
         ~rollup:sc_rollup
-        ~src:bootstrap1_key
+        ~src
         ~fee:(Tez.of_mutez_int recover_bond_fee)
         ~staker
         client
@@ -1897,22 +1890,20 @@ let attempt_withdraw_stake =
     match expect_failure with
     | None ->
         let*! () = inject_op () in
-        let* old_bal = contract_balances ~pkh:bootstrap1_key client in
+        let* old_bal = contract_balances ~pkh:staker client in
         let* () = Client.bake_for_and_wait ~keys:["bootstrap2"] client in
-        let* new_bal = contract_balances ~pkh:bootstrap1_key client in
+        let* new_bal = contract_balances ~pkh:staker client in
         let expected_liq_new_bal =
-          old_bal.liquid - recover_bond_fee + recover_bond_unfreeze
+          old_bal.liquid - recover_bond_fee + sc_rollup_stake_amount
         in
-        check_eq_int new_bal.liquid expected_liq_new_bal ;
-        check_eq_int new_bal.frozen (old_bal.frozen - recover_bond_unfreeze) ;
+        if check_liquid_balance then
+          check_eq_int new_bal.liquid expected_liq_new_bal ;
+        check_eq_int new_bal.frozen (old_bal.frozen - sc_rollup_stake_amount) ;
         unit
     | Some failure_string ->
         let*? p = inject_op () in
         Process.check_error ~msg:(rex failure_string) p
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/2942
-   Do not pass an explicit value for `?commitment_period until
-   https://gitlab.com/tezos/tezos/-/merge_requests/5212 has been merged. *)
 (* Test that nodes do not publish commitments before the last cemented commitment. *)
 let commitment_before_lcc_not_published _protocol sc_rollup_node
     sc_rollup_client sc_rollup node client =
@@ -1988,6 +1979,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
   let* () =
     attempt_withdraw_stake
       ~sc_rollup
+      ~sc_rollup_stake_amount:(Tez.to_mutez constants.stake_amount)
       client
       ~expect_failure:
         "Attempted to withdraw while not staked on the last cemented \
@@ -2005,7 +1997,12 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
   in
 
   (* Withdraw stake after cementing should succeed *)
-  let* () = attempt_withdraw_stake ~sc_rollup client in
+  let* () =
+    attempt_withdraw_stake
+      ~sc_rollup
+      ~sc_rollup_stake_amount:(Tez.to_mutez constants.stake_amount)
+      client
+  in
 
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   (* Rollup node 2 starts and processes enough levels to publish a commitment.*)
@@ -3776,6 +3773,85 @@ let test_messages_processed_by_commitment ~kind =
        expected %L, got %R" ;
   unit
 
+let test_recover_bond_of_stakers =
+  test_l1_scenario
+    ~regression:true
+    ~boot_sector:""
+    ~kind:"arith"
+    ~challenge_window:10
+    ~commitment_period:10
+    {
+      variant = None;
+      tags = ["commitment"; "staker"; "recover"];
+      description = "recover bond of stakers";
+    }
+  @@ fun sc_rollup _tezos_node tezos_client ->
+  let* {
+         commitment_period_in_blocks;
+         challenge_window_in_blocks;
+         stake_amount;
+         _;
+       } =
+    get_sc_rollup_constants tezos_client
+  in
+  let* predecessor, level =
+    last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
+  in
+  let staker1 = Constant.bootstrap1 in
+  let staker2 = Constant.bootstrap2 in
+  (* Bake enough to publish. *)
+  let* () =
+    repeat (commitment_period_in_blocks + 1) (fun () ->
+        Client.bake_for_and_wait tezos_client)
+  in
+  (* Both accounts stakes on a commitment. *)
+  let* commitment1 =
+    publish_dummy_commitment
+      ~inbox_level:(level + commitment_period_in_blocks)
+      ~predecessor
+      ~sc_rollup
+      ~src:staker1.public_key_hash
+      tezos_client
+  in
+  let* commitment2 =
+    publish_dummy_commitment
+      ~inbox_level:(level + commitment_period_in_blocks)
+      ~predecessor
+      ~sc_rollup
+      ~src:staker2.public_key_hash
+      tezos_client
+  in
+  assert (commitment1 = commitment2) ;
+  (* Bake enough to cement. *)
+  let* () =
+    repeat challenge_window_in_blocks (fun () ->
+        Client.bake_for_and_wait tezos_client)
+  in
+  (* Cement. *)
+  let* () = cement_commitment tezos_client ~sc_rollup ~hash:commitment1 in
+
+  (* Staker1 withdraw its stake. *)
+  let* () =
+    attempt_withdraw_stake
+      ~check_liquid_balance:false
+      ~sc_rollup
+      ~sc_rollup_stake_amount:(Tez.to_mutez stake_amount)
+      ~src:staker1.public_key_hash
+      ~staker:staker1.public_key_hash
+      tezos_client
+  in
+  (* Staker1 withdraw the stake of staker2. *)
+  let* () =
+    attempt_withdraw_stake
+      ~check_liquid_balance:false
+      ~sc_rollup
+      ~sc_rollup_stake_amount:(Tez.to_mutez stake_amount)
+      ~src:staker1.public_key_hash
+      ~staker:staker2.public_key_hash
+      tezos_client
+  in
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -3966,6 +4042,7 @@ let register ~protocols =
     protocols ;
   test_refutation protocols ~kind:"arith" ;
   test_refutation protocols ~kind:"wasm_2_0_0" ;
+  test_recover_bond_of_stakers protocols ;
   (* Specific Arith PVM tezts *)
   test_rollup_origination_boot_sector
     ~boot_sector:"10 10 10 + +"
