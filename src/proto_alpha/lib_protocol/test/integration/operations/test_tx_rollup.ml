@@ -215,7 +215,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_max_ticket_payload_size = 10_240)
     ?(tx_rollup_finality_period = 1) ?(tx_rollup_origination_size = 60_000)
     ?(cost_per_byte = Tez.zero) ?(tx_rollup_hard_size_limit_per_message = 5_000)
-    tup =
+    ?(tx_max_messages_per_inbox = 1010) tup =
   Context.init_with_constants_gen
     tup
     {
@@ -234,6 +234,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
           max_inboxes_count = tx_rollup_max_inboxes_count;
           hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
           max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
+          max_messages_per_inbox = tx_max_messages_per_inbox;
         };
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
@@ -247,7 +248,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
 let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size ?tx_rollup_rejection_max_proof_size
     ?tx_rollup_finality_period ?tx_rollup_origination_size ?cost_per_byte
-    ?tx_rollup_hard_size_limit_per_message () =
+    ?tx_rollup_hard_size_limit_per_message ?tx_max_messages_per_inbox () =
   context_init
     ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
@@ -256,6 +257,7 @@ let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_origination_size
     ?cost_per_byte
     ?tx_rollup_hard_size_limit_per_message
+    ?tx_max_messages_per_inbox
     Context.T1
 
 (** [context_init2] initializes a context with no consensus rewards
@@ -995,7 +997,7 @@ let test_inbox_size_too_big () =
 
 (** Try to add enough batches to reach the batch count limit of an inbox. *)
 let test_inbox_count_too_big () =
-  context_init1 () >>=? fun (b, contract) ->
+  context_init1 ~tx_max_messages_per_inbox:505 () >>=? fun (b, contract) ->
   let _, _, pkh = gen_l2_account () in
   Context.get_constants (B b) >>=? fun constant ->
   let message_count = constant.parametric.tx_rollup.max_messages_per_inbox in
