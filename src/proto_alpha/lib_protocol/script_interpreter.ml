@@ -1991,7 +1991,7 @@ and klog :
         k
         accu
         stack
-  | KMap_head (f, k) -> (next [@ocaml.taillcall]) g gas k (f accu) stack
+  | KMap_head (f, k) -> (next [@ocaml.tailcall]) g gas k (f accu) stack
   | KView_exit (scs, k) ->
       (next [@ocaml.tailcall]) (fst g, scs) gas k accu stack
   | KLog _ as k ->
@@ -2343,7 +2343,7 @@ and klog :
         k
         accu
         stack
-  | KMap_head (f, k) -> (next [@ocaml.taillcall]) g gas k (f accu) stack
+  | KMap_head (f, k) -> (next [@ocaml.tailcall]) g gas k (f accu) stack
   | KView_exit (scs, k) ->
       (next [@ocaml.tailcall]) (fst g, scs) gas k accu stack
   | KLog _ as k ->

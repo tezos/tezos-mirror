@@ -109,9 +109,9 @@ module Result_syntax = struct
 end
 
 module Lwt_option_syntax = struct
-  let (return [@ocaml.iniline "always"]) = fun x -> Lwt.return (Some x)
+  let (return [@ocaml.inline "always"]) = fun x -> Lwt.return (Some x)
 
-  let (fail [@ocaml.iniline "always"]) = Lwt.return None
+  let (fail [@ocaml.inline "always"]) = Lwt.return None
 
   let return_unit = Lwt_syntax.return_some ()
 
@@ -140,9 +140,9 @@ module Lwt_option_syntax = struct
 end
 
 module Lwt_result_syntax = struct
-  let (return [@ocaml.iniline "always"]) = fun x -> Lwt.return (Ok x)
+  let (return [@ocaml.inline "always"]) = fun x -> Lwt.return (Ok x)
 
-  let (fail [@ocaml.iniline "always"]) = fun x -> Lwt.return (Error x)
+  let (fail [@ocaml.inline "always"]) = fun x -> Lwt.return (Error x)
 
   let return_unit = Lwt_syntax.return_ok_unit
 
