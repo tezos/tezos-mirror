@@ -187,80 +187,6 @@ let test_single_valid_game_move () =
   in
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_game_result game_result
 
-(** Test that a staker can be part of at most one refutation game. *)
-let test_staker_injectivity () =
-  let open Lwt_result_syntax in
-  (* Create the defender and the two refuters. *)
-  let* ctxt, rollup, genesis_hash, refuter1, refuter2, operator =
-    T.originate_rollup_and_deposit_with_three_stakers ()
-  in
-  (* Create and publish four commits:
-       - [commit1]: the base commit published by [operator] and that everybody
-         agrees on;
-     and then three commits whose [commit1] is the predecessor and that will
-     be challenged in the refutation game:
-       - [commit2]: published by [operator];
-       - [commit3]: published by [refuter1];
-       - [commit4]: published by [refuter2].
-  *)
-  let hash1 = hash_string "foo" in
-  let hash2 = hash_string "bar" in
-  let hash3 = hash_string "xyz" in
-  let hash4 = hash_string "abc" in
-  let agreed_commit =
-    Commitment_repr.
-      {
-        predecessor = genesis_hash;
-        inbox_level = T.valid_inbox_level ctxt 1l;
-        number_of_ticks = T.number_of_ticks_exn 152231L;
-        compressed_state = hash1;
-      }
-  in
-  let level l = T.valid_inbox_level ctxt l in
-  let* c1_hash, _, ctxt =
-    T.lift @@ T.advance_level_n_refine_stake ctxt rollup operator agreed_commit
-  in
-  let challenging_commit compressed_state =
-    Commitment_repr.
-      {
-        predecessor = c1_hash;
-        inbox_level = level 2l;
-        number_of_ticks = T.number_of_ticks_exn 10000L;
-        compressed_state;
-      }
-  in
-  let* ctxt =
-    List.fold_left_es
-      (fun ctxt (hash, player) ->
-        let commit = challenging_commit hash in
-        let ctxt = T.advance_level_for_commitment ctxt commit in
-        let* _, _, ctxt, _ =
-          T.lift
-          @@ Sc_rollup_stake_storage.publish_commitment
-               ctxt
-               rollup
-               player
-               commit
-        in
-        return ctxt)
-      ctxt
-      [(hash2, operator); (hash3, refuter1); (hash4, refuter2)]
-  in
-  (* We start a game [operator <-> refuter1], it succeeds, neither of them
-     were in a game before. *)
-  let* ctxt =
-    T.lift @@ R.start_game ctxt rollup ~player:operator ~opponent:refuter1
-  in
-  (* We start a game [operator <-> refuter2], it must fail as [operator] is
-     already playing against [refuter1]. *)
-  let*! res =
-    T.lift @@ R.start_game ctxt rollup ~player:operator ~opponent:refuter2
-  in
-  Assert.proto_error
-    ~loc:__LOC__
-    res
-    (( = ) (Sc_rollup_errors.Sc_rollup_staker_in_game (`Refuter operator)))
-
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 
 (** Test that sending a invalid serialized inbox proof to
@@ -324,10 +250,6 @@ let tests =
       "A single game move with a valid dissection"
       `Quick
       test_single_valid_game_move;
-    Tztest.tztest
-      "Staker can be in at most one game (injectivity)."
-      `Quick
-      test_staker_injectivity;
     Tztest.tztest
       "Invalid serialized inbox proof is rejected."
       `Quick

@@ -750,7 +750,7 @@ let get_chain_block_context_sc_rollups_all ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "all"]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_game ?(chain = "main")
+let get_chain_block_context_sc_rollups_sc_rollup_games ?(chain = "main")
     ?(block = "head") ~staker sc_rollup () =
   make
     GET
@@ -764,7 +764,7 @@ let get_chain_block_context_sc_rollups_sc_rollup_game ?(chain = "main")
       "sc_rollups";
       "sc_rollup";
       sc_rollup;
-      "game";
+      "games";
     ]
     Fun.id
 

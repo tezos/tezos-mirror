@@ -50,6 +50,9 @@ type error +=
       Sc_rollup_commitment_repr.Hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
   | (* `Temporary *) Sc_rollup_game_already_started
+  | (* `Temporary *)
+      Sc_rollup_max_number_of_parallel_games_reached of
+      Signature.Public_key_hash.t
   | (* `Temporary *) Sc_rollup_wrong_turn
   | (* `Temporary *) Sc_rollup_no_game
   | (* `Temporary *)
@@ -510,4 +513,21 @@ let () =
     ~description
     Data_encoding.empty
     (function Sc_rollup_zero_tick_commitment -> Some () | _ -> None)
-    (fun () -> Sc_rollup_zero_tick_commitment)
+    (fun () -> Sc_rollup_zero_tick_commitment) ;
+  let description = "Maximal number of parallel games reached" in
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_maximal_number_of_parallel_games_reached"
+    ~title:description
+    ~pp:(fun ppf staker ->
+      Format.fprintf
+        ppf
+        "%a has reached the limit for number of parallel games"
+        Signature.Public_key_hash.pp
+        staker)
+    ~description
+    Data_encoding.(obj1 (req "staker" Signature.Public_key_hash.encoding))
+    (function
+      | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
+      | _ -> None)
+    (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker)

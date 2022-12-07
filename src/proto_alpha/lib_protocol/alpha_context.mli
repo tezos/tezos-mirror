@@ -829,6 +829,7 @@ module Constants : sig
       number_of_sections_in_dissection : int;
       timeout_period_in_blocks : int;
       max_number_of_stored_cemented_commitments : int;
+      max_number_of_parallel_games : int;
     }
 
     type zk_rollup = {
@@ -4083,11 +4084,11 @@ module Sc_rollup : sig
     val conflicting_stakers_uncarbonated :
       context -> t -> Staker.t -> conflict list tzresult Lwt.t
 
-    val get_ongoing_game_for_staker :
+    val get_ongoing_games_for_staker :
       context ->
       t ->
       Staker.t ->
-      ((Game.t * Game.Index.t) option * context) tzresult Lwt.t
+      ((Game.t * Game.Index.t) list * context) tzresult Lwt.t
 
     val start_game :
       context ->

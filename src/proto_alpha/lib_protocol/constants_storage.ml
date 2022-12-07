@@ -262,6 +262,10 @@ let sc_rollup_timeout_period_in_blocks c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.timeout_period_in_blocks
 
+let sc_rollup_max_number_of_parallel_games c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.max_number_of_parallel_games
+
 let max_number_of_stored_cemented_commitments c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.max_number_of_stored_cemented_commitments

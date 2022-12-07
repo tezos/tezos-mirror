@@ -2037,7 +2037,7 @@ module Sc_rollup = struct
         RPC_path.(
           path_sc_rollup / "dal_slot_subscriptions" /: Raw_level.rpc_arg)
 
-    let ongoing_refutation_game =
+    let ongoing_refutation_games =
       let query =
         let open RPC_query in
         query Sc_rollup.Staker.of_b58check_exn
@@ -2048,17 +2048,17 @@ module Sc_rollup = struct
       let output =
         Sc_rollup.(
           Data_encoding.(
-            option
+            list
               (obj3
                  (req "game" Game.encoding)
                  (req "alice" Staker.encoding)
                  (req "bob" Staker.encoding))))
       in
       RPC_service.get_service
-        ~description:"Ongoing refufation game for a given staker"
+        ~description:"Ongoing refufation games for a given staker"
         ~query
         ~output
-        RPC_path.(path_sc_rollup / "game")
+        RPC_path.(path_sc_rollup / "games")
 
     let stakers_commitments =
       let output =
@@ -2233,17 +2233,17 @@ module Sc_rollup = struct
     Registration.register0 ~chunked:true S.root (fun context () () ->
         Sc_rollup.list_unaccounted context)
 
-  let register_ongoing_refutation_game () =
+  let register_ongoing_refutation_games () =
     Registration.register1
       ~chunked:false
-      S.ongoing_refutation_game
+      S.ongoing_refutation_games
       (fun context rollup staker () ->
         let open Lwt_result_syntax in
         let open Sc_rollup.Game.Index in
         let open Sc_rollup.Refutation_storage in
-        let* game, _ = get_ongoing_game_for_staker context rollup staker in
+        let* game, _ = get_ongoing_games_for_staker context rollup staker in
         let game =
-          Option.map (fun (game, index) -> (game, index.alice, index.bob)) game
+          List.map (fun (game, index) -> (game, index.alice, index.bob)) game
         in
         return game)
 
@@ -2312,7 +2312,7 @@ module Sc_rollup = struct
     register_staked_on_commitment () ;
     register_commitment () ;
     register_root () ;
-    register_ongoing_refutation_game () ;
+    register_ongoing_refutation_games () ;
     register_stakers_commitments () ;
     register_conflicts () ;
     register_timeout () ;
@@ -2346,9 +2346,9 @@ module Sc_rollup = struct
       ()
       ()
 
-  let ongoing_refutation_game ctxt block sc_rollup_address staker =
+  let ongoing_refutation_games ctxt block sc_rollup_address staker =
     RPC_context.make_call1
-      S.ongoing_refutation_game
+      S.ongoing_refutation_games
       ctxt
       block
       sc_rollup_address

@@ -76,19 +76,26 @@ let update_timeout ctxt rollup (game : Sc_rollup_game_repr.t) idx =
   let* ctxt, _ = Store.Game_timeout.update (ctxt, rollup) idx new_timeout in
   return ctxt
 
-let get_ongoing_game ctxt rollup staker1 staker2 =
+let get_ongoing_games_for_staker ctxt rollup staker =
   let open Lwt_result_syntax in
-  let stakers = Sc_rollup_game_repr.Index.make staker1 staker2 in
-  let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
-  let answer = Option.map (fun game -> (game, stakers)) game in
-  return (answer, ctxt)
-
-let get_ongoing_game_for_staker ctxt rollup staker =
-  let open Lwt_result_syntax in
-  let* ctxt, opponent = Store.Opponent.find (ctxt, rollup) staker in
-  match opponent with
-  | Some opponent -> get_ongoing_game ctxt rollup staker opponent
-  | None -> return (None, ctxt)
+  let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
+  let* ctxt, games =
+    List.fold_left_es
+      (fun (ctxt, games) (opponent, game_index) ->
+        let* ctxt, answer = Store.Game_info.find (ctxt, rollup) game_index in
+        match answer with
+        | None ->
+            (* A hash in [Store.Game] is always present in [Store.Game_info]. *)
+            assert false
+        | Some game ->
+            let games =
+              (game, Sc_rollup_game_repr.Index.make staker opponent) :: games
+            in
+            return (ctxt, games))
+      (ctxt, [])
+      entries
+  in
+  return (games, ctxt)
 
 (** [goto_inbox_level ctxt rollup inbox_level commit] Follows the predecessors of [commit] until it
     arrives at the exact [inbox_level]. The result is the commit hash at the given inbox level. *)
@@ -191,10 +198,50 @@ let get_conflict_point ctxt rollup staker1 staker2 =
 
 let get_game ctxt rollup stakers =
   let open Lwt_result_syntax in
-  let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
-  match game with
-  | Some g -> return (g, ctxt)
+  let open Sc_rollup_game_repr.Index in
+  let* ctxt, game_index =
+    Store.Game.find ((ctxt, rollup), stakers.alice) stakers.bob
+  in
+  match game_index with
   | None -> tzfail Sc_rollup_no_game
+  | Some game_hash -> (
+      let* ctxt, game = Store.Game_info.find (ctxt, rollup) game_hash in
+      match game with
+      | Some game -> return (game, ctxt)
+      | None -> tzfail Sc_rollup_no_game)
+
+let create_game ctxt rollup stakers game =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr.Index in
+  let* ctxt, _ = Store.Game_info.init (ctxt, rollup) stakers game in
+  let* ctxt, _ =
+    Store.Game.init ((ctxt, rollup), stakers.alice) stakers.bob stakers
+  in
+  let* ctxt, _ =
+    Store.Game.init ((ctxt, rollup), stakers.bob) stakers.alice stakers
+  in
+  return ctxt
+
+let update_game ctxt rollup stakers new_game =
+  let open Lwt_result_syntax in
+  let* ctxt, _storage_diff =
+    Store.Game_info.update (ctxt, rollup) stakers new_game
+  in
+  return ctxt
+
+let remove_game ctxt rollup stakers =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr.Index in
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game.remove ((ctxt, rollup), stakers.alice) stakers.bob
+  in
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game.remove ((ctxt, rollup), stakers.bob) stakers.alice
+  in
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game_info.remove (ctxt, rollup) stakers
+  in
+  return ctxt
 
 (** [start_game ctxt rollup refuter defender] initialises the game or
     if it already exists fails with `Sc_rollup_game_already_started`.
@@ -206,12 +253,9 @@ let get_game ctxt rollup stakers =
     commitments is turned into an initial game state.
 
     This also deals with the other bits of data in the storage around
-    the game. It checks neither staker is already in a game (and also
-    marks them as in a game once the new game is created). The reason we
-    only allow a staker to play one game at a time is to keep the
-    end-of-game logic simple---this way, a game can't end suddenly in
-    the middle because one player lost their stake in another game, it
-    can only end due to it's own moves or timeouts.
+    the game. Notice that a staker can participate in multiple games in
+    parallel. However, there is at most one game between two given stakers
+    since a staker can publish at most one commitment per inbox level.
 
     It also initialises the timeout level to the current level plus
     [timeout_period_in_blocks] (which will become a protocol constant
@@ -231,20 +275,21 @@ let get_game ctxt rollup stakers =
 let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make refuter defender in
-  let* ctxt, game_exists = Store.Game.mem (ctxt, rollup) stakers in
+  let* ctxt, game_exists = Store.Game_info.mem (ctxt, rollup) stakers in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
-  let* ctxt, opp_1 = Store.Opponent.find (ctxt, rollup) refuter in
-  let* ctxt, opp_2 = Store.Opponent.find (ctxt, rollup) defender in
-  let* () =
-    match (opp_1, opp_2) with
-    | None, None -> return ()
-    | Some _refuter_opponent, None ->
-        tzfail (Sc_rollup_staker_in_game (`Refuter refuter))
-    | None, Some _defender_opponent ->
-        tzfail (Sc_rollup_staker_in_game (`Defender defender))
-    | Some _refuter_opponent, Some _defender_opponent ->
-        tzfail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
+  let check_staker_availability ctxt staker =
+    let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
+    let* () =
+      fail_when
+        Compare.List_length_with.(
+          entries
+          >= Constants_storage.sc_rollup_max_number_of_parallel_games ctxt)
+        (Sc_rollup_max_number_of_parallel_games_reached staker)
+    in
+    return ctxt
   in
+  let* ctxt = check_staker_availability ctxt stakers.alice in
+  let* ctxt = check_staker_availability ctxt stakers.bob in
   let* ( ( {hash = _refuter_commit; commitment = _info},
            {hash = _defender_commit; commitment = child_info} ),
          ctxt ) =
@@ -272,13 +317,23 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
       ~defender
       ~default_number_of_sections
   in
-  let* ctxt, _ = Store.Game.init (ctxt, rollup) stakers game in
+  let* ctxt = create_game ctxt rollup stakers game in
   let* ctxt, _ =
     Store.Game_timeout.init (ctxt, rollup) stakers (initial_timeout ctxt)
   in
-  let* ctxt, _ = Store.Opponent.init (ctxt, rollup) refuter defender in
-  let* ctxt, _ = Store.Opponent.init (ctxt, rollup) defender refuter in
   return ctxt
+
+let check_stakes ctxt rollup (stakers : Sc_rollup_game_repr.Index.t) =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_game_repr in
+  let* alice_stake, ctxt = Stake_storage.is_staker ctxt rollup stakers.alice in
+  let* bob_stake, ctxt = Stake_storage.is_staker ctxt rollup stakers.bob in
+  let game_over loser = Loser {loser; reason = Conflict_resolved} in
+  match (alice_stake, bob_stake) with
+  | true, true -> return (None, ctxt)
+  | false, true -> return (Some (game_over stakers.alice), ctxt)
+  | true, false -> return (Some (game_over stakers.bob), ctxt)
+  | false, false -> return (Some Draw, ctxt)
 
 let game_move ctxt rollup ~player ~opponent refutation =
   let open Lwt_result_syntax in
@@ -294,24 +349,28 @@ let game_move ctxt rollup ~player ~opponent refutation =
   in
   let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
   let dal = (Constants_storage.parametric ctxt).dal in
-  let play_cost = Sc_rollup_game_repr.cost_play game refutation in
-  let*? ctxt = Raw_context.consume_gas ctxt play_cost in
-  let* move_result =
-    Sc_rollup_game_repr.play
-      kind
-      dal.cryptobox_parameters
-      ~dal_attestation_lag:dal.attestation_lag
-      ~stakers
-      metadata
-      game
-      refutation
-  in
-  match move_result with
-  | Either.Left game_result -> return (Some game_result, ctxt)
-  | Either.Right new_game ->
-      let* ctxt, _ = Store.Game.update (ctxt, rollup) stakers new_game in
-      let* ctxt = update_timeout ctxt rollup game stakers in
-      return (None, ctxt)
+  let* check_result, ctxt = check_stakes ctxt rollup stakers in
+  match check_result with
+  | Some game_result -> return (Some game_result, ctxt)
+  | None -> (
+      let play_cost = Sc_rollup_game_repr.cost_play game refutation in
+      let*? ctxt = Raw_context.consume_gas ctxt play_cost in
+      let* move_result =
+        Sc_rollup_game_repr.play
+          kind
+          dal.cryptobox_parameters
+          ~dal_attestation_lag:dal.attestation_lag
+          ~stakers
+          metadata
+          game
+          refutation
+      in
+      match move_result with
+      | Either.Left game_result -> return (Some game_result, ctxt)
+      | Either.Right new_game ->
+          let* ctxt = update_game ctxt rollup stakers new_game in
+          let* ctxt = update_timeout ctxt rollup game stakers in
+          return (None, ctxt))
 
 let get_timeout ctxt rollup stakers =
   let open Lwt_result_syntax in
@@ -379,7 +438,7 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
           if Signature.Public_key_hash.(alice = loser) then bob else alice
         in
         let* ctxt, balance_updates_winner = reward ctxt winning_staker in
-        let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
+        let* ctxt = remove_game ctxt rollup stakers in
         let* ctxt, balance_updates_loser =
           Stake_storage.remove_staker ctxt rollup losing_staker
         in
@@ -394,9 +453,9 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
         in
         return (ctxt, balances_updates_alice @ balances_updates_bob)
   in
-  let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
-  let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.alice in
-  let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.bob in
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game_timeout.remove (ctxt, rollup) stakers
+  in
   return (status, ctxt, balances_updates)
 
 module Internal_for_tests = struct
@@ -428,8 +487,8 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
   let make_conflict ctxt rollup other (our_point, their_point) =
     let our_hash = our_point.hash and their_hash = their_point.hash in
     let get = Sc_rollup_commitment_storage.get_commitment_unsafe ctxt rollup in
-    let* our_commitment, _ = get our_hash in
-    let* their_commitment, _ = get their_hash in
+    let* our_commitment, _ctxt = get our_hash in
+    let* their_commitment, _ctxt = get their_hash in
     let parent_commitment = our_commitment.predecessor in
     return {other; their_commitment; our_commitment; parent_commitment}
   in

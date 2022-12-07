@@ -30,6 +30,16 @@ module Commitment_storage = Sc_rollup_commitment_storage
 module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
+let is_staker ctxt rollup staker =
+  let open Lwt_result_syntax in
+  let* ctxt, res = Store.Last_cemented_commitment.mem ctxt rollup in
+  if not res then tzfail (Sc_rollup_does_not_exist rollup)
+  else
+    let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in
+    match res with
+    | None -> return (false, ctxt)
+    | Some _branch -> return (true, ctxt)
+
 let find_staker_unsafe ctxt rollup staker =
   let open Lwt_result_syntax in
   let* ctxt, res = Store.Stakers.find (ctxt, rollup) staker in

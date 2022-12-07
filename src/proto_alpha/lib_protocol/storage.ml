@@ -1837,11 +1837,11 @@ module Sc_rollup = struct
         let encoding = Raw_level_repr.encoding
       end)
 
-  module Game_versioned =
+  module Game_info_versioned =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
-           let name = ["game"]
+           let name = ["refutation_game_info"]
          end))
          (Make_index (Sc_rollup_game_repr.Index))
       (struct
@@ -1850,10 +1850,31 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_game_repr.versioned_encoding
       end)
 
-  module Game = struct
-    include Game_versioned
-    include Make_versioned (Sc_rollup_game_repr) (Game_versioned)
+  module Game_info = struct
+    include Game_info_versioned
+    include Make_versioned (Sc_rollup_game_repr) (Game_info_versioned)
   end
+
+  module Games_per_staker =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["game"]
+         end))
+         (Public_key_hash_index)
+
+  module Game =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Games_per_staker.Raw_context)
+         (struct
+           let name = ["opponents"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Sc_rollup_game_repr.Index.t
+
+        let encoding = Sc_rollup_game_repr.Index.encoding
+      end)
 
   module Game_timeout =
     Make_indexed_carbonated_data_storage
@@ -1866,19 +1887,6 @@ module Sc_rollup = struct
         type t = Sc_rollup_game_repr.timeout
 
         let encoding = Sc_rollup_game_repr.timeout_encoding
-      end)
-
-  module Opponent =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["opponent"]
-         end))
-         (Public_key_hash_index)
-      (struct
-        type t = Sc_rollup_repr.Staker.t
-
-        let encoding = Sc_rollup_repr.Staker.encoding
       end)
 
   (** An index used for a SCORU's outbox levels. An outbox level is mapped to

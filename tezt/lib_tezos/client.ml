@@ -2153,8 +2153,8 @@ module Sc_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  let timeout ?expect_failure ?hooks ?(wait = "none") ?burn_cap ~staker ~src
-      ~dst client =
+  let timeout ?expect_failure ?hooks ?(wait = "none") ?burn_cap ~staker1
+      ~staker2 ~src ~dst client =
     let process =
       spawn_command
         ?hooks
@@ -2168,7 +2168,9 @@ module Sc_rollup = struct
             "rollup";
             dst;
             "with";
-            staker;
+            staker1;
+            "against";
+            staker2;
             "from";
             src;
           ]

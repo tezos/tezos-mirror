@@ -1778,6 +1778,75 @@ let add_publish ~rollup block account commitment =
   let* block = bake_blocks_until_inbox_level block commitment in
   add_op block publish
 
+(** [test_number_of_parallel_games_bounded] checks that one cannot
+    play an arbitrary number of games. *)
+let test_number_of_parallel_games_bounded () =
+  let max_number_of_parallel_games =
+    Context.default_test_constants.sc_rollup.max_number_of_parallel_games
+  in
+  let nb_accounts = max_number_of_parallel_games + 2 in
+  let* block, accounts =
+    context_init
+      ~sc_rollup_challenge_window_in_blocks:100
+      (Context.TList nb_accounts)
+  in
+  let* block, rollup = sc_originate block (Stdlib.List.hd accounts) "unit" in
+  let* dummy_commitment = dummy_commitment (B block) rollup in
+
+  let commitments =
+    List.mapi
+      (fun i _ ->
+        {
+          dummy_commitment with
+          number_of_ticks = number_of_ticks_exn (Int64.of_int (i + 1));
+        })
+      accounts
+  in
+  let* block =
+    List.fold_left2_es
+      ~when_different_lengths:[]
+      (fun block account commitment ->
+        add_publish ~rollup block account commitment)
+      block
+      accounts
+      commitments
+  in
+  match accounts with
+  | staker :: opponents ->
+      let expect_apply_failure = function
+        | Environment.Ecoproto_error
+            (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached
+              xstaker)
+          :: _ ->
+            assert (
+              Tezos_crypto.Signature.Public_key_hash.(
+                xstaker = Account.pkh_of_contract_exn staker)) ;
+            return_unit
+        | _ ->
+            failwith
+              "It should have failed with \
+               [Sc_rollup_max_number_of_parallel_games_reached]"
+      in
+      let* block = Incremental.begin_construction block in
+      let* _block, _counter =
+        List.fold_left_es
+          (fun (block, counter) opponent ->
+            let addr = Account.pkh_of_contract_exn staker in
+            let* op = Op.sc_rollup_refute (I block) opponent rollup addr None in
+            let* block =
+              if counter = max_number_of_parallel_games then
+                Incremental.add_operation ~expect_apply_failure block op
+              else Incremental.add_operation block op
+            in
+            return (block, counter + 1))
+          (block, 0)
+          opponents
+      in
+      return ()
+  | [] ->
+      (* Because [max_number_of_parallel_games] is strictly positive. *)
+      assert false
+
 (** [test_timeout] test multiple cases of the timeout logic.
     - Test to timeout a player before it's allowed and fails.
     - Test that the timeout left by player decreases as expected.
@@ -2661,6 +2730,11 @@ let tests =
        and related timeout value."
       `Quick
       test_timeout;
+    Tztest.tztest
+      "Test that a player cannot play more than max_number_of_parallel_games \
+       games in parallel."
+      `Quick
+      test_number_of_parallel_games_bounded;
     Tztest.tztest
       "Two invalid final moves end the game in a draw situation"
       `Quick

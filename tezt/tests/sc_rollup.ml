@@ -2646,7 +2646,7 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
 
 *)
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
-    (loser_mode, inputs, final_level, empty_levels, stop_loser_at) =
+    (loser_modes, inputs, final_level, empty_levels, stop_loser_at) =
   test_full_scenario
     ?commitment_period
     ~kind
@@ -2669,18 +2669,37 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
     unit
   in
 
-  let sc_rollup_node2 =
-    Sc_rollup_node.create Operator node client ~default_operator:bootstrap2_key
+  let loser_sc_rollup_nodes =
+    List.map
+      (fun _ ->
+        Sc_rollup_node.create
+          Operator
+          node
+          client
+          ~default_operator:bootstrap2_key)
+      loser_modes
   in
-  let* _configuration_filename =
-    Sc_rollup_node.config_init ~loser_mode sc_rollup_node2 sc_rollup_address
+  let* _configuration_filenames =
+    Lwt_list.map_p (fun (loser_mode, loser_sc_rollup_node) ->
+        Sc_rollup_node.config_init
+          ~loser_mode
+          loser_sc_rollup_node
+          sc_rollup_address)
+    @@ List.combine loser_modes loser_sc_rollup_nodes
   in
   let* () = Sc_rollup_node.run sc_rollup_node []
-  and* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  and* () =
+    Lwt_list.iter_p
+      (fun loser_sc_rollup_node -> Sc_rollup_node.run loser_sc_rollup_node [])
+      loser_sc_rollup_nodes
+  in
 
-  let stop_loser level =
+  let stop_losers level =
     if List.mem level stop_loser_at then
-      Sc_rollup_node.terminate sc_rollup_node2
+      Lwt_list.iter_p
+        (fun loser_sc_rollup_node ->
+          Sc_rollup_node.terminate loser_sc_rollup_node)
+        loser_sc_rollup_nodes
     else unit
   in
 
@@ -2688,8 +2707,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
     | [] -> unit
     | inputs :: next_batches as all ->
         let* level = Client.level client in
-
-        let* () = stop_loser level in
+        let* () = stop_losers level in
         if List.mem level empty_levels then
           let* () = Client.bake_for_and_wait client in
           consume_inputs all
@@ -2704,12 +2722,12 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
 
   let hook i =
     let level = after_inputs_level + i in
-    stop_loser level
+    stop_losers level
   in
   let keep_going client =
     let* game =
       RPC.Client.call client
-      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_game
+      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_games
            ~staker:bootstrap1_key
            sc_rollup_address
            ()
@@ -2765,36 +2783,55 @@ let test_refutation protocols ~kind =
     match kind with
     | "arith" ->
         [
-          ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
-          ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 80, [], []));
-          ("inbox_proof", ("5 0 0", inputs_for 10, 80, [], []));
-          ("inbox_proof_with_new_content", ("5 0 0", inputs_for 30, 80, [], []));
+          (* As a reminder, the format of loser modes is a space-separated
+             list of space-separated triples of integers. The first integer
+             is the inbox level of the failure, the second integer is the
+             message index of the failure, and the third integer is the
+             index of the failing tick during the processing of this
+             message. *)
+          ("inbox_proof_at_genesis", (["3 0 0"], inputs_for 10, 80, [], []));
+          ("pvm_proof_at_genesis", (["3 0 1"], inputs_for 10, 80, [], []));
+          ("inbox_proof", (["5 0 0"], inputs_for 10, 80, [], []));
+          ( "inbox_proof_with_new_content",
+            (["5 0 0"], inputs_for 30, 80, [], []) );
           (* In "inbox_proof_with_new_content" we add messages after the commitment
              period so the current inbox is not equal to the inbox snapshot-ted at the
              game creation. *)
-          ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
+          ( "inbox_proof_one_empty_level",
+            (["6 0 0"], inputs_for 10, 80, [2], []) );
           ( "inbox_proof_many_empty_levels",
-            ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
-          ("pvm_proof_0", ("5 2 1", inputs_for 10, 80, [], []));
-          ("pvm_proof_1", ("7 2 0", inputs_for 10, 80, [], []));
-          ("pvm_proof_2", ("7 2 5", inputs_for 7, 80, [], []));
-          ("pvm_proof_3", ("9 2 5", inputs_for 7, 80, [4; 5], []));
-          ("timeout", ("5 2 1", inputs_for 10, 80, [], [35]));
+            (["9 0 0"], inputs_for 10, 80, [2; 3; 4], []) );
+          ("pvm_proof_0", (["5 2 1"], inputs_for 10, 80, [], []));
+          ("pvm_proof_1", (["7 2 0"], inputs_for 10, 80, [], []));
+          ("pvm_proof_2", (["7 2 5"], inputs_for 7, 80, [], []));
+          ("pvm_proof_3", (["9 2 5"], inputs_for 7, 80, [4; 5], []));
+          ("timeout", (["5 2 1"], inputs_for 10, 80, [], [35]));
+          ("parallel_games_0", (["3 0 0"; "3 0 1"], inputs_for 10, 80, [], []));
+          ( "parallel_games_1",
+            (["3 0 0"; "3 0 1"; "3 0 0"], inputs_for 10, 200, [], []) );
         ]
     | "wasm_2_0_0" ->
         [
           (* First message of an inbox (level 3) *)
-          ("inbox_proof_0", ("3 0 0", inputs_for 10, 80, [], []));
+          ("inbox_proof_0", (["3 0 0"], inputs_for 10, 80, [], []));
           (* Fourth message of an inbox (level 3) *)
-          ("inbox_proof_1", ("3 4 0", inputs_for 10, 80, [], []));
+          ("inbox_proof_1", (["3 4 0"], inputs_for 10, 80, [], []));
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
-          ("pvm_proof_0", ("5 7 11_000_000_001", inputs_for 10, 80, [], []));
-          ("pvm_proof_1", ("7 7 11_000_001_000", inputs_for 10, 80, [], []));
+          ("pvm_proof_0", (["5 7 11_000_000_001"], inputs_for 10, 80, [], []));
+          ("pvm_proof_1", (["7 7 11_000_001_000"], inputs_for 10, 80, [], []));
           (* End of evaluation *)
-          ("pvm_proof_2", ("7 7 22_000_002_000", inputs_for 10, 80, [], []));
+          ("pvm_proof_2", (["7 7 22_000_002_000"], inputs_for 10, 80, [], []));
           (* During padding *)
-          ("pvm_proof_3", ("7 7 22_010_000_000", inputs_for 10, 80, [], []));
+          ("pvm_proof_3", (["7 7 22_010_000_000"], inputs_for 10, 80, [], []));
+          ( "parallel_games_0",
+            (["4 0 0"; "5 7 11_000_000_001"], inputs_for 10, 80, [], []) );
+          ( "parallel_games_1",
+            ( ["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"],
+              inputs_for 10,
+              80,
+              [],
+              [] ) );
         ]
     | _ -> assert false
   in
@@ -2948,13 +2985,14 @@ let test_forking_scenario ~kind ~variant scenario =
 let cement_commitments client sc_rollup ?fail =
   Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
 
-let timeout ?expect_failure ~sc_rollup ~staker client =
+let timeout ?expect_failure ~sc_rollup ~staker1 ~staker2 client =
   let*! () =
     Client.Sc_rollup.timeout
       ~hooks
       ~dst:sc_rollup
       ~src:"bootstrap1"
-      ~staker
+      ~staker1
+      ~staker2
       client
       ?expect_failure
   in
@@ -3015,7 +3053,13 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
     repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
   in
   (* He even timeout himself, what a shame. *)
-  let* () = timeout ~sc_rollup ~staker:operator1.public_key_hash client in
+  let* () =
+    timeout
+      ~sc_rollup
+      ~staker1:operator1.public_key_hash
+      ~staker2:operator2.public_key_hash
+      client
+  in
   (* Attempting to cement defeated branch will fail. *)
   let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
   (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
@@ -3122,7 +3166,11 @@ let test_timeout =
   let* () =
     repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
   in
-  timeout ~sc_rollup ~staker:operator1.public_key_hash client
+  timeout
+    ~sc_rollup
+    ~staker1:operator1.public_key_hash
+    ~staker2:operator2.public_key_hash
+    client
 
 (* Testing rollup node catch up mechanism
    --------------------------------------
@@ -3264,7 +3312,13 @@ let test_refutation_reward_and_punishment ~kind =
   let* () =
     repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
   in
-  let* () = timeout ~sc_rollup ~staker:operator2.public_key_hash client in
+  let* () =
+    timeout
+      ~sc_rollup
+      ~staker1:operator2.public_key_hash
+      ~staker2:operator1.public_key_hash
+      client
+  in
 
   (* The game should have now ended. *)
 

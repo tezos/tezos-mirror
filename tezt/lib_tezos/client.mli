@@ -1645,14 +1645,15 @@ module Sc_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [octez-client timeout dispute on sc rollup <dst> with <staker> from
-           <src>]. *)
+  (** Run [octez-client timeout dispute on sc rollup <dst> with
+     <staker1> against <staker2> from <src>]. *)
   val timeout :
     ?expect_failure:bool ->
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
-    staker:string ->
+    staker1:string ->
+    staker2:string ->
     src:string ->
     dst:string ->
     t ->

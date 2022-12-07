@@ -242,6 +242,7 @@ let constants_mainnet =
              validated against a cemented commitment while it is in the
              mempool. *)
          max_number_of_stored_cemented_commitments = 5;
+         max_number_of_parallel_games = 32;
        });
     zk_rollup =
       {

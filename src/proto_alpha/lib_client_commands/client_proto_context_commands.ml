@@ -3562,8 +3562,12 @@ let commands_rw () =
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"]
       @@ Client_keys.Public_key_hash.source_param
-           ~name:"staker"
-           ~desc:"One of the players involved in the dispute."
+           ~name:"staker1"
+           ~desc:"The staker that has timed out."
+      @@ prefixes ["against"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"staker2"
+           ~desc:"The opponent of this staker."
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
@@ -3577,20 +3581,30 @@ let commands_rw () =
              counter,
              fee_parameter )
            rollup
-           staker
+           staker1
+           staker2
            source
            cctxt ->
         let open Lwt_result_syntax in
-        let* game_info =
-          Plugin.RPC.Sc_rollup.ongoing_refutation_game
+        let* games =
+          Plugin.RPC.Sc_rollup.ongoing_refutation_games
             cctxt
             (cctxt#chain, cctxt#block)
             rollup
-            staker
+            staker1
             ()
         in
         let* alice, bob =
-          match game_info with
+          let* answer =
+            List.find_es
+              (fun (_, alice, bob) ->
+                let stakers = Sc_rollup.Game.Index.make staker1 staker2 in
+                return
+                  Tezos_crypto.Signature.Public_key_hash.(
+                    alice = stakers.alice && bob = stakers.bob))
+              games
+          in
+          match answer with
           | None ->
               cctxt#error
                 "Couldn't find an ongoing dispute for this staker on this \

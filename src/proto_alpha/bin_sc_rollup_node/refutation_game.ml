@@ -435,9 +435,9 @@ module Make (Interpreter : Interpreter.S) :
         in
         unless timeout_reached @@ fun () -> play_timeout node_ctxt self index
 
-  let ongoing_game head_block node_ctxt self =
+  let ongoing_games head_block node_ctxt self =
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    Plugin.RPC.Sc_rollup.ongoing_refutation_game
+    Plugin.RPC.Sc_rollup.ongoing_refutation_games
       cctxt
       (cctxt#chain, head_block)
       rollup_address
@@ -461,9 +461,7 @@ module Make (Interpreter : Interpreter.S) :
         self
         ()
     in
-    let*! res =
-      Option.iter_es (play_opening_move node_ctxt self) (List.hd conflicts)
-    in
+    let*! res = List.iter_es (play_opening_move node_ctxt self) conflicts in
     match res with
     | Ok r -> return r
     | Error
@@ -484,10 +482,11 @@ module Make (Interpreter : Interpreter.S) :
     | None ->
         (* Not injecting refutations, don't play refutation games *)
         return_unit
-    | Some self -> (
-        let* res = ongoing_game head_block node_ctxt self in
-        match res with
-        | Some (game, staker1, staker2) ->
-            play head_block node_ctxt self game staker1 staker2
-        | None -> start_game_if_conflict head_block node_ctxt self)
+    | Some self ->
+        let* () = start_game_if_conflict head_block node_ctxt self in
+        let* res = ongoing_games head_block node_ctxt self in
+        List.iter_es
+          (fun (game, staker1, staker2) ->
+            play head_block node_ctxt self game staker1 staker2)
+          res
 end

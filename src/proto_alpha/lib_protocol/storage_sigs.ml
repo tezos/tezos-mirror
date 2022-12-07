@@ -231,6 +231,9 @@ module type Indexed_carbonated_data_storage = sig
     ?length:int ->
     t ->
     (Raw_context.t * (key * value) list) tzresult Lwt.t
+
+  (** Returns [true] iff [context] is empty. *)
+  val is_empty : context -> bool Lwt.t
 end
 
 module type Indexed_carbonated_data_storage_INTERNAL = sig
@@ -274,6 +277,9 @@ module type Indexed_data_storage = sig
     init:'a ->
     f:(key -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
+
+  (** Returns [true] iff [context] is empty. *)
+  val is_empty : context -> bool Lwt.t
 end
 
 module type Indexed_data_storage_with_local_context = sig
@@ -452,6 +458,8 @@ module type Indexed_raw_context = sig
   type local_context
 
   val clear : context -> Raw_context.t Lwt.t
+
+  val is_empty : context -> bool Lwt.t
 
   val fold_keys :
     context ->

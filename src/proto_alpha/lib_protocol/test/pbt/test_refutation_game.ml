@@ -1398,12 +1398,13 @@ type game_result_for_tests = Defender_wins | Refuter_wins
 let play_until_game_result ~refuter_client ~defender_client ~rollup block =
   let rec play ~player_turn ~opponent block =
     let open Lwt_result_syntax in
-    let* game_opt =
-      Context.Sc_rollup.ongoing_game_for_staker
+    let* games =
+      Context.Sc_rollup.ongoing_games_for_staker
         (B block)
         rollup
         player_turn.player.pkh
     in
+    let game_opt = List.hd games in
     let game, _, _ = WithExceptions.Option.get ~loc:__LOC__ game_opt in
     let* refutation = next_move ~player_client:player_turn game in
     let* incr = Incremental.begin_construction block in
