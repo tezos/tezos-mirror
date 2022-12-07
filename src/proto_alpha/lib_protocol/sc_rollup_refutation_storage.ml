@@ -275,9 +275,7 @@ let remove_game ctxt rollup stakers =
 let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make refuter defender in
-  let* ctxt, game_exists =
-    Store.Game.mem ((ctxt, rollup), stakers.alice) stakers.bob
-  in
+  let* ctxt, game_exists = Store.Game_info.mem (ctxt, rollup) stakers in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
   let check_staker_availability ctxt staker =
     let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
