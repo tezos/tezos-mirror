@@ -150,9 +150,9 @@ Randomness generation parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_COMMITMENT``
-     - 64 blocks
+     - 128 blocks
    * - ``NONCE_REVELATION_THRESHOLD``
-     - 256 blocks
+     - 512 blocks
    * -  ``MAX_ANON_OPS_PER_BLOCK``
      - 132 revelations
    * - ``SEED_NONCE_REVELATION_TIP``
