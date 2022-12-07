@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Kathmandu | Lima | Alpha
+type t = Kathmandu | Lima | Mumbai | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
@@ -33,13 +33,19 @@ let name = function
   | Alpha -> "Alpha"
   | Kathmandu -> "Kathmandu"
   | Lima -> "Lima"
+  | Mumbai -> "Mumbai"
 
-let number = function Kathmandu -> 014 | Lima -> 015 | Alpha -> 016
+let number = function
+  | Kathmandu -> 014
+  | Lima -> 015
+  | Mumbai -> 016
+  | Alpha -> 017
 
 let directory = function
   | Alpha -> "proto_alpha"
   | Kathmandu -> "proto_014_PtKathma"
   | Lima -> "proto_015_PtLimaPt"
+  | Mumbai -> "proto_016_PtMumbai"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -48,6 +54,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Kathmandu -> "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
   | Lima -> "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
+  | Mumbai -> "PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -163,14 +170,16 @@ let write_parameter_file :
 let next_protocol = function
   | Kathmandu -> Some Lima
   | Lima -> Some Alpha
+  | Mumbai -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
   | Alpha -> Some Lima
+  | Mumbai -> Some Lima
   | Lima -> Some Kathmandu
   | Kathmandu -> None
 
-let all = [Alpha; Kathmandu; Lima]
+let all = [Alpha; Kathmandu; Lima; Mumbai]
 
 type supported_protocols =
   | Any_protocol

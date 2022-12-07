@@ -116,7 +116,7 @@ let baker_bls_test =
   let msg =
     match protocol with
     | Kathmandu | Lima -> rex "Invalid protocol_parameters"
-    | Alpha ->
+    | Mumbai | Alpha ->
         rex "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"
   in
   Process.check_error activate_process ~exit_code:1 ~msg
