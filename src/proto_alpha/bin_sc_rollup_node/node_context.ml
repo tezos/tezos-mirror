@@ -26,6 +26,8 @@
 open Protocol
 open Alpha_context
 
+type lcc = {commitment : Sc_rollup.Commitment.Hash.t; level : Raw_level.t}
+
 type 'a t = {
   cctxt : Protocol_client_context.full;
   dal_cctxt : Dal_node_client.cctxt;
@@ -42,6 +44,7 @@ type 'a t = {
   loser_mode : Loser_mode.t;
   store : 'a Store.t;
   context : 'a Context.index;
+  mutable lcc : lcc;
 }
 
 type rw = [`Read | `Write] t
@@ -69,27 +72,40 @@ let get_fee_parameter node_ctxt purpose =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
+let get_lcc (cctxt : Protocol_client_context.full) rollup_address =
+  let open Lwt_result_syntax in
+  let+ commitment, level =
+    Plugin.RPC.Sc_rollup.last_cemented_commitment_hash_with_level
+      cctxt
+      (cctxt#chain, `Head 0)
+      rollup_address
+  in
+  {commitment; level}
+
 let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
     rollup_address kind operators fee_parameters ~loser_mode store context =
   let open Lwt_result_syntax in
-  let+ protocol_constants = retrieve_constants cctxt in
-  {
-    cctxt;
-    dal_cctxt;
-    data_dir;
-    l1_ctxt;
-    rollup_address;
-    operators;
-    genesis_info = l1_ctxt.Layer1.genesis_info;
-    kind;
-    injector_retention_period = 0;
-    block_finality_time = 2;
-    fee_parameters;
-    protocol_constants;
-    loser_mode;
-    store;
-    context;
-  }
+  let* protocol_constants = retrieve_constants cctxt
+  and* lcc = get_lcc cctxt rollup_address in
+  return
+    {
+      cctxt;
+      dal_cctxt;
+      data_dir;
+      l1_ctxt;
+      rollup_address;
+      operators;
+      genesis_info = l1_ctxt.Layer1.genesis_info;
+      lcc;
+      kind;
+      injector_retention_period = 0;
+      block_finality_time = 2;
+      fee_parameters;
+      protocol_constants;
+      loser_mode;
+      store;
+      context;
+    }
 
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
