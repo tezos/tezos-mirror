@@ -374,10 +374,9 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let open Lwt_result_syntax in
     let*! result =
       let open Lwt_option_syntax in
-      let* commitment, hash =
-        Commitment.last_commitment_with_hash
-          (module Store.Last_published_commitment_level)
-          node_ctxt.store
+      let*? commitment = node_ctxt.lpc in
+      let hash =
+        Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment
       in
       (* The corresponding level in Store.Commitments.published_at_level is
          available only when the commitment has been published and included
@@ -461,16 +460,16 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level
       =
     let open Alpha_context in
-    let open Lwt_option_syntax in
-    let+ last_published =
-      Store.Last_published_commitment_level.find node_ctxt.store
-    in
+    let open Option_syntax in
+    let+ last_published_commitment = node_ctxt.lpc in
     let commitment_period =
       Int32.of_int
         node_ctxt.protocol_constants.parametric.sc_rollup
           .commitment_period_in_blocks
     in
-    let last_published = Raw_level.to_int32 last_published in
+    let last_published =
+      Raw_level.to_int32 last_published_commitment.inbox_level
+    in
     let open Int32 in
     div (sub last_published inbox_level) commitment_period
     |> mul commitment_period |> sub last_published |> Raw_level.of_int32_exn
@@ -513,7 +512,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                   let*! inbox_info =
                     inbox_info_of_level node_ctxt info.l1_level
                   in
-                  let*! commitment_level =
+                  let commitment_level =
                     commitment_level_of_inbox_level node_ctxt info.l1_level
                   in
                   match commitment_level with

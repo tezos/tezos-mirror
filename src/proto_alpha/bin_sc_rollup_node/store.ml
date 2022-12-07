@@ -266,19 +266,6 @@ module Last_stored_commitment_level =
       let encoding = Raw_level.encoding
     end)
 
-module Last_published_commitment_level =
-  Make_mutable_value
-    (struct
-      let path = ["commitments"; "last_published_level"]
-    end)
-    (struct
-      type value = Raw_level.t
-
-      let name = "raw_level"
-
-      let encoding = Raw_level.encoding
-    end)
-
 module Commitments_published_at_level =
   Make_updatable_map
     (struct

@@ -108,6 +108,17 @@ let next_lcc_level node_ctxt =
        (Raw_level.to_int32 node_ctxt.Node_context.lcc.level)
        (sc_rollup_commitment_period node_ctxt)
 
+let next_publishable_level node_ctxt =
+  let lpc_level =
+    match node_ctxt.Node_context.lpc with
+    | None -> node_ctxt.genesis_info.level
+    | Some lpc -> lpc.inbox_level
+  in
+  Environment.wrap_tzresult @@ Raw_level.of_int32
+  @@ Int32.add
+       (Raw_level.to_int32 lpc_level)
+       (sc_rollup_commitment_period node_ctxt)
+
 let next_commitment_level node_ctxt
     (module Last_commitment_level : Mutable_level_store) =
   let open Lwt_syntax in
@@ -270,57 +281,51 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let get_commitment_and_publish ~check_lcc_hash
       ({store; _} as node_ctxt : _ Node_context.t) next_level_to_publish =
     let open Lwt_result_syntax in
-    let*! is_commitment_available =
-      Store.Commitments.mem store next_level_to_publish
-    in
-    if is_commitment_available then
-      let*! commitment, _commitment_hash =
-        Store.Commitments.get store next_level_to_publish
-      in
-      let* () =
-        if check_lcc_hash then
-          let open Lwt_result_syntax in
-          if
-            Sc_rollup.Commitment.Hash.equal
-              node_ctxt.lcc.commitment
-              commitment.predecessor
-          then return ()
-          else
-            let*! () =
-              Commitment_event.commitment_parent_is_not_lcc
-                commitment.inbox_level
-                commitment.predecessor
+    let*! commitment = Store.Commitments.find store next_level_to_publish in
+    match commitment with
+    | None ->
+        (* Commitment not available *)
+        return_unit
+    | Some (commitment, _commitment_hash) -> (
+        let* () =
+          if check_lcc_hash then
+            let open Lwt_result_syntax in
+            if
+              Sc_rollup.Commitment.Hash.equal
                 node_ctxt.lcc.commitment
+                commitment.predecessor
+            then return ()
+            else
+              let*! () =
+                Commitment_event.commitment_parent_is_not_lcc
+                  commitment.inbox_level
+                  commitment.predecessor
+                  node_ctxt.lcc.commitment
+              in
+              tzfail
+                (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
+                   commitment)
+          else return_unit
+        in
+        let operator = Node_context.get_operator node_ctxt Publish in
+        match operator with
+        | None ->
+            (* Configured to not publish commitments *)
+            return_unit
+        | Some source ->
+            let publish_operation =
+              Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
             in
-            tzfail
-              (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
-                 commitment)
-        else return_unit
-      in
-      let operator = Node_context.get_operator node_ctxt Publish in
-      match operator with
-      | None ->
-          (* Configured to not publish commitments *)
-          return_unit
-      | Some source ->
-          let publish_operation =
-            Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
-          in
-          let* _hash =
-            Injector.add_pending_operation ~source publish_operation
-          in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
-             Decouple commitments from head processing
+            let* _hash =
+              Injector.add_pending_operation ~source publish_operation
+            in
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
+               Decouple commitments from head processing
 
-             Move the following, in a part where we know the operation is
-             included. *)
-          let*! () =
-            Store.Last_published_commitment_level.set
-              store
-              commitment.inbox_level
-          in
-          return_unit
-    else return_unit
+               Move the following, in a part where we know the operation is
+               included. *)
+            node_ctxt.lpc <- Some commitment ;
+            return_unit)
 
   let publish_commitment node_ctxt =
     let open Lwt_result_syntax in
@@ -328,12 +333,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
        on or before the last cemented commitment.
     *)
     let*? next_lcc_level = next_lcc_level node_ctxt in
-    let* next_publishable_level =
-      Lwt.map Environment.wrap_tzresult
-      @@ next_commitment_level
-           node_ctxt
-           (module Store.Last_published_commitment_level)
-    in
+    let*? next_publishable_level = next_publishable_level node_ctxt in
     let check_lcc_hash, level_to_publish =
       if Raw_level.(next_publishable_level < next_lcc_level) then
         (*
