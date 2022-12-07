@@ -8,7 +8,6 @@ include: .gitlab/ci/jobs/test/common.yml
 
 .tezt_template:
   variables:
-    TESTS: "/protocol_override"
     JUNIT: "tezt-junit.xml"
   artifacts:
     reports:
