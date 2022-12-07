@@ -2156,8 +2156,17 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       | Some pred_block -> return pred_block
     in
     (* Make sure that the predecessor's context is known *)
-    let*! pred_context_exists =
-      Store.Block.context_exists chain_store pred_block
+    let* pred_context_exists =
+      let protocol_level = Store.Block.proto_level block in
+      let* expect_predecessor_context_hash =
+        Store.Chain.expect_predecessor_context_hash chain_store ~protocol_level
+      in
+      let*! exists =
+        if expect_predecessor_context_hash then
+          Store.Block.context_exists chain_store block
+        else Store.Block.context_exists chain_store pred_block
+      in
+      return exists
     in
     (* We also need the predecessor not to be pruned *)
     let* () =
