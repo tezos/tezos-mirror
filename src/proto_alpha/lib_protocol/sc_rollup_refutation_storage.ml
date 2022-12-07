@@ -217,10 +217,6 @@ let create_game ctxt rollup stakers game =
   let* ctxt, _ =
     Store.Game.init ((ctxt, rollup), stakers.alice) stakers.bob stakers
   in
-  (*
-     We assume that {!Store} implements a form of maximal sharing so
-     that [game] is actually shared between the two entries.
-  *)
   let* ctxt, _ =
     Store.Game.init ((ctxt, rollup), stakers.bob) stakers.alice stakers
   in
