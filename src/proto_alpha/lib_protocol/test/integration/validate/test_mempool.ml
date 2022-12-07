@@ -98,7 +98,10 @@ let assert_operation_present_in_mempool ~__LOC__ mempool ophl =
 let test_simple () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
       =
     extract_values ctxt block
@@ -130,7 +133,10 @@ let test_imcompatible_mempool () =
   let open Lwt_result_syntax in
   let* block, _ = Context.init1 ~consensus_threshold:0 () in
   let* block = Block.bake block in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
       =
     extract_values ctxt block
@@ -146,7 +152,10 @@ let test_imcompatible_mempool () =
   in
   (* Create a second mempool on a different block *)
   let* block2 = Block.bake block in
-  let* ctxt2 = Block.to_alpha_ctxt block2 in
+  let* ctxt2 =
+    let+ incr = Incremental.begin_construction block2 in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash2, grandparent_round
       =
     extract_values ctxt2 block2
@@ -175,7 +184,10 @@ let test_imcompatible_mempool () =
 let test_merge () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
       =
     extract_values ctxt block
@@ -267,7 +279,10 @@ let test_merge () =
 let test_add_invalid_operation () =
   let open Lwt_result_syntax in
   let* block, c1 = Context.init1 () in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
       =
     extract_values ctxt block
@@ -292,7 +307,10 @@ let test_add_invalid_operation () =
 let test_add_and_replace () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
       =
     extract_values ctxt block
@@ -344,7 +362,10 @@ let test_add_and_replace () =
 let test_remove_operation () =
   let open Lwt_result_syntax in
   let* block, (c1, c2) = Context.init2 () in
-  let* ctxt = Block.to_alpha_ctxt block in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
   let predecessor_level, predecessor_round, predecessor_hash, grandparent_round
       =
     extract_values ctxt block

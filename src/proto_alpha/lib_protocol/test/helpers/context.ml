@@ -41,7 +41,7 @@ let get_level ctxt =
   level ctxt |> Raw_level.of_int32 |> Environment.wrap_tzresult
 
 let to_alpha_ctxt = function
-  | B b -> Block.to_alpha_ctxt b
+  | B _ -> assert false
   | I i -> return (Incremental.alpha_ctxt i)
 
 let rpc_ctxt =
