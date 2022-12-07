@@ -72,10 +72,6 @@ module Constants = struct
   (* Cost of serializing a nonce. The cost of serializing the index (an int32)
      is negligible. *)
   let cost_serialize_nonce = cost_serialize_operation_hash
-
-  (* Set to [proof_size_coeff] in {!Tx_rollup_l2_verifier.verify_proof_model}.
-     This is an estimate to be updated when benchmarking is completed. *)
-  let cost_verify_output_proof_per_byte = S.safe_int 152
 end
 
 (* Reusing model from {!Ticket_costs.has_tickets_of_ty_cost}. *)
@@ -133,10 +129,6 @@ let cost_check_dissection ~number_of_states ~tick_size ~hash_size =
   cost_search_in_tick_list number_of_states tick_size
   + (S.safe_int 2 * cost_compare hash_size hash_size)
 
-let cost_verify_output_proof ~bytes_len =
-  let open S.Syntax in
-  Constants.cost_verify_output_proof_per_byte * S.safe_int bytes_len
-
 let cost_add_message ~current_index ~msg_len =
   let open S.Syntax in
   let hash_cell_cost =
@@ -148,3 +140,13 @@ let cost_add_message ~current_index ~msg_len =
     Skip_list_costs.model_next ~length:(Z.succ current_index)
   in
   hash_cell_cost + hash_content_cost + next_cell_cost
+
+(* Derived from benchmark in
+   [Sc_rollup_benchmarks.Sc_rollup_verify_output_proof_benchmark] and model
+   [model_Sc_rollup_verify_output_proof_benchmark] with estimated parameters:
+   [fun size -> (98707.0824163 + (11.6809615751 * size))] *)
+let cost_verify_output_proof ~bytes_len =
+  let open S.Syntax in
+  let size = S.safe_int bytes_len in
+  let v0 = size in
+  S.safe_int 98750 + ((v0 lsl 3) + (v0 lsl 1) + v0 + (v0 lsr 1))
