@@ -161,3 +161,13 @@ let get_message buffer {outbox_level; message_index} =
   let* outbox = get_outbox buffer outbox_level in
   if not (is_message_available outbox message_index) then raise Invalid_id
   else Messages.get message_index outbox
+
+module Internal_for_tests = struct
+  let make level_map =
+    {
+      outboxes = level_map;
+      validity_period = Int32.min_int;
+      last_level = Some Int32.max_int;
+      message_limit = Z.of_int @@ Int.max_int;
+    }
+end

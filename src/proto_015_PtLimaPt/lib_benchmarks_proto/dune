@@ -11,6 +11,7 @@
   tezos-base
   tezos-error-monad
   tezos-protocol-015-PtLimaPt.parameters
+  tezos-lazy-containers
   tezos-benchmark
   tezos-benchmark-015-PtLimaPt
   tezos-benchmark-type-inference-015-PtLimaPt
@@ -32,6 +33,7 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_error_monad
   -open Tezos_protocol_015_PtLimaPt_parameters
+  -open Tezos_lazy_containers
   -open Tezos_benchmark
   -open Tezos_benchmark_015_PtLimaPt
   -open Tezos_benchmark_type_inference_015_PtLimaPt

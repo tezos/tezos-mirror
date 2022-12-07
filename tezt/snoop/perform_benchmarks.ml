@@ -297,6 +297,12 @@ let perform_skip_list_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
+let perform_sc_rollup_benchmarks snoop proto =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Sc_rollup; Proto proto] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
 let main protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
@@ -310,4 +316,5 @@ let main protocol =
   let* () = perform_tx_rollup_benchmarks snoop protocol in
   let* () = perform_big_map_benchmarks snoop protocol in
   let* () = perform_skip_list_benchmarks snoop protocol in
-  perform_carbonated_map_benchmarks snoop protocol
+  let* () = perform_carbonated_map_benchmarks snoop protocol in
+  perform_sc_rollup_benchmarks snoop protocol

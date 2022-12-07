@@ -13,6 +13,7 @@ depends: [
   "tezos-base"
   "tezos-error-monad"
   "tezos-protocol-014-PtKathma"
+  "tezos-lazy-containers"
   "tezos-benchmark"
   "tezos-benchmark-014-PtKathma"
   "tezos-benchmark-type-inference-014-PtKathma"

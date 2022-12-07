@@ -35,7 +35,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x03000269d5857d4eadb7a943345e791980b53c41ed50abb73cfe83575cef06a776592169d5857d4eadb7a943345e791980b53c41ed50abb73cfe83575cef06a776592100100007d0030170000382066f7574707574810130c805639510aee988ab3152135cb7851c3eb7d8e19f3b0b5d61a761107951ded1dd0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0c94a7d88406cd132dab72d630166c726359f3367a007a915db26b0052147caebc06cebd770767d6e9e746e42e5b2c772092c7874983cd57a5a7d57128ad2a26eb769d5857d4eadb7a943345e791980b53c41ed50abb73cfe83575cef06a77659210000000500000000001f002501c00c5e4e94a48a49e267873112bbe3cf3373be5b0000000003617578 --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 5879.286 units (will add 100 for safety)
+Estimated gas: 5930.406 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -46,19 +46,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001217
+    Fee to the baker: ꜩ0.001223
     Expected counter: 1
-    Gas limit: 5980
+    Gas limit: 6031
     Storage limit: 25 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001217
-      payload fees(the block proposer) ....... +ꜩ0.001217
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001223
+      payload fees(the block proposer) ....... +ꜩ0.001223
     Smart contract output message execution:
       Address: [SMART_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract output message execution was successfully applied
       Paid storage size diff: 5 bytes
-      Consumed gas: 4676.147
+      Consumed gas: 4727.267
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00125
         storage fees ........................... +ꜩ0.00125

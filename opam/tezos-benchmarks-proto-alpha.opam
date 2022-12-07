@@ -13,6 +13,7 @@ depends: [
   "tezos-base"
   "tezos-error-monad"
   "tezos-protocol-alpha"
+  "tezos-lazy-containers"
   "tezos-benchmark"
   "tezos-benchmark-alpha"
   "tezos-benchmark-type-inference-alpha"

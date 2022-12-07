@@ -46,6 +46,7 @@ type tag =
   | Tickets
   | Big_map
   | Skip_list
+  | Sc_rollup
 
 type michelson_term_kind = Data | Code
 
@@ -354,6 +355,7 @@ let string_of_tag (tag : tag) =
   | Tickets -> "tickets"
   | Big_map -> "big_map"
   | Skip_list -> "skip_list"
+  | Sc_rollup -> "sc_rollup"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in
