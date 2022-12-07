@@ -45,6 +45,7 @@ type 'a t = {
   store : 'a Store.t;
   context : 'a Context.index;
   mutable lcc : lcc;
+  mutable lpc : Sc_rollup.Commitment.t option;
 }
 
 type rw = [`Read | `Write] t
@@ -72,7 +73,8 @@ let get_fee_parameter node_ctxt purpose =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
-let get_lcc (cctxt : Protocol_client_context.full) rollup_address =
+let get_last_cemented_commitment (cctxt : Protocol_client_context.full)
+    rollup_address =
   let open Lwt_result_syntax in
   let+ commitment, level =
     Plugin.RPC.Sc_rollup.last_cemented_commitment_hash_with_level
@@ -82,11 +84,42 @@ let get_lcc (cctxt : Protocol_client_context.full) rollup_address =
   in
   {commitment; level}
 
+let get_last_published_commitment (cctxt : Protocol_client_context.full)
+    rollup_address operator =
+  let open Lwt_result_syntax in
+  let*! res =
+    Plugin.RPC.Sc_rollup.staked_on_commitment
+      cctxt
+      (cctxt#chain, `Head 0)
+      rollup_address
+      operator
+  in
+  match res with
+  | Error trace
+    when TzTrace.fold
+           (fun exists -> function
+             | Environment.Ecoproto_error Sc_rollup_errors.Sc_rollup_not_staked
+               ->
+                 true
+             | _ -> exists)
+           false
+           trace ->
+      return_none
+  | Error trace -> fail trace
+  | Ok None -> return_none
+  | Ok (Some (_staked_hash, staked_commitment)) -> return_some staked_commitment
+
 let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
     rollup_address kind operators fee_parameters ~loser_mode store context =
   let open Lwt_result_syntax in
+  let publisher = Configuration.Operator_purpose_map.find Publish operators in
   let* protocol_constants = retrieve_constants cctxt
-  and* lcc = get_lcc cctxt rollup_address in
+  and* lcc = get_last_cemented_commitment cctxt rollup_address
+  and* lpc =
+    Option.filter_map_es
+      (get_last_published_commitment cctxt rollup_address)
+      publisher
+  in
   return
     {
       cctxt;
@@ -97,6 +130,7 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
       operators;
       genesis_info = l1_ctxt.Layer1.genesis_info;
       lcc;
+      lpc;
       kind;
       injector_retention_period = 0;
       block_finality_time = 2;

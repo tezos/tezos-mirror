@@ -60,6 +60,9 @@ type 'a t = {
   context : 'a Context.index;
       (** The persistent context for the rollup node. *)
   mutable lcc : lcc;  (** Last cemented commitment and its level. *)
+  mutable lpc : Sc_rollup.Commitment.t option;
+      (** The last published commitment, i.e. commitment that the operator is
+          staked on. *)
 }
 
 (** Read/write node context {!t}. *)

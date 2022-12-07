@@ -41,6 +41,12 @@ module Make (PVM : Pvm.S) = struct
     | ( Sc_rollup_publish {commitment; _},
         Sc_rollup_publish_result {published_at_level; _} ) ->
         (* Published commitment --------------------------------------------- *)
+        let is_newest_lpc =
+          match node_ctxt.lpc with
+          | None -> true
+          | Some lpc -> Raw_level.(commitment.inbox_level > lpc.inbox_level)
+        in
+        if is_newest_lpc then node_ctxt.lpc <- Some commitment ;
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
