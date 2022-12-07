@@ -57,12 +57,6 @@ module Make (PVM : Pvm.S) = struct
         if Raw_level.(inbox_level > node_ctxt.lcc.level) then
           node_ctxt.lcc <- {commitment; level = inbox_level} ;
         let*! () =
-          Store.Last_cemented_commitment_level.set node_ctxt.store inbox_level
-        in
-        let*! () =
-          Store.Last_cemented_commitment_hash.set node_ctxt.store commitment
-        in
-        let*! () =
           Commitment_event.last_cemented_commitment_updated
             commitment
             inbox_level
@@ -249,13 +243,6 @@ module Make (PVM : Pvm.S) = struct
      imply the processing of head~3, etc). *)
   let on_layer_1_head node_ctxt head =
     let open Lwt_result_syntax in
-    let* () =
-      (* Get information about the last cemented commitment to determine the
-         commitment (if any) to publish next. We do this only once per
-         chain event to avoid spamming the layer1 node. *)
-      Components.Commitment.sync_last_cemented_commitment_hash_with_level
-        node_ctxt
-    in
     let*! old_head =
       State.last_processed_head_opt node_ctxt.Node_context.store
     in

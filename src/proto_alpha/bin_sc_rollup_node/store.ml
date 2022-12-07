@@ -279,32 +279,6 @@ module Last_published_commitment_level =
       let encoding = Raw_level.encoding
     end)
 
-module Last_cemented_commitment_level =
-  Make_mutable_value
-    (struct
-      let path = ["commitments"; "last_cemented_commitment"; "level"]
-    end)
-    (struct
-      type value = Raw_level.t
-
-      let name = "raw_level"
-
-      let encoding = Raw_level.encoding
-    end)
-
-module Last_cemented_commitment_hash =
-  Make_mutable_value
-    (struct
-      let path = ["commitments"; "last_cemented_commitment"; "hash"]
-    end)
-    (struct
-      type value = Sc_rollup.Commitment.Hash.t
-
-      let name = "commitment_hash"
-
-      let encoding = Sc_rollup.Commitment.Hash.encoding
-    end)
-
 module Commitments_published_at_level =
   Make_updatable_map
     (struct
