@@ -390,14 +390,14 @@ let pp_manager_operation_content (type kind) source ppf
         rollup
         Sc_rollup.Commitment.Hash.pp
         cemented_commitment
-  | Sc_rollup_recover_bond {sc_rollup} ->
+  | Sc_rollup_recover_bond {sc_rollup; staker} ->
       Format.fprintf
         ppf
-        "Smart contract bond retrieval:@,Address: %a@,From: %a"
+        "Smart contract bond retrieval:@,Address: %a@,Staker: %a"
         Sc_rollup.Address.pp
         sc_rollup
-        Contract.pp
-        source
+        Tezos_crypto.Signature.Public_key_hash.pp
+        staker
   | Dal_publish_slot_header slot_header ->
       Format.fprintf
         ppf

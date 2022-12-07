@@ -954,7 +954,8 @@ let sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
   sign account.sk (Context.branch ctxt) to_sign_op
 
 let sc_rollup_recover_bond ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
-    ctxt (source : Contract.t) (sc_rollup : Sc_rollup.t) =
+    ctxt (source : Contract.t) (sc_rollup : Sc_rollup.t)
+    (staker : public_key_hash) =
   manager_operation
     ?force_reveal
     ?counter
@@ -963,7 +964,7 @@ let sc_rollup_recover_bond ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     ?storage_limit
     ~source
     ctxt
-    (Sc_rollup_recover_bond {sc_rollup})
+    (Sc_rollup_recover_bond {sc_rollup; staker})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk (Context.branch ctxt) to_sign_op

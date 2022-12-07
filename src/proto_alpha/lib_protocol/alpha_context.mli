@@ -4716,6 +4716,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
       sc_rollup : Sc_rollup.t;
+      staker : Signature.Public_key_hash.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {

@@ -2180,13 +2180,24 @@ module Sc_rollup = struct
     {value = process; run = parse}
 
   let submit_recover_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks
-      ~rollup ~src client =
+      ~rollup ~src ~staker client =
     let process =
       spawn_command
         ?hooks
         client
         (["--wait"; wait]
-        @ ["recover"; "bond"; "of"; src; "for"; "sc"; "rollup"; rollup]
+        @ [
+            "recover";
+            "bond";
+            "of";
+            staker;
+            "for";
+            "sc";
+            "rollup";
+            rollup;
+            "from";
+            src;
+          ]
         @ Option.fold
             ~none:[]
             ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])

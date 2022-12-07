@@ -698,7 +698,8 @@ val sc_rollup_execute_outbox_message :
   output_proof:string ->
   (packed_operation, tztrace) result Lwt.t
 
-(** [sc_rollup_recover_bond ctxt source sc_rollup] returns a commitment bond. *)
+(** [sc_rollup_recover_bond ctxt source sc_rollup staker] recovers the
+    commitment bond of [staker]. *)
 val sc_rollup_recover_bond :
   ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
@@ -708,6 +709,7 @@ val sc_rollup_recover_bond :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
+  public_key_hash ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_add_messages :

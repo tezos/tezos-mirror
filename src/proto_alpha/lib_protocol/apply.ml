@@ -1541,8 +1541,8 @@ let apply_manager_operation :
           }
       in
       (ctxt, result, operations)
-  | Sc_rollup_recover_bond {sc_rollup} ->
-      Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup source
+  | Sc_rollup_recover_bond {sc_rollup; staker} ->
+      Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup staker
       >>=? fun (ctxt, balance_updates) ->
       let result =
         Sc_rollup_recover_bond_result

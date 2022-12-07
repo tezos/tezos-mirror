@@ -634,8 +634,19 @@ let gen_commitments incr ~baker ~originator rollup ~predecessor_hash
   in
   aux incr predecessor_hash num_commitments []
 
-let attempt_to_recover_bond i contract rollup =
-  let* recover_bond_op = Op.sc_rollup_recover_bond (I i) contract rollup in
+let attempt_to_recover_bond i contract ?staker rollup =
+  (* Recover its own bond by default. *)
+  let staker =
+    match staker with
+    | Some staker -> staker
+    | None -> (
+        match contract with
+        | Contract.Implicit staker -> staker
+        | _ -> assert false)
+  in
+  let* recover_bond_op =
+    Op.sc_rollup_recover_bond (I i) contract rollup staker
+  in
   let* i = Incremental.add_operation i recover_bond_op in
   let* b = Incremental.finalize_block i in
   return b

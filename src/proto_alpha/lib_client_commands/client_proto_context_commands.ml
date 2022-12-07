@@ -3736,13 +3736,17 @@ let commands_rw () =
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
       @@ Client_keys.Public_key_hash.source_param
-           ~name:"src"
+           ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "sc"; "rollup"]
       @@ Tezos_clic.param
            ~name:"smart contract rollup address"
            ~desc:"The address of the smart-contract rollup of the bond."
            Sc_rollup_params.sc_rollup_address_parameter
+      @@ prefixes ["from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"The implicit account that triggers the operation."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3751,8 +3755,9 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter )
-           source
+           staker
            sc_rollup
+           source
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -3773,6 +3778,7 @@ let commands_rw () =
             ~src_sk
             ~fee_parameter
             ~sc_rollup
+            ~staker
             ()
         in
         return_unit);
