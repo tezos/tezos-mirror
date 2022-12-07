@@ -46,8 +46,8 @@ open Alpha_context
 
 module type Mutable_level_store =
   Store_sigs.Mutable_value
-    with type value = Raw_level.t
-     and type 'a store = 'a Store.store
+    with type value := Raw_level.t
+     and type 'a store := 'a Store.store
 
 (* We persist the number of ticks to be included in the
    next commitment on disk, in a map that is indexed by
@@ -102,6 +102,23 @@ let last_commitment_with_hash
   in
   return commitment_with_hash
 
+let next_lcc_level node_ctxt =
+  Environment.wrap_tzresult @@ Raw_level.of_int32
+  @@ Int32.add
+       (Raw_level.to_int32 node_ctxt.Node_context.lcc.level)
+       (sc_rollup_commitment_period node_ctxt)
+
+let next_publishable_level node_ctxt =
+  let lpc_level =
+    match node_ctxt.Node_context.lpc with
+    | None -> node_ctxt.genesis_info.level
+    | Some lpc -> lpc.inbox_level
+  in
+  Environment.wrap_tzresult @@ Raw_level.of_int32
+  @@ Int32.add
+       (Raw_level.to_int32 lpc_level)
+       (sc_rollup_commitment_period node_ctxt)
+
 let next_commitment_level node_ctxt
     (module Last_commitment_level : Mutable_level_store) =
   let open Lwt_syntax in
@@ -138,22 +155,29 @@ let must_store_commitment node_ctxt current_level =
 
   Raw_level.equal current_level next_commitment_level
 
-let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
+let update_last_stored_commitment (node_ctxt : _ Node_context.t)
+    (commitment : Sc_rollup.Commitment.t) =
   let open Lwt_syntax in
   let commitment_hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
   let inbox_level = commitment.inbox_level in
-  let* lcc_level = Store.Last_cemented_commitment_level.get store in
   (* Do not change the order of these two operations. This guarantees that
      whenever `Store.Last_stored_commitment_level.get` returns `Some hash`,
      then the call to `Store.Commitments.get hash` will succeed.
   *)
   let* () =
-    Store.Commitments.add store inbox_level (commitment, commitment_hash)
+    Store.Commitments.add
+      node_ctxt.store
+      inbox_level
+      (commitment, commitment_hash)
   in
-  let* () = Store.Last_stored_commitment_level.set store inbox_level in
+  let* () =
+    Store.Last_stored_commitment_level.set node_ctxt.store inbox_level
+  in
   let* () = Commitment_event.commitment_stored commitment_hash commitment in
-  if commitment.inbox_level <= lcc_level then
-    Commitment_event.commitment_will_not_be_published lcc_level commitment
+  if commitment.inbox_level <= node_ctxt.lcc.level then
+    Commitment_event.commitment_will_not_be_published
+      node_ctxt.lcc.level
+      commitment
   else return ()
 
 module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
@@ -204,7 +228,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     if must_store_commitment then
       let*! () = Commitment_event.compute_commitment block_hash current_level in
       let* commitment = build_commitment node_ctxt block_hash in
-      let*! () = update_last_stored_commitment node_ctxt.store commitment in
+      let*! () = update_last_stored_commitment node_ctxt commitment in
       return_unit
     else return_unit
 
@@ -254,92 +278,62 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let*! () = update_ticks node_ctxt current_level hash in
     store_commitment_if_necessary node_ctxt current_level hash
 
-  let sync_last_cemented_commitment_hash_with_level
-      ({cctxt; rollup_address; store; _} : _ Node_context.t) =
-    let open Lwt_result_syntax in
-    let* hash, inbox_level =
-      Plugin.RPC.Sc_rollup.last_cemented_commitment_hash_with_level
-        cctxt
-        (cctxt#chain, cctxt#block)
-        rollup_address
-    in
-    let*! () = Store.Last_cemented_commitment_level.set store inbox_level in
-    let*! () = Store.Last_cemented_commitment_hash.set store hash in
-    let*! () =
-      Commitment_event.last_cemented_commitment_updated hash inbox_level
-    in
-    return_unit
-
   let get_commitment_and_publish ~check_lcc_hash
       ({store; _} as node_ctxt : _ Node_context.t) next_level_to_publish =
     let open Lwt_result_syntax in
-    let*! is_commitment_available =
-      Store.Commitments.mem store next_level_to_publish
-    in
-    if is_commitment_available then
-      let*! commitment, _commitment_hash =
-        Store.Commitments.get store next_level_to_publish
-      in
-      let* () =
-        if check_lcc_hash then
-          let open Lwt_result_syntax in
-          let*! lcc_hash = Store.Last_cemented_commitment_hash.get store in
-          if Sc_rollup.Commitment.Hash.equal lcc_hash commitment.predecessor
-          then return ()
-          else
-            let*! () =
-              Commitment_event.commitment_parent_is_not_lcc
-                commitment.inbox_level
+    let*! commitment = Store.Commitments.find store next_level_to_publish in
+    match commitment with
+    | None ->
+        (* Commitment not available *)
+        return_unit
+    | Some (commitment, _commitment_hash) -> (
+        let* () =
+          if check_lcc_hash then
+            let open Lwt_result_syntax in
+            if
+              Sc_rollup.Commitment.Hash.equal
+                node_ctxt.lcc.commitment
                 commitment.predecessor
-                lcc_hash
+            then return ()
+            else
+              let*! () =
+                Commitment_event.commitment_parent_is_not_lcc
+                  commitment.inbox_level
+                  commitment.predecessor
+                  node_ctxt.lcc.commitment
+              in
+              tzfail
+                (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
+                   commitment)
+          else return_unit
+        in
+        let operator = Node_context.get_operator node_ctxt Publish in
+        match operator with
+        | None ->
+            (* Configured to not publish commitments *)
+            return_unit
+        | Some source ->
+            let publish_operation =
+              Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
             in
-            tzfail
-              (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
-                 commitment)
-        else return_unit
-      in
-      let operator = Node_context.get_operator node_ctxt Publish in
-      match operator with
-      | None ->
-          (* Configured to not publish commitments *)
-          return_unit
-      | Some source ->
-          let publish_operation =
-            Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
-          in
-          let* _hash =
-            Injector.add_pending_operation ~source publish_operation
-          in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
-             Decouple commitments from head processing
+            let* _hash =
+              Injector.add_pending_operation ~source publish_operation
+            in
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
+               Decouple commitments from head processing
 
-             Move the following, in a part where we know the operation is
-             included. *)
-          let*! () =
-            Store.Last_published_commitment_level.set
-              store
-              commitment.inbox_level
-          in
-          return_unit
-    else return_unit
+               Move the following, in a part where we know the operation is
+               included. *)
+            node_ctxt.lpc <- Some commitment ;
+            return_unit)
 
   let publish_commitment node_ctxt =
     let open Lwt_result_syntax in
     (* Check level of next publishable commitment and avoid publishing if it is
        on or before the last cemented commitment.
     *)
-    let* next_lcc_level =
-      Lwt.map Environment.wrap_tzresult
-      @@ next_commitment_level
-           node_ctxt
-           (module Store.Last_cemented_commitment_level)
-    in
-    let* next_publishable_level =
-      Lwt.map Environment.wrap_tzresult
-      @@ next_commitment_level
-           node_ctxt
-           (module Store.Last_published_commitment_level)
-    in
+    let*? next_lcc_level = next_lcc_level node_ctxt in
+    let*? next_publishable_level = next_publishable_level node_ctxt in
     let check_lcc_hash, level_to_publish =
       if Raw_level.(next_publishable_level < next_lcc_level) then
         (*
@@ -401,12 +395,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
 
   let cement_commitment_if_possible node_ctxt Layer1.{level = head_level; _} =
     let open Lwt_result_syntax in
-    let* next_level_to_cement =
-      Lwt.map Environment.wrap_tzresult
-      @@ next_commitment_level
-           node_ctxt
-           (module Store.Last_cemented_commitment_level)
-    in
+    let*? next_level_to_cement = next_lcc_level node_ctxt in
     let*! commitment_with_hash =
       Store.Commitments.find node_ctxt.store next_level_to_cement
     in
