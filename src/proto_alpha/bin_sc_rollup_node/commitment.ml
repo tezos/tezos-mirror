@@ -46,8 +46,8 @@ open Alpha_context
 
 module type Mutable_level_store =
   Store_sigs.Mutable_value
-    with type value = Raw_level.t
-     and type 'a store = 'a Store.store
+    with type value := Raw_level.t
+     and type 'a store := 'a Store.store
 
 (* We persist the number of ticks to be included in the
    next commitment on disk, in a map that is indexed by

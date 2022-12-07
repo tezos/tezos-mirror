@@ -65,9 +65,9 @@ val readonly : _ t -> ro
 (** Extraneous state information for the PVM *)
 module StateInfo :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = state_info
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := state_info
+     and type 'a store := 'a store
 
 module StateHistoryRepr : sig
   type event = {
@@ -77,7 +77,7 @@ module StateHistoryRepr : sig
     level : Raw_level.t;
   }
 
-  module TickMap : Map.S with type key = Sc_rollup.Tick.t
+  module TickMap : Map.S with type key := Sc_rollup.Tick.t
 
   type value = event TickMap.t
 end
@@ -90,38 +90,36 @@ end
 module StateHistory : sig
   include
     Store_sigs.Mutable_value
-      with type value = StateHistoryRepr.value
-       and type 'a store = 'a store
+      with type value := StateHistoryRepr.value
+       and type 'a store := 'a store
 
   val insert : rw -> StateHistoryRepr.event -> unit Lwt.t
 
   val event_of_largest_tick_before :
-    _ t ->
-    StateHistoryRepr.TickMap.key ->
-    StateHistoryRepr.event option tzresult Lwt.t
+    _ t -> Sc_rollup.Tick.t -> StateHistoryRepr.event option tzresult Lwt.t
 end
 
 (** Storage for persisting messages downloaded from the L1 node, indexed by
     [Tezos_crypto.Block_hash.t]. *)
 module Messages :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Sc_rollup.Inbox_message.t list
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := Sc_rollup.Inbox_message.t list
+     and type 'a store := 'a store
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Sc_rollup.Inbox.t
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := Sc_rollup.Inbox.t
+     and type 'a store := 'a store
 
 (** Histories from the rollup node. **)
 module Histories :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Sc_rollup.Inbox.History.t
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := Sc_rollup.Inbox.History.t
+     and type 'a store := 'a store
 
 (** messages histories from the rollup node. Each history contains the messages
     of one level. The store is indexed by a level in order to maintain a small
@@ -129,47 +127,47 @@ module Histories :
     computing the proof. *)
 module Payloads_histories :
   Store_sigs.Append_only_map
-    with type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-     and type value = Sc_rollup.Inbox_merkelized_payload_hashes.History.t
-     and type 'a store = 'a store
+    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+     and type value := Sc_rollup.Inbox_merkelized_payload_hashes.History.t
+     and type 'a store := 'a store
 
 (** Storage containing commitments and corresponding commitment hashes that the
     rollup node has knowledge of. *)
 module Commitments :
   Store_sigs.Append_only_map
-    with type key = Raw_level.t
-     and type value = Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t
-     and type 'a store = 'a store
+    with type key := Raw_level.t
+     and type value := Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t
+     and type 'a store := 'a store
 
 (** Storage containing the inbox level of the last commitment produced by the
     rollup node. *)
 module Last_stored_commitment_level :
   Store_sigs.Mutable_value
-    with type value = Raw_level.t
-     and type 'a store = 'a store
+    with type value := Raw_level.t
+     and type 'a store := 'a store
 
 (** Storage contianing the inbox level of the last commitment published by the
     rollup node. *)
 module Last_published_commitment_level :
   Store_sigs.Mutable_value
-    with type value = Raw_level.t
-     and type 'a store = 'a store
+    with type value := Raw_level.t
+     and type 'a store := 'a store
 
 (** Storage mapping commitment hashes to the level when they were published by
     the rollup node. It only contains hashes of commitments published by this
     rollup node. *)
 module Commitments_published_at_level :
   Store_sigs.Map
-    with type key = Sc_rollup.Commitment.Hash.t
-     and type value = Raw_level.t
-     and type 'a store = 'a store
+    with type key := Sc_rollup.Commitment.Hash.t
+     and type value := Raw_level.t
+     and type 'a store := 'a store
 
 (** Storage containing the hashes of contexts retrieved from the L1 node. *)
 module Contexts :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Context.hash
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := Context.hash
+     and type 'a store := 'a store
 
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
@@ -177,24 +175,24 @@ module Contexts :
     list into a [Dal.Slot_index.t]-indexed map. *)
 module Dal_slots_headers :
   Store_sigs.Nested_map
-    with type primary_key = Tezos_crypto.Block_hash.t
-     and type secondary_key = Dal.Slot_index.t
-     and type value = Dal.Slot.Header.t
-     and type 'a store = 'a store
+    with type primary_key := Tezos_crypto.Block_hash.t
+     and type secondary_key := Dal.Slot_index.t
+     and type value := Dal.Slot.Header.t
+     and type 'a store := 'a store
 
 module Dal_confirmed_slots_history :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Dal.Slots_history.t
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := Dal.Slots_history.t
+     and type 'a store := 'a store
 
 (** Confirmed DAL slots histories cache. See documentation of
     {Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
-    with type key = Tezos_crypto.Block_hash.t
-     and type value = Dal.Slots_history.History_cache.t
-     and type 'a store = 'a store
+    with type key := Tezos_crypto.Block_hash.t
+     and type value := Dal.Slots_history.History_cache.t
+     and type 'a store := 'a store
 
 (** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
     of dal slots fetched by the rollup node, as a list of pages. The values of
@@ -204,10 +202,10 @@ module Dal_confirmed_slots_histories :
 *)
 module Dal_slot_pages :
   Store_sigs.Nested_map
-    with type primary_key = Tezos_crypto.Block_hash.t
-     and type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
-     and type value = Dal.Page.content
-     and type 'a store = 'a store
+    with type primary_key := Tezos_crypto.Block_hash.t
+     and type secondary_key := Dal.Slot_index.t * Dal.Page.Index.t
+     and type value := Dal.Page.content
+     and type 'a store := 'a store
 
 (** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing
     status of dal slots content fetched by the rollup node. The values of
@@ -218,7 +216,7 @@ module Dal_slot_pages :
 *)
 module Dal_processed_slots :
   Store_sigs.Nested_map
-    with type primary_key = Tezos_crypto.Block_hash.t
-     and type secondary_key = Dal.Slot_index.t
-     and type value = [`Confirmed | `Unconfirmed]
-     and type 'a store = 'a store
+    with type primary_key := Tezos_crypto.Block_hash.t
+     and type secondary_key := Dal.Slot_index.t
+     and type value := [`Confirmed | `Unconfirmed]
+     and type 'a store := 'a store
