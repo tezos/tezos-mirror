@@ -23,16 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 module Plugin = struct
   module Proto = Registerer.Registered
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  let get_constants chain block ctxt =
+  let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    Protocol.Constants_services.parametric cpctxt (chain, block)
+
+  let get_constants chain block ctxt =
     let open Lwt_result_syntax in
-    let* constants = Protocol.Constants_services.all cpctxt (chain, block) in
-    return constants.parametric.dal.cryptobox_parameters
+    let* parametric = parametric_constants chain block ctxt in
+    let {
+      Constants.Parametric.feature_enable;
+      number_of_slots;
+      attestation_lag;
+      availability_threshold;
+      cryptobox_parameters;
+      blocks_per_epoch;
+    } =
+      parametric.dal
+    in
+    return
+      {
+        Dal_plugin.feature_enable;
+        number_of_slots;
+        attestation_lag;
+        availability_threshold;
+        cryptobox_parameters;
+        blocks_per_epoch;
+      }
 
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_full ctxt in

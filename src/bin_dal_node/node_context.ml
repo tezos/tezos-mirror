@@ -25,7 +25,11 @@
 
 exception Status_already_ready
 
-type ready_ctxt = {cryptobox : Cryptobox.t; plugin : (module Dal_plugin.T)}
+type ready_ctxt = {
+  cryptobox : Cryptobox.t;
+  proto_parameters : Dal_plugin.proto_parameters;
+  plugin : (module Dal_plugin.T);
+}
 
 type status = Ready of ready_ctxt | Starting
 
@@ -45,9 +49,9 @@ let init config store =
   in
   {status = Starting; config; store; neighbors_cctxts}
 
-let set_ready ctxt plugin cryptobox =
+let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
-  | Starting -> ctxt.status <- Ready {plugin; cryptobox}
+  | Starting -> ctxt.status <- Ready {plugin; cryptobox; proto_parameters}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready

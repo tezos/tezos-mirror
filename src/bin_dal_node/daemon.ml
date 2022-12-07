@@ -53,18 +53,20 @@ let () =
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
     (fun str -> Cryptobox_initialisation_failed str)
 
-let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
+let init_cryptobox unsafe_srs (proto_parameters : Dal_plugin.proto_parameters) =
   let open Cryptobox in
   let open Lwt_result_syntax in
-  let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
-  let srs_size = if unsafe_srs then Some parameters.slot_size else None in
+  let srs_size =
+    if unsafe_srs then Some proto_parameters.cryptobox_parameters.slot_size
+    else None
+  in
   let* () =
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
     Cryptobox.Config.init_dal
       ~find_srs_files
       Cryptobox.Config.{activated = true; srs_size}
   in
-  match Cryptobox.make parameters with
+  match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox -> return cryptobox
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
@@ -108,10 +110,13 @@ module Handler = struct
       | Some plugin ->
           let (module Plugin : Dal_plugin.T) = plugin in
           let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
-          let* cryptobox =
-            init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
+          let* proto_parameters =
+            Plugin.get_constants cctxt#chain cctxt#block cctxt
           in
-          Node_context.set_ready ctxt (module Plugin) cryptobox ;
+          let* cryptobox =
+            init_cryptobox config.Configuration.use_unsafe_srs proto_parameters
+          in
+          Node_context.set_ready ctxt (module Plugin) cryptobox proto_parameters ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit

@@ -42,6 +42,15 @@ type slot_header = {
   commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
 }
 
+type proto_parameters = {
+  feature_enable : bool;
+  number_of_slots : int;
+  attestation_lag : int;
+  availability_threshold : int;
+  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
+  blocks_per_epoch : int32;
+}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -62,7 +71,7 @@ module type T = sig
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
+    proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
     block_info ->
