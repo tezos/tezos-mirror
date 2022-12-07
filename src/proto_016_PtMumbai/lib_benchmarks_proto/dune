@@ -2,27 +2,27 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmarks_proto_alpha)
- (public_name tezos-benchmarks-proto-alpha)
+ (name tezos_benchmarks_proto_016_PtMumbai)
+ (public_name tezos-benchmarks-proto-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
   str
   tezos-stdlib
   tezos-base
   tezos-error-monad
-  tezos-protocol-alpha.parameters
+  tezos-protocol-016-PtMumbai.parameters
   tezos-lazy-containers
   tezos-benchmark
-  tezos-benchmark-alpha
-  tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha
+  tezos-benchmark-016-PtMumbai
+  tezos-benchmark-type-inference-016-PtMumbai
+  tezos-protocol-016-PtMumbai
   tezos-crypto
   tezos-shell-benchmarks
   tezos-micheline
-  tezos-alpha-test-helpers
+  tezos-016-PtMumbai-test-helpers
   tezos-sapling
-  tezos-client-alpha
-  tezos-protocol-plugin-alpha
+  tezos-client-016-PtMumbai
+  tezos-protocol-plugin-016-PtMumbai
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
@@ -32,14 +32,14 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_error_monad
-  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_016_PtMumbai_parameters
   -open Tezos_lazy_containers
   -open Tezos_benchmark
-  -open Tezos_benchmark_alpha
-  -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_alpha.Protocol
+  -open Tezos_benchmark_016_PtMumbai
+  -open Tezos_benchmark_type_inference_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_protocol_016_PtMumbai.Protocol
   -open Tezos_micheline
-  -open Tezos_alpha_test_helpers
-  -open Tezos_client_alpha
-  -open Tezos_protocol_plugin_alpha))
+  -open Tezos_016_PtMumbai_test_helpers
+  -open Tezos_client_016_PtMumbai
+  -open Tezos_protocol_plugin_016_PtMumbai))

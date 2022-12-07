@@ -2,33 +2,33 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_plugin_alpha)
- (public_name tezos-protocol-plugin-alpha)
+ (name tezos_protocol_plugin_016_PtMumbai)
+ (public_name tezos-protocol-plugin-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-alpha)
+  tezos-protocol-016-PtMumbai)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha)
+  -open Tezos_protocol_016_PtMumbai)
  (modules (:standard \ Plugin_registerer)))
 
 (library
- (name tezos_protocol_plugin_alpha_registerer)
- (public_name tezos-protocol-plugin-alpha-registerer)
+ (name tezos_protocol_plugin_016_PtMumbai_registerer)
+ (public_name tezos-protocol-plugin-016-PtMumbai-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-embedded-protocol-alpha
-  tezos-protocol-plugin-alpha
+  tezos-embedded-protocol-016-PtMumbai
+  tezos-protocol-plugin-016-PtMumbai
   tezos-shell)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_embedded_protocol_alpha
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_embedded_protocol_016_PtMumbai
+  -open Tezos_protocol_plugin_016_PtMumbai
   -open Tezos_shell)
  (modules Plugin_registerer))

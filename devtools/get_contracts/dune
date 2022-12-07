@@ -11,6 +11,8 @@
   tezos-client-014-PtKathma
   tezos-protocol-015-PtLimaPt
   tezos-client-015-PtLimaPt
+  tezos-protocol-016-PtMumbai
+  tezos-client-016-PtMumbai
   tezos-protocol-alpha
   tezos-client-alpha)
  (library_flags (:standard -linkall))

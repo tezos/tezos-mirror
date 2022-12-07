@@ -6,21 +6,21 @@
  (libraries
   tezos-micheline
   tezos-micheline-rewriting
-  tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha
+  tezos-benchmark-type-inference-016-PtMumbai
+  tezos-protocol-016-PtMumbai
   tezos-error-monad
-  tezos-client-alpha)
+  tezos-client-016-PtMumbai)
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_type_inference_016_PtMumbai))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-alpha)
+ (package tezos-benchmark-type-inference-016-PtMumbai)
  (action (run %{dep:./test_uf.exe})))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-alpha)
+ (package tezos-benchmark-type-inference-016-PtMumbai)
  (action (run %{dep:./test_inference.exe})))

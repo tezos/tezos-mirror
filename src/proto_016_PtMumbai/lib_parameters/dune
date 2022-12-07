@@ -2,33 +2,33 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_alpha_parameters)
- (public_name tezos-protocol-alpha.parameters)
+ (name tezos_protocol_016_PtMumbai_parameters)
+ (public_name tezos-protocol-016-PtMumbai.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-protocol-environment
-  tezos-protocol-alpha)
+  tezos-protocol-016-PtMumbai)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha)
+  -open Tezos_protocol_016_PtMumbai)
  (modules (:standard \ gen)))
 
 (executable
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-alpha.parameters
-  tezos-protocol-alpha)
+  tezos-protocol-016-PtMumbai.parameters
+  tezos-protocol-016-PtMumbai)
  (link_flags
   (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha_parameters
-  -open Tezos_protocol_alpha)
+  -open Tezos_protocol_016_PtMumbai_parameters
+  -open Tezos_protocol_016_PtMumbai)
  (modules gen))
 
 (rule
@@ -47,6 +47,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
- (package tezos-protocol-alpha)
+ (package tezos-protocol-016-PtMumbai)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

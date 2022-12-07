@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_injector_alpha)
- (public_name tezos-injector-alpha)
+ (name tezos_injector_016_PtMumbai)
+ (public_name tezos-injector-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
   tezos-crypto
-  tezos-protocol-alpha
+  tezos-protocol-016-PtMumbai
   tezos-micheline
-  tezos-client-alpha
+  tezos-client-016-PtMumbai
   tezos-client-base
   tezos-workers
   tezos-shell
-  tezos-layer2-utils-alpha)
+  tezos-layer2-utils-016-PtMumbai)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -26,9 +26,9 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_base
   -open Tezos_stdlib_unix
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_016_PtMumbai
   -open Tezos_micheline
-  -open Tezos_client_alpha
+  -open Tezos_client_016_PtMumbai
   -open Tezos_client_base
   -open Tezos_workers
-  -open Tezos_layer2_utils_alpha))
+  -open Tezos_layer2_utils_016_PtMumbai))
