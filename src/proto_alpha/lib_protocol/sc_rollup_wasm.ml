@@ -83,7 +83,7 @@ let () =
 module V2_0_0 = struct
   let ticks_per_snapshot = Z.of_int64 11_000_000_000L
 
-  let outbox_validity_period = Int32.of_int 40_320
+  let outbox_validity_period = Int32.of_int 80_640
 
   let outbox_message_limit = Z.of_int 100
 
