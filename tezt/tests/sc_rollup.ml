@@ -3209,17 +3209,47 @@ let test_timeout =
 *)
 let test_late_rollup_node =
   test_full_scenario
+    ~commitment_period:3
     {
       tags = ["late"];
       variant = None;
       description = "a late rollup should catch up";
     }
-  @@ fun _protocol sc_rollup_node _rollup_client _sc_rollup_address _node client
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup_address node client
     ->
   let* () = bake_levels 65 client in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = bake_levels 30 client in
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
+  Log.info "First rollup node synchronized." ;
+  let sc_rollup_node2 =
+    Sc_rollup_node.create
+      Operator
+      node
+      client
+      ~default_operator:
+        Constant.bootstrap1.alias (* Same as other rollup_node *)
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup_address
+  in
+  Log.info "Start rollup node from scratch with same operator" ;
+  let* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Other rollup node synchronized." ;
+  let* () = Client.bake_for_and_wait client in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Other rollup node progresses." ;
   unit
 
 (* Test interruption of rollup node before the first inbox is processed. Upon
