@@ -1,0 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (libraries
+  alcotest-lwt
+  tezos-base
+  tezos-protocol-016-PtMumbai
+  tezos-alpha-test-helpers
+  tezos-base-test-helpers
+  tezos-client-alpha
+  tezos-benchmark
+  tezos-micheline
+  tezos-benchmark-alpha
+  tezos-benchmark-type-inference-alpha
+  tezos-protocol-plugin-alpha
+  tezos-protocol-016-PtMumbai.parameters)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_016_PtMumbai
+  -open Tezos_alpha_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_client_alpha
+  -open Tezos_micheline
+  -open Tezos_benchmark_alpha
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_plugin_alpha))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-016-PtMumbai-tests)
+ (deps (glob_files contracts/*) (glob_files patched_contracts/*))
+ (action (run %{dep:./main.exe})))

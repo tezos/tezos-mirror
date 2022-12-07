@@ -1,0 +1,34 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_alpha)
+ (public_name tezos-benchmark-alpha)
+ (libraries
+  tezos-stdlib
+  tezos-base
+  tezos-error-monad
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-alpha
+  tezos-protocol-alpha
+  tezos-crypto
+  tezos-protocol-alpha.parameters
+  hashcons
+  tezos-alpha-test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_alpha
+  -open Tezos_alpha_test_helpers)
+ (private_modules kernel rules state_space))

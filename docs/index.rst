@@ -167,6 +167,15 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Mumbai Protocol doc:
+
+   mumbai/protocol
+   mumbai/glossary
+   mumbai/cli-commands
+   mumbai/rpc
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
    alpha/protocol
@@ -221,6 +230,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/013_jakarta
    protocols/014_kathmandu
    protocols/015_lima
+   protocols/016_mumbai
    protocols/alpha
 
 .. toctree::

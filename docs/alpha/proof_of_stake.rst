@@ -149,13 +149,13 @@ Proof-of-stake parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
-     - 16384 blocks
+     - 8192 blocks
    * - ``PRESERVED_CYCLES``
      - 5 cycles
    * - ``TOKENS_PER_ROLL``
      - 6,000 ꜩ
    * - ``BLOCKS_PER_STAKE_SNAPSHOT``
-     - 1024 blocks
+     - 512 blocks
 
 
 Further External Resources
