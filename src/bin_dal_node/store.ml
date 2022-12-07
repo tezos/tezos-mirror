@@ -66,7 +66,7 @@ let init config =
   let slots_watcher = Lwt_watcher.create_input () in
   let* repo = Repo.v (Irmin_pack.config dir) in
   let* slots_store = main repo in
-  let* shard_store = Shard_store.init shard_store_path in
+  let* shard_store = Shard_store.init (Filename.concat dir shard_store_path) in
   let* () = Event.(emit store_is_ready ()) in
   Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
 
