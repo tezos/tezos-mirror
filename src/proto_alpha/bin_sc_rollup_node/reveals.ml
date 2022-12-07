@@ -29,6 +29,7 @@ module Reveal_hash = Protocol.Sc_rollup_reveal_hash
 type error +=
   | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
   | Could_not_open_preimage_file of String.t
+  | Could_not_encode_raw_data
 
 let () =
   register_error_kind
@@ -64,7 +65,20 @@ let () =
     Data_encoding.(obj1 (req "hash" string))
     (function
       | Could_not_open_preimage_file filename -> Some filename | _ -> None)
-    (fun filename -> Could_not_open_preimage_file filename)
+    (fun filename -> Could_not_open_preimage_file filename) ;
+  register_error_kind
+    ~id:"sc_rollup.node.could_not_encode_raw_data"
+    ~title:"Could not encode raw data to reveal"
+    ~description:"Could not encode raw data to reveal."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "Could not encode raw data to reveal with the expected protocol \
+         encoding")
+    `Permanent
+    Data_encoding.unit
+    (function Could_not_encode_raw_data -> Some () | _ -> None)
+    (fun () -> Could_not_encode_raw_data)
 
 type source = String of string | File of string
 
@@ -91,5 +105,16 @@ let get ~data_dir ~pvm_kind ~hash =
     error_unless
       (Reveal_hash.equal contents_hash hash)
       (Wrong_hash {found = contents_hash; expected = hash})
+  in
+  let* _encoded =
+    (* Check that the reveal input can be encoded within the bounds enforced by
+       the protocol. *)
+    trace Could_not_encode_raw_data
+    @@ protect
+    @@ fun () ->
+    Data_encoding.Binary.to_bytes_exn
+      Sc_rollup.input_encoding
+      (Reveal (Raw_data contents))
+    |> return
   in
   return contents

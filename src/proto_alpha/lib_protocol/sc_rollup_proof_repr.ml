@@ -67,9 +67,11 @@ let reveal_proof_encoding =
          (req "reveal_proof_kind" (constant "raw_data_proof"))
          (req
             "raw_data"
-            (check_size
-               Constants_repr.sc_rollup_message_size_limit
-               (string Hex))))
+            Bounded.(
+              string
+                ~length_kind:`Uint16
+                Hex
+                Constants_repr.sc_rollup_message_size_limit)))
       (function Raw_data_proof s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Raw_data_proof s)
   and case_metadata_proof =

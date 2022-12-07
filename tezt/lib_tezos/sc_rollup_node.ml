@@ -76,14 +76,10 @@ let wait sc_node =
         (name sc_node)
   | Running {process; _} -> Process.wait process
 
-let wait_for_failure_handler sc_node =
-  match sc_node.status with
-  | Not_running ->
-      Test.fail
-        "Smart-contract rollup node %s is not running, cannot wait for it to \
-         terminate"
-        (name sc_node)
-  | Running {process; _} -> fun () -> Process.check ~expect_failure:true process
+let process node =
+  match node.status with
+  | Running {process; _} -> Some process
+  | Not_running -> None
 
 let name sc_node = sc_node.name
 

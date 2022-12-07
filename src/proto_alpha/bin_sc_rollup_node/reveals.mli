@@ -63,6 +63,8 @@ type source =
      {li [Could_not_open_preimage_file filename] if the function tries to
         retrieve the data from [filename], but it cannot read the contents
         of the file.}
+     {li [Could_not_encode_raw_data] if the data is too large (more than
+        4kB) to be revealed.}
    } *)
 val get :
   data_dir:string ->

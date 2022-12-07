@@ -111,15 +111,9 @@ val run : t -> string list -> unit Lwt.t
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** [wait_for_failure_handler sc_node] returns a function of type
-    [unit -> unit Lwt.t] which, when invoked, waits for sc_node to terminate
-    and then checks that its exit status code is different from 0. If
-    the rollup node terminated before the function handler is invoked, then
-    only the exit code is checked. If the rollup node is not running when the
-    function is invoked, the test where the function is invoked fails. If the
-    handler is invoked and the rollup node terminates with status code 0,
-    then the test where the function is invoked fails. *)
-val wait_for_failure_handler : t -> unit -> unit Lwt.t
+(** Returns [None] if node is already terminated or returns the node process if
+    it still running. *)
+val process : t -> Process.t option
 
 (** Send SIGTERM and wait for the process to terminate.
 

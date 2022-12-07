@@ -2380,11 +2380,11 @@ let test_reveals_fails_on_wrong_hash ~kind =
     ~timeout:120
     ~kind
     {
-      tags = ["reveals"];
+      tags = ["reveals"; "wrong"];
       variant = None;
       description = "reveal data fails with wrong hash";
     }
-  @@ fun _protocol sc_rollup_node _sc_rollup_client sc_rollup _node client ->
+  @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
   (* This value has been obtained from the logs of the test
      "Alpha: arith - rollup node correctly handles reveals." *)
   let hash = "scrrh13sj3sMk3Ne75xd4dnYGH4TF4dHzAcmXpEPkdJrQ3fBEGN4jtoF" in
@@ -2396,24 +2396,111 @@ let test_reveals_fails_on_wrong_hash ~kind =
   let cout = open_out filename in
   let () = output_string cout "Some data that is not related to the hash" in
   let () = close_out cout in
-  let* genesis_info =
-    RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   (* Prepare the handler to wait for the rollup node to fail before
      sending the L1 message that will trigger the failure. This
      ensures that the failure handler can access the status code
      of the rollup node even after it has terminated. *)
-  let expect_failure = Sc_rollup_node.wait_for_failure_handler sc_rollup_node in
-  let* _level =
-    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  let expect_failure =
+    let node_process = Option.get @@ Sc_rollup_node.process sc_rollup_node in
+    Process.check_error
+      ~exit_code:1
+      ~msg:
+        (rex
+           "The hash of reveal preimage is \\w+ while a value of \\w+ is \
+            expected")
+      node_process
   in
-
   let* () = send_text_messages client ["hash:" ^ hash] in
-  expect_failure ()
+  let should_not_sync =
+    let* _level =
+      Sc_rollup_node.wait_for_level
+        ~timeout:10.
+        sc_rollup_node
+        (Node.get_level node)
+    in
+    Test.fail "The rollup node processed the incorrect reveal without failing"
+  in
+  Lwt.choose [expect_failure; should_not_sync]
+
+let test_reveals_4k =
+  let kind = "arith" in
+  test_full_scenario
+    ~timeout:120
+    ~kind
+    {
+      tags = ["reveals"; "4k"];
+      variant = None;
+      description = "reveal 4kB of data";
+    }
+  @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
+  let data = String.make 4096 'z' in
+  let hash = "scrrh14ZQQhSPAYTCdcHw8FYrXCtLqtyukNXj4UuTe33wPpoixYP4mbU" in
+  let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
+  let filename = Filename.concat pvm_dir hash in
+  let () = Sys.mkdir pvm_dir 0o700 in
+  let () = with_open_out filename @@ fun cout -> output_string cout data in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let failure =
+    let* () =
+      Sc_rollup_node.process sc_rollup_node |> Option.get |> Process.check
+    in
+    Test.fail "Node terminated before reveal"
+  in
+  let* () = send_text_messages client ["hash:" ^ hash] in
+  let sync =
+    let* _level =
+      Sc_rollup_node.wait_for_level
+        ~timeout:10.
+        sc_rollup_node
+        (Node.get_level node)
+    in
+    unit
+  in
+  Lwt.choose [sync; failure]
+
+let test_reveals_above_4k =
+  let kind = "arith" in
+  test_full_scenario
+    ~timeout:120
+    ~kind
+    {
+      tags = ["reveals"; "4k"];
+      variant = None;
+      description = "reveal more than 4kB of data";
+    }
+  @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
+  let data = String.make 4097 'z' in
+  let hash = "scrrh13kjkToxe8quiXqyjx4GHrdmNLPwiMf4Mdi7CMbV24amzSTT97g" in
+  let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
+  let filename = Filename.concat pvm_dir hash in
+  let () = Sys.mkdir pvm_dir 0o700 in
+  let cout = open_out filename in
+  let () = output_string cout data in
+  let () = close_out cout in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let expect_failure =
+    let node_process = Option.get @@ Sc_rollup_node.process sc_rollup_node in
+    Process.check_error
+      ~exit_code:1
+      ~msg:
+        (rex
+           "Could not encode raw data to reveal with the expected protocol \
+            encoding")
+      node_process
+  in
+  let* () = send_text_messages client ["hash:" ^ hash] in
+  let should_not_sync =
+    let* _level =
+      Sc_rollup_node.wait_for_level
+        ~timeout:10.
+        sc_rollup_node
+        (Node.get_level node)
+    in
+    Test.fail "The rollup node processed the incorrect reveal without failing"
+  in
+  Lwt.choose [expect_failure; should_not_sync]
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4147
 
@@ -3833,6 +3920,8 @@ let register ~protocols =
     ~boot_sector2:"31"
     ~kind:"arith"
     protocols ;
+  test_reveals_4k protocols ;
+  test_reveals_above_4k protocols ;
   (* Specific Wasm PVM tezts *)
   test_rollup_node_run_with_kernel
     protocols
