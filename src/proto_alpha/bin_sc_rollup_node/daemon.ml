@@ -189,9 +189,6 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
     let* () = Components.Commitment.process_head node_ctxt block in
-    (* At each block, there may be some refutation related actions to
-       be performed. *)
-    let* () = Components.Refutation_game.process block node_ctxt in
     let*! () = State.mark_finalized_head node_ctxt.store block in
     return_unit
 
@@ -284,6 +281,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
     let* () = notify_injector node_ctxt new_head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
+    let* () = Components.Refutation_game.process head node_ctxt in
     let* () = Components.Batcher.batch () in
     let* () = Components.Batcher.new_head head in
     let*! () = Injector.inject ~header () in
