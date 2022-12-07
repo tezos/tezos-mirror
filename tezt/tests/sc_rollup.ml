@@ -791,15 +791,8 @@ let basic_scenario sc_rollup_node _rollup_client _sc_rollup _node client =
   in
   unit
 
-(* Reactivate when the following TODO is fixed:
-
-   FIXME: https://gitlab.com/tezos/tezos/-/issues/3205
-
-   The rollup node should be able to restart properly after an
-   abnormal interruption at every point of its process.  Currently,
-   the state is not persistent enough and the processing is not
-   idempotent enough to achieve that property. *)
-let _sc_rollup_node_stops_scenario sc_rollup_node _node client =
+let sc_rollup_node_stops_scenario sc_rollup_node _rollup_client _sc_rollup _node
+    client =
   let num_messages = 2 in
   let expected_level =
     (* We start at level 2 and each message also bakes a block. With 2 messages being sent twice, we
@@ -3924,14 +3917,11 @@ let register ~kind ~protocols =
     basic_scenario
     protocols ;
   test_rpcs ~kind protocols ;
-  (* See above at definition of sc_rollup_node_stops_scenario:
-
-     test_rollup_inbox_of_rollup_node
-      ~kind
-      "stops"
-      sc_rollup_node_stops_scenario
-      protocols ;
-  *)
+  test_rollup_inbox_of_rollup_node
+    ~kind
+    ~variant:"stops"
+    sc_rollup_node_stops_scenario
+    protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
     ~variant:"disconnects"
