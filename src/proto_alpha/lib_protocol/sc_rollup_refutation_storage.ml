@@ -236,10 +236,10 @@ let update_game ctxt rollup stakers new_game =
 let remove_game ctxt rollup stakers =
   let open Lwt_result_syntax in
   let open Sc_rollup_game_repr.Index in
-  let* ctxt, _, _ =
+  let* ctxt, _storage_diff, _was_here =
     Store.Game.remove ((ctxt, rollup), stakers.alice) stakers.bob
   in
-  let* ctxt, _, _ =
+  let* ctxt, _storage_diff, _was_here =
     Store.Game.remove ((ctxt, rollup), stakers.bob) stakers.alice
   in
   let* ctxt, _storage_diff, _was_here =
@@ -459,7 +459,9 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
         in
         return (ctxt, balances_updates_alice @ balances_updates_bob)
   in
-  let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
+  let* ctxt, _storage_diff, _was_here =
+    Store.Game_timeout.remove (ctxt, rollup) stakers
+  in
   return (status, ctxt, balances_updates)
 
 module Internal_for_tests = struct
@@ -491,8 +493,8 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
   let make_conflict ctxt rollup other (our_point, their_point) =
     let our_hash = our_point.hash and their_hash = their_point.hash in
     let get = Sc_rollup_commitment_storage.get_commitment_unsafe ctxt rollup in
-    let* our_commitment, _ = get our_hash in
-    let* their_commitment, _ = get their_hash in
+    let* our_commitment, _ctxt = get our_hash in
+    let* their_commitment, _ctxt = get their_hash in
     let parent_commitment = our_commitment.predecessor in
     return {other; their_commitment; our_commitment; parent_commitment}
   in
