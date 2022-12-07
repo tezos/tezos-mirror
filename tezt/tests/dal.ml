@@ -250,25 +250,13 @@ let test_feature_flag _protocol _parameters _cryptobox node client
      - 2. It checks the new operations added by the feature flag
      cannot be propagated by checking their classification in the
      mempool. *)
-  let* protocol_parameters =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
-  in
-  let feature_flag =
-    JSON.(
-      protocol_parameters |-> "dal_parametric" |-> "feature_enable" |> as_bool)
-  in
-  let number_of_slots =
-    JSON.(
-      protocol_parameters |-> "dal_parametric" |-> "number_of_slots" |> as_int)
-  in
-  let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox_params = parameters.cryptobox in
-  let cryptobox = Rollup.Dal.make cryptobox_params in
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make params.cryptobox in
   let commitment, proof =
     Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou"
   in
   Check.(
-    (feature_flag = false)
+    (params.feature_enabled = false)
       bool
       ~error_msg:"Feature flag for the DAL should be disabled") ;
   let*? process =
@@ -285,7 +273,9 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       inject
         ~force:true
         ~signer:Constant.bootstrap1
-        (dal_attestation ~level ~attestation:(Array.make number_of_slots false))
+        (dal_attestation
+           ~level
+           ~attestation:(Array.make params.number_of_slots false))
         client)
   in
   let* (`OpHash oph2) =
@@ -310,12 +300,10 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let test_one_committee_per_epoch _protocol _parameters _cryptobox node _client
+let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
     _bootstrap_key =
-  let* blocks_per_epoch =
-    let* json = RPC.(call node @@ get_chain_block_context_constants ()) in
-    return @@ JSON.(json |-> "dal_parametric" |-> "blocks_per_epoch" |> as_int)
-  in
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let blocks_per_epoch = params.blocks_per_epoch in
   let* current_level =
     RPC.(call node @@ get_chain_block_helper_current_level ())
   in

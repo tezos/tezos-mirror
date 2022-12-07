@@ -503,9 +503,11 @@ module Dal = struct
 
   module Parameters = struct
     type t = {
+      feature_enabled : bool;
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      blocks_per_epoch : int;
     }
 
     let parameter_file protocol =
@@ -523,13 +525,17 @@ module Dal = struct
       let page_size = JSON.(json |-> "page_size" |> as_int) in
       let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
       let attestation_lag = JSON.(json |-> "attestation_lag" |> as_int) in
+      let blocks_per_epoch = JSON.(json |-> "blocks_per_epoch" |> as_int) in
+      let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
       return
         {
+          feature_enabled;
           cryptobox =
             Cryptobox.Verifier.
               {number_of_shards; redundancy_factor; slot_size; page_size};
           number_of_slots;
           attestation_lag;
+          blocks_per_epoch;
         }
   end
 
