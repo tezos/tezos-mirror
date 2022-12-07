@@ -1,7 +1,7 @@
-Protocol Alpha
-==============
+Protocol Mumbai
+===============
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Mumbai with respect
 to Lima (see :ref:`naming_convention`).
 
 The code can be found in directory :src:`src/proto_016_PtMumbai` of the ``master``
