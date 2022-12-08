@@ -175,11 +175,23 @@ module type INDEXED_FILE = sig
   val read : [> `Read] t -> key -> value option tzresult Lwt.t
 
   val append :
-    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
+    ?flush:bool ->
+    [> `Write] t ->
+    key:key ->
+    header:header ->
+    value:value ->
+    unit tzresult Lwt.t
 
   val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   val close : _ t -> unit tzresult Lwt.t
+end
+
+module type SIMPLE_INDEXED_FILE = sig
+  include INDEXED_FILE
+
+  val append :
+    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
 end
 
 module type ENCODABLE_VALUE = sig
@@ -200,8 +212,6 @@ module type ENCODABLE_VALUE_HEADER = sig
   include ENCODABLE_VALUE
 
   module Header : FIXED_ENCODABLE_VALUE
-
-  val header : t -> Header.t
 end
 
 module Make_fixed_encodable (V : ENCODABLE_VALUE) :
@@ -560,7 +570,7 @@ struct
     | Some (Ok value) -> return_some value
     | Some (Error _ as e) -> Lwt.return e
 
-  let locked_write_value store ~offset ~value ~key =
+  let locked_write_value store ~offset ~value ~key ~header =
     trace (Cannot_write_to_store N.name)
     @@ protect
     @@ fun () ->
@@ -572,10 +582,10 @@ struct
     let*! () =
       Lwt_utils_unix.write_bytes ~pos:0 ~len:value_length store.fd value_bytes
     in
-    Header_index.replace store.index key {offset; header = V.header value} ;
+    Header_index.replace store.index key {offset; header} ;
     return value_length
 
-  let append ?(flush = true) store ~key ~(value : V.t) =
+  let append ?(flush = true) store ~key ~header ~(value : V.t) =
     trace (Cannot_write_to_store N.name)
     @@ protect
     @@ fun () ->
@@ -583,7 +593,7 @@ struct
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     Cache.put store.cache key (Lwt.return_some (Ok value)) ;
     let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
-    let*! _written_len = locked_write_value store ~offset ~value ~key in
+    let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
     if flush then Header_index.flush store.index ;
     return_unit
 
@@ -618,4 +628,18 @@ struct
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     (try Header_index.close store.index with Index.Closed -> ()) ;
     Lwt_utils_unix.safe_close store.fd
+end
+
+module Make_simple_indexed_file
+    (N : NAME)
+    (K : Index.Key.S) (V : sig
+      include ENCODABLE_VALUE_HEADER
+
+      val header : t -> Header.t
+    end) =
+struct
+  include Make_indexed_file (N) (K) (V)
+
+  let append ?flush store ~key ~value =
+    append ?flush store ~key ~value ~header:(V.header value)
 end
