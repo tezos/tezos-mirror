@@ -121,13 +121,27 @@ module type INDEXED_FILE = sig
 
   (** Append a new binding to the indexed file store. *)
   val append :
-    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
+    ?flush:bool ->
+    [> `Write] t ->
+    key:key ->
+    header:header ->
+    value:value ->
+    unit tzresult Lwt.t
 
   (** Loads a new or existing indexed file store in the directory [path]. *)
   val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Close the index and the file. *)
   val close : _ t -> unit tzresult Lwt.t
+end
+
+(** Same as {!INDEXED_FILE} but where headers are extracted from values. *)
+module type SIMPLE_INDEXED_FILE = sig
+  include INDEXED_FILE
+
+  (** Append a new binding to the indexed file store. *)
+  val append :
+    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
 end
 
 (** Names for stores.  *)
@@ -174,6 +188,18 @@ module Make_indexed_file
     (K : Index.Key.S)
     (V : ENCODABLE_VALUE_HEADER) :
   INDEXED_FILE
+    with type key := K.t
+     and type value := V.t
+     and type header := V.Header.t
+
+module Make_simple_indexed_file
+    (_ : NAME)
+    (K : Index.Key.S) (V : sig
+      include ENCODABLE_VALUE_HEADER
+
+      val header : t -> Header.t
+    end) :
+  SIMPLE_INDEXED_FILE
     with type key := K.t
      and type value := V.t
      and type header := V.Header.t
