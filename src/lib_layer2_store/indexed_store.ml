@@ -316,9 +316,9 @@ module Make_singleton (S : sig
 
   val encoding : t Data_encoding.t
 end) : SINGLETON_STORE with type value := S.t = struct
-  type 'a t = {file : string}
+  type 'a t = {file : string; mutable cache : S.t option option}
 
-  let read store =
+  let read_disk store =
     let open Lwt_syntax in
     let* exists = Lwt_unix.file_exists store.file in
     match exists with
@@ -334,7 +334,10 @@ end) : SINGLETON_STORE with type value := S.t = struct
           S.encoding
           (Bytes.unsafe_of_string bytes)
 
-  let write store x =
+  let read store =
+    match store.cache with Some v -> Lwt.return v | None -> read_disk store
+
+  let write_disk store x =
     let open Lwt_result_syntax in
     let*! res =
       Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
@@ -351,14 +354,24 @@ end) : SINGLETON_STORE with type value := S.t = struct
     | Ok res -> Lwt.return res
     | Error _ -> tzfail (Cannot_write_file S.name)
 
-  let delete store =
+  let write store x =
+    let open Lwt_result_syntax in
+    let+ () = write_disk store x in
+    store.cache <- Some (Some x)
+
+  let delete_disk store =
     let open Lwt_syntax in
     let* exists = Lwt_unix.file_exists store.file in
     match exists with
     | false -> return_unit
     | true -> Lwt_unix.unlink store.file
 
-  let init ~path _mode = Lwt.return {file = path}
+  let delete store =
+    let open Lwt_syntax in
+    let+ () = delete_disk store in
+    store.cache <- Some None
+
+  let init ~path _mode = Lwt.return {file = path; cache = None}
 end
 
 module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) = struct
