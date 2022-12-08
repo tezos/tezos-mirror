@@ -290,6 +290,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     trace (Cannot_load_store (N.name, path))
     @@ protect
     @@ fun () ->
+    let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
     let readonly = match mode with Read_only -> true | Read_write -> false in
     let index = I.v ~log_size ~readonly path in
     let scheduler = Lwt_idle_waiter.create () in
@@ -432,7 +433,13 @@ end) : SINGLETON_STORE with type value := S.t = struct
     let+ () = delete_disk store in
     store.cache <- Some None
 
-  let load ~path _mode = Lwt_result.return {file = path; cache = None}
+  let load ~path _mode =
+    let open Lwt_result_syntax in
+    trace (Cannot_load_store (S.name, path))
+    @@ protect
+    @@ fun () ->
+    let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
+    return {file = path; cache = None}
 end
 
 module Make_indexed_file
@@ -585,6 +592,7 @@ struct
     trace (Cannot_load_store (N.name, path))
     @@ protect
     @@ fun () ->
+    let*! () = Lwt_utils_unix.create_dir path in
     let readonly = match mode with Read_only -> true | Read_write -> false in
     let flag, perms =
       if readonly then (Unix.O_RDONLY, 0o444) else (Unix.O_RDWR, 0o644)
