@@ -23,13 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Describes the different representations that can be stored persistently. *)
+(** This library provides functors to build various kinds of stores using
+    mirage's {{:https://github.com/mirage/index} index}} and Octez
+    {{:https://gitlab.com/nomadic-labs/data-encoding} data-encoding}
+    libraries.
+
+    It is tailored to build stores for the Layer 2 nodes of Tezos (Tx-rollups
+    and Smart rollups).
+
+    The stores built with this library support concurrent accesses thanks to the
+    use of the light scheduler provided by {!Lwt_idle_waiter} for exclusive
+    write access. *)
 
 open Store_sigs
 
 (** {2 Signatures} *)
 
-(** A store composed of a single file on disk *)
+(** A store for single updatable values. Values are stored in a file on disk and
+    are kept in memory in a cache. *)
 module type SINGLETON_STORE = sig
   (** The type of the singleton store. *)
   type +'a t
@@ -51,15 +62,15 @@ module type SINGLETON_STORE = sig
   val delete : [> `Write] t -> unit tzresult Lwt.t
 end
 
-(** An index store mapping keys to values. It is composed of an index only. *)
+(** An index store mapping keys to values. It uses an index file internally. *)
 module type INDEXABLE_STORE = sig
-  (** The type of store build in indexes *)
+  (** The type of store built on indexes. *)
   type +'a t
 
-  (** The type of keys for the *)
+  (** The type of keys for the store. *)
   type key
 
-  (** The type of values stored in the index *)
+  (** The type of values stored in the index, *)
   type value
 
   (** Load (or initializes) a store in the file [path]. If [readonly] is [true],
@@ -79,7 +90,8 @@ module type INDEXABLE_STORE = sig
       right away. *)
   val add : ?flush:bool -> [> `Write] t -> key -> value -> unit tzresult Lwt.t
 
-  (** Closes the store. After this call the store cannot be accessed anymore. *)
+  (** Closes the store. After this call the store cannot be accessed anymore
+      (unless one calls {!load} again). *)
   val close : _ t -> unit tzresult Lwt.t
 end
 
@@ -93,13 +105,17 @@ module type INDEXABLE_REMOVABLE_STORE = sig
   val remove : ?flush:bool -> [> `Write] t -> key -> unit tzresult Lwt.t
 end
 
-(** An indexed file (i.e. a file and an index) mapping keys to values. The
-    values can vary in size. *)
+(** An indexed file (i.e. a file and an index) mapping keys to values. Contrary
+    to {!INDEXABLE_STORE}, the values can vary in size. Internally, values are
+    stored, concatenated, in a append only file. The index file associates keys
+    to offsets in this file (and a header to retrieve information more
+    efficiently).
+*)
 module type INDEXED_FILE = sig
-  (** The type of indexed file store *)
+  (** The type of indexed file store. *)
   type +'a t
 
-  (** The type of keys  *)
+  (** The type of keys for the store. *)
   type key
 
   (** The type of headers stored in the index. The header can contain fixed size
@@ -131,7 +147,8 @@ module type INDEXED_FILE = sig
   (** Loads a new or existing indexed file store in the directory [path]. *)
   val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
-  (** Close the index and the file. *)
+  (** Close the index and the file. One must call {!load} again to read or write
+      data in the store. *)
   val close : _ t -> unit tzresult Lwt.t
 end
 
