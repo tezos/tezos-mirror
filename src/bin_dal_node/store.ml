@@ -219,7 +219,7 @@ module Legacy = struct
             Lwt.return_unit)
       slot_headers
 
-  let add_slot_headers ~block_level:_ ~block_hash slot_headers node_store =
+  let add_slot_headers ~block_level ~block_hash slot_headers node_store =
     let open Lwt_syntax in
     let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
     let slots_store = node_store.slots_store in
@@ -232,6 +232,8 @@ module Legacy = struct
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
         in
+        (* This invariant should hold. *)
+        assert (Int32.equal published_level block_level) ;
         match status with
         | Dal_plugin.Succeeded ->
             let index =
