@@ -170,8 +170,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Transfer.register ~protocols ;
   Tickets.register ~protocols ;
   Timelock.register ~protocols ;
-  Tx_rollup.register ~protocols ;
-  Tx_rollup_l2_node.register ~protocols ;
   Tzip4_view.register ~protocols ;
   Used_paid_storage_spaces.register ~protocols ;
   Vdf_test.register ~protocols
@@ -188,6 +186,8 @@ let register_protocol_specific_because_regression_tests () =
   Sc_rollup.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Ticket_receipt_and_rpc.register ~protocols:[Alpha] ;
+  Tx_rollup.register ~protocols:[Kathmandu; Lima] ;
+  Tx_rollup_l2_node.register ~protocols:[Kathmandu; Lima] ;
   Views.register [Alpha] ;
   Zk_rollup.register ~protocols:[Alpha]
 
