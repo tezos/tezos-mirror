@@ -160,8 +160,7 @@ module Handler = struct
   let new_slot_header ctxt =
     (* Monitor neighbor DAL nodes and download published slots as shards. *)
     let open Lwt_result_syntax in
-    let handler n_cctxt ready_ctxt slot_header =
-      let cryptobox = ready_ctxt.Node_context.cryptobox in
+    let handler n_cctxt Node_context.{cryptobox; _} slot_header =
       let dal_parameters = Cryptobox.parameters cryptobox in
       let downloaded_shard_ids =
         0
@@ -182,7 +181,7 @@ module Handler = struct
         Slot_manager.save_shards
           (Node_context.get_store ctxt).shard_store
           (Node_context.get_store ctxt).slots_watcher
-          ready_ctxt.Node_context.cryptobox
+          cryptobox
           slot_header
           shards
       in
