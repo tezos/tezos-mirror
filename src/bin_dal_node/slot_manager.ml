@@ -99,3 +99,12 @@ let find_slot node_store cryptobox commitment =
 
 let store_slot_headers ~block_level ~block_hash slot_headers node_store =
   Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store
+
+let update_selected_slot_headers_statuses ~block_level ~attestation_lag
+    attested_slots unattested_slots node_store =
+  Store.Legacy.update_selected_slot_headers_statuses
+    ~block_level
+    attested_slots
+    unattested_slots
+    node_store
+    ~attestation_lag

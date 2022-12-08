@@ -138,7 +138,7 @@ module Handler = struct
     let handler _stopper (block_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
-      | Ready {plugin = (module Plugin); _} ->
+      | Ready {plugin = (module Plugin); proto_parameters; _} ->
           let* block_info =
             Plugin.block_info
               cctxt
@@ -151,6 +151,20 @@ module Handler = struct
               ~block_level:header.shell.level
               ~block_hash
               slot_headers
+              (Node_context.get_store ctxt)
+          in
+          let* attested_slots, unattested_slots =
+            Plugin.slot_headers_attestation
+              block_hash
+              block_info
+              ~number_of_slots:proto_parameters.number_of_slots
+          in
+          let* () =
+            Slot_manager.update_selected_slot_headers_statuses
+              ~block_level:header.shell.level
+              ~attestation_lag:proto_parameters.attestation_lag
+              attested_slots
+              unattested_slots
               (Node_context.get_store ctxt)
           in
           return_unit
