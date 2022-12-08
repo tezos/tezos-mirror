@@ -3201,7 +3201,7 @@ let test_timeout =
     ~staker2:operator2.public_key_hash
     client
 
-(* Testing rollup node catch up mechanism
+(* Testing rollup node catch up mechanism I
    --------------------------------------
 
    The rollup node must be able to catch up from the genesis
@@ -3250,6 +3250,70 @@ let test_late_rollup_node =
       (Node.get_level node)
   in
   Log.info "Other rollup node progresses." ;
+  unit
+
+(* Testing rollup node catch up mechanism II
+   --------------------------------------
+
+   An alternative rollup node must be able to catch up from the genesis
+   of the rollup when paired with a node in archive mode when there is
+   already an other rollup node with a different operator already operating
+   on the given rollup. This same alternative rollup node must be able to
+   catch up a second time when it is stopped midway.
+*)
+let test_late_rollup_node_2 =
+  test_full_scenario
+    ~commitment_period:3
+    {
+      tags = ["late"];
+      variant = None;
+      description = "a late alternative rollup should catch up";
+    }
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup_address node client
+    ->
+  let* () = bake_levels 65 client in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = bake_levels 30 client in
+  let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
+  Log.info "First rollup node synchronized." ;
+  let sc_rollup_node2 =
+    Sc_rollup_node.create
+      Operator
+      node
+      client
+      ~default_operator:Constant.bootstrap2.alias
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup_address
+  in
+  Log.info
+    "Starting alternative rollup node from scratch with a different operator." ;
+  let* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Alternative rollup node is synchronized." ;
+  let* () = Client.bake_for_and_wait client in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Both rollup nodes are progressing and are synchronized." ;
+  let* () = Sc_rollup_node.terminate sc_rollup_node2 in
+  Log.info "Alternative rollup node terminated." ;
+  let* () = bake_levels 30 client in
+  let* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  Log.info "Alternative rollup node is re-running." ;
+  let* () = bake_levels 30 client in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node2 155 in
+  Log.info
+    "Alternative rollup node is synchronized once again after being terminated \
+     once." ;
   unit
 
 (* Test interruption of rollup node before the first inbox is processed. Upon
@@ -4051,6 +4115,7 @@ let register ~kind ~protocols =
      Uncomment this test as soon as the issue done.
      test_reinject_failed_commitment protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
+  test_late_rollup_node_2 protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message
     ~regression:true
