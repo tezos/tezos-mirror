@@ -38,17 +38,17 @@ module type SINGLETON_STORE = sig
   type value
 
   (** Initializes a singleton store in the file [path]. *)
-  val init : path:string -> 'a mode -> 'a t Lwt.t
+  val init : path:string -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Reads the current value from the disk. Returns [None] if the
-      file does not exist or if it is corrupted. *)
-  val read : [> `Read] t -> value option Lwt.t
+      file does not exist. *)
+  val read : [> `Read] t -> value option tzresult Lwt.t
 
   (** Write the value to disk. *)
   val write : [> `Write] t -> value -> unit tzresult Lwt.t
 
   (** Deletes the value from the disk. *)
-  val delete : [> `Write] t -> unit Lwt.t
+  val delete : [> `Write] t -> unit tzresult Lwt.t
 end
 
 (** An index store mapping keys to values. It is composed of an index only. *)
@@ -64,23 +64,23 @@ module type INDEXABLE_STORE = sig
 
   (** Initializes a store in the file [path]. If [readonly] is [true],
       the store will only be accessed in read only mode. *)
-  val init : path:string -> 'a mode -> 'a t Lwt.t
+  val init : path:string -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Returns [true] if the key has a value associated in
       the store. *)
-  val mem : [> `Read] t -> key -> bool Lwt.t
+  val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
   (** Returns the value associated to a key in the store,
       or [None] otherwise. *)
-  val find : [> `Read] t -> key -> value option Lwt.t
+  val find : [> `Read] t -> key -> value option tzresult Lwt.t
 
   (** Add an association from a key to a value in the
       store. If [flush] (default to [true]) is set, the index is written on disk
       right away. *)
-  val add : ?flush:bool -> [> `Write] t -> key -> value -> unit Lwt.t
+  val add : ?flush:bool -> [> `Write] t -> key -> value -> unit tzresult Lwt.t
 
   (** Closes the store. After this call the store cannot be accessed anymore. *)
-  val close : _ t -> unit Lwt.t
+  val close : _ t -> unit tzresult Lwt.t
 end
 
 (** An index store mapping keys to values. Keys are associated to optional
@@ -90,7 +90,7 @@ module type INDEXABLE_REMOVABLE_STORE = sig
 
   (** Removes an association from the store. Does nothing if the key was not
       registered. *)
-  val remove : ?flush:bool -> [> `Write] t -> key -> unit Lwt.t
+  val remove : ?flush:bool -> [> `Write] t -> key -> unit tzresult Lwt.t
 end
 
 (** An indexed file (i.e. a file and an index) mapping keys to values. The
@@ -111,23 +111,28 @@ module type INDEXED_FILE = sig
 
   (** Returns [true] if the key has a value associated in
       the store. *)
-  val mem : [> `Read] t -> key -> bool Lwt.t
+  val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
   (** Returns the header for a key if it exists in the store. *)
-  val header : [> `Read] t -> key -> header option Lwt.t
+  val header : [> `Read] t -> key -> header option tzresult Lwt.t
 
   (** Read a full value from the indexed file store. *)
-  val read : [> `Read] t -> key -> value option Lwt.t
+  val read : [> `Read] t -> key -> value option tzresult Lwt.t
 
   (** Append a new binding to the indexed file store. *)
   val append :
-    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit Lwt.t
+    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
 
   (** Initialize a new indexed file store in the directory [data_dir]. *)
-  val init : data_dir:string -> cache_size:int -> 'a mode -> 'a t Lwt.t
+  val init : data_dir:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Close the index and the file. *)
-  val close : _ t -> unit Lwt.t
+  val close : _ t -> unit tzresult Lwt.t
+end
+
+(** Names for stores.  *)
+module type NAME = sig
+  val name : string
 end
 
 (** Values that can be encoded. *)
@@ -158,13 +163,16 @@ end
 module Make_singleton (S : ENCODABLE_VALUE) :
   SINGLETON_STORE with type value := S.t
 
-module Make_indexable (K : Index.Key.S) (V : Index.Value.S) :
+module Make_indexable (_ : NAME) (K : Index.Key.S) (V : Index.Value.S) :
   INDEXABLE_STORE with type key := K.t and type value := V.t
 
-module Make_indexable_removable (K : Index.Key.S) (V : Index.Value.S) :
+module Make_indexable_removable (_ : NAME) (K : Index.Key.S) (V : Index.Value.S) :
   INDEXABLE_REMOVABLE_STORE with type key := K.t and type value := V.t
 
-module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) :
+module Make_indexed_file
+    (_ : NAME)
+    (K : Index.Key.S)
+    (V : ENCODABLE_VALUE_HEADER) :
   INDEXED_FILE
     with type key := K.t
      and type value := V.t
