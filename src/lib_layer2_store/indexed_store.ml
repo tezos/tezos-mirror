@@ -133,6 +133,8 @@ module type SINGLETON_STORE = sig
   val write : [> `Write] t -> value -> unit tzresult Lwt.t
 
   val delete : [> `Write] t -> unit tzresult Lwt.t
+
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 module type INDEXABLE_STORE = sig
@@ -151,6 +153,8 @@ module type INDEXABLE_STORE = sig
   val add : ?flush:bool -> [> `Write] t -> key -> value -> unit tzresult Lwt.t
 
   val close : _ t -> unit tzresult Lwt.t
+
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
@@ -185,6 +189,8 @@ module type INDEXED_FILE = sig
   val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   val close : _ t -> unit tzresult Lwt.t
+
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 module type SIMPLE_INDEXED_FILE = sig
@@ -312,6 +318,8 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     (try I.close store.index with Index.Closed -> ()) ;
     return_unit
+
+  let readonly x = (x :> [`Read] t)
 end
 
 module Make_indexable_removable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) =
@@ -384,7 +392,7 @@ module Make_singleton (S : sig
 
   val encoding : t Data_encoding.t
 end) : SINGLETON_STORE with type value := S.t = struct
-  type 'a t = {file : string; mutable cache : S.t option option}
+  type +'a t = {file : string; mutable cache : S.t option option}
 
   let read_disk store =
     let open Lwt_result_syntax in
@@ -450,6 +458,8 @@ end) : SINGLETON_STORE with type value := S.t = struct
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
     return {file = path; cache = None}
+
+  let readonly x = (x :> [`Read] t)
 end
 
 module Make_indexed_file
@@ -628,6 +638,8 @@ struct
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     (try Header_index.close store.index with Index.Closed -> ()) ;
     Lwt_utils_unix.safe_close store.fd
+
+  let readonly x = (x :> [`Read] t)
 end
 
 module Make_simple_indexed_file
