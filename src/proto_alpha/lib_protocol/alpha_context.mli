@@ -2920,7 +2920,9 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
-    val of_int : int -> t option
+    val of_int_opt : int -> t option
+
+    val of_int : int -> t tzresult
 
     val to_int : t -> int
 

@@ -67,10 +67,44 @@ module Index = struct
 
   let zero = 0
 
+  type error += Invalid_slot_index of {given : int; min : int; max : int}
+
+  let () =
+    let open Data_encoding in
+    register_error_kind
+      `Permanent
+      ~id:"dal_slot_repr.index.invalid_index"
+      ~title:"Invalid Dal slot index"
+      ~description:
+        "The given index is out of range of representable slot indices"
+      ~pp:(fun ppf (given, min, max) ->
+        Format.fprintf
+          ppf
+          "The given index %d is out of range of representable slot indices \
+           [%d, %d]"
+          given
+          min
+          max)
+      (obj3 (req "given" int31) (req "min" int31) (req "max" int31))
+      (function
+        | Invalid_slot_index {given; min; max} -> Some (given, min, max)
+        | _ -> None)
+      (fun (given, min, max) -> Invalid_slot_index {given; min; max})
+
+  let check_is_in_range slot_index =
+    error_unless
+      Compare.Int.(slot_index >= zero && slot_index <= max_value)
+      (Invalid_slot_index {given = slot_index; min = zero; max = max_value})
+
+  let of_int_opt slot_index =
+    match check_is_in_range slot_index with
+    | Ok () -> Some slot_index
+    | Error _ -> None
+
   let of_int slot_index =
-    if Compare.Int.(slot_index <= max_value && slot_index >= zero) then
-      Some slot_index
-    else None
+    let open Result_syntax in
+    let* () = check_is_in_range slot_index in
+    return slot_index
 
   let to_int slot_index = slot_index [@@ocaml.inline always]
 

@@ -89,6 +89,8 @@ end
 module Index : sig
   type t
 
+  type error += Invalid_slot_index of {given : int; min : int; max : int}
+
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
@@ -97,8 +99,14 @@ module Index : sig
 
   val max_value : t
 
-  (** [of_int n] constructs a`Slot_index.t` *)
-  val of_int : int -> t option
+  (** [of_int_opt n] constructs a value of type {!t} from [n]. Returns {!None}
+      in case the given value is not in the interval [zero, max_value]. *)
+  val of_int_opt : int -> t option
+
+  (** [of_int n] constructs a value of type {!t} from [n]. Returns
+      {!Invalid_slot_index} in case the given value is not in the interval [zero,
+      max_value]. *)
+  val of_int : int -> t tzresult
 
   val to_int : t -> int
 

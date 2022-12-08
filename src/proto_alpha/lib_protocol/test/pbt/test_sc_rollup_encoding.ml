@@ -133,7 +133,9 @@ let gen_dal_slots_history () =
                genesis cell's level in the skip list. *)
             succ @@ try of_int32_exn (Int32.of_int level) with _ -> root)
         in
-        let index = Index.(of_int slot_index |> Option.value ~default:zero) in
+        let index =
+          Index.(of_int_opt slot_index |> Option.value ~default:zero)
+        in
         Header.{id = {published_level; index}; commitment = Commitment.zero})
       list
   in

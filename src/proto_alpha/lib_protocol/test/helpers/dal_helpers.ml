@@ -142,7 +142,7 @@ struct
 
   let succ_slot_index index =
     Option.value_f
-      S.Index.(of_int (to_int index + 1))
+      S.Index.(of_int_opt (to_int index + 1))
       ~default:(fun () -> S.Index.zero)
 
   let next_char c = Char.(chr ((code c + 1) mod 255))

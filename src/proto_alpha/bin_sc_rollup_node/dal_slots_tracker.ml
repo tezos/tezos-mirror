@@ -140,7 +140,7 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
      then Dal.Slot_index.to_int will always return a defined value. See
      `src/proto_alpha/lib_protocol/constants_repr.ml`.
   *)
-  List.filter_map Dal.Slot_index.of_int filtered
+  List.filter_map Dal.Slot_index.of_int_opt filtered
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4139.
    Use a shared storage between dal and rollup node to store slots data.

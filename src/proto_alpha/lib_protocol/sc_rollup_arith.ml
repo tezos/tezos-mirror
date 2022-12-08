@@ -1250,7 +1250,7 @@ module Make (Context : P) :
       let open Option_syntax in
       let* index = Option.map Int32.to_int @@ Int32.of_string_opt slot_str in
       if Compare.Int.(index < 0 || index >= number_of_slots) then None
-      else Dal_slot_repr.Index.of_int index
+      else Dal_slot_repr.Index.of_int_opt index
     in
     let mk_page_index page_str =
       let open Option_syntax in
