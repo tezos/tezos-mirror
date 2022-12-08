@@ -60,6 +60,9 @@ module type SINGLETON_STORE = sig
 
   (** Deletes the value from the disk. *)
   val delete : [> `Write] t -> unit tzresult Lwt.t
+
+  (** [readonly t] returns a read only version of the store [t]. *)
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 (** An index store mapping keys to values. It uses an index file internally. *)
@@ -93,6 +96,9 @@ module type INDEXABLE_STORE = sig
   (** Closes the store. After this call the store cannot be accessed anymore
       (unless one calls {!load} again). *)
   val close : _ t -> unit tzresult Lwt.t
+
+  (** [readonly t] returns a read only version of the store [t]. *)
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 (** An index store mapping keys to values. Keys are associated to optional
@@ -150,6 +156,9 @@ module type INDEXED_FILE = sig
   (** Close the index and the file. One must call {!load} again to read or write
       data in the store. *)
   val close : _ t -> unit tzresult Lwt.t
+
+  (** [readonly t] returns a read only version of the store [t]. *)
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 (** Same as {!INDEXED_FILE} but where headers are extracted from values. *)
