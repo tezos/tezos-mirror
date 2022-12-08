@@ -37,8 +37,8 @@ module type SINGLETON_STORE = sig
   (** The type of values stored in this singleton store. *)
   type value
 
-  (** Initializes a singleton store in the file [path]. *)
-  val init : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  (** Load (or initializes) a singleton store in the file [path]. *)
+  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Reads the current value from the disk. Returns [None] if the
       file does not exist. *)
@@ -62,9 +62,9 @@ module type INDEXABLE_STORE = sig
   (** The type of values stored in the index *)
   type value
 
-  (** Initializes a store in the file [path]. If [readonly] is [true],
+  (** Load (or initializes) a store in the file [path]. If [readonly] is [true],
       the store will only be accessed in read only mode. *)
-  val init : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Returns [true] if the key has a value associated in
       the store. *)
@@ -123,8 +123,8 @@ module type INDEXED_FILE = sig
   val append :
     ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
 
-  (** Initialize a new indexed file store in the directory [data_dir]. *)
-  val init : data_dir:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
+  (** Loads a new or existing indexed file store in the directory [path]. *)
+  val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Close the index and the file. *)
   val close : _ t -> unit tzresult Lwt.t
