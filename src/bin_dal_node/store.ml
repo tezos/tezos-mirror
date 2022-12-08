@@ -105,6 +105,12 @@ module Legacy = struct
       val other_header_status :
         Services.Types.slot_id -> Cryptobox.commitment -> Path.t
     end
+
+    module Profile : sig
+      val profiles : Path.t
+
+      val profile : Services.Types.profile -> Path.t
+    end
   end = struct
     type t = string list
 
@@ -169,6 +175,19 @@ module Legacy = struct
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
         let prefix = headers index in
         prefix / "others" / commitment_repr / "status"
+    end
+
+    module Profile = struct
+      let root = ["profiles"]
+
+      let profiles = root
+
+      let encode_profile profile =
+        Data_encoding.Binary.to_string_exn
+          Services.Types.profile_encoding
+          profile
+
+      let profile profile = root / encode_profile profile
     end
   end
 
@@ -352,4 +371,21 @@ module Legacy = struct
           ~none:(Lwt.return (Error (error_with "Commitment decoding failed")))
           ~some:return
         @@ decode_commitment c_str)
+
+  let decode_profile profile =
+    Data_encoding.Binary.of_string_exn Services.Types.profile_encoding profile
+
+  let get_profiles node_store =
+    let open Lwt_syntax in
+    let path = Path.Profile.profiles in
+    let* profiles = list node_store.store path in
+    return @@ List.map (fun (p, _) -> decode_profile p) profiles
+
+  let add_profile node_store profile =
+    let path = Path.Profile.profile profile in
+    set
+      ~msg:(Printf.sprintf "New profile added: %s" (Path.to_string path))
+      node_store.store
+      path
+      ""
 end
