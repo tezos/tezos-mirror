@@ -25,33 +25,65 @@
 
 open Store_sigs
 
-type error += Cannot_encode_data of string
+type error +=
+  | Cannot_load_store of string * string
+  | Cannot_write_to_store of string
+  | Cannot_read_from_store of string
+  | Decoding_error of Data_encoding.Binary.read_error
 
 let () =
   register_error_kind
-    ~id:"layer2_store.cannot_encode_data"
-    ~title:"Data cannot be encoded"
-    ~description:"Data cannot be encoded to be stored on disk."
-    ~pp:(fun ppf name ->
-      Format.fprintf ppf "Data %s cannot be encoded to be stored on disk." name)
+    ~id:"layer2_store.cannot_load_store"
+    ~title:"Store cannot be loaded"
+    ~description:"Store cannot be loaded."
+    ~pp:(fun ppf (name, path) ->
+      Format.fprintf ppf "Store %s cannot be loaded from %s." name path)
     `Permanent
-    Data_encoding.(obj1 (req "name" string))
-    (function Cannot_encode_data n -> Some n | _ -> None)
-    (fun n -> Cannot_encode_data n)
-
-type error += Cannot_write_file of string
+    Data_encoding.(obj2 (req "name" string) (req "path" string))
+    (function Cannot_load_store (n, p) -> Some (n, p) | _ -> None)
+    (fun (n, p) -> Cannot_load_store (n, p))
 
 let () =
   register_error_kind
-    ~id:"layer2_store.cannot_write_file"
-    ~title:"File cannot be written"
-    ~description:"File cannot be written to disk."
+    ~id:"layer2_store.cannot_write_to_store"
+    ~title:"Value cannot be written to store"
+    ~description:"Value cannot be written to store."
     ~pp:(fun ppf name ->
-      Format.fprintf ppf "File %s cannot be written to disk." name)
+      Format.fprintf ppf "Value cannot be written to store %s." name)
     `Permanent
     Data_encoding.(obj1 (req "name" string))
-    (function Cannot_write_file n -> Some n | _ -> None)
-    (fun n -> Cannot_write_file n)
+    (function Cannot_write_to_store n -> Some n | _ -> None)
+    (fun n -> Cannot_write_to_store n)
+
+let () =
+  register_error_kind
+    ~id:"layer2_store.cannot_read_from_store"
+    ~title:"Value cannot be read from store"
+    ~description:"Value cannot be read from store."
+    ~pp:(fun ppf name ->
+      Format.fprintf ppf "Value cannot be read from store %s." name)
+    `Permanent
+    Data_encoding.(obj1 (req "name" string))
+    (function Cannot_read_from_store n -> Some n | _ -> None)
+    (fun n -> Cannot_read_from_store n)
+
+let () =
+  register_error_kind
+    ~id:"layer2_store.decoding_error"
+    ~title:"Cannot decode file"
+    ~description:"A file for a persistent element could not be decoded"
+    ~pp:(fun ppf error ->
+      Format.fprintf
+        ppf
+        "Decoding error: %a"
+        Data_encoding.Json.pp
+        (Data_encoding.Json.construct
+           Data_encoding.Binary.read_error_encoding
+           error))
+    `Permanent
+    Data_encoding.(obj1 (req "error" Data_encoding.Binary.read_error_encoding))
+    (function Decoding_error e -> Some e | _ -> None)
+    (fun e -> Decoding_error e)
 
 (* Helper functions to copy byte sequences or integers in [src] to another byte
    sequence [dst] at offset [offset], with named arguments to avoid
@@ -85,18 +117,22 @@ let read_int8 str offset =
 
 (* Functors to build stores on indexes *)
 
+module type NAME = sig
+  val name : string
+end
+
 module type SINGLETON_STORE = sig
   type +'a t
 
   type value
 
-  val init : path:string -> 'a mode -> 'a t Lwt.t
+  val init : path:string -> 'a mode -> 'a t tzresult Lwt.t
 
-  val read : [> `Read] t -> value option Lwt.t
+  val read : [> `Read] t -> value option tzresult Lwt.t
 
   val write : [> `Write] t -> value -> unit tzresult Lwt.t
 
-  val delete : [> `Write] t -> unit Lwt.t
+  val delete : [> `Write] t -> unit tzresult Lwt.t
 end
 
 module type INDEXABLE_STORE = sig
@@ -106,21 +142,21 @@ module type INDEXABLE_STORE = sig
 
   type value
 
-  val init : path:string -> 'a mode -> 'a t Lwt.t
+  val init : path:string -> 'a mode -> 'a t tzresult Lwt.t
 
-  val mem : [> `Read] t -> key -> bool Lwt.t
+  val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
-  val find : [> `Read] t -> key -> value option Lwt.t
+  val find : [> `Read] t -> key -> value option tzresult Lwt.t
 
-  val add : ?flush:bool -> [> `Write] t -> key -> value -> unit Lwt.t
+  val add : ?flush:bool -> [> `Write] t -> key -> value -> unit tzresult Lwt.t
 
-  val close : _ t -> unit Lwt.t
+  val close : _ t -> unit tzresult Lwt.t
 end
 
 module type INDEXABLE_REMOVABLE_STORE = sig
   include INDEXABLE_STORE
 
-  val remove : ?flush:bool -> [> `Write] t -> key -> unit Lwt.t
+  val remove : ?flush:bool -> [> `Write] t -> key -> unit tzresult Lwt.t
 end
 
 module type INDEXED_FILE = sig
@@ -132,18 +168,18 @@ module type INDEXED_FILE = sig
 
   type value
 
-  val mem : [> `Read] t -> key -> bool Lwt.t
+  val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
-  val header : [> `Read] t -> key -> header option Lwt.t
+  val header : [> `Read] t -> key -> header option tzresult Lwt.t
 
-  val read : [> `Read] t -> key -> value option Lwt.t
+  val read : [> `Read] t -> key -> value option tzresult Lwt.t
 
   val append :
-    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit Lwt.t
+    ?flush:bool -> [> `Write] t -> key:key -> value:value -> unit tzresult Lwt.t
 
-  val init : data_dir:string -> cache_size:int -> 'a mode -> 'a t Lwt.t
+  val init : data_dir:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
-  val close : _ t -> unit Lwt.t
+  val close : _ t -> unit tzresult Lwt.t
 end
 
 module type ENCODABLE_VALUE = sig
@@ -213,7 +249,7 @@ end) : Index.Key.S with type t = E.t = struct
   let hash_size = 30 (* in bits *)
 end
 
-module Make_indexable (K : Index.Key.S) (V : Index.Value.S) = struct
+module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
   module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
 
   type _ t = {index : I.t; scheduler : Lwt_idle_waiter.t}
@@ -223,35 +259,52 @@ module Make_indexable (K : Index.Key.S) (V : Index.Value.S) = struct
   let log_size = 10_000
 
   let mem store k =
+    let open Lwt_result_syntax in
+    trace (Cannot_read_from_store N.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Lwt.return (I.mem store.index k)
+    return (I.mem store.index k)
 
   let find store k =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
+    trace (Cannot_read_from_store N.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Option.catch_os @@ fun () ->
-    let v = I.find store.index k in
-    return_some v
+    let v = try Some (I.find store.index k) with Not_found -> None in
+    return v
 
   let add ?(flush = true) store k v =
+    let open Lwt_result_syntax in
+    trace (Cannot_write_to_store N.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     I.replace store.index k v ;
     if flush then I.flush store.index ;
-    Lwt.return_unit
+    return_unit
 
-  let init (type a) ~path (mode : a mode) : a t Lwt.t =
+  let init (type a) ~path (mode : a mode) : a t tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    trace (Cannot_load_store (N.name, path))
+    @@ protect
+    @@ fun () ->
     let readonly = match mode with Read_only -> true | Read_write -> false in
     let index = I.v ~log_size ~readonly path in
     let scheduler = Lwt_idle_waiter.create () in
-    Lwt.return {index; scheduler}
+    return {index; scheduler}
 
   let close store =
+    let open Lwt_result_syntax in
+    protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     (try I.close store.index with Index.Closed -> ()) ;
-    Lwt.return_unit
+    return_unit
 end
 
-module Make_indexable_removable (K : Index.Key.S) (V : Index.Value.S) = struct
+module Make_indexable_removable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) =
+struct
   module V_opt = struct
     (* The values stored in the index are optional values.  When we "remove" a
        key from the store, we're not really removing it from the index, but
@@ -285,28 +338,32 @@ module Make_indexable_removable (K : Index.Key.S) (V : Index.Value.S) = struct
       | _ -> assert false
   end
 
-  include Make_indexable (K) (V_opt)
+  include Make_indexable (N) (K) (V_opt)
 
   let find store k =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let+ v = find store k in
     match v with None | Some None -> None | Some (Some v) -> Some v
 
   let mem store hash =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let+ b = find store hash in
     Option.is_some b
 
   let add ?flush store k v = add ?flush store k (Some v)
 
   let remove ?(flush = true) store k =
+    let open Lwt_result_syntax in
+    trace (Cannot_write_to_store N.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     let exists = I.mem store.index k in
-    if not exists then Lwt.return_unit
+    if not exists then return_unit
     else (
       I.replace store.index k None ;
       if flush then I.flush store.index ;
-      Lwt.return_unit)
+      return_unit)
 end
 
 module Make_singleton (S : sig
@@ -319,40 +376,39 @@ end) : SINGLETON_STORE with type value := S.t = struct
   type 'a t = {file : string; mutable cache : S.t option option}
 
   let read_disk store =
-    let open Lwt_syntax in
-    let* exists = Lwt_unix.file_exists store.file in
+    let open Lwt_result_syntax in
+    trace (Cannot_read_from_store S.name)
+    @@ protect
+    @@ fun () ->
+    let*! exists = Lwt_unix.file_exists store.file in
     match exists with
     | false -> return_none
-    | true ->
+    | true -> (
         Lwt_io.with_file
           ~flags:[Unix.O_RDONLY; O_CLOEXEC]
           ~mode:Input
           store.file
         @@ fun channel ->
-        let+ bytes = Lwt_io.read channel in
-        Data_encoding.Binary.of_bytes_opt
-          S.encoding
-          (Bytes.unsafe_of_string bytes)
+        let*! raw_data = Lwt_io.read channel in
+        let data = Data_encoding.Binary.of_string S.encoding raw_data in
+        match data with
+        | Ok data -> return_some data
+        | Error err -> tzfail (Decoding_error err))
 
   let read store =
-    match store.cache with Some v -> Lwt.return v | None -> read_disk store
+    let open Lwt_result_syntax in
+    match store.cache with Some v -> return v | None -> read_disk store
 
   let write_disk store x =
     let open Lwt_result_syntax in
-    let*! res =
-      Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
-      @@ fun fd ->
-      let* block_bytes =
-        match Data_encoding.Binary.to_bytes_opt S.encoding x with
-        | None -> tzfail (Cannot_encode_data S.name)
-        | Some bytes -> return bytes
-      in
-      let*! () = Lwt_utils_unix.write_bytes fd block_bytes in
-      return_unit
-    in
-    match res with
-    | Ok res -> Lwt.return res
-    | Error _ -> tzfail (Cannot_write_file S.name)
+    trace (Cannot_write_to_store S.name)
+    @@ let*! res =
+         Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
+         @@ fun fd ->
+         let block_bytes = Data_encoding.Binary.to_bytes_exn S.encoding x in
+         Lwt_utils_unix.write_bytes fd block_bytes
+       in
+       Result.bind_error res Lwt_utils_unix.tzfail_of_io_error |> Lwt.return
 
   let write store x =
     let open Lwt_result_syntax in
@@ -360,26 +416,37 @@ end) : SINGLETON_STORE with type value := S.t = struct
     store.cache <- Some (Some x)
 
   let delete_disk store =
-    let open Lwt_syntax in
-    let* exists = Lwt_unix.file_exists store.file in
+    let open Lwt_result_syntax in
+    trace (Cannot_write_to_store S.name)
+    @@ protect
+    @@ fun () ->
+    let*! exists = Lwt_unix.file_exists store.file in
     match exists with
     | false -> return_unit
-    | true -> Lwt_unix.unlink store.file
+    | true ->
+        let*! () = Lwt_unix.unlink store.file in
+        return_unit
 
   let delete store =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let+ () = delete_disk store in
     store.cache <- Some None
 
-  let init ~path _mode = Lwt.return {file = path; cache = None}
+  let init ~path _mode = Lwt_result.return {file = path; cache = None}
 end
 
-module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) = struct
+module Make_indexed_file
+    (N : NAME)
+    (K : Index.Key.S)
+    (V : ENCODABLE_VALUE_HEADER) =
+struct
   module Cache =
     Aches_lwt.Lache.Make_option (Aches.Rache.Transfer (Aches.Rache.LRU) (K))
   module Raw_header = Make_index_value (V.Header)
 
   module IHeader = struct
+    let name = N.name ^ ".header"
+
     type t = {offset : int; header : V.Header.t}
 
     let encoded_size = 8 (* offset *) + Raw_header.encoded_size
@@ -410,17 +477,20 @@ module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) = struct
   module Values_file = struct
     let encoding = Data_encoding.dynamic_size ~kind:`Uint30 V.encoding
 
-    let pread_value_exn fd ~file_offset =
-      let open Lwt_syntax in
+    let pread_value fd ~file_offset =
+      let open Lwt_result_syntax in
+      trace (Cannot_read_from_store N.name)
+      @@ protect
+      @@ fun () ->
       (* Read length *)
       let length_bytes = Bytes.create 4 in
-      let* () =
+      let*! () =
         Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
       in
       let value_length_int32 = Bytes.get_int32_be length_bytes 0 in
       let value_length = Int32.to_int value_length_int32 in
       let value_bytes = Bytes.extend length_bytes 0 value_length in
-      let* () =
+      let*! () =
         Lwt_utils_unix.read_bytes
           ~file_offset:(file_offset + 4)
           ~pos:4
@@ -428,19 +498,16 @@ module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) = struct
           fd
           value_bytes
       in
-      Lwt.return
-        ( Data_encoding.Binary.of_bytes_exn encoding value_bytes,
-          4 + value_length )
-
-    let pread_value fd ~file_offset =
-      Option.catch_s (fun () -> pread_value_exn fd ~file_offset)
+      match Data_encoding.Binary.of_bytes encoding value_bytes with
+      | Ok value -> return (value, 4 + value_length)
+      | Error err -> tzfail (Decoding_error err)
   end
 
   type +'a t = {
     index : Header_index.t;
     fd : Lwt_unix.file_descr;
     scheduler : Lwt_idle_waiter.t;
-    cache : V.t Cache.t;
+    cache : V.t tzresult Cache.t;
   }
 
   (* The log_size corresponds to the maximum size of the memory zone
@@ -452,57 +519,77 @@ module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) = struct
   let blocks_log_size = 10_000
 
   let mem store key =
+    let open Lwt_result_syntax in
+    trace (Cannot_read_from_store IHeader.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Lwt.return (Header_index.mem store.index key)
+    return (Header_index.mem store.index key)
 
   let header store key =
+    let open Lwt_result_syntax in
+    trace (Cannot_read_from_store IHeader.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     try
       let {IHeader.header; _} = Header_index.find store.index key in
-      Lwt.return_some header
-    with Not_found -> Lwt.return_none
+      return_some header
+    with Not_found -> return_none
 
   let read store key =
-    let open Lwt_syntax in
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Option.catch_os @@ fun () ->
     let read_from_disk key =
-      let {IHeader.offset; _} = Header_index.find store.index key in
-      let* o = Values_file.pread_value store.fd ~file_offset:offset in
-      match o with
-      | Some (value, _) -> Lwt.return_some value
-      | None -> Lwt.return_none
+      let open Lwt_syntax in
+      match Header_index.find store.index key with
+      | exception Not_found -> Lwt.return_none
+      | {IHeader.offset; _} ->
+          let+ value = Values_file.pread_value store.fd ~file_offset:offset in
+          Some (Result.map fst value)
     in
-    Cache.bind_or_put store.cache key read_from_disk Lwt.return
+    let open Lwt_result_syntax in
+    Cache.bind_or_put store.cache key read_from_disk @@ function
+    | None -> return_none
+    | Some (Ok value) -> return_some value
+    | Some (Error _ as e) -> Lwt.return e
 
   let locked_write_value store ~offset ~value ~key =
-    let open Lwt_syntax in
+    trace (Cannot_write_to_store N.name)
+    @@ protect
+    @@ fun () ->
+    let open Lwt_result_syntax in
     let value_bytes =
       Data_encoding.Binary.to_bytes_exn Values_file.encoding value
     in
     let value_length = Bytes.length value_bytes in
-    let* () =
+    let*! () =
       Lwt_utils_unix.write_bytes ~pos:0 ~len:value_length store.fd value_bytes
     in
     Header_index.replace store.index key {offset; header = V.header value} ;
     return value_length
 
   let append ?(flush = true) store ~key ~(value : V.t) =
-    let open Lwt_syntax in
+    trace (Cannot_write_to_store N.name)
+    @@ protect
+    @@ fun () ->
+    let open Lwt_result_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Cache.put store.cache key (return_some value) ;
-    let* offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
-    let* _written_len = locked_write_value store ~offset ~value ~key in
+    Cache.put store.cache key (Lwt.return_some (Ok value)) ;
+    let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
+    let*! _written_len = locked_write_value store ~offset ~value ~key in
     if flush then Header_index.flush store.index ;
-    Lwt.return_unit
+    return_unit
 
-  let init (type a) ~data_dir ~cache_size (mode : a mode) : a t Lwt.t =
-    let open Lwt_syntax in
+  let init (type a) ~data_dir ~cache_size (mode : a mode) : a t tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    trace (Cannot_load_store (N.name, path))
+    @@ protect
+    @@ fun () ->
     let readonly = match mode with Read_only -> true | Read_write -> false in
     let flag, perms =
       if readonly then (Unix.O_RDONLY, 0o444) else (Unix.O_RDWR, 0o644)
     in
-    let* fd =
+    let*! fd =
       Lwt_unix.openfile
         (Filename.concat data_dir "data")
         [Unix.O_CREAT; O_CLOEXEC; flag]
@@ -516,12 +603,11 @@ module Make_indexed_file (K : Index.Key.S) (V : ENCODABLE_VALUE_HEADER) = struct
     in
     let scheduler = Lwt_idle_waiter.create () in
     let cache = Cache.create cache_size in
-    Lwt.return {index; fd; scheduler; cache}
+    return {index; fd; scheduler; cache}
 
   let close store =
-    let open Lwt_syntax in
+    protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     (try Header_index.close store.index with Index.Closed -> ()) ;
-    let* _ignore = Lwt_utils_unix.safe_close store.fd in
-    Lwt.return_unit
+    Lwt_utils_unix.safe_close store.fd
 end
