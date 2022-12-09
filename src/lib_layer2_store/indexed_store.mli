@@ -138,8 +138,8 @@ module type INDEXED_FILE = sig
   (** Returns the header for a key if it exists in the store. *)
   val header : [> `Read] t -> key -> header option tzresult Lwt.t
 
-  (** Read a full value from the indexed file store. *)
-  val read : [> `Read] t -> key -> value option tzresult Lwt.t
+  (** Read a full value and header from the indexed file store. *)
+  val read : [> `Read] t -> key -> (value * header) option tzresult Lwt.t
 
   (** Append a new binding to the indexed file store. *)
   val append :
