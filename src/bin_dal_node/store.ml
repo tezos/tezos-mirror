@@ -74,6 +74,8 @@ module Legacy = struct
   module Path : sig
     type t = string list
 
+    val to_string : ?prefix:string -> t -> string
+
     module Commitment : sig
       val slot : Cryptobox.commitment -> slot_size:int -> Path.t
 
@@ -105,6 +107,10 @@ module Legacy = struct
     type t = string list
 
     let ( / ) b a = a :: b
+
+    let to_string ?prefix p =
+      let s = String.concat "/" p in
+      Option.fold ~none:s ~some:(fun pr -> pr ^ s) prefix
 
     module Commitment = struct
       let root = ["commitments"]
@@ -249,18 +255,13 @@ module Legacy = struct
             let* () =
               set
                 ~msg:
-                  (Printf.sprintf
-                     "add_slot_headers:%s"
-                     (String.concat "/" commitment_path))
+                  (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
                 slots_store
                 commitment_path
                 data
             in
             set
-              ~msg:
-                (Printf.sprintf
-                   "add_slot_headers:%s"
-                   (String.concat "/" status_path))
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
               slots_store
               status_path
               (Services.Types.header_attestation_status_to_string
@@ -271,7 +272,7 @@ module Legacy = struct
             in
             let path = Path.Level.other_header_status index commitment in
             set
-              ~msg:"add_slot_headers:others:status"
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" path)
               slots_store
               path
               (Services.Types.header_status_to_string `Not_selected))
