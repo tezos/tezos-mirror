@@ -105,6 +105,8 @@ module Index = struct
 
   let to_int slot_index = slot_index [@@ocaml.inline always]
 
+  let to_int_list l = l [@@ocaml.inline always]
+
   let compare = Compare.Int.compare
 
   let equal = Compare.Int.equal

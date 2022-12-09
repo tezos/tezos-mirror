@@ -110,6 +110,8 @@ module Index : sig
 
   val to_int : t -> int
 
+  val to_int_list : t list -> int list
+
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
