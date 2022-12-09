@@ -26,7 +26,8 @@
 open Protocol
 open Alpha_context
 open Apply_results
-open Protocol_client_context.Alpha_block_services
+open Protocol_client_context
+open Alpha_block_services
 
 type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
 
