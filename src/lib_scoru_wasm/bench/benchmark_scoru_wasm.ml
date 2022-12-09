@@ -55,7 +55,7 @@ let scenario_tx_kernel_deposit_transfer_withdraw_LOOP =
              Other (File Messages.Deposit_transfer_withdraw.invalid_message);
              Other (File Messages.Deposit_transfer_withdraw.valid_message);
            ]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_loop;
+      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
 
 let scenario_tx_kernel_deposit_transfer_withdraw_many_transfers_LOOP =
@@ -72,7 +72,7 @@ let scenario_tx_kernel_deposit_transfer_withdraw_many_transfers_LOOP =
              Deposit (File Messages.Deposit_transfer_withdraw.snd_deposit);
              Other (File Messages.Large.transfer_two_actors);
            ]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_loop;
+      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
 
 let scenario_computation_kernel =
@@ -83,7 +83,7 @@ let scenario_computation_kernel =
       Scenario.make_scenario_step
         "Load inbox"
         (Scenario.load_messages 1l [Other (Str "dummy")]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_loop;
+      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
 
 let scenario_unreachable_kernel =
@@ -94,7 +94,7 @@ let scenario_unreachable_kernel =
       Scenario.make_scenario_step
         "Load inbox"
         (Scenario.load_messages 1l [Other (Str "dummy")]);
-      Scenario.make_scenario_step "Loop" Scenario.exec_loop;
+      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
 
 let filename () =

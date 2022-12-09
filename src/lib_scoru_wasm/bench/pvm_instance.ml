@@ -29,6 +29,7 @@ module Context = Test_encodings_util.Context
 module Tree = Test_encodings_util.Tree
 module Tree_encoding_runner = Test_encodings_util.Tree_encoding_runner
 module Wasm = Wasm_utils.Wasm
+module Wasm_fast_vm = Tezos_scoru_wasm_fast.Vm
 
 let encode_pvm_state state tree =
   Tree_encoding_runner.encode
@@ -53,3 +54,18 @@ module PP = struct
 
   let tick_label = Format.asprintf "%a" Wasm_utils.pp_state
 end
+
+module Placeholder_builtins = struct
+  let reveal_preimage _hash =
+    Stdlib.failwith "reveal_preimage is not available out of the box in tests"
+
+  let reveal_metadata () =
+    Stdlib.failwith "reveal_metadata is not available out of the box in tests"
+end
+
+let builtins =
+  Tezos_scoru_wasm.Builtins.
+    {
+      reveal_preimage = Placeholder_builtins.reveal_preimage;
+      reveal_metadata = Placeholder_builtins.reveal_metadata;
+    }

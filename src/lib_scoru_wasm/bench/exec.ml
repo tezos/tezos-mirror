@@ -26,24 +26,28 @@
 open Test_scoru_wasm_test_helpers
 open Tezos_scoru_wasm
 open Wasm_pvm_state.Internal_state
+open Pvm_instance
 
 type phase = Decoding | Initialising | Linking | Evaluating | Padding
 [@@deriving show {with_path = false}]
 
-let run_loop_aux f a =
+let run_loop_once f a =
   Lwt_list.fold_left_s
     f
     a
     [Decoding; Linking; Initialising; Evaluating; Padding]
 
-let rec run_loop ?(reboot = None) f a =
+(** do [f a] until [reboot] returns false *)
+let rec do_while continue f a =
   let open Lwt_syntax in
-  let* next_a = run_loop_aux f a in
+  let* next = f a in
+  let* should_reboot = continue next in
+  if should_reboot then (do_while [@tailcall]) continue f next else return next
+
+let run_loop ?(reboot = None) f a =
   match reboot with
-  | None -> return next_a
-  | Some need_reboot ->
-      let* should_reboot = need_reboot next_a in
-      if should_reboot then run_loop ~reboot f next_a else return next_a
+  | None -> run_loop_once f a
+  | Some need_reboot -> do_while need_reboot (run_loop_once f) a
 
 (** Predicate defining the different phases of an execution *)
 let should_continue phase (pvm_state : pvm_state) =
@@ -62,14 +66,21 @@ let should_continue phase (pvm_state : pvm_state) =
   Lwt.return continue
 
 let finish_top_level_call_on_state pvm_state =
-  Wasm_vm.compute_step_many ~max_steps:Int64.max_int ~debug_flag:true pvm_state
+  Wasm_vm.compute_step_many ~max_steps:Int64.max_int ~write_debug:Noop pvm_state
+
+let execute_fast pvm_state =
+  Wasm_fast_vm.compute_step_many
+    ~reveal_builtins:builtins
+    ~max_steps:Int64.max_int
+    ~write_debug:Noop
+    pvm_state
 
 let execute_on_state phase state =
   match state.tick_state with
   | Stuck _ -> Lwt.return (state, 0L)
   | _ ->
       Wasm_vm.compute_step_many_until
-        ~debug_flag:Noop
+        ~write_debug:Noop
         ~max_steps:Int64.max_int
         (should_continue phase)
         state
@@ -99,13 +110,13 @@ type input = File of string | Str of string
 
 let read_input = function Str s -> s | File s -> read_message s
 
-type message = Deposit of input | Other of input | Encoded of input
+type message = Transfer of input | Other of input | Encoded of input
 
 let encode_message = function
-  | Deposit s ->
+  | Transfer s ->
       Pvm_input_kind.(
         Internal_for_tests.to_binary_input
-          (Internal Deposit)
+          (Internal Transfer)
           (Some (read_input s)))
   | Other s ->
       Pvm_input_kind.(
@@ -127,4 +138,4 @@ let load_messages messages level tree =
   in
   (* this should only advance the tick counter after executing the input steps
      until the next snapshot is reached. *)
-  Wasm_utils.eval_to_snapshot ~max_steps:Int64.max_int ~debug_flag:true tree
+  Wasm_utils.eval_to_snapshot ~max_steps:Int64.max_int ~write_debug:Noop tree

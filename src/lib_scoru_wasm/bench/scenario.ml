@@ -61,8 +61,8 @@ type 'a run_state = {benchmark : benchmark; state : 'a; message_counter : int}
 
 let init_run_state benchmark state = {benchmark; state; message_counter = 1}
 
-(** Apply an action of type [a -> b Lwt.t] to the current state of the benchmark
-     run. Can be responsible for changing the type of the state. *)
+(** Apply an action of type [a -> b Lwt.t] to the current state of the
+  benchmark run. Can be responsible for changing the type of the state. *)
 let lift_action action =
   let open Lwt_syntax in
   fun run_state ->
@@ -139,33 +139,37 @@ let run_pvm_action name run_state action =
   @@ lift_add_datum (Data.add_datum name (Z.of_int64 tick) time) run_state_after
 
 (** [switch_state_type switch label state] apply [switch] on the current state
-    of the VM, changing it's type, and record a datum using the given [label] *)
+    of the VM, changing it's type, and records a datum using the [label] *)
 let switch_state_type switch switch_label a_state =
   let open Lwt_syntax in
   let* time, b_state = Measure.time (fun () -> (lift_action switch) a_state) in
   return @@ lift_add_datum (Data.add_tickless_datum switch_label time) b_state
 
 (** Run a [phase] of the execution loop to the VM state *)
-let exec_phase run_state phase =
+let exec_phase_in_slow_mode run_state phase =
   run_pvm_action
     (Exec.show_phase phase)
     run_state
     (lift_action_plus @@ Exec.execute_on_state phase)
+
+let exec_fast_execution_once state =
+  run_pvm_action "Fast execution" state (lift_action_plus @@ Exec.execute_fast)
 
 (** Predicate governing the reboot strategy. *)
 let should_reboot {state; _} =
   let open Lwt_syntax in
   return Internal_state.(state.tick_state = Snapshot)
 
-(** Full loop, including reboots. *)
-let exec_loop tree_run_state =
+(** Decode a tree to a pvm_state,
+    apply a function on the state,
+     encode to a tree.
+    And record the corresponding data points.*)
+let exec_on_pvm_state f tree_run_state =
   let open Lwt_syntax in
   let* pvm_run_state =
     switch_state_type decode_pvm_state "Decode tree" tree_run_state
   in
-  let* pvm_run_state =
-    Exec.run_loop ~reboot:(Some should_reboot) exec_phase pvm_run_state
-  in
+  let* pvm_run_state = f pvm_run_state in
   let* tree_run_state =
     switch_state_type
       (fun state ->
@@ -175,6 +179,13 @@ let exec_loop tree_run_state =
       pvm_run_state
   in
   return tree_run_state
+
+let exec_slow =
+  exec_on_pvm_state
+    (Exec.run_loop ~reboot:(Some should_reboot) exec_phase_in_slow_mode)
+
+let exec_fast =
+  exec_on_pvm_state (Exec.do_while should_reboot exec_fast_execution_once)
 
 let load_messages level messages tree_run_state =
   lift_action (Exec.load_messages messages level) tree_run_state

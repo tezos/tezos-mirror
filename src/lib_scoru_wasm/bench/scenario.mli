@@ -52,12 +52,13 @@ val make_scenario : string -> string -> scenario_step list -> scenario
       having to delete anything. *)
 val ignore_scenario : scenario -> scenario
 
-(** action corresponding to one top level call of PVM *)
-val exec_loop : Wasm.tree action
-
-(** action corresponding to a top level call of PVM,
+(** action corresponding to a top level call of PVM, in slow mode,
     including reboots if necessary. *)
-val exec_loop : Wasm.tree action
+val exec_slow : Wasm.tree action
+
+(** action corresponding to a top level call of PVM, using fast execution,
+    including reboots if necessary. *)
+val exec_fast : Wasm.tree action
 
 (** [load_messages level messages] returns the action corresponding to
       adding a list of [messages] in the inbox at a given [level]. *)

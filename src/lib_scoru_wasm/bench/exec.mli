@@ -31,6 +31,10 @@ open Tezos_scoru_wasm.Wasm_pvm_state
 (** the different phases in a top level call *)
 type phase = Decoding | Initialising | Linking | Evaluating | Padding
 
+(** [do_while reboot f a] apply [f] on a state [a] regardless of it's type.
+    Will reboot at the end of the last phase according to [reboot]. *)
+val do_while : ('a -> bool Lwt.t) -> ('a -> 'a Lwt.t) -> 'a -> 'a Lwt.t
+
 (** [run_loop ~reboot f a] folds [f] on all phases of an exection on a state [a]
     regardless of it's type. Will reboot at the end of the last phase according
     to the [reboot] predicate.  *)
@@ -54,6 +58,10 @@ val finish_top_level_call_on_state :
 val execute_on_state :
   phase -> Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
 
+(** Execute one top level call using fast execution. *)
+val execute_fast :
+  Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
+
 (** [run path k] execute [k] on the content of the file at [path] *)
 val run : Lwt_io.file_name -> (string -> 'a Lwt.t) -> 'a Lwt.t
 
@@ -71,7 +79,7 @@ type input = File of string | Str of string
 (** Types of messages to send to inbox. Can be either already encoded, or not.
     If it's not encoded then it must be designated as Deposit or Other
     to allow encoding *)
-type message = Deposit of input | Other of input | Encoded of input
+type message = Transfer of input | Other of input | Encoded of input
 
 (** [load_messages messages level state] sends messages to the inbox,
     at a given level. Will fail if the VM is not accepting input,
