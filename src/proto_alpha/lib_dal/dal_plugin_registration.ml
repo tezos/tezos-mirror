@@ -26,11 +26,22 @@
 module Plugin = struct
   module Proto = Registerer.Registered
 
+  type block_info = Protocol_client_context.Alpha_block_services.block_info
+
   let get_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
     let open Lwt_result_syntax in
     let* constants = Protocol.Constants_services.all cpctxt (chain, block) in
     return constants.parametric.dal.cryptobox_parameters
+
+  let block_info ?chain ?block ~metadata ctxt =
+    let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    Protocol_client_context.Alpha_block_services.info
+      cpctxt
+      ?chain
+      ?block
+      ~metadata
+      ()
 
   (* Turn the given value of type {!Protocol.Apply_operation_result.operation_result}
      into a value of type {!Dal_plugin.operation_application_result}. *)
@@ -38,17 +49,9 @@ module Plugin = struct
     | Protocol.Apply_operation_result.Applied _ -> Dal_plugin.Succeeded
     | _ -> Dal_plugin.Failed
 
-  let get_published_slot_headers block ctxt =
+  let get_published_slot_headers (block : block_info) =
     let open Lwt_result_syntax in
     let open Protocol.Alpha_context in
-    let cpctxt = new Protocol_client_context.wrap_full ctxt in
-    let* block =
-      Protocol_client_context.Alpha_block_services.info
-        cpctxt
-        ~block
-        ~metadata:`Always
-        ()
-    in
     let apply_internal acc ~source:_ _op _res = acc in
     let apply (type kind) acc ~source:_ (op : kind manager_operation)
         (result : (kind, _, _) Protocol.Apply_operation_result.operation_result)

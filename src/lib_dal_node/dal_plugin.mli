@@ -31,17 +31,32 @@ type operation_application_result =
       (** The associated operation is included in a block but its application was
           not successful (failed, backtracked or skipped). *)
 
+type slot_index = int
+
 (** Information extracted from DAL slots headers operations included in L1
     blocks. Each slot header is made of an L1 level for which it is published,
     the slot's index and commitment. *)
 type slot_header = {
   published_level : int32;
-  slot_index : int;
+  slot_index : slot_index;
   commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
 }
 
 module type T = sig
   module Proto : Registered_protocol.T
+
+  type block_info
+
+  (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
+      [block] in [ctxt] for the given [chain]. Block's metadata are included or
+      skipped depending on the value of [metadata]. This is a wrapper on top of
+      {!Protocol_client_context.Alpha_block_services.info}.  *)
+  val block_info :
+    ?chain:Tezos_shell_services.Block_services.chain ->
+    ?block:Tezos_shell_services.Block_services.block ->
+    metadata:[`Always | `Never] ->
+    Client_context.full ->
+    block_info tzresult Lwt.t
 
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
@@ -50,8 +65,7 @@ module type T = sig
     Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
+    block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
   module RPC : sig

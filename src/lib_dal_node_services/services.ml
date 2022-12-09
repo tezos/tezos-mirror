@@ -69,7 +69,7 @@ module Types = struct
       (fun (slot_level, slot_index) -> {slot_level; slot_index})
       (obj2 (req "slot_level" int32) (req "slot_index" uint8))
 
-  let slot_content = Data_encoding.bytes
+  let slot_encoding = Data_encoding.bytes
 end
 
 let post_slots :
@@ -85,7 +85,7 @@ let post_slots :
       "Add a slot in the node's context if not already present. The \
        corresponding commitment is returned."
     ~query:Tezos_rpc.Query.empty
-    ~input:Types.slot_content
+    ~input:Types.slot_encoding
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(open_root / "slots")
 
@@ -116,7 +116,7 @@ let get_slot :
     ~description:
       "Retrieve the content of the slot associated with the given commitment."
     ~query:Tezos_rpc.Query.empty
-    ~output:Types.slot_content
+    ~output:Types.slot_encoding
     Tezos_rpc.Path.(open_root / "slots" /: Cryptobox.Commitment.rpc_arg)
 
 let get_slot_commitment_proof :

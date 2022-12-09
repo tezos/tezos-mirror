@@ -27,24 +27,6 @@ open Protocol
 open Alpha_context
 module Block_services = Block_services.Make (Protocol) (Protocol)
 
-type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
-
-let () =
-  register_error_kind
-    ~id:"sc_rollup.node.cannot_read_receipt_of_block"
-    ~title:"Cannot read receipt of block from L1"
-    ~description:"The receipt of a block could not be read."
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "Could not read block receipt for block with hash %a."
-        Tezos_crypto.Block_hash.pp
-        hash)
-    `Temporary
-    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
-    (function Cannot_read_block_metadata hash -> Some hash | _ -> None)
-    (fun hash -> Cannot_read_block_metadata hash)
-
 let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
     =
   let genesis_level = genesis_info.level in
@@ -106,7 +88,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       in
       let*? metadata =
         Option.to_result
-          ~none:(TzTrace.make @@ Cannot_read_block_metadata hash)
+          ~none:(TzTrace.make @@ Layer1_services.Cannot_read_block_metadata hash)
           metadata
       in
       (* `metadata.protocol_data.dal_attestation` is `None` if we are behind
@@ -139,7 +121,7 @@ let is_slot_confirmed node_ctxt (Layer1.{hash; _} as head) slot_index =
   let open Lwt_result_syntax in
   let* slots_info_opt = slots_info node_ctxt head in
   match slots_info_opt with
-  | None -> tzfail @@ Cannot_read_block_metadata hash
+  | None -> tzfail @@ Layer1_services.Cannot_read_block_metadata hash
   | Some {confirmed_slots_indexes; _} ->
       let*? is_confirmed =
         Environment.wrap_tzresult

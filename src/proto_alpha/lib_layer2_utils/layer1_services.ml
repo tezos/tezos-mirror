@@ -28,6 +28,24 @@ open Alpha_context
 open Apply_results
 open Protocol_client_context.Alpha_block_services
 
+type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
+
+let () =
+  register_error_kind
+    ~id:"cannot_read_receipt_of_block"
+    ~title:"Cannot read receipt of block from L1"
+    ~description:"The receipt of a block could not be read."
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "Could not read block receipt for block with hash %a."
+        Tezos_crypto.Block_hash.pp
+        hash)
+    `Temporary
+    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
+    (function Cannot_read_block_metadata hash -> Some hash | _ -> None)
+    (fun hash -> Cannot_read_block_metadata hash)
+
 type 'accu successful_operation_processor = {
   apply :
     'kind.

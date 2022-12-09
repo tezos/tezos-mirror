@@ -33,8 +33,6 @@ open Alpha_context
 
     The state of slots per block is persistent.  *)
 
-type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
-
 (** [is_slot_confirmed node_ctxt head slot_index] checks whether the slot
     with index [slot_index] has been confirmed in [head]. *)
 val is_slot_confirmed :

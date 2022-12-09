@@ -25,14 +25,25 @@
 
 type operation_application_result = Succeeded | Failed
 
+type slot_index = int
+
 type slot_header = {
   published_level : int32;
-  slot_index : int;
+  slot_index : slot_index;
   commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
 }
 
 module type T = sig
   module Proto : Registered_protocol.T
+
+  type block_info
+
+  val block_info :
+    ?chain:Tezos_shell_services.Block_services.chain ->
+    ?block:Tezos_shell_services.Block_services.block ->
+    metadata:[`Always | `Never] ->
+    Client_context.full ->
+    block_info tzresult Lwt.t
 
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
@@ -41,8 +52,7 @@ module type T = sig
     Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
+    block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
   module RPC : sig
