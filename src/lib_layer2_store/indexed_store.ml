@@ -176,7 +176,7 @@ module type INDEXED_FILE = sig
 
   val header : [> `Read] t -> key -> header option tzresult Lwt.t
 
-  val read : [> `Read] t -> key -> value option tzresult Lwt.t
+  val read : [> `Read] t -> key -> (value * header) option tzresult Lwt.t
 
   val append :
     ?flush:bool ->
@@ -534,7 +534,7 @@ struct
     index : Header_index.t;
     fd : Lwt_unix.file_descr;
     scheduler : Lwt_idle_waiter.t;
-    cache : V.t tzresult Cache.t;
+    cache : (V.t * V.Header.t) tzresult Cache.t;
   }
 
   (* The log_size corresponds to the maximum size of the memory zone
@@ -570,9 +570,9 @@ struct
       let open Lwt_syntax in
       match Header_index.find store.index key with
       | exception Not_found -> Lwt.return_none
-      | {IHeader.offset; _} ->
+      | {IHeader.offset; header} ->
           let+ value = Values_file.pread_value store.fd ~file_offset:offset in
-          Some (Result.map fst value)
+          Some (Result.map (fun (value, _ofs) -> (value, header)) value)
     in
     let open Lwt_result_syntax in
     Cache.bind_or_put store.cache key read_from_disk @@ function
@@ -601,7 +601,7 @@ struct
     @@ fun () ->
     let open Lwt_result_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Cache.put store.cache key (Lwt.return_some (Ok value)) ;
+    Cache.put store.cache key (Lwt.return_some (Ok (value, header))) ;
     let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
     let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
     if flush then Header_index.flush store.index ;
