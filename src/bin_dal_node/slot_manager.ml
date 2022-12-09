@@ -108,3 +108,9 @@ let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     unattested_slots
     node_store
     ~attestation_lag
+
+let get_commitment_by_published_level_and_index ~level ~slot_index node_store =
+  Store.Legacy.get_commitment_by_published_level_and_index
+    ~level
+    ~slot_index
+    node_store

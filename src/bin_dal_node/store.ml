@@ -334,4 +334,20 @@ module Legacy = struct
     let published_level = Int32.(sub block_level (of_int attestation_lag)) in
     let* () = update_slot_headers_attestation ~published_level store attested in
     update_slot_headers_attestation ~published_level store unattested
+
+  let get_commitment_by_published_level_and_index ~level ~slot_index node_store
+      =
+    let open Lwt_result_syntax in
+    let index = Services.Types.{slot_level = level; slot_index} in
+    let*! commitment_str_opt =
+      find node_store.slots_store @@ Path.Level.accepted_header_commitment index
+    in
+    Option.fold
+      commitment_str_opt
+      ~none:(fail (Ok `Not_found))
+      ~some:(fun c_str ->
+        Option.fold
+          ~none:(Lwt.return (Error (error_with "Commitment decoding failed")))
+          ~some:return
+        @@ decode_commitment c_str)
 end
