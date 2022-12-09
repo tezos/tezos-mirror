@@ -220,7 +220,21 @@ let pp_state fmt state =
   match state with
   | Wasm_pvm_state.Internal_state.Snapshot -> pp_s "Start"
   | Decode _ -> pp_s "Decode"
-  | Eval _ -> pp_s "Eval"
+  | Eval
+      {
+        config =
+          {step_kont = Tezos_webassembly_interpreter.Eval.(SK_Result _); _};
+        _;
+      } ->
+      pp_s "Evaluation succeeded"
+  | Eval
+      {
+        config =
+          {step_kont = Tezos_webassembly_interpreter.Eval.(SK_Trapped msg); _};
+        _;
+      } ->
+      Format.fprintf fmt "Evaluation failed (%s)" msg.it
+  | Eval _ -> Format.fprintf fmt "Eval"
   | Stuck e ->
       Format.fprintf fmt "Stuck (%a)" Test_wasm_pvm_encodings.pp_error_state e
   | Init _ -> pp_s "Init"
