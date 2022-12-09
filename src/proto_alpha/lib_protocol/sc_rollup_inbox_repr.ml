@@ -204,51 +204,28 @@ module V1 = struct
         let encoding = history_proof_encoding
       end)
 
-  (*
+  (* An inbox is composed of a metadata of type {!t}, and a [level witness]
+     representing the messages of the current level (held by the
+     [Raw_context.t] in the protocol).
 
-   At a given level, an inbox is composed of metadata of type [t] and
-   [current_level], a [tree] representing the messages of the current level
-   (held by the [Raw_context.t] in the protocol).
-
-   The metadata contains :
-   - [level] : the inbox level ;
-   - [current_level_proof] : the [current_level] and its root hash ;
-   - [old_levels_messages] : a witness of the inbox history.
-
-   When new messages are appended to the current level inbox, the
-   metadata stored in the context may be related to an older level.
-   In that situation, an archival process is applied to the metadata.
-   This process saves the [current_level_proof] in the
-   [old_levels_messages] and empties [current_level]. It then
-   initializes a new level tree for the new messages---note that any
-   intermediate levels are simply skipped. See
-   {!Make_hashing_scheme.archive_if_needed} for details.
-
+     The metadata contains :
+     - [level] : the inbox level ;
+     - [old_levels_messages] : a witness of the inbox history.
   *)
-  type t = {
-    level : Raw_level_repr.t;
-    current_level_proof : level_proof;
-    old_levels_messages : history_proof;
-  }
+  type t = {level : Raw_level_repr.t; old_levels_messages : history_proof}
 
   let equal inbox1 inbox2 =
     (* To be robust to addition of fields in [t]. *)
-    let {level; current_level_proof; old_levels_messages} = inbox1 in
+    let {level; old_levels_messages} = inbox1 in
     Raw_level_repr.equal level inbox2.level
-    && equal_level_proof current_level_proof inbox2.current_level_proof
     && equal_history_proof old_levels_messages inbox2.old_levels_messages
 
-  let pp fmt {level; current_level_proof; old_levels_messages} =
+  let pp fmt {level; old_levels_messages} =
     Format.fprintf
       fmt
-      "@[<hov 2>{ level = %a@;\
-       current messages hash  = %a@;\
-       old_levels_messages = %a@;\
-       }@]"
+      "@[<hov 2>{ level = %a@;old_levels_messages = %a@;}@]"
       Raw_level_repr.pp
       level
-      pp_level_proof
-      current_level_proof
       pp_history_proof
       old_levels_messages
 
@@ -256,18 +233,13 @@ module V1 = struct
 
   let old_levels_messages inbox = inbox.old_levels_messages
 
-  let current_level_proof inbox = inbox.current_level_proof
-
   let encoding =
     Data_encoding.(
       conv
-        (fun {level; current_level_proof; old_levels_messages} ->
-          (level, current_level_proof, old_levels_messages))
-        (fun (level, current_level_proof, old_levels_messages) ->
-          {level; current_level_proof; old_levels_messages})
-        (obj3
+        (fun {level; old_levels_messages} -> (level, old_levels_messages))
+        (fun (level, old_levels_messages) -> {level; old_levels_messages})
+        (obj2
            (req "level" Raw_level_repr.encoding)
-           (req "current_level_proof" level_proof_encoding)
            (req "old_levels_messages" history_proof_encoding)))
 end
 
@@ -360,15 +332,13 @@ let archive history inbox witness =
     let prev_cell = inbox.old_levels_messages in
     let prev_cell_ptr = hash_history_proof prev_cell in
     let* history = History.remember prev_cell_ptr prev_cell history in
-    let level_proof = current_level_proof inbox in
-    let cell = Skip_list.next ~prev_cell ~prev_cell_ptr level_proof in
+    let current_level_proof =
+      let hash = Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness in
+      {hash; level = inbox.level}
+    in
+    let cell = Skip_list.next ~prev_cell ~prev_cell_ptr current_level_proof in
     return (history, cell)
   in
-  let current_level_proof =
-    let hash = Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness in
-    {hash; level = inbox.level}
-  in
-  let inbox = {inbox with current_level_proof} in
   let* history, old_levels_messages = form_history_proof history inbox in
   let inbox = {inbox with old_levels_messages} in
   return (history, inbox)
@@ -843,12 +813,7 @@ let genesis ~predecessor_timestamp ~predecessor level =
     {hash; level}
   in
 
-  return
-    {
-      level;
-      current_level_proof = level_proof;
-      old_levels_messages = Skip_list.genesis level_proof;
-    }
+  return {level; old_levels_messages = Skip_list.genesis level_proof}
 
 module Internal_for_tests = struct
   let produce_inclusion_proof = produce_inclusion_proof

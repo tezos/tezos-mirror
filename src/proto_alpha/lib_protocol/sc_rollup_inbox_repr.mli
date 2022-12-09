@@ -139,18 +139,10 @@ module V1 : sig
       [inbox] or its initial level. *)
   val inbox_level : t -> Raw_level_repr.t
 
-  (** A [level_proof] contains the root hash of the level tree and its
-      corresponding level. *)
-  type level_proof = private {
-    hash : Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t;
-    level : Raw_level_repr.t;
-  }
-
   (** A [history_proof] is a [Skip_list.cell] that stores multiple
-    hashes. [Skip_list.content history_proof] gives the hash of the
-    [level_proof] for this cell, while [Skip_list.back_pointers
-    history_proof] is an array of hashes of earlier [history_proof]s
-    in the inbox.
+    hashes. [Skip_list.content history_proof] gives the hash of this cell,
+    while [Skip_list.back_pointers history_proof] is an array of hashes of
+    earlier [history_proof]s in the inbox.
 
     On the one hand, we think of this type as representing the whole
     Merkle structure of an inbox at a given level---it is the part of
@@ -205,12 +197,6 @@ end
 include Sc_rollup_data_version_sig.S with type t = V1.t
 
 include module type of V1 with type t = V1.t
-
-(** This extracts the current {!level_proof} from the inbox. Note: the
-    current level hash is stored lazily as [fun () -> ...], and this
-    function will call that function. So don't use this if you want to
-    preserve the laziness. *)
-val current_level_proof : t -> level_proof
 
 type serialized_proof
 
