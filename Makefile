@@ -233,7 +233,7 @@ coverage-report-cobertura:
 
 .PHONY: enable-time-measurement
 enable-time-measurement:
-	@$(MAKE) build PROFILE=dev DUNE_INSTRUMENT_WITH=tezos-time-measurement
+	@$(MAKE) all DUNE_INSTRUMENT_WITH=tezos-time-measurement
 
 .PHONY: test-protocol-compile
 test-protocol-compile:
