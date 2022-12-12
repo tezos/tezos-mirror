@@ -457,7 +457,9 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_bad_commitment_serialization -> Some () | _ -> None)
     (fun () -> Sc_rollup_bad_commitment_serialization) ;
-  let description = "Commitment inbox level is greater than current level" in
+  let description =
+    "Commitment inbox level is greater or equal than current level"
+  in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_commitment_from_future"
