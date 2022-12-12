@@ -23,9 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
 open Prometheus
 
 let sc_rollup_node_registry = CollectorRegistry.create ()
+
+let namespace = Tezos_version.Node_version.namespace
+
+let subsystem = "sc_rollup_node"
+
+(** Registers a labeled counter in [sc_rollup_node_registry] *)
+let v_labels_counter =
+  Counter.v_labels ~registry:sc_rollup_node_registry ~namespace ~subsystem
 
 module Cohttp (Server : Cohttp_lwt.S.Server) = struct
   let callback _conn req _body =
@@ -102,3 +112,44 @@ let print_csv_metrics ppf metrics =
         v.MetricInfo.label_names)
     (Prometheus.MetricFamilyMap.to_list metrics) ;
   Format.fprintf ppf "@]@."
+
+module Info = struct
+  open Tezos_version
+
+  let node_general_info =
+    v_labels_counter
+      ~help:"General information on the node"
+      ~label_names:["version"; "commit_hash"; "commit_date"]
+      "node_info"
+
+  let rollup_node_info =
+    let help = "Rollup node info" in
+    v_labels_counter
+      ~help
+      ~label_names:
+        ["rollup_address"; "mode"; "genesis_level"; "genesis_hash"; "pvm_kind"]
+      "rollup_node_info"
+
+  let init_rollup_node_info ~id ~mode ~genesis_level ~genesis_hash ~pvm_kind =
+    let id = Sc_rollup_repr.Address.to_b58check id in
+    let mode = Configuration.string_of_mode mode in
+    let genesis_level = Format.asprintf "%a" Raw_level.pp genesis_level in
+    let genesis_hash =
+      Format.asprintf "%a" Sc_rollup.Commitment.Hash.pp genesis_hash
+    in
+    let pvm_kind = Sc_rollup.Kind.to_string pvm_kind in
+    ignore
+    @@ Counter.labels
+         rollup_node_info
+         [id; mode; genesis_level; genesis_hash; pvm_kind] ;
+    ()
+
+  let () =
+    let version = Version.to_string Current_git_info.version in
+    let commit_hash = Current_git_info.commit_hash in
+    let commit_date = Current_git_info.committer_date in
+    let _ =
+      Counter.labels node_general_info [version; commit_hash; commit_date]
+    in
+    ()
+end
