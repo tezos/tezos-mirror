@@ -571,7 +571,7 @@ let fill_inbox ~inbox history payloads_histories payloads_per_levels =
             (fun message -> Sc_rollup.Inbox_message.External message)
             messages
         in
-        let* payloads_history, history, inbox, _witness, _messages =
+        let* payloads_history, history, inbox, witness, _messages =
           Environment.wrap_tzresult
           @@ Sc_rollup.Inbox.add_all_messages
                ~predecessor_timestamp
@@ -581,8 +581,8 @@ let fill_inbox ~inbox history payloads_histories payloads_per_levels =
                messages
         in
         (* Store in the history this archived level. *)
-        let Sc_rollup.Inbox.{hash = witness_hash; _} =
-          Sc_rollup.Inbox.current_level_proof inbox
+        let witness_hash =
+          Sc_rollup.Inbox_merkelized_payload_hashes.hash witness
         in
         let payloads_histories =
           Payloads_histories.add

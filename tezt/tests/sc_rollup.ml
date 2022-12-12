@@ -697,10 +697,7 @@ let send_text_messages ?(format = `Raw) ?src client msgs =
 
 let parse_inbox json =
   let go () =
-    return
-      JSON.
-        ( json |-> "current_level_proof" |-> "hash" |> as_string,
-          json |-> "current_level_proof" |-> "level" |> as_int )
+    return JSON.(json |-> "old_levels_messages", json |-> "level" |> as_int)
   in
   Lwt.catch go @@ fun exn ->
   failwith
@@ -768,7 +765,7 @@ let test_rollup_inbox_of_rollup_node ?(extra_tags = []) ~variant scenario ~kind
   return
   @@ Check.(
        (inbox_from_sc_rollup_node = inbox_from_tezos_node)
-         (tuple2 string int)
+         (tuple2 json int)
          ~error_msg:"expected value %R, got %L")
 
 let basic_scenario sc_rollup_node _rollup_client _sc_rollup _node client =

@@ -3350,13 +3350,6 @@ module Sc_rollup : sig
         with type key = Hash.t
          and type value = history_proof
 
-    type level_proof = private {
-      hash : Inbox_merkelized_payload_hashes.Hash.t;
-      level : Raw_level.t;
-    }
-
-    val current_level_proof : t -> level_proof
-
     type serialized_proof
 
     val serialized_proof_encoding : serialized_proof Data_encoding.t
