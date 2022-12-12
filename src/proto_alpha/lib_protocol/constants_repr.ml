@@ -327,6 +327,16 @@ let check_constants constants =
        "The number of data availability slot must be between 1 and 256")
   >>? fun () ->
   error_unless
+    Compare.Int32.(
+      constants.dal.blocks_per_epoch > 0l
+      && constants.dal.blocks_per_epoch <= constants.blocks_per_cycle
+      && Int32.rem constants.blocks_per_cycle constants.dal.blocks_per_epoch
+         = 0l)
+    (Invalid_protocol_constants
+       "The epoch length must be between 1 and blocks_per_cycle, and \
+        blocks_per_epoch must divide blocks_per_cycle.")
+  >>? fun () ->
+  error_unless
     Compare.Int.(
       constants.sc_rollup.max_number_of_stored_cemented_commitments > 0)
     (Invalid_protocol_constants

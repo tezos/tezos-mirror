@@ -250,25 +250,13 @@ let test_feature_flag _protocol _parameters _cryptobox node client
      - 2. It checks the new operations added by the feature flag
      cannot be propagated by checking their classification in the
      mempool. *)
-  let* protocol_parameters =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
-  in
-  let feature_flag =
-    JSON.(
-      protocol_parameters |-> "dal_parametric" |-> "feature_enable" |> as_bool)
-  in
-  let number_of_slots =
-    JSON.(
-      protocol_parameters |-> "dal_parametric" |-> "number_of_slots" |> as_int)
-  in
-  let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox_params = parameters.cryptobox in
-  let cryptobox = Rollup.Dal.make cryptobox_params in
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make params.cryptobox in
   let commitment, proof =
     Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou"
   in
   Check.(
-    (feature_flag = false)
+    (params.feature_enabled = false)
       bool
       ~error_msg:"Feature flag for the DAL should be disabled") ;
   let*? process =
@@ -285,7 +273,9 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       inject
         ~force:true
         ~signer:Constant.bootstrap1
-        (dal_attestation ~level ~attestation:(Array.make number_of_slots false))
+        (dal_attestation
+           ~level
+           ~attestation:(Array.make params.number_of_slots false))
         client)
   in
   let* (`OpHash oph2) =
@@ -309,6 +299,46 @@ let test_feature_flag _protocol _parameters _cryptobox node client
   if not JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
+
+let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
+    _bootstrap_key =
+  let* params = Rollup.Dal.Parameters.from_client client in
+  let blocks_per_epoch = params.blocks_per_epoch in
+  let* current_level =
+    RPC.(call node @@ get_chain_block_helper_current_level ())
+  in
+  (* The test assumes we are at a level when an epoch starts. And
+     that is indeed the case. *)
+  assert (current_level.cycle_position = 0) ;
+  let* first_committee =
+    Rollup.Dal.Committee.at_level node ~level:current_level.level
+  in
+  (* We iterate through (the committees at) levels [current_level +
+     offset], with [offset] from 1 to [blocks_per_epoch]. At offset 0
+     we have the [first_committee] (first in the current epoch). The
+     committees at offsets 1 to [blocks_per_epoch - 1] should be the
+     same as the one at offset 0, the one at [blocks_per_epoch] (first
+     in the next epoch) should be different. *)
+  let rec iter offset =
+    if offset > blocks_per_epoch then unit
+    else
+      let level = current_level.level + offset in
+      let* committee = Rollup.Dal.Committee.at_level node ~level in
+      if offset < blocks_per_epoch then (
+        Check.((first_committee = committee) Rollup.Dal.Committee.typ)
+          ~error_msg:
+            "Unexpected different DAL committees at first level: %L, versus \
+             current level: %R" ;
+        unit)
+      else if offset = blocks_per_epoch then (
+        Check.((first_committee = committee) Rollup.Dal.Committee.typ)
+          ~error_msg:
+            "Unexpected equal DAL committees at first levels in subsequent \
+             epochs: %L and %R" ;
+        unit)
+      else iter (offset + 1)
+  in
+  iter 1
 
 let publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof node
     client =
@@ -1627,6 +1657,10 @@ let register ~protocols =
     ~dal_enable:false
     "feature_flag_is_disabled"
     test_feature_flag
+    protocols ;
+  scenario_with_layer1_node
+    "one_committee_per_epoch"
+    test_one_committee_per_epoch
     protocols ;
 
   (* Tests with layer1 and dal nodes *)

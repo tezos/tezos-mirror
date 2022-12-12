@@ -44,8 +44,6 @@
 
 type t
 
-type attested_slots = t
-
 (** The shape of Dal attestation operations injected by delegates. *)
 type operation = {
   attestor : Signature.Public_key_hash.t;
@@ -69,7 +67,7 @@ val empty : t
 val is_attested : t -> Dal_slot_repr.Index.t -> bool
 
 (** [commit slot_attestation index] commits into [slot_attestation]
-   that the [index] is available. *)
+   that the slot [index] is available. *)
 val commit : t -> Dal_slot_repr.Index.t -> t
 
 (** [occupied_size_in_bits slot_attestation] returns the size in bits of an attestation. *)
@@ -95,6 +93,8 @@ module Shard_map : Map.S with type key = shard_index
    This information will be used at the end of block finalisation to
    have the protocol declaring whether the slot is available.  *)
 module Accountability : sig
+  type attested_slots = t
+
   (** The data-structure used to record the shards-slots availability. *)
   type t
 

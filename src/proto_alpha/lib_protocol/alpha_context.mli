@@ -794,6 +794,7 @@ module Constants : sig
       number_of_slots : int;
       attestation_lag : int;
       availability_threshold : int;
+      blocks_per_epoch : int32;
       cryptobox_parameters : Dal.parameters;
     }
 
@@ -2956,7 +2957,7 @@ module Dal : sig
     val shards_of_attestor :
       context -> attestor:public_key_hash -> shard_index list option
 
-    val record_available_shards : context -> t -> int list -> context
+    val record_attested_shards : context -> t -> int list -> context
 
     type committee = {
       pkh_to_shards : (shard_index * int) Signature.Public_key_hash.Map.t;

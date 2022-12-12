@@ -503,9 +503,11 @@ module Dal = struct
 
   module Parameters = struct
     type t = {
+      feature_enabled : bool;
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      blocks_per_epoch : int;
     }
 
     let parameter_file protocol =
@@ -523,14 +525,45 @@ module Dal = struct
       let page_size = JSON.(json |-> "page_size" |> as_int) in
       let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
       let attestation_lag = JSON.(json |-> "attestation_lag" |> as_int) in
+      let blocks_per_epoch = JSON.(json |-> "blocks_per_epoch" |> as_int) in
+      let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
       return
         {
+          feature_enabled;
           cryptobox =
             Cryptobox.Verifier.
               {number_of_shards; redundancy_factor; slot_size; page_size};
           number_of_slots;
           attestation_lag;
+          blocks_per_epoch;
         }
+  end
+
+  module Committee = struct
+    type member = {attestor : string; first_shard_index : int; power : int}
+
+    type t = member list
+
+    let typ =
+      let open Check in
+      list
+      @@ convert
+           (fun {attestor; first_shard_index; power} ->
+             (attestor, first_shard_index, power))
+           (tuple3 string int int)
+
+    let at_level node ~level =
+      let* json =
+        RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
+      in
+      return
+      @@ List.map
+           (fun json ->
+             let pkh = JSON.(json |=> 0 |> as_string) in
+             let first_shard_index = JSON.(json |=> 1 |=> 0 |> as_int) in
+             let power = JSON.(json |=> 1 |=> 1 |> as_int) in
+             {attestor = pkh; first_shard_index; power})
+           (JSON.as_list json)
   end
 
   let pad n message =

@@ -63,3 +63,6 @@ val finalisation : t -> (t * Dal.Attestation.t option) tzresult Lwt.t
    in memory so that every time we need to use this committee, there
    is no need to recompute it again. *)
 val initialisation : t -> level:Level.t -> t tzresult Lwt.t
+
+(** [compute_committee ctxt level] computes the DAL committee for [level]. *)
+val compute_committee : t -> Level.t -> Dal.Attestation.committee tzresult Lwt.t

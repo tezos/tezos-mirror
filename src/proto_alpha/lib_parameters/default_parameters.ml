@@ -73,6 +73,7 @@ let default_dal =
       number_of_slots = 256;
       attestation_lag = 1;
       availability_threshold = 50;
+      blocks_per_epoch = 32l;
       cryptobox_parameters = default_cryptobox_parameters;
     }
 
@@ -289,6 +290,7 @@ let constants_sandbox =
         {
           constants_mainnet.dal with
           number_of_slots = 16;
+          blocks_per_epoch = 2l;
           cryptobox_parameters =
             derive_cryptobox_parameters
               ~redundancy_factor:8
@@ -335,6 +337,7 @@ let constants_test =
         {
           constants_mainnet.dal with
           number_of_slots = 8;
+          blocks_per_epoch = 2l;
           cryptobox_parameters =
             derive_cryptobox_parameters
               ~redundancy_factor:4

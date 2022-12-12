@@ -219,9 +219,11 @@ module Dal : sig
 
   module Parameters : sig
     type t = {
+      feature_enabled : bool;
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      blocks_per_epoch : int;
     }
 
     val parameter_file : Protocol.t -> string Lwt.t
@@ -327,5 +329,13 @@ module Dal : sig
       Cryptobox.commitment * Cryptobox.commitment_proof
 
     val to_string : Cryptobox.commitment -> string
+  end
+
+  module Committee : sig
+    type t
+
+    val typ : t Check.typ
+
+    val at_level : Node.t -> level:int -> t Lwt.t
   end
 end

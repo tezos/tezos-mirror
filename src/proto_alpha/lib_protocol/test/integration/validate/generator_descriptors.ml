@@ -631,15 +631,7 @@ let endorsement_descriptor =
 let dal_slot_availibility ctxt delegate =
   let open Lwt_result_syntax in
   let level = Alpha_context.Level.current ctxt in
-  let pkh_from_tenderbake_slot slot =
-    Alpha_context.Stake_distribution.slot_owner ctxt level slot
-    >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
-  in
-  let* committee =
-    Alpha_context.Dal.Attestation.compute_committee
-      ctxt
-      pkh_from_tenderbake_slot
-  in
+  let* committee = Dal_apply.compute_committee ctxt level in
   match
     Environment.Signature.Public_key_hash.Map.find
       delegate

@@ -1016,6 +1016,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             number_of_slots = c.dal.number_of_slots;
             attestation_lag = c.dal.endorsement_lag;
             availability_threshold = c.dal.availability_threshold;
+            blocks_per_epoch = 32l;
             cryptobox_parameters;
           }
       in
@@ -1600,11 +1601,11 @@ module Dal = struct
       (fun (length, slot_header) ->
         Dal_register_invalid_slot_header {length; slot_header})
 
-  let record_available_shards ctxt slots shards =
+  let record_attested_shards ctxt attestation shards =
     let dal_attestation_slot_accountability =
       Dal_attestation_repr.Accountability.record_shards_availability
         ctxt.back.dal_attestation_slot_accountability
-        slots
+        attestation
         shards
     in
     {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
@@ -1702,13 +1703,13 @@ module Dal = struct
         let slot_index = Slot_repr.to_int slot in
         (* An optimisation could be to return only [pkh_to_shards] map
            because the second one is not used. This can be done later
-           on if it is a good optimisation. *)
+           on, if it is a good optimisation. *)
         let committee = update_committee committee pkh ~slot_index ~power:1 in
         compute_power (index - 1) committee
     in
     (* This committee is an intermediate to compute the final DAL
-       commitee. This one only projects the Tenderbake committee into
-       the DAL committee. The next one reorder the slots so that they
+       committee. This one only projects the Tenderbake committee into
+       the DAL committee. The next one reorders the slots so that they
        are grouped by public key hash. *)
     compute_power (number_of_shards - 1) empty_dal_committee
     >>=? fun unordered_committee ->

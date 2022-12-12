@@ -79,7 +79,7 @@ let apply_attestation ctxt op =
       let level = Level.current ctxt in
       error (Dal_data_availibility_attestor_not_in_committee {attestor; level})
   | Some shards ->
-      Ok (Dal.Attestation.record_available_shards ctxt attestation shards)
+      Ok (Dal.Attestation.record_attested_shards ctxt attestation shards)
 
 let validate_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
@@ -152,21 +152,35 @@ let finalisation ctxt =
       Dal.Slot.finalize_pending_slot_headers ctxt
       >|=? fun (ctxt, attestation) -> (ctxt, Some attestation))
 
+let compute_committee ctxt level =
+  assert_dal_feature_enabled ctxt >>?= fun () ->
+  let blocks_per_epoch = (Constants.parametric ctxt).dal.blocks_per_epoch in
+  let first_level_in_epoch =
+    match
+      Level.sub
+        ctxt
+        level
+        (Int32.to_int @@ Int32.rem level.Level.cycle_position blocks_per_epoch)
+    with
+    | Some v -> v
+    | None ->
+        (* unreachable, because level.level >= level.cycle_position >=
+           (level.cycle_position mod blocks_per_epoch) *)
+        assert false
+  in
+  let pkh_from_tenderbake_slot slot =
+    Stake_distribution.slot_owner ctxt first_level_in_epoch slot
+    >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
+  in
+  (* This committee is cached because it is the one we will use
+     for the validation of the DAL attestations. *)
+  Alpha_context.Dal.Attestation.compute_committee ctxt pkh_from_tenderbake_slot
+
 let initialisation ctxt ~level =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled
     ctxt
     ~default:(fun ctxt -> return ctxt)
     (fun ctxt ->
-      let pkh_from_tenderbake_slot slot =
-        Stake_distribution.slot_owner ctxt level slot
-        >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
-      in
-      (* This committee is cached because it is the one we will use
-         for the validation of the DAL attestations. *)
-      let* committee =
-        Alpha_context.Dal.Attestation.compute_committee
-          ctxt
-          pkh_from_tenderbake_slot
-      in
-      return (Alpha_context.Dal.Attestation.init_committee ctxt committee))
+      let+ committee = compute_committee ctxt level in
+      Alpha_context.Dal.Attestation.init_committee ctxt committee)
