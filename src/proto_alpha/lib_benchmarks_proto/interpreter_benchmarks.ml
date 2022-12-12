@@ -1628,20 +1628,38 @@ module Registration_section = struct
         ~kinstr:(IAnd_bytes (dummy_loc, halt))
         ()
 
+    let stack_sampler_for_or_and_xor_on_bytes cfg rng_state =
+      let _, (module Samplers) =
+        make_default_samplers cfg.Default_config.sampler
+      in
+      fun () ->
+        (* We benchmark the worst cases: when the two bytes have
+               the same length *)
+        let bytes1 =
+          Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+        in
+        let bytes2 =
+          Bytes.init (Bytes.length bytes1) (fun _ ->
+              Char.chr (Random.State.int rng_state 256))
+        in
+        (bytes1, (bytes2, eos))
+
     let () =
-      simple_benchmark
+      simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IOr_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
         ~kinstr:(IOr_bytes (dummy_loc, halt))
+        ~stack_sampler:stack_sampler_for_or_and_xor_on_bytes
         ()
 
     let () =
-      simple_benchmark
+      simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IXor_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
         ~kinstr:(IXor_bytes (dummy_loc, halt))
+        ~stack_sampler:stack_sampler_for_or_and_xor_on_bytes
         ()
 
     let () =
