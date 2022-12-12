@@ -124,6 +124,19 @@ let assert_timeout_result ?game_status incr =
   assert (op_type = `Timeout) ;
   assert_equal_game_status ?game_status actual_game_status
 
+let bake_timeout_period ?timeout_period_in_blocks block =
+  let* timeout_period_in_blocks =
+    match timeout_period_in_blocks with
+    | Some v -> return v
+    | None ->
+        let* constants = Context.get_constants (B block) in
+        let Constants.Parametric.{timeout_period_in_blocks; _} =
+          constants.parametric.sc_rollup
+        in
+        return timeout_period_in_blocks
+  in
+  Block.bake_n timeout_period_in_blocks block
+
 (** [context_init tup] initializes a context for testing in which the
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
@@ -2162,11 +2175,7 @@ let test_timeout_during_final_move () =
 
   (* Player2 will not play and it will be timeout. *)
   let* incr =
-    let* constants = Context.get_constants (B block) in
-    let Constants.Parametric.{timeout_period_in_blocks; _} =
-      constants.parametric.sc_rollup
-    in
-    let* block = Block.bake_n timeout_period_in_blocks block in
+    let* block = bake_timeout_period block in
     let game_index = Sc_rollup.Game.Index.make p1_pkh p2_pkh in
     let* timeout = Op.sc_rollup_timeout (B block) p1 rollup game_index in
     let* incr = Incremental.begin_construction block in
@@ -2697,6 +2706,185 @@ let test_offline_staker_does_not_prevent_cementation () =
   let* _b = Block.bake ~operation:cement_op b in
   return_unit
 
+let init_with_4_conflicts () =
+  let dumb_compressed_state s =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Tezos_crypto.Context_hash.hash_string [s])
+  in
+  let* block, players = context_init (Context.TList 4) in
+  let pA, pB, pC, pD =
+    match players with
+    | [pA; pB; pC; pD] -> (pA, pB, pC, pD)
+    | _ -> assert false
+  in
+  let pA_pkh = Account.pkh_of_contract_exn pA in
+  let pB_pkh = Account.pkh_of_contract_exn pB in
+  let pC_pkh = Account.pkh_of_contract_exn pC in
+  let pD_pkh = Account.pkh_of_contract_exn pD in
+  let* block, rollup = sc_originate block pA "unit" in
+
+  (* The four players stake on a conflicting commitment. *)
+  let* pA_commitment =
+    dummy_commitment
+      ~number_of_ticks:1L
+      ~compressed_state:(dumb_compressed_state "A")
+      (B block)
+      rollup
+  in
+  let* pB_commitment =
+    dummy_commitment
+      ~number_of_ticks:1L
+      ~compressed_state:(dumb_compressed_state "B")
+      (B block)
+      rollup
+  in
+  let* pC_commitment =
+    dummy_commitment
+      ~number_of_ticks:1L
+      ~compressed_state:(dumb_compressed_state "C")
+      (B block)
+      rollup
+  in
+  let* pD_commitment =
+    dummy_commitment
+      ~number_of_ticks:1L
+      ~compressed_state:(dumb_compressed_state "D")
+      (B block)
+      rollup
+  in
+  let* block =
+    List.fold_left_es
+      (fun block (player, commitment) ->
+        add_publish ~rollup block player commitment)
+      block
+      [
+        (pA, pA_commitment);
+        (pB, pB_commitment);
+        (pC, pC_commitment);
+        (pD, pD_commitment);
+      ]
+  in
+  return (block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh))
+
+(** Test that when A plays against B, C, D and if A losts the game against
+    one of them, the others can win against A for free. *)
+let test_winner_by_forfeit () =
+  let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, _pC_pkh), (pD, pD_pkh) =
+    init_with_4_conflicts ()
+  in
+
+  (* Refutation game starts: A against B, C and D. *)
+  (* A starts against B and D so it can be timeouted. *)
+  let* pA_against_pB_op = Op.sc_rollup_refute (B block) pA rollup pB_pkh None in
+  let* pA_against_pD_op = Op.sc_rollup_refute (B block) pA rollup pD_pkh None in
+  let* pA_op =
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:pA
+      (B block)
+      [pA_against_pB_op; pA_against_pD_op]
+  in
+  (* C starts against A so it can win through a move. *)
+  let* pC_against_pA_op = Op.sc_rollup_refute (B block) pC rollup pA_pkh None in
+  let* block = Block.bake block ~operations:[pA_op; pC_against_pA_op] in
+  let* block = bake_timeout_period block in
+
+  (* B timeouts A. *)
+  let game_index = Sc_rollup.Game.Index.make pA_pkh pB_pkh in
+  let* pB_timeout = Op.sc_rollup_timeout (B block) pB rollup game_index in
+  let* block = Block.bake block ~operation:pB_timeout in
+
+  (* C sends a dumb move but A was already slashed. *)
+  let dumb_dissection =
+    let choice = Sc_rollup.Tick.initial in
+    Sc_rollup.Game.{choice; step = Dissection []}
+  in
+  let* pC_move =
+    Op.sc_rollup_refute (B block) pC rollup pA_pkh (Some dumb_dissection)
+  in
+
+  (* D timeouts A. *)
+  let game_index = Sc_rollup.Game.Index.make pA_pkh pD_pkh in
+  let* pD_timeout = Op.sc_rollup_timeout (B block) pD rollup game_index in
+
+  (* Both operation fails with [Unknown staker], because pA was removed when
+     it lost against B. *)
+  let* incr = Incremental.begin_construction block in
+  let* _incr = Incremental.add_operation incr pC_move in
+  let* _incr = Incremental.add_operation incr pD_timeout in
+
+  return_unit
+
+(** Test the same property as in {!test_winner_by_forfeit} but where two
+    players slashed eachother with a draw. *)
+let test_winner_by_forfeit_with_draw () =
+  let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (_pD, _pD_pkh) =
+    init_with_4_conflicts ()
+  in
+  let* constants = Context.get_constants (B block) in
+  let Constants.Parametric.{timeout_period_in_blocks; stake_amount; _} =
+    constants.parametric.sc_rollup
+  in
+
+  (* A and B starts a refutation game against C. *)
+  let* pA_against_pC_op = Op.sc_rollup_refute (B block) pA rollup pC_pkh None in
+  let* pB_against_pC_op = Op.sc_rollup_refute (B block) pB rollup pC_pkh None in
+  let* block = Block.bake block ~operation:pA_against_pC_op in
+  let* block = Block.bake block ~operation:pB_against_pC_op in
+
+  (* A starts a refutation against B.  *)
+  let* frozen_bonds_pA = Context.Contract.frozen_bonds (B block) pA in
+  let* frozen_bonds_pB = Context.Contract.frozen_bonds (B block) pB in
+  let* pA_against_pB_op = Op.sc_rollup_refute (B block) pA rollup pB_pkh None in
+  let* block = Block.bake block ~operation:pA_against_pB_op in
+
+  (* A and B will both make an invalid move and ends up in a draw. *)
+  let* dumb_move =
+    let choice = Sc_rollup.Tick.initial in
+    dumb_proof ~choice
+  in
+  let* pA_dumb_move_op =
+    Op.sc_rollup_refute (B block) pA rollup pB_pkh (Some dumb_move)
+  in
+  let* block = Block.bake block ~operation:pA_dumb_move_op in
+  let* pB_dumb_move_op =
+    Op.sc_rollup_refute (B block) pB rollup pA_pkh (Some dumb_move)
+  in
+  let* block = Block.bake block ~operation:pB_dumb_move_op in
+
+  (* Assert the draw by checking the frozen bonds. *)
+  let* () =
+    Assert.frozen_bonds_was_debited
+      ~loc:__LOC__
+      (B block)
+      pA
+      frozen_bonds_pA
+      stake_amount
+  in
+  let* () =
+    Assert.frozen_bonds_was_debited
+      ~loc:__LOC__
+      (B block)
+      pB
+      frozen_bonds_pB
+      stake_amount
+  in
+
+  (* Now C will win the game against A and B with a timeout. *)
+  let* block = bake_timeout_period ~timeout_period_in_blocks block in
+
+  (* C timeouts A. *)
+  let game_index = Sc_rollup.Game.Index.make pC_pkh pA_pkh in
+  let* pC_timeout_pA = Op.sc_rollup_timeout (B block) pC rollup game_index in
+  let* block = Block.bake block ~operation:pC_timeout_pA in
+
+  (* C timeouts B. *)
+  let game_index = Sc_rollup.Game.Index.make pC_pkh pB_pkh in
+  let* pC_timeout_pB = Op.sc_rollup_timeout (B block) pC rollup game_index in
+  let* _block = Block.bake block ~operation:pC_timeout_pB in
+
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -2834,4 +3022,9 @@ let tests =
       "An offline staker should not prevent cementation"
       `Quick
       test_offline_staker_does_not_prevent_cementation;
+    Tztest.tztest "win refutation game by forfeit" `Quick test_winner_by_forfeit;
+    Tztest.tztest
+      "win refutation game by forfeit"
+      `Quick
+      test_winner_by_forfeit_with_draw;
   ]
