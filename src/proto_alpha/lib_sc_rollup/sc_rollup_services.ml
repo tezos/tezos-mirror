@@ -550,7 +550,7 @@ module Global = struct
         raise (Invalid (Format.asprintf "Invalid parameter (%d)" i))
       in
       query (fun raw_index raw_page ->
-          let index = req "index" Dal.Slot_index.of_int raw_index in
+          let index = req "index" Dal.Slot_index.of_int_opt raw_index in
           let page = req "page" (fun p -> p) raw_page in
           match index with
           | None -> invalid_parameter @@ Option.value ~default:0 raw_index

@@ -89,6 +89,8 @@ end
 module Index : sig
   type t
 
+  type error += Invalid_slot_index of {given : int; min : int; max : int}
+
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
@@ -97,14 +99,33 @@ module Index : sig
 
   val max_value : t
 
-  (** [of_int n] constructs a`Slot_index.t` *)
-  val of_int : int -> t option
+  (** [of_int_opt n] constructs a value of type {!t} from [n]. Returns {!None}
+      in case the given value is not in the interval [zero, max_value]. *)
+  val of_int_opt : int -> t option
+
+  (** [of_int n] constructs a value of type {!t} from [n]. Returns
+      {!Invalid_slot_index} in case the given value is not in the interval [zero,
+      max_value]. *)
+  val of_int : int -> t tzresult
 
   val to_int : t -> int
+
+  val to_int_list : t list -> int list
 
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
+
+  (** [slots_range ~lower ~upper] returns the list of slots indexes between
+      [lower] and [upper].
+
+      If [lower] is negative or [upper] is bigger than [max_value], the function
+      returns {!Invalid_slot_index}. *)
+  val slots_range : lower:int -> upper:int -> t list tzresult
+
+  (** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
+      {None} in case of error instead of {!Invalid_slot_index}. *)
+  val slots_range_opt : lower:int -> upper:int -> t list option
 end
 
 module Header : sig

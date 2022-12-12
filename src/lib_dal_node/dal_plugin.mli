@@ -42,6 +42,15 @@ type slot_header = {
   commitment : Tezos_crypto_dal.Cryptobox.Verifier.commitment;
 }
 
+type proto_parameters = {
+  feature_enable : bool;
+  number_of_slots : int;
+  attestation_lag : int;
+  availability_threshold : int;
+  cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
+  blocks_per_epoch : int32;
+}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -62,11 +71,26 @@ module type T = sig
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
+    proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
+
+  (** [slot_headers_attestation hash block_info number_of_slots] reads the
+      metadata of the given [block_info] and constructs two lists of attested
+      and unattested slots depending on the value of dal_attestation bitset.
+      The value of [number_of_slots] indicates the current maximum number of
+      slots on DAL per level.
+
+      Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
+      stripped.  *)
+  val slot_headers_attestation :
+    Tezos_crypto.Block_hash.t ->
+    block_info ->
+    number_of_slots:int ->
+    ([`Attested of slot_index list] * [`Unattested of slot_index list]) tzresult
+    Lwt.t
 
   module RPC : sig
     val rpc_services :

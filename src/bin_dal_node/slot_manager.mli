@@ -76,3 +76,20 @@ val store_slot_headers :
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
   unit Lwt.t
+
+(** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
+    attested_slots unattested_slots store] updates the statuses of the
+    previously selected slots at level [block_level] - [endorsement_lag] and
+    that were waiting for attestation.
+
+    Slot headers whose indexes are in [attested_slots] are now set as
+    {!`Attested} in [store]. Those in [unattested_slots] are marked as
+    {!`Unattested} in the [store].
+*)
+val update_selected_slot_headers_statuses :
+  block_level:int32 ->
+  attestation_lag:int ->
+  [`Attested of Dal_plugin.slot_index list] ->
+  [`Unattested of Dal_plugin.slot_index list] ->
+  Store.node_store ->
+  unit tzresult Lwt.t

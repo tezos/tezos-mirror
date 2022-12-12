@@ -45,6 +45,8 @@ let info message =
 
 let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
+let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
+
 (** Store context *)
 type node_store = {
   slots_store : t;
@@ -73,6 +75,8 @@ let init config =
 module Legacy = struct
   module Path : sig
     type t = string list
+
+    val to_string : ?prefix:string -> t -> string
 
     module Commitment : sig
       val slot : Cryptobox.commitment -> slot_size:int -> Path.t
@@ -105,6 +109,10 @@ module Legacy = struct
     type t = string list
 
     let ( / ) b a = a :: b
+
+    let to_string ?prefix p =
+      let s = String.concat "/" p in
+      Option.fold ~none:s ~some:(fun pr -> pr ^ s) prefix
 
     module Commitment = struct
       let root = ["commitments"]
@@ -219,7 +227,7 @@ module Legacy = struct
             Lwt.return_unit)
       slot_headers
 
-  let add_slot_headers ~block_level:_ ~block_hash slot_headers node_store =
+  let add_slot_headers ~block_level ~block_hash slot_headers node_store =
     let open Lwt_syntax in
     let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
     let slots_store = node_store.slots_store in
@@ -232,6 +240,8 @@ module Legacy = struct
         let Dal_plugin.{slot_index; commitment; published_level} =
           slot_header
         in
+        (* This invariant should hold. *)
+        assert (Int32.equal published_level block_level) ;
         match status with
         | Dal_plugin.Succeeded ->
             let index =
@@ -247,18 +257,13 @@ module Legacy = struct
             let* () =
               set
                 ~msg:
-                  (Printf.sprintf
-                     "add_slot_headers:%s"
-                     (String.concat "/" commitment_path))
+                  (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
                 slots_store
                 commitment_path
                 data
             in
             set
-              ~msg:
-                (Printf.sprintf
-                   "add_slot_headers:%s"
-                   (String.concat "/" status_path))
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
               slots_store
               status_path
               (Services.Types.header_attestation_status_to_string
@@ -269,9 +274,64 @@ module Legacy = struct
             in
             let path = Path.Level.other_header_status index commitment in
             set
-              ~msg:"add_slot_headers:others:status"
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" path)
               slots_store
               path
               (Services.Types.header_status_to_string `Not_selected))
       slot_headers
+
+  let check_old_stored_value_is ?old_value ~path store : unit tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*! data_opt = find store path in
+    let* data =
+      match data_opt with
+      | Some data -> return data
+      | None ->
+          failwith
+            "check_old_value_is: No data found under %s"
+            (Path.to_string path)
+    in
+    match old_value with
+    | None -> return_unit
+    | Some expected ->
+        if String.equal expected data then return_unit
+        else
+          failwith "check_old_value_is: expecting %s but got %s" expected data
+
+  let update_slot_headers_attestation ~published_level store slots =
+    let open Lwt_result_syntax in
+    let attestation_status, slots =
+      match slots with
+      | `Attested l -> (`Attested, l)
+      | `Unattested l -> (`Unattested, l)
+    in
+    let attestation_status =
+      Services.Types.header_attestation_status_to_string attestation_status
+    in
+    let old_value =
+      Services.Types.header_attestation_status_to_string
+        `Waiting_for_attestations
+    in
+    List.iter_es
+      (fun slot_index ->
+        let index = Services.Types.{slot_level = published_level; slot_index} in
+        let status_path = Path.Level.accepted_header_status index in
+        let* () =
+          check_old_stored_value_is ~old_value ~path:status_path store
+        in
+        let msg =
+          Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
+        in
+        let*! () = remove ~msg store status_path in
+        let*! () = set ~msg store status_path attestation_status in
+        return_unit)
+      slots
+
+  let update_selected_slot_headers_statuses ~block_level ~attestation_lag
+      attested unattested node_store =
+    let open Lwt_result_syntax in
+    let store = node_store.slots_store in
+    let published_level = Int32.(sub block_level (of_int attestation_lag)) in
+    let* () = update_slot_headers_attestation ~published_level store attested in
+    update_slot_headers_attestation ~published_level store unattested
 end

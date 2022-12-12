@@ -2920,13 +2920,21 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
-    val of_int : int -> t option
+    val of_int_opt : int -> t option
+
+    val of_int : int -> t tzresult
 
     val to_int : t -> int
+
+    val to_int_list : t list -> int list
 
     val compare : t -> t -> int
 
     val equal : t -> t -> bool
+
+    val slots_range : lower:int -> upper:int -> t list tzresult
+
+    val slots_range_opt : lower:int -> upper:int -> t list option
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and

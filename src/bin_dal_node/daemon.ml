@@ -53,18 +53,20 @@ let () =
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
     (fun str -> Cryptobox_initialisation_failed str)
 
-let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
+let init_cryptobox unsafe_srs (proto_parameters : Dal_plugin.proto_parameters) =
   let open Cryptobox in
   let open Lwt_result_syntax in
-  let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
-  let srs_size = if unsafe_srs then Some parameters.slot_size else None in
+  let srs_size =
+    if unsafe_srs then Some proto_parameters.cryptobox_parameters.slot_size
+    else None
+  in
   let* () =
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
     Cryptobox.Config.init_dal
       ~find_srs_files
       Cryptobox.Config.{activated = true; srs_size}
   in
-  match Cryptobox.make parameters with
+  match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox -> return cryptobox
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
@@ -108,10 +110,13 @@ module Handler = struct
       | Some plugin ->
           let (module Plugin : Dal_plugin.T) = plugin in
           let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
-          let* cryptobox =
-            init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
+          let* proto_parameters =
+            Plugin.get_constants cctxt#chain cctxt#block cctxt
           in
-          Node_context.set_ready ctxt (module Plugin) cryptobox ;
+          let* cryptobox =
+            init_cryptobox config.Configuration.use_unsafe_srs proto_parameters
+          in
+          Node_context.set_ready ctxt (module Plugin) cryptobox proto_parameters ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
@@ -133,7 +138,7 @@ module Handler = struct
     let handler _stopper (block_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
-      | Ready {plugin = (module Plugin); _} ->
+      | Ready {plugin = (module Plugin); proto_parameters; _} ->
           let* block_info =
             Plugin.block_info
               cctxt
@@ -148,6 +153,20 @@ module Handler = struct
               slot_headers
               (Node_context.get_store ctxt)
           in
+          let* attested_slots, unattested_slots =
+            Plugin.slot_headers_attestation
+              block_hash
+              block_info
+              ~number_of_slots:proto_parameters.number_of_slots
+          in
+          let* () =
+            Slot_manager.update_selected_slot_headers_statuses
+              ~block_level:header.shell.level
+              ~attestation_lag:proto_parameters.attestation_lag
+              attested_slots
+              unattested_slots
+              (Node_context.get_store ctxt)
+          in
           return_unit
     in
     let*! () = Event.(emit layer1_node_tracking_started ()) in
@@ -160,8 +179,7 @@ module Handler = struct
   let new_slot_header ctxt =
     (* Monitor neighbor DAL nodes and download published slots as shards. *)
     let open Lwt_result_syntax in
-    let handler n_cctxt ready_ctxt slot_header =
-      let cryptobox = ready_ctxt.Node_context.cryptobox in
+    let handler n_cctxt Node_context.{cryptobox; _} slot_header =
       let dal_parameters = Cryptobox.parameters cryptobox in
       let downloaded_shard_ids =
         0
@@ -182,7 +200,7 @@ module Handler = struct
         Slot_manager.save_shards
           (Node_context.get_store ctxt).shard_store
           (Node_context.get_store ctxt).slots_watcher
-          ready_ctxt.Node_context.cryptobox
+          cryptobox
           slot_header
           shards
       in
