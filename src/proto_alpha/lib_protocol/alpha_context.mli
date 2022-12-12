@@ -2931,6 +2931,8 @@ module Dal : sig
     val equal : t -> t -> bool
 
     val slots_range : lower:int -> upper:int -> t list tzresult
+
+    val slots_range_opt : lower:int -> upper:int -> t list option
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and

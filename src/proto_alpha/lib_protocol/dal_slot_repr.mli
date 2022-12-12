@@ -120,6 +120,10 @@ module Index : sig
       If [lower] is negative or [upper] is bigger than [max_value], the function
       returns {!Invalid_slot_index}. *)
   val slots_range : lower:int -> upper:int -> t list tzresult
+
+  (** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
+      {None} in case of error instead of {!Invalid_slot_index}. *)
+  val slots_range_opt : lower:int -> upper:int -> t list option
 end
 
 module Header : sig

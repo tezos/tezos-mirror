@@ -96,15 +96,12 @@ module Index = struct
       Compare.Int.(slot_index >= zero && slot_index <= max_value)
       (Invalid_slot_index {given = slot_index; min = zero; max = max_value})
 
-  let of_int_opt slot_index =
-    match check_is_in_range slot_index with
-    | Ok () -> Some slot_index
-    | Error _ -> None
-
   let of_int slot_index =
     let open Result_syntax in
     let* () = check_is_in_range slot_index in
     return slot_index
+
+  let of_int_opt slot_index = Option.of_result @@ of_int slot_index
 
   let to_int slot_index = slot_index [@@ocaml.inline always]
 
@@ -117,6 +114,9 @@ module Index = struct
     let* () = check_is_in_range lower in
     let* () = check_is_in_range upper in
     return Misc.(lower --> upper)
+
+  let slots_range_opt ~lower ~upper =
+    Option.of_result @@ slots_range ~lower ~upper
 end
 
 module Header = struct
