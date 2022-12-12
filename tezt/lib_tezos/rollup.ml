@@ -704,6 +704,18 @@ module Dal = struct
 
     let get_slot_proof commitment =
       make GET ["slots"; commitment; "proof"] JSON.as_string
+
+    let get_level_index_commitment ~slot_level ~slot_index =
+      make
+        GET
+        [
+          "levels";
+          string_of_int slot_level;
+          "slot_indices";
+          string_of_int slot_index;
+          "commitment";
+        ]
+        JSON.as_string
   end
 
   let make
