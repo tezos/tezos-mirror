@@ -1468,6 +1468,9 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBig_map_mem
         ~stack_type:(int @$ big_map int unit @$ unit @$ bot)
         ~kinstr:(IBig_map_mem (dummy_loc, halt))
+        ~intercept_stack:
+          (let map = Script_big_map.empty int unit in
+           (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
