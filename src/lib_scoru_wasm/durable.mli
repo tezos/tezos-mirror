@@ -46,6 +46,9 @@ exception Durable_empty
 (** Cannot modify a readonly value. *)
 exception Readonly_value
 
+(** Cannot read from or write to more than 2,048 bytes *)
+exception IO_too_large
+
 (** [encoding] is a [Tezos_tree_encoding] for [t]. *)
 val encoding : t Tezos_tree_encoding.t
 

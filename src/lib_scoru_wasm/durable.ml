@@ -30,6 +30,9 @@ module Storage = Tezos_webassembly_interpreter.Durable_storage
 
 type t = T.tree
 
+(* The maximum size of bytes allowed to be read/written at once. *)
+let max_store_io_size = 2048L
+
 exception Invalid_key of string
 
 exception Index_too_large of int
@@ -41,6 +44,8 @@ exception Tree_not_found
 exception Durable_empty = Storage.Durable_empty
 
 exception Out_of_bounds of (int64 * int64)
+
+exception IO_too_large
 
 exception Readonly_value
 
@@ -99,6 +104,9 @@ let to_value_key k = List.append k [value_marker]
 let assert_key_writeable = function
   | Readonly _ -> raise Readonly_value
   | Writeable _ -> ()
+
+let assert_max_bytes max_bytes =
+  if max_store_io_size < max_bytes then raise IO_too_large
 
 let key_contents = function Readonly k | Writeable k -> k
 
@@ -165,9 +173,6 @@ let hash_exn tree key =
   let+ opt = hash tree key in
   match opt with None -> raise Value_not_found | Some hash -> hash
 
-(* The maximum size of bytes allowed to be read/written at once. *)
-let max_store_io_size = 4096L
-
 let set_value_exn tree ?(edit_readonly = false) key str =
   if not edit_readonly then assert_key_writeable key ;
   let key = to_value_key @@ key_contents key in
@@ -183,7 +188,7 @@ let write_value_exn tree ?(edit_readonly = false) key offset bytes =
   let open Lwt.Syntax in
   let open Tezos_lazy_containers in
   let num_bytes = Int64.of_int @@ String.length bytes in
-  assert (num_bytes <= max_store_io_size) ;
+  assert_max_bytes num_bytes ;
 
   let key = to_value_key @@ key_contents key in
   let* opt = T.find_tree tree key in
@@ -205,7 +210,7 @@ let write_value_exn tree ?(edit_readonly = false) key offset bytes =
 let read_value_exn tree key offset num_bytes =
   let open Lwt.Syntax in
   let open Tezos_lazy_containers in
-  assert (num_bytes <= max_store_io_size) ;
+  assert_max_bytes num_bytes ;
 
   let* value = find_value_exn tree key in
   let vec_len = Chunked_byte_vector.length value in
