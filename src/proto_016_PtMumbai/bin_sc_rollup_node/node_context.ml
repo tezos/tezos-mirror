@@ -143,19 +143,19 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
 
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
-  let*! context_hash = Store.Contexts.find node_ctxt.store block_hash in
+  let*! l2_block = Store.L2_blocks.find node_ctxt.store block_hash in
   let*? context_hash =
-    match context_hash with
+    match l2_block with
     | None ->
         error (Sc_rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some context_hash -> ok context_hash
+    | Some {header = {context; _}; _} -> ok context
   in
   let*! ctxt = Context.checkout node_ctxt.context context_hash in
   match ctxt with
   | None ->
       tzfail
         (Sc_rollup_node_errors.Cannot_checkout_context
-           (block_hash, Some (Context.hash_to_raw_string context_hash)))
+           (block_hash, Some context_hash))
   | Some ctxt -> return ctxt
 
 let metadata node_ctxt =
@@ -174,3 +174,13 @@ let readonly (node_ctxt : _ t) =
   }
 
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
+
+let get_full_l2_block {store; _} block_hash =
+  let open Lwt_syntax in
+  let* block = Store.L2_blocks.get store block_hash in
+  let* inbox = Store.Inboxes.get store block.header.inbox_hash
+  and* {messages; _} = Store.Messages.get store block.header.inbox_witness
+  and* commitment =
+    Option.map_s (Store.Commitments.get store) block.header.commitment_hash
+  in
+  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}

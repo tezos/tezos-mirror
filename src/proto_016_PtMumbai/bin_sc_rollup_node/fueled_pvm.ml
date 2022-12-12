@@ -36,16 +36,16 @@ module type S = sig
 
   type eval_result = {state : PVM.state; remaining_fuel : fuel; num_ticks : Z.t}
 
-  (** [eval_block_inbox ~fuel node_ctxt block_hash state] evaluates the
-      [messages] for the inbox of block [block_hash] in the given [state] of the
-      PVM and returns the evaluation results containing the new state, the
-      number of messages, the inbox level and the remaining fuel. *)
+  (** [eval_block_inbox ~fuel node_ctxt (inbox, messages) state] evaluates the
+      [messages] for the [inbox] in the given [state] of the PVM and returns the
+      evaluation results containing the new state, the number of messages, the
+      inbox level and the remaining fuel. *)
   val eval_block_inbox :
     fuel:fuel ->
     _ Node_context.t ->
-    Tezos_crypto.Block_hash.t ->
+    Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
     PVM.state ->
-    (PVM.state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult
+    (PVM.state * int * Raw_level.t * fuel) Node_context.delayed_write tzresult
     Lwt.t
 
   (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
@@ -341,33 +341,26 @@ module Make (PVM : Pvm.S) = struct
         (state, fuel)
         messages
 
-    let eval_block_inbox ~fuel (Node_context.{store; _} as node_ctxt) hash
-        (state : PVM.state) :
-        (PVM.state * Z.t * Raw_level.t * fuel) Node_context.delayed_write
+    let eval_block_inbox ~fuel node_ctxt (inbox, messages) (state : PVM.state) :
+        (PVM.state * int * Raw_level.t * fuel) Node_context.delayed_write
         tzresult
         Lwt.t =
-      let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
       (* Obtain inbox and its messages for this block. *)
-      let*! inbox = Store.Inboxes.find store hash in
-      match inbox with
-      | None -> failwith "There is no empty inbox"
-      | Some inbox ->
-          let inbox_level = Inbox.inbox_level inbox in
-          let*! messages = Store.Messages.get store hash in
-          let num_messages = List.length messages |> Z.of_int in
-          (* Evaluate all the messages for this level. *)
-          let>* state, fuel =
-            eval_messages
-              ~reveal_map:None
-              ~fuel
-              node_ctxt
-              ~message_counter_offset:0
-              state
-              inbox_level
-              messages
-          in
-          return (state, num_messages, inbox_level, fuel)
+      let inbox_level = Inbox.inbox_level inbox in
+      let num_messages = List.length messages in
+      (* Evaluate all the messages for this level. *)
+      let>* state, fuel =
+        eval_messages
+          ~reveal_map:None
+          ~fuel
+          node_ctxt
+          ~message_counter_offset:0
+          state
+          inbox_level
+          messages
+      in
+      return (state, num_messages, inbox_level, fuel)
 
     let eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
         inbox_level messages =

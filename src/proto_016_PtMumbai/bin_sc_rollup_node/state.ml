@@ -22,41 +22,28 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Protocol
+open Alpha_context
+module Raw_store = Store
 
 module Store = struct
-  (** Table from blocks hashes to unit. The entry is present iff the block
-      identified by that hash is fully processed by the rollup node. *)
-  module Processed_hashes =
-    Store.Make_append_only_map
-      (struct
-        let path = ["tezos"; "processed_blocks"]
-      end)
-      (struct
-        type key = Tezos_crypto.Block_hash.t
-
-        let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-      end)
-      (struct
-        type value = unit
-
-        let name = "processed"
-
-        let encoding = Data_encoding.unit
-      end)
-
-  module Last_processed_head =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
+     Use file. *)
+  module L2_head =
     Store.Make_mutable_value
       (struct
-        let path = ["tezos"; "processed_head"]
+        let path = ["l2_head"]
       end)
       (struct
-        type value = Layer1.head
+        type value = Sc_rollup_block.t
 
-        let name = "head"
+        let name = "l2_block"
 
-        let encoding = Layer1.head_encoding
+        let encoding = Sc_rollup_block.encoding
       end)
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
+     Use file. *)
   module Last_finalized_head =
     Store.Make_mutable_value
       (struct
@@ -119,14 +106,14 @@ let level_of_hash store hash =
       failwith "No level known for block %a" Tezos_crypto.Block_hash.pp hash
   | Some l -> return l
 
-let mark_processed_head store Layer1.({hash; level = _} as head) =
+let save_l2_block store (head : Sc_rollup_block.t) =
   let open Lwt_syntax in
-  let* () = Store.Processed_hashes.add store hash () in
-  Store.Last_processed_head.set store head
+  let* () = Raw_store.L2_blocks.add store head.header.block_hash head in
+  Store.L2_head.set store head
 
-let is_processed store head = Store.Processed_hashes.mem store head
+let is_processed store head = Raw_store.L2_blocks.mem store head
 
-let last_processed_head_opt store = Store.Last_processed_head.find store
+let last_processed_head_opt store = Store.L2_head.find store
 
 let mark_finalized_head store head = Store.Last_finalized_head.set store head
 
@@ -136,3 +123,24 @@ let set_block_level_and_hash store Layer1.{hash; level} =
   let open Lwt_syntax in
   let* () = Store.Hashes_to_levels.add store hash level in
   Store.Levels_to_hashes.add store level hash
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4532
+   Make this logarithmic, by storing pointers to muliple predecessor and
+   by dichotomy. *)
+let block_before store tick =
+  let open Lwt_result_syntax in
+  let*! head = Store.L2_head.find store in
+  match head with
+  | None -> return_none
+  | Some head ->
+      let rec search block_hash =
+        let*! block = Raw_store.L2_blocks.find store block_hash in
+        match block with
+        | None ->
+            failwith "Missing block %a" Tezos_crypto.Block_hash.pp block_hash
+        | Some block ->
+            if Sc_rollup.Tick.(block.initial_tick <= tick) then
+              return_some block
+            else search block.header.predecessor
+      in
+      search head.header.block_hash

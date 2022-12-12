@@ -41,7 +41,7 @@ module Simple = struct
       ("inbox_level", Protocol.Alpha_context.Raw_level.encoding)
       ("state_hash", State_hash.encoding)
       ("ticks", Tick.encoding)
-      ("num_messages", Data_encoding.z)
+      ("num_messages", Data_encoding.int31)
 
   let intended_failure =
     declare_4
