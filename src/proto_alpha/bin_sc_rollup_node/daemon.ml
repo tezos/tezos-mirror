@@ -34,12 +34,13 @@ module Make (PVM : Pvm.S) = struct
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
   let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
-      head ~source:_ (operation : kind manager_operation)
+      head ~source (operation : kind manager_operation)
       (result : kind successful_manager_operation_result) =
     let open Lwt_result_syntax in
     match (operation, result) with
     | ( Sc_rollup_publish {commitment; _},
-        Sc_rollup_publish_result {published_at_level; _} ) ->
+        Sc_rollup_publish_result {published_at_level; _} )
+      when Node_context.is_operator node_ctxt source ->
         (* Published commitment --------------------------------------------- *)
         let is_newest_lpc =
           match node_ctxt.lpc with
