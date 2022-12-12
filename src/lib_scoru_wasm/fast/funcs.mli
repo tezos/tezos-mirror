@@ -32,6 +32,7 @@ type host_state = {
   retrieve_mem : unit -> Memory.t;
   buffers : Eval.buffers;
   mutable durable : Durable.t;
+  enable_debugging : bool;  (** Use `write_output` alternative implementation *)
 }
 
 (** [make builtins host_state] generates a list of host functions that can be

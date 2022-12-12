@@ -39,7 +39,7 @@ let load_kernel durable =
   let store = Lazy.force store in
   Module_cache.load_kernel store durable
 
-let compute builtins durable buffers =
+let compute ~enable_debugging builtins durable buffers =
   let open Lwt.Syntax in
   let* module_ = load_kernel durable in
 
@@ -48,7 +48,7 @@ let compute builtins durable buffers =
     match !main_mem with Some x -> x () | None -> assert false
   in
 
-  let host_state = Funcs.{retrieve_mem; buffers; durable} in
+  let host_state = Funcs.{retrieve_mem; buffers; durable; enable_debugging} in
   let host_funcs = Funcs.make builtins host_state in
 
   let with_durable f =

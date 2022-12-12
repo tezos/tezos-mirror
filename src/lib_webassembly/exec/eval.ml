@@ -1544,7 +1544,7 @@ let step ?(init = false) ?(durable = Durable_storage.empty) module_reg c buffers
       in
       (durable, {c with step_kont})
 
-let rec eval durable module_reg (c : config) buffers :
+let rec eval ?(init = false) durable module_reg (c : config) buffers :
     (Durable_storage.t * value list) Lwt.t =
   match c.step_kont with
   | SK_Result vs ->
@@ -1552,8 +1552,8 @@ let rec eval durable module_reg (c : config) buffers :
       (durable, values)
   | SK_Trapped {it = msg; at} -> Trap.error at msg
   | _ ->
-      let* durable, c = step ~init:false ~durable module_reg c buffers in
-      eval durable module_reg c buffers
+      let* durable, c = step ~init ~durable module_reg c buffers in
+      eval ~init durable module_reg c buffers
 
 type reveal_error =
   | Reveal_step
@@ -1604,7 +1604,7 @@ let reveal_step reveal module_reg payload =
 
 let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
     ?(output = default_output_buffer ()) ?(durable = Durable_storage.empty)
-    host_funcs (func : func_inst) (vs : value list) :
+    ?(init = false) host_funcs (func : func_inst) (vs : value list) :
     (Durable_storage.t * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
@@ -1633,7 +1633,7 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
   let buffers = buffers ~input ~output () in
   Lwt.catch
     (fun () ->
-      let+ durable, values = eval durable module_reg c buffers in
+      let+ durable, values = eval ~init durable module_reg c buffers in
       (durable, List.rev values))
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"

@@ -36,6 +36,7 @@ let test_padding_state () =
   in
   let*! pvm_state, _ =
     Wasm_vm.compute_step_many_until
+      ~debug_flag:false
       ~max_steps:Int64.max_int
       should_continue
       pvm_state
