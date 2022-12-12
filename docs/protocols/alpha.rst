@@ -27,8 +27,8 @@ It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
 Michelson opcodes for logical operations on bytes
 -------------------------------------------------
 
-Michelson opcodes ``AND``, ``OR``, ``XOR``, ``NOT``, ``LSL`` and ``LSR``
-now support ``bytes``. (MR :gl:`!6055`)
+- Michelson opcodes ``AND``, ``OR``, ``XOR``, ``NOT``, ``LSL`` and ``LSR``
+  now support ``bytes``. (MRs :gl:`!6055`, :gl:`!7093`)
 
 - Michelson opcodes ``NAT``, ``INT`` and ``BYTES`` for bytes-int and bytes-nat
   conversions. (MR :gl:`!6681`)
@@ -46,7 +46,10 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6946`, :gl:`!6954`, :gl:`!6942`, :gl:`!6963`, :gl:`!5741`, :gl:`!6974`,
 :gl:`!7013`, :gl:`!7015`, :gl:`!6980`, :gl:`!6993`, :gl:`!6949`, :gl:`!6930`,
 :gl:`!6991`, :gl:`!6955`, :gl:`!6937`, :gl:`!7010`, :gl:`!7027`, :gl:`!7034`,
-:gl:`!7045`, :gl:`!7036`, :gl:`!6987`, :gl:`!7016`, :gl:`!6380`)
+:gl:`!7045`, :gl:`!7036`, :gl:`!6987`, :gl:`!7016`, :gl:`!6380`, :gl:`!7023`,
+:gl:`!6950`, :gl:`!7030`, :gl:`!7081`, :gl:`!7060`, :gl:`!7071`, :gl:`!7068`,
+:gl:`!7044`, :gl:`!7062`, :gl:`!7080`, :gl:`!7086`, :gl:`!5747`, :gl:`!6972`,
+:gl:`!7092`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
