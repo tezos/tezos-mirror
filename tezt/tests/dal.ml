@@ -889,20 +889,32 @@ let publish_and_store_slot ?(fee = 1_200) node client dal_node source index
   let* _ = publish_slot ~source ~fee ~index ~commitment ~proof node client in
   return (index, slot_commitment)
 
+let check_get_commitment ~check_result dal_node ~slot_level slots_info =
+  Lwt_list.iter_s
+    (fun (slot_index, commitment') ->
+      let* response =
+        RPC.call_raw
+          dal_node
+          (Rollup.Dal.RPC.get_level_index_commitment ~slot_index ~slot_level)
+      in
+      check_result commitment' response ;
+      unit)
+    slots_info
+
 let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
     client dal_node =
   let publish ?fee = publish_and_store_slot ?fee node client dal_node in
   let* slot0 = publish Constant.bootstrap1 0 "test0" in
   let* slot1 = publish Constant.bootstrap2 1 "test1" in
   let* slot2_a = publish Constant.bootstrap3 4 ~fee:1_200 "test4_a" in
-  let* slot2_b = publish Constant.bootstrap4 4 ~fee:1_200 "test4_b" in
-  let* slot2_c = publish Constant.bootstrap5 4 ~fee:1_350 "test4_c" in
-  (* slot2_a and slot2_b will be included as failed, slot2_c has better fees for
-     slot 4. We decide to have two failed slots instead of just one to better
-     test some internal aspects of failed slots headers recoding (i.e. having a
-     collection of data instead of just one). *)
-  ignore slot2_a ;
-  ignore slot2_b ;
+  let* slot2_b = publish Constant.bootstrap4 4 ~fee:1_350 "test4_b" in
+  let* slot3 = publish Constant.bootstrap5 5 ~fee:1 "test5" in
+  (* slot2_a and slot3 will not be included as successfull, slot2_b has better
+     fees for slot 4. While slot3's fee is too low.
+
+     We decide to have two failed slots instead of just one to better test some
+     internal aspects of failed slots headers recoding (i.e. having a collection
+     of data instead of just one). *)
   (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7049
      Retrieve successfull & failed slots with GET /slots/<commitment>/headers
      in MR !7049. *)
@@ -912,12 +924,52 @@ let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
   let* slot_headers =
     RPC.call dal_node (Rollup.Dal.RPC.stored_slot_headers block)
   in
-  Check.(slot_headers = [slot0; slot1; slot2_c])
+  Check.(slot_headers = [slot0; slot1; slot2_b])
     Check.(list (tuple2 int string))
     ~error_msg:
       "Published header is different from stored header (current = %L, \
        expected = %R)" ;
-  return ()
+  let slot_level = Node.get_level node in
+  let ok = [slot0; slot1; slot2_b] in
+  ignore slot2_a ;
+  let ko = slot3 :: List.map (fun (i, c) -> (i + 100, c)) ok in
+  (* Aux function to check succesful RPC calls. *)
+  let result_ok commitment' response =
+    let commitment =
+      JSON.(
+        parse
+          ~origin:"test_dal_node_slots_headers_tracking"
+          response.RPC_core.body
+        |> as_string)
+    in
+    Check.(commitment' = commitment)
+      Check.string
+      ~error_msg:
+        "The value of a stored commitment should match the one computed \
+         locally (current = %L, expected = %R)"
+  in
+  (* Aux function to check RPC calls that are expected to fail with 404. *)
+  let result_ko _commitment' response =
+    RPC.check_string_response ~code:404 response
+  in
+  (* Slots waiting for confirmation. *)
+  let* () =
+    check_get_commitment ~check_result:result_ok dal_node ~slot_level ok
+  in
+  (* Slots not selected/accepted. *)
+  let* () =
+    check_get_commitment ~check_result:result_ko dal_node ~slot_level ko
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Slot confirmed. *)
+  let* () =
+    check_get_commitment ~check_result:result_ok dal_node ~slot_level ok
+  in
+  (* Slots still not selected/accepted. *)
+  let* () =
+    check_get_commitment ~check_result:result_ko dal_node ~slot_level ko
+  in
+  unit
 
 let generate_dummy_slot slot_size =
   String.init slot_size (fun i ->
@@ -1773,6 +1825,7 @@ let register ~protocols =
     "dal node GET /slot/<commitment>/proof"
     test_dal_node_test_get_slot_proof
     protocols ;
+
   (* Tests with all nodes *)
   test_dal_node_dac_threshold_not_reached protocols ;
   scenario_with_all_nodes
