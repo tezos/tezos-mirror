@@ -94,15 +94,15 @@ let cost_serialize_internal_inbox_message
   | End_of_level -> Saturation_repr.zero
   | Info_per_level _ -> Saturation_repr.zero
 
-(** TODO: #3212
-    Confirm gas cost model.
-    We here assume that the cost of deserializing an expression of [bytes_len]
-    is proportional to deserializing a script expression of size [bytes_len].
-    This may not be the case and in particular, the cost depends on the specific
-    structure used for the PVM. We may thus need to split the cost function.
-  *)
+(* Derived from benchmark in
+   [Sc_rollup_benchmarks.Sc_rollup_deserialize_output_proof_benchmark] and model
+   [model_Sc_rollup_deserialize_output_proof_benchmark] with estimated parameters:
+   [fun size -> (7148.78790875 + (5.53034040727 * size))] *)
 let cost_deserialize_output_proof ~bytes_len =
-  Script_repr.deserialization_cost_estimated_from_bytes bytes_len
+  let open S.Syntax in
+  let size = S.safe_int bytes_len in
+  let v0 = size in
+  S.safe_int 7150 + ((v0 lsl 2) + v0 + (v0 lsr 1))
 
 let cost_serialize_external_inbox_message ~bytes_len =
   let len = S.safe_int bytes_len in

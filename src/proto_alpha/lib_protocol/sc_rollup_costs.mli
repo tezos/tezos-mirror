@@ -62,8 +62,7 @@ val cost_serialize_internal_inbox_message :
   Sc_rollup_inbox_message_repr.internal_inbox_message -> Gas_limit_repr.cost
 
 (** [cost_deserialize_output_proof ~bytes_len] is the cost of the
-    deserialization of an output proof. It's equal to the cost of deserializing
-    a script expression of size [bytes_len]. *)
+    deserialization of an output proof. *)
 val cost_deserialize_output_proof : bytes_len:int -> Gas_limit_repr.cost
 
 (** [cost_serialize_external_inbox_message ~bytes_len] is the cost of the
