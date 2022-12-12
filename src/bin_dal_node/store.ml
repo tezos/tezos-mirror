@@ -227,6 +227,10 @@ module Legacy = struct
             Lwt.return_unit)
       slot_headers
 
+  let encode_commitment = Cryptobox.Commitment.to_b58check
+
+  let decode_commitment = Cryptobox.Commitment.of_b58check_opt
+
   let add_slot_headers ~block_level ~block_hash slot_headers node_store =
     let open Lwt_syntax in
     let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
@@ -249,11 +253,7 @@ module Legacy = struct
             in
             let commitment_path = Path.Level.accepted_header_commitment index in
             let status_path = Path.Level.accepted_header_status index in
-            let data =
-              Data_encoding.Binary.to_string_exn
-                Cryptobox.Commitment.encoding
-                commitment
-            in
+            let data = encode_commitment commitment in
             let* () =
               set
                 ~msg:
