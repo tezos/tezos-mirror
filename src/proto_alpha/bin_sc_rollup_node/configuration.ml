@@ -83,7 +83,7 @@ let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8932
 
-let default_metrics_port = 9934
+let default_metrics_port = 9933
 
 let default_reconnection_delay = 2.0 (* seconds *)
 

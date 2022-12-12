@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The collector registry for the rollup node metrics. *)
+val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
+
 (** [metrics_server metrics_addr] runs a server for the rollup metrics on [metrics_addr].
     The metrics are accessible thanks to a [/metrics] request. *)
 val metrics_serve : string option -> (unit, tztrace) result Lwt.t
+
+(** [print_csv_metrics ppf metrics] prints the [metrics] as CSV. *)
+val print_csv_metrics :
+  Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit

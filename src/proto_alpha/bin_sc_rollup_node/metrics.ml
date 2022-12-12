@@ -73,3 +73,32 @@ let metrics_serve metrics_addr =
       in
       return_unit
   | None -> return_unit
+
+let metric_type_to_string = function
+  | Counter -> "Counter"
+  | Gauge -> "Gauge"
+  | Summary -> "Summary"
+  | Histogram -> "Histogram"
+
+let pp_label_names fmt =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt ";")
+    (fun fmt v -> Format.fprintf fmt "%a" LabelName.pp v)
+    fmt
+
+let print_csv_metrics ppf metrics =
+  let open Prometheus in
+  Format.fprintf ppf "@[<v>Name,Type,Description,Labels" ;
+  List.iter
+    (fun (v, _) ->
+      Format.fprintf
+        ppf
+        "@,@[%a@],%s,\"%s\",%a"
+        MetricName.pp
+        v.MetricInfo.name
+        (metric_type_to_string v.MetricInfo.metric_type)
+        v.MetricInfo.help
+        pp_label_names
+        v.MetricInfo.label_names)
+    (Prometheus.MetricFamilyMap.to_list metrics) ;
+  Format.fprintf ppf "@]@."
