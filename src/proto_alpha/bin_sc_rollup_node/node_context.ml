@@ -143,12 +143,12 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
 
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
-  let*! context_hash = Store.Contexts.find node_ctxt.store block_hash in
+  let*! l2_block = Store.L2_blocks.find node_ctxt.store block_hash in
   let*? context_hash =
-    match context_hash with
+    match l2_block with
     | None ->
         error (Sc_rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some context_hash -> ok context_hash
+    | Some {header = {context; _}; _} -> ok context
   in
   let*! ctxt = Context.checkout node_ctxt.context context_hash in
   match ctxt with

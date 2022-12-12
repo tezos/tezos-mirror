@@ -61,7 +61,6 @@ val commitment_parent_is_not_lcc :
   Sc_rollup.Commitment.Hash.t ->
   unit Lwt.t
 
-(** [compute_commitment hash level] emits the event that a new commitment is
-    being computed and stored for the block of the given [hash] and at the given
-    [level]. *)
-val compute_commitment : Tezos_crypto.Block_hash.t -> Raw_level.t -> unit Lwt.t
+(** [compute_commitment level] emits the event that a new commitment is being
+    computed and stored for the block at the given [level]. *)
+val compute_commitment : Raw_level.t -> unit Lwt.t

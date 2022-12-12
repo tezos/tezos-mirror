@@ -75,13 +75,11 @@ module Simple = struct
       ("level", Raw_level.encoding)
 
   let compute_commitment =
-    declare_2
+    declare_1
       ~section
       ~name:"sc_rollup_node_commitment_process_head"
-      ~msg:
-        "Computing and storing new commitment for head {head} at level {level}"
+      ~msg:"Computing and storing new commitment for level {level}"
       ~level:Notice
-      ("head", Tezos_crypto.Block_hash.encoding)
       ("level", Raw_level.encoding)
 
   let commitment_parent_is_not_lcc =
@@ -144,8 +142,7 @@ let commitment_stored = emit_commitment_event Simple.commitment_stored
 let last_cemented_commitment_updated head level =
   Simple.(emit last_cemented_commitment_updated (head, level))
 
-let compute_commitment head level =
-  Simple.(emit compute_commitment (head, level))
+let compute_commitment level = Simple.(emit compute_commitment level)
 
 let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
   Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))

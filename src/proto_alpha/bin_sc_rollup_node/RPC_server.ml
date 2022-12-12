@@ -30,7 +30,9 @@ open Protocol
 let get_head store =
   let open Lwt_result_syntax in
   let*! head = State.last_processed_head_opt store in
-  match head with None -> failwith "No head" | Some {hash; _} -> return hash
+  match head with
+  | None -> failwith "No head"
+  | Some {header = {block_hash; _}; _} -> return block_hash
 
 let get_finalized store =
   let open Lwt_result_syntax in
@@ -51,18 +53,18 @@ let get_last_cemented (node_ctxt : _ Node_context.t) =
 
 let get_head_hash_opt store =
   let open Lwt_option_syntax in
-  let+ {hash; _} = State.last_processed_head_opt store in
-  hash
+  let+ {header = {block_hash; _}; _} = State.last_processed_head_opt store in
+  block_hash
 
 let get_head_level_opt store =
   let open Lwt_option_syntax in
-  let+ {level; _} = State.last_processed_head_opt store in
-  level
+  let+ {header = {level; _}; _} = State.last_processed_head_opt store in
+  Alpha_context.Raw_level.to_int32 level
 
-let get_state_info_exn store block =
+let get_l2_block_exn store block =
   let open Lwt_result_syntax in
-  let*! state = Store.StateInfo.get store block in
-  return state
+  let*! b = Store.L2_blocks.get store block in
+  return b
 
 module Slot_pages_map = struct
   open Protocol
@@ -221,8 +223,11 @@ module Common = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let+ state_info = get_state_info_exn node_ctxt.store block in
-    state_info.num_messages
+    let* l2_block = get_l2_block_exn node_ctxt.store block in
+    let*! messages =
+      Store.Messages.get node_ctxt.store l2_block.header.inbox_witness
+    in
+    return @@ Z.of_int (List.length messages)
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
@@ -252,8 +257,8 @@ module Common = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.ticks
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let+ state = get_state_info_exn node_ctxt.store block in
-    state.num_ticks
+    let+ l2_block = get_l2_block_exn node_ctxt.store block in
+    Z.of_int64 l2_block.num_ticks
 end
 
 module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
@@ -359,14 +364,18 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     Global_directory.register0 Sc_rollup_services.Global.last_stored_commitment
     @@ fun node_ctxt () () ->
     let open Lwt_result_syntax in
-    let*! commitment_with_hash =
-      Commitment.last_commitment_with_hash
-        (module Store.Last_stored_commitment_level)
-        node_ctxt.store
+    let*! res =
+      let open Lwt_option_syntax in
+      let* head = State.last_processed_head_opt node_ctxt.store in
+      let commitment_hash =
+        Sc_rollup_block.most_recent_commitment head.header
+      in
+      let*! commitment =
+        Store.Commitments.get node_ctxt.store commitment_hash
+      in
+      return (commitment, commitment_hash, None)
     in
-    return
-      (commitment_with_hash
-      |> Option.map (fun (commitment, hash) -> (commitment, hash, None)))
+    return res
 
   let () =
     Local_directory.register0 Sc_rollup_services.Local.last_published_commitment
@@ -519,15 +528,25 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                   | None ->
                       return (Sc_rollup_services.Included (info, inbox_info))
                   | Some commitment_level -> (
-                      let*! commitment =
-                        Store.Commitments.find node_ctxt.store commitment_level
+                      let*! block =
+                        State.hash_of_level
+                          node_ctxt.store
+                          (Alpha_context.Raw_level.to_int32 commitment_level)
                       in
-                      match commitment with
+                      let*! block =
+                        Store.L2_blocks.find node_ctxt.store block
+                      in
+                      match block with
                       | None ->
                           (* Commitment not computed yet for inbox *)
                           return
                             (Sc_rollup_services.Included (info, inbox_info))
-                      | Some (commitment, commitment_hash) -> (
+                      | Some block -> (
+                          let commitment_hash =
+                            WithExceptions.Option.get
+                              ~loc:__LOC__
+                              block.header.commitment_hash
+                          in
                           (* Commitment computed *)
                           let*! published_at =
                             Store.Commitments_published_at_level.find
@@ -541,6 +560,11 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                                 (Sc_rollup_services.Included (info, inbox_info))
                           | Some published_at ->
                               (* Commitment published *)
+                              let*! commitment =
+                                Store.Commitments.get
+                                  node_ctxt.store
+                                  commitment_hash
+                              in
                               let commitment_info =
                                 Sc_rollup_services.
                                   {commitment; commitment_hash; published_at}

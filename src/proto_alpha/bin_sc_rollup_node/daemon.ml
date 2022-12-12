@@ -190,7 +190,6 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let* () = Components.Commitment.process_head node_ctxt block in
     let*! () = State.mark_finalized_head node_ctxt.store block in
     return_unit
 
@@ -198,17 +197,60 @@ module Make (PVM : Pvm.S) = struct
       =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
-    let* ctxt = Inbox.process_head node_ctxt head in
+    let*! () = State.set_block_level_and_hash node_ctxt.store head in
+    let* inbox_hash, inbox, inbox_witness, messages, ctxt =
+      Inbox.process_head node_ctxt head
+    in
     let* () =
       when_ (Node_context.dal_enabled node_ctxt) @@ fun () ->
       Dal_slots_tracker.process_head node_ctxt head
     in
-    let*! () = State.set_block_level_and_hash node_ctxt.store head in
     let* () = process_l1_block_operations ~finalized:false node_ctxt head in
     (* Avoid storing and publishing commitments if the head is not final. *)
     (* Avoid triggering the pvm execution if this has been done before for
        this head. *)
-    let* () = Components.Interpreter.process_head node_ctxt ctxt head in
+    let* ctxt, _num_messages, num_ticks, initial_tick =
+      Components.Interpreter.process_head node_ctxt ctxt head (inbox, messages)
+    in
+    let*! context_hash = Context.commit ctxt in
+    let* {Layer1.hash = predecessor; _} =
+      Layer1.get_predecessor node_ctxt.l1_ctxt head
+    in
+    let* commitment_hash =
+      Components.Commitment.process_head node_ctxt ~predecessor head ctxt
+    in
+    let level = Raw_level.of_int32_exn level in
+    let* previous_commitment_hash =
+      if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+        (* Previous commitment for rollup genesis is itself. *)
+        return node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash
+      else
+        let*! pred = Store.L2_blocks.find node_ctxt.store predecessor in
+        match pred with
+        | None ->
+            failwith
+              "Missing L2 predecessor %a for previous commitment"
+              Tezos_crypto.Block_hash.pp
+              predecessor
+        | Some pred ->
+            return (Sc_rollup_block.most_recent_commitment pred.header)
+    in
+    let header =
+      Sc_rollup_block.
+        {
+          block_hash = hash;
+          level;
+          predecessor;
+          commitment_hash;
+          previous_commitment_hash;
+          context = context_hash;
+          inbox_witness;
+          inbox_hash;
+        }
+    in
+    let l2_block =
+      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+    in
     let* finalized_block, _ =
       Layer1.nth_predecessor
         node_ctxt.l1_ctxt
@@ -216,14 +258,16 @@ module Make (PVM : Pvm.S) = struct
         head
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
-    let*! () = State.mark_processed_head node_ctxt.store head in
+    let*! () = State.save_l2_block node_ctxt.store l2_block in
     (* Publishing a commitment when one is available does not depend on the
        state of the current head. *)
     let* () = Components.Commitment.publish_commitment node_ctxt in
     let* () =
       Components.Commitment.cement_commitment_if_possible node_ctxt head
     in
-    let*! () = Daemon_event.new_head_processed hash level in
+    let*! () =
+      Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
+    in
     return_unit
 
   let notify_injector {Node_context.l1_ctxt; _} new_head
@@ -253,7 +297,13 @@ module Make (PVM : Pvm.S) = struct
     in
     let old_head =
       match old_head with
-      | Some old_head -> `Head old_head
+      | Some h ->
+          `Head
+            Layer1.
+              {
+                hash = h.header.block_hash;
+                level = Raw_level.to_int32 h.header.level;
+              }
       | None ->
           (* if no head has been processed yet, we want to handle all blocks
              since, and including, the rollup origination. *)
