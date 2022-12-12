@@ -121,13 +121,17 @@ specifies the two endpoints to use:
 
     $ echo '{ "uris": [ "http://localhost:18731", "http://localhost:18732" ] }' > sources.json
 
-You're now ready to use the light client. For example, bake a block:
+You're now ready to use the light client. For example, bake a block (note that this command may take up to a few minutes to complete):
 
 ::
 
     $ octez-client --endpoint http://localhost:18731 --mode light --sources sources.json bake for bootstrap1
     Apr  8 16:42:24.202 - alpha.baking.forge: found 0 valid operations (0 refused) for timestamp 2021-04-08T14:42:24.000-00:00 (fitness 01::0000000000000004)
     Injected block BMAHozsNCos2
+
+As you may have noticed, the block is baked when the ``boostrap1`` baker has rights to bake, which explains the possible delay of up to a few minutes.
+If you are in a hurry, you may want to bake for any baker, by replacing ``bake for bootstrap1`` with ``bake for --minimal-timestamp``.
+We will use this option for the next times.
 
 Well, that doesn't seem very different from what the default client would return.
 Indeed, it's the same; that was the point! To see what the light client
@@ -152,7 +156,7 @@ And then bake a new block:
 
 ::
 
-    $ light-client bake for bootstrap1
+    $ light-client bake for --minimal-timestamp
     Apr  8 16:49:28.172 - light_mode: light mode's core created for chain main and block head
     Apr  8 16:49:28.173 - light_mode: API call: do_rpc v1
     Apr  8 16:49:28.175 - light_mode: integrated data for key v1 from one endpoint, about to validate from 1 other
