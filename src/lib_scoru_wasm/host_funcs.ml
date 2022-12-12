@@ -256,6 +256,7 @@ module Aux = struct
           | Durable.Invalid_key _ -> fail Error.Store_invalid_key
           | Durable.Value_not_found -> fail Error.Store_not_a_value
           | Durable.Tree_not_found -> fail Error.Store_not_a_node
+          | Durable.IO_too_large -> fail Error.Input_output_too_large
           | Output_buffer.Full_outbox -> fail Error.Full_outbox
           | exn ->
               fail @@ M.exn_to_error ~default:Error.Generic_invalid_access exn)
@@ -440,36 +441,32 @@ module Aux = struct
       in
       extract_error_code res
 
-    let chunk_max_size = 4096l
-
     let store_write ~durable ~memory ~key_offset ~key_length ~value_offset ~src
         ~num_bytes =
       let open Lwt_result_syntax in
       let*! res =
-        if num_bytes > chunk_max_size then fail Error.Input_output_too_large
-        else
-          let* key = load_key_from_memory key_offset key_length memory in
-          let*! value_size_err = store_value_size_aux ~durable ~key in
-          let* value_size =
-            match value_size_err with
-            | Ok s -> return s
-            | Error Error.Store_not_a_value -> return 0l
-            | Error e -> fail e
-          in
-          let* () =
-            (* Checks for overflow. *)
-            if value_size > Int32.add value_size num_bytes then
-              fail Error.Store_value_size_exceeded
-            else return ()
-          in
-          let value_offset = Int64.of_int32 value_offset in
-          let num_bytes = Int32.to_int num_bytes in
-          let* payload = M.load_bytes memory src num_bytes in
-          let+ durable =
-            guard (fun () ->
-                Durable.write_value_exn durable key value_offset payload)
-          in
-          (durable, 0l)
+        let* key = load_key_from_memory key_offset key_length memory in
+        let*! value_size_err = store_value_size_aux ~durable ~key in
+        let* value_size =
+          match value_size_err with
+          | Ok s -> return s
+          | Error Error.Store_not_a_value -> return 0l
+          | Error e -> fail e
+        in
+        let* () =
+          (* Checks for overflow. *)
+          if value_size > Int32.add value_size num_bytes then
+            fail Error.Store_value_size_exceeded
+          else return ()
+        in
+        let value_offset = Int64.of_int32 value_offset in
+        let num_bytes = Int32.to_int num_bytes in
+        let* payload = M.load_bytes memory src num_bytes in
+        let+ durable =
+          guard (fun () ->
+              Durable.write_value_exn durable key value_offset payload)
+        in
+        (durable, 0l)
       in
       extract_error durable res
 
