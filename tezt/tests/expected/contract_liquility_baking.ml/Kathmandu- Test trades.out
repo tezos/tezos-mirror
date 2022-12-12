@@ -1,0 +1,446 @@
+
+./octez-client --mode mockup rpc get /chains/main/blocks/head/context/liquidity_baking/cpmm_address
+"KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
+
+./octez-client --mode mockup get contract storage for KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+Pair 1
+     100
+     100
+     "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN"
+     "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
+
+./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap1 --entrypoint mintOrBurn --arg '(Pair 100000000 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 3217.054 units (will add 100 for safety)
+Estimated storage: 71 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'onn2EjEkNixUGs2Rq7Wky66zepuLfzXz6kKo8aDSZe2rAswt7J4'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for onn2EjEkNixUGs2Rq7Wky66zepuLfzXz6kKo8aDSZe2rAswt7J4 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    Fee to the baker: ꜩ0.000644
+    Expected counter: 1
+    Gas limit: 3318
+    Storage limit: 91 bytes
+    Balance updates:
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000644
+      payload fees(the block proposer) ....... +ꜩ0.000644
+    Transaction:
+      Amount: ꜩ0
+      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+      Entrypoint: mintOrBurn
+      Parameter: (Pair 100000000 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+      This transaction was successfully applied
+      Updated storage:
+        { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+      Updated big_maps:
+        Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 100000000
+      Storage size: 1982 bytes
+      Paid storage size diff: 71 bytes
+      Consumed gas: 3217.527
+      Balance updates:
+        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.01775
+        storage fees ........................... +ꜩ0.01775
+
+
+./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap1 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 3219.337 units (will add 100 for safety)
+Estimated storage: 71 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'opao2h8Dk8qUzeQXWD7mAHBq138Cix1jdg8K2Td1YdBmHWQyPgq'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for opao2h8Dk8qUzeQXWD7mAHBq138Cix1jdg8K2Td1YdBmHWQyPgq to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    Fee to the baker: ꜩ0.000642
+    Expected counter: 2
+    Gas limit: 3320
+    Storage limit: 91 bytes
+    Balance updates:
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000642
+      payload fees(the block proposer) ....... +ꜩ0.000642
+    Transaction:
+      Amount: ꜩ0
+      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+      Entrypoint: approve
+      Parameter: (Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)
+      This transaction was successfully applied
+      Updated storage:
+        { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+      Updated big_maps:
+        Set map(1)[(Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
+              0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 1000000000
+      Storage size: 2053 bytes
+      Paid storage size diff: 71 bytes
+      Consumed gas: 3219.810
+      Balance updates:
+        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.01775
+        storage fees ........................... +ꜩ0.01775
+
+
+./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap2 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 3219.337 units (will add 100 for safety)
+Estimated storage: 71 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'opYd4D9ntPBfU2DnTYvnjHXs6F1UQPSCTyHSEVoniGxetRsFcZw'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for opYd4D9ntPBfU2DnTYvnjHXs6F1UQPSCTyHSEVoniGxetRsFcZw to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+    Fee to the baker: ꜩ0.000642
+    Expected counter: 1
+    Gas limit: 3320
+    Storage limit: 91 bytes
+    Balance updates:
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000642
+      payload fees(the block proposer) ....... +ꜩ0.000642
+    Transaction:
+      Amount: ꜩ0
+      From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+      To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+      Entrypoint: approve
+      Parameter: (Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)
+      This transaction was successfully applied
+      Updated storage:
+        { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+      Updated big_maps:
+        Set map(1)[(Pair 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
+              0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 1000000000
+      Storage size: 2124 bytes
+      Paid storage size diff: 71 bytes
+      Consumed gas: 3219.810
+      Balance updates:
+        tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.01775
+        storage fees ........................... +ꜩ0.01775
+
+
+./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap3 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 3219.337 units (will add 100 for safety)
+Estimated storage: 71 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'op8ToBRT94cCScoyVZjTSeLW4vk9qd8B1gFDUsXJkBSfMJQFHs7'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for op8ToBRT94cCScoyVZjTSeLW4vk9qd8B1gFDUsXJkBSfMJQFHs7 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
+    Fee to the baker: ꜩ0.000642
+    Expected counter: 1
+    Gas limit: 3320
+    Storage limit: 91 bytes
+    Balance updates:
+      tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.000642
+      payload fees(the block proposer) ....... +ꜩ0.000642
+    Transaction:
+      Amount: ꜩ0
+      From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
+      To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+      Entrypoint: approve
+      Parameter: (Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)
+      This transaction was successfully applied
+      Updated storage:
+        { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+      Updated big_maps:
+        Set map(1)[(Pair 0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6
+              0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 1000000000
+      Storage size: 2195 bytes
+      Paid storage size diff: 71 bytes
+      Consumed gas: 3219.810
+      Balance updates:
+        tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.01775
+        storage fees ........................... +ꜩ0.01775
+
+
+./octez-client --mode mockup --wait none transfer 9001 from bootstrap1 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint addLiquidity --arg '(Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 1000000000 "2050-01-01T00:00:00Z")'
+Node is bootstrapped.
+Estimated gas: 12149.620 units (will add 100 for safety)
+Estimated storage: 141 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'opEou13te7EeKTxwFQdB2wHvbDmeTs97Au3LHgerYgU7fBwWfzE'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for opEou13te7EeKTxwFQdB2wHvbDmeTs97Au3LHgerYgU7fBwWfzE to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    Fee to the baker: ꜩ0.00158
+    Expected counter: 3
+    Gas limit: 12250
+    Storage limit: 161 bytes
+    Balance updates:
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00158
+      payload fees(the block proposer) ....... +ꜩ0.00158
+    Transaction:
+      Amount: ꜩ9001
+      From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      To: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+      Entrypoint: addLiquidity
+      Parameter: (Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 1000000000 "2050-01-01T00:00:00Z")
+      This transaction was successfully applied
+      Updated storage:
+        { 722 ;
+          9013500100 ;
+          72107 ;
+          0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
+          0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
+      Storage size: 4633 bytes
+      Paid storage size diff: 3 bytes
+      Consumed gas: 2274.737
+      Balance updates:
+        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00075
+        storage fees ........................... +ꜩ0.00075
+        tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ9001
+        KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... +ꜩ9001
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+          Entrypoint: transfer
+          Parameter: (Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
+                           (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 721))
+          This transaction was successfully applied
+          Updated storage:
+            { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+          Updated big_maps:
+            Set map(1)[(Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
+                  0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 999999279
+            Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 99999279
+            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
+          Storage size: 2263 bytes
+          Paid storage size diff: 68 bytes
+          Consumed gas: 4605.577
+          Balance updates:
+            tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.017
+            storage fees ........................... +ꜩ0.017
+        Internal Transaction:
+          Amount: ꜩ0
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo
+          Entrypoint: mintOrBurn
+          Parameter: (Pair 72007 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
+          This transaction was successfully applied
+          Updated storage:
+            { 2 ; 3 ; 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 ; 72107 }
+          Updated big_maps:
+            Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 72007
+          Storage size: 2048 bytes
+          Paid storage size diff: 70 bytes
+          Consumed gas: 3213.097
+          Balance updates:
+            tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.0175
+            storage fees ........................... +ꜩ0.0175
+
+
+./octez-client --mode mockup --wait none transfer 9001 from bootstrap2 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint xtzToToken --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 0 "2050-01-01T00:00:00Z")'
+Node is bootstrapped.
+Estimated gas: 8709.942 units (will add 100 for safety)
+Estimated storage: 326 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'onjb9iMJWAoJWUvg8NLBdaC4qg7oreZP6FNFR2zRjdYwrE2dWg6'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for onjb9iMJWAoJWUvg8NLBdaC4qg7oreZP6FNFR2zRjdYwrE2dWg6 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+    Fee to the baker: ꜩ0.001228
+    Expected counter: 2
+    Gas limit: 8810
+    Storage limit: 346 bytes
+    Balance updates:
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.001228
+      payload fees(the block proposer) ....... +ꜩ0.001228
+    Transaction:
+      Amount: ꜩ9001
+      From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+      To: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+      Entrypoint: xtzToToken
+      Parameter: (Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 0 "2050-01-01T00:00:00Z")
+      This transaction was successfully applied
+      Updated storage:
+        { 362 ;
+          18007999100 ;
+          72107 ;
+          0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
+          0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
+      Storage size: 4634 bytes
+      Paid storage size diff: 1 bytes
+      Consumed gas: 1745.741
+      Balance updates:
+        tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.00025
+        storage fees ........................... +ꜩ0.00025
+        tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ9001
+        KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... +ꜩ9001
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+          Entrypoint: transfer
+          Parameter: (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600
+                           (Pair 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c 360))
+          This transaction was successfully applied
+          Updated storage:
+            { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+          Updated big_maps:
+            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 361
+            Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 360
+          Storage size: 2331 bytes
+          Paid storage size diff: 68 bytes
+          Consumed gas: 3907.866
+          Balance updates:
+            tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.017
+            storage fees ........................... +ꜩ0.017
+        Internal Transaction:
+          Amount: ꜩ9.001
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU
+          This transaction was successfully applied
+          Consumed gas: 1000
+          Balance updates:
+            KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ9.001
+            tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU ... +ꜩ9.001
+            tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
+
+
+./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap2 --entrypoint transfer --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" 100)' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 3916.093 units (will add 100 for safety)
+Estimated storage: 68 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is 'opTUbnUNZskn9prKmtBtMb8Qu8F8D6oxVsD2vTeErWuWVhhw82m'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for opTUbnUNZskn9prKmtBtMb8Qu8F8D6oxVsD2vTeErWuWVhhw82m to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+    Fee to the baker: ꜩ0.000759
+    Expected counter: 3
+    Gas limit: 4017
+    Storage limit: 88 bytes
+    Balance updates:
+      tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000759
+      payload fees(the block proposer) ....... +ꜩ0.000759
+    Transaction:
+      Amount: ꜩ0
+      From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+      To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+      Entrypoint: transfer
+      Parameter: (Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
+                       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
+                       100)
+      This transaction was successfully applied
+      Updated storage:
+        { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+      Updated big_maps:
+        Set map(0)[0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6] to 100
+        Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 260
+      Storage size: 2399 bytes
+      Paid storage size diff: 68 bytes
+      Consumed gas: 3916.566
+      Balance updates:
+        tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.017
+        storage fees ........................... +ꜩ0.017
+
+
+./octez-client --mode mockup call KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 from bootstrap3 --entrypoint tokenToXtz --arg '(Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" 100 0 "2050-01-01T00:00:00Z")' --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 10608.915 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is 'onoxdw6ot39cWANs5rY9vdrmuqffuMj9jvAbe52KGmWbZTexiez'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for onoxdw6ot39cWANs5rY9vdrmuqffuMj9jvAbe52KGmWbZTexiez to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
+    Fee to the baker: ꜩ0.001416
+    Expected counter: 2
+    Gas limit: 10709
+    Storage limit: 0 bytes
+    Balance updates:
+      tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... -ꜩ0.001416
+      payload fees(the block proposer) ....... +ꜩ0.001416
+    Transaction:
+      Amount: ꜩ0
+      From: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
+      To: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+      Entrypoint: tokenToXtz
+      Parameter: (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" 100 0 "2050-01-01T00:00:00Z")
+      This transaction was successfully applied
+      Updated storage:
+        { 462 ;
+          14117137204 ;
+          72107 ;
+          0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
+          0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
+      Storage size: 4633 bytes
+      Consumed gas: 1746.925
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+          Entrypoint: transfer
+          Parameter: (Pair 0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6
+                           (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 100))
+          This transaction was successfully applied
+          Updated storage:
+            { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
+          Updated big_maps:
+            Set map(1)[(Pair 0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6
+                  0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 999999900
+            Unset map(0)[0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6]
+            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 461
+          Storage size: 2331 bytes
+          Consumed gas: 4805.613
+        Internal Transaction:
+          Amount: ꜩ3891.966034
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
+          This transaction was successfully applied
+          Consumed gas: 1000
+          Balance updates:
+            KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ3891.966034
+            tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU ... +ꜩ3891.966034
+        Internal Transaction:
+          Amount: ꜩ3.895862
+          From: KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5
+          To: tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU
+          This transaction was successfully applied
+          Consumed gas: 1000
+          Balance updates:
+            KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 ... -ꜩ3.895862
+            tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU ... +ꜩ3.895862
+
+
+./octez-client --mode mockup get contract storage for KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo
+Pair 2 3 "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 72107
+
+./octez-client --mode mockup get contract storage for KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN
+Pair 0 1 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 100010000
