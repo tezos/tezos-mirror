@@ -520,7 +520,7 @@ module Elem = struct
     let tag = "EKStart" in
     case
       tag
-      (value [] (Data_encoding.constant "tag"))
+      (value [] (Data_encoding.constant tag))
       (function Decode.EKStart -> Some () | _ -> None)
       (fun () -> EKStart)
 
