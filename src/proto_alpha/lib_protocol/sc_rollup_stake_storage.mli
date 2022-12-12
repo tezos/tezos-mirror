@@ -57,15 +57,16 @@ val remove_staker :
       {li [Sc_rollup_commitment_past_curfew] if current level is
         more than {!Constants_storage.sc_rollup_challenge_window_in_blocks}
         after the first commit for the same inbox level.}
-      {li [Sc_rollup_commitment_from_future] if [commitment]'s inbox level is greater than current level
+      {li [Sc_rollup_commitment_from_future] if [commitment]'s inbox level is
+        greater or equal than current level
       {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
         less than [sc_rollup_commitment_period] blocks ahead}
       {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor
         of [commitment]}
       {li [Sc_rollup_unknown_commitment] if the parent of the given commitment
         does not exist}
-      {li [Sc_rollup_staker_funds_too_low] if [staker] is not previously a staker, and does not have enough funds
-        to cover the deposit}
+      {li [Sc_rollup_staker_funds_too_low] if [staker] is not previously a
+        staker, and does not have enough funds to cover the deposit}
     }
 
     Returns the hash of the given commitment, and the level when the commitment
