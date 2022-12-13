@@ -253,7 +253,7 @@ let process_head (node_ctxt : _ Node_context.t)
 
 let inbox_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
-  let* level = State.level_of_hash node_ctxt.Node_context.store hash in
+  let* level = State.level_of_hash node_ctxt hash in
   State.inbox_of_head node_ctxt {hash; level}
 
 let inbox_of_head = State.inbox_of_head

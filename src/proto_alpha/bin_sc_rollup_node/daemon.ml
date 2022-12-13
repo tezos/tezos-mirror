@@ -197,7 +197,7 @@ module Make (PVM : Pvm.S) = struct
       =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
-    let*! () = State.set_block_level_and_hash node_ctxt.store head in
+    let*! () = State.save_level node_ctxt.store head in
     let* inbox_hash, inbox, inbox_witness, messages, ctxt =
       Inbox.process_head node_ctxt head
     in

@@ -87,12 +87,12 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   module PVM = PVM
 
   let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let* block_hash =
-      State.hash_of_level node_ctxt.store (Raw_level.to_int32 inbox_level)
+      State.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
     in
-    let+ block = Store.L2_blocks.get node_ctxt.store block_hash in
-    Sc_rollup_block.final_tick block
+    let*! block = Store.L2_blocks.get node_ctxt.store block_hash in
+    return (Sc_rollup_block.final_tick block)
 
   let build_commitment (node_ctxt : _ Node_context.t)
       (prev_commitment : Sc_rollup.Commitment.Hash.t) ~prev_commitment_level
@@ -110,9 +110,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     let*! compressed_state = PVM.state_hash pvm_state in
     let*! tick = PVM.get_tick pvm_state in
-    let*! prev_commitment_tick =
-      tick_of_level node_ctxt prev_commitment_level
-    in
+    let* prev_commitment_tick = tick_of_level node_ctxt prev_commitment_level in
     let number_of_ticks =
       Sc_rollup.Tick.distance tick prev_commitment_tick
       |> Z.to_int64 |> Sc_rollup.Number_of_ticks.of_value
@@ -192,22 +190,25 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         in
         return_some commitment_hash
 
-  let block_of_known_level store level =
+  let block_of_known_level (node_ctxt : _ Node_context.t) level =
     let open Lwt_option_syntax in
-    let* head = State.last_processed_head_opt store in
+    let* head = State.last_processed_head_opt node_ctxt.store in
     if Raw_level.(head.header.level < level) then
       (* Level is not known yet  *)
       fail
     else
-      let*! block_hash = State.hash_of_level store (Raw_level.to_int32 level) in
-      Store.L2_blocks.find store block_hash
+      let*! block_hash =
+        State.hash_of_level node_ctxt (Raw_level.to_int32 level)
+      in
+      let*? block_hash = Result.to_option block_hash in
+      Store.L2_blocks.find node_ctxt.store block_hash
 
-  let get_commitment_and_publish ~check_lcc_hash
-      ({store; _} as node_ctxt : _ Node_context.t) next_level_to_publish =
+  let get_commitment_and_publish ~check_lcc_hash node_ctxt next_level_to_publish
+      =
     let open Lwt_result_syntax in
     let*! commitment =
       let open Lwt_option_syntax in
-      let* block = block_of_known_level store next_level_to_publish in
+      let* block = block_of_known_level node_ctxt next_level_to_publish in
       let*? commitment_hash = block.header.commitment_hash in
       Store.Commitments.find node_ctxt.store commitment_hash
     in
@@ -323,11 +324,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         let* _hash = Injector.add_pending_operation ~source cement_operation in
         return_unit
 
-  let cement_commitment_if_possible ({Node_context.store; _} as node_ctxt)
-      Layer1.{level = head_level; _} =
+  let cement_commitment_if_possible node_ctxt Layer1.{level = head_level; _} =
     let open Lwt_result_syntax in
     let next_level_to_cement = next_lcc_level node_ctxt in
-    let*! block = block_of_known_level store next_level_to_cement in
+    let*! block = block_of_known_level node_ctxt next_level_to_cement in
     match block with
     | None | Some {header = {commitment_hash = None; _}; _} ->
         (* Commitment not available *)
