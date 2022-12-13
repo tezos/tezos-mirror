@@ -66,7 +66,8 @@ type inbox_info = {finalized : bool; cemented : bool}
 type commitment_info = {
   commitment : Sc_rollup.Commitment.t;
   commitment_hash : Sc_rollup.Commitment.Hash.t;
-  published_at : Raw_level.t;
+  first_published_at_level : Raw_level.t;
+  published_at_level : Raw_level.t;
 }
 
 type message_status =
@@ -80,10 +81,16 @@ type message_status =
 module Encodings = struct
   open Data_encoding
 
-  let commitment_with_hash_and_level =
-    obj3
+  let commitment_with_hash =
+    obj2
       (req "commitment" Sc_rollup.Commitment.encoding)
       (req "hash" Sc_rollup.Commitment.Hash.encoding)
+
+  let commitment_with_hash_and_level_infos =
+    obj4
+      (req "commitment" Sc_rollup.Commitment.encoding)
+      (req "hash" Sc_rollup.Commitment.Hash.encoding)
+      (opt "first_published_at_level" Raw_level.encoding)
       (opt "published_at_level" Raw_level.encoding)
 
   let hex_string = conv Bytes.of_string Bytes.to_string bytes
@@ -144,15 +151,31 @@ module Encodings = struct
 
   let commitment_info =
     conv
-      (fun {commitment; commitment_hash; published_at} ->
-        (commitment, (commitment_hash, published_at)))
-      (fun (commitment, (commitment_hash, published_at)) ->
-        {commitment; commitment_hash; published_at})
-    @@ merge_objs
-         Sc_rollup.Commitment.encoding
-         (obj2
-            (req "hash" Sc_rollup.Commitment.Hash.encoding)
-            (req "published_at" Raw_level.encoding))
+      (fun {
+             commitment;
+             commitment_hash;
+             first_published_at_level;
+             published_at_level;
+           } ->
+        ( commitment,
+          commitment_hash,
+          first_published_at_level,
+          published_at_level ))
+      (fun ( commitment,
+             commitment_hash,
+             first_published_at_level,
+             published_at_level ) ->
+        {
+          commitment;
+          commitment_hash;
+          first_published_at_level;
+          published_at_level;
+        })
+    @@ obj4
+         (req "commitment" Sc_rollup.Commitment.encoding)
+         (req "hash" Sc_rollup.Commitment.Hash.encoding)
+         (req "first_published_at_level" Raw_level.encoding)
+         (req "published_at_level" Raw_level.encoding)
 
   let message_status =
     union
@@ -327,7 +350,7 @@ module Global = struct
     Tezos_rpc.Service.get_service
       ~description:"Last commitment computed by the node"
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
+      ~output:(Data_encoding.option Encodings.commitment_with_hash)
       (path / "last_stored_commitment")
 
   module Helpers = struct
@@ -628,7 +651,8 @@ module Local = struct
     Tezos_rpc.Service.get_service
       ~description:"Last commitment published by the node"
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
+      ~output:
+        (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "last_published_commitment")
 
   let injection =

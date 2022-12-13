@@ -47,14 +47,14 @@ module Store = struct
   module Last_finalized_head =
     Store.Make_mutable_value
       (struct
-        let path = ["tezos"; "finalized_head"]
+        let path = ["finalized_head"]
       end)
       (struct
-        type value = Layer1.head
+        type value = Sc_rollup_block.t
 
-        let name = "head"
+        let name = "l2_block"
 
-        let encoding = Layer1.head_encoding
+        let encoding = Sc_rollup_block.encoding
       end)
 
   (** Table from L1 levels to blocks hashes. *)
@@ -120,7 +120,12 @@ let is_processed store head = Raw_store.L2_blocks.mem store head
 
 let last_processed_head_opt store = Store.L2_head.find store
 
-let mark_finalized_head store head = Store.Last_finalized_head.set store head
+let mark_finalized_head store head_hash =
+  let open Lwt_syntax in
+  let* block = Raw_store.L2_blocks.find store head_hash in
+  match block with
+  | None -> return_unit
+  | Some block -> Store.Last_finalized_head.set store block
 
 let get_finalized_head_opt store = Store.Last_finalized_head.find store
 
