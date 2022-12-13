@@ -62,24 +62,6 @@ let next_lcc_level node_ctxt =
     node_ctxt.Node_context.lcc.level
     (sc_rollup_commitment_period node_ctxt)
 
-(** Returns the next level for which a commitment can be published, i.e. the
-    level that is [commitment_period] blocks after the last published one. It
-    returns [None] if this level is not finalized because we only publish
-    commitments for inbox of finalized L1 blocks. *)
-let next_publishable_level node_ctxt =
-  let open Lwt_option_syntax in
-  let lpc_level =
-    match node_ctxt.Node_context.lpc with
-    | None -> node_ctxt.genesis_info.level
-    | Some lpc -> lpc.inbox_level
-  in
-  let next_level =
-    add_level lpc_level (sc_rollup_commitment_period node_ctxt)
-  in
-  let* finalized_level = State.get_finalized_head_opt node_ctxt.store in
-  if Raw_level.(of_int32_exn finalized_level.level < next_level) then fail
-  else return next_level
-
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
@@ -202,90 +184,77 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let*? block_hash = Result.to_option block_hash in
       Store.L2_blocks.find node_ctxt.store block_hash
 
-  let get_commitment_and_publish ~check_lcc_hash node_ctxt next_level_to_publish
-      =
-    let open Lwt_result_syntax in
-    let*! commitment =
-      let open Lwt_option_syntax in
-      let* block = block_of_known_level node_ctxt next_level_to_publish in
-      let*? commitment_hash = block.header.commitment_hash in
-      Store.Commitments.find node_ctxt.store commitment_hash
+  let missing_commitments (node_ctxt : _ Node_context.t) =
+    let open Lwt_syntax in
+    let lpc_level =
+      match node_ctxt.lpc with
+      | None -> node_ctxt.genesis_info.level
+      | Some lpc -> lpc.inbox_level
     in
-    match commitment with
-    | None ->
-        (* Commitment not available *)
-        return_unit
-    | Some commitment -> (
-        let* () =
-          if check_lcc_hash then
-            let open Lwt_result_syntax in
-            if
-              Sc_rollup.Commitment.Hash.equal
-                node_ctxt.lcc.commitment
-                commitment.predecessor
-            then return ()
-            else
-              let*! () =
-                Commitment_event.commitment_parent_is_not_lcc
-                  commitment.inbox_level
-                  commitment.predecessor
-                  node_ctxt.lcc.commitment
-              in
-              tzfail
-                (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
-                   commitment)
-          else return_unit
+    let rec gather acc (commitment : Sc_rollup.Commitment.Hash.t) =
+      let* commitment = Store.Commitments.find node_ctxt.store commitment in
+      match commitment with
+      | None -> return acc
+      | Some commitment
+        when Raw_level.(
+               commitment.inbox_level <= node_ctxt.lcc.level
+               || commitment.inbox_level <= lpc_level) ->
+          (* If the commitment is before or at the LCC, we have reached the end.
+             If the commitment is before the last published one, we have also
+             reached the end because we only publish commitments that are
+             for the inbox of a finalized L1 block. *)
+          return acc
+      | Some commitment ->
+          (* We keep the commitment and go back to the previous one. *)
+          gather (commitment :: acc) commitment.predecessor
+    in
+    let* finalized_block = State.get_finalized_head_opt node_ctxt.store in
+    match finalized_block with
+    | None -> return_nil
+    | Some finalized ->
+        (* Start from finalized block's most recent commitment and gather all
+           commitments that are missing. *)
+        let commitment =
+          Sc_rollup_block.most_recent_commitment finalized.header
         in
-        let operator = Node_context.get_operator node_ctxt Publish in
-        match operator with
-        | None ->
-            (* Configured to not publish commitments *)
-            return_unit
-        | Some source ->
-            let publish_operation =
-              Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
-            in
-            let* _hash =
-              Injector.add_pending_operation ~source publish_operation
-            in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
-               Decouple commitments from head processing
+        gather [] commitment
 
-               Move the following, in a part where we know the operation is
-               included. *)
-            node_ctxt.lpc <- Some commitment ;
-            return_unit)
-
-  let publish_commitment node_ctxt =
+  let publish_commitment (node_ctxt : _ Node_context.t) ~source
+      (commitment : Sc_rollup.Commitment.t) =
     let open Lwt_result_syntax in
-    (* Check level of next publishable commitment and avoid publishing if it is
-       on or before the last cemented commitment.
-    *)
     let next_lcc_level = next_lcc_level node_ctxt in
-    let*! next_publishable_level = next_publishable_level node_ctxt in
-    match next_publishable_level with
-    | None -> return_unit
-    | Some next_publishable_level ->
-        let check_lcc_hash, level_to_publish =
-          if Raw_level.(next_publishable_level < next_lcc_level) then
-            (*
+    (* The predecessor of the commitment right after the LCC level
+       must be the LCC otherwise this commitment is invalid. *)
+    let*? () =
+      error_unless
+        (Raw_level.(commitment.inbox_level <> next_lcc_level)
+        || Sc_rollup.Commitment.Hash.equal
+             node_ctxt.lcc.commitment
+             commitment.predecessor)
+        (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC commitment)
+    in
+    let publish_operation =
+      Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
+    in
+    let* _hash = Injector.add_pending_operation ~source publish_operation in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
+       Decouple commitments from head processing
 
-           This situation can happen if the rollup node has been
-           shutdown and the rollup has been progressing in the
-           meantime. In that case, the rollup node must wait to reach
-           [lcc_level + commitment_frequency] to publish the
-           commitment. ([lcc_level] is a multiple of
-           commitment_frequency.)
+       Move the following, in a part where we know the operation is
+       included. *)
+    node_ctxt.lpc <- Some commitment ;
+    return_unit
 
-           We need to check that the published commitment comes
-           immediately after the last cemented commitment, otherwise
-           that's an invalid commitment.
-
-        *)
-            (true, next_lcc_level)
-          else (false, next_publishable_level)
-        in
-        get_commitment_and_publish node_ctxt level_to_publish ~check_lcc_hash
+  let publish_commitments (node_ctxt : _ Node_context.t) =
+    let open Lwt_result_syntax in
+    let operator = Node_context.get_operator node_ctxt Publish in
+    match operator with
+    | None ->
+        (* Configured to not publish commitments *)
+        return_unit
+    | Some source ->
+        let*! commitments = missing_commitments node_ctxt in
+        List.iter_es (publish_commitment node_ctxt ~source) commitments
 
   let earliest_cementing_level node_ctxt commitment_hash =
     let open Lwt_option_syntax in
