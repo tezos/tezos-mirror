@@ -49,7 +49,7 @@ let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 
 (** Store context *)
 type node_store = {
-  slots_store : t;
+  store : t;
   shard_store : Shard_store.t;
   slot_headers_store : Slot_headers_store.t;
   slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
@@ -67,10 +67,10 @@ let init config =
   let* slot_headers_store = Slot_headers_store.load dir in
   let slots_watcher = Lwt_watcher.create_input () in
   let* repo = Repo.v (Irmin_pack.config dir) in
-  let* slots_store = main repo in
+  let* store = main repo in
   let* shard_store = Shard_store.init (Filename.concat dir shard_store_path) in
   let* () = Event.(emit store_is_ready ()) in
-  Lwt.return {shard_store; slots_store; slots_watcher; slot_headers_store}
+  Lwt.return {shard_store; store; slots_watcher; slot_headers_store}
 
 module Legacy = struct
   module Path : sig
@@ -183,7 +183,7 @@ module Legacy = struct
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
     let encoded_slot = encode_exn (Data_encoding.Fixed.bytes slot_size) slot in
-    let* () = set ~msg:"Slot stored" node_store.slots_store path encoded_slot in
+    let* () = set ~msg:"Slot stored" node_store.store path encoded_slot in
     let* () = Event.(emit stored_slot_content commitment) in
     Lwt_watcher.notify node_store.slots_watcher commitment ;
     return_unit
@@ -192,19 +192,19 @@ module Legacy = struct
     let open Lwt_syntax in
     let path = Path.Commitment.header commitment slot_id in
     (* The path allows to reconstruct the data. *)
-    let* () = set ~msg:"Slot id stored" node_store.slots_store path "" in
+    let* () = set ~msg:"Slot id stored" node_store.store path "" in
     return_unit
 
   let exists_slot_by_commitment node_store cryptobox commitment =
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
-    mem node_store.slots_store path
+    mem node_store.store path
 
   let find_slot_by_commitment node_store cryptobox commitment =
     let open Lwt_syntax in
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
-    let* res_opt = find node_store.slots_store path in
+    let* res_opt = find node_store.store path in
     Option.bind res_opt (decode (Data_encoding.Fixed.bytes slot_size))
     |> Lwt.return
 
@@ -236,7 +236,7 @@ module Legacy = struct
   let add_slot_headers ~block_level ~block_hash slot_headers node_store =
     let open Lwt_syntax in
     let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
-    let slots_store = node_store.slots_store in
+    let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
        Handle reorgs. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
@@ -332,7 +332,7 @@ module Legacy = struct
   let update_selected_slot_headers_statuses ~block_level ~attestation_lag
       attested unattested node_store =
     let open Lwt_result_syntax in
-    let store = node_store.slots_store in
+    let store = node_store.store in
     let published_level = Int32.(sub block_level (of_int attestation_lag)) in
     let* () = update_slot_headers_attestation ~published_level store attested in
     update_slot_headers_attestation ~published_level store unattested
@@ -342,7 +342,7 @@ module Legacy = struct
     let open Lwt_result_syntax in
     let index = Services.Types.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
-      find node_store.slots_store @@ Path.Level.accepted_header_commitment index
+      find node_store.store @@ Path.Level.accepted_header_commitment index
     in
     Option.fold
       commitment_str_opt
