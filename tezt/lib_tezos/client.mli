@@ -389,6 +389,7 @@ val spawn_import_secret_key :
 *)
 val activate_protocol :
   ?endpoint:endpoint ->
+  ?block:string ->
   ?protocol:Protocol.t ->
   ?protocol_hash:string ->
   ?fitness:int ->
@@ -421,6 +422,7 @@ val activate_protocol_and_wait :
 (** Same as [activate_protocol], but do not wait for the process to exit. *)
 val spawn_activate_protocol :
   ?endpoint:endpoint ->
+  ?block:string ->
   ?protocol:Protocol.t ->
   ?protocol_hash:string ->
   ?fitness:int ->

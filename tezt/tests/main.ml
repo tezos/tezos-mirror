@@ -49,6 +49,7 @@ let register_protocol_independent_tests () =
   Config.register () ;
   Demo_counter.register () ;
   Injection.register_protocol_independent () ;
+  Forge_block.register_protocol_independent () ;
   Light.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   P2p.register_protocol_independent () ;
