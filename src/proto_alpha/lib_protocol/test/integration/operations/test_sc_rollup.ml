@@ -655,7 +655,7 @@ let recover_bond_not_lcc i contract rollup =
   assert_fails_with
     ~__LOC__
     (attempt_to_recover_bond i contract rollup)
-    Sc_rollup_errors.Sc_rollup_not_staked_on_lcc
+    Sc_rollup_errors.Sc_rollup_not_staked_on_lcc_or_ancestor
 
 let recover_bond_not_staked i contract rollup =
   assert_fails_with
