@@ -144,9 +144,9 @@ let cost_add_message ~current_index ~msg_len =
 (* Derived from benchmark in
    [Sc_rollup_benchmarks.Sc_rollup_verify_output_proof_benchmark] and model
    [model_Sc_rollup_verify_output_proof_benchmark] with estimated parameters:
-   [fun size -> (98707.0824163 + (11.6809615751 * size))] *)
+   [fun size -> (103413.141163 + (6.85566158429 * size))] *)
 let cost_verify_output_proof ~bytes_len =
   let open S.Syntax in
   let size = S.safe_int bytes_len in
   let v0 = size in
-  S.safe_int 98750 + ((v0 lsl 3) + (v0 lsl 1) + v0 + (v0 lsr 1))
+  S.safe_int 103450 + (v0 lsl 2) + (v0 lsl 1) + v0
