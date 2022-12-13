@@ -56,7 +56,8 @@ manuals: \
 	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
 	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
 	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
-	@../octez-node --help | ./scripts/man2txt.py > api/octez-node.txt
+	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
+		./scripts/man2txt.py > api/octez-node.txt
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
