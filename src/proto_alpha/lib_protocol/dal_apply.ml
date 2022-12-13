@@ -49,6 +49,8 @@ let validate_attestation ctxt op =
   let open Result_syntax in
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4163
      check the signature of the attestor as well *)
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4444
+     Move DAL committee check from [apply_attestation] to [validate_attestation]. *)
   let Dal.Attestation.{attestor = _; attestation; level = given} = op in
   let* max_index =
     slot_of_int_e @@ ((Constants.parametric ctxt).dal.number_of_slots - 1)

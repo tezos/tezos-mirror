@@ -58,7 +58,8 @@ let dal_enable_param dal_enable =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ~parameter_file ~protocol =
+let setup_node ~parameter_file ~protocol ?(event_sections_levels = [])
+    ?(node_arguments = []) () =
   let* client = Client.init_mockup ~parameter_file ~protocol () in
   let nodes_args =
     Node.
@@ -82,7 +83,7 @@ let setup_node ~parameter_file ~protocol =
       in
       let json = JSON.put ("dal", value) json in
       json) ;
-  let* () = Node.run node [] in
+  let* () = Node.run node ~event_sections_levels node_arguments in
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () =
@@ -91,7 +92,7 @@ let setup_node ~parameter_file ~protocol =
   return (node, client, dal_parameters)
 
 let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
-    ?dal_enable f ~protocol =
+    ?dal_enable ?event_sections_levels ?node_arguments f ~protocol =
   let parameters =
     make_int_parameter
       ["dal_parametric"; "attestation_lag"]
@@ -109,7 +110,14 @@ let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
-  let* node, client, dal_parameters = setup_node ~parameter_file ~protocol in
+  let* node, client, dal_parameters =
+    setup_node
+      ~parameter_file
+      ?event_sections_levels
+      ?node_arguments
+      ~protocol
+      ()
+  in
   let cryptobox = Rollup.Dal.make dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
@@ -160,7 +168,8 @@ let with_dal_node tezos_node tezos_client f key =
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
-    ?commitment_period ?challenge_window ?(dal_enable = true) variant scenario =
+    ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?event_sections_levels ?node_arguments variant scenario =
   let description = "Testing DAL L1 integration" in
   test
     ~__FILE__
@@ -171,6 +180,8 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
         ?attestation_lag
         ?commitment_period
         ?challenge_window
+        ?event_sections_levels
+        ?node_arguments
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
@@ -781,6 +792,55 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   in
   check_slots_availability ~__LOC__ ~attested:[10]
 
+(* Tests that DAL attestations are only included in the block
+   if the attestation is from a DAL-committee member. *)
+let test_slots_attestation_operation_dal_committee_membership_check _protocol
+    parameters _cryptobox node client _bootstrap_key =
+  let* new_account =
+    (* Set up a new account that holds some tez and is revealed. *)
+    let* new_account = Client.gen_and_show_keys client in
+    let* () =
+      Client.transfer
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:new_account.alias
+        ~amount:(Tez.of_int 10)
+        ~burn_cap:Tez.one
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+    let* () = Client.bake_for_and_wait client in
+    return new_account
+  in
+  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let level = Node.get_level node + 1 in
+  let* (`OpHash _oph) =
+    (* The attestation from the new account should fail as
+       the new account is not an endorser and cannot be on the DAL committee. *)
+    Operation.Consensus.(
+      inject
+        ~error:
+          (rex
+             (sf
+                "%s is not part of the DAL committee for the level %d"
+                new_account.public_key_hash
+                level))
+        ~request:`Notify
+        ~signer:new_account
+        (dal_attestation ~level ~attestation:(Array.make nb_slots false))
+        client)
+  in
+  let* (`OpHash _oph) =
+    (* The attestation from the bootstrap account should succeed as
+       the bootstrap node is an endorser and is on the DAL committee by default. *)
+    Operation.Consensus.(
+      inject
+        ~signer:Constant.bootstrap1
+        (dal_attestation ~level ~attestation:(Array.make nb_slots false))
+        client)
+  in
+  unit
+
 let split_slot node client content =
   let* slot = Rollup.Dal.make_slot content client in
   RPC.call node (Rollup.Dal.RPC.split_slot slot)
@@ -1087,7 +1147,12 @@ let test_dal_node_startup =
     | None -> assert false
   in
   let* node, client =
-    Client.init_with_protocol `Client ~protocol:previous_protocol ~nodes_args ()
+    Client.init_with_protocol
+      `Client
+      ~protocol:previous_protocol
+      ~event_sections_levels:[("prevalidator", `Debug)]
+      ~nodes_args
+      ()
   in
   let dal_node = Dal_node.create ~node ~client () in
   let* _dir = Dal_node.init_config dal_node in
@@ -1652,6 +1717,16 @@ let register ~protocols =
     ~attestation_lag:5
     "slots attestation operation behavior"
     test_slots_attestation_operation_behavior
+    protocols ;
+  scenario_with_layer1_node
+    "slots attestation operation dal committee membership check"
+    test_slots_attestation_operation_dal_committee_membership_check
+    (* We need to disable precheck and set the prevalidator's event level to `Debug
+       in order to check the [Dal_data_availibility_attestor_not_in_committee] error in the test. *)
+    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4444
+       Enable precheck once we move DAL committee check to [validate_attestation]. *)
+    ~node_arguments:[Disable_operations_precheck]
+    ~event_sections_levels:[("prevalidator", `Debug)]
     protocols ;
   scenario_with_layer1_node
     ~dal_enable:false
