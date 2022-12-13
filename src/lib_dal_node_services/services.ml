@@ -79,6 +79,9 @@ module Types = struct
 
   let slot_encoding = Data_encoding.bytes
 
+  let equal_profile (Attestor p1) (Attestor p2) =
+    Tezos_crypto.Signature.Public_key_hash.( = ) p1 p2
+
   let profile_encoding =
     let open Data_encoding in
     union

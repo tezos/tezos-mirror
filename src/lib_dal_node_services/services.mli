@@ -91,6 +91,8 @@ module Types : sig
   val header_status_to_string : header_status -> string
 
   val profile_encoding : profile Data_encoding.t
+
+  val equal_profile : profile -> profile -> bool
 end
 
 (** Add the given slot in the node if not already present. The corresponding

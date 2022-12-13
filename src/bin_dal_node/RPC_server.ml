@@ -89,6 +89,12 @@ module Slots_handlers = struct
       ctxt
 end
 
+module Profile_handlers = struct
+  let patch_profile ctxt () profile =
+    let store = Node_context.get_store ctxt in
+    Profile_manager.add_profile store profile
+end
+
 let add_service registerer service handler directory =
   registerer directory service handler
 
@@ -118,6 +124,10 @@ let register_new :
        Tezos_rpc.Directory.opt_register2
        Services.get_commitment_by_published_level_and_index
        (Slots_handlers.get_commitment_by_published_level_and_index ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.patch_profile
+       (Profile_handlers.patch_profile ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
