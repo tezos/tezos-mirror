@@ -799,9 +799,7 @@ let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 3_300
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 3_300
 
 (* model B58CHECK_DECODING_PUBLIC_KEY_HASH_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 3_300
+let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 3_600
 
 (* model B58CHECK_DECODING_PUBLIC_KEY_ed25519 *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 4_200
@@ -813,9 +811,7 @@ let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = S.safe_int 325_000
 let cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1 = S.safe_int 9_000
 
 (* model B58CHECK_DECODING_PUBLIC_KEY_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_B58CHECK_DECODING_PUBLIC_KEY_bls = S.safe_int 9_000
+let cost_B58CHECK_DECODING_PUBLIC_KEY_bls = S.safe_int 79_000
 
 (* model B58CHECK_DECODING_SIGNATURE_ed25519 *)
 let cost_B58CHECK_DECODING_SIGNATURE_ed25519 = S.safe_int 6_400
@@ -827,8 +823,6 @@ let cost_B58CHECK_DECODING_SIGNATURE_p256 = S.safe_int 6_400
 let cost_B58CHECK_DECODING_SIGNATURE_secp256k1 = S.safe_int 6_400
 
 (* model B58CHECK_DECODING_SIGNATURE_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
 let cost_B58CHECK_DECODING_SIGNATURE_bls = S.safe_int 6_400
 
 (* model ENCODING_BLS_FR *)
@@ -853,8 +847,6 @@ let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 = S.safe_int 3_200
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 3_200
 
 (* model B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 3_200
 
 (* model B58CHECK_ENCODING_PUBLIC_KEY_ed25519 *)
@@ -867,9 +859,7 @@ let cost_B58CHECK_ENCODING_PUBLIC_KEY_p256 = S.safe_int 4_550
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_secp256k1 = S.safe_int 4_950
 
 (* model B58CHECK_ENCODING_PUBLIC_KEY_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_B58CHECK_ENCODING_PUBLIC_KEY_bls = S.safe_int 4_500
+let cost_B58CHECK_ENCODING_PUBLIC_KEY_bls = S.safe_int 5_900
 
 (* model B58CHECK_ENCODING_SIGNATURE_ed25519 *)
 let cost_B58CHECK_ENCODING_SIGNATURE_ed25519 = S.safe_int 8_300
@@ -881,40 +871,34 @@ let cost_B58CHECK_ENCODING_SIGNATURE_p256 = S.safe_int 8_300
 let cost_B58CHECK_ENCODING_SIGNATURE_secp256k1 = S.safe_int 8_300
 
 (* model B58CHECK_ENCODING_SIGNATURE_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
 let cost_B58CHECK_ENCODING_SIGNATURE_bls = S.safe_int 8_300
 
 (* model DECODING_CHAIN_ID *)
 let cost_DECODING_CHAIN_ID = S.safe_int 50
 
 (* model DECODING_PUBLIC_KEY_HASH_ed25519 *)
-let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 50
+let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 60
 
 (* model DECODING_PUBLIC_KEY_HASH_p256 *)
-let cost_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 50
+let cost_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 60
 
 (* model DECODING_PUBLIC_KEY_HASH_secp256k1 *)
-let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 50
+let cost_DECODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 60
 
 (* model DECODING_PUBLIC_KEY_HASH_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 50
+let cost_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 60
 
 (* model DECODING_PUBLIC_KEY_ed25519 *)
 let cost_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 60
 
 (* model DECODING_PUBLIC_KEY_p256 *)
-let cost_DECODING_PUBLIC_KEY_p256 = S.safe_int 320_000
+let cost_DECODING_PUBLIC_KEY_p256 = S.safe_int 18_800
 
 (* model DECODING_PUBLIC_KEY_secp256k1 *)
 let cost_DECODING_PUBLIC_KEY_secp256k1 = S.safe_int 4_900
 
 (* model DECODING_PUBLIC_KEY_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_DECODING_PUBLIC_KEY_bls = S.safe_int 60
+let cost_DECODING_PUBLIC_KEY_bls = S.safe_int 74_000
 
 (* model DECODING_SIGNATURE_ed25519 *)
 let cost_DECODING_SIGNATURE_ed25519 = S.safe_int 35
@@ -926,8 +910,6 @@ let cost_DECODING_SIGNATURE_p256 = S.safe_int 35
 let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 35
 
 (* model DECODING_SIGNATURE_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
 let cost_DECODING_SIGNATURE_bls = S.safe_int 35
 
 (* model DECODING_Chest_key *)
@@ -953,9 +935,7 @@ let cost_ENCODING_PUBLIC_KEY_HASH_p256 = S.safe_int 70
 let cost_ENCODING_PUBLIC_KEY_HASH_secp256k1 = S.safe_int 70
 
 (* model ENCODING_PUBLIC_KEY_HASH_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 70
+let cost_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 80
 
 (* model ENCODING_PUBLIC_KEY_ed25519 *)
 let cost_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 80
@@ -967,9 +947,7 @@ let cost_ENCODING_PUBLIC_KEY_p256 = S.safe_int 90
 let cost_ENCODING_PUBLIC_KEY_secp256k1 = S.safe_int 455
 
 (* model ENCODING_PUBLIC_KEY_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_ENCODING_PUBLIC_KEY_bls = S.safe_int 80
+let cost_ENCODING_PUBLIC_KEY_bls = S.safe_int 90
 
 (* model ENCODING_SIGNATURE_ed25519 *)
 let cost_ENCODING_SIGNATURE_ed25519 = S.safe_int 45
@@ -981,9 +959,7 @@ let cost_ENCODING_SIGNATURE_p256 = S.safe_int 45
 let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 45
 
 (* model ENCODING_SIGNATURE_bls *)
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3183
-   Run benchmarks to update costs. *)
-let cost_ENCODING_SIGNATURE_bls = S.safe_int 45
+let cost_ENCODING_SIGNATURE_bls = S.safe_int 50
 
 (* model ENCODING_Chest_key *)
 let cost_ENCODING_Chest_key = S.safe_int 10_000
