@@ -7,4 +7,9 @@ import re
 import fileinput
 
 for line in fileinput.input():
-    print(re.sub(r'.[\b]', '', line.rstrip('\n')))
+    line = line.rstrip('\n')
+    # get rid of the overwritten letters
+    line = re.sub(r'.[\b]', '', line)
+    # protect double dashes from being interpreted as a long dash
+    line = re.sub(r'--', r'-\-', line)
+    print(line)
