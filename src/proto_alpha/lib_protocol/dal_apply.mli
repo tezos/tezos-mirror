@@ -29,7 +29,7 @@
 open Alpha_context
 
 (** [validate_attestation ctxt op] ensures that [op.attestation] is
-   valid and cannot prevent an operation containing [op.attestation]
+   valid and prevents an operation containing [op.attestation]
    to be refused on top of [ctxt]. If an [Error _] is returned, the
    [op.attestation] is not valid. *)
 val validate_attestation : t -> Dal.Attestation.operation -> unit tzresult
@@ -39,7 +39,7 @@ val validate_attestation : t -> Dal.Attestation.operation -> unit tzresult
 val apply_attestation : t -> Dal.Attestation.operation -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
-   valid and cannot prevent an operation containing [slot_header] to be
+   valid and prevents an operation containing [slot_header] to be
    refused on top of [ctxt]. If an [Error _] is returned, the [slot_header]
    is not valid. *)
 val validate_publish_slot_header :
