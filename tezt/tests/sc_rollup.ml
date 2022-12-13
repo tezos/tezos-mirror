@@ -2128,7 +2128,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
      `init_level + sc_rollup_commitment_period_in_blocks` is processed by
      the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
-  let* commitment_finalized_level =
+  let* _commitment_finalized_level =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
       sc_rollup_node
@@ -2146,8 +2146,9 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
        %R)" ;
   (* Bake an additional block for the commitment to be included. *)
   let* () = Client.bake_for_and_wait client in
-  let* commitment_publish_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (commitment_finalized_level + 1)
+  let commitment_publish_level = Node.get_level node in
+  let* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node commitment_publish_level
   in
   let*! rollup_node1_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
@@ -2172,16 +2173,25 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
   in
   let* () = Sc_rollup_node.run sc_rollup_node' [] in
 
-  let* rollup_node2_catchup_level =
+  let* _ =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
       sc_rollup_node'
-      commitment_finalized_level
+      commitment_publish_level
   in
-  Check.(rollup_node2_catchup_level = commitment_finalized_level)
-    Check.int
-    ~error_msg:"Current level has moved past cementation inbox level (%L = %R)" ;
-  (* Check that no commitment was published. *)
+  let*! rollup_node2_published_commitment =
+    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
+  in
+  Check.(
+    Option.bind rollup_node2_published_commitment first_published_at_level
+    = None)
+    (Check.option Check.int)
+    ~error_msg:"Rollup node 2 cannot publish commitment without any new block." ;
+  let* () = Client.bake_for_and_wait client in
+  let commitment_publish_level2 = Node.get_level node in
+  let* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node' commitment_publish_level2
+  in
   let*! rollup_node2_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
