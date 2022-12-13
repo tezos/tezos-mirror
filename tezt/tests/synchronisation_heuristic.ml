@@ -227,7 +227,7 @@ let test_threshold_zero =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
 
   Log.info "Check that the node is bootstrapped" ;
   let* () = check_sync_state client Synced in
@@ -263,7 +263,7 @@ let test_threshold_one =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
 
   Log.info "Check synchronisation state of first peer" ;
   let* () = check_sync_state client Synced in
@@ -299,7 +299,7 @@ let test_threshold_two =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
 
   Log.info "Add nodes and connect in clique" ;
 
@@ -446,7 +446,7 @@ let test_threshold_split_view =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
   let* () = connect_clique client [node; node1; node2] in
 
   Log.info "Test that all nodes bootstrap" ;
@@ -496,7 +496,7 @@ let test_many_nodes_bootstrap =
       ~timestamp:Now
       ()
   in
-  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* _ = Baker.init ~protocol node client in
   let* node1, client1 =
     Client.init_with_protocol
       ~nodes_args:
