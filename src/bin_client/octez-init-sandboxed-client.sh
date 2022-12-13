@@ -162,7 +162,7 @@ main () {
 
     for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions); do
         protocol_underscore=$(echo $protocol | tr -- - _)
-        protocol_without_number=$(echo $protocol | tr --delete "\-[0-9]")
+        protocol_without_number=$(echo $protocol | tr -d "\-[0-9]")
         local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
         local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
         local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
