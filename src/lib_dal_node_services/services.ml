@@ -50,6 +50,8 @@ module Types = struct
 
   type header_status = [`Not_selected | `Unseen | header_attestation_status]
 
+  (* Auxiliary functions.  *)
+
   let header_attestation_status_to_string = function
     | `Waiting_for_attestations -> "waiting_for_attestations"
     | `Attested -> "attested"
@@ -59,6 +61,8 @@ module Types = struct
     | `Not_selected -> "not_selected"
     | `Unseen -> "unseen"
     | #header_attestation_status as e -> header_attestation_status_to_string e
+
+  (* Encodings associated  to the types. *)
 
   let slot_id_encoding =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4396
@@ -133,3 +137,21 @@ let get_slot_commitment_proof :
     ~output:Cryptobox.Commitment_proof.encoding
     Tezos_rpc.Path.(
       open_root / "slots" /: Cryptobox.Commitment.rpc_arg / "proof")
+
+let get_commitment_by_published_level_and_index :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Cryptobox.commitment
+    ; prefix : unit
+    ; params : (unit * Types.level) * Types.slot_index
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Return the accepted commitment associated to the given slot index and \
+       published at the given level."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Cryptobox.Commitment.encoding
+    Tezos_rpc.Path.(
+      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slot_indices"
+      /: Tezos_rpc.Arg.int / "commitment")

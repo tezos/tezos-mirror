@@ -316,6 +316,12 @@ module Dal : sig
     (** Call RPC "GET /slots/<commitment>/proof" to get the proof
        associated to a commitment. *)
     val get_slot_proof : commitment -> (Dal_node.t, commitment_proof) RPC_core.t
+
+    (** Call RPC "GET
+        /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
+        the commitment associated to the given level and index. *)
+    val get_level_index_commitment :
+      slot_level:int -> slot_index:int -> (Dal_node.t, commitment) RPC_core.t
   end
 
   val make :

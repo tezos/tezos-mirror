@@ -93,3 +93,13 @@ val update_selected_slot_headers_statuses :
   [`Unattested of Dal_plugin.slot_index list] ->
   Store.node_store ->
   unit tzresult Lwt.t
+
+(** [get_commitment_by_published_level_and_index ~level ~slot_index node_store]
+    returns the commitment associated with the accepted slot header of index
+    [slot_index] published at level [level]. Returns [Error `Not_found] if no
+    such commitment is found in [node_store]. *)
+val get_commitment_by_published_level_and_index :
+  level:Services.Types.level ->
+  slot_index:Services.Types.slot_index ->
+  Store.node_store ->
+  (Cryptobox.commitment, [`Not_found] tzresult) result Lwt.t
