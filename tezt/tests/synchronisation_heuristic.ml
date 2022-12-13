@@ -373,7 +373,7 @@ let test_threshold_stuck =
   let* baker = Baker.init ~protocol node client in
 
   Log.info "Bake a few blocks and kill baker" ;
-  let* (_ : int) = Node.wait_for_level node (Node.get_level node + 3) in
+  let* (level : int) = Node.wait_for_level node (Node.get_level node + 3) in
   let* () = Baker.terminate baker in
 
   Log.info "Add two additional peers" ;
@@ -392,10 +392,15 @@ let test_threshold_stuck =
       ()
   in
 
+  Log.info "Delay until sync_latency has expired" ;
+  let* () = Lwt_unix.sleep (float_of_int (2 * sync_latency)) in
+
+  Log.info "Connect nodes." ;
   let* () = connect_clique client [node; node1; node2] in
 
-  Log.info "Delay until until sync_latency has expired" ;
-  let* () = Lwt_unix.sleep (float_of_int (2 * sync_latency)) in
+  Log.info "Wait for nodes 1 and 2 to catch up." ;
+  let* _lvl1 = Node.wait_for_level node1 level
+  and* _lvl2 = Node.wait_for_level node2 level in
 
   Log.info "Check that additional peers are bootstrapped and stuck" ;
   let* () = check_sync_state client1 Stuck in
