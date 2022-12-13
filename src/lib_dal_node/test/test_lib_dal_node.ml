@@ -63,6 +63,32 @@ let with_store f =
   in
   f dal parameters store
 
+let test_read_fail () =
+  with_store @@ fun dal parameters store ->
+  let open Lwt_result_syntax in
+  let share_size = Cryptobox.encoded_share_size dal in
+  let commitment, _ =
+    shards_from_bytes dal (Bytes.make parameters.slot_size 'a')
+  in
+  let*! failed_shards = Shard_store.read_shards ~share_size store commitment in
+  let () =
+    match failed_shards with
+    | Error [Shard_store.Resource_not_found s]
+      when s = Cryptobox.Commitment.to_b58check commitment ->
+        ()
+    | _ -> assert false
+  in
+  let*! failed_shard = Shard_store.read_shard ~share_size store commitment 0 in
+  let () =
+    match failed_shard with
+    | Error [Shard_store.Resource_not_found s]
+      when s = Filename.concat (Cryptobox.Commitment.to_b58check commitment) "0"
+      ->
+        ()
+    | _ -> assert false
+  in
+  return_unit
+
 let test_rw () =
   with_store @@ fun dal parameters store ->
   let open Lwt_result_syntax in
@@ -84,6 +110,11 @@ let test_rw () =
     = Cryptobox.IntMap.bindings shards) ;
   return_unit
 
-let tests_store = ("Test Store", [Tztest.tztest "Read/write" `Quick test_rw])
+let tests_store =
+  ( "Test Store",
+    [
+      Tztest.tztest "Read/write" `Quick test_rw;
+      Tztest.tztest "Read unknown shard/commitement" `Quick test_read_fail;
+    ] )
 
 let () = Alcotest_lwt.run "Shard_store" [tests_store] |> Lwt_main.run

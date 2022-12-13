@@ -23,6 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Resource_not_found of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.resource_not_found"
+    ~title:"Resource not found"
+    ~description:"Resource not found at the given path"
+    ~pp:(fun ppf s ->
+      Format.fprintf ppf "Resource not found at the given path: %s" s)
+    Data_encoding.(obj1 (req "path" string))
+    (function Resource_not_found s -> Some s | _ -> None)
+    (fun s -> Resource_not_found s)
+
 module Mutexes = struct
   type mutex = Lwt_idle_waiter.t
 
@@ -108,9 +122,9 @@ let write_shards store commitment shards =
            in
            Lwt.return @@ Result.bind_error r Lwt_utils_unix.tzfail_of_io_error)
 
-let read_share_from_disk store ~share_size filepath =
+let read_share_from_disk ~commitment ~name store ~share_size filepath =
   let open Lwt_result_syntax in
-  let* share =
+  let*! share =
     with_mutex store filepath @@ fun mutex ->
     catch_es @@ fun () ->
     let*! share =
@@ -122,14 +136,30 @@ let read_share_from_disk store ~share_size filepath =
     in
     Lwt.return @@ Result.bind_error share Lwt_utils_unix.tzfail_of_io_error
   in
-  Lwt.return @@ share_of_bytes share
+  match share with
+  | Ok share -> Lwt.return @@ share_of_bytes share
+  | Error [Lwt_utils_unix.Io_error e] when e.action = `Open ->
+      fail
+        [
+          Resource_not_found
+            (Filename.concat (Cryptobox.Commitment.to_b58check commitment) name);
+        ]
+  | Error e -> fail e
 
 let read_shards ~share_size store commitment =
   let open Lwt_result_syntax in
   let dir = commitment_dir store commitment in
   let file_stream = Lwt_unix.files_of_directory dir in
   let rec read acc =
-    let*! elt = Lwt_stream.get file_stream in
+    let*! elt = catch_s @@ fun () -> Lwt_stream.get file_stream in
+    let* elt =
+      match elt with
+      | Ok r -> return r
+      | Error [Exn (Unix.Unix_error (_, "opendir", _))] ->
+          fail
+            [Resource_not_found (Cryptobox.Commitment.to_b58check commitment)]
+      | Error e -> fail e
+    in
     match elt with
     | None -> return acc
     | Some "." | Some ".." -> read acc
@@ -138,7 +168,14 @@ let read_shards ~share_size store commitment =
            handle error cases for [int_of_string] *)
         let shard_index = int_of_string shard_file in
         let filepath = Filename.concat dir shard_file in
-        let* share = read_share_from_disk store ~share_size filepath in
+        let* share =
+          read_share_from_disk
+            ~commitment
+            ~name:shard_file
+            store
+            ~share_size
+            filepath
+        in
         read (Cryptobox.IntMap.add shard_index share acc)
   in
   read Cryptobox.IntMap.empty
@@ -148,14 +185,20 @@ let read_shards_subset ~share_size store commitment shards =
   let dir = commitment_dir store commitment in
   List.map_es
     (fun index ->
-      let filepath = Filename.concat dir (string_of_int index) in
-      let* share = read_share_from_disk store ~share_size filepath in
+      let name = string_of_int index in
+      let filepath = Filename.concat dir name in
+      let* share =
+        read_share_from_disk store ~commitment ~name ~share_size filepath
+      in
       return Cryptobox.{index; share})
     shards
 
 let read_shard ~share_size store commitment shard_index =
   let open Lwt_result_syntax in
   let dir = commitment_dir store commitment in
-  let filepath = Filename.concat dir (string_of_int shard_index) in
-  let* share = read_share_from_disk store ~share_size filepath in
+  let name = string_of_int shard_index in
+  let filepath = Filename.concat dir name in
+  let* share =
+    read_share_from_disk ~commitment ~name store ~share_size filepath
+  in
   return Cryptobox.{index = shard_index; share}

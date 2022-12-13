@@ -31,6 +31,8 @@
     representation of the share. *)
 type t
 
+type error += Resource_not_found of string
+
 val get_data_dir : t -> string
 
 (** [init ~max_mutexes data_dir] initiates a shard storage at [path]. [max_mutexes]
