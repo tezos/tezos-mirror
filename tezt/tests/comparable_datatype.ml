@@ -310,7 +310,7 @@ let register ~protocols =
       Protocol.register_test
         ~__FILE__
         ~title
-        ~tags:["client"; "michelson"]
+        ~tags:["client"; "michelson"; "typechecking"; "comparable"]
         (fun protocol ->
           let* client = Client.init_mockup ~protocol () in
           test_function client ())

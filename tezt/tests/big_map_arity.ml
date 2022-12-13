@@ -46,7 +46,7 @@ let test_big_map_arity =
   Protocol.register_test
     ~__FILE__
     ~title:"Test EMPTY_BIG_MAP arity error"
-    ~tags:["client"; "michelson"]
+    ~tags:["client"; "michelson"; "typechecking"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let process =
