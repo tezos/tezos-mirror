@@ -179,7 +179,7 @@ module Make (PVM : Pvm.S) = struct
     let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
     let already_finalized =
       match last_finalized with
-      | Some Layer1.{level = finalized_level; _} -> level <= finalized_level
+      | Some finalized -> level <= Raw_level.to_int32 finalized.header.level
       | None -> false
     in
     unless (already_finalized || before_origination node_ctxt block)
@@ -190,7 +190,7 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let*! () = State.mark_finalized_head node_ctxt.store block in
+    let*! () = State.mark_finalized_head node_ctxt.store hash in
     return_unit
 
   let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
