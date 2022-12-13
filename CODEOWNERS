@@ -42,6 +42,9 @@
 /src/proto_*/lib_protocol/sc_rollup_inbox*         @vch9 @sribaroud
 /src/proto_*/lib_protocol/sc_rollup_refutation*    @vch9 @sribaroud
 
+/src/lib_webassembly         @lthms @ole.kruger @picdc
+/src/lib_scoru_wasm          @lthms @ole.kruger @picdc
+
 /scripts                     @romain.nl
 
 /tests_python                @arvidnl
