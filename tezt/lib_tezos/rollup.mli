@@ -295,6 +295,8 @@ module Dal : sig
 
     type commitment = string
 
+    type profile = Attestor of string
+
     (** Call RPC "POST /slots" to store a slot and retrun the commitment in case
        of success. *)
     val post_slot : slot -> (Dal_node.t, commitment) RPC_core.t
@@ -322,6 +324,10 @@ module Dal : sig
         the commitment associated to the given level and index. *)
     val get_level_index_commitment :
       slot_level:int -> slot_index:int -> (Dal_node.t, commitment) RPC_core.t
+
+    (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
+         the DAL node. *)
+    val patch_profile : profile -> (Dal_node.t, unit) RPC_core.t
   end
 
   val make :

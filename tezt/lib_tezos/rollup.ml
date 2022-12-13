@@ -673,6 +673,8 @@ module Dal = struct
 
     type commitment = string
 
+    type profile = Attestor of string
+
     let as_empty_object_or_fail t =
       match JSON.as_object t with
       | [] -> ()
@@ -716,6 +718,14 @@ module Dal = struct
           "commitment";
         ]
         JSON.as_string
+
+    let json_of_profile = function
+      | Attestor pkh ->
+          `O [("kind", `String "attestor"); ("public_key_hash", `String pkh)]
+
+    let patch_profile profile =
+      let data = json_of_profile profile in
+      make ~data PATCH ["profiles"] as_empty_object_or_fail
   end
 
   let make
