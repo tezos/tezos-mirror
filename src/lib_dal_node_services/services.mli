@@ -158,3 +158,13 @@ val patch_profile :
   ; params : unit
   ; query : unit >
   service
+
+(** Return the list of current profiles tracked by the DAL node *)
+val get_profiles :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.profile list
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service

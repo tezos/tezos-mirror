@@ -193,3 +193,17 @@ let patch_profile :
     ~input:Types.profile_encoding
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "profiles")
+
+let get_profiles :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.profile list
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"Return the list of current profiles tracked by the DAL node"
+    ~query:Tezos_rpc.Query.empty
+    ~output:(Data_encoding.list Types.profile_encoding)
+    Tezos_rpc.Path.(open_root / "profiles")
