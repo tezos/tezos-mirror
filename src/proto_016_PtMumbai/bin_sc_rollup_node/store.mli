@@ -102,11 +102,22 @@ module Last_stored_commitment_level :
 (** Storage mapping commitment hashes to the level when they were published by
     the rollup node. It only contains hashes of commitments published by this
     rollup node. *)
-module Commitments_published_at_level :
-  Store_sigs.Map
-    with type key := Sc_rollup.Commitment.Hash.t
-     and type value := Raw_level.t
-     and type 'a store := 'a store
+module Commitments_published_at_level : sig
+  type element = {
+    first_published_at_level : Raw_level.t;
+        (** The level at which this commitment was first published. *)
+    published_at_level : Raw_level.t option;
+        (** The level at which we published this commitment. If
+            [first_published_at_level <> published_at_level] it means that the
+            commitment is republished. *)
+  }
+
+  include
+    Store_sigs.Map
+      with type key := Sc_rollup.Commitment.Hash.t
+       and type value := element
+       and type 'a store := 'a store
+end
 
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
