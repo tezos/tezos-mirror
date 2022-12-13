@@ -146,3 +146,13 @@ val get_commitment_by_published_level_and_index :
   ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >
   service
+
+(** Update the list of profiles tracked by the DAL node *)
+val patch_profile :
+  < meth : [`PATCH]
+  ; input : Types.profile
+  ; output : unit
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service

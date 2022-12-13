@@ -175,3 +175,18 @@ let get_commitment_by_published_level_and_index :
     Tezos_rpc.Path.(
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slot_indices"
       /: Tezos_rpc.Arg.int / "commitment")
+
+let patch_profile :
+    < meth : [`PATCH]
+    ; input : Types.profile
+    ; output : unit
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.patch_service
+    ~description:"Update the list of profiles tracked by the DAL node"
+    ~query:Tezos_rpc.Query.empty
+    ~input:Types.profile_encoding
+    ~output:Data_encoding.unit
+    Tezos_rpc.Path.(open_root / "profiles")
