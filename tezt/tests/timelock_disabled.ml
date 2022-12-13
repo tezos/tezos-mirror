@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Client commands
-   Invocation:   dune exec tezt/tests/main.exe -- --file timelock.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file timelock_disabled.ml
    Subject:      Tests checking contracts with timelock cannot be originated
 *)
 
