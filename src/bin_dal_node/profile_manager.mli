@@ -29,3 +29,7 @@
     the store does not change. *)
 val add_profile :
   Store.node_store -> Services.Types.profile -> unit tzresult Lwt.t
+
+(** [get_profiles node_store] returns the list of profiles that the node tracks *)
+val get_profiles :
+  Store.node_store -> Services.Types.profile list tzresult Lwt.t

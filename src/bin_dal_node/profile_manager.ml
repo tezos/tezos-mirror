@@ -27,3 +27,8 @@ let add_profile node_store profile =
   let open Lwt_result_syntax in
   let*! () = Store.Legacy.add_profile node_store profile in
   return_unit
+
+let get_profiles node_store =
+  let open Lwt_result_syntax in
+  let*! profiles = Store.Legacy.get_profiles node_store in
+  return profiles
