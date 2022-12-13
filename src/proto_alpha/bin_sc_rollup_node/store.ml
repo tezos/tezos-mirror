@@ -163,23 +163,41 @@ module Last_stored_commitment_level =
       let encoding = Raw_level.encoding
     end)
 
-module Commitments_published_at_level =
-  Make_updatable_map
-    (struct
-      let path = ["commitments"; "published_at_level"]
-    end)
-    (struct
-      type key = Sc_rollup.Commitment.Hash.t
+module Commitments_published_at_level = struct
+  type element = {
+    first_published_at_level : Raw_level.t;
+    published_at_level : Raw_level.t;
+  }
 
-      let to_path_representation = Sc_rollup.Commitment.Hash.to_b58check
-    end)
-    (struct
-      type value = Raw_level.t
+  let element_encoding =
+    let open Data_encoding in
+    conv
+      (fun {first_published_at_level; published_at_level} ->
+        (first_published_at_level, published_at_level))
+      (fun (first_published_at_level, published_at_level) ->
+        {first_published_at_level; published_at_level})
+    @@ obj2
+         (req "first_published_at_level" Raw_level.encoding)
+         (req "published_at_level" Raw_level.encoding)
 
-      let name = "raw_level"
+  include
+    Make_updatable_map
+      (struct
+        let path = ["commitments"; "published_at_level"]
+      end)
+      (struct
+        type key = Sc_rollup.Commitment.Hash.t
 
-      let encoding = Raw_level.encoding
-    end)
+        let to_path_representation = Sc_rollup.Commitment.Hash.to_b58check
+      end)
+      (struct
+        type value = element
+
+        let name = "published_levels"
+
+        let encoding = element_encoding
+      end)
+end
 
 (* Published slot headers per block hash,
    stored as a list of bindings from `Dal_slot_index.t`

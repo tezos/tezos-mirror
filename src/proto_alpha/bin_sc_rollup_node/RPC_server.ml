@@ -376,10 +376,10 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
       let commitment_hash =
         Sc_rollup_block.most_recent_commitment head.header
       in
-      let*! commitment =
-        Store.Commitments.get node_ctxt.store commitment_hash
+      let* commitment =
+        Store.Commitments.find node_ctxt.store commitment_hash
       in
-      return (commitment, commitment_hash, None)
+      return (commitment, commitment_hash)
     in
     return res
 
@@ -396,10 +396,16 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
       (* The corresponding level in Store.Commitments.published_at_level is
          available only when the commitment has been published and included
          in a block. *)
-      let*! published_at_level =
+      let*! published_at_level_info =
         Store.Commitments_published_at_level.find node_ctxt.store hash
       in
-      return (commitment, hash, published_at_level)
+      let first_published, published =
+        match published_at_level_info with
+        | None -> (None, None)
+        | Some {first_published_at_level; published_at_level} ->
+            (Some first_published_at_level, Some published_at_level)
+      in
+      return (commitment, hash, first_published, published)
     in
     return result
 
@@ -564,7 +570,8 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                               (* Commitment not published yet *)
                               return
                                 (Sc_rollup_services.Included (info, inbox_info))
-                          | Some published_at ->
+                          | Some {first_published_at_level; published_at_level}
+                            ->
                               (* Commitment published *)
                               let*! commitment =
                                 Store.Commitments.get
@@ -573,7 +580,12 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                               in
                               let commitment_info =
                                 Sc_rollup_services.
-                                  {commitment; commitment_hash; published_at}
+                                  {
+                                    commitment;
+                                    commitment_hash;
+                                    first_published_at_level;
+                                    published_at_level;
+                                  }
                               in
                               return
                                 (Sc_rollup_services.Committed

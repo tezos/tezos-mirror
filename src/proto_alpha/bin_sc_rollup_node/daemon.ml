@@ -55,8 +55,12 @@ module Make (PVM : Pvm.S) = struct
           Store.Commitments_published_at_level.add
             node_ctxt.store
             commitment_hash
-            published_at_level
+            {
+              first_published_at_level = published_at_level;
+              published_at_level = Raw_level.of_int32_exn head.Layer1.level;
+            }
         in
+
         return_unit
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
@@ -92,7 +96,7 @@ module Make (PVM : Pvm.S) = struct
         let*! () =
           Store.Dal_slots_headers.add
             node_ctxt.store
-            ~primary_key:head
+            ~primary_key:head.Layer1.hash
             ~secondary_key:slot_header.id.index
             slot_header
         in
@@ -147,14 +151,15 @@ module Make (PVM : Pvm.S) = struct
           (* No action for non successful operations  *)
           return_unit
 
-  let process_l1_block_operations ~finalized node_ctxt Layer1.{hash; _} =
+  let process_l1_block_operations ~finalized node_ctxt
+      (Layer1.{hash; _} as head) =
     let open Lwt_result_syntax in
     let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
         result =
       let open Lwt_result_syntax in
       let* () = accu in
-      process_l1_operation ~finalized node_ctxt hash ~source operation result
+      process_l1_operation ~finalized node_ctxt head ~source operation result
     in
     let apply_internal (type kind) accu ~source:_
         (_operation : kind Apply_internal_results.internal_operation)

@@ -258,12 +258,12 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
 
   let earliest_cementing_level node_ctxt commitment_hash =
     let open Lwt_option_syntax in
-    let+ published_at_level =
+    let+ {first_published_at_level; _} =
       Store.Commitments_published_at_level.find
         node_ctxt.Node_context.store
         commitment_hash
     in
-    add_level published_at_level (sc_rollup_challenge_window node_ctxt)
+    add_level first_published_at_level (sc_rollup_challenge_window node_ctxt)
 
   let can_be_cemented node_ctxt earliest_cementing_level head_level
       commitment_hash =
