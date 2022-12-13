@@ -172,10 +172,81 @@ let test_host_fun () =
   assert (result = Values.[Num (I32 5l)]) ;
   Lwt.return @@ Result.return_unit
 
+let write_outside_bounds_doesnt_dequeue_gen info_addr input_addr input_max_bytes
+    =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let message =
+    {
+      Input_buffer.raw_level = 0l;
+      message_counter = Z.of_int 0;
+      payload = Bytes.of_string "hello";
+    }
+  in
+  let* () = Input_buffer.enqueue input_buffer message in
+  let input_buffer_size = Input_buffer.num_elements input_buffer in
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~memory
+      ~info_addr
+      ~dst:input_addr
+      ~max_bytes:input_max_bytes
+  in
+  assert (result = Host_funcs.Error.code Memory_invalid_access) ;
+  assert (Input_buffer.num_elements input_buffer = input_buffer_size) ;
+  let* dequeued_message = Input_buffer.dequeue input_buffer in
+  assert (message = dequeued_message) ;
+  return_ok_unit
+
+let test_write_input_info_invalid_address () =
+  (* The memory is allocated with only one page, this address would be on the
+     second page. *)
+  let address = Int64.(to_int32 (add Memory.page_size 100L)) in
+  write_outside_bounds_doesnt_dequeue_gen address 0l 100l
+
+let test_write_input_info_beyond_memory_bounds () =
+  (* The memory is allocated with only one page, this address would be the exact
+     one at the end of this page. The input would be written on the second page
+     too. *)
+  let address = Int64.(to_int32 (sub Memory.page_size 1L)) in
+  write_outside_bounds_doesnt_dequeue_gen address 0l 100l
+
+let test_write_input_invalid_address () =
+  (* The memory is allocated with only one page, this address would be on the
+     second page. *)
+  let address = Int64.(to_int32 (add Memory.page_size 100L)) in
+  write_outside_bounds_doesnt_dequeue_gen 0l address 100l
+
+let test_write_input_beyond_memory_bounds () =
+  (* The memory is allocated with only one page, this address would be at the
+     end of this page. *)
+  let address = Int64.(to_int32 (sub Memory.page_size 1L)) in
+  let length = 100l in
+  write_outside_bounds_doesnt_dequeue_gen 0l address length
+
 let tests =
   [
     tztest "Write input" `Quick write_input;
     tztest "Read input" `Quick read_input;
     tztest "Read input no messages" `Quick read_input_no_messages;
     tztest "Host read input" `Quick test_host_fun;
+    tztest
+      "Write input info at invalid address doesn't dequeue the input"
+      `Quick
+      test_write_input_info_invalid_address;
+    tztest
+      "Write input info beyond memory bounds doesn't dequeue the input"
+      `Quick
+      test_write_input_info_beyond_memory_bounds;
+    tztest
+      "Write input at invalid address doesn't dequeue the input"
+      `Quick
+      test_write_input_invalid_address;
+    tztest
+      "Write input beyond memory bounds doesn't dequeue the input"
+      `Quick
+      test_write_input_beyond_memory_bounds;
   ]
