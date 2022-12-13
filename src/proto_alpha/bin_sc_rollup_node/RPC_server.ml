@@ -39,7 +39,7 @@ let get_finalized store =
   let*! head = State.get_finalized_head_opt store in
   match head with
   | None -> failwith "No finalized head"
-  | Some {hash; _} -> return hash
+  | Some {header = {block_hash; _}; _} -> return block_hash
 
 let get_last_cemented (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
@@ -496,8 +496,8 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let finalized =
       match finalized_head with
       | None -> false
-      | Some {level = finalized_level; _} ->
-          Compare.Int32.(inbox_level <= finalized_level)
+      | Some {header = {level = finalized_level; _}; _} ->
+          Compare.Int32.(inbox_level <= Raw_level.to_int32 finalized_level)
     in
     let cemented =
       Compare.Int32.(inbox_level <= Raw_level.to_int32 node_ctxt.lcc.level)
