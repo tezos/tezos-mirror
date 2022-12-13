@@ -239,6 +239,39 @@ module Pvm_state_generator = struct
         tree
     in
     Lwt.return (dummy_context, output, tree)
+
+  let select_output ~output_buffer ~nb_output_buffer_levels ~output_buffer_size
+      rng_state =
+    let open Lwt_result_syntax in
+    let open Base_samplers in
+    (* Pick a level. *)
+    let outbox_level =
+      Int32.of_int
+      @@ sample_in_interval
+           ~range:(0 -- (nb_output_buffer_levels - 1))
+           rng_state
+    in
+    (* Pick a message. *)
+    let message_index =
+      Z.of_int
+      @@ sample_in_interval ~range:(0 -- (output_buffer_size - 1)) rng_state
+    in
+    let*! bytes_output_message =
+      Tezos_webassembly_interpreter.Output_buffer.get_message
+        output_buffer
+        {outbox_level; message_index}
+    in
+    let message =
+      Data_encoding.Binary.of_bytes_exn
+        Sc_rollup_outbox_message_repr.encoding
+        bytes_output_message
+    in
+    let*? outbox_level =
+      Environment.wrap_tzresult @@ Raw_level_repr.of_int32 outbox_level
+    in
+    (* Produce an output proof for the picked message, and return the proof
+       and its length. *)
+    return Sc_rollup_PVM_sig.{outbox_level; message_index; message}
 end
 
 (** This benchmark estimates the cost of verifying an output proof for the
@@ -402,7 +435,7 @@ module Sc_rollup_verify_output_proof_benchmark = struct
       let open Lwt_result_syntax in
       (* Build [pvm_state] and save it to be used for all benchmarks. The state
          is large enough for each benchmark to be relatively random. *)
-      let*! context, output, initial_tree =
+      let*! context, output_buffer, initial_tree =
         match !pvm_state with
         | None ->
             let res =
@@ -420,35 +453,15 @@ module Sc_rollup_verify_output_proof_benchmark = struct
             res
         | Some pvm_state -> pvm_state
       in
-      let open Base_samplers in
-      (* Pick a level. *)
-      let outbox_level =
-        Int32.of_int
-        @@ sample_in_interval
-             ~range:(0 -- (nb_output_buffer_levels - 1))
-             rng_state
+      (* Select an output. *)
+      let* output =
+        select_output
+          ~output_buffer
+          ~nb_output_buffer_levels
+          ~output_buffer_size
+          rng_state
       in
-      (* Pick a message. *)
-      let message_index =
-        Z.of_int
-        @@ sample_in_interval ~range:(0 -- (output_buffer_size - 1)) rng_state
-      in
-      let*! bytes_output_message =
-        Tezos_webassembly_interpreter.Output_buffer.get_message
-          output
-          {outbox_level; message_index}
-      in
-      let message =
-        Data_encoding.Binary.of_bytes_exn
-          Sc_rollup_outbox_message_repr.encoding
-          bytes_output_message
-      in
-      let*? outbox_level =
-        Environment.wrap_tzresult @@ Raw_level_repr.of_int32 outbox_level
-      in
-      (* Produce an output proof for the picked message, and return the proof
-         and its length. *)
-      let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
+      (* produce an output proof, and also return the length of its encoding.*)
       let*! pf = Full_Wasm.produce_output_proof context initial_tree output in
       match pf with
       | Ok proof ->
@@ -566,14 +579,13 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
 
   let benchmark rng_state conf () =
     let prepared_benchmark_scenario =
-      let open Base_samplers in
       let nb_output_buffer_levels = conf.nb_output_buffer_levels in
       let output_buffer_size = conf.output_buffer_size in
       let tree_depth = conf.tree_depth in
       let open Lwt_result_syntax in
       (* Build [pvm_state] and save it to be used for all benchmarks. The state
          is large enough for each benchmark to be relatively random. *)
-      let*! context, output, initial_tree =
+      let*! context, output_buffer, initial_tree =
         match !pvm_state with
         | Some pvm_state -> pvm_state
         | None ->
@@ -591,34 +603,16 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
             pvm_state := Some res ;
             res
       in
-      (* Pick a level. *)
-      let outbox_level =
-        Int32.of_int
-        @@ sample_in_interval
-             ~range:(0 -- (nb_output_buffer_levels - 1))
-             rng_state
+      (* Select an output. *)
+      let* output =
+        select_output
+          ~output_buffer
+          ~nb_output_buffer_levels
+          ~output_buffer_size
+          rng_state
       in
-      (* Pick a message. *)
-      let message_index =
-        Z.of_int
-        @@ sample_in_interval ~range:(0 -- (output_buffer_size - 1)) rng_state
-      in
-      let*! bytes_output_message =
-        Tezos_webassembly_interpreter.Output_buffer.get_message
-          output
-          {outbox_level; message_index}
-      in
-      let message =
-        Data_encoding.Binary.of_bytes_exn
-          Sc_rollup_outbox_message_repr.encoding
-          bytes_output_message
-      in
-      let*? outbox_level =
-        Environment.wrap_tzresult @@ Raw_level_repr.of_int32 outbox_level
-      in
-      (* Produce an output proof for the picked message, and return the encoded
-         proof and its length. *)
-      let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
+      (* Produce an output proof, and return its encoding and the length of the
+         encoding. *)
       let*! pf = Full_Wasm.produce_output_proof context initial_tree output in
       match pf with
       | Ok proof ->
