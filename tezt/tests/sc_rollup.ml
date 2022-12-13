@@ -1400,17 +1400,17 @@ let mode_publish mode publishes _protocol sc_rollup_node sc_rollup_client
       (if publishes then " have" else " never do so") ;
   unit
 
-let commitment_not_stored_if_non_final _protocol sc_rollup_node sc_rollup_client
-    sc_rollup _node client =
+let commitment_not_published_if_non_final _protocol sc_rollup_node
+    sc_rollup_client sc_rollup _node client =
   (* The rollup is originated at level `init_level`, and it requires
      `sc_rollup_commitment_period_in_blocks` levels to store a commitment.
-     There is also a delay of `block_finality_time` before storing a
+     There is also a delay of `block_finality_time` before publishing a
      commitment, to avoid including wrong commitments due to chain
-     reorganisations. Therefore the commitment will be stored and published
+     reorganisations. Therefore the commitment will be published
      when the [Commitment] module processes the block at level
      `init_level + sc_rollup_commitment_period_in_blocks +
-     levels_to_finalise`. At the level before, the commitment will not be
-     neither stored nor published.
+     levels_to_finalise`. At the level before, the commitment will be
+     neither stored but not published.
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -1449,7 +1449,7 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node sc_rollup_client
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
   let stored_inbox_level = Option.map inbox_level commitment in
-  Check.(stored_inbox_level = None)
+  Check.(stored_inbox_level = Some store_commitment_level)
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
@@ -4003,7 +4003,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_commitment_scenario
     ~variant:"non_final_level"
-    commitment_not_stored_if_non_final
+    commitment_not_published_if_non_final
     protocols
     ~kind ;
   test_commitment_scenario
