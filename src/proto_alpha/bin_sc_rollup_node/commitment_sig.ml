@@ -54,24 +54,10 @@ module type S = sig
     Context.rw ->
     Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t option tzresult Lwt.t
 
-  (** [publish_commitment node_ctxt] publishes the earliest commitment
-      stored in [store] that has not been published yet, unless its inbox level
-      is below or equal to the inbox level of the last cemented commitment in
-      the layer1 chain. In this case, the rollup node checks whether it has
-      computed a commitment whose inbox level is
-      [sc_rollup_commitment_period] levels after the inbox level of the last
-      cemented commitment:
-      {ul
-      {li if the commitment is found and its predecessor hash coincides with
-       the hash of the LCC, the rollup node will try to publish that commitment
-      instead; }
-      {li if the commitment is found but its predecessor hash differs from the
-        hash of the LCC, the rollup node will stop its execution;}
-      {li if no commitment is found, no action is taken by the rollup node;
-        in particular, no commitment is published.}
-    }
-  *)
-  val publish_commitment : Node_context.rw -> unit tzresult Lwt.t
+  (** [publish_commitments node_ctxt] publishes the commitments that were not
+      yet published up to the finalized head and which are after the last
+      cemented commitment. *)
+  val publish_commitments : _ Node_context.t -> unit tzresult Lwt.t
 
   (** [cement_commitment_if_possible node_ctxt head] checks whether the next
       commitment to be cemented (i.e. whose inbox level is
