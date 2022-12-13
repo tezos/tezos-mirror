@@ -1858,11 +1858,8 @@ let register ~protocols =
   scenario_with_layer1_node
     "slots attestation operation dal committee membership check"
     test_slots_attestation_operation_dal_committee_membership_check
-    (* We need to disable precheck and set the prevalidator's event level to `Debug
-       in order to check the [Dal_data_availibility_attestor_not_in_committee] error in the test. *)
-    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4444
-       Enable precheck once we move DAL committee check to [validate_attestation]. *)
-    ~node_arguments:[Disable_operations_precheck]
+    (* We need to set the prevalidator's event level to [`Debug]
+       in order to capture the errors thrown in the validation phase. *)
     ~event_sections_levels:[("prevalidator", `Debug)]
     protocols ;
   scenario_with_layer1_node
