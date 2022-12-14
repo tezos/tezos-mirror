@@ -41,11 +41,13 @@ parameter string;
 
 let script_hash = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
 
+let tags = ["client"; "michelson"; "typechecking"]
+
 let test_bad_indentation_ill_typed =
   Protocol.register_test
     ~__FILE__
     ~title:"Bad indentation contract is ill-typed"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let process =
@@ -57,7 +59,7 @@ let test_bad_indentation_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"Bad indentation contract hash is expected"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* received = Client.hash_script ~script:badly_indented_script client in
@@ -73,7 +75,7 @@ let test_formatted_typechecks =
   Protocol.register_test
     ~__FILE__
     ~title:"Formatted bad indentation contract is well-typed"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* formatted_script =
@@ -90,7 +92,7 @@ let test_formatted_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"Formatted bad indentation contract hash is expected"
-    ~tags:["client"; "michelson"]
+    ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* formatted_script =

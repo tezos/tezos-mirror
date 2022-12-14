@@ -27,7 +27,7 @@
 (* Testing
    -------
    Components: Michelson
-   Invocation: dune exec tezt/tests/main.exe -- --file contract_typecheck.ml
+   Invocation: dune exec tezt/tests/main.exe -- --file contract_typecheck_regression.ml
    Subject: Regression testing of Michelson typechecking
 *)
 
