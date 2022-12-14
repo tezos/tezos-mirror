@@ -59,6 +59,6 @@ val add_tickless_datum : string -> Measure.time -> benchmark -> benchmark
 val add_final_info : Measure.time -> Z.t -> benchmark -> benchmark
 
 module Csv : sig
-  (** Output benchmark data in CSV format *)
-  val print_benchmark : benchmark -> unit
+  (** [print_benchmark filename benchmark] Output benchmark data in CSV format *)
+  val pp_benchmark : out_channel -> benchmark -> unit
 end

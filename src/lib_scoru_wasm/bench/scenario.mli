@@ -59,9 +59,15 @@ val exec_on_message : string -> Wasm.tree action
       - adding the message in the inbox  *)
 val exec_on_message_from_file : string -> Wasm.tree action
 
-(** Execute a list of scenario with options:
+(** [run_scenarios filename benches] Execute a list of scenario with options:
       - verbose: print info during execution
       - totals: adds summary data point for each step
-      - irmin: adds data point for decoding / encoding the state *)
+      - irmin: adds data point for decoding / encoding the state
+      and output the result in a csv format in a file with the provided name *)
 val run_scenarios :
-  ?verbose:bool -> ?totals:bool -> ?irmin:bool -> scenario list -> unit Lwt.t
+  ?verbose:bool ->
+  ?totals:bool ->
+  ?irmin:bool ->
+  string ->
+  scenario list ->
+  unit Lwt.t
