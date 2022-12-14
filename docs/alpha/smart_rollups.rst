@@ -334,8 +334,8 @@ the Octez client:
     octez-client originate sc rollup from "${OPERATOR_ADDR}" \
       of kind wasm_2_0_0 \
       of type bytes \
-      booting with "${KERNEL}" \
-      -burn-cap 999
+      with kernel "${KERNEL}" \
+      --burn-cap 999
 
 where ``${KERNEL}`` is a hex representation of a WebAssembly
 bytecode serving as an initial program to boot on. From a
@@ -418,7 +418,7 @@ This creates a configuration file:
 
 ::
 
-   Smart-contract rollup node configuration written in {ROLLUP_NODE_DIR}/config.json
+   Smart-contract rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
 
 Here is the content of the file:
 
