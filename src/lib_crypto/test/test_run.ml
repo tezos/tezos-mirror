@@ -24,11 +24,9 @@ runtest
     (module Test_blake2b);
     (module Test_crypto_box);
     (module Test_deterministic_nonce);
-    (module Test_ed25519);
     (module Test_merkle);
-    (module Test_p256);
     (module Test_signature);
+    (module Test_signature_encodings);
     (module Test_timelock);
     (module Test_context_hash);
-    (module Test_bls12_381);
   ]
