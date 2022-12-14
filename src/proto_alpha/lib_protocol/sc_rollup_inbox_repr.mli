@@ -145,12 +145,12 @@ module V1 : sig
     On the other hand, we think of this type as representing a single
     proof-step back through the history of the inbox; given a hash that
     appears at some point later in the inbox this type proves that that
-    hash points to this particular combination of a level tree and
-    further back-pointers.
+    hash points to this particular combination of a witness and further
+    back-pointers.
 
     In terms of size, this type is a small set of hashes; one for the
-    current level tree and `O(log2(ix))` in the back-pointers, where
-    [ix] is the index of the cell in the skip list. That is, [ix] is the
+    current witness and `O(log2(ix))` in the back-pointers, where [ix]
+    is the index of the cell in the skip list. That is, [ix] is the
     number of non-empty levels between now and the origination level of
     the rollup.
   *)
@@ -201,7 +201,7 @@ module V1 : sig
   val equal_history_proof : history_proof -> history_proof -> bool
 
   (** [old_levels_messages inbox] returns the latest skip list cell of the inbox
-      history that is not up to change (i.e. not the current level tree). *)
+      history that is not up to change (i.e. not the current witness). *)
   val old_levels_messages : t -> history_proof
 
   (** [current_witness inbox] returns the current witness of the inbox, i.e. the
@@ -269,8 +269,8 @@ val take_snapshot : t -> history_proof
     >= L], an [inclusion_proof] guarantees that [A] is an older version of [B].
 
     To be more precise, an [inclusion_proof] guarantees that the previous levels
-    [level_tree]s of [A] are included in the previous levels [level_tree]s of
-    [B]. The current [level_tree] of [A] and [B] are not considered.
+    [witness]s of [A] are included in the previous levels [witness]s of [B]. The
+    current [witness] of [A] and [B] are not considered.
 
     The size of this proof is O(log2 (L' - L)). *)
 type inclusion_proof

@@ -273,12 +273,12 @@ type serialized_proof = string
 
 let serialized_proof_encoding = Data_encoding.(string Hex)
 
-type level_tree_proof = {
+type payloads_proof = {
   proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
   payload : Sc_rollup_inbox_message_repr.serialized option;
 }
 
-let level_tree_proof_encoding =
+let payloads_proof_encoding =
   let open Data_encoding in
   conv
     (fun {proof; payload} -> (proof, (payload :> string option)))
@@ -399,16 +399,13 @@ let pp_inclusion_proof fmt proof =
    and [message_proof] is a tree proof showing that
 
    [exists witness .
-   (hash_level_tree witness = history_proof.content.hash)
+   (hash witness = history_proof.content.hash)
    AND (get_messages_payload n witness = (_, message))]
 
    Note: in the case that [message] is [None] this shows that there's no
    value at the index [n]; in this case we also must check that
    [history_proof] equals [snapshot]. *)
-type proof = {
-  inclusion_proof : inclusion_proof;
-  message_proof : level_tree_proof;
-}
+type proof = {inclusion_proof : inclusion_proof; message_proof : payloads_proof}
 
 let pp_proof fmt {inclusion_proof; message_proof = _} =
   Format.fprintf
@@ -424,7 +421,7 @@ let proof_encoding =
     (fun (inclusion_proof, message_proof) -> {inclusion_proof; message_proof})
     (obj2
        (req "inclusion_proof" inclusion_proof_encoding)
-       (req "message_proof" level_tree_proof_encoding))
+       (req "message_proof" payloads_proof_encoding))
 
 let of_serialized_proof = Data_encoding.Binary.of_string_opt proof_encoding
 
@@ -560,7 +557,7 @@ let produce_payloads_proof get_paylooads_history head_cell_hash ~index =
   let head_cell_max_index =
     Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index head_cell
   in
-  (* if [index <= level_tree_max_index] then the index belongs to this level, we
+  (* if [index <= head_cell_max_index] then the index belongs to this level, we
      prove its existence. Else the index is out of bounds, we prove its
      non-existence. *)
   let target_index = Compare.Z.(min index head_cell_max_index) in

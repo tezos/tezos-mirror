@@ -224,7 +224,7 @@ module Protocol_inbox = struct
 
   let fill_inbox inbox payloads_per_levels =
     let open Result_syntax in
-    let* _level_tree_histories, _history, inbox =
+    let* _payloads_histories, _history, inbox =
       Sc_rollup_helpers.fill_inbox
         ~inbox
         (Inbox.History.empty ~capacity:0L)
@@ -247,7 +247,7 @@ module Protocol_inbox = struct
 
   let construct_inbox ~inbox_creation_level payloads_per_levels =
     let open Result_syntax in
-    let* _level_tree_histories, _history, inbox =
+    let* _payloads_histories, _history, inbox =
       Sc_rollup_helpers.construct_inbox
         ~inbox_creation_level
         ~with_histories:false
