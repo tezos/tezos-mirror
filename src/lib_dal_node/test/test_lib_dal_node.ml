@@ -89,6 +89,23 @@ let test_read_fail () =
   in
   return_unit
 
+let test_wrong_shard_size () =
+  with_store @@ fun dal parameters store ->
+  let open Lwt_result_syntax in
+  let commitment, shards =
+    shards_from_bytes dal (Bytes.make parameters.slot_size 'a')
+  in
+  let* () = Shard_store.write_shards store commitment shards in
+  let*! failed_shards =
+    Shard_store.read_shards ~share_size:22 store commitment
+  in
+  let () =
+    match failed_shards with
+    | Error [Tezos_base.Data_encoding_wrapper.Decoding_error _s] -> ()
+    | _ -> assert false
+  in
+  return_unit
+
 let test_rw () =
   with_store @@ fun dal parameters store ->
   let open Lwt_result_syntax in
@@ -115,6 +132,7 @@ let tests_store =
     [
       Tztest.tztest "Read/write" `Quick test_rw;
       Tztest.tztest "Read unknown shard/commitement" `Quick test_read_fail;
+      Tztest.tztest "Read wrong share size" `Quick test_wrong_shard_size;
     ] )
 
 let () = Alcotest_lwt.run "Shard_store" [tests_store] |> Lwt_main.run
