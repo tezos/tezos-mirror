@@ -108,7 +108,9 @@ module Legacy = struct
   end = struct
     type t = string list
 
-    let ( / ) b a = a :: b
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4457
+       Avoid the wasteful [List.append]s. *)
+    let ( / ) path suffix = path @ [suffix]
 
     let to_string ?prefix p =
       let s = String.concat "/" p in
