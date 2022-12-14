@@ -292,15 +292,12 @@ module Types (S : Ctypes.TYPE) = struct
   end)
 
   module Func_callback = struct
-    let t =
-      Foreign.funptr
-        ~runtime_lock:true
-          (* [runtime_lock=true] is required to unblock execution in other
-             threads. Without it, we would deadlock. The description of [funptr]
-             is a little confusing: it seems to suggest that it must be
-             [runtime_lock=false] to work - but that seems false in experiments.
-          *)
-        (ptr Val_vec.t @-> ptr Val_vec.t @-> returning (ptr Trap.t))
+    let fn = ptr Val_vec.t @-> ptr Val_vec.t @-> returning (ptr Trap.t)
+
+    let m =
+      Foreign.dynamic_funptr ~runtime_lock:true ~thread_registration:true fn
+
+    let t = static_funptr fn
   end
 
   (** [wasm_func_t] *)

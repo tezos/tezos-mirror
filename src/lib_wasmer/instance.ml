@@ -44,7 +44,11 @@ end)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
    Ensure that ownership and lifetime of [Types.Instance.t] is respected.
 *)
-type t = {module_ : Module.t; instance : Types.Instance.t Ctypes.ptr}
+type t = {
+  module_ : Module.t;
+  instance : Types.Instance.t Ctypes.ptr;
+  clean : unit -> unit;
+}
 
 exception
   Unsatisfied_import of {
@@ -63,13 +67,25 @@ let resolve_imports store modul resolver =
     | None -> raise (Unsatisfied_import {module_; name; kind})
     | Some m -> Extern.to_extern store m
   in
-
-  Module.imports modul |> Import_type_vector.to_array |> Array.map lookup
-  |> Extern_vector.from_array
+  let imports =
+    Module.imports modul |> Import_type_vector.to_array |> Array.map lookup
+  in
+  let externs = Extern_vector.from_array (Array.map fst imports) in
+  let clean =
+    Array.fold_left
+      (fun clean_all (_, clean) ->
+        () ;
+        fun x ->
+          clean_all x ;
+          clean x)
+      Fun.id
+      imports
+  in
+  (externs, clean)
 
 let create store module_ externs =
   let open Lwt.Syntax in
-  let externs_vec =
+  let externs_vec, clean =
     externs
     |> List.map (fun (module_, name, extern) ->
            ((module_, name, Extern.to_externkind extern), extern))
@@ -92,6 +108,8 @@ let create store module_ externs =
 
   check_null_ptr Error.(make_exception Instantiate_module) instance ;
 
-  {module_; instance}
+  {module_; instance; clean}
 
-let delete inst = Functions.Instance.delete inst.instance
+let delete inst =
+  Functions.Instance.delete inst.instance ;
+  inst.clean ()
