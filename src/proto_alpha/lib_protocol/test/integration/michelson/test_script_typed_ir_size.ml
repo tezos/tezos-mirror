@@ -281,12 +281,6 @@ let check_value_size () =
     *)
     @ exs nsample show_address Address_t ": address_t"
     (*
-       Tx_rollup_l2_address_t
-       ======================
-    *)
-    @ (let show = Indexable.pp Tx_rollup_l2_address.pp in
-       exs nsample show Tx_rollup_l2_address_t ": tx_rollup_l2_t")
-    (*
        Bool_t
        ======
     *)
@@ -639,6 +633,8 @@ let check_value_size () =
           - Chest_key_t ;
           - Chest_t ;
           - Lambda_t.
+          Missing because of language deprecation:
+          - Tx_rollup_l2_address_t.
     *)
     )
 

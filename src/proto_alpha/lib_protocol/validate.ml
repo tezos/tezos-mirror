@@ -2404,7 +2404,6 @@ module Manager = struct
       | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
           assert_tx_rollup_feature_enabled vi
       | Transfer_ticket {contents; ty; _} ->
-          let* () = assert_tx_rollup_feature_enabled vi in
           let* remaining_gas = consume_decoding_gas remaining_gas contents in
           let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
           return_unit

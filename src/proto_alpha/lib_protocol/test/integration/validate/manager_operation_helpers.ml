@@ -1642,12 +1642,13 @@ let revealed_subjects =
 let is_disabled flags = function
   | K_Transaction | K_Origination | K_Register_global_constant | K_Delegation
   | K_Undelegation | K_Self_delegation | K_Set_deposits_limit
-  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal ->
+  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal
+  | K_Transfer_ticket ->
       false
   | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_commit
   | K_Tx_rollup_return_bond | K_Tx_rollup_finalize
   | K_Tx_rollup_remove_commitment | K_Tx_rollup_dispatch_tickets
-  | K_Transfer_ticket | K_Tx_rollup_reject ->
+  | K_Tx_rollup_reject ->
       flags.toru = false
   | K_Sc_rollup_origination | K_Sc_rollup_publish | K_Sc_rollup_cement
   | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout
