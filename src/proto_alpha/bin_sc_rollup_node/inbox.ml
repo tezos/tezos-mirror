@@ -124,7 +124,7 @@ let get_messages Node_context.{l1_ctxt; _} head =
     match (operation, result) with
     | ( {
           operation = Transaction {destination = Sc_rollup rollup; parameters; _};
-          source = Originated sender;
+          source = Contract (Originated sender);
           _;
         },
         ITransaction_result (Transaction_to_sc_rollup_result _) ) ->

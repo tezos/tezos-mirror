@@ -72,14 +72,13 @@ val originate :
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 
-(** [execute_outbox_message ctxt rollup ~cemented_commitment ~source
-      ~output_proof] validates the given outbox message and prepares a set of
-      resulting operations. *)
+(** [execute_outbox_message ctxt rollup ~cemented_commitment
+      ~output_proof] validates the given outbox message and prepares a
+      set of resulting operations. *)
 val execute_outbox_message :
   context ->
   Sc_rollup.t ->
   cemented_commitment:Sc_rollup.Commitment.Hash.t ->
-  source:public_key_hash ->
   output_proof:string ->
   (execute_outbox_message_result * context) tzresult Lwt.t
 
@@ -97,7 +96,6 @@ module Internal_for_tests : sig
       (Sc_rollup.output * context) tzresult Lwt.t) ->
     Sc_rollup.t ->
     cemented_commitment:Sc_rollup.Commitment.Hash.t ->
-    source:public_key_hash ->
     output_proof:string ->
     (execute_outbox_message_result * context) tzresult Lwt.t
 end

@@ -269,7 +269,7 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
   in
   ({address; size; genesis_commitment_hash}, ctxt)
 
-let to_transaction_operation ctxt ~source
+let to_transaction_operation ctxt rollup
     (Sc_rollup_management_protocol.Transaction
       {destination; entrypoint; parameters_ty; parameters; unparsed_parameters})
     =
@@ -302,7 +302,7 @@ let to_transaction_operation ctxt ~source
   in
   return
     ( Script_typed_ir.Internal_operation
-        {source = Contract.Implicit source; operation; nonce},
+        {source = Destination.Sc_rollup rollup; operation; nonce},
       ctxt )
 
 (* Transfer some ticket-tokens from [source_destination] to [target_destination].
@@ -419,7 +419,7 @@ let validate_outbox_level ctxt ~outbox_level ~lcc_level =
     Sc_rollup_invalid_outbox_level
 
 let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
-    ~cemented_commitment ~source ~output_proof =
+    ~cemented_commitment ~output_proof =
   let open Lwt_result_syntax in
   (* Get inbox level of last cemented commitment, needed to validate that the
      outbox message is active. This call also implicitly checks that the rollup
@@ -463,7 +463,7 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     List.fold_left_map_e
       (fun ctxt transaction ->
         let open Result_syntax in
-        let+ op, ctxt = to_transaction_operation ctxt ~source transaction in
+        let+ op, ctxt = to_transaction_operation ctxt rollup transaction in
         (ctxt, op))
       ctxt
       transactions

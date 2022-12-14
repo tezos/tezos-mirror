@@ -3392,20 +3392,32 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
   let src2 = Constant.bootstrap2.public_key_hash in
   let originate_target_contract () =
     let prg =
-      {|
-      {
-        parameter (or (int %default) (int %aux));
-        storage (int :s);
-
-        code
+      Printf.sprintf
+        {|
           {
-            UNPAIR;
-            IF_LEFT
-              { SWAP ; DROP; NIL operation }
-              { SWAP ; DROP; NIL operation };
-            PAIR;
+            parameter (or (int %%default) (int %%aux));
+            storage (int :s);
+            code
+              {
+                # Check that SENDER is the rollup address
+                SENDER;
+                PUSH address %S;
+                ASSERT_CMPEQ;
+                # Check that SOURCE is the implicit account used for executing
+                # the outbox message.
+                SOURCE;
+                PUSH address %S;
+                ASSERT_CMPEQ;
+                UNPAIR;
+                IF_LEFT
+                  { SWAP ; DROP; NIL operation }
+                  { SWAP ; DROP; NIL operation };
+                PAIR;
+              }
           }
-      } |}
+        |}
+        sc_rollup
+        src2
     in
     let* address =
       Client.originate_contract

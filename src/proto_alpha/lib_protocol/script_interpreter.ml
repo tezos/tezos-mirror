@@ -91,7 +91,7 @@ open Script_interpreter_defs
 module S = Saturation_repr
 
 type step_constants = Script_typed_ir.step_constants = {
-  source : Contract.t;
+  source : Destination.t;
   payer : Signature.public_key_hash;
   self : Contract_hash.t;
   amount : Tez.t;
@@ -608,7 +608,8 @@ module Raw = struct
                     (step [@ocaml.tailcall])
                       ( ctxt,
                         {
-                          source = Contract.Originated sc.self;
+                          source =
+                            Destination.Contract (Contract.Originated sc.self);
                           self = contract_hash;
                           amount = Tez.zero;
                           balance;
@@ -1255,7 +1256,11 @@ module Raw = struct
             fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
             let piop =
               Internal_operation
-                {source = Contract.Originated sc.self; operation; nonce}
+                {
+                  source = Destination.Contract (Contract.Originated sc.self);
+                  operation;
+                  nonce;
+                }
             in
             let res = {piop; lazy_storage_diff = None} in
             let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
@@ -1303,7 +1308,7 @@ module Raw = struct
             let res = {destination; entrypoint = Entrypoint.default} in
             (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
         | ISender (_, k) ->
-            let destination : Destination.t = Contract sc.source in
+            let destination : Destination.t = sc.source in
             let res = {destination; entrypoint = Entrypoint.default} in
             (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
         | ISelf (_, ty, entrypoint, k) ->

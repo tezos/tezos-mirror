@@ -54,7 +54,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         tez_sym
         Tez.pp
         amount
-        Contract.pp
+        Destination.pp
         source
         Destination.pp
         destination ;
@@ -70,7 +70,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
       Format.fprintf
         ppf
         "Origination:@,From: %a@,Credit: %s%a"
-        Contract.pp
+        Destination.pp
         source
         tez_sym
         Tez.pp
@@ -99,7 +99,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
             Tezos_crypto.Signature.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
-      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Tezos_crypto.Signature.Public_key_hash.pp ppf delegate)
@@ -107,7 +107,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
       Format.fprintf
         ppf
         "Event:@,From: %a@,Type: %a"
-        Contract.pp
+        Destination.pp
         source
         pp_micheline_expr
         ty ;

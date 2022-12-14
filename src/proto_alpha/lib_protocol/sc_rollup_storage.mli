@@ -76,3 +76,10 @@ val parameters_type :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   (Script_repr.lazy_expr option * Raw_context.t) tzresult Lwt.t
+
+(** [must_exist ctxt rollup] checks whether the given [rollup] exists
+    in [ctxt]. If [rollup] exists, a new context is returned with gas
+    consumed for the lookup cost. If it does not exist, an error is
+    returned. *)
+val must_exist :
+  Raw_context.t -> Sc_rollup_repr.t -> Raw_context.t tzresult Lwt.t

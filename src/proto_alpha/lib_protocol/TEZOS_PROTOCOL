@@ -187,6 +187,7 @@
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
 
+        "Destination_storage",
 
         "Alpha_context",
         "Script_string",
