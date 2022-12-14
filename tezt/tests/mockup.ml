@@ -1015,9 +1015,11 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      If [obj] does not correspond to [schema], return an arbitrary
      value that respects [schema]. *)
   let rec distinct_sample (value : JSON.t) (schema : JSON.t) : JSON.u =
-    (* Returns an integer different from [n_opt]. If [minimum] and/or
-       [maximum] is given, then a value greater or equal than minimum
-       and/or greater or equal than maximum is returned. *)
+    (* Returns an integer [x] such that [min <= x <= max].
+       [min] (resp. [max]) defaults to [Int.min_int] (resp. [Int.max_int]).
+       Additionally, if [n_opt] is [Some n] then the returned value [x] is
+       distinct from [n] ([n] must be in the bounds [min <= n <= max]).
+    *)
     let distinct_sample_numeric ?minimum ?maximum n_opt =
       let n =
         match (n_opt, minimum, maximum) with
@@ -1026,16 +1028,15 @@ let test_create_mockup_config_show_init_roundtrip protocols =
         | None, None, Some maximum -> maximum
         | _ -> 0
       in
-      let () =
-        (* sanity checks *)
-        let max = Option.value ~default:Int.max_int maximum in
-        let min = Option.value ~default:Int.min_int minimum in
-        assert (min < max && min <= n && n <= max)
-      in
-      match (maximum, minimum) with
-      | None, _ -> n + 1
-      | _, None -> n - 1
-      | Some min, Some max -> min + ((n - min + 1) mod (max - min + 1))
+      let max = Option.value ~default:Int.max_int maximum in
+      let min = Option.value ~default:Int.min_int minimum in
+      (* sanity check *)
+      if not (min < max && min <= n && n <= max) then
+        Test.fail
+          ~__LOC__
+          "[distinct_sample_numeric] given [n_opt] is not in between [min] and \
+           [max] (inclusive)" ;
+      if n < max then n + 1 else min
     in
     (* Returns an element from [candidates] distinct from [value_opt].
        If [value_opt] is [None], return first element in [candidates]. *)
