@@ -157,6 +157,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Script_chain_id.register ~protocols ;
   Script_execution_ordering.register ~protocols ;
   Script_hash_regression.register ~protocols ;
+  Script_hash_multiple.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Script_conversion.register ~protocols ;
   Script_illtyped.register ~protocols ;

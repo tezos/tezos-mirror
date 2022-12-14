@@ -8,14 +8,6 @@ from tools.utils import originate
 from .contract_paths import CONTRACT_PATH
 
 
-ID_SCRIPT_LITERAL = '''
-parameter unit; storage unit; code {CAR; NIL operation; PAIR}
-'''.strip()
-ID_SCRIPT_HASH = '''
-exprtpyospPfMqcARmu5FGukprC7kbbe4jb4zxFd4Gxrp2vcCPjRNa
-'''.strip()
-
-
 @pytest.mark.contract
 @pytest.mark.incremental
 class TestManager:
@@ -260,79 +252,3 @@ class TestManager:
             'manager', 'rooted_target', ['--arg', arg, '--entrypoint', 'root']
         )
         utils.bake(client, bake_for='bootstrap5')
-
-
-@pytest.mark.contract
-class TestScriptHashMultiple:
-    """Test octez-client hash script with diffent number and type of
-    arguments"""
-
-    def test_contract_hashes_empty(self, client: Client):
-        assert client.hash_script([]) == []
-
-    def test_contract_hashes_single(self, client: Client):
-        assert client.hash_script([ID_SCRIPT_LITERAL]) == [
-            (ID_SCRIPT_HASH, None)
-        ]
-
-    def test_contract_hashes_single_display_names(self, client: Client):
-        assert client.hash_script([ID_SCRIPT_LITERAL], display_names=True,) == [
-            (
-                ID_SCRIPT_HASH,
-                'Literal script 1',
-            )
-        ]
-
-    def test_contract_hashes_mixed(self, client: Client):
-        contract_path = os.path.join(CONTRACT_PATH, 'attic', 'empty.tz')
-        script_empty_hash = '''
-expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod
-        '''.strip()
-        with open(contract_path, 'r') as contract_file:
-            script = contract_file.read()
-
-            hashes = client.hash_script([contract_path, script])
-
-            assert hashes == [
-                (
-                    script_empty_hash,
-                    None,
-                ),
-                (
-                    script_empty_hash,
-                    None,
-                ),
-            ]
-
-            hashes = client.hash_script(
-                [contract_path, script], display_names=True
-            )
-
-            assert hashes == [
-                (
-                    script_empty_hash,
-                    contract_path,
-                ),
-                (
-                    script_empty_hash,
-                    'Literal script 2',
-                ),
-            ]
-
-    @pytest.mark.parametrize(
-        "for_script, display_names, results",
-        [
-            ('csv', True, (ID_SCRIPT_HASH, 'Literal script 1')),
-            ('csv', False, (ID_SCRIPT_HASH, None)),
-            ('tsv', True, (ID_SCRIPT_HASH, 'Literal script 1')),
-            ('tsv', False, (ID_SCRIPT_HASH, None)),
-        ],
-    )
-    def test_contract_hashes_for_script(
-        self, client: Client, for_script, display_names, results
-    ):
-        assert client.hash_script(
-            [ID_SCRIPT_LITERAL],
-            display_names=display_names,
-            for_script=for_script,
-        ) == [results]

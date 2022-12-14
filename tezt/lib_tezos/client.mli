@@ -1243,12 +1243,24 @@ val hash_data :
 val spawn_hash_data :
   ?hooks:Process.hooks -> data:string -> typ:string -> t -> Process.t
 
+(** Arguments to the [hash_script]'s and [hash_data]'s [?for_script] *)
+type hash_script_format = TSV | CSV
+
 (** Run [octez-client hash script ..]*)
-val hash_script : ?hooks:Process_hooks.t -> script:string -> t -> string Lwt.t
+val hash_script :
+  ?hooks:Process_hooks.t ->
+  ?for_script:hash_script_format ->
+  script:string ->
+  t ->
+  string Lwt.t
 
 (** Same as [hash_script], but do not wait for the process to exit. *)
 val spawn_hash_script :
-  ?hooks:Process_hooks.t -> script:string -> t -> Process.t
+  ?hooks:Process_hooks.t ->
+  ?for_script:hash_script_format ->
+  script:string ->
+  t ->
+  Process.t
 
 (** Run [octez-client get contract script hash for ..]*)
 val get_contract_hash :
@@ -1262,13 +1274,19 @@ val spawn_get_contract_hash :
 val hash_scripts :
   ?hooks:Process_hooks.t ->
   ?display_names:bool ->
+  ?for_script:hash_script_format ->
   string list ->
   t ->
   string list Lwt.t
 
 (** Same as [hash_scripts], but do not wait for the process to exit. *)
 val spawn_hash_scripts :
-  ?hooks:Process_hooks.t -> ?display_names:bool -> string list -> t -> Process.t
+  ?hooks:Process_hooks.t ->
+  ?display_names:bool ->
+  ?for_script:hash_script_format ->
+  string list ->
+  t ->
+  Process.t
 
 (** Run [octez-client normalize data .. of type ...]*)
 val normalize_data :
