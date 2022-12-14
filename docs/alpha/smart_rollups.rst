@@ -418,7 +418,7 @@ This creates a configuration file:
 
 ::
 
-   Smart-contract rollup node configuration written in {ROLLUP_NODE_DIR}/config.json
+   Smart-contract rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
 
 Here is the content of the file:
 
