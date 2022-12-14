@@ -102,6 +102,9 @@ type rex
 (** Compile a regular expression using Perl syntax. *)
 val rex : ?opts:Re.Perl.opt list -> string -> rex
 
+(** [rexf ...] is [rex @@ sf ...] *)
+val rexf : ?opts:Re.Perl.opt list -> ('a, unit, string, rex) format4 -> 'a
+
 (** Convert a regular expression to a string using Perl syntax. *)
 val show_rex : rex -> string
 
