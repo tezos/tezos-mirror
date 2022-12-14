@@ -35,6 +35,8 @@ open Protocol
 
 let opt_get ~__LOC__ = WithExceptions.Option.get ~loc:__LOC__
 
+open Sc_rollup_helpers
+
 module Merkelized_payload_hashes =
   Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes
 
@@ -134,7 +136,7 @@ let gen_payloads ?(min_size = 2) ?(max_size = 50) () =
   let open QCheck2.Gen in
   list_size (min_size -- max_size) gen_payload
 
-let gen_z_index_of_payloads ?(max_index_offset = 0) payloads =
+let gen_index_of_payloads ?(max_index_offset = 0) payloads =
   let open QCheck2.Gen in
   let max_index = List.length payloads - 1 - max_index_offset in
   let+ index = 0 -- max_index in
@@ -143,56 +145,77 @@ let gen_z_index_of_payloads ?(max_index_offset = 0) payloads =
 let gen_payloads_and_index ?min_size ?max_size ?max_index_offset () =
   let open QCheck2.Gen in
   let* payloads = gen_payloads ?min_size ?max_size () in
-  let* index = gen_z_index_of_payloads ?max_index_offset payloads in
+  let* index = gen_index_of_payloads ?max_index_offset payloads in
   return (payloads, index)
 
-let gen_payloads_and_two_index =
-  let open QCheck2.Gen in
-  let* payloads = gen_payloads () in
-  let* index = gen_z_index_of_payloads payloads in
-  let* index' = gen_z_index_of_payloads payloads in
-  return (payloads, index, index')
+let gen_payloads_for_level ?(inbox_level = Raw_level.(succ root)) () =
+  gen_messages inbox_level gen_payload_string
 
-let gen_payloads_for_level ?(inbox_creation_level = 0) () =
+let gen_level ?(inbox_creation_level = 0) ~max_level () =
   let open QCheck2.Gen in
-  let* messages = small_list gen_payload_string in
-  let* level =
-    let+ level = inbox_creation_level + 1 -- 100_000 in
-    Raw_level.of_int32_exn (Int32.of_int level)
-  in
-  let+ predecessor_timestamp =
-    let+ seconds = 0 -- 1_000_000 in
-    Time.Protocol.of_seconds (Int64.of_int seconds)
-  in
-  let predecessor = Block_hash.zero in
-  Sc_rollup_helpers.wrap_messages
-    ~predecessor_timestamp
-    ~predecessor
-    level
-    messages
+  let+ int_level = inbox_creation_level -- max_level in
+  Raw_level.of_int32_exn (Int32.of_int int_level)
 
-let gen_payloads_for_levels ?(inbox_creation_level = 0) ~max_level () =
-  Sc_rollup_helpers.gen_payloads_for_levels
+let gen_payloads_and_level ?inbox_creation_level ?(max_level = 100_000) () =
+  let open QCheck2.Gen in
+  let* inbox_level = gen_level ?inbox_creation_level ~max_level () in
+  gen_payloads_for_level ~inbox_level ()
+
+let gen_payloads_and_level_and_index ?inbox_creation_level ?max_level () =
+  let open QCheck2.Gen in
+  let* payloads_for_level =
+    gen_payloads_and_level ?inbox_creation_level ?max_level ()
+  in
+  let* index = gen_index_of_payloads payloads_for_level.messages in
+  return (payloads_for_level, index)
+
+let gen_payloads_for_levels ?(inbox_creation_level = 0) ?(max_level = 15) () =
+  gen_payloads_for_levels
     ~start_level:(inbox_creation_level + 1)
     ~max_level
     gen_payload_string
 
-let gen_inclusion_proof_inputs ?(max_level = 15) () =
+let gen_payloads_for_levels_and_level ?inbox_creation_level ?max_level
+    ?(level_offset = 1) () =
   let open QCheck2.Gen in
-  let* payloads_per_levels = gen_payloads_for_levels ~max_level () in
-  let* index = 0 -- (List.length payloads_per_levels - 2) in
-  let level = Raw_level.of_int32_exn (Int32.of_int index) in
-  return (payloads_per_levels, level)
-
-let gen_proof_inputs ?(max_level = 4) () =
-  let open QCheck2.Gen in
-  let* payloads_per_levels = gen_payloads_for_levels ~max_level () in
-  let* level_index = 0 -- (List.length payloads_per_levels - 1) in
-  let payloads_at_level =
-    opt_get ~__LOC__ @@ List.nth payloads_per_levels level_index
+  let* payloads_for_levels =
+    gen_payloads_for_levels ?inbox_creation_level ?max_level ()
   in
-  let* counter = 0 -- (List.length payloads_at_level.inputs - 1) in
-  return (payloads_per_levels, payloads_at_level.level, Z.of_int counter)
+  let* payloads_index =
+    0 -- (List.length payloads_for_levels - 1 - level_offset)
+  in
+  let payloads =
+    opt_get ~__LOC__ @@ List.nth payloads_for_levels payloads_index
+  in
+  return (payloads_for_levels, payloads.level)
+
+let gen_level_and_index payloads_for_levels =
+  let open QCheck2.Gen in
+  let* payloads_index = 0 -- (List.length payloads_for_levels - 1) in
+  let payloads =
+    opt_get ~__LOC__ @@ List.nth payloads_for_levels payloads_index
+  in
+  let* index = gen_index_of_payloads payloads.Sc_rollup_helpers.inputs in
+  return (payloads.level, index)
+
+let gen_payloads_for_levels_and_level_and_index ?inbox_creation_level ?max_level
+    () =
+  let open QCheck2.Gen in
+  let* payloads_for_levels =
+    gen_payloads_for_levels ?inbox_creation_level ?max_level ()
+  in
+  let* level, index = gen_level_and_index payloads_for_levels in
+  return (payloads_for_levels, level, index)
+
+let gen_payloads_for_levels_and_two_levels_and_two_indexes ?inbox_creation_level
+    ?max_level () =
+  let open QCheck2.Gen in
+  let* payloads_for_levels =
+    gen_payloads_for_levels ?inbox_creation_level ?max_level ()
+  in
+  let* level, index = gen_level_and_index payloads_for_levels in
+  let* level', index' = gen_level_and_index payloads_for_levels in
+  return (payloads_for_levels, level, index, level', index')
 
 let fill_merkelized_payload history payloads =
   let open Lwt_result_syntax in
@@ -230,24 +253,24 @@ module Node_inbox = struct
       payloads_histories = Sc_rollup_helpers.Payloads_histories.empty;
     }
 
-  let fill_inbox inbox payloads_per_levels =
+  let fill_inbox inbox payloads_for_levels =
     let open Result_syntax in
     let* payloads_histories, history, inbox =
       Sc_rollup_helpers.fill_inbox
         ~inbox:inbox.inbox
         inbox.history
         inbox.payloads_histories
-        payloads_per_levels
+        payloads_for_levels
     in
     return {inbox; payloads_histories; history}
 
-  let construct_inbox ~inbox_creation_level payloads_per_levels =
+  let construct_inbox ~inbox_creation_level payloads_for_levels =
     let open Result_syntax in
     let* payloads_histories, history, inbox =
       Sc_rollup_helpers.construct_inbox
         ~inbox_creation_level
         ~with_histories:true
-        payloads_per_levels
+        payloads_for_levels
     in
     return {inbox; payloads_histories; history}
 
@@ -266,14 +289,14 @@ end
 module Protocol_inbox = struct
   let new_inbox level = Sc_rollup_helpers.dumb_init level
 
-  let fill_inbox inbox payloads_per_levels =
+  let fill_inbox inbox payloads_for_levels =
     let open Result_syntax in
     let* _payloads_histories, _history, inbox =
       Sc_rollup_helpers.fill_inbox
         ~inbox
         (Inbox.History.empty ~capacity:0L)
         Sc_rollup_helpers.Payloads_histories.empty
-        payloads_per_levels
+        payloads_for_levels
     in
     return inbox
 
@@ -289,13 +312,13 @@ module Protocol_inbox = struct
     let empty_level = [Sc_rollup_helpers.make_empty_level next_level] in
     fill_inbox inbox empty_level
 
-  let construct_inbox ~inbox_creation_level payloads_per_levels =
+  let construct_inbox ~inbox_creation_level payloads_for_levels =
     let open Result_syntax in
     let* _payloads_histories, _history, inbox =
       Sc_rollup_helpers.construct_inbox
         ~inbox_creation_level
         ~with_histories:false
-        payloads_per_levels
+        payloads_for_levels
     in
     return inbox
 end
@@ -462,11 +485,11 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
   let* () = assert_fails ~__LOC__ proof_with_extra_step in
   return_unit
 
-let test_inclusion_proof_production (payloads_per_levels, level) =
+let test_inclusion_proof_production (payloads_for_levels, level) =
   let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Node_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let*@ proof, node_old_level_messages =
@@ -476,7 +499,7 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
       level
   in
   let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let*? verified_old_levels_messages =
@@ -490,11 +513,11 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
     verified_old_levels_messages
     node_old_level_messages
 
-let test_inclusion_proof_verification (payloads_per_levels, level) =
+let test_inclusion_proof_verification (payloads_for_levels, level) =
   let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Node_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let*@ proof, _node_old_level_messages =
@@ -504,7 +527,7 @@ let test_inclusion_proof_verification (payloads_per_levels, level) =
       level
   in
   let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let*? proto_inbox = Protocol_inbox.add_new_empty_level proto_inbox in
   (* This snapshot is not the same one as node_inbox_snapshot because we
@@ -515,15 +538,15 @@ let test_inclusion_proof_verification (payloads_per_levels, level) =
   in
   assert_inbox_proof_error ~__LOC__ "invalid inclusion proof" result
 
-let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
+let test_inbox_proof_production (payloads_for_levels, level, message_counter) =
   let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   (* We begin with a Node inbox so we can produce a proof. *)
   let exp_message =
-    Sc_rollup_helpers.first_after payloads_per_levels level message_counter
+    Sc_rollup_helpers.first_after payloads_for_levels level message_counter
   in
   let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Node_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.take_snapshot node_inbox.inbox in
   let* proof, input_of_produced_proof =
@@ -535,7 +558,7 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
   (* We now switch to a protocol inbox built from the same messages for
      verification. *)
   let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let* () =
@@ -550,13 +573,13 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
   in
   assert_inbox_message ~__LOC__ exp_message input_in_proof
 
-let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
+let test_inbox_proof_verification (payloads_for_levels, level, message_counter)
     =
   let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   (* We begin with a Node inbox so we can produce a proof. *)
   let*? node_inbox =
-    Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Node_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, _input =
@@ -568,7 +591,7 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   (* We now switch to a protocol inbox built from the same messages for
      verification. *)
   let*? proto_inbox =
-    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
+    Protocol_inbox.construct_inbox ~inbox_creation_level payloads_for_levels
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   (* The proto and node inboxes are synchronized, we make sure the verification
@@ -679,22 +702,22 @@ let inbox_tests =
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"produce inclusion proof and verifies it."
-      (gen_inclusion_proof_inputs ())
+      (gen_payloads_for_levels_and_level ())
       test_inclusion_proof_production;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"negative test of inclusion proof."
-      (gen_inclusion_proof_inputs ())
+      (gen_payloads_for_levels_and_level ())
       test_inclusion_proof_verification;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"produce inbox proof and verifies it."
-      (gen_proof_inputs ())
+      (gen_payloads_for_levels_and_level_and_index ())
       test_inbox_proof_production;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"negative test of inbox proof."
-      (gen_proof_inputs ())
+      (gen_payloads_for_levels_and_level_and_index ())
       test_inbox_proof_verification;
     Tztest.tztest_qcheck2
       ~count:1000
