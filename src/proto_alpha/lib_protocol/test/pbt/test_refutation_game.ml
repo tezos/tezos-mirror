@@ -208,12 +208,7 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
 let originate_rollup originator block =
   let open Lwt_result_syntax in
   let* origination_operation, sc_rollup =
-    Op.sc_rollup_origination
-      (B block)
-      originator
-      Kind.Example_arith
-      ~boot_sector:""
-      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string "unit")
+    Sc_rollup_helpers.origination_op (B block) originator Kind.Example_arith
   in
   let* block = Block.bake ~operations:[origination_operation] block in
   let* inbox = Context.Sc_rollup.inbox (B block) in

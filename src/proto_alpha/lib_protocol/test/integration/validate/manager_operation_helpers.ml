@@ -330,14 +330,13 @@ let delegation block source delegate =
 let originate_sc_rollup block rollup_account =
   let open Lwt_result_syntax in
   let rollup_contract = contract_of rollup_account in
+  let kind = Sc_rollup.Kind.Example_arith in
   let* rollup_origination, sc_rollup =
-    Op.sc_rollup_origination
+    Sc_rollup_helpers.origination_op
       ~force_reveal:true
       (B block)
       rollup_contract
-      Sc_rollup.Kind.Example_arith
-      ~boot_sector:""
-      ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
+      kind
   in
   let+ block =
     Block.bake ~allow_manager_failures:true ~operation:rollup_origination block
@@ -780,7 +779,8 @@ let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
 let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let+ op, _ =
-    Op.sc_rollup_origination
+    let kind = Sc_rollup.Kind.Example_arith in
+    Sc_rollup_helpers.origination_op
       ?fee:oinfos.fee
       ?gas_limit:oinfos.gas_limit
       ?counter:oinfos.counter
@@ -788,9 +788,7 @@ let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
       ?force_reveal:oinfos.force_reveal
       (B infos.ctxt.block)
       (contract_of (get_source infos))
-      Sc_rollup.Kind.Example_arith
-      ~boot_sector:""
-      ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
+      kind
   in
   op
 

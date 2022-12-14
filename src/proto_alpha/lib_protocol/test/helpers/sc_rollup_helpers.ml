@@ -143,7 +143,7 @@ let make_empty_tree =
   let dummy_context = make_empty_context ~root:"dummy" () in
   fun () -> Tezos_context_memory.Context_binary.Tree.empty dummy_context
 
-let origination_proof ~boot_sector = function
+let compute_origination_proof ~boot_sector = function
   | Sc_rollup.Kind.Example_arith ->
       let open Lwt_syntax in
       let context = make_empty_context () in
@@ -187,7 +187,7 @@ let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
   let open Lwt_result_syntax in
   match proof_string_opt with
   | None ->
-      let*! origination_proof = origination_proof ~boot_sector kind in
+      let*! origination_proof = compute_origination_proof ~boot_sector kind in
       return origination_proof
   | Some proof_string -> return proof_string
 
@@ -661,3 +661,25 @@ let dumb_init_repr level =
        ~predecessor_timestamp:Time.Protocol.epoch
        ~predecessor:Block_hash.zero
        level
+
+let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ?origination_proof ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src
+    kind =
+  let open Lwt_result_syntax in
+  let*! origination_proof =
+    match origination_proof with
+    | Some origination_proof -> Lwt.return origination_proof
+    | None -> compute_origination_proof ~boot_sector kind
+  in
+  Op.sc_rollup_origination
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ctxt
+    src
+    kind
+    ~boot_sector
+    ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
+    ~origination_proof
