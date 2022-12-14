@@ -319,6 +319,14 @@ module Aux = struct
                      fail. *)
                   Error Error.Generic_invalid_access
             in
+            (* We never read more than the maximum bytes expected from the
+               protocol. Contrary to `write_output` were the control of the size
+               of the output is managed by the kernel and can be bigger than the
+               protocol accepted value, this does not lead to an error since the
+               value is enforced by the protocol. This is purely defensive. *)
+            let max_bytes =
+              Int32.min (Int32.of_int input_output_max_size) max_bytes
+            in
             (* Check the input payload can be safely stored in the memory at the
                given address and with the maximum expected size. *)
             let*? () = check_address memory dst max_bytes in
