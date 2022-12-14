@@ -764,57 +764,12 @@ unsigned mask afterwards.
 Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
 
-Strings are mostly used for naming things without having to rely on
-external ID databases. They are restricted to the printable subset of
-7-bit ASCII, plus some escaped characters (see section on
-constants). So what can be done is basically use string constants as
-is, concatenate or splice them, and use them as keys.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-
--  ``CONCAT``: String concatenation.
-
-::
-
-    :: string : string : 'S   -> string : 'S
-
-    > CONCAT / s : t : S  =>  (s ^ t) : S
-
-    :: string list : 'S   -> string : 'S
-
-    > CONCAT / {} : S  =>  "" : S
-    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
-       where CONCAT / { <ss> } : S  =>  r : S
-
--  ``SIZE``: number of characters in a string.
-
-::
-
-     :: string : 'S   ->   nat : 'S
-
--  ``SLICE``: String access.
-
-::
-
-    :: nat : nat : string : 'S   ->  option string : 'S
-
-    > SLICE / offset : length : s : S  =>  Some ss : S
-       where ss is the substring of s at the given offset and of the given length
-         iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  None  : S
-         iff offset or (offset + length) are out of bounds
-
--  ``COMPARE``: Lexicographic comparison.
-
-::
-
-    :: string : string : 'S   ->   int : 'S
-
-    > COMPARE / s : t : S  =>  -1 : S
-        iff s < t
-    > COMPARE / s : t : S  =>  0 : S
-        iff s = t
-    > COMPARE / s : t : S  =>  1 : S
-        iff s > t
+-  ``CONCAT``: String concatenation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
+-  ``SIZE``: number of characters in a string (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``SLICE``: String access (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
+-  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on pairs and right combs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
