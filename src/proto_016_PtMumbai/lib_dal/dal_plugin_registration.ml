@@ -23,16 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 module Plugin = struct
   module Proto = Registerer.Registered
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  let get_constants chain block ctxt =
+  let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    Protocol.Constants_services.parametric cpctxt (chain, block)
+
+  let get_constants chain block ctxt =
     let open Lwt_result_syntax in
-    let* constants = Protocol.Constants_services.all cpctxt (chain, block) in
-    return constants.parametric.dal.cryptobox_parameters
+    let* parametric = parametric_constants chain block ctxt in
+    let {
+      Constants.Parametric.feature_enable;
+      number_of_slots;
+      attestation_lag;
+      availability_threshold;
+      cryptobox_parameters;
+    } =
+      parametric.dal
+    in
+    return
+      {
+        Dal_plugin.feature_enable;
+        number_of_slots;
+        attestation_lag;
+        availability_threshold;
+        cryptobox_parameters;
+        blocks_per_epoch =
+          (* This is a protocol constant in future protocol. *)
+          32l;
+      }
 
   let block_info ?chain ?block ~metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
@@ -74,6 +99,48 @@ module Plugin = struct
                    commitment = slot.Dal.Slot.Header.commitment;
                  },
                  status ))
+
+  let check_is_in_range slot_index =
+    let zero = Dal.Slot_index.(to_int zero) in
+    let max_value = 255 in
+    if Compare.Int.(slot_index >= zero && slot_index <= max_value) then
+      Result_syntax.return_unit
+    else Stdlib.failwith "Invalid_slot_index"
+
+  let slots_range ~lower ~upper =
+    let open Result_syntax in
+    let* () = check_is_in_range lower in
+    let* () = check_is_in_range upper in
+    return Misc.(lower --> upper)
+
+  let slot_headers_attestation hash (block : block_info) ~number_of_slots =
+    let open Lwt_result_syntax in
+    let*? metadata =
+      Option.to_result
+        block.metadata
+        ~none:(TzTrace.make @@ Layer1_services.Cannot_read_block_metadata hash)
+    in
+    let confirmed_slots =
+      Option.value
+        ~default:Dal.Attestation.empty
+        metadata.protocol_data.dal_attestation
+    in
+    let*? all_slots =
+      slots_range ~lower:0 ~upper:(number_of_slots - 1)
+      |> Environment.wrap_tzresult
+    in
+    let attested, unattested =
+      List.map
+        (fun i ->
+          match Dal.Slot_index.of_int i with
+          | None -> assert false
+          | Some i -> i)
+        all_slots
+      |> List.partition (Dal.Attestation.is_attested confirmed_slots)
+    in
+    return
+      ( `Attested (List.map Dal.Slot_index.to_int attested),
+        `Unattested (List.map Dal.Slot_index.to_int unattested) )
 
   module RPC = RPC
 end
