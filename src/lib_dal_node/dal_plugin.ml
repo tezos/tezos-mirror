@@ -64,12 +64,11 @@ module type T = sig
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
-  val slot_headers_attestation :
+  val attested_slot_headers :
     Tezos_crypto.Block_hash.t ->
     block_info ->
     number_of_slots:int ->
-    ([`Attested of slot_index list] * [`Unattested of slot_index list]) tzresult
-    Lwt.t
+    slot_index list tzresult
 
   module RPC : sig
     val rpc_services :

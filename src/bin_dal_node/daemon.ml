@@ -153,18 +153,18 @@ module Handler = struct
               slot_headers
               (Node_context.get_store ctxt)
           in
-          let* attested_slots, unattested_slots =
-            Plugin.slot_headers_attestation
+          let*? attested_slots =
+            Plugin.attested_slot_headers
               block_hash
               block_info
               ~number_of_slots:proto_parameters.number_of_slots
           in
-          let* () =
+          let*! () =
             Slot_manager.update_selected_slot_headers_statuses
               ~block_level:header.shell.level
               ~attestation_lag:proto_parameters.attestation_lag
+              ~number_of_slots:proto_parameters.number_of_slots
               attested_slots
-              unattested_slots
               (Node_context.get_store ctxt)
           in
           return_unit
