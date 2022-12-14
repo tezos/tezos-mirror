@@ -264,9 +264,6 @@ module Make (PVM : Pvm.S) = struct
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
     let*! () = State.save_l2_block node_ctxt.store l2_block in
-    let* () =
-      Components.Commitment.cement_commitment_if_possible node_ctxt head
-    in
     let*! () =
       Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
     in
@@ -334,6 +331,7 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
     let* () = Components.Commitment.publish_commitments node_ctxt in
+    let* () = Components.Commitment.cement_commitments node_ctxt in
     let* () = notify_injector node_ctxt new_head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let* () = Components.Refutation_game.process head node_ctxt in

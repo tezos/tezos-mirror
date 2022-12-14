@@ -59,16 +59,11 @@ module type S = sig
       cemented commitment. *)
   val publish_commitments : _ Node_context.t -> unit tzresult Lwt.t
 
-  (** [cement_commitment_if_possible node_ctxt head] checks whether the next
-      commitment to be cemented (i.e. whose inbox level is
-      [sc_rollup_commitment_period] levels after
-      [Store.Last_cemented_commitment_level store]) can be cemented. In
-      particular, the request to cement the commitment happens only if the
-      commitment is stored in [Store.Commitments store], and if
-      [sc_rollup_challenge_period] levels have passed since when the commitment
-      was originally published.  *)
-  val cement_commitment_if_possible :
-    _ Node_context.t -> Layer1.head -> unit tzresult Lwt.t
+  (** [cement_commitments node_ctxt] cements the commitments that can be
+      cemented, i.e. the commitments that are after the current last cemented
+      commitment and which have [sc_rollup_challenge_period] levels on top of
+      them since they were originally published.  *)
+  val cement_commitments : _ Node_context.t -> unit tzresult Lwt.t
 
   (** [start ()] only emits the event that the commitment manager
       for the rollup node has started. *)

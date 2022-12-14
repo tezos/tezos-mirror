@@ -49,6 +49,11 @@ let add_level level increment =
   if increment < 0 then invalid_arg "Commitment.add_level negative increment" ;
   Raw_level.Internal_for_tests.add level increment
 
+let sub_level level decrement =
+  (* We only use this function with positive increments so it is safe *)
+  if decrement < 0 then invalid_arg "Commitment.sub_level negative decrement" ;
+  Raw_level.Internal_for_tests.sub level decrement
+
 let sc_rollup_commitment_period node_ctxt =
   node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
     .commitment_period_in_blocks
@@ -171,19 +176,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         in
         return_some commitment_hash
 
-  let block_of_known_level (node_ctxt : _ Node_context.t) level =
-    let open Lwt_option_syntax in
-    let* head = State.last_processed_head_opt node_ctxt.store in
-    if Raw_level.(head.header.level < level) then
-      (* Level is not known yet  *)
-      fail
-    else
-      let*! block_hash =
-        State.hash_of_level node_ctxt (Raw_level.to_int32 level)
-      in
-      let*? block_hash = Result.to_option block_hash in
-      Store.L2_blocks.find node_ctxt.store block_hash
-
   let missing_commitments (node_ctxt : _ Node_context.t) =
     let open Lwt_syntax in
     let lpc_level =
@@ -256,6 +248,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         let*! commitments = missing_commitments node_ctxt in
         List.iter_es (publish_commitment node_ctxt ~source) commitments
 
+  (* Commitments can only be cemented after [sc_rollup_challenge_window] has
+     passed since they were first published. *)
   let earliest_cementing_level node_ctxt commitment_hash =
     let open Lwt_option_syntax in
     let+ {first_published_at_level; _} =
@@ -265,19 +259,107 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     add_level first_published_at_level (sc_rollup_challenge_window node_ctxt)
 
-  let can_be_cemented node_ctxt earliest_cementing_level head_level
-      commitment_hash =
-    let {Node_context.cctxt; rollup_address; _} = node_ctxt in
-    let open Lwt_result_syntax in
-    if earliest_cementing_level <= head_level then
-      Plugin.RPC.Sc_rollup.can_be_cemented
-        cctxt
-        (cctxt#chain, cctxt#block)
-        rollup_address
-        commitment_hash
-    else return_false
+  (** [latest_cementable_commitment node_ctxt head] is the most recent commitment
+      hash that could be cemented in [head]'s successor if:
 
-  let cement_commitment (node_ctxt : _ Node_context.t) commitment_hash =
+      - all its predecessors were cemented
+      - it would have been first published at the same level as its inbox
+
+      It does not need to be exact but it must be an upper bound on which we can
+      start the search for cementable commitments. *)
+  let latest_cementable_commitment (node_ctxt : _ Node_context.t)
+      (head : Sc_rollup_block.t) =
+    let open Lwt_option_syntax in
+    let commitment_hash = Sc_rollup_block.most_recent_commitment head.header in
+    let* commitment = Store.Commitments.find node_ctxt.store commitment_hash in
+    let*? cementable_level_bound =
+      sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
+    in
+    if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then fail
+    else
+      let* cementable_bound_block_hash =
+        State.hash_of_level_opt
+          node_ctxt
+          (Raw_level.to_int32 cementable_level_bound)
+      in
+      let* cementable_bound_block =
+        Store.L2_blocks.find node_ctxt.store cementable_bound_block_hash
+      in
+      let cementable_commitment =
+        Sc_rollup_block.most_recent_commitment cementable_bound_block.header
+      in
+      return cementable_commitment
+
+  let cementable_commitments (node_ctxt : _ Node_context.t) =
+    let open Lwt_result_syntax in
+    let ( let*& ) x f =
+      (* A small monadic combinator to return an empty list of cementable
+         commitments on None results. *)
+      let*! x = x in
+      match x with None -> return_nil | Some x -> f x
+    in
+    let*& head = State.last_processed_head_opt node_ctxt.Node_context.store in
+    let head_level = head.header.level in
+    let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
+      let open Lwt_syntax in
+      let* commitment =
+        Store.Commitments.find node_ctxt.store commitment_hash
+      in
+      match commitment with
+      | None -> return acc
+      | Some commitment
+        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+          (* If we have moved backward passed or at the current LCC then we have
+             reached the end. *)
+          return acc
+      | Some commitment ->
+          let* earliest_cementing_level =
+            earliest_cementing_level node_ctxt commitment_hash
+          in
+          let acc =
+            match earliest_cementing_level with
+            | None -> acc
+            | Some earliest_cementing_level ->
+                if Raw_level.(earliest_cementing_level > head_level) then
+                  (* Commitments whose cementing level are after the head's
+                     successor won't be cementable in the next block. *)
+                  acc
+                else commitment_hash :: acc
+          in
+          gather acc commitment.predecessor
+    in
+    (* We start our search from the last possible cementable commitment. This is
+       to avoid iterating over a large number of commitments
+       ([challenge_window_in_blocks / commitment_period_in_blocks], in the order
+       of 10^3 on mainnet). *)
+    let*& latest_cementable_commitment =
+      latest_cementable_commitment node_ctxt head
+    in
+    let*! cementable = gather [] latest_cementable_commitment in
+    match cementable with
+    | [] -> return_nil
+    | first_cementable :: _ ->
+        (* Make sure that the first commitment can be cemented according to the
+           Layer 1 node as a failsafe. *)
+        let* green_light =
+          Plugin.RPC.Sc_rollup.can_be_cemented
+            node_ctxt.cctxt
+            (node_ctxt.cctxt#chain, `Head 0)
+            node_ctxt.rollup_address
+            first_cementable
+        in
+        if green_light then return cementable else return_nil
+
+  let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment_hash =
+    let open Lwt_result_syntax in
+    let cement_operation =
+      Sc_rollup_cement
+        {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
+    in
+    let* _hash = Injector.add_pending_operation ~source cement_operation in
+    return_unit
+
+  let cement_commitments node_ctxt =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Cement in
     match operator with
@@ -285,42 +367,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         (* Configured to not cement commitments *)
         return_unit
     | Some source ->
-        let cement_operation =
-          Sc_rollup_cement
-            {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
-        in
-        let* _hash = Injector.add_pending_operation ~source cement_operation in
-        return_unit
-
-  let cement_commitment_if_possible node_ctxt Layer1.{level = head_level; _} =
-    let open Lwt_result_syntax in
-    let next_level_to_cement = next_lcc_level node_ctxt in
-    let*! block = block_of_known_level node_ctxt next_level_to_cement in
-    match block with
-    | None | Some {header = {commitment_hash = None; _}; _} ->
-        (* Commitment not available *)
-        return_unit
-    | Some {header = {commitment_hash = Some commitment_hash; _}; _} -> (
-        (* If `commitment_hash` is defined, the commitment to be cemented has
-           been stored but not necessarily published by the rollup node. *)
-        let*! earliest_cementing_level =
-          earliest_cementing_level node_ctxt commitment_hash
-        in
-        match earliest_cementing_level with
-        (* If `earliest_cementing_level` is well defined, then the rollup node
-           has previously published `commitment`, which means that the rollup
-           is indirectly staked on it. *)
-        | Some earliest_cementing_level ->
-            let* green_flag =
-              can_be_cemented
-                node_ctxt
-                earliest_cementing_level
-                (Raw_level.of_int32_exn head_level)
-                commitment_hash
-            in
-            if green_flag then cement_commitment node_ctxt commitment_hash
-            else return_unit
-        | None -> return_unit)
+        let* cementable_commitments = cementable_commitments node_ctxt in
+        List.iter_es
+          (cement_commitment node_ctxt ~source)
+          cementable_commitments
 
   let start () = Commitment_event.starting ()
 end
