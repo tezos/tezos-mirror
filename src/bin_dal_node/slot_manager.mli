@@ -104,3 +104,13 @@ val get_commitment_by_published_level_and_index :
   slot_index:Services.Types.slot_index ->
   Store.node_store ->
   (Cryptobox.commitment, [`Not_found] tzresult) result Lwt.t
+
+(** [get_commitment_headers commitment ?slot_level ?slot_index store] returns
+    the list of accepted slot headers {!Services.Types.slot_header} that are
+    known by the DAL together with their respective statuses. *)
+val get_commitment_headers :
+  Cryptobox.commitment ->
+  ?slot_level:Services.Types.level ->
+  ?slot_index:Services.Types.slot_index ->
+  Store.node_store ->
+  Services.Types.slot_header list tzresult Lwt.t

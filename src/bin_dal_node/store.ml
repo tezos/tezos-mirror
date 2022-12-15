@@ -254,6 +254,9 @@ module Legacy = struct
 
   let decode_commitment = Cryptobox.Commitment.of_b58check_opt
 
+  let decode_slot_id =
+    Data_encoding.Binary.of_string_exn Services.Types.slot_id_encoding
+
   let add_slot_headers ~block_level ~block_hash slot_headers node_store =
     let open Lwt_syntax in
     let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
@@ -376,4 +379,79 @@ module Legacy = struct
       node_store.store
       path
       ""
+
+  (** Filter the given list of indices according to the values of the given slot
+      level and index. *)
+  let filter_indexes =
+    let keep_field v = function None -> true | Some f -> f = v in
+    fun ?slot_level ?slot_index indexes ->
+      List.map (fun (slot_id, _) -> decode_slot_id slot_id) indexes
+      |> List.filter (fun {Services.Types.slot_level = l; slot_index = i} ->
+             keep_field l slot_level && keep_field i slot_index)
+
+  let get_accepted_headers_of_commitment commitment indices store accu =
+    let open Lwt_result_syntax in
+    let encoded_commitment = encode_commitment commitment in
+    List.fold_left_es
+      (fun acc slot_id ->
+        let commitment_path = Path.Level.accepted_header_commitment slot_id in
+        let*! commitment_opt = find store commitment_path in
+        match commitment_opt with
+        | None -> return acc
+        | Some read_commitment -> (
+            if not @@ String.equal read_commitment encoded_commitment then
+              return acc
+            else
+              let status_path = Path.Level.accepted_header_status slot_id in
+              let*! status_opt = find store status_path in
+              match status_opt with
+              | None -> return acc
+              | Some status_str -> (
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4466
+                     Use more compact encodings to reduce allocated storage. *)
+                  match
+                    Services.Types.header_attestation_status_of_string
+                      status_str
+                  with
+                  | None -> failwith "Attestation status decoding failed"
+                  | Some status ->
+                      return
+                      @@ {
+                           Services.Types.slot_id;
+                           commitment;
+                           status = (status :> Services.Types.header_status);
+                         }
+                         :: acc)))
+      accu
+      indices
+
+  let get_other_headers_of_commitment commitment indices store accu =
+    let open Lwt_result_syntax in
+    List.fold_left_es
+      (fun acc slot_id ->
+        let*! status_opt =
+          find store @@ Path.Level.other_header_status slot_id commitment
+        in
+        match status_opt with
+        | None -> return acc
+        | Some status_str -> (
+            match Services.Types.header_status_of_string status_str with
+            | None -> failwith "Attestation status decoding failed"
+            | Some status ->
+                return @@ ({Services.Types.slot_id; commitment; status} :: acc)))
+      accu
+      indices
+
+  let get_commitment_headers commitment ?slot_level ?slot_index node_store =
+    let open Lwt_result_syntax in
+    let store = node_store.store in
+    (* Get the list of known slot identifiers for [commitment]. *)
+    let*! indexes = list store @@ Path.Commitment.headers commitment in
+    (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
+    let indices = filter_indexes ?slot_level ?slot_index indexes in
+    (* Retrieve the headers that haven't been "accepted" on L1. *)
+    let* accu = get_other_headers_of_commitment commitment indices store [] in
+    (* Retrieve the headers that have "accepted" on L1 (i.e. with
+       [`Waiting_for_attestation], [`Attested] or [`Unattested] statuses). *)
+    get_accepted_headers_of_commitment commitment indices store accu
 end

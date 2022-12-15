@@ -114,3 +114,10 @@ let get_commitment_by_published_level_and_index ~level ~slot_index node_store =
     ~level
     ~slot_index
     node_store
+
+let get_commitment_headers commitment ?slot_level ?slot_index node_store =
+  Store.Legacy.get_commitment_headers
+    commitment
+    ?slot_level
+    ?slot_index
+    node_store
