@@ -49,6 +49,7 @@ let rec run_loop ?(reboot = None) f a =
 let should_continue phase (pvm_state : pvm_state) =
   let continue =
     match (phase, pvm_state.tick_state) with
+    | Decoding, Snapshot -> true
     | Initialising, Init _ -> true
     | Linking, Link _ -> true
     | Decoding, Decode _ -> true
@@ -64,11 +65,14 @@ let finish_top_level_call_on_state pvm_state =
   Wasm_vm.compute_step_many ~max_steps:Int64.max_int pvm_state
 
 let execute_on_state phase state =
-  Wasm_vm.compute_step_many_until
-    ~write_debug:Noop
-    ~max_steps:Int64.max_int
-    (should_continue phase)
-    state
+  match state.tick_state with
+  | Stuck _ -> Lwt.return (state, 0L)
+  | _ ->
+      Wasm_vm.compute_step_many_until
+        ~debug_flag:Noop
+        ~max_steps:Int64.max_int
+        (should_continue phase)
+        state
 
 let run kernel k =
   let open Lwt_syntax in
