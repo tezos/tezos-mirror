@@ -444,6 +444,14 @@ let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
   Operation.Consensus.(
     inject ~force ~signer (dal_attestation ~level ~attestation) client)
 
+let dal_attestations ?level ?force
+    ?(signers = Array.to_list Account.Bootstrap.keys) ~nb_slots availability
+    client =
+  Lwt_list.map_s
+    (fun signer ->
+      dal_attestation ?level ?force ~signer ~nb_slots availability client)
+    signers
+
 type status = Applied | Failed of {error_id : string}
 
 let pp fmt = function
@@ -635,14 +643,19 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   check_manager_operation_status operations_result Applied oph2 ;
   let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   let* _ =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap1 [1; 0] client
+    dal_attestations
+      ~nb_slots
+      ~signers:[Constant.bootstrap1; Constant.bootstrap2]
+      [1; 0]
+      client
   in
   let* _ =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap2 [1; 0] client
+    dal_attestations
+      ~nb_slots
+      ~signers:[Constant.bootstrap3; Constant.bootstrap4; Constant.bootstrap5]
+      [1]
+      client
   in
-  let* _ = dal_attestation ~nb_slots ~signer:Constant.bootstrap3 [1] client in
-  let* _ = dal_attestation ~nb_slots ~signer:Constant.bootstrap4 [1] client in
-  let* _ = dal_attestation ~nb_slots ~signer:Constant.bootstrap5 [1] client in
   let* () = Client.bake_for_and_wait client in
   let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
   let attestation =
@@ -762,15 +775,9 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
   let* () = Client.bake_for_and_wait client in
   let now = Node.get_level node in
   let* attestation_ops =
-    let open Constant in
     let level = now + lag in
-    Lwt_list.map_s
-      (fun signer ->
-        let* (`OpHash h) =
-          dal_attestation ~force:true ~nb_slots ~level ~signer [10] client
-        in
-        return h)
-      [bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
+    let* hashes = dal_attestations ~force:true ~nb_slots ~level [10] client in
+    return @@ List.map (fun (`OpHash h) -> h) hashes
   in
   let applied = [] in
   let branch_delayed = attestation_ops in
@@ -1341,21 +1348,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   (* 6. attest only slots 1 and 2. *)
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let nb_slots = parameters.number_of_slots in
-  let* _op_hash =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap1 [2; 1] client
-  in
-  let* _op_hash =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap2 [2; 1] client
-  in
-  let* _op_hash =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap3 [2; 1] client
-  in
-  let* _op_hash =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap4 [2; 1] client
-  in
-  let* _op_hash =
-    dal_attestation ~nb_slots ~signer:Constant.bootstrap5 [2; 1] client
-  in
+  let* _ops_hashes = dal_attestations ~nb_slots [2; 1] client in
   let* () = Client.bake_for_and_wait client in
   let* slot_confirmed_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (slots_published_level + 1)
