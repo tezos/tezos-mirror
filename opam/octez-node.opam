@@ -35,6 +35,8 @@ depends: [
   "tezos-protocol-plugin-014-PtKathma-registerer"
   "tezos-embedded-protocol-015-PtLimaPt"
   "tezos-protocol-plugin-015-PtLimaPt-registerer"
+  "tezos-embedded-protocol-016-PtMumbai"
+  "tezos-protocol-plugin-016-PtMumbai-registerer"
 ]
 depopts: [
   "tezos-embedded-protocol-genesis"

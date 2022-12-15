@@ -2734,7 +2734,7 @@ let test_withdraw_command =
         let dest =
           match protocol with
           | Lima | Kathmandu -> Constant.bootstrap2.public_key_hash
-          | Alpha -> Constant.tz4_account.public_key_hash
+          | Mumbai | Alpha -> Constant.tz4_account.public_key_hash
         in
         inject_withdraw
           ~counter:2L
@@ -2984,7 +2984,9 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
-  test_withdrawals_tz4 [Alpha] ;
+  (match List.filter Protocol.(fun proto -> proto = Alpha) protocols with
+  | [] -> ()
+  | protocols -> test_withdrawals_tz4 protocols) ;
   test_single_signer protocols ;
   test_signer_reveals protocols ;
   test_accuser protocols ;

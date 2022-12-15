@@ -1,0 +1,15 @@
+
+./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/get_and_update_map.tz --details
+Well typed
+Gas remaining: 1039994.850 units remaining
+{ parameter string ;
+  storage (pair (option nat) (map string nat)) ;
+  code { UNPAPAIR ;
+         GET_AND_UPDATE
+         /* [ option nat : map string nat ] */ ;
+         PAIR
+         /* [ pair (option nat) (map string nat) ] */ ;
+         NIL operation
+         /* [ list operation : pair (option nat) (map string nat) ] */ ;
+         PAIR
+         /* [ pair (list operation) (option nat) (map string nat) ] */ } }

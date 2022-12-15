@@ -540,12 +540,13 @@ end)
      fun arg_ty ->
       let open M in
       let* ru = sc_rollup in
+      let* entrypoint = entrypoint in
       let destination = Alpha_context.Destination.Sc_rollup ru in
       return
         (Typed_contract.Internal_for_tests.typed_exn
            arg_ty
            destination
-           Alpha_context.Entrypoint.default)
+           entrypoint)
 
     let generate_any_type_contract :
         type arg argc.

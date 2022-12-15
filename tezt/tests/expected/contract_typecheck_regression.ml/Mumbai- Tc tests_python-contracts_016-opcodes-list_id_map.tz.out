@@ -1,0 +1,14 @@
+
+./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/list_id_map.tz --details
+Well typed
+Gas remaining: 1039996.974 units remaining
+{ parameter (list string) ;
+  storage (list string) ;
+  code { CAR
+         /* [ list string ] */ ;
+         MAP { /* [ string ] */ }
+         /* [ list string ] */ ;
+         NIL operation
+         /* [ list operation : list string ] */ ;
+         PAIR
+         /* [ pair (list operation) (list string) ] */ } }

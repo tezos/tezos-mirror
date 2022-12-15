@@ -42,7 +42,7 @@
     "prevalidator" section regardless of the protocol version. *)
 let prevalidator_worker_event_section = function
   | Protocol.Kathmandu -> "legacy_prevalidator"
-  | Lima | Alpha -> "prevalidator"
+  | Lima | Mumbai | Alpha -> "prevalidator"
 
 (** The [event_sections_levels] argument that should be provided to
     {!Node.init} in order to observe all debug-level prevalidator
@@ -52,7 +52,7 @@ let prevalidator_worker_event_section = function
 let prevalidator_debug = function
   | Protocol.Kathmandu ->
       [("prevalidator", `Debug); ("legacy_prevalidator", `Debug)]
-  | Lima | Alpha -> [("prevalidator", `Debug)]
+  | Lima | Mumbai | Alpha -> [("prevalidator", `Debug)]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1657
 

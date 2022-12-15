@@ -1,0 +1,14 @@
+
+./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/store_bls12_381_fr.tz --details
+Well typed
+Gas remaining: 1039997.300 units remaining
+{ parameter bls12_381_fr ;
+  storage (option bls12_381_fr) ;
+  code { CAR
+         /* [ bls12_381_fr ] */ ;
+         SOME
+         /* [ option bls12_381_fr ] */ ;
+         NIL operation
+         /* [ list operation : option bls12_381_fr ] */ ;
+         PAIR
+         /* [ pair (list operation) (option bls12_381_fr) ] */ } }

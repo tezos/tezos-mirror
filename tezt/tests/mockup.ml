@@ -1192,7 +1192,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
              (sf
                 "./tezt/tests/mockup_protocol_constants/protocol_constants-%d.json"
                 (Protocol.number protocol))
-    | Lima | Alpha ->
+    | Lima | Mumbai | Alpha ->
         (* This function should work on all protocols since Lima.  *)
         protocol_constants_fixture_rpc protocol
   in

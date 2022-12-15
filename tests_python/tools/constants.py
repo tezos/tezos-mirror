@@ -99,6 +99,11 @@ LIMA_DAEMON = "PtLimaPt"
 LIMA_FOLDER = "proto_015_PtLimaPt"
 LIMA_PARAMETERS = get_parameters(LIMA_FOLDER)
 
+MUMBAI = "PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD"
+MUMBAI_DAEMON = "PtMumbai"
+MUMBAI_FOLDER = "proto_016_PtMumbai"
+MUMBAI_PARAMETERS = get_parameters(MUMBAI_FOLDER)
+
 TEZOS_CRT = """
 Certificate:
     Data:

@@ -4,6 +4,10 @@ octez-codec
 octez-client
 octez-admin-client
 octez-node
+octez-sc-rollup-node-PtMumbai
+octez-sc-rollup-client-PtMumbai
+octez-accuser-PtMumbai
+octez-baker-PtMumbai
 octez-tx-rollup-node-PtLimaPt
 octez-tx-rollup-client-PtLimaPt
 octez-accuser-PtLimaPt

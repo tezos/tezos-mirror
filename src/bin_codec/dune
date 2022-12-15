@@ -49,6 +49,9 @@
   (select void_for_linking-tezos-client-015-PtLimaPt from
    (tezos-client-015-PtLimaPt -> void_for_linking-tezos-client-015-PtLimaPt.empty)
    (-> void_for_linking-tezos-client-015-PtLimaPt.empty))
+  (select void_for_linking-tezos-client-016-PtMumbai from
+   (tezos-client-016-PtMumbai -> void_for_linking-tezos-client-016-PtMumbai.empty)
+   (-> void_for_linking-tezos-client-016-PtMumbai.empty))
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty)))
@@ -78,4 +81,5 @@
    (write-file void_for_linking-tezos-client-013-PtJakart.empty "")
    (write-file void_for_linking-tezos-client-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-client-015-PtLimaPt.empty "")
+   (write-file void_for_linking-tezos-client-016-PtMumbai.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty ""))))

@@ -4983,7 +4983,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let _tx_rollup_client =
-      only_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       public_exe
         (sf "octez-tx-rollup-client-%s" short_hash)
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
@@ -5005,7 +5005,7 @@ module Protocol = Protocol
           ]
     in
     let _tx_rollup_node =
-      only_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       public_exe
         (sf "octez-tx-rollup-node-%s" short_hash)
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
@@ -5276,6 +5276,8 @@ module Protocol = Protocol
   let _014_PtKathma = active (Name.v "PtKathma" 014)
 
   let _015_PtLimaPt = active (Name.v "PtLimaPt" 015)
+
+  let _016_PtMumbai = active (Name.v "PtMumbai" 016)
 
   let alpha = active Name.alpha
 
