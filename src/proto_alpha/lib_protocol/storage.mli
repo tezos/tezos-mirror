@@ -764,6 +764,25 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.Hash.t
        and type t := Raw_context.t
 
+  (** Contains the current latest attributed index for stakers. *)
+  module Staker_index_counter :
+    Single_data_storage
+      with type value = Sc_rollup_staker_index_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Contains the index of any staker that currently have stake. *)
+  module Staker_index :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Sc_rollup_staker_index_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Contains the stakers' index that currently have stake indexed by rollup. *)
+  module Stakers_by_rollup :
+    Carbonated_data_set_storage
+      with type t = Raw_context.t * Sc_rollup_repr.t
+       and type elt = Sc_rollup_staker_index_repr.t
+
   module Stakers :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Signature.Public_key_hash.t

@@ -436,7 +436,15 @@ let withdraw_stake_and_check_balances ctxt rollup staker =
       in
       let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
       let bonds_account = `Frozen_bonds (staker_contract, bond_id) in
-      let+ () = assert_balance_decreased ctxt ctxt' bonds_account stake in
+      let* () = assert_balance_decreased ctxt ctxt' bonds_account stake in
+      let+ () =
+        assert_not_exist
+          ~loc:__LOC__
+          ~pp:(fun fmt (z : Sc_rollup_staker_index_repr.t) ->
+            Z.pp_print fmt (z :> Z.t))
+        @@ lift
+        @@ Storage.Sc_rollup.Staker_index.find (ctxt', rollup) staker
+      in
       ctxt')
 
 let test_deposit_then_withdraw () =
@@ -2695,6 +2703,25 @@ let test_unrelated_commitments () =
   in
   Assert.equal_bool ~loc:__LOC__ are_commitments_related false
 
+let test_fresh_index_correctly_increment () =
+  let* ctxt, rollup, _genesis_hash, staker1, staker2 =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let assert_staker_index ~__LOC__ ctxt staker expected_index =
+    let* _, (found_index : Sc_rollup_staker_index_repr.t) =
+      lift @@ Storage.Sc_rollup.Staker_index.get (ctxt, rollup) staker
+    in
+    Assert.equal_z ~loc:__LOC__ (found_index :> Z.t) expected_index
+  in
+  let* () = assert_staker_index ~__LOC__ ctxt staker1 Z.zero in
+  let* () = assert_staker_index ~__LOC__ ctxt staker2 Z.one in
+  let Account.{pkh; _} = Account.new_account () in
+  let* ctxt, fresh_staker3_index =
+    lift @@ Sc_rollup_staker_index_storage.fresh_staker_index ctxt rollup pkh
+  in
+  let* () = assert_staker_index ~__LOC__ ctxt pkh Z.(succ one) in
+  Assert.equal_z ~loc:__LOC__ (fresh_staker3_index :> Z.t) Z.(succ one)
+
 let tests =
   [
     Tztest.tztest
@@ -2940,6 +2967,10 @@ let tests =
       "Unrelated commitments are classified as such"
       `Quick
       test_unrelated_commitments;
+    Tztest.tztest
+      "test fresh index is correcly incremented"
+      `Quick
+      test_fresh_index_correctly_increment;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460

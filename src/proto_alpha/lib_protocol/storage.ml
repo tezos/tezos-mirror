@@ -1743,6 +1743,30 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
 
+  module Staker_index_counter =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["staker_index_counter"]
+      end)
+      (Sc_rollup_staker_index_repr)
+
+  module Staker_index =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["staker_index"]
+         end))
+         (Public_key_hash_index)
+      (Sc_rollup_staker_index_repr)
+
+  module Stakers_by_rollup =
+    Make_carbonated_data_set_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["stakers_by_rollup"]
+         end))
+         (Make_index (Sc_rollup_staker_index_repr.Index))
+
   module Stakers =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)

@@ -110,6 +110,9 @@ let deposit_stake ctxt rollup staker =
       (`Frozen_bonds (staker_contract, bond_id))
       stake
   in
+  let* ctxt, _staker_index =
+    Sc_rollup_staker_index_storage.fresh_staker_index ctxt rollup staker
+  in
   let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
   let* ctxt = modify_staker_count ctxt rollup Int32.succ in
   return (ctxt, balance_updates, lcc)
@@ -137,6 +140,9 @@ let withdraw_stake ctxt rollup staker =
   in
   let* ctxt, _size_freed =
     Store.Stakers.remove_existing (ctxt, rollup) staker
+  in
+  let* ctxt, _size_freed =
+    Sc_rollup_staker_index_storage.remove_staker ctxt rollup staker
   in
   let+ ctxt = modify_staker_count ctxt rollup Int32.pred in
   (ctxt, balance_updates)
