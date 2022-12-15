@@ -26,17 +26,17 @@
 module S = Saturation_repr
 
 (* Inferred from model model_next in file skip_list_benchmarks.ml *)
-(* fun size -> (41.51416897 * (log2 (1 + size))) *)
+(* fun size -> (35.3519166771 * (log2 (1 + size))) *)
 let model_next ~length =
   let open S.Syntax in
   let length = S.safe_z length in
-  S.safe_int 42 * log2 (S.safe_int 1 + length)
+  S.safe_int 37 * log2 (S.safe_int 1 + length)
 
 (* Inferred from model model_hash_cell in file skip_list_benchmarks.ml *)
-(* fun size -> (614.246755643 + (33.7098924139 * size)) *)
+(* fun size -> (0. + (76.1386774605 * size)) *)
 let model_hash_cell backpointers_count =
   let open S.Syntax in
-  S.safe_int 614 + (S.safe_int 34 * backpointers_count)
+  S.safe_int 77 * backpointers_count
 
 let model_hash_cell_computed_backpointers_count ~index =
   model_hash_cell (S.Syntax.log2 (S.safe_z index))
