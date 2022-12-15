@@ -45,7 +45,7 @@ val parse_ticket_and_operation :
   ticketer:Contract.t ->
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
-  source:Contract.t ->
+  source:Destination.t ->
   destination:Contract_hash.t ->
   entrypoint:Entrypoint.t ->
   amount:Script_typed_ir.ticket_amount ->

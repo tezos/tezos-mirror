@@ -39,7 +39,7 @@ open Dependent_bool
 
 *)
 type step_constants = {
-  source : Contract.t;
+  source : Destination.t;
       (** The address calling this contract, as returned by SENDER. *)
   payer : Signature.public_key_hash;
       (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
@@ -1668,7 +1668,7 @@ and 'kind internal_operation_contents =
       -> Kind.delegation internal_operation_contents
 
 and 'kind internal_operation = {
-  source : Contract.t;
+  source : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }

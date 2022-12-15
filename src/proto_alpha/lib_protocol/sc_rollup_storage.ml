@@ -160,3 +160,8 @@ let parameters_type ctxt rollup =
   let open Lwt_result_syntax in
   let+ ctxt, res = Store.Parameters_type.find ctxt rollup in
   (res, ctxt)
+
+let must_exist ctxt rollup =
+  let open Lwt_result_syntax in
+  let+ ctxt, _info = genesis_info ctxt rollup in
+  ctxt

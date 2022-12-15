@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.633
 
 
-./octez-client --wait none send sc rollup message 'hex:["3337204b543153364537793463703851657451516a555467784d646f6d706a4b66386f73776755"]' from bootstrap2
+./octez-client --wait none send sc rollup message 'hex:["3337204b5431427663427559354d4e5350704778754e59704473336668426738514a3151554a4e"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 1001.327 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -58,9 +58,9 @@ This sequence of operations was run:
       Consumed gas: 1001.361
 
 
-./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x030002ca9deff6c5c766d66c96a4339387d614811dea25656a82d7b629a676d0556df5ca9deff6c5c766d66c96a4339387d614811dea25656a82d7b629a676d0556df500100007d0030170000382066f7574707574810130c8b3be8e119db56ecbdb098e21636b1e0d6f7429a633db34b47445364df8c39c0c0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c00aeb3d498091257b568445fa9c2f756712d8bd07de2a02ffaf7eefe81c3556b7c097354cf34106c0e824fd1b44d759ce74dc917914c3ab5b23d62120d4ff1dabd3ca9deff6c5c766d66c96a4339387d614811dea25656a82d7b629a676d0556df500000005000000000023002501c00c5e4e94a48a49e267873112bbe3cf3373be5b000000000764656661756c74 --burn-cap 10
+./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x030002296844a1f6f698d66fd7e6e09e306a2a1723407f1bc4938b5baa2730040583ed296844a1f6f698d66fd7e6e09e306a2a1723407f1bc4938b5baa2730040583ed00100007d0030170000382066f7574707574810130c847a5c2aba11c9a05ba4f50b87cbf46235ff3d5f0513e34da8b6b891259d7ec8b0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0b9543ec7505c0d34f509d4f3e29af8c2de75d2a22ff591850e07401737bc956cc097354cf34106c0e824fd1b44d759ce74dc917914c3ab5b23d62120d4ff1dabd3296844a1f6f698d66fd7e6e09e306a2a1723407f1bc4938b5baa2730040583ed0000000500000000002300250124a8de819e9ab9dcadac94c3d49981dc4b864f2f000000000764656661756c74 --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 5930.462 units (will add 100 for safety)
+Estimated gas: 6398.436 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -71,30 +71,30 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001227
+    Fee to the baker: ꜩ0.001273
     Expected counter: 2
-    Gas limit: 6031
+    Gas limit: 6499
     Storage limit: 25 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001227
-      payload fees(the block proposer) ....... +ꜩ0.001227
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001273
+      payload fees(the block proposer) ....... +ꜩ0.001273
     Smart contract output message execution:
       Address: [SMART_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract output message execution was successfully applied
       Paid storage size diff: 5 bytes
-      Consumed gas: 4727.358
+      Consumed gas: 4745.058
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00125
         storage fees ........................... +ꜩ0.00125
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
-          From: [PUBLIC_KEY_HASH]
+          From: [SMART_ROLLUP_HASH]
           To: [CONTRACT_HASH]
           Parameter: 37
           This transaction was successfully applied
           Updated storage: 37
-          Storage size: 92 bytes
-          Consumed gas: 1203.104
+          Storage size: 228 bytes
+          Consumed gas: 1653.378
 

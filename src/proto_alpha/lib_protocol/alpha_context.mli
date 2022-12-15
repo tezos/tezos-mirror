@@ -3179,6 +3179,8 @@ module Sc_rollup : sig
 
   val in_memory_size : t -> Cache_memory_helpers.sint
 
+  val must_exist : context -> t -> context tzresult Lwt.t
+
   module Staker : S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
 
   module State_hash : sig
@@ -4159,6 +4161,8 @@ module Destination : sig
   val of_b58check : string -> t tzresult
 
   val in_memory_size : t -> Cache_memory_helpers.sint
+
+  val must_exist : context -> t -> context tzresult Lwt.t
 
   type error += Invalid_destination_b58check of string
 end

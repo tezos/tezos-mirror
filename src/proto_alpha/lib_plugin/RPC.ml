@@ -1057,6 +1057,7 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
+          let source = Destination.Contract source in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
         Script_interpreter.execute
@@ -1128,6 +1129,7 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
+          let source = Destination.Contract source in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
         let module Unparsing_mode = struct
@@ -1211,6 +1213,7 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
+          let source = Destination.Contract source in
           {
             source;
             payer;
@@ -1309,6 +1312,7 @@ module Scripts = struct
              |> Script_int.of_int32 |> Script_int.abs)
         in
         let step_constants =
+          let source = Destination.Contract source in
           {
             Script_interpreter.source;
             payer;

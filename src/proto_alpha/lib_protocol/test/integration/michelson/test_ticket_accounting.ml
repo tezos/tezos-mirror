@@ -991,7 +991,7 @@ let test_update_invalid_transfer () =
     boxed_list [string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1]
   in
   let* operation, ctxt =
-    transfer_operation ctxt ~src ~destination ~arg_type ~arg
+    transfer_operation ctxt ~src:(Contract src) ~destination ~arg_type ~arg
   in
   assert_fail_with
     ~loc:__LOC__
@@ -1080,7 +1080,7 @@ let test_update_self_ticket_transfer () =
     in
     transfer_operation
       ctxt
-      ~src:self
+      ~src:(Contract self)
       ~destination:ticket_receiver
       ~arg_type
       ~arg
@@ -1125,11 +1125,7 @@ let test_update_valid_transfer () =
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* red_self_token_hash, ctxt =
-    wrap
-    @@ Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Destination.Contract self)
-         red_token
+    wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner:(Contract self) red_token
   in
   let* red_receiver_token_hash, ctxt =
     wrap
@@ -1145,7 +1141,7 @@ let test_update_valid_transfer () =
   let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg = boxed_list [string_ticket ticketer "red" 1] in
-    transfer_operation ctxt ~src:self ~destination ~arg_type ~arg
+    transfer_operation ctxt ~src:(Contract self) ~destination ~arg_type ~arg
   in
   let* _, ctxt =
     let* ticket_diffs, ctxt =
@@ -1205,7 +1201,12 @@ let test_update_transfer_tickets_to_self () =
   let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg = boxed_list [string_ticket ticketer "red" 1] in
-    transfer_operation ctxt ~src:self ~destination:self_hash ~arg_type ~arg
+    transfer_operation
+      ctxt
+      ~src:(Contract self)
+      ~destination:self_hash
+      ~arg_type
+      ~arg
   in
   let* _, ctxt =
     (* Ticket diff removes 5 tickets. *)
@@ -1252,7 +1253,7 @@ let test_update_invalid_origination () =
   in
   let ctxt = Incremental.alpha_ctxt incr in
   let* operation, ctxt =
-    origination_operation ctxt ~src ~orig_contract ~script
+    origination_operation ctxt ~src:(Contract src) ~orig_contract ~script
   in
   assert_fail_with
     ~loc:__LOC__
@@ -1296,7 +1297,7 @@ let test_update_valid_origination () =
     wrap @@ Ticket_balance.adjust_balance ctxt red_self_token_hash ~delta:Z.one
   in
   let* operation, ctxt =
-    origination_operation ctxt ~src:self ~orig_contract ~script
+    origination_operation ctxt ~src:(Contract self) ~orig_contract ~script
   in
   let* _, ctxt =
     let* ticket_diffs, ctxt =
@@ -1348,7 +1349,7 @@ let test_update_self_origination () =
          red_token
   in
   let* operation, ctxt =
-    origination_operation ctxt ~src:self ~orig_contract ~script
+    origination_operation ctxt ~src:(Contract self) ~orig_contract ~script
   in
   let* _, ctxt =
     wrap
