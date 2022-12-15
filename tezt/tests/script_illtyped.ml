@@ -67,12 +67,7 @@ let test_ill_typecheck script error_pattern =
   let script_path =
     Michelson_script.(
       find
-        ~prefix:
-          (sf
-             "tests_python/contracts_%s"
-             (match protocol with
-             | Alpha -> "alpha"
-             | _ -> sf "%03d" (Protocol.number protocol)))
+        ~prefix:(Michelson_script.pytest_prefix protocol)
         ["ill_typed"; script]
         protocol
       |> path)
@@ -107,12 +102,7 @@ let register ~protocols =
   protocols
   |> List.iter (fun protocol ->
          Michelson_script.find_all_legacy
-           ~prefix:
-             (sf
-                "tests_python/contracts_%s"
-                (match protocol with
-                | Alpha -> "alpha"
-                | _ -> sf "%03d" (Protocol.number protocol)))
+           ~prefix:(Michelson_script.pytest_prefix protocol)
            protocol
          |> List.iter (fun michelson_script ->
                 test_deprecated_typecheck
