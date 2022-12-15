@@ -294,24 +294,29 @@ let unsafe_next_tick_state ~debug_flag
       let durable' = Durable.of_storage ~default:durable store' in
       return ~durable:durable' (Eval {config; module_reg})
 
-let next_tick_state ~debug_flag pvm_state =
-  let to_stuck exn =
-    let error = Wasm_pvm_errors.extract_interpreter_error exn in
-    let wasm_error =
-      match error with
-      | `Interpreter error -> (
-          match pvm_state.tick_state with
-          | Decode _ -> Wasm_pvm_errors.Decode_error error
-          | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
-          | Init _ -> Init_error error
-          | Eval _ -> Eval_error error
-          | Snapshot | Stuck _ | Collect | Padding ->
-              Unknown_error error.raw_exception)
-      | `Unknown raw_exception -> Unknown_error raw_exception
-    in
-    Lwt.return (pvm_state.durable, Stuck wasm_error, Failing)
+let exn_to_stuck pvm_state exn =
+  let error = Wasm_pvm_errors.extract_interpreter_error exn in
+  let wasm_error =
+    match error with
+    | `Interpreter error -> (
+        match pvm_state.tick_state with
+        | Decode _ -> Wasm_pvm_errors.Decode_error error
+        | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
+        | Init _ -> Init_error error
+        | Eval _ -> Eval_error error
+        | Snapshot | Stuck _ | Collect | Padding ->
+            Unknown_error error.raw_exception)
+    | `Unknown raw_exception -> Unknown_error raw_exception
   in
-  Lwt.catch (fun () -> unsafe_next_tick_state ~debug_flag pvm_state) to_stuck
+  Lwt.return (Stuck wasm_error)
+
+let next_tick_state ~debug_flag pvm_state =
+  let open Lwt_syntax in
+  Lwt.catch
+    (fun () -> unsafe_next_tick_state ~debug_flag pvm_state)
+    (fun exn ->
+      let+ tick_state = exn_to_stuck pvm_state exn in
+      (pvm_state.durable, tick_state, Failing))
 
 let next_last_top_level_call {current_tick; last_top_level_call; _} = function
   | Forcing_yield | Yielding | Reboot -> Z.succ current_tick
@@ -515,7 +520,7 @@ let set_input_step input_info message pvm_state =
          (Wasm_pvm_errors.invalid_state
          @@ Format.sprintf "No input required during %s" state_name))
   in
-  let+ tick_state =
+  let next_tick_state () =
     match pvm_state.tick_state with
     | Collect -> (
         let+ () =
@@ -538,6 +543,7 @@ let set_input_step input_info message pvm_state =
     | Eval _ -> return_stuck "evaluation"
     | Padding -> return_stuck "padding"
   in
+  let+ tick_state = Lwt.catch next_tick_state (exn_to_stuck pvm_state) in
   (* Increase the current tick counter and update last input *)
   {
     pvm_state with
