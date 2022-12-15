@@ -102,6 +102,13 @@ let benchmark_cmd (bench_pattern : string)
         ~bench
         ~workload_data
 
+let is_constant_input (type a t) (bench : (a, t) Benchmark.poly) workload_data =
+  let module Bench = (val bench) in
+  List.map
+    (fun Measure.{workload; _} -> Bench.workload_to_vector workload)
+    workload_data
+  |> List.all_equal Sparse_vec.String.equal
+
 let rec infer_cmd model_name workload_data solver infer_opts =
   Pyinit.pyinit () ;
   let file_stats = Unix.stat workload_data in
@@ -158,7 +165,10 @@ and infer_cmd_one_shot model_name workload_data solver
             err
       | _ -> ()) ;
       let solver = solver_of_string solver infer_opts in
-      let solution = Inference.solve_problem problem solver in
+      let is_constant_input = is_constant_input (module Bench) workload_data in
+      let solution =
+        Inference.solve_problem ~is_constant_input problem solver
+      in
       let () =
         let perform_report () =
           let report =
@@ -243,7 +253,12 @@ and infer_cmd_full_auto model_name workload_data solver
         let problem =
           Inference.make_problem ~data:m.Measure.workload_data ~model ~overrides
         in
-        let solution = Inference.solve_problem problem solver in
+        let is_constant_input =
+          is_constant_input (module Bench) m.Measure.workload_data
+        in
+        let solution =
+          Inference.solve_problem ~is_constant_input problem solver
+        in
         let report =
           Option.map
             (Report.add_section

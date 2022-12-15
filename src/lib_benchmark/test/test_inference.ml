@@ -91,6 +91,7 @@ module T () = struct
 
   let {Inference.mapping; weights = _; scores = _} =
     Inference.solve_problem
+      ~is_constant_input:false
       problem
       (Inference.Lasso {alpha = 1.0; positive = false})
 

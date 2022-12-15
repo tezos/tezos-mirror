@@ -123,16 +123,16 @@ let r2_score ~output ~prediction =
   if len <= 1 then
     (* The following warning will be raised from `r2_score` of Python. *)
     (* `R^2 score is not well-defined with less than two samples.` *)
-
-    (* For this case, we use `1.0 (perfect predictions)` as the score. *)
     (* see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.r2_score.html#sklearn.metrics.r2_score *)
-    1.0
+
+    (* For this case, we use `None` as the score. *)
+    None
   else
     Py.Module.get_function
       (Pyinit.sklearn_metrics ())
       "r2_score"
       [|output; prediction|]
-    |> Py.Float.to_float
+    |> Py.Float.to_float |> Option.some
 
 let rmse_score ~output ~prediction =
   let output = Scikit_matrix.to_numpy output in

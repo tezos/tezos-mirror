@@ -117,6 +117,20 @@ let test_rev_split _ =
   Assert.equal ~msg:__LOC__ (TzList.rev_split_n 3 [1; 2; 3]) ([3; 2; 1], []) ;
   Assert.equal ~msg:__LOC__ (TzList.rev_split_n 4 [1; 2; 3]) ([3; 2; 1], [])
 
+let test_all_equal _ =
+  Assert.equal ~msg:__LOC__ (TzList.all_equal ( = ) [1; 1; 1]) true ;
+  Assert.equal ~msg:__LOC__ (TzList.all_equal ( = ) [1; 1; 2]) false ;
+  Assert.equal
+    ~msg:__LOC__
+    (TzList.all_equal (fun (x, _) (y, _) -> x = y) [(3, 1); (3, 2); (3, 3)])
+    true ;
+  Assert.equal
+    ~msg:__LOC__
+    (TzList.all_equal (fun (x, _) (y, _) -> x = y) [(3, 1); (4, 1); (3, 3)])
+    false ;
+  Assert.equal ~msg:__LOC__ (TzList.all_equal ( = ) [1]) true ;
+  Assert.equal ~msg:__LOC__ (TzList.all_equal ( = ) []) true
+
 let () =
   Alcotest.run
     "stdlib"
@@ -128,5 +142,6 @@ let () =
           ("consistency(rev)", `Quick, test_drop_take_split_rev);
           ("split", `Quick, test_split);
           ("rev_split", `Quick, test_rev_split);
+          ("all_equal", `Quick, test_all_equal);
         ] );
     ]
