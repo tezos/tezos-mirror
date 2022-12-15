@@ -27,13 +27,11 @@ let ns = Namespace.make Registration_helpers.ns "sc_rollup"
 
 let fv s = Free_variable.of_namespace (ns s)
 
-(** This benchmark estimates the cost of verifying an output proof for the
-    Wasm PVM.
-    The inferred cost model is [c1 + c2*proof_length]. *)
-module Sc_rollup_verify_output_proof_benchmark = struct
-  (* This section contains preliminary definitions for building a pvm state
-     from scratch. *)
+let ( -- ) min max : Base_samplers.range = {min; max}
 
+(** This section contains preliminary definitions for building a pvm state from
+    scratch. *)
+module Pvm_state_generator = struct
   module Context = Tezos_context_memory.Context_binary
 
   module Wasm_context = struct
@@ -110,8 +108,6 @@ module Sc_rollup_verify_output_proof_benchmark = struct
              [] )
     in
     Sc_rollup_outbox_message_repr.{unparsed_parameters; entrypoint; destination}
-
-  let ( -- ) min max : Base_samplers.range = {min; max}
 
   let make_transactions ~rng_state ~max =
     let open Base_samplers in
@@ -244,6 +240,45 @@ module Sc_rollup_verify_output_proof_benchmark = struct
     in
     Lwt.return (dummy_context, output, tree)
 
+  let select_output ~output_buffer ~nb_output_buffer_levels ~output_buffer_size
+      rng_state =
+    let open Lwt_result_syntax in
+    let open Base_samplers in
+    (* Pick a level. *)
+    let outbox_level =
+      Int32.of_int
+      @@ sample_in_interval
+           ~range:(0 -- (nb_output_buffer_levels - 1))
+           rng_state
+    in
+    (* Pick a message. *)
+    let message_index =
+      Z.of_int
+      @@ sample_in_interval ~range:(0 -- (output_buffer_size - 1)) rng_state
+    in
+    let*! bytes_output_message =
+      Tezos_webassembly_interpreter.Output_buffer.get_message
+        output_buffer
+        {outbox_level; message_index}
+    in
+    let message =
+      Data_encoding.Binary.of_bytes_exn
+        Sc_rollup_outbox_message_repr.encoding
+        bytes_output_message
+    in
+    let*? outbox_level =
+      Environment.wrap_tzresult @@ Raw_level_repr.of_int32 outbox_level
+    in
+    (* Produce an output proof for the picked message, and return the proof
+       and its length. *)
+    return Sc_rollup_PVM_sig.{outbox_level; message_index; message}
+end
+
+(** This benchmark estimates the cost of verifying an output proof for the
+    Wasm PVM.
+    The inferred cost model is [c1 + c2 * proof_length]. *)
+module Sc_rollup_verify_output_proof_benchmark = struct
+  open Pvm_state_generator
   module Full_Wasm =
     Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
 
@@ -400,7 +435,7 @@ module Sc_rollup_verify_output_proof_benchmark = struct
       let open Lwt_result_syntax in
       (* Build [pvm_state] and save it to be used for all benchmarks. The state
          is large enough for each benchmark to be relatively random. *)
-      let*! context, output, initial_tree =
+      let*! context, output_buffer, initial_tree =
         match !pvm_state with
         | None ->
             let res =
@@ -418,35 +453,15 @@ module Sc_rollup_verify_output_proof_benchmark = struct
             res
         | Some pvm_state -> pvm_state
       in
-      let open Base_samplers in
-      (* Pick a level. *)
-      let outbox_level =
-        Int32.of_int
-        @@ sample_in_interval
-             ~range:(0 -- (nb_output_buffer_levels - 1))
-             rng_state
+      (* Select an output. *)
+      let* output =
+        select_output
+          ~output_buffer
+          ~nb_output_buffer_levels
+          ~output_buffer_size
+          rng_state
       in
-      (* Pick a message. *)
-      let message_index =
-        Z.of_int
-        @@ sample_in_interval ~range:(0 -- (output_buffer_size - 1)) rng_state
-      in
-      let*! bytes_output_message =
-        Tezos_webassembly_interpreter.Output_buffer.get_message
-          output
-          {outbox_level; message_index}
-      in
-      let message =
-        Data_encoding.Binary.of_bytes_exn
-          Sc_rollup_outbox_message_repr.encoding
-          bytes_output_message
-      in
-      let*? outbox_level =
-        Environment.wrap_tzresult @@ Raw_level_repr.of_int32 outbox_level
-      in
-      (* Produce an output proof for the picked message, and return the proof
-         and its length. *)
-      let output = Sc_rollup_PVM_sig.{outbox_level; message_index; message} in
+      (* produce an output proof, and also return the length of its encoding.*)
       let*! pf = Full_Wasm.produce_output_proof context initial_tree output in
       match pf with
       | Ok proof ->
@@ -478,5 +493,165 @@ module Sc_rollup_verify_output_proof_benchmark = struct
       (Model.For_codegen verify_output_proof_model)
 end
 
+(** This benchmark estimates the cost of verifying an output proof for the
+    Wasm PVM.
+    The inferred cost model is [c1 + c2 * proof_length]. *)
+module Sc_rollup_deserialize_output_proof_benchmark = struct
+  open Pvm_state_generator
+  module Full_Wasm =
+    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+
+  (* Benchmark starts here. *)
+
+  let name = ns "Sc_rollup_deserialize_output_proof_benchmark"
+
+  let info = "Estimating the cost of deserializing an output proof"
+
+  let tags = ["sc_rollup"]
+
+  type config = {
+    nb_output_buffer_levels : int;
+    output_buffer_size : int;
+    nb_transactions : int;
+    tree_depth : int;
+  }
+
+  let config_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             nb_output_buffer_levels;
+             output_buffer_size;
+             nb_transactions;
+             tree_depth;
+           } ->
+        ( nb_output_buffer_levels,
+          output_buffer_size,
+          nb_transactions,
+          tree_depth ))
+      (fun ( nb_output_buffer_levels,
+             output_buffer_size,
+             nb_transactions,
+             tree_depth ) ->
+        {
+          nb_output_buffer_levels;
+          output_buffer_size;
+          nb_transactions;
+          tree_depth;
+        })
+      (obj4
+         (req "nb_output_buffer_levels" int31)
+         (req "output_buffer_size" int31)
+         (req "nb_transactions" int31)
+         (req "tree_depth" int31))
+
+  let default_config =
+    {
+      nb_output_buffer_levels = 10_000;
+      output_buffer_size = 100;
+      nb_transactions = 50;
+      tree_depth = 10;
+    }
+
+  type workload = {proof_length : int}
+
+  let workload_encoding =
+    let open Data_encoding in
+    conv
+      (fun {proof_length} -> proof_length)
+      (fun proof_length -> {proof_length})
+      (obj1 (req "proof_length" int31))
+
+  let workload_to_vector {proof_length} =
+    Sparse_vec.String.of_list [("proof_length", float_of_int proof_length)]
+
+  let verify_output_proof_model =
+    Model.make
+      ~conv:(fun {proof_length} -> (proof_length, ()))
+      ~model:
+        (Model.affine
+           ~intercept:(Free_variable.of_string "const")
+           ~coeff:(Free_variable.of_string "proof_length"))
+
+  let models = [("deserialize_output_proof", verify_output_proof_model)]
+
+  let pvm_state = ref None
+
+  let benchmark rng_state conf () =
+    let prepared_benchmark_scenario =
+      let nb_output_buffer_levels = conf.nb_output_buffer_levels in
+      let output_buffer_size = conf.output_buffer_size in
+      let tree_depth = conf.tree_depth in
+      let open Lwt_result_syntax in
+      (* Build [pvm_state] and save it to be used for all benchmarks. The state
+         is large enough for each benchmark to be relatively random. *)
+      let*! context, output_buffer, initial_tree =
+        match !pvm_state with
+        | Some pvm_state -> pvm_state
+        | None ->
+            let res =
+              build_pvm_state
+                rng_state
+                ~nb_inbox_messages:0
+                ~input_payload_size:0
+                ~nb_output_buffer_levels
+                ~output_buffer_size
+                ~nb_transactions:conf.nb_transactions
+                ~tree_depth
+                ~tree_branching_factor:2
+            in
+            pvm_state := Some res ;
+            res
+      in
+      (* Select an output. *)
+      let* output =
+        select_output
+          ~output_buffer
+          ~nb_output_buffer_levels
+          ~output_buffer_size
+          rng_state
+      in
+      (* Produce an output proof, and return its encoding and the length of the
+         encoding. *)
+      let*! pf = Full_Wasm.produce_output_proof context initial_tree output in
+      match pf with
+      | Ok proof ->
+          let encoded_proof =
+            Data_encoding.Binary.to_bytes_exn
+              Full_Wasm.output_proof_encoding
+              proof
+          in
+          let proof_length = Bytes.length encoded_proof in
+          return (encoded_proof, proof_length)
+      | Error _ -> assert false
+    in
+
+    let encoded_proof, proof_length =
+      prepared_benchmark_scenario |> Lwt_main.run
+      |> WithExceptions.Result.get_ok ~loc:__LOC__
+    in
+    let workload = {proof_length} in
+
+    let closure () =
+      ignore
+        (Data_encoding.Binary.of_bytes_exn
+           Full_Wasm.output_proof_encoding
+           encoded_proof)
+    in
+    Generator.Plain {workload; closure}
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (benchmark rng_state config)
+
+  let () =
+    Registration.register_for_codegen
+      (Namespace.basename name)
+      (Model.For_codegen verify_output_proof_model)
+end
+
 let () =
   Registration_helpers.register (module Sc_rollup_verify_output_proof_benchmark)
+
+let () =
+  Registration_helpers.register
+    (module Sc_rollup_deserialize_output_proof_benchmark)

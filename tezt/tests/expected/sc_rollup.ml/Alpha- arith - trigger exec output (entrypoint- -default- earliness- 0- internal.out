@@ -35,7 +35,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x03000258d7266ea850d6eef1fa03db97d047e5d46be09d289d4c8db8452baecc28633058d7266ea850d6eef1fa03db97d047e5d46be09d289d4c8db8452baecc28633000100007d0030170000382066f7574707574810130c847a5c2aba11c9a05ba4f50b87cbf46235ff3d5f0513e34da8b6b891259d7ec8b0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0b9543ec7505c0d34f509d4f3e29af8c2de75d2a22ff591850e07401737bc956cc093cf7b0656a49a394fee9856478046aff511d04dd9d8cfcfa32a2182074c29c358d7266ea850d6eef1fa03db97d047e5d46be09d289d4c8db8452baecc2863300000000500000000002300250124a8de819e9ab9dcadac94c3d49981dc4b864f2f000000000764656661756c74 --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 6398.436 units (will add 100 for safety)
+Estimated gas: 6400.612 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -46,19 +46,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001273
+    Fee to the baker: ꜩ0.001274
     Expected counter: 1
-    Gas limit: 6499
+    Gas limit: 6501
     Storage limit: 25 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001273
-      payload fees(the block proposer) ....... +ꜩ0.001273
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001274
+      payload fees(the block proposer) ....... +ꜩ0.001274
     Smart contract output message execution:
       Address: [SMART_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract output message execution was successfully applied
       Paid storage size diff: 5 bytes
-      Consumed gas: 4745.058
+      Consumed gas: 4747.234
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00125
         storage fees ........................... +ꜩ0.00125
