@@ -943,7 +943,12 @@ let test_cement () =
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
+  let staker2 =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1RikjCkrEde1QQmuesp796jCxeiyE6t3Vo"
+  in
+
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
+  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker2 in
   let commitment =
     Commitment_repr.
       {
@@ -995,6 +1000,16 @@ let test_cement () =
     @@ Storage.Sc_rollup.Commitment_count_per_inbox_level.find
          (ctxt, rollup)
          old_lcc.inbox_level
+  in
+
+  let* () =
+    let* _ctxt, staker_exists =
+      lift
+      @@ Storage.Sc_rollup.Commitment_stakers.mem
+           ((ctxt, rollup), old_lcc_hash)
+           (Sc_rollup_staker_index_repr.Internal_for_tests.of_z Z.one)
+    in
+    Assert.equal_bool ~loc:__LOC__ false staker_exists
   in
   assert_true ctxt
 

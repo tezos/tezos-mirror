@@ -1839,6 +1839,28 @@ module Sc_rollup = struct
         let encoding = Data_encoding.int32
       end)
 
+  module Commitment_indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_index"]
+         end))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
+
+  module Commitment_subcontext =
+    Make_subcontext (Registered) (Commitment_indexed_context.Raw_context)
+      (struct
+        let name = ["commitment_stakers"]
+      end)
+
+  let clean_commitment_stakers ctxt rollup commitment_hash =
+    Commitment_indexed_context.remove (ctxt, rollup) commitment_hash
+
+  module Commitment_stakers =
+    Make_carbonated_data_set_storage
+      (Commitment_subcontext)
+      (Make_index (Sc_rollup_staker_index_repr.Index))
+
   module Commitment_first_publication_level =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
