@@ -1628,20 +1628,38 @@ module Registration_section = struct
         ~kinstr:(IAnd_bytes (dummy_loc, halt))
         ()
 
+    let stack_sampler_for_or_and_xor_on_bytes cfg rng_state =
+      let _, (module Samplers) =
+        make_default_samplers cfg.Default_config.sampler
+      in
+      fun () ->
+        (* We benchmark the worst cases: when the two bytes have
+               the same length *)
+        let bytes1 =
+          Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+        in
+        let bytes2 =
+          Bytes.init (Bytes.length bytes1) (fun _ ->
+              Char.chr (Random.State.int rng_state 256))
+        in
+        (bytes1, (bytes2, eos))
+
     let () =
-      simple_benchmark
+      simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IOr_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
         ~kinstr:(IOr_bytes (dummy_loc, halt))
+        ~stack_sampler:stack_sampler_for_or_and_xor_on_bytes
         ()
 
     let () =
-      simple_benchmark
+      simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IXor_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
         ~kinstr:(IXor_bytes (dummy_loc, halt))
+        ~stack_sampler:stack_sampler_for_or_and_xor_on_bytes
         ()
 
     let () =
@@ -1655,7 +1673,7 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ILsl_bytes
-        ~intercept_stack:(Bytes.empty, (Script_int.zero_n, eos))
+        ~intercept_stack:(Bytes.empty, (Script_int.one_n, eos))
         ~stack_type:(bytes @$ nat @$ bot)
         ~kinstr:(ILsl_bytes (dummy_loc, halt))
         ~stack_sampler:(fun cfg rng_state ->
@@ -1664,16 +1682,20 @@ module Registration_section = struct
             let bytes =
               Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
             in
-            let shift =
-              Script_int.(abs (of_int (Random.State.int rng_state 64000)))
+            (* Avoid [n mod 8 = 0] which runs faster than the others. *)
+            let n =
+              (* 0-63999 without multiples of 8 *)
+              let n = Random.State.int rng_state 56000 in
+              (n / 7 * 8) + (n mod 7) + 1
             in
+            let shift = Script_int.(abs (of_int n)) in
             (bytes, (shift, eos)))
         ()
 
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ILsr_bytes
-        ~intercept_stack:(Bytes.empty, (Script_int.zero_n, eos))
+        ~intercept_stack:(Bytes.empty, (Script_int.one_n, eos))
         ~stack_type:(bytes @$ nat @$ bot)
         ~kinstr:(ILsr_bytes (dummy_loc, halt))
         ~stack_sampler:(fun cfg rng_state ->
@@ -1682,14 +1704,16 @@ module Registration_section = struct
             let bytes =
               Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
             in
-            let shift =
-              (* No need of samples of shift > bytes * 8 which are equivalent with
-                 the case of shift = bytes * 8 where LSR returns empty bytes immediately *)
-              Script_int.(
-                abs
-                  (of_int
-                     (Random.State.int rng_state ((Bytes.length bytes * 8) + 1))))
+            (* No need of samples of shift > bytes * 8 which are equivalent with
+               the case of shift = bytes * 8 where LSR returns empty bytes immediately *)
+            (* Avoid [n mod 8 = 0] which runs faster than the others. *)
+            let n =
+              let n =
+                Random.State.int rng_state ((Bytes.length bytes * 7) + 1)
+              in
+              (n / 7 * 8) + (n mod 7) + 1
             in
+            let shift = Script_int.(abs (of_int n)) in
             (bytes, (shift, eos)))
         ()
 
