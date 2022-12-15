@@ -206,6 +206,44 @@ let drop_works =
              | Bounds -> Lwt.return (IntVector.num_elements map = 0)
              | _ -> Lwt.return false))
 
+let check_overflow () =
+  let open Lwt.Syntax in
+  let expect_size_overflow f =
+    Lwt.catch
+      (fun () ->
+        let+ () = f () in
+        failwith "This test should have overflown, but didn't.")
+      (function SizeOverflow -> Lwt.return_unit | exn -> raise exn)
+  in
+  (* Creates a vector of the maximum size possible (2^63) *)
+  let v = IntVector.create (-1) in
+  (* Unfortunately, we cannot put the previous QCheck tests into the Lwt monad
+     to be runned by Alcotest_lwt, since they use `Lwt_main.run` themselves. As
+     such, we directly run the monad in the test. *)
+  Lwt_main.run
+    ((* Check overflow on cons *)
+     let* () =
+       expect_size_overflow (fun () ->
+           let _ = IntVector.cons 0 v in
+           Lwt.return_unit)
+     in
+     (* Check overflow on grow *)
+     let* () =
+       expect_size_overflow (fun () ->
+           let _ = IntVector.grow 1 v in
+           Lwt.return_unit)
+     in
+     (* Check overflow on append *)
+     let* () =
+       expect_size_overflow (fun () ->
+           let _ = IntVector.append 1 v in
+           Lwt.return_unit)
+     in
+     (* Check overflow on concat *)
+     expect_size_overflow (fun () ->
+         let _ = IntVector.concat v v in
+         Lwt.return_unit))
+
 let tests =
   [
     to_alcotest of_list_constructs_correctly;
@@ -214,4 +252,5 @@ let tests =
     to_alcotest cons_works;
     to_alcotest drop_works;
     ("concat works lazily", `Quick, concat_works);
+    ("check size overflow", `Quick, check_overflow);
   ]
