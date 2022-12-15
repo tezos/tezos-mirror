@@ -269,11 +269,17 @@ module Legacy = struct
         in
         (* This invariant should hold. *)
         assert (Int32.equal published_level block_level) ;
+        let index = Services.Types.{slot_level = published_level; slot_index} in
+        let header_path = Path.Commitment.header commitment index in
+        let* () =
+          set
+            ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
+            slots_store
+            header_path
+            ""
+        in
         match status with
         | Dal_plugin.Succeeded ->
-            let index =
-              Services.Types.{slot_level = published_level; slot_index}
-            in
             let commitment_path = Path.Level.accepted_header_commitment index in
             let status_path = Path.Level.accepted_header_status index in
             let data = encode_commitment commitment in
@@ -292,9 +298,6 @@ module Legacy = struct
               (Services.Types.header_attestation_status_to_string
                  `Waiting_for_attestations)
         | Dal_plugin.Failed ->
-            let index =
-              Services.Types.{slot_level = published_level; slot_index}
-            in
             let path = Path.Level.other_header_status index commitment in
             set
               ~msg:(Path.to_string ~prefix:"add_slot_headers:" path)
