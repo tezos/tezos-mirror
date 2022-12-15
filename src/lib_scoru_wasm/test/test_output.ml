@@ -308,6 +308,33 @@ let test_write_output_above_limit () =
   in
   List.iter_es push_message l
 
+let test_push_output_bigger_than_max_size () =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let output_buffer = Eval.default_output_buffer () in
+  let message_size = Host_funcs.Aux.input_output_max_size * 2 in
+  assert (output_buffer.Output_buffer.last_level = Some 0l) ;
+  let* outbox_level_0 = Output_buffer.get_outbox output_buffer 0l in
+  let num_messages_before =
+    Output_buffer.Messages.num_elements outbox_level_0
+  in
+  let* result =
+    Host_funcs.Aux.write_output
+      ~output_buffer
+      ~memory
+      ~src:0l
+      ~num_bytes:(Int32.of_int message_size)
+  in
+  assert (result = Host_funcs.Error.(code Input_output_too_large)) ;
+  assert (output_buffer.Output_buffer.last_level = Some 0l) ;
+  let* outbox_level_0 = Output_buffer.get_outbox output_buffer 0l in
+  assert (
+    Z.equal
+      num_messages_before
+      (Output_buffer.Messages.num_elements outbox_level_0)) ;
+  return_ok_unit
+
 let tests =
   [
     tztest "Output buffer" `Quick test_output_buffer;
@@ -320,4 +347,8 @@ let tests =
       "Write_output: Push message above the limit"
       `Quick
       test_write_output_above_limit;
+    tztest
+      "Write_output: push messages bigger than the protocol limit"
+      `Quick
+      test_push_output_bigger_than_max_size;
   ]
