@@ -127,9 +127,9 @@ let test_write_debug_too_many_memories () =
 
 let test_write_debug_invalid_length () =
   let open Lwt_syntax in
-  let memory = Memory.alloc (MemoryType Types.{min = 0l; max = Some 1l}) in
+  let memory = Memory.alloc (MemoryType Types.{min = 1l; max = Some 1l}) in
   let offset = 0l in
-  let length = 10_000l in
+  let length = 100_000l in
   assert (Memory.bound memory < Int64.of_int32 (Int32.add offset length)) ;
 
   let values = Values.[Num (I32 offset); Num (I32 length)] in
@@ -143,8 +143,8 @@ let test_write_debug_invalid_length () =
 
 let test_write_debug_invalid_offset () =
   let open Lwt_syntax in
-  let memory = Memory.alloc (MemoryType Types.{min = 0l; max = Some 1l}) in
-  let offset = 10_000l in
+  let memory = Memory.alloc (MemoryType Types.{min = 1l; max = Some 1l}) in
+  let offset = 100_000l in
   assert (Memory.bound memory < Int64.of_int32 offset) ;
   let values = Values.[Num (I32 offset); Num (I32 10l)] in
   let* _, result_noop = write_debug ~debug:false ~init:false ~values [memory] in
@@ -152,6 +152,79 @@ let test_write_debug_invalid_offset () =
     write_debug ~debug:true ~init:false ~values [memory]
   in
   assert (result_noop = result_alternative) ;
+  return_ok_unit
+
+let test_read_mem_outside_of_bounds () =
+  let open Lwt_syntax in
+  let check_read_mem_empty memory =
+    let bound = Memory.bound memory |> I64.to_int_u |> I32.of_int_u in
+    let offset_outside_bound = Int32.add bound 10l in
+    let offset_in_bound = Int32.sub bound 10l in
+    (* The correct offset is always set 10 bytes before the upper bound of the
+       memory. Reading the 5 bytes should succeed, 50 will fail and -100_000 too
+       with a potential overflow. *)
+    let length_ok = 5l in
+    let length_outside = 50l in
+    let length_32bits = -100_000l in
+
+    (* Should fill the end of the memory. *)
+    let in_memory = String.init 10 (fun i -> Char.chr i) in
+    let* () = Memory.store_bytes memory offset_in_bound in_memory in
+    (* Reading in the bounds of the memory, should work. *)
+    let* res =
+      Host_funcs.Aux.read_mem_for_debug
+        ~memory
+        ~src:offset_in_bound
+        ~num_bytes:length_ok
+    in
+    assert (res = String.sub in_memory 0 (Int32.to_int length_ok)) ;
+
+    (* The offset is not in the bounds of the memory, it should return an error
+       code. *)
+    let* res =
+      Host_funcs.Aux.read_mem_for_debug
+        ~memory
+        ~src:offset_outside_bound
+        ~num_bytes:length_ok
+    in
+    assert (String.starts_with ~prefix:"Error code:" res) ;
+
+    (* The offset is in the bounds of the memory but the length would make it
+       read outside of the memory, it should return an error code. *)
+    let* res =
+      Host_funcs.Aux.read_mem_for_debug
+        ~memory
+        ~src:offset_in_bound
+        ~num_bytes:length_outside
+    in
+    (* The truncated result is exactly the message put at the end of the memory,
+       hence not of size `length_outside`. *)
+    assert (String.starts_with ~prefix:"Error code:" res) ;
+
+    (* The offset is in the bounds of the memory but the length would make it
+       read outside of the memory and potentially overflow, it should return a
+       an error code. *)
+    let+ res =
+      Host_funcs.Aux.read_mem_for_debug
+        ~memory
+        ~src:offset_in_bound
+        ~num_bytes:length_32bits
+    in
+    (* The truncated result is exactly the message put at the end of the memory,
+       hence not of size `length_outside`. *)
+    assert (String.starts_with ~prefix:"Error code:" res)
+  in
+
+  let small_memory =
+    Memory.alloc (MemoryType Types.{min = 1l; max = Some 1l})
+  in
+  let* () = check_read_mem_empty small_memory in
+
+  (* Invalid addresses are in [-65536l; -1l] *)
+  let memory_almost_4gb =
+    Memory.alloc (MemoryType Types.{min = 0x0ffffl; max = None})
+  in
+  let* () = check_read_mem_empty memory_almost_4gb in
   return_ok_unit
 
 let tests =
@@ -170,4 +243,9 @@ let tests =
       "debug with inputs outside of the memory"
       `Quick
       test_write_debug_invalid_offset;
+    tztest
+      "Check reading at invalid position of the memory doesn't fail and \
+       truncates if possible"
+      `Quick
+      test_read_mem_outside_of_bounds;
   ]

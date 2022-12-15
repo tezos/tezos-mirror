@@ -233,7 +233,12 @@ module Aux : sig
       payload:bytes ->
       int32 Lwt.t
 
-    val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
+    (* [read_mem_for_debug ~memory ~src ~num_bytes] is a safe version of
+       `Memory.load_bytes` that never fails: if [src] and [src + num_bytes] are
+       out of bounds of [memory] it prints the error code, and the value in
+       memory otherwise. *)
+    val read_mem_for_debug :
+      memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
 
     val write_debug :
       implem:Builtins.write_debug ->
