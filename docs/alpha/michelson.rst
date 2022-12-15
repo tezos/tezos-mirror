@@ -595,171 +595,23 @@ A detailed description of the following instructions can be found in the `intera
 Operations on integers and natural numbers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Integers and naturals are arbitrary-precision, meaning that the only size
-limit is gas.
-
--  ``NEG``
-
-::
-
-    :: int : 'S   ->   int : 'S
-    :: nat : 'S   ->   int : 'S
-
-    > NEG / x : S  =>  -x : S
-
--  ``ABS``
-
-::
-
-    :: int : 'S   ->   nat : 'S
-
-    > ABS / x : S  =>  abs (x) : S
-
--  ``ISNAT``
-
-::
-
-    :: int : 'S   ->   option nat : 'S
-
-    > ISNAT / x : S  =>  Some (x) : S
-       iff x >= 0
-
-    > ISNAT / x : S  =>  None : S
-       iff x < 0
-
--  ``INT``
-
-::
-
-    :: nat : 'S   ->   int : 'S
-
-    > INT / x : S  =>  x : S
-
--  ``ADD``
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: int : nat : 'S   ->   int : 'S
-    :: nat : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > ADD / x : y : S  =>  (x + y) : S
-
--  ``SUB``
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: int : nat : 'S   ->   int : 'S
-    :: nat : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   int : 'S
-
-    > SUB / x : y : S  =>  (x - y) : S
-
--  ``MUL``
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: int : nat : 'S   ->   int : 'S
-    :: nat : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > MUL / x : y : S  =>  (x * y) : S
-
--  ``EDIV``: Perform Euclidean division
-
-::
-
-    :: int : int : 'S   ->   option (pair int nat) : 'S
-    :: int : nat : 'S   ->   option (pair int nat) : 'S
-    :: nat : int : 'S   ->   option (pair int nat) : 'S
-    :: nat : nat : 'S   ->   option (pair nat nat) : 'S
-
-    > EDIV / x : 0 : S  =>  None : S
-    > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
-        iff y <> 0
-
-Bitwise logical operators are also available on unsigned integers.
-
--  ``OR``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > OR / x : y : S  =>  (x | y) : S
-
--  ``AND``: (also available when the top operand is signed)
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-    :: int : nat : 'S   ->   nat : 'S
-
-    > AND / x : y : S  =>  (x & y) : S
-
--  ``XOR``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > XOR / x : y : S  =>  (x ^ y) : S
-
--  ``NOT``: Two's complement
-
-::
-
-    :: nat : 'S   ->   int : 'S
-    :: int : 'S   ->   int : 'S
-
-    > NOT / x : S  =>  ~x : S
-
-
-The return type of ``NOT`` is an ``int`` and not a ``nat``.  This is
-because the sign is also negated. The resulting integer is computed
-using two's complement. For instance, the boolean negation of ``0`` is
-``-1``. To get a natural back, a possibility is to use ``AND`` with an
-unsigned mask afterwards.
-
-
--  ``LSL``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > LSL / x : s : S  =>  (x << s) : S
-        iff   s <= 256
-    > LSL / x : s : S  =>  [FAILED]
-        iff   s > 256
-
--  ``LSR``
-
-::
-
-    :: nat : nat : 'S   ->   nat : 'S
-
-    > LSR / x : s : S  =>  (x >> s) : S
-        iff   s <= 256
-    > LSR / x : s : S  =>  [FAILED]
-        iff   s > 256
-
--  ``COMPARE``: Integer/natural comparison
-
-::
-
-    :: int : int : 'S   ->   int : 'S
-    :: nat : nat : 'S   ->   int : 'S
-
-    > COMPARE / x : y : S  =>  -1 : S
-        iff x < y
-    > COMPARE / x : y : S  =>  0 : S
-        iff x = y
-    > COMPARE / x : y : S  =>  1 : S
-        iff x > y
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
+
+-  ``NEG`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEG>`__).
+-  ``ABS`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ABS>`__).
+-  ``ISNAT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ISNAT>`__).
+-  ``INT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
+-  ``ADD`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-ADD>`__).
+-  ``SUB`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SUB>`__).
+-  ``MUL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-MUL>`__).
+-  ``EDIV``: Perform Euclidean division (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-EDIV>`__).
+-  ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
+-  ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
+-  ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
+-  ``NOT``: Two's complement (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
+-  ``LSL`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSL>`__).
+-  ``LSR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSR>`__).
+-  ``COMPARE``: Integer/natural comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
