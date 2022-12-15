@@ -109,28 +109,6 @@ module Inboxes =
       let encoding = Sc_rollup.Inbox.encoding
     end)
 
-(** payloads history for the inbox at a given block *)
-module Payloads_histories =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
-     Recompute on the fly in dissection. *)
-    Make_append_only_map
-      (struct
-        let path = ["payloads_histories"]
-      end)
-      (struct
-        type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-
-        let to_path_representation =
-          Sc_rollup.Inbox_merkelized_payload_hashes.Hash.to_b58check
-      end)
-    (struct
-      let name = "payloads_history"
-
-      type value = Sc_rollup.Inbox_merkelized_payload_hashes.History.t
-
-      let encoding = Sc_rollup.Inbox_merkelized_payload_hashes.History.encoding
-    end)
-
 module Commitments =
   Make_append_only_map
     (struct

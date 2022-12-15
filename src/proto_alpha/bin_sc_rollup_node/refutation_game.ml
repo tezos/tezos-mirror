@@ -228,8 +228,11 @@ module Make (Interpreter : Interpreter.S) :
           let+ inbox = Store.Inboxes.find node_ctxt.store inbox_hash in
           Sc_rollup.Inbox.take_snapshot inbox
 
-        let get_payloads_history =
-          Store.Payloads_histories.get node_ctxt.Node_context.store
+        let get_payloads_history witness =
+          let open Lwt_syntax in
+          let+ messages = Store.Messages.get node_ctxt.store witness in
+          Inbox.payloads_history_of_messages messages
+          |> WithExceptions.Result.get_ok ~loc:__LOC__
       end
 
       module Dal_with_history = struct
