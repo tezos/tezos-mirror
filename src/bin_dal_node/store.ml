@@ -140,9 +140,7 @@ module Legacy = struct
       let header commitment index =
         let open Services.Types in
         let prefix = headers commitment in
-        prefix
-        / Int32.to_string index.slot_level
-        / Int.to_string index.slot_index
+        prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
 
       let shards commitment =
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
