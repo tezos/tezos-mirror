@@ -3390,6 +3390,8 @@ module Sc_rollup : sig
 
     module Hash : S.HASH
 
+    val hash : t -> Hash.t
+
     module History :
       Bounded_history_repr.S
         with type key = Hash.t

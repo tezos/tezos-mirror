@@ -133,6 +133,8 @@ module V1 : sig
 
   val equal : t -> t -> bool
 
+  val hash : t -> Hash.t
+
   val encoding : t Data_encoding.t
 
   (** [inbox_level inbox] returns the maximum level of message insertion in
