@@ -3095,7 +3095,9 @@ module Dal : sig
   module Slots_history : sig
     type t
 
-    type hash
+    module Pointer_hash : S.HASH
+
+    type hash = Pointer_hash.t
 
     (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3766
        Do we need to export this? *)
