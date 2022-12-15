@@ -171,8 +171,7 @@ module Make (Interpreter : Interpreter.S) :
     let snapshot_head =
       Layer1.{hash = snapshot_hash; level = snapshot_level_int32}
     in
-    let* snapshot_inbox = Inbox.inbox_of_hash node_ctxt snapshot_hash in
-    let* snapshot_history = Inbox.history_of_hash node_ctxt snapshot_hash in
+    let* snapshot_inbox = Inbox.inbox_of_head node_ctxt snapshot_head in
     let* snapshot_ctxt =
       Node_context.checkout_context node_ctxt snapshot_hash
     in
@@ -225,7 +224,9 @@ module Make (Interpreter : Interpreter.S) :
         let inbox = snapshot
 
         let get_history inbox_hash =
-          Sc_rollup.Inbox.History.find inbox_hash snapshot_history |> Lwt.return
+          let open Lwt_option_syntax in
+          let+ inbox = Store.Inboxes.find node_ctxt.store inbox_hash in
+          Sc_rollup.Inbox.take_snapshot inbox
 
         let get_payloads_history =
           Store.Payloads_histories.get node_ctxt.Node_context.store
@@ -249,7 +250,7 @@ module Make (Interpreter : Interpreter.S) :
     let* proof =
       trace
         (Sc_rollup_node_errors.Cannot_produce_proof
-           (snapshot_inbox, snapshot_history, game.inbox_level))
+           (snapshot_inbox, game.inbox_level))
       @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in

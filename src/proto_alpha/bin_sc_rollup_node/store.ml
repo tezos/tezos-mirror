@@ -109,27 +109,6 @@ module Inboxes =
       let encoding = Sc_rollup.Inbox.encoding
     end)
 
-(** Message history for the inbox at a given block *)
-module Histories =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
-     Store single history points in map instead of whole history. *)
-    Make_append_only_map
-      (struct
-        let path = ["histories"]
-      end)
-      (struct
-        type key = Tezos_crypto.Block_hash.t
-
-        let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-      end)
-    (struct
-      type value = Sc_rollup.Inbox.History.t
-
-      let name = "inbox_history"
-
-      let encoding = Sc_rollup.Inbox.History.encoding
-    end)
-
 (** payloads history for the inbox at a given block *)
 module Payloads_histories =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390

@@ -85,27 +85,6 @@ module State = struct
              the scope of the rollup's node"
             block_level
     | Some inbox -> return inbox
-
-  let history_of_head node_ctxt Layer1.{hash = block_hash; level = block_level}
-      =
-    let open Lwt_result_syntax in
-    let open Node_context in
-    let*! res = Store.Histories.find node_ctxt.store block_hash in
-    match res with
-    | Some history -> return history
-    | None ->
-        (* We won't find inboxes for blocks before the rollup origination level.
-           Fortunately this case will only ever be called once when dealing with
-           the rollup origination block. After that we would always find an
-           inbox. *)
-        let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
-        if block_level <= genesis_level then
-          return @@ Sc_rollup.Inbox.History.empty ~capacity:60000L
-        else
-          failwith
-            "The inbox history for hash %a is missing."
-            Tezos_crypto.Block_hash.pp
-            block_hash
 end
 
 let get_messages Node_context.{l1_ctxt; _} head =
@@ -278,13 +257,6 @@ let inbox_of_hash node_ctxt hash =
   let* level = State.level_of_hash node_ctxt.Node_context.store hash in
   State.inbox_of_head node_ctxt {hash; level}
 
-let history_of_hash node_ctxt hash =
-  let open Lwt_result_syntax in
-  let* level = State.level_of_hash node_ctxt.Node_context.store hash in
-  State.history_of_head node_ctxt {hash; level}
-
 let inbox_of_head = State.inbox_of_head
-
-let history_of_head = State.history_of_head
 
 let start () = Inbox_event.starting ()

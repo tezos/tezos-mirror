@@ -28,8 +28,7 @@ open Protocol.Alpha_context
 let tez_sym = "\xEA\x9C\xA9"
 
 type error +=
-  | Cannot_produce_proof of
-      Sc_rollup.Inbox.t * Sc_rollup.Inbox.History.t * Raw_level.t
+  | Cannot_produce_proof of Sc_rollup.Inbox.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Bad_minimal_fees of string
   | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
@@ -99,27 +98,21 @@ let () =
     ~description:
       "The rollup node is in a state that prevents it from producing \
        refutation proofs."
-    ~pp:(fun ppf (inbox, history, level) ->
+    ~pp:(fun ppf (inbox, level) ->
       Format.fprintf
         ppf
-        "cannot produce proof for inbox %a of level %a with history %a"
+        "cannot produce proof for inbox %a of level %a"
         Sc_rollup.Inbox.pp
         inbox
         Raw_level.pp
-        level
-        Sc_rollup.Inbox.History.pp
-        history)
+        level)
     Data_encoding.(
-      obj3
+      obj2
         (req "inbox" Sc_rollup.Inbox.encoding)
-        (req "history" Sc_rollup.Inbox.History.encoding)
         (req "level" Raw_level.encoding))
     (function
-      | Cannot_produce_proof (inbox, history, level) ->
-          Some (inbox, history, level)
-      | _ -> None)
-    (fun (inbox, history, level) ->
-      Cannot_produce_proof (inbox, history, level)) ;
+      | Cannot_produce_proof (inbox, level) -> Some (inbox, level) | _ -> None)
+    (fun (inbox, level) -> Cannot_produce_proof (inbox, level)) ;
 
   register_error_kind
     ~id:"sc_rollup.node.missing_mode_operators"
