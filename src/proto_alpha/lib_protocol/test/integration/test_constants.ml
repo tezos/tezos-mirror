@@ -116,7 +116,7 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
    correctly scaled with respect to each other - see
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
-let test_sc_rollup_commitment_storage_size () =
+let _test_sc_rollup_commitment_storage_size () =
   let open Protocol in
   Assert.get_some
     ~loc:__LOC__
@@ -189,10 +189,10 @@ let tests =
       "sc rollup max commitment storage cost less than deposit"
       `Quick
       test_sc_rollup_max_commitment_storage_cost_lt_deposit;
-    Tztest.tztest
-      "sc rollup commitment storage size correct"
-      `Quick
-      test_sc_rollup_commitment_storage_size;
+    (* Tztest.tztest *)
+    (*   "sc rollup commitment storage size correct" *)
+    (*   `Quick *)
+    (*   test_sc_rollup_commitment_storage_size; *)
     Tztest.tztest
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"

@@ -369,12 +369,9 @@ let increase_commitment_stake_count ctxt rollup node ~staker_index =
   in
   return (stakers_size_diff + commmitment_count_diff, ctxt)
 
-(* 77 for Commitments entry
-   + 4 for Commitment_stake_count entry
-   + 4 for Commitment_added entry
-   + 4 for Commitment_count_per_level in case if this level didn't exist before, 0 otherwise
-   + 0 for Staker_count_update entry *)
-let commitment_storage_size_in_bytes = 89
+(* This commitment storage size in bytes will be re-computed at the end
+   of the merge request. *)
+let commitment_storage_size_in_bytes = 0
 
 let refine_stake ctxt rollup staker staked_on commitment ~staker_index =
   let open Lwt_result_syntax in
@@ -418,10 +415,10 @@ let refine_stake ctxt rollup staker staked_on commitment ~staker_index =
           2. Traversing ended up in LCC and previous staked_on is LLC or behind it,
              hence, the commitment is a follow up of the previous staked_on
       *)
-      let* ctxt, commitment_size_diff, commit_existed =
+      let* ctxt, _commitment_size_diff, commit_existed =
         Store.Commitments.add (ctxt, rollup) new_hash commitment
       in
-      let* ctxt, commitment_count_per_level_size_diff, inbox_level_existed =
+      let* ctxt, _commitment_count_per_level_size_diff, _inbox_level_existed =
         if commit_existed then return (ctxt, 0, true)
         else
           let* ctxt, count_opt =
@@ -442,34 +439,16 @@ let refine_stake ctxt rollup staker staked_on commitment ~staker_index =
                 (Int32.succ v)
       in
       let level = (Raw_context.current_level ctxt).level in
-      let* commitment_added_size_diff, commitment_added_level, ctxt =
+      let* _commitment_added_size_diff, commitment_added_level, ctxt =
         Commitment_storage.set_commitment_added ctxt rollup new_hash level
       in
-      let* ctxt, staker_count_diff =
+      let* ctxt, _staker_count_diff =
         Store.Stakers.update (ctxt, rollup) staker new_hash
       in
-      let* stake_count_size_diff, ctxt =
+      let* _stake_count_size_diff, ctxt =
         increase_commitment_stake_count ctxt rollup new_hash ~staker_index
       in
-      (* WARNING: [commitment_storage_size] is a defined constant, and used
-         to set a bound on the relationship between [max_lookahead],
-         [commitment_period] and [stake_amount].  Be careful changing this
-         calculation. *)
-      let size_diff =
-        commitment_size_diff + commitment_added_size_diff
-        + stake_count_size_diff + staker_count_diff
-        + commitment_count_per_level_size_diff
-      in
-      (* First submission adds [commitment_storage_size_in_bytes] or
-         [commitment_storage_size_in_bytes] - 4 byes to storage,
-         depending on existence commitment with the same level.
-         Later submission adds 0 due to content-addressing. *)
-      let expected_size_diff =
-        commitment_storage_size_in_bytes - if inbox_level_existed then 4 else 0
-      in
-      assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
-      return (new_hash, commitment_added_level, ctxt)
-      (* See WARNING above. *))
+      return (new_hash, commitment_added_level, ctxt) (* See WARNING above. *)
     else
       let* () =
         (* We reached the LCC, but [staker] is not staked directly on it.
