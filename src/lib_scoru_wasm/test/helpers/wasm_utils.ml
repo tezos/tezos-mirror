@@ -109,7 +109,7 @@ let rec eval_to_snapshot ?(builtins = builtins) ?(max_steps = Int64.max_int)
     let* state = Wasm.Internal_for_tests.get_tick_state tree in
     match state with
     | Snapshot | Collect -> return tree
-    | _ -> eval_to_snapshot ~max_steps tree
+    | _ -> eval_to_snapshot ~max_steps ~builtins ~debug_flag tree
   in
   let* info = Wasm.get_info tree in
   match info.input_request with
@@ -130,7 +130,13 @@ let rec eval_until_input_requested ?(builtins = builtins) ?after_fast_exec
   match info.input_request with
   | No_input_required ->
       let* tree, _ = run ~builtins ~debug_flag ~max_steps tree in
-      eval_until_input_requested ~max_steps tree
+      eval_until_input_requested
+        ~builtins
+        ?after_fast_exec
+        ~fast_exec
+        ~max_steps
+        ~debug_flag
+        tree
   | Input_required | Reveal_required _ -> return tree
 
 let input_info level message_counter =
