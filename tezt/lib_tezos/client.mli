@@ -692,6 +692,34 @@ val spawn_transfer :
   t ->
   Process.t
 
+(** Run [octez-client call <destination> from <source>]. *)
+val call :
+  ?hooks:Process.hooks ->
+  ?log_output:bool ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  destination:string ->
+  source:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [call], but do not wait for the process to exit. *)
+val spawn_call :
+  ?hooks:Process.hooks ->
+  ?log_output:bool ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?entrypoint:string ->
+  ?arg:string ->
+  destination:string ->
+  source:string ->
+  t ->
+  Process.t
+
 (** Run [octez-client multiple transfers from giver using json_batch]. *)
 val multiple_transfers :
   ?log_output:bool ->
