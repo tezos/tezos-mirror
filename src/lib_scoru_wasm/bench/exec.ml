@@ -62,7 +62,7 @@ let should_continue phase (pvm_state : pvm_state) =
   Lwt.return continue
 
 let finish_top_level_call_on_state pvm_state =
-  Wasm_vm.compute_step_many ~max_steps:Int64.max_int pvm_state
+  Wasm_vm.compute_step_many ~max_steps:Int64.max_int ~debug_flag:true pvm_state
 
 let execute_on_state phase state =
   match state.tick_state with
@@ -127,4 +127,4 @@ let load_messages messages level tree =
   in
   (* this should only advance the tick counter after executing the input steps
      until the next snapshot is reached. *)
-  Wasm_utils.eval_to_snapshot ~max_steps:Int64.max_int tree
+  Wasm_utils.eval_to_snapshot ~max_steps:Int64.max_int ~debug_flag:true tree
