@@ -30,6 +30,7 @@ type t = Function : 'a Function_type.t * 'a -> t
 let to_extern wasmer ext =
   match ext with
   | Function (typ, f) ->
-      Function.create wasmer typ f |> Functions.Func.as_extern
+      let func, clean = Function.create wasmer typ f in
+      (Functions.Func.as_extern func, clean)
 
 let to_externkind = function Function _ -> Types.Externkind.func

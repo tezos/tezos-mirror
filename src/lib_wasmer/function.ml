@@ -63,7 +63,10 @@ let pack_outputs results r outputs =
   in
   go results r 0
 
-let create : type f. Store.t -> f Function_type.t -> f -> owned =
+module Func_callback_maker = (val Types.Func_callback.m)
+
+let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
+    =
  fun store typ f ->
   let func_type = Function_type.to_owned typ in
   let (Function_type.Function (params, results)) = typ in
@@ -79,7 +82,12 @@ let create : type f. Store.t -> f Function_type.t -> f -> owned =
       Trap.none
     with exn -> Trap.from_string store (Printexc.to_string exn)
   in
-  Functions.Func.new_ store func_type try_run
+  let try_run = Func_callback_maker.of_fun try_run in
+  let free () = Func_callback_maker.free try_run in
+  let try_run =
+    Ctypes.coerce Func_callback_maker.t Types.Func_callback.t try_run
+  in
+  (Functions.Func.new_ store func_type try_run, free)
 
 let call_raw func inputs =
   let open Lwt.Syntax in
