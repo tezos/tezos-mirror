@@ -134,6 +134,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Mockup.register_global_constants ~protocols ;
   Monitor_operations.register ~protocols ;
   Multinode_snapshot.register ~protocols ;
+  Node_cors.register ~protocols ;
   Node_event_level.register ~protocols ;
   Normalize.register ~protocols ;
   Operation_validation.register ~protocols ;
