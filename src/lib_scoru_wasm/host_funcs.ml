@@ -284,11 +284,43 @@ module Aux = struct
         let* key = M.load_bytes memory key_offset key_length in
         guard (fun () -> Lwt.return (Durable.key_of_string_exn key))
 
+    (* [check_address memory address length] checks a value of size [length] can
+       be safely stored at the [address] in the [memory]. *)
+    let check_address memory address length =
+      let open Result_syntax in
+      let size = M.bound memory in
+      let address = I64_convert.extend_i32_u address in
+      let* length =
+        if length < 0l then fail Error.Memory_invalid_access
+        else return (Int64.of_int32 length)
+      in
+      if Int64.add address length < size then return_unit
+      else fail Error.Memory_invalid_access
+
     let read_input ~input_buffer ~memory ~info_addr ~dst ~max_bytes =
       let open Lwt_result_syntax in
       let*! res =
         Lwt.catch
           (fun () ->
+            (* Check the input info can be safely stored in the memory at the
+               given address. *)
+            let*? () =
+              match
+                Data_encoding.Binary.maximum_length read_input_info_encoding
+              with
+              | Some length ->
+                  check_address memory info_addr (Int32.of_int length)
+              | None ->
+                  (* According to the representation of read_input_info the size
+                     is always fixed (8 bytes), there's no reason this value can
+                     fail. *)
+                  Error Error.Generic_invalid_access
+            in
+            (* Check the input payload can be safely stored in the memory at the
+               given address and with the maximum expected size. *)
+            let*? () = check_address memory dst max_bytes in
+            (* Once we know the input can be contained in the memory, we can
+               safely dequeue it. *)
             let*! {raw_level; message_counter; payload} =
               Input_buffer.dequeue input_buffer
             in
@@ -317,7 +349,7 @@ module Aux = struct
           (fun exn ->
             match exn with
             | Input_buffer.Dequeue_from_empty_queue -> return 0l
-            | _ -> return Error.(code Generic_invalid_access))
+            | _ -> fail Error.Generic_invalid_access)
       in
       extract_error_code res
 
