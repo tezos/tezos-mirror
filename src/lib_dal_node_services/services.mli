@@ -77,6 +77,10 @@ module Types : sig
   (** The slot header was successfully included in a block. see
       {!header_attestation_status} for more details. *)
 
+  (** DAL node can track one or many profiles that correspond to various modes 
+      that the DAL node would operate in *)
+  type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+
   val slot_id_encoding : slot_id Data_encoding.t
 
   (** Return the string representation for values of type
@@ -85,6 +89,10 @@ module Types : sig
 
   (** Return the string representation for values of type {!header_status}. *)
   val header_status_to_string : header_status -> string
+
+  val profile_encoding : profile Data_encoding.t
+
+  val equal_profile : profile -> profile -> bool
 end
 
 (** Add the given slot in the node if not already present. The corresponding
@@ -138,5 +146,25 @@ val get_commitment_by_published_level_and_index :
   ; output : Cryptobox.commitment
   ; prefix : unit
   ; params : (unit * Types.level) * Types.slot_index
+  ; query : unit >
+  service
+
+(** Update the list of profiles tracked by the DAL node *)
+val patch_profile :
+  < meth : [`PATCH]
+  ; input : Types.profile
+  ; output : unit
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
+(** Return the list of current profiles tracked by the DAL node *)
+val get_profiles :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.profile list
+  ; prefix : unit
+  ; params : unit
   ; query : unit >
   service

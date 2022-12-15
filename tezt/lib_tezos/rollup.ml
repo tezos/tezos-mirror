@@ -673,6 +673,8 @@ module Dal = struct
 
     type commitment = string
 
+    type profile = Attestor of string
+
     let as_empty_object_or_fail t =
       match JSON.as_object t with
       | [] -> ()
@@ -716,6 +718,25 @@ module Dal = struct
           "commitment";
         ]
         JSON.as_string
+
+    let json_of_profile = function
+      | Attestor pkh ->
+          `O [("kind", `String "attestor"); ("public_key_hash", `String pkh)]
+
+    let profiles_of_json json =
+      let json_field_value json ~field = JSON.(get field json |> as_string) in
+      JSON.as_list json
+      |> List.map (fun obj ->
+             match json_field_value ~field:"kind" obj with
+             | "attestor" ->
+                 Attestor (json_field_value ~field:"public_key_hash" obj)
+             | _ -> failwith "invalid case")
+
+    let patch_profile profile =
+      let data = json_of_profile profile in
+      make ~data PATCH ["profiles"] as_empty_object_or_fail
+
+    let get_profiles () = make GET ["profiles"] profiles_of_json
   end
 
   let make
@@ -750,5 +771,21 @@ module Dal = struct
       | Error (`Slot_wrong_size str) -> on_error str
 
     let to_string commitment = Cryptobox.Commitment.to_b58check commitment
+  end
+
+  module Check = struct
+    open RPC
+
+    type profiles = RPC.profile list
+
+    let profile_typ : profile Check.typ =
+      Check.equalable
+        (fun ppf (Attestor pkh) -> Format.fprintf ppf "(Attestor %s) " pkh)
+        (fun (RPC.Attestor att1) (RPC.Attestor att2) -> String.equal att1 att2)
+
+    let profiles_typ : profiles Check.typ =
+      let open Check in
+      let sort = List.sort compare in
+      convert sort (list profile_typ)
   end
 end

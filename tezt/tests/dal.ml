@@ -1513,6 +1513,38 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
             "Invalid value in rollup state (current = %L, expected = %R)") ;
       return ()
 
+let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
+    _client dal_node =
+  let open Rollup.Dal.RPC in
+  let check_profiles ~__LOC__ ~expected =
+    let* profiles = RPC.call dal_node (get_profiles ()) in
+    return
+      Check.(
+        (profiles = expected)
+          Rollup.Dal.Check.profiles_typ
+          ~error_msg:
+            (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
+  in
+  let check_bad_attestor_pkh_encoding profile =
+    let* response = RPC.call_raw dal_node @@ patch_profile profile in
+    return @@ RPC.check_string_response ~code:400 response
+  in
+  let patch_profile_rpc profile = RPC.call dal_node (patch_profile profile) in
+  let profile1 = Attestor Constant.bootstrap1.public_key_hash in
+  let profile2 = Attestor Constant.bootstrap2.public_key_hash in
+  (* We start with empty profile list *)
+  let* () = check_profiles ~__LOC__ ~expected:[] in
+  (* Adding [Attestor] profile with pkh that is not encoded as
+     [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
+  let* () = check_bad_attestor_pkh_encoding (Attestor "This is invalid PKH") in
+  (* Test adding duplicate profiles stores profile only once *)
+  let* () = patch_profile_rpc profile1 in
+  let* () = patch_profile_rpc profile1 in
+  let* () = check_profiles ~__LOC__ ~expected:[profile1] in
+  (* Test adding multiple profiles *)
+  let* () = patch_profile_rpc profile2 in
+  check_profiles ~__LOC__ ~expected:[profile1; profile2]
+
 (* DAC tests *)
 let check_valid_root_hash expected_rh actual_rh =
   Check.(
@@ -1824,6 +1856,10 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node GET /slot/<commitment>/proof"
     test_dal_node_test_get_slot_proof
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node PATCH+GET /profiles"
+    test_dal_node_test_patch_profile
     protocols ;
 
   (* Tests with all nodes *)

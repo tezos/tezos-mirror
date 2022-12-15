@@ -50,6 +50,10 @@ module Types = struct
 
   type header_status = [`Not_selected | `Unseen | header_attestation_status]
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4442
+     Add missing profiles. *)
+  type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+
   (* Auxiliary functions.  *)
 
   let header_attestation_status_to_string = function
@@ -74,6 +78,25 @@ module Types = struct
       (obj2 (req "slot_level" int32) (req "slot_index" uint8))
 
   let slot_encoding = Data_encoding.bytes
+
+  let equal_profile (Attestor p1) (Attestor p2) =
+    Tezos_crypto.Signature.Public_key_hash.( = ) p1 p2
+
+  let profile_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Attestor with pkh"
+          (Tag 0)
+          (obj2
+             (req "kind" (constant "attestor"))
+             (req
+                "public_key_hash"
+                Tezos_crypto.Signature.Public_key_hash.encoding))
+          (function Attestor attest -> Some ((), attest))
+          (function (), attest -> Attestor attest);
+      ]
 end
 
 let post_slots :
@@ -155,3 +178,32 @@ let get_commitment_by_published_level_and_index :
     Tezos_rpc.Path.(
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slot_indices"
       /: Tezos_rpc.Arg.int / "commitment")
+
+let patch_profile :
+    < meth : [`PATCH]
+    ; input : Types.profile
+    ; output : unit
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.patch_service
+    ~description:"Update the list of profiles tracked by the DAL node"
+    ~query:Tezos_rpc.Query.empty
+    ~input:Types.profile_encoding
+    ~output:Data_encoding.unit
+    Tezos_rpc.Path.(open_root / "profiles")
+
+let get_profiles :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.profile list
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"Return the list of current profiles tracked by the DAL node"
+    ~query:Tezos_rpc.Query.empty
+    ~output:(Data_encoding.list Types.profile_encoding)
+    Tezos_rpc.Path.(open_root / "profiles")
