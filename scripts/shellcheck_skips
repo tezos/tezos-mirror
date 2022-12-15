@@ -1,6 +1,4 @@
 scripts/baker-version-stats.sh
-scripts/ci/create_docker_image.build.sh
-scripts/ci/create_docker_image.minimal.sh
 scripts/ci/docker_registry_delete.sh
 scripts/ci/docker_registry.inc.sh
 scripts/ci/docker_registry_read.sh

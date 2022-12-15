@@ -27,6 +27,10 @@ test_version() {
     echo "Testing version of binaries in Docker image"
 
     binaries=$(docker run --entrypoint ls "$IMAGE" /usr/local/bin/)
+
+    echo "Found the following executables in the Docker image:"
+    echo "$binaries"
+
     for bin in octez-client octez-node; do
         if ! echo "$binaries" | grep -q "^${bin}$" ; then
             echo "Could not find binary $bin in Docker image."
@@ -36,7 +40,7 @@ test_version() {
         fi
     done
 
-    for binary in $(echo "$binaries" | grep tezos-); do
+    for binary in $(echo "$binaries" | grep octez-); do
         printf "Checking version of %s: " "$binary"
 
         cmd="docker run --entrypoint $binary $IMAGE --version"

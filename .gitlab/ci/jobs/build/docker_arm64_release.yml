@@ -7,5 +7,6 @@ docker:arm64:
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"
     CI_DOCKER_HUB: "true"
+    EXECUTABLE_FILES: "script-inputs/released-executables"
   tags:
     - arm64

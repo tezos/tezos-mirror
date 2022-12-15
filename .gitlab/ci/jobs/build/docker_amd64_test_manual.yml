@@ -9,4 +9,5 @@ docker:amd64:
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "false"
+    EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
   allow_failure: true
