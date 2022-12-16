@@ -297,6 +297,22 @@ module Dal : sig
 
     type profile = Attestor of string
 
+    (** Information contained in a slot header fetched from the DAL node. *)
+    type slot_header = {
+      slot_level : int;
+      slot_index : int;
+      commitment : string;
+      status : string;
+    }
+
+    (** [slot_header_of_json json] decodes [json] as a slot header. The function
+        fails if the given [json] cannot be decoded. *)
+    val slot_header_of_json : JSON.t -> slot_header
+
+    (** [slot_header_of_json json_] similar to {!slot_header_of_json}, but
+        the input (and output) is expected to be a list. *)
+    val slot_headers_of_json : JSON.t -> slot_header list
+
     (** Call RPC "POST /slots" to store a slot and retrun the commitment in case
        of success. *)
     val post_slot : slot -> (Dal_node.t, commitment) RPC_core.t
@@ -332,6 +348,15 @@ module Dal : sig
     (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)
     val get_profiles : unit -> (Dal_node.t, profile list) RPC_core.t
+
+    (** Call RPC "GET /commitments/<commitment>/headers" to get the header and
+        status know about the given commitment. The resulting list can be filtered by a
+        given header publication level and slot index. *)
+    val get_commitment_headers :
+      ?slot_level:int ->
+      ?slot_index:int ->
+      commitment ->
+      (Dal_node.t, slot_header list) RPC_core.t
   end
 
   val make :

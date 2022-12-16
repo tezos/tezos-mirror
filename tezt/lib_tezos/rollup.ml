@@ -675,6 +675,25 @@ module Dal = struct
 
     type profile = Attestor of string
 
+    type slot_header = {
+      slot_level : int;
+      slot_index : int;
+      commitment : string;
+      status : string;
+    }
+
+    let slot_header_of_json json =
+      let open JSON in
+      {
+        slot_level = json |-> "slot_level" |> as_int;
+        slot_index = json |-> "slot_index" |> as_int;
+        commitment = json |-> "commitment" |> as_string;
+        status = json |-> "status" |> as_string;
+      }
+
+    let slot_headers_of_json json =
+      JSON.as_list json |> List.map slot_header_of_json
+
     let as_empty_object_or_fail t =
       match JSON.as_object t with
       | [] -> ()
@@ -737,6 +756,20 @@ module Dal = struct
       make ~data PATCH ["profiles"] as_empty_object_or_fail
 
     let get_profiles () = make GET ["profiles"] profiles_of_json
+
+    let mk_query_arg field v_opt =
+      Option.fold ~none:[] ~some:(fun v -> [(field, string_of_int v)]) v_opt
+
+    let get_commitment_headers ?slot_level ?slot_index commitment =
+      let query_string =
+        mk_query_arg "slot_level" slot_level
+        @ mk_query_arg "slot_index" slot_index
+      in
+      make
+        ~query_string
+        GET
+        ["commitments"; commitment; "headers"]
+        slot_headers_of_json
   end
 
   let make
