@@ -161,11 +161,6 @@ unit:016_PtMumbai:
   script:
     - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
     - ./scripts/ci/merge_coverage.sh
-unit:non-proto-x86_64:
-  extends:
-  - .unit_test_template_x86_64_coverage
-  variables:
-    MAKE_TARGETS: test-nonproto-unit test-webassembly
 
 unit:alpha:
   extends:
@@ -215,6 +210,7 @@ unit:non-proto-x86_64:
   - .unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: test-nonproto-unit test-webassembly
+
 unit:non-proto-arm64:
   extends: .unit_test_template_arm64
   variables:
