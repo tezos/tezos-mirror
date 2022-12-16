@@ -113,34 +113,10 @@ module Plugin = struct
     let* () = check_is_in_range upper in
     return Misc.(lower --> upper)
 
-  let slot_headers_attestation hash (block : block_info) ~number_of_slots =
-    let open Lwt_result_syntax in
-    let*? metadata =
-      Option.to_result
-        block.metadata
-        ~none:(TzTrace.make @@ Layer1_services.Cannot_read_block_metadata hash)
-    in
-    let confirmed_slots =
-      Option.value
-        ~default:Dal.Attestation.empty
-        metadata.protocol_data.dal_attestation
-    in
-    let*? all_slots =
-      slots_range ~lower:0 ~upper:(number_of_slots - 1)
-      |> Environment.wrap_tzresult
-    in
-    let attested, unattested =
-      List.map
-        (fun i ->
-          match Dal.Slot_index.of_int i with
-          | None -> assert false
-          | Some i -> i)
-        all_slots
-      |> List.partition (Dal.Attestation.is_attested confirmed_slots)
-    in
-    return
-      ( `Attested (List.map Dal.Slot_index.to_int attested),
-        `Unattested (List.map Dal.Slot_index.to_int unattested) )
+  let attested_slot_headers _hash (_block : block_info) ~number_of_slots:_ =
+    let open Result_syntax in
+    (* DAL Will not be activated in Mumbai. *)
+    return []
 
   module RPC = RPC
 end

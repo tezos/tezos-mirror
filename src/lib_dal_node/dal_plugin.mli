@@ -77,20 +77,20 @@ module type T = sig
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
-  (** [slot_headers_attestation hash block_info number_of_slots] reads the
-      metadata of the given [block_info] and constructs two lists of attested
-      and unattested slots depending on the value of dal_attestation bitset.
+  (** [attested_slot_headers hash block_info number_of_slots] reads the metadata
+      of the given [block_info] and constructs the list of attested slots
+      headers.
+
       The value of [number_of_slots] indicates the current maximum number of
       slots on DAL per level.
 
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
-  val slot_headers_attestation :
+  val attested_slot_headers :
     Tezos_crypto.Block_hash.t ->
     block_info ->
     number_of_slots:int ->
-    ([`Attested of slot_index list] * [`Unattested of slot_index list]) tzresult
-    Lwt.t
+    slot_index list tzresult
 
   module RPC : sig
     val rpc_services :

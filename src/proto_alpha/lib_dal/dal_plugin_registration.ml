@@ -99,9 +99,9 @@ module Plugin = struct
                  },
                  status ))
 
-  let slot_headers_attestation hash (block : block_info) ~number_of_slots =
-    let open Lwt_result_syntax in
-    let*? metadata =
+  let attested_slot_headers hash (block : block_info) ~number_of_slots =
+    let open Result_syntax in
+    let* metadata =
       Option.to_result
         block.metadata
         ~none:(TzTrace.make @@ Layer1_services.Cannot_read_block_metadata hash)
@@ -111,16 +111,12 @@ module Plugin = struct
         ~default:Dal.Attestation.empty
         metadata.protocol_data.dal_attestation
     in
-    let*? all_slots =
+    let* all_slots =
       Dal.Slot_index.slots_range ~lower:0 ~upper:(number_of_slots - 1)
       |> Environment.wrap_tzresult
     in
-    let attested, unattested =
-      List.partition (Dal.Attestation.is_attested confirmed_slots) all_slots
-    in
-    return
-      ( `Attested (Dal.Slot_index.to_int_list attested),
-        `Unattested (Dal.Slot_index.to_int_list unattested) )
+    List.filter (Dal.Attestation.is_attested confirmed_slots) all_slots
+    |> Dal.Slot_index.to_int_list |> return
 
   module RPC = RPC
 end
