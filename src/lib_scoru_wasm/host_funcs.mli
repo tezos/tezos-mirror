@@ -104,7 +104,9 @@ module type Memory_access = sig
   val exn_to_error : default:Error.t -> exn -> Error.t
 end
 
-module Memory_access_interpreter : Memory_access
+module Memory_access_interpreter :
+  Memory_access
+    with type t := Tezos_webassembly_interpreter.Instance.memory_inst
 
 module Aux : sig
   module type S = sig
