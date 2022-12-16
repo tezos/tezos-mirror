@@ -224,7 +224,7 @@ let set_input_step message message_counter tree =
 let pp_state fmt state =
   let pp_s s = Format.fprintf fmt "%s" s in
   match state with
-  | Wasm_pvm_state.Internal_state.Snapshot -> pp_s "Start"
+  | Wasm_pvm_state.Internal_state.Snapshot -> pp_s "Snapshot"
   | Decode _ -> pp_s "Decode"
   | Eval
       {
