@@ -896,7 +896,7 @@ let publish_and_store_slot ?(fee = 1_200) node client dal_node source index
   let* _ = publish_slot ~source ~fee ~index ~commitment ~proof node client in
   return (index, slot_commitment)
 
-let check_get_commitment ~check_result dal_node ~slot_level slots_info =
+let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
     (fun (slot_index, commitment') ->
       let* response =
@@ -904,9 +904,20 @@ let check_get_commitment ~check_result dal_node ~slot_level slots_info =
           dal_node
           (Rollup.Dal.RPC.get_level_index_commitment ~slot_index ~slot_level)
       in
-      check_result commitment' response ;
-      unit)
+      return @@ check_result commitment' response)
     slots_info
+
+let get_commitment_succeeds commitment' response =
+  let commitment =
+    JSON.(parse ~origin:__LOC__ response.RPC_core.body |> as_string)
+  in
+  Check.(commitment' = commitment)
+    Check.string
+    ~error_msg:
+      "The value of a stored commitment should match the one computed locally \
+       (current = %L, expected = %R)"
+
+let get_commitment_not_found _commit r = RPC.check_string_response ~code:404 r
 
 let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
     client dal_node =
@@ -937,45 +948,23 @@ let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
       "Published header is different from stored header (current = %L, \
        expected = %R)" ;
   let slot_level = Node.get_level node in
+  let check_get_commitment = check_get_commitment dal_node ~slot_level in
   let ok = [slot0; slot1; slot2_b] in
   ignore slot2_a ;
   let ko = slot3 :: List.map (fun (i, c) -> (i + 100, c)) ok in
-  (* Aux function to check succesful RPC calls. *)
-  let result_ok commitment' response =
-    let commitment =
-      JSON.(
-        parse
-          ~origin:"test_dal_node_slots_headers_tracking"
-          response.RPC_core.body
-        |> as_string)
-    in
-    Check.(commitment' = commitment)
-      Check.string
-      ~error_msg:
-        "The value of a stored commitment should match the one computed \
-         locally (current = %L, expected = %R)"
-  in
-  (* Aux function to check RPC calls that are expected to fail with 404. *)
-  let result_ko _commitment' response =
-    RPC.check_string_response ~code:404 response
-  in
+
   (* Slots waiting for confirmation. *)
-  let* () =
-    check_get_commitment ~check_result:result_ok dal_node ~slot_level ok
-  in
+  let* () = check_get_commitment get_commitment_succeeds ok in
+
   (* Slots not selected/accepted. *)
-  let* () =
-    check_get_commitment ~check_result:result_ko dal_node ~slot_level ko
-  in
+  let* () = check_get_commitment get_commitment_not_found ko in
+
   let* () = Client.bake_for_and_wait client in
+
   (* Slot confirmed. *)
-  let* () =
-    check_get_commitment ~check_result:result_ok dal_node ~slot_level ok
-  in
+  let* () = check_get_commitment get_commitment_succeeds ok in
   (* Slots still not selected/accepted. *)
-  let* () =
-    check_get_commitment ~check_result:result_ko dal_node ~slot_level ko
-  in
+  let* () = check_get_commitment get_commitment_not_found ko in
   unit
 
 let generate_dummy_slot slot_size =
