@@ -162,6 +162,21 @@ let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
     ]
     Fun.id
 
+let get_chain_block_context_liquidity_baking_cpmm_address ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "liquidity_baking";
+      "cpmm_address";
+    ]
+    JSON.as_string
+
 let get_network_peer_untrust peer_id =
   make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
 

@@ -965,6 +965,30 @@ let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
   in
   {value; run = Process.check ?expect_failure}
 
+let spawn_call_contract ?hooks ?endpoint ?burn_cap ~src ~destination ?entrypoint
+    ?arg client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["call"; destination; "from"; src]
+    @ optional_arg "entrypoint" Fun.id entrypoint
+    @ optional_arg "arg" Fun.id arg
+    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+
+let call_contract ?hooks ?endpoint ?burn_cap ~src ~destination ?entrypoint ?arg
+    client =
+  spawn_call_contract
+    ?hooks
+    ?endpoint
+    ?burn_cap
+    ~src
+    ~destination
+    ?entrypoint
+    ?arg
+    client
+  |> Process.check
+
 let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
     ~src client =
   let value =
@@ -2584,9 +2608,10 @@ let register_key ?hooks ?expect_failure ?consensus owner client =
   spawn_register_key ?hooks ?consensus owner client
   |> Process.check ?expect_failure
 
-let contract_storage ?unparsing_mode address client =
+let contract_storage ?hooks ?unparsing_mode address client =
   spawn_command
     client
+    ?hooks
     (["get"; "contract"; "storage"; "for"; address]
     @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode)
   |> Process.check_and_read_stdout
