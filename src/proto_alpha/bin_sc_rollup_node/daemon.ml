@@ -568,26 +568,8 @@ let run ~data_dir (configuration : Configuration.t)
         ())
       configuration.sc_rollup_node_operators
   in
-  let*! store =
-    Store.load Read_write Configuration.(default_storage_dir data_dir)
-  in
-  let*! context =
-    Context.load Read_write (Configuration.default_context_dir data_dir)
-  in
-  let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
-    Node_context.init
-      cctxt
-      dal_cctxt
-      ~data_dir
-      l1_ctxt
-      configuration.sc_rollup_address
-      kind
-      configuration.sc_rollup_node_operators
-      configuration.fee_parameters
-      ~loser_mode:configuration.loser_mode
-      store
-      context
+    Node_context.init cctxt dal_cctxt ~data_dir Read_write configuration
   in
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration

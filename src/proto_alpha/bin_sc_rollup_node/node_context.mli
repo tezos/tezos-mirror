@@ -88,23 +88,16 @@ val is_operator : _ t -> Signature.Public_key_hash.t -> bool
 *)
 val get_fee_parameter : _ t -> Configuration.purpose -> Injection.fee_parameter
 
-(** [init cctxt dal_cctxt ~data_dir l1_ctxt sc_rollup genesis_info kind operators fees
-    ~loser_mode store context] initialises the rollup representation. The rollup
-    origination level and kind are fetched via an RPC call to the layer1 node
-    that [cctxt] uses for RPC requests.
+(** [init cctxt dal_cctxt ~data_dir mode configuration] initializes the rollup
+    representation. The rollup origination level and kind are fetched via an RPC
+    call to the layer1 node that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
   Dal_node_client.cctxt ->
   data_dir:string ->
-  Layer1.t ->
-  Sc_rollup.t ->
-  Protocol.Alpha_context.Sc_rollup.Kind.t ->
-  Configuration.operators ->
-  Configuration.fee_parameters ->
-  loser_mode:Loser_mode.t ->
-  'a Store.t ->
-  'a Context.index ->
+  'a Store_sigs.mode ->
+  Configuration.t ->
   'a t tzresult Lwt.t
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
