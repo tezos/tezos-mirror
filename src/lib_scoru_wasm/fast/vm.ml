@@ -28,10 +28,10 @@ open Wasm_pvm_state.Internal_state
 
 include (Wasm_vm : Wasm_vm_sig.S)
 
-let compute_until_snapshot ~max_steps pvm_state =
+let compute_until_snapshot ~max_steps ~debug_flag pvm_state =
   Wasm_vm.compute_step_many_until
     ~max_steps
-    ~debug_flag:false
+    ~debug_flag
     (fun pvm_state ->
       Lwt.return
       @@
@@ -55,7 +55,9 @@ let compute_fast ~enable_debugging builtins pvm_state =
   let tick_state = Padding in
   (* Assemble state *)
   let pvm_state = {pvm_state with durable; current_tick; tick_state} in
-  let+ pvm_state = Wasm_vm.compute_step pvm_state in
+  let+ pvm_state =
+    Wasm_vm.compute_step_with_debug ~debug_flag:enable_debugging pvm_state
+  in
   (pvm_state, Z.to_int64 ticks)
 
 let rec compute_step_many accum_ticks ?builtins
@@ -81,7 +83,12 @@ let rec compute_step_many accum_ticks ?builtins
   match builtins with
   | Some builtins when eligible_for_fast_exec -> (
       let goto_snapshot_and_retry () =
-        let* pvm_state, ticks = compute_until_snapshot ~max_steps pvm_state in
+        let* pvm_state, ticks =
+          compute_until_snapshot
+            ~debug_flag:enable_debugging
+            ~max_steps
+            pvm_state
+        in
         match pvm_state.tick_state with
         | Snapshot when not stop_at_snapshot ->
             let max_steps = Int64.sub max_steps ticks in
