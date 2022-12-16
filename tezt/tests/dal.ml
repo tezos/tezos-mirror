@@ -907,11 +907,11 @@ let check_get_commitment dal_node ~slot_level check_result slots_info =
       return @@ check_result commitment' response)
     slots_info
 
-let get_commitment_succeeds commitment' response =
+let get_commitment_succeeds expected_commitment response =
   let commitment =
     JSON.(parse ~origin:__LOC__ response.RPC_core.body |> as_string)
   in
-  Check.(commitment' = commitment)
+  Check.(commitment = expected_commitment)
     Check.string
     ~error_msg:
       "The value of a stored commitment should match the one computed locally \
@@ -935,7 +935,7 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
   let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
   Lwt_list.iter_s (test check_result ~query_string:false) slots_info
 
-let get_headers_succeeds status response =
+let get_headers_succeeds expected_status response =
   let headers =
     JSON.(
       parse ~origin:"get_headers_succeeds" response.RPC_core.body
@@ -943,14 +943,14 @@ let get_headers_succeeds status response =
   in
   List.iter
     (fun header ->
-      Check.(header.Rollup.Dal.RPC.status = status)
+      Check.(header.Rollup.Dal.RPC.status = expected_status)
         Check.string
         ~error_msg:
           "The value of the fetched status should match the expected \
            one(current = %L, expected = %R)")
     headers
 
-let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
+let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
   let publish ?fee = publish_and_store_slot ?fee node client dal_node in
   let* slot0 = publish Constant.bootstrap1 0 "test0" in
@@ -979,23 +979,63 @@ let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
       "Published header is different from stored header (current = %L, \
        expected = %R)" ;
   let slot_level = Node.get_level node in
+  let check_get_commitment_headers =
+    check_get_commitment_headers dal_node ~slot_level
+  in
   let check_get_commitment = check_get_commitment dal_node ~slot_level in
   let ok = [slot0; slot1; slot2_b] in
-  ignore slot2_a ;
+  let attested = [slot0; slot2_b] in
+  let unattested = [slot1] in
   let ko = slot3 :: List.map (fun (i, c) -> (i + 100, c)) ok in
 
-  (* Slots waiting for confirmation. *)
+  (* Slots waiting for attestation. *)
   let* () = check_get_commitment get_commitment_succeeds ok in
-
-  (* Slots not selected/accepted. *)
+  let* () =
+    check_get_commitment_headers
+      (get_headers_succeeds "waiting_for_attestations")
+      ok
+  in
+  (* slot_2_a is not selected. *)
+  let* () =
+    check_get_commitment_headers (get_headers_succeeds "not_selected") [slot2_a]
+  in
+  (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
 
+  (* Attest slots slot0 = (2, 0) and slot2_b = (2,4), bake and wait
+     two seconds so that the DAL node updates its state. *)
+  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let* _op_hash = dal_attestations ~nb_slots (List.map fst attested) client in
   let* () = Client.bake_for_and_wait client in
+  let* () = Lwt_unix.sleep 2.0 in
 
   (* Slot confirmed. *)
   let* () = check_get_commitment get_commitment_succeeds ok in
-  (* Slots still not selected/accepted. *)
+  (* Slot that were waiting for attestation and now attested. *)
+  let* () =
+    check_get_commitment_headers (get_headers_succeeds "attested") attested
+  in
+  (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
+  (* Slot that were waiting for attestation and now unattested. *)
+  let* () =
+    check_get_commitment_headers (get_headers_succeeds "unattested") unattested
+  in
+  (* slot_2_a is still not selected. *)
+  let* () =
+    check_get_commitment_headers (get_headers_succeeds "not_selected") [slot2_a]
+  in
+  (* slot_3 never finished in an L1 block, so the DAL node never tracked it
+     (except when its content has been injected). *)
+  let* () =
+    check_get_commitment_headers
+      (fun response ->
+        Check.(
+          (String.trim response.RPC_core.body = "[]")
+            string
+            ~error_msg:"Slot3 is not expected to be indexed by DAL node"))
+      [slot3]
+  in
   unit
 
 let generate_dummy_slot slot_size =
