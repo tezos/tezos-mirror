@@ -1,0 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_scoru_wasm_fast)
+ (libraries
+  tezos-base
+  tezos-tree-encoding
+  tezos-base.unix
+  tezos-context.disk
+  tezos-base-test-helpers
+  test_scoru_wasm_test_helpers
+  tezos-test-helpers
+  tezos-scoru-wasm
+  tezos-scoru-wasm-fast
+  qcheck-alcotest
+  alcotest-lwt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_test_helpers
+  -open Test_scoru_wasm_test_helpers))
+
+(rule
+ (alias runtest)
+ (package tezos-scoru-wasm-fast-test)
+ (action (run %{dep:./test_scoru_wasm_fast.exe})))

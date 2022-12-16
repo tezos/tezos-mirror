@@ -36,3 +36,20 @@ let get mem = Array.get mem.raw
 let set mem = Array.set mem.raw
 
 let length mem = Array.length mem.raw
+
+module Internal_for_tests = struct
+  let of_list (content : Unsigned.uint8 list) =
+    let mem_length = List.length content in
+    let page_size = 0x10000 in
+    let pages = mem_length / page_size in
+
+    assert (Int.rem mem_length page_size = 0) ;
+
+    {
+      raw = Array.of_list Ctypes.uint8_t content;
+      min = Unsigned.UInt32.of_int pages;
+      max = None;
+    }
+
+  let to_list (mem : t) = Array.to_list mem.raw
+end

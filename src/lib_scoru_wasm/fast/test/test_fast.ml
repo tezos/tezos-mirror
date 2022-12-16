@@ -235,6 +235,93 @@ let test_store_read_write =
   in
   test_against_both ~from_binary:false ~kernel ~messages:(List.repeat 100 "")
 
+let test_read_input =
+  let kernel =
+    {|
+  (module       
+    (import
+      "smart_rollup_core"
+      "read_input"
+      (func $read_input (param i32 i32 i32) (result i32))
+    )
+
+    (import
+      "smart_rollup_core"
+      "write_output"
+      (func $write_output (param i32 i32) (result i32))
+    )
+
+    (import
+      "smart_rollup_core"
+      "write_debug"
+      (func $write_debug (param i32 i32))
+    )
+
+
+    (memory 1)
+    (export "memory" (memory 0))
+  
+    (data (i32.const 1000) "kernel_run called")
+  
+    (func (export "kernel_run")
+      (call $write_debug
+        (i32.const 1000) ;; Memory address
+        (i32.const 17) ;; length of the string to log
+      ) ;; Should print "kernel_run called" 
+
+      (call $read_input
+        (i32.const 100) ;; address to write the level (4b) 
+        (i32.const 104) ;; address to write the message counter (8b)
+        (i32.const 112) ;; address to write the read input
+        (i32.const 4) ;; length of the input
+      ) ;; should fill the bytes 100-116 with level, msg counter and the data "abcd"
+
+      (drop) ;; we don't care about the result
+
+      (call $write_output
+        (i32.const 100) ;; source address
+        (i32.const 16) ;; number of bytes 
+      ) ;; writes the read level, msg counter and the data "abcd"
+
+      (drop) ;; we don't care about the result of write_output 
+      (drop) ;; we don't care about the result of write_output 
+    )
+  )
+    |}
+  in
+  let msg = "abcd" in
+  (* We want to produce more than 255 levels such that, when the level is written
+     in the memory, its multi-byte representation is tested for correctness.
+     If the number were a single byte the test would have been less relevant*)
+  let no_of_levels = 257 in
+
+  test_against_both
+    ~from_binary:false
+    ~kernel
+    ~messages:(List.repeat no_of_levels msg)
+
+let test_big_address =
+  let kernel =
+    {|
+        (module
+          (type $read_t (func (param i32 i32 i32) (result i32)))
+          (import "smart_rollup_core" "read_input" (func $read_input (type $read_t)))
+          (memory 65536)
+          (export "mem" (memory 0))
+          
+          (func (export "kernel_run")
+            (call $read_input
+                  (i32.const 4_294_967_100) ;; addr_info
+                  (i32.const 4_294_967_196) ;; (-100)
+                  (i32.const 4))
+            (drop)
+          )
+        )
+      |}
+  in
+  let msg = "abcd" in
+  test_against_both ~from_binary:false ~kernel ~messages:[msg]
+
 let test_reveal_preimage =
   let example_hash = "this represents the 33-byte hash " in
   let example_preimage = "This is the expected preimage" in
@@ -343,8 +430,10 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set =
 
 let tests =
   [
+    tztest "Big addresses are working correctly" `Quick test_big_address;
     tztest "Computation kernel" `Quick test_computation;
     tztest "Store read/write kernel" `Quick test_store_read_write;
+    tztest "read_input" `Quick test_read_input;
     tztest "Reveal_preimage kernel" `Quick test_reveal_preimage;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3729
        Enable back this test when the transaction kernel has been

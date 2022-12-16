@@ -3349,6 +3349,28 @@ let _octez_scoru_wasm_tests =
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
+let _octez_scoru_wasm_fast_tests =
+  test
+    "test_scoru_wasm_fast"
+    ~path:"src/lib_scoru_wasm/fast/test"
+    ~opam:"tezos-scoru-wasm-fast-test"
+    ~synopsis:"Tests for the scoru-wasm-fast functionality"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_context_disk;
+        octez_base_test_helpers |> open_;
+        octez_scoru_wasm_tests_helpers |> open_;
+        octez_test_helpers;
+        octez_scoru_wasm;
+        octez_scoru_wasm_fast;
+        qcheck_alcotest;
+        alcotest_lwt;
+      ]
+    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig

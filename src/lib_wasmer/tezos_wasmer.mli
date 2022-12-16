@@ -155,6 +155,16 @@ module Memory : sig
 
   (** [length mem] gives you the memory size in bytes. *)
   val length : t -> int
+
+  module Internal_for_tests : sig
+    (** [of_list content] creates a memory instance containing the bytes from [content] 
+      The content is expected to be a multiple of pages size (64KB)
+    *)
+    val of_list : Unsigned.uint8 list -> t
+
+    (** [to_list mem] returns a list containing each byte of [mem] *)
+    val to_list : t -> Unsigned.uint8 list
+  end
 end
 
 module Instance : sig

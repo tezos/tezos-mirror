@@ -27,50 +27,10 @@ open Tezos_scoru_wasm
 module Wasmer = Tezos_wasmer
 module Lazy_containers = Tezos_lazy_containers
 
-let to_ref_memory mem =
-  let open Wasmer.Memory in
-  let get_chunk page_id =
-    let start_address =
-      Int64.mul page_id Lazy_containers.Chunked_byte_vector.Chunk.size
-    in
-    let body =
-      Bytes.init
-        (Int64.to_int Lazy_containers.Chunked_byte_vector.Chunk.size)
-        (fun i ->
-          Wasmer.Memory.get mem Int64.(add start_address (of_int i) |> to_int)
-          |> Unsigned.UInt8.to_int |> Char.chr)
-    in
-    Lwt.return (Lazy_containers.Chunked_byte_vector.Chunk.of_bytes body)
-  in
-  let length = Wasmer.Memory.length mem |> Int64.of_int in
-  let chunked = Lazy_containers.Chunked_byte_vector.create ~get_chunk length in
-  let min = Unsigned.UInt32.to_int32 mem.min in
-  let max = Option.map Unsigned.UInt32.to_int32 mem.max in
-  Tezos_webassembly_interpreter.(
-    Partial_memory.of_chunks (MemoryType {min; max}) chunked)
-
-let commit_memory mem partial_memory =
-  let chunks =
-    Lazy_containers.Chunked_byte_vector.loaded_chunks
-      (Tezos_webassembly_interpreter.Partial_memory.content partial_memory)
-  in
-  List.iter
-    (function
-      | chunk_id, Some chunk ->
-          let start =
-            Int64.mul chunk_id Lazy_containers.Chunked_byte_vector.Chunk.size
-          in
-          let body = Lazy_containers.Chunked_byte_vector.Chunk.to_bytes chunk in
-          Bytes.iteri
-            (fun i char ->
-              let addr = Int64.(add start (of_int i) |> to_int) in
-              Wasmer.Memory.set
-                mem
-                addr
-                (Char.code char |> Unsigned.UInt8.of_int))
-            body
-      | _ -> ())
-    chunks
+module Host_funcs = struct
+  module Aux : Host_funcs.Aux.S with type memory = Wasmer.Memory.t =
+    Host_funcs.Aux.Make (Memory_access.Wasmer)
+end
 
 type host_state = {
   retrieve_mem : unit -> Wasmer.Memory.t;
@@ -110,10 +70,7 @@ let make (module Builtins : Builtins.S) state =
   let open Lwt.Syntax in
   let with_mem f =
     let mem = state.retrieve_mem () in
-    let ref_mem = to_ref_memory mem in
-    let+ value = f ref_mem in
-    commit_memory mem ref_mem ;
-    value
+    f mem
   in
 
   let read_input =
