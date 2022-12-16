@@ -357,14 +357,12 @@ let pp_manager_operation_content (type kind) source ppf
         "Smart contract rollup refutation move:@,\
          Address: %a@,\
          Staker: %a@,\
-         Move: %a"
+         Refutation: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Staker.pp
         opponent
-        (fun fmt -> function
-          | None -> Format.pp_print_string fmt "opening of the game"
-          | Some refutation -> Sc_rollup.Game.pp_refutation fmt refutation)
+        Sc_rollup.Game.pp_refutation
         refutation
   | Sc_rollup_timeout {rollup; stakers = {alice; bob}} ->
       Format.fprintf

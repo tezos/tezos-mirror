@@ -304,10 +304,15 @@ module Manager : sig
 
   (** An sc_rollup_refutation is the information submitted by players during a
      (refutation) game. *)
-  type sc_rollup_refutation = {
-    choice_tick : int;
-    refutation_step : sc_rollup_game_refutation_step;
-  }
+  type sc_rollup_refutation =
+    | Start of {
+        player_commitment_hash : string;
+        opponent_commitment_hash : string;
+      }
+    | Move of {
+        choice_tick : int;
+        refutation_step : sc_rollup_game_refutation_step;
+      }
 
   (** [sc_rollup_refute ?refutation ~rollup ~oppenent] builds an Sc rollup
       refutation manager operation payload. The refutation is [None] in case
@@ -316,7 +321,7 @@ module Manager : sig
       public key hash of the staker who published the commitment we are about
       to refute. *)
   val sc_rollup_refute :
-    ?refutation:sc_rollup_refutation ->
+    refutation:sc_rollup_refutation ->
     sc_rollup:string ->
     opponent:string ->
     unit ->

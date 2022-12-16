@@ -80,15 +80,13 @@ let init_dissection ~size ?init_tick start_hash =
   Stdlib.List.init (size + 1) init_tick
 
 let init_refutation ~size ?init_tick start_hash =
-  G.
-    {
-      choice = Sc_rollup_tick_repr.initial;
-      step = Dissection (init_dissection ~size ?init_tick start_hash);
-    }
+  let choice = Sc_rollup_tick_repr.initial in
+  let step = G.Dissection (init_dissection ~size ?init_tick start_hash) in
+  (choice, step)
 
 let two_stakers_in_conflict () =
-  let* ctxt, rollup, genesis_hash, refuter, defender =
-    T.originate_rollup_and_deposit_with_two_stakers ()
+  let* ctxt, rollup, genesis_hash, refuter, defender, staker3 =
+    T.originate_rollup_and_deposit_with_three_stakers ()
   in
   let hash1 = hash_string "foo" in
   let hash2 = hash_string "bar" in
@@ -133,14 +131,35 @@ let two_stakers_in_conflict () =
     T.lift
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup refuter child2
   in
-  return (ctxt, rollup, refuter, defender)
+  let defender_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated child1
+  in
+  let refuter_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated child2
+  in
+  return
+    ( ctxt,
+      rollup,
+      refuter,
+      defender,
+      staker3,
+      refuter_commitment_hash,
+      defender_commitment_hash )
 
 (** A dissection is 'poorly distributed' if its tick counts are not
 very evenly spread through the total tick-duration. Formally, the
 maximum tick-distance between two consecutive states in a dissection
 may not be more than half of the total tick-duration. *)
 let test_poorly_distributed_dissection () =
-  let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
   let start_hash = hash_string "foo" in
   let init_tick size i =
     mk_dissection_chunk
@@ -148,20 +167,38 @@ let test_poorly_distributed_dissection () =
     if i = size then (None, tick_of_int_exn 10000)
     else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
   in
+  let player = refuter and opponent = defender in
+  let player_commitment_hash = refuter_commitment_hash
+  and opponent_commitment_hash = defender_commitment_hash in
   let* ctxt =
-    T.lift @@ R.start_game ctxt rollup ~player:refuter ~opponent:defender
+    T.lift
+    @@ R.start_game
+         ctxt
+         rollup
+         ~player:(player, player_commitment_hash)
+         ~opponent:(opponent, opponent_commitment_hash)
   in
   let size =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
-  let move = init_refutation ~size ~init_tick start_hash in
+  let choice, step = init_refutation ~size ~init_tick start_hash in
   assert_fails_with_f
     ~__LOC__
-    (T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move)
+    (T.lift
+    @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender ~step ~choice
+    )
     (function D.Dissection_invalid_distribution _ -> true | _ -> false)
 
 let test_single_valid_game_move () =
-  let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
   let start_hash = hash_string "foo" in
   let size =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
@@ -175,15 +212,22 @@ let test_single_valid_game_move () =
         else if i = size then (None, tick_of_int_exn 10000)
         else (Some (hash_int i), tick_of_int_exn (i * tick_per_state)))
   in
+  let player = refuter and opponent = defender in
+  let player_commitment_hash = refuter_commitment_hash
+  and opponent_commitment_hash = defender_commitment_hash in
+
   let* ctxt =
-    T.lift @@ R.start_game ctxt rollup ~player:refuter ~opponent:defender
+    T.lift
+    @@ R.start_game
+         ctxt
+         rollup
+         ~player:(player, player_commitment_hash)
+         ~opponent:(opponent, opponent_commitment_hash)
   in
-  let move =
-    Sc_rollup_game_repr.
-      {choice = Sc_rollup_tick_repr.initial; step = Dissection dissection}
-  in
+  let choice, step = (Sc_rollup_tick_repr.initial, G.Dissection dissection) in
   let* game_result, _ctxt =
-    T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move
+    T.lift
+    @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender ~choice ~step
   in
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_game_result game_result
 
@@ -240,6 +284,164 @@ let test_invalid_serialized_inbox_proof () =
     res
     (( = ) Sc_rollup_proof_repr.Sc_rollup_invalid_serialized_inbox_proof)
 
+let test_first_move_with_swapped_commitment () =
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
+  let player = refuter
+  and opponent = defender
+  and player_commitment_hash = refuter_commitment_hash
+  and opponent_commitment_hash = defender_commitment_hash in
+  let*! res =
+    T.lift
+    @@ R.start_game
+         ctxt
+         rollup
+         ~player:(player, opponent_commitment_hash)
+         ~opponent:(opponent, player_commitment_hash)
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = )
+       (Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment
+          (player, opponent_commitment_hash)))
+
+let test_first_move_from_invalid_player () =
+  let* ( ctxt,
+         rollup,
+         _refuter,
+         defender,
+         staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
+  let opponent = defender
+  and player_commitment_hash = refuter_commitment_hash
+  and opponent_commitment_hash = defender_commitment_hash in
+  let*! res =
+    T.lift
+    @@ R.start_game
+         ctxt
+         rollup
+         ~player:(staker3, player_commitment_hash)
+         ~opponent:(opponent, opponent_commitment_hash)
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = )
+       (Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment
+          (staker3, player_commitment_hash)))
+
+let test_first_move_with_invalid_opponent () =
+  let* ( ctxt,
+         rollup,
+         refuter,
+         _defender,
+         staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
+  let player = refuter
+  and player_commitment_hash = refuter_commitment_hash
+  and opponent_commitment_hash = defender_commitment_hash in
+  let*! res =
+    T.lift
+    @@ R.start_game
+         ctxt
+         rollup
+         ~player:(player, player_commitment_hash)
+         ~opponent:(staker3, opponent_commitment_hash)
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = )
+       (Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment
+          (staker3, opponent_commitment_hash)))
+
+let test_first_move_with_invalid_ancestor () =
+  let* ( ctxt,
+         rollup,
+         refuter,
+         defender,
+         _staker3,
+         refuter_commitment_hash,
+         defender_commitment_hash ) =
+    two_stakers_in_conflict ()
+  in
+  let* inbox_level = T.lift @@ T.proper_valid_inbox_level (ctxt, rollup) 3 in
+  let refuter_commitment =
+    let context_hash11 = hash_string "child11" in
+    Commitment_repr.
+      {
+        predecessor = refuter_commitment_hash;
+        inbox_level;
+        number_of_ticks = T.number_of_ticks_exn 10000L;
+        compressed_state = context_hash11;
+      }
+  in
+  let defender_commitment =
+    let context_hash21 = hash_string "child21" in
+    Commitment_repr.
+      {
+        predecessor = defender_commitment_hash;
+        inbox_level;
+        number_of_ticks = T.number_of_ticks_exn 10000L;
+        compressed_state = context_hash21;
+      }
+  in
+  let ctxt = T.advance_level_for_commitment ctxt refuter_commitment in
+  let* _, _, ctxt, _ =
+    T.lift
+    @@ Sc_rollup_stake_storage.publish_commitment
+         ctxt
+         rollup
+         refuter
+         refuter_commitment
+  in
+  let* _, _, ctxt, _ =
+    T.lift
+    @@ Sc_rollup_stake_storage.publish_commitment
+         ctxt
+         rollup
+         defender
+         defender_commitment
+  in
+  let refuter_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated refuter_commitment
+  in
+  let defender_commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated defender_commitment
+  in
+  let player = refuter
+  and opponent = defender
+  and player_commitment_hash = refuter_commitment_hash
+  and opponent_commitment_hash = defender_commitment_hash in
+  let*! res =
+    T.lift
+    @@ R.start_game
+         ctxt
+         rollup
+         ~player:(player, player_commitment_hash)
+         ~opponent:(opponent, opponent_commitment_hash)
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = )
+       (Sc_rollup_errors.Sc_rollup_not_valid_commitments_conflict
+          (player_commitment_hash, player, opponent_commitment_hash, opponent)))
+
 let tests =
   [
     Tztest.tztest
@@ -254,4 +456,22 @@ let tests =
       "Invalid serialized inbox proof is rejected."
       `Quick
       test_invalid_serialized_inbox_proof;
+    Tztest.tztest
+      "Test to start a game with invalid commitment hash (swap commitment)."
+      `Quick
+      test_first_move_with_swapped_commitment;
+    Tztest.tztest
+      "Test to start a game with invalid commitment hash (op from outsider)."
+      `Quick
+      test_first_move_from_invalid_player;
+    Tztest.tztest
+      "Test to start a game with invalid commitment hash (opponent is not in \
+       game)."
+      `Quick
+      test_first_move_with_invalid_opponent;
+    Tztest.tztest
+      "Test to start a game with commitment hash that are not the first \
+       conflict."
+      `Quick
+      test_first_move_with_invalid_ancestor;
   ]

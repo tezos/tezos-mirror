@@ -110,9 +110,12 @@ let deposit_stake ctxt rollup staker =
       (`Frozen_bonds (staker_contract, bond_id))
       stake
   in
+  let* ctxt, staker_index =
+    Sc_rollup_staker_index_storage.fresh_staker_index ctxt rollup staker
+  in
   let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
   let* ctxt = modify_staker_count ctxt rollup Int32.succ in
-  return (ctxt, balance_updates, lcc)
+  return (ctxt, balance_updates, lcc, staker_index)
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_result_syntax in
@@ -137,6 +140,9 @@ let withdraw_stake ctxt rollup staker =
   in
   let* ctxt, _size_freed =
     Store.Stakers.remove_existing (ctxt, rollup) staker
+  in
+  let* ctxt, _size_freed =
+    Sc_rollup_staker_index_storage.remove_staker ctxt rollup staker
   in
   let+ ctxt = modify_staker_count ctxt rollup Int32.pred in
   (ctxt, balance_updates)
@@ -294,6 +300,7 @@ let deallocate_commitment_metadata ctxt rollup node =
         (ctxt, rollup)
         commitment.inbox_level
     in
+    let*! ctxt, _sc_rollup = Store.clean_commitment_stakers ctxt rollup node in
     if Compare.Int32.(count = 1l) then
       let* ctxt, _size_freed =
         Store.Commitment_count_per_inbox_level.remove_existing
@@ -338,20 +345,29 @@ let find_commitment_to_deallocate ctxt rollup commitment_hash
   in
   aux ctxt commitment_hash num_commitments_to_keep
 
-let decrease_commitment_stake_count ctxt rollup node =
+let decrease_commitment_stake_count ctxt rollup node ~staker_index =
   let open Lwt_result_syntax in
-  let* new_count, _size_diff, ctxt =
+  let* ctxt, _stakers_size_diff, _existed =
+    Storage.Sc_rollup.Commitment_stakers.remove
+      ((ctxt, rollup), node)
+      staker_index
+  in
+  let* new_count, _commitment_stake_count_size_diff, ctxt =
     modify_commitment_stake_count ctxt rollup node Int32.pred
   in
   if Compare.Int32.(new_count <= 0l) then deallocate ctxt rollup node
   else return ctxt
 
-let increase_commitment_stake_count ctxt rollup node =
+let increase_commitment_stake_count ctxt rollup node ~staker_index =
   let open Lwt_result_syntax in
-  let* _new_count, size_diff, ctxt =
+  let* ctxt, stakers_size_diff, _existed =
+    Storage.Sc_rollup.Commitment_stakers.add ((ctxt, rollup), node) staker_index
+  in
+
+  let* _new_count, commmitment_count_diff, ctxt =
     modify_commitment_stake_count ctxt rollup node Int32.succ
   in
-  return (size_diff, ctxt)
+  return (stakers_size_diff + commmitment_count_diff, ctxt)
 
 (* 77 for Commitments entry
    + 4 for Commitment_stake_count entry
@@ -360,7 +376,7 @@ let increase_commitment_stake_count ctxt rollup node =
    + 0 for Staker_count_update entry *)
 let commitment_storage_size_in_bytes = 89
 
-let refine_stake ctxt rollup staker staked_on commitment =
+let refine_stake ctxt rollup staker staked_on commitment ~staker_index =
   let open Lwt_result_syntax in
   let* lcc, lcc_inbox_level, ctxt =
     Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
@@ -433,7 +449,7 @@ let refine_stake ctxt rollup staker staked_on commitment =
         Store.Stakers.update (ctxt, rollup) staker new_hash
       in
       let* stake_count_size_diff, ctxt =
-        increase_commitment_stake_count ctxt rollup new_hash
+        increase_commitment_stake_count ctxt rollup new_hash ~staker_index
       in
       (* WARNING: [commitment_storage_size] is a defined constant, and used
          to set a bound on the relationship between [max_lookahead],
@@ -464,7 +480,9 @@ let refine_stake ctxt rollup staker staked_on commitment =
       let* pred, ctxt =
         Commitment_storage.get_predecessor_unsafe ctxt rollup node
       in
-      let* _size, ctxt = increase_commitment_stake_count ctxt rollup node in
+      let* _size, ctxt =
+        increase_commitment_stake_count ctxt rollup node ~staker_index
+      in
       (go [@ocaml.tailcall]) pred ctxt
   in
   go Commitment.(commitment.predecessor) ctxt
@@ -478,13 +496,20 @@ let publish_commitment ctxt rollup staker commitment =
       Sc_rollup_zero_tick_commitment
   in
   let* ctxt, staked_on_opt = Store.Stakers.find (ctxt, rollup) staker in
-  let* ctxt, balance_updates, staked_on =
+  let* ctxt, balance_updates, staked_on, staker_index =
     match staked_on_opt with
-    | Some staked_on -> return (ctxt, [], staked_on)
+    | Some staked_on ->
+        let* ctxt, staker_index =
+          Sc_rollup_staker_index_storage.find_staker_index_unsafe
+            ctxt
+            rollup
+            staker
+        in
+        return (ctxt, [], staked_on, staker_index)
     | None -> deposit_stake ctxt rollup staker
   in
   let+ commitment_hash, ctxt, level =
-    refine_stake ctxt rollup staker staked_on commitment
+    refine_stake ctxt rollup staker staked_on commitment ~staker_index
   in
   (commitment_hash, ctxt, level, balance_updates)
 
@@ -575,6 +600,9 @@ let remove_staker ctxt rollup staker =
     is_staked_on_lcc_or_ancestor ctxt rollup ~staked_on ~lcc_inbox_level
   in
   let* () = fail_when is_staked_on_cemented Sc_rollup_remove_lcc_or_ancestor in
+  let* ctxt, staker_index =
+    Sc_rollup_staker_index_storage.find_staker_index_unsafe ctxt rollup staker
+  in
   let staker_contract, stake = get_contract_and_stake ctxt staker in
   let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
   let* ctxt, balance_updates =
@@ -604,23 +632,34 @@ let remove_staker ctxt rollup staker =
       let* pred, ctxt =
         Commitment_storage.get_predecessor_unsafe ctxt rollup node
       in
-      let* ctxt = decrease_commitment_stake_count ctxt rollup node in
+      let* ctxt =
+        decrease_commitment_stake_count ctxt rollup node ~staker_index
+      in
       (go [@ocaml.tailcall]) pred ctxt
   in
   let+ ctxt = go staked_on ctxt in
   (ctxt, balance_updates)
 
 module Internal_for_tests = struct
-  let deposit_stake = deposit_stake
+  let deposit_stake ctxt rollup staker =
+    let open Lwt_result_syntax in
+    let* ctxt, balance_updates, staked_on, _staker_index =
+      deposit_stake ctxt rollup staker
+    in
+    return (ctxt, balance_updates, staked_on)
 
   let refine_stake ctxt rollup staker ?staked_on commitment =
     let open Lwt_result_syntax in
+    let* ctxt, staker_index =
+      Sc_rollup_staker_index_storage.find_staker_index ctxt rollup staker
+    in
     match staked_on with
-    | Some staked_on -> refine_stake ctxt rollup staker staked_on commitment
+    | Some staked_on ->
+        refine_stake ctxt rollup staker staked_on commitment ~staker_index
     | None ->
         (* This allows to call {!refine_stake} without explicitely passing the
-           staked_on parameter, it's more convenient for tests. However,
-           it still enforce that {!deposit_stake} was called before. *)
+             staked_on parameter, it's more convenient for tests. However,
+             it still enforce that {!deposit_stake} was called before. *)
         let* _ctxt, staked_on = Store.Stakers.get (ctxt, rollup) staker in
-        refine_stake ctxt rollup staker staked_on commitment
+        refine_stake ctxt rollup staker staked_on commitment ~staker_index
 end

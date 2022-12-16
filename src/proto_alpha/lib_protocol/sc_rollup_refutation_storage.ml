@@ -243,12 +243,72 @@ let remove_game ctxt rollup stakers =
   in
   return ctxt
 
-(** [start_game ctxt rollup refuter defender] initialises the game or
-    if it already exists fails with `Sc_rollup_game_already_started`.
+(** [check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash
+    ~defender ~defender_commitment_hash] checks that the refuter is staked on
+    [commitment] with hash [refuter_commitment_hash], res. for [defender] and
+    [defender_commitment] with hash [defender_commitment_hash]. Fails with
+    {!Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment}.
 
-    The game is created with `refuter` as the first player to move. The
-    initial state of the game will be obtained from the commitment pair
-    belonging to [defender] at the conflict point. See
+    It also verifies that both are pointing to the same predecessor and thus are
+    in conflict, fails with
+    {!Sc_rollup_errors.Sc_rollup_not_first_conflict_between_stakers} otherwise.
+*)
+let check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash ~defender
+    ~defender_commitment_hash =
+  let open Lwt_result_syntax in
+  let fail_unless_staker_is_staked_on_commitment ctxt staker commitment_hash =
+    let* ctxt, staker_index =
+      Storage.Sc_rollup.Staker_index.get (ctxt, rollup) staker
+    in
+    let* ctxt, valid_staker_index =
+      Storage.Sc_rollup.Commitment_stakers.mem
+        ((ctxt, rollup), commitment_hash)
+        staker_index
+    in
+    let* () =
+      fail_unless
+        valid_staker_index
+        (Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment_hash))
+    in
+    return ctxt
+  in
+  let* ctxt =
+    fail_unless_staker_is_staked_on_commitment
+      ctxt
+      refuter
+      refuter_commitment_hash
+  in
+  let* ctxt =
+    fail_unless_staker_is_staked_on_commitment
+      ctxt
+      defender
+      defender_commitment_hash
+  in
+  let* refuter_commitment, ctxt =
+    Commitment_storage.get_commitment_unsafe ctxt rollup refuter_commitment_hash
+  in
+  let* defender_commitment, ctxt =
+    Commitment_storage.get_commitment_unsafe
+      ctxt
+      rollup
+      defender_commitment_hash
+  in
+  let* () =
+    fail_unless
+      Commitment_hash.(
+        refuter_commitment.predecessor = defender_commitment.predecessor)
+      (Sc_rollup_errors.Sc_rollup_not_valid_commitments_conflict
+         (refuter_commitment_hash, refuter, defender_commitment_hash, defender))
+  in
+  return (defender_commitment, ctxt)
+
+(** [start_game ctxt rollup ~player:(player, player_commitment_hash)
+    ~opponent:(opponent, opponent_commitment_hash)] initialises the game or if
+    it already exists fails with [Sc_rollup_game_already_started].
+
+    The game is created with [player] as the first player to
+    move. The initial state of the game will be obtained from the
+    commitment pair belonging to [opponent] at the conflict point. See
     [Sc_rollup_game_repr.initial] for documentation on how a pair of
     commitments is turned into an initial game state.
 
@@ -258,22 +318,32 @@ let remove_game ctxt rollup stakers =
     since a staker can publish at most one commitment per inbox level.
 
     It also initialises the timeout level to the current level plus
-    [timeout_period_in_blocks] (which will become a protocol constant
-    soon) to mark the block level at which it becomes possible for
-    anyone to end the game by timeout.
+    [timeout_period_in_blocks] to mark the block level at which it becomes
+    possible for anyone to end the game by timeout.
 
     May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-      {li [Sc_rollup_no_conflict] if [refuter] is staked on an ancestor of
-         the commitment staked on by [defender], or vice versa}
-      {li [Sc_rollup_not_staked] if one of the [refuter] or [defender] is
-         not actually staked}
-      {li [Sc_rollup_staker_in_game] if one of the [refuter] or [defender]
-         is already playing a game}
-    } *)
-let start_game ctxt rollup ~player:refuter ~opponent:defender =
+
+   {ul
+    {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+    {li [Sc_rollup_no_conflict] if [player] is staked on an
+     ancestor of the commitment staked on by [opponent], or vice versa}
+    {li [Sc_rollup_not_staked] if one of the [player] or [opponent] is
+    not actually staked}
+    {li [Sc_rollup_staker_in_game] if one of the [player] or [opponent]
+     is already playing a game}
+    {li [Sc_rollup_not_first_conflict_between_stakers] if the provided
+    commitments are not the first commitments in conflict between
+    [player] and [opponent].}
+*)
+let start_game ctxt rollup ~player:(player, player_commitment_hash)
+    ~opponent:(opponent, opponent_commitment_hash) =
   let open Lwt_result_syntax in
+  (* When the game is started by a given [player], this player is
+     called the [refuter] and its opponent is the [defender]. *)
+  let refuter = player
+  and refuter_commitment_hash = player_commitment_hash
+  and defender = opponent
+  and defender_commitment_hash = opponent_commitment_hash in
   let stakers = Sc_rollup_game_repr.Index.make refuter defender in
   let* ctxt, game_exists = Store.Game_info.mem (ctxt, rollup) stakers in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
@@ -290,13 +360,20 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   in
   let* ctxt = check_staker_availability ctxt stakers.alice in
   let* ctxt = check_staker_availability ctxt stakers.bob in
-  let* ( ( {hash = _refuter_commit; commitment = _info},
-           {hash = _defender_commit; commitment = child_info} ),
-         ctxt ) =
-    get_conflict_point ctxt rollup refuter defender
+  let* defender_commitment, ctxt =
+    check_conflict_point
+      ctxt
+      rollup
+      ~refuter
+      ~defender
+      ~refuter_commitment_hash
+      ~defender_commitment_hash
   in
-  let* parent_info, ctxt =
-    Commitment_storage.get_commitment_unsafe ctxt rollup child_info.predecessor
+  let* parent_commitment, ctxt =
+    Commitment_storage.get_commitment_unsafe
+      ctxt
+      rollup
+      defender_commitment.predecessor
   in
   let* inbox, ctxt = Sc_rollup_inbox_storage.get_inbox ctxt in
   let default_number_of_sections =
@@ -311,11 +388,11 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
       ~start_level:current_level
       (Sc_rollup_inbox_repr.take_snapshot inbox)
       slots_history_snapshot
-      ~parent:parent_info
-      ~child:child_info
       ~refuter
       ~defender
       ~default_number_of_sections
+      ~parent_commitment
+      ~defender_commitment
   in
   let* ctxt = create_game ctxt rollup stakers game in
   let* ctxt, _ =
@@ -335,7 +412,7 @@ let check_stakes ctxt rollup (stakers : Sc_rollup_game_repr.Index.t) =
   | true, false -> return (Some (game_over stakers.bob), ctxt)
   | false, false -> return (Some Draw, ctxt)
 
-let game_move ctxt rollup ~player ~opponent refutation =
+let game_move ctxt rollup ~player ~opponent ~step ~choice =
   let open Lwt_result_syntax in
   let stakers = Sc_rollup_game_repr.Index.make player opponent in
   let* game, ctxt = get_game ctxt rollup stakers in
@@ -353,7 +430,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
   match check_result with
   | Some game_result -> return (Some game_result, ctxt)
   | None -> (
-      let play_cost = Sc_rollup_game_repr.cost_play game refutation in
+      let play_cost = Sc_rollup_game_repr.cost_play ~step ~choice in
       let*? ctxt = Raw_context.consume_gas ctxt play_cost in
       let* move_result =
         Sc_rollup_game_repr.play
@@ -363,7 +440,8 @@ let game_move ctxt rollup ~player ~opponent refutation =
           ~stakers
           metadata
           game
-          refutation
+          ~step
+          ~choice
       in
       match move_result with
       | Either.Left game_result -> return (Some game_result, ctxt)

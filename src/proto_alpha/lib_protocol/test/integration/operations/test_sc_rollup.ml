@@ -1800,46 +1800,69 @@ let test_number_of_parallel_games_bounded () =
       accounts
       commitments
   in
-  match accounts with
-  | staker :: opponents ->
-      let expect_apply_failure = function
-        | Environment.Ecoproto_error
-            (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached
-              xstaker)
-          :: _ ->
-            assert (
-              Tezos_crypto.Signature.Public_key_hash.(
-                xstaker = Account.pkh_of_contract_exn staker)) ;
-            return_unit
-        | _ ->
-            failwith
-              "It should have failed with \
-               [Sc_rollup_max_number_of_parallel_games_reached]"
-      in
-      let* block = Incremental.begin_construction block in
-      let* _block, _counter =
-        List.fold_left_es
-          (fun (block, counter) opponent ->
-            let addr = Account.pkh_of_contract_exn staker in
-            let* op = Op.sc_rollup_refute (I block) opponent rollup addr None in
-            let* block =
-              if counter = max_number_of_parallel_games then
-                Incremental.add_operation ~expect_apply_failure block op
-              else Incremental.add_operation block op
-            in
-            return (block, counter + 1))
-          (block, 0)
-          opponents
-      in
-      return ()
-  | [] ->
-      (* Because [max_number_of_parallel_games] is strictly positive. *)
-      assert false
+  let staker, opponents =
+    match accounts with
+    | staker :: opponents -> (staker, opponents)
+    | [] ->
+        (* Because [max_number_of_parallel_games] is strictly positive. *)
+        assert false
+  in
+  let staker_commitment, opponents_commitments =
+    match commitments with
+    | staker_commitment :: opponents_commitments ->
+        (staker_commitment, opponents_commitments)
+    | [] ->
+        (* Because [max_number_of_parallel_games] is strictly positive. *)
+        assert false
+  in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached
+          xstaker)
+      :: _ ->
+        assert (
+          Tezos_crypto.Signature.Public_key_hash.(
+            xstaker = Account.pkh_of_contract_exn staker)) ;
+        return_unit
+    | _ ->
+        failwith
+          "It should have failed with \
+           [Sc_rollup_max_number_of_parallel_games_reached]"
+  in
+  let* block = Incremental.begin_construction block in
+  let* _block, _counter =
+    List.fold_left2_es
+      ~when_different_lengths:[]
+      (fun (block, counter) opponent opponent_commitment ->
+        let addr = Account.pkh_of_contract_exn staker in
+        let refutation =
+          Sc_rollup.Game.Start
+            {
+              player_commitment_hash =
+                Sc_rollup.Commitment.hash_uncarbonated opponent_commitment;
+              opponent_commitment_hash =
+                Sc_rollup.Commitment.hash_uncarbonated staker_commitment;
+            }
+        in
+        let* op =
+          Op.sc_rollup_refute (I block) opponent rollup addr refutation
+        in
+        let* block =
+          if counter = max_number_of_parallel_games then
+            Incremental.add_operation ~expect_apply_failure block op
+          else Incremental.add_operation block op
+        in
+        return (block, counter + 1))
+      (block, 0)
+      opponents
+      opponents_commitments
+  in
+  return ()
 
 (** [test_timeout] test multiple cases of the timeout logic.
-    - Test to timeout a player before it's allowed and fails.
-    - Test that the timeout left by player decreases as expected.
-    - Test another account can timeout a late player.
+- Test to timeout a player before it's allowed and fails.
+- Test that the timeout left by player decreases as expected.
+- Test another account can timeout a late player.
 *)
 let test_timeout () =
   let* block, (account1, account2, account3) = context_init Context.T3 in
@@ -1873,8 +1896,17 @@ let test_timeout () =
 
   let* block = add_publish ~rollup block account1 commitment1 in
   let* block = add_publish ~rollup block account2 commitment2 in
+  let refutation =
+    Sc_rollup.Game.Start
+      {
+        player_commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment1;
+        opponent_commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment2;
+      }
+  in
   let* start_game_op =
-    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
   let* block = add_op block start_game_op in
   let* block = Block.bake_n (timeout_period_in_blocks - 1) block in
@@ -1934,8 +1966,8 @@ let test_timeout () =
           return Sc_rollup.Dissection_chunk.{state_hash; tick})
     in
     let step = Sc_rollup.Game.Dissection (first_chunk :: rest) in
-    let move = Sc_rollup.Game.{choice = tick; step} in
-    Op.sc_rollup_refute (B block) account1 rollup pkh2 (Some move)
+    let refutation = Sc_rollup.Game.(Move {choice = tick; step}) in
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
   let* block = add_op block refute in
   let* pkh1_timeout, pkh2_timeout =
@@ -1979,8 +2011,17 @@ let init_with_conflict () =
   in
   let* block = add_publish ~rollup block account1 commitment1 in
   let* block = add_publish ~rollup block account2 commitment2 in
+  let refutation =
+    Sc_rollup.Game.Start
+      {
+        player_commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment1;
+        opponent_commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment2;
+      }
+  in
   let* start_game_op =
-    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
   let* block = add_op block start_game_op in
   return (block, (account1, pkh1), (account2, pkh2), rollup)
@@ -2015,7 +2056,7 @@ let dumb_proof ~choice =
       }
   in
   let proof = Sc_rollup.Proof.{pvm_step; input_proof = Some inbox_proof} in
-  return Sc_rollup.Game.{choice; step = Proof proof}
+  return Sc_rollup.Game.(Move {choice; step = Proof proof})
 
 (** Test that two invalid proofs from the two players lead to a draw
     in the refutation game. *)
@@ -2029,7 +2070,7 @@ let test_draw_with_two_invalid_moves () =
       dumb_proof ~choice
     in
     let* p1_final_move_op =
-      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh p1_refutation
     in
     add_op block p1_final_move_op
   in
@@ -2045,7 +2086,7 @@ let test_draw_with_two_invalid_moves () =
       dumb_proof ~choice
     in
     let* p2_final_move_op =
-      Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some p2_refutation)
+      Op.sc_rollup_refute (B block) p2 rollup p1_pkh p2_refutation
     in
     let* incr = Incremental.begin_construction block in
     Incremental.add_operation incr p2_final_move_op
@@ -2089,7 +2130,7 @@ let test_timeout_during_final_move () =
     in
 
     let* p1_final_move_op =
-      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh p1_refutation
     in
     add_op block p1_final_move_op
   in
@@ -2124,7 +2165,7 @@ let test_dissection_during_final_move () =
     in
 
     let* p1_final_move_op =
-      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh p1_refutation
     in
     add_op block p1_final_move_op
   in
@@ -2132,11 +2173,9 @@ let test_dissection_during_final_move () =
   (* Player2 will play a dissection. *)
   let dumb_dissection =
     let choice = Sc_rollup.Tick.initial in
-    Sc_rollup.Game.{choice; step = Dissection []}
+    Sc_rollup.Game.(Move {choice; step = Dissection []})
   in
-  let* p2_op =
-    Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some dumb_dissection)
-  in
+  let* p2_op = Op.sc_rollup_refute (B block) p2 rollup p1_pkh dumb_dissection in
   (* Dissecting is no longer accepted. *)
   let* incr = Incremental.begin_construction block in
   let expect_apply_failure = function
@@ -2199,7 +2238,7 @@ let make_refutation_metadata ?(boot_sector = "") metadata =
     let input_proof = Some Sc_rollup.Proof.(Reveal_proof Metadata_proof) in
     Proof {pvm_step; input_proof}
   in
-  return Sc_rollup.Game.{choice; step}
+  return Sc_rollup.Game.(Move {choice; step})
 
 (** Test that during a refutation game when one malicious player lied on the
     metadata, he can not win the game. *)
@@ -2223,7 +2262,7 @@ let test_refute_invalid_metadata () =
       }
     in
     let* block = add_publish ~rollup block account commitment in
-    return (block, state1, state2, state3)
+    return (commitment, block, state1, state2, state3)
   in
 
   (* [account1] will play a valid commitment with the correct evaluation of
@@ -2232,7 +2271,7 @@ let test_refute_invalid_metadata () =
     Sc_rollup.Metadata.
       {address = rollup; origination_level = Raw_level.(succ root)}
   in
-  let* block, state1, state2, state3 =
+  let* commitment1, block, state1, state2, state3 =
     post_commitment_from_metadata block account1 valid_metadata
   in
 
@@ -2240,7 +2279,7 @@ let test_refute_invalid_metadata () =
   let invalid_metadata =
     {valid_metadata with origination_level = Raw_level.of_int32_exn 42l}
   in
-  let* block, _, _, _ =
+  let* commitment2, block, _, _, _ =
     post_commitment_from_metadata block account2 invalid_metadata
   in
 
@@ -2249,9 +2288,19 @@ let test_refute_invalid_metadata () =
      know which tick we want to refute.
   *)
   let* start_game_op =
-    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+    let refutation =
+      Sc_rollup.Game.Start
+        {
+          player_commitment_hash =
+            Sc_rollup.Commitment.hash_uncarbonated commitment1;
+          opponent_commitment_hash =
+            Sc_rollup.Commitment.hash_uncarbonated commitment2;
+        }
+    in
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
   let* block = add_op block start_game_op in
+  Format.eprintf "Foo\n%!" ;
   let dissection : Sc_rollup.Game.refutation =
     let choice = Sc_rollup.Tick.initial in
     let step : Sc_rollup.Game.step =
@@ -2265,26 +2314,24 @@ let test_refute_invalid_metadata () =
           {tick = two; state_hash = Some state3};
         ]
     in
-    {choice; step}
+    Move {choice; step}
   in
   let* dissection_op =
-    Op.sc_rollup_refute (B block) account1 rollup pkh2 (Some dissection)
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 dissection
   in
   let* block = add_op block dissection_op in
 
   (* [account2] will play an invalid proof about the invalid metadata. *)
   let*! proof = make_refutation_metadata invalid_metadata in
-  let* proof1_op =
-    Op.sc_rollup_refute (B block) account2 rollup pkh1 (Some proof)
-  in
+  let* proof1_op = Op.sc_rollup_refute (B block) account2 rollup pkh1 proof in
   let* block = add_op block proof1_op in
 
   (* We can implicitely check that [proof1_op] was invalid if
      [account1] wins the game. *)
-  let*! proof = make_refutation_metadata valid_metadata in
+  let*! refutation = make_refutation_metadata valid_metadata in
   let* incr = Incremental.begin_construction block in
   let* proof2_op =
-    Op.sc_rollup_refute (I incr) account1 rollup pkh2 (Some proof)
+    Op.sc_rollup_refute (I incr) account1 rollup pkh2 refutation
   in
   let* incr = Incremental.add_operation incr proof2_op in
   let expected_game_status : Sc_rollup.Game.status =

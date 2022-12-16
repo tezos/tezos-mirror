@@ -471,20 +471,20 @@ end
 let make_chunk state_hash tick = {state_hash; tick}
 
 let initial inbox dal_snapshot ~start_level
-    ~(parent : Sc_rollup_commitment_repr.t)
-    ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender
+    ~(parent_commitment : Sc_rollup_commitment_repr.t)
+    ~(defender_commitment : Sc_rollup_commitment_repr.t) ~refuter ~defender
     ~default_number_of_sections =
   let ({alice; _} : Index.t) = Index.make refuter defender in
   let alice_to_play = Staker.equal alice refuter in
   let open Sc_rollup_tick_repr in
-  let tick = of_number_of_ticks child.number_of_ticks in
+  let tick = of_number_of_ticks defender_commitment.number_of_ticks in
   let game_state =
     Dissecting
       {
         dissection =
           [
-            make_chunk (Some parent.compressed_state) initial;
-            make_chunk (Some child.compressed_state) tick;
+            make_chunk (Some parent_commitment.compressed_state) initial;
+            make_chunk (Some defender_commitment.compressed_state) tick;
             make_chunk None (next tick);
           ];
         default_number_of_sections;
@@ -496,7 +496,7 @@ let initial inbox dal_snapshot ~start_level
     inbox_snapshot = inbox;
     dal_snapshot;
     start_level;
-    inbox_level = child.inbox_level;
+    inbox_level = defender_commitment.inbox_level;
     game_state;
   }
 
@@ -541,25 +541,63 @@ let pp_step ppf step =
         states
   | Proof proof -> Format.fprintf ppf "proof: %a" Sc_rollup_proof_repr.pp proof
 
-type refutation = {choice : Sc_rollup_tick_repr.t; step : step}
+type refutation =
+  | Start of {
+      player_commitment_hash : Sc_rollup_commitment_repr.Hash.t;
+      opponent_commitment_hash : Sc_rollup_commitment_repr.Hash.t;
+    }
+  | Move of {choice : Sc_rollup_tick_repr.t; step : step}
 
-let pp_refutation ppf {choice; step} =
-  Format.fprintf
-    ppf
-    "Tick: %a@ Step: %a"
-    Sc_rollup_tick_repr.pp
-    choice
-    pp_step
-    step
+let pp_refutation ppf = function
+  | Start {player_commitment_hash; opponent_commitment_hash} ->
+      Format.fprintf
+        ppf
+        "Start game between commitment hashes %a and %a"
+        Sc_rollup_commitment_repr.Hash.pp
+        player_commitment_hash
+        Sc_rollup_commitment_repr.Hash.pp
+        opponent_commitment_hash
+  | Move {choice; step} ->
+      Format.fprintf
+        ppf
+        "Tick: %a@ Step: %a"
+        Sc_rollup_tick_repr.pp
+        choice
+        pp_step
+        step
 
 let refutation_encoding =
   let open Data_encoding in
-  conv
-    (fun {choice; step} -> (choice, step))
-    (fun (choice, step) -> {choice; step})
-    (obj2
-       (req "choice" Sc_rollup_tick_repr.encoding)
-       (req "step" step_encoding))
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"Start"
+        (Tag 0)
+        (obj3
+           (req "refutation_kind" (constant "start"))
+           (req
+              "player_commitment_hash"
+              Sc_rollup_commitment_repr.Hash.encoding)
+           (req
+              "opponent_commitment_hash"
+              Sc_rollup_commitment_repr.Hash.encoding))
+        (function
+          | Start {player_commitment_hash; opponent_commitment_hash} ->
+              Some ((), player_commitment_hash, opponent_commitment_hash)
+          | _ -> None)
+        (fun ((), player_commitment_hash, opponent_commitment_hash) ->
+          Start {player_commitment_hash; opponent_commitment_hash});
+      case
+        ~title:"Move"
+        (Tag 1)
+        (obj3
+           (req "refutation_kind" (constant "move"))
+           (req "choice" Sc_rollup_tick_repr.encoding)
+           (req "step" step_encoding))
+        (function Move {choice; step} -> Some ((), choice, step) | _ -> None)
+        (fun ((), choice, step) -> Move {choice; step});
+    ]
 
 type reason = Conflict_resolved | Timeout
 
@@ -808,12 +846,12 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
-let cost_play _game refutation =
-  match refutation.step with
+let cost_play ~step ~choice =
+  match step with
   | Dissection states ->
       let number_of_states = List.length states in
       let hash_size = State_hash.size in
-      let tick_size = Sc_rollup_tick_repr.size_in_bytes refutation.choice in
+      let tick_size = Sc_rollup_tick_repr.size_in_bytes choice in
       Sc_rollup_costs.cost_check_dissection
         ~number_of_states
         ~tick_size
@@ -865,19 +903,17 @@ let cost_play _game refutation =
       scale10 @@ Gas_limit_repr.atomic_step_cost
       @@ cost_N_IBlake2b overapproximated_hashing_size
 
-let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game
-    refutation =
+let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game ~step
+    ~choice =
   let open Lwt_result_syntax in
   let (Packed ((module PVM) as pvm)) = Sc_rollups.Kind.pvm_of kind in
   let mk_loser loser =
     let loser = Index.staker stakers loser in
     Either.Left (Loser {loser; reason = Conflict_resolved})
   in
-  match (refutation.step, game.game_state) with
+  match (step, game.game_state) with
   | Dissection states, Dissecting {dissection; default_number_of_sections} ->
-      let*? start_chunk, stop_chunk =
-        find_choice dissection refutation.choice
-      in
+      let*? start_chunk, stop_chunk = find_choice dissection choice in
       let*? () =
         PVM.check_dissection
           ~default_number_of_sections
@@ -900,9 +936,7 @@ let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game
            })
   | Dissection _, Final_move _ -> tzfail Dissecting_during_final_move
   | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
-      let*? start_chunk, stop_chunk =
-        find_choice dissection refutation.choice
-      in
+      let*? start_chunk, stop_chunk = find_choice dissection choice in
       let*? pvm_step =
         Sc_rollup_proof_repr.unserialize_pvm_step ~pvm proof.pvm_step
       in

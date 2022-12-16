@@ -990,7 +990,7 @@ val sc_rollup_refute :
   ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
-  refutation:Alpha_context.Sc_rollup.Game.refutation option ->
+  refutation:Alpha_context.Sc_rollup.Game.refutation ->
   opponent:Alpha_context.Sc_rollup.Staker.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->

@@ -764,6 +764,25 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.Hash.t
        and type t := Raw_context.t
 
+  (** Contains the current latest attributed index for stakers. *)
+  module Staker_index_counter :
+    Single_data_storage
+      with type value = Sc_rollup_staker_index_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Contains the index of any staker that currently have stake. *)
+  module Staker_index :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Sc_rollup_staker_index_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Contains the stakers' index that currently have stake indexed by rollup. *)
+  module Stakers_by_rollup :
+    Carbonated_data_set_storage
+      with type t = Raw_context.t * Sc_rollup_repr.t
+       and type elt = Sc_rollup_staker_index_repr.t
+
   module Stakers :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Signature.Public_key_hash.t
@@ -823,6 +842,25 @@ module Sc_rollup : sig
       with type key = Sc_rollup_commitment_repr.Hash.t
        and type value = int32
        and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Contains for all commitment not yet cemented the list of stakers that have
+      staked on it. This storage must contains only commitments that are not yet
+      cemented and so only stakers that currently have stake. The number of
+      element for any commitment must be equal to the value stored in
+      {!Commitment_stake_count} *)
+  module Commitment_stakers :
+    Carbonated_data_set_storage
+      with type t =
+        (Raw_context.t * Sc_rollup_repr.t) * Sc_rollup_commitment_repr.Hash.t
+       and type elt = Sc_rollup_staker_index_repr.t
+
+  (** Delete the staker list storage. This function must be called only on
+      a cemented commitment.  *)
+  val clean_commitment_stakers :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    Sc_rollup_commitment_repr.Hash.t ->
+    (Raw_context.t * Sc_rollup_repr.t) Lwt.t
 
   (** This storage contains for each rollup and inbox level not yet cemented the
       level of publication of the first commitment. This is used to compute the

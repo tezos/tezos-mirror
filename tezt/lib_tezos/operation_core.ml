@@ -302,10 +302,15 @@ module Manager = struct
     | Proof of sc_rollup_proof
     | Dissection of sc_rollup_dissection_chunk list
 
-  type sc_rollup_refutation = {
-    choice_tick : int;
-    refutation_step : sc_rollup_game_refutation_step;
-  }
+  type sc_rollup_refutation =
+    | Start of {
+        player_commitment_hash : string;
+        opponent_commitment_hash : string;
+      }
+    | Move of {
+        choice_tick : int;
+        refutation_step : sc_rollup_game_refutation_step;
+      }
 
   let json_of_sc_rollup_dissection ~dissection =
     Ezjsonm.list
@@ -318,15 +323,28 @@ module Manager = struct
 
   let json_payload_binding_of_sc_rollup_refutation sc_rollup opponent refutation
       =
-    let json_of_refutation_step {choice_tick; refutation_step} =
-      let step =
-        match refutation_step with
-        | Proof proof -> proof
-        | Dissection dissection -> json_of_sc_rollup_dissection ~dissection
-      in
-      `O [("choice", json_of_int_as_string choice_tick); ("step", step)]
+    let json_of_refutation_step = function
+      | Start {player_commitment_hash; opponent_commitment_hash} ->
+          `O
+            [
+              ("refutation_kind", `String "start");
+              ("player_commitment_hash", `String player_commitment_hash);
+              ("opponent_commitment_hash", `String opponent_commitment_hash);
+            ]
+      | Move {choice_tick; refutation_step} ->
+          let step =
+            match refutation_step with
+            | Proof proof -> proof
+            | Dissection dissection -> json_of_sc_rollup_dissection ~dissection
+          in
+          `O
+            [
+              ("refutation_kind", `String "move");
+              ("choice", json_of_int_as_string choice_tick);
+              ("step", step);
+            ]
     in
-    let refutation = json_of_option json_of_refutation_step refutation in
+    let refutation = json_of_refutation_step refutation in
     strip_null_fields
       [
         ("kind", `String "sc_rollup_refute");
@@ -355,7 +373,7 @@ module Manager = struct
         (* See details in {!Operation_repr} module. *)
         sc_rollup : string;
         opponent : string;
-        refutation : sc_rollup_refutation option;
+        refutation : sc_rollup_refutation;
       }
 
   let reveal account = Reveal account
@@ -372,7 +390,7 @@ module Manager = struct
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
-  let sc_rollup_refute ?refutation ~sc_rollup ~opponent () =
+  let sc_rollup_refute ~refutation ~sc_rollup ~opponent () =
     Sc_rollup_refute {sc_rollup; opponent; refutation}
 
   type t = {

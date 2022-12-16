@@ -1052,7 +1052,7 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let* sc_rollup = sc_rollup_of infos.ctxt.sc_rollup in
   let refutation : Sc_rollup.Game.refutation =
-    {choice = Sc_rollup.Tick.initial; step = Dissection []}
+    Move {choice = Sc_rollup.Tick.initial; step = Dissection []}
   in
   Op.sc_rollup_refute
     ?fee:oinfos.fee
@@ -1066,7 +1066,7 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
     (match infos.accounts.dest with
     | None -> (get_source infos).pkh
     | Some dest -> dest.pkh)
-    (Some refutation)
+    refutation
 
 let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
   Op.sc_rollup_add_messages

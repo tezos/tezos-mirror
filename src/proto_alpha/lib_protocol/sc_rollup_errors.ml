@@ -80,6 +80,15 @@ type error +=
   | (* `Permanent *) Sc_rollup_address_generation
   | (* `Permanent *) Sc_rollup_zero_tick_commitment
   | (* `Permanent *) Sc_rollup_commitment_past_curfew
+  | (* `Permanent *)
+      Sc_rollup_not_valid_commitments_conflict of
+      Sc_rollup_commitment_repr.Hash.t
+      * Signature.public_key_hash
+      * Sc_rollup_commitment_repr.Hash.t
+      * Signature.public_key_hash
+  | (* `Permanent *)
+      Sc_rollup_wrong_staker_for_conflict_commitment of
+      Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
 
 let () =
   register_error_kind
@@ -533,4 +542,58 @@ let () =
     (function
       | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
       | _ -> None)
-    (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker)
+    (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker) ;
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_not_valid_commitments_conflict"
+    ~title:"Conflicting commitments does not have a common ancestor"
+    ~pp:(fun ppf (c1, s1, c2, s2) ->
+      Format.fprintf
+        ppf
+        "The two commitments %a, staked by %a, and %a, staked by %a, does not \
+         have a common predecessor. Two commitments are in conflict when there \
+         direct predecessor is the same."
+        Sc_rollup_commitment_repr.Hash.pp
+        c1
+        Signature.Public_key_hash.pp_short
+        s1
+        Sc_rollup_commitment_repr.Hash.pp
+        c2
+        Signature.Public_key_hash.pp_short
+        s2)
+    ~description
+    Data_encoding.(
+      obj4
+        (req "commitment" Sc_rollup_commitment_repr.Hash.encoding)
+        (req "player" Signature.Public_key_hash.encoding)
+        (req "opponent_commitment" Sc_rollup_commitment_repr.Hash.encoding)
+        (req "opponent" Signature.Public_key_hash.encoding))
+    (function
+      | Sc_rollup_not_valid_commitments_conflict (c1, s1, c2, s2) ->
+          Some (c1, s1, c2, s2)
+      | _ -> None)
+    (fun (c1, s1, c2, s2) ->
+      Sc_rollup_not_valid_commitments_conflict (c1, s1, c2, s2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_wrong_staker_for_conflict_commitment"
+    ~title:"Given commitment is not staked by given staker"
+    ~pp:(fun ppf (staker, commitment) ->
+      Format.fprintf
+        ppf
+        "The staker %a has not staked commitment %a"
+        Signature.Public_key_hash.pp
+        staker
+        Sc_rollup_commitment_repr.Hash.pp
+        commitment)
+    ~description
+    Data_encoding.(
+      obj2
+        (req "player" Signature.Public_key_hash.encoding)
+        (req "commitment" Sc_rollup_commitment_repr.Hash.encoding))
+    (function
+      | Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment) ->
+          Some (staker, commitment)
+      | _ -> None)
+    (fun (staker, commitment) ->
+      Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment))

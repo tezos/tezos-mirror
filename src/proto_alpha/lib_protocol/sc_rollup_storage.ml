@@ -67,6 +67,7 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
   let* ctxt, param_ty_size_diff, _added =
     Store.Parameters_type.add ctxt address parameters_ty
   in
+  let* ctxt = Sc_rollup_staker_index_storage.init ctxt address in
   let* ctxt, lcc_size_diff =
     Store.Last_cemented_commitment.init ctxt address genesis_commitment_hash
   in
