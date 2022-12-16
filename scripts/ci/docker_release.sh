@@ -20,7 +20,7 @@ if [ -z "$EXECUTABLE_FILES" ]; then
 fi
 
 # shellcheck disable=SC2086
-EXECUTABLES="$(cat $EXECUTABLE_FILES)"
+OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 
 # Build minimal, bare and debug images
 ./scripts/create_docker_image.sh \
@@ -28,7 +28,7 @@ EXECUTABLES="$(cat $EXECUTABLE_FILES)"
   "${DOCKER_IMAGE_TAG}" \
   "${build_deps_image_name}" \
   "${build_deps_image_version}" \
-  "${EXECUTABLES}" \
+  "${OCTEZ_EXECUTABLES}" \
   "${CI_COMMIT_SHORT_SHA}"
 
 # auth gitlab or dockerhub registry
