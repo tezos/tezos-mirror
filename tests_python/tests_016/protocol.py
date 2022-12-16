@@ -7,6 +7,7 @@ from tools import constants, utils
 HASH = constants.MUMBAI
 DAEMON = constants.MUMBAI_DAEMON
 PARAMETERS = constants.MUMBAI_PARAMETERS
+NUMBER = constants.MUMBAI_NUMBER
 
 TENDERBAKE_PARAMETERS = deepcopy(PARAMETERS)
 TENDERBAKE_PARAMETERS['consensus_threshold'] = 45

@@ -4,7 +4,7 @@ from os import path
 import pytest
 from tools import utils, paths, constants
 from tools.utils import assert_run_failure
-from . import contract_paths
+from .contract_paths import find_script
 from . import protocol
 
 CONTRACT_PATH = path.join(
@@ -825,9 +825,7 @@ class TestSaplingStateCorruption:
         """
         Makes sure sapling state with id 0 exists
         """
-        contract = path.join(
-            contract_paths.OPCODES_CONTRACT_PATH, "sapling_empty_state.tz"
-        )
+        contract = find_script(['opcodes', 'sapling_empty_state'])
         client.originate(
             amount=0,
             sender="bootstrap1",
@@ -838,9 +836,7 @@ class TestSaplingStateCorruption:
         utils.bake(client, bake_for="bootstrap1")
 
     def test_originate_with_id_is_forbidden(self, client):
-        contract = path.join(
-            contract_paths.OPCODES_CONTRACT_PATH, "sapling_empty_state.tz"
-        )
+        contract = find_script(['opcodes', 'sapling_empty_state'])
         with assert_run_failure(r'Unexpected forged value'):
             client.originate(
                 amount=0,
