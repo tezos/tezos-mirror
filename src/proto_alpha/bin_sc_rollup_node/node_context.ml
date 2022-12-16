@@ -109,9 +109,21 @@ let get_last_published_commitment (cctxt : Protocol_client_context.full)
   | Ok None -> return_none
   | Ok (Some (_staked_hash, staked_commitment)) -> return_some staked_commitment
 
-let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
-    rollup_address kind operators fee_parameters ~loser_mode store context =
+let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
+    Configuration.(
+      {
+        sc_rollup_address = rollup_address;
+        sc_rollup_node_operators = operators;
+        fee_parameters;
+        loser_mode;
+        _;
+      } as configuration) =
   let open Lwt_result_syntax in
+  let*! store = Store.load mode Configuration.(default_storage_dir data_dir) in
+  let*! context =
+    Context.load Read_write (Configuration.default_context_dir data_dir)
+  in
+  let* l1_ctxt, kind = Layer1.start configuration cctxt in
   let publisher = Configuration.Operator_purpose_map.find Publish operators in
   let* protocol_constants = retrieve_constants cctxt
   and* lcc = get_last_cemented_commitment cctxt rollup_address
