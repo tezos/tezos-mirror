@@ -119,6 +119,22 @@ module Commitments_published_at_level : sig
        and type 'a store := 'a store
 end
 
+module L2_head :
+  Store_sigs.Mutable_value
+    with type value := Sc_rollup_block.t
+     and type 'a store := 'a store
+
+module Last_finalized_head :
+  Store_sigs.Mutable_value
+    with type value := Sc_rollup_block.t
+     and type 'a store := 'a store
+
+module Levels_to_hashes :
+  Store_sigs.Map
+    with type key := int32
+     and type value := Block_hash.t
+     and type 'a store := 'a store
+
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
     to [Dal.Slot.t]. The encoding function converts this
