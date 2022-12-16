@@ -148,21 +148,6 @@ module Commitments =
       let encoding = Sc_rollup.Commitment.encoding
     end)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
-   Use file. *)
-module Last_stored_commitment_level =
-  Make_mutable_value
-    (struct
-      let path = ["commitments"; "last_stored_level"]
-    end)
-    (struct
-      type value = Raw_level.t
-
-      let name = "raw_level"
-
-      let encoding = Raw_level.encoding
-    end)
-
 module Commitments_published_at_level = struct
   type element = {
     first_published_at_level : Raw_level.t;
