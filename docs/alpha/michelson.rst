@@ -575,37 +575,10 @@ A detailed description of the following instructions can be found in the `intera
 Operations on type never
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The type ``never`` is the type of forbidden values. The most prominent
-scenario in which ``never`` is used is when implementing a contract
-template with no additional entrypoint. A contract template defines a set
-of basic entrypoints, and its ``parameter`` declaration contains a type
-variable for additional entrypoints in some branch of an union type, or
-wrapped inside an option type. Letting this type variable be ``never`` in
-a particular implementation indicates that the contract template has not
-been extended, and turns the branch in the code that processes the
-additional entrypoints into a forbidden branch.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-Values of type ``never`` cannot occur in a well-typed program. However,
-they can be abstracted in the ``parameter`` declaration of a contract---or
-by using the ``LAMBDA`` operation---thus indicating that the corresponding
-branches in the code are forbidden. The type ``never`` also plays a role
-when introducing values of union or option type with ``LEFT never``,
-``RIGHT never``, or ``NONE never``. In such cases, the created values can
-be inspected with the operations ``IF_LEFT``, ``IF_RIGHT``, or
-``IF_NONE``, and the corresponding branches in the code are forbidden
-branches.
-
--  ``NEVER``: Close a forbidden branch.
-
-::
-
-    :: never : 'A  ->  'B
-
-- ``COMPARE``: Trivial comparison on type ``never``
-
-::
-
-   :: never : never : 'S   ->   int : 'S
+-  ``NEVER``: Close a forbidden branch (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NEVER>`__).
+-  ``COMPARE``: Trivial comparison on type ``never`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 
 Operations on booleans
@@ -791,57 +764,12 @@ unsigned mask afterwards.
 Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
 
-Strings are mostly used for naming things without having to rely on
-external ID databases. They are restricted to the printable subset of
-7-bit ASCII, plus some escaped characters (see section on
-constants). So what can be done is basically use string constants as
-is, concatenate or splice them, and use them as keys.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-
--  ``CONCAT``: String concatenation.
-
-::
-
-    :: string : string : 'S   -> string : 'S
-
-    > CONCAT / s : t : S  =>  (s ^ t) : S
-
-    :: string list : 'S   -> string : 'S
-
-    > CONCAT / {} : S  =>  "" : S
-    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
-       where CONCAT / { <ss> } : S  =>  r : S
-
--  ``SIZE``: number of characters in a string.
-
-::
-
-     :: string : 'S   ->   nat : 'S
-
--  ``SLICE``: String access.
-
-::
-
-    :: nat : nat : string : 'S   ->  option string : 'S
-
-    > SLICE / offset : length : s : S  =>  Some ss : S
-       where ss is the substring of s at the given offset and of the given length
-         iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  None  : S
-         iff offset or (offset + length) are out of bounds
-
--  ``COMPARE``: Lexicographic comparison.
-
-::
-
-    :: string : string : 'S   ->   int : 'S
-
-    > COMPARE / s : t : S  =>  -1 : S
-        iff s < t
-    > COMPARE / s : t : S  =>  0 : S
-        iff s = t
-    > COMPARE / s : t : S  =>  1 : S
-        iff s > t
+-  ``CONCAT``: String concatenation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
+-  ``SIZE``: number of characters in a string (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``SLICE``: String access (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
+-  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
 
 Operations on pairs and right combs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
