@@ -19,6 +19,7 @@ module Test = struct
     let number_of_shards = 2048 / 16 in
     let slot_size = 1048576 / 16 in
     let page_size = 4096 / 16 in
+    let number_of_pages = slot_size / page_size in
     let msg_size = slot_size / 16 in
     (* [msg] is initialized with random bytes. *)
     let msg = Bytes.create msg_size in
@@ -41,9 +42,10 @@ module Test = struct
         in
         let* p = Cryptobox.polynomial_from_slot t slot in
         let cm = Cryptobox.commit t p in
-        let* pi = Cryptobox.prove_page t p 1 in
-        let page = Bytes.sub msg page_size page_size in
-        let* check = Cryptobox.verify_page t cm ~page_index:1 page pi in
+        let page_index = Random.int number_of_pages in
+        let* pi = Cryptobox.prove_page t p page_index in
+        let page = Bytes.sub slot (page_index * page_size) page_size in
+        let* check = Cryptobox.verify_page t cm ~page_index page pi in
         assert check ;
         let enc_shards = Cryptobox.shards_from_polynomial t p in
         let c_indices =
