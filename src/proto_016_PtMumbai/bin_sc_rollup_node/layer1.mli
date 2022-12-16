@@ -47,20 +47,19 @@ type t = private {
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3311
    Allow to retrieve L1 blocks through Tezos node storage locally. *)
 
-(** [start configuration cctxt store] returns a stream of [chain_event] obtained
+(** [start configuration cctxt] returns a stream of [chain_event] obtained
     from the monitoring of the Tezos node set up by the client [cctxt]. The
     layer 1 state is stored in the data directory declared in
     [configuration]. *)
 val start :
   Configuration.t ->
   Protocol_client_context.full ->
-  _ Store.t ->
   (t * Protocol.Alpha_context.Sc_rollup.Kind.t) tzresult Lwt.t
 
-(** [reconnect cfg l1_ctxt store] reconnects (and retries with delay) to the
+(** [reconnect cfg l1_ctxt] reconnects (and retries with delay) to the
     Tezos node. The delay for each reconnection is increased with a randomized
     exponential backoff (capped to 1.5h) . *)
-val reconnect : Configuration.t -> t -> _ Store.t -> t tzresult Lwt.t
+val reconnect : Configuration.t -> t -> t tzresult Lwt.t
 
 (** [get_predecessor_opt state head] returns the predecessor of block [head],
     when [head] is not the genesis block. *)

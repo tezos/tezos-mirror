@@ -38,22 +38,6 @@ open Alpha_context
 val is_slot_confirmed :
   _ Node_context.t -> Layer1.head -> Dal.Slot_index.t -> bool tzresult Lwt.t
 
-(** [save_unconfirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
-    that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
-*)
-val save_unconfirmed_slot :
-  Node_context.rw -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
-
-(** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
-    that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
-    The contents of the slot are set to [pages] in [node_ctxt.store]. *)
-val save_confirmed_slot :
-  Node_context.rw ->
-  Block_hash.t ->
-  Dal.Slot_index.t ->
-  Dal.Page.content list ->
-  unit Lwt.t
-
 (** [process_head node_ctxt head] performs the following operations:
     {ul
       {li it reads the endorsements for headers published attestation_lag
