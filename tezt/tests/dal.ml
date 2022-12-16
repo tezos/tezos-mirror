@@ -919,6 +919,37 @@ let get_commitment_succeeds commitment' response =
 
 let get_commitment_not_found _commit r = RPC.check_string_response ~code:404 r
 
+let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
+  let test check_result ~query_string (slot_index, commit) =
+    let slot_level, slot_index =
+      if not query_string then (None, None)
+      else (Some slot_level, Some slot_index)
+    in
+    let* response =
+      RPC.call_raw
+        dal_node
+        (Rollup.Dal.RPC.get_commitment_headers ?slot_index ?slot_level commit)
+    in
+    return @@ check_result response
+  in
+  let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
+  Lwt_list.iter_s (test check_result ~query_string:false) slots_info
+
+let get_headers_succeeds status response =
+  let headers =
+    JSON.(
+      parse ~origin:"get_headers_succeeds" response.RPC_core.body
+      |> Rollup.Dal.RPC.slot_headers_of_json)
+  in
+  List.iter
+    (fun header ->
+      Check.(header.Rollup.Dal.RPC.status = status)
+        Check.string
+        ~error_msg:
+          "The value of the fetched status should match the expected \
+           one(current = %L, expected = %R)")
+    headers
+
 let test_dal_node_slots_headers_tracking _protocol _parameters _cryptobox node
     client dal_node =
   let publish ?fee = publish_and_store_slot ?fee node client dal_node in
