@@ -328,16 +328,12 @@ module Term = struct
       let* snapshot_path = check_snapshot_path snapshot_path in
       let* snapshot_header = Snapshots.read_snapshot_header ~snapshot_path in
       if format_json then
-        let json =
-          Data_encoding.Json.construct
-            Snapshots.snapshot_header_encoding
-            snapshot_header
-        in
+        let json = Snapshots.Snapshot_header.to_json snapshot_header in
         Format.printf "@[<v 2>%a@]@." Data_encoding.Json.pp json
       else
         Format.printf
           "@[<v 2>Snapshot information:@ %a@]@."
-          Snapshots.pp_snapshot_header
+          Snapshots.Snapshot_header.pp
           snapshot_header ;
       return_unit
     in

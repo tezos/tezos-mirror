@@ -145,21 +145,23 @@ val pp_snapshot_format : Format.formatter -> snapshot_format -> unit
 
 val snapshot_format_encoding : snapshot_format Data_encoding.t
 
-type snapshot_header
+module Snapshot_header : sig
+  type t
 
-val snapshot_header_encoding : snapshot_header Data_encoding.t
+  (** Pretty-printer of a snapshot's {!header} *)
+  val pp : Format.formatter -> t -> unit
 
-(** [version snapshot_header] returns the version of a given
+  val to_json : t -> Data_encoding.json
+
+  (** [version snapshot_header] returns the version of a given
     [snapshot_header] as an integer value. *)
-val version : snapshot_header -> int
-
-(** Pretty-printer of a snapshot's {!header} *)
-val pp_snapshot_header : Format.formatter -> snapshot_header -> unit
+  val get_version : t -> int
+end
 
 (** [read_snapshot_header ~snapshot_path] reads [snapshot_file]'s
    header. *)
 val read_snapshot_header :
-  snapshot_path:string -> snapshot_header tzresult Lwt.t
+  snapshot_path:string -> Snapshot_header.t tzresult Lwt.t
 
 (** [export ?snapshot_path snapshot_format ?rolling ~block ~store_dir
     ~context_dir ~chain_name genesis ~progress_display_mode] reads

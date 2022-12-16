@@ -66,25 +66,15 @@ module Event = struct
       ("filename", Data_encoding.string)
 
   let import_info =
-    let option_pp ~default pp fmt = function
-      | None -> Format.fprintf fmt "%s" default
-      | Some x -> Format.fprintf fmt "%a" pp x
-    in
     declare_2
       ~section
       ~level:Notice
       ~name:"import_info"
-      ~msg:"importing data from snapshot {filename}{metadata}"
+      ~msg:"importing data from snapshot {filename}: {header}"
       ~pp1:Format.pp_print_string
       ("filename", Data_encoding.string)
-      ~pp2:(fun fmt v ->
-        Format.fprintf
-          fmt
-          "%a"
-          (option_pp ~default:" (legacy)" (fun fmt metadata ->
-               Format.fprintf fmt ": %s" metadata))
-          v)
-      ("metadata", Data_encoding.(option string))
+      ~pp2:Format.pp_print_string
+      ("header", Data_encoding.(string))
 
   let import_unspecified_hash =
     declare_0
