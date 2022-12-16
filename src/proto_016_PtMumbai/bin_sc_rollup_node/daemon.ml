@@ -52,8 +52,8 @@ module Make (PVM : Pvm.S) = struct
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
         let*! () =
-          Store.Commitments_published_at_level.add
-            node_ctxt.store
+          Node_context.set_commitment_published_at_level
+            node_ctxt
             commitment_hash
             {
               first_published_at_level = published_at_level;
@@ -69,20 +69,21 @@ module Make (PVM : Pvm.S) = struct
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
         let*! known_commitment =
-          Store.Commitments.mem node_ctxt.store commitment_hash
+          Node_context.commitment_exists node_ctxt commitment_hash
         in
         if not known_commitment then return_unit
         else
           let*! republication =
-            Store.Commitments_published_at_level.mem
-              node_ctxt.store
+            Node_context.commitment_was_published
+              node_ctxt
+              ~source:Anyone
               commitment_hash
           in
           if republication then return_unit
           else
             let*! () =
-              Store.Commitments_published_at_level.add
-                node_ctxt.store
+              Node_context.set_commitment_published_at_level
+                node_ctxt
                 commitment_hash
                 {
                   first_published_at_level = published_at_level;
@@ -93,11 +94,10 @@ module Make (PVM : Pvm.S) = struct
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
-        let* inbox_block_hash =
-          State.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
-        in
-        let*! inbox_block =
-          Store.L2_blocks.get node_ctxt.store inbox_block_hash
+        let* inbox_block =
+          Node_context.get_l2_block_by_level
+            node_ctxt
+            (Raw_level.to_int32 inbox_level)
         in
         let*? () =
           (* We stop the node if we disagree with a cemented commitment *)
@@ -141,10 +141,9 @@ module Make (PVM : Pvm.S) = struct
     | Dal_publish_slot_header slot_header, Dal_publish_slot_header_result _ ->
         assert (Node_context.dal_enabled node_ctxt) ;
         let*! () =
-          Store.Dal_slots_headers.add
-            node_ctxt.store
-            ~primary_key:head.Layer1.hash
-            ~secondary_key:slot_header.header.id.index
+          Node_context.save_slot_header
+            node_ctxt
+            ~published_in_block_hash:head.Layer1.hash
             slot_header.header
         in
         return_unit
@@ -228,7 +227,7 @@ module Make (PVM : Pvm.S) = struct
   let rec processed_finalized_block (node_ctxt : _ Node_context.t)
       Layer1.({hash; level} as block) =
     let open Lwt_result_syntax in
-    let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
+    let*! last_finalized = Node_context.get_finalized_head_opt node_ctxt in
     let already_finalized =
       match last_finalized with
       | Some finalized -> level <= Raw_level.to_int32 finalized.header.level
@@ -242,14 +241,14 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let*! () = State.mark_finalized_head node_ctxt.store hash in
+    let*! () = Node_context.mark_finalized_head node_ctxt hash in
     return_unit
 
   let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
       =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
-    let*! () = State.save_level node_ctxt.store head in
+    let*! () = Node_context.save_level node_ctxt head in
     let* inbox_hash, inbox, inbox_witness, messages, ctxt =
       Inbox.process_head node_ctxt head
     in
@@ -277,15 +276,8 @@ module Make (PVM : Pvm.S) = struct
         (* Previous commitment for rollup genesis is itself. *)
         return node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash
       else
-        let*! pred = Store.L2_blocks.find node_ctxt.store predecessor in
-        match pred with
-        | None ->
-            failwith
-              "Missing L2 predecessor %a for previous commitment"
-              Block_hash.pp
-              predecessor
-        | Some pred ->
-            return (Sc_rollup_block.most_recent_commitment pred.header)
+        let+ pred = Node_context.get_l2_block node_ctxt predecessor in
+        Sc_rollup_block.most_recent_commitment pred.header
     in
     let header =
       Sc_rollup_block.
@@ -310,7 +302,7 @@ module Make (PVM : Pvm.S) = struct
         head
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
-    let*! () = State.save_l2_block node_ctxt.store l2_block in
+    let*! () = Node_context.save_l2_head node_ctxt l2_block in
     let*! () =
       Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
     in
@@ -338,9 +330,7 @@ module Make (PVM : Pvm.S) = struct
      imply the processing of head~3, etc). *)
   let on_layer_1_head node_ctxt head =
     let open Lwt_result_syntax in
-    let*! old_head =
-      State.last_processed_head_opt node_ctxt.Node_context.store
-    in
+    let*! old_head = Node_context.last_processed_head_opt node_ctxt in
     let old_head =
       match old_head with
       | Some h ->
@@ -426,27 +416,22 @@ module Make (PVM : Pvm.S) = struct
           l1_ctxt.heads
       in
       let*! () = Event.connection_lost () in
-      let* l1_ctxt =
-        Layer1.reconnect configuration node_ctxt.l1_ctxt node_ctxt.store
-      in
+      let* l1_ctxt = Layer1.reconnect configuration node_ctxt.l1_ctxt in
       loop l1_ctxt
     in
     protect @@ fun () -> Lwt.no_cancel @@ loop node_ctxt.l1_ctxt
 
-  let install_finalizer {Node_context.l1_ctxt; store; _} rpc_server =
+  let install_finalizer node_ctxt rpc_server =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-    let message = l1_ctxt.cctxt#message in
-    let* () = message "Shutting down L1@." in
-    let* () = Layer1.shutdown l1_ctxt in
+    let message = node_ctxt.Node_context.cctxt#message in
     let* () = message "Shutting down RPC server@." in
     let* () = Components.RPC_server.shutdown rpc_server in
     let* () = message "Shutting down Injector@." in
     let* () = Injector.shutdown () in
     let* () = message "Shutting down Batcher@." in
     let* () = Components.Batcher.shutdown () in
-    let* () = message "Closing store@." in
-    let* () = Store.close store in
+    let* () = Node_context.close node_ctxt in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
@@ -570,26 +555,8 @@ let run ~data_dir (configuration : Configuration.t)
         ())
       configuration.sc_rollup_node_operators
   in
-  let*! store =
-    Store.load Read_write Configuration.(default_storage_dir data_dir)
-  in
-  let*! context =
-    Context.load Read_write (Configuration.default_context_dir data_dir)
-  in
-  let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
-    Node_context.init
-      cctxt
-      dal_cctxt
-      ~data_dir
-      l1_ctxt
-      configuration.sc_rollup_address
-      kind
-      configuration.sc_rollup_node_operators
-      configuration.fee_parameters
-      ~loser_mode:configuration.loser_mode
-      store
-      context
+    Node_context.init cctxt dal_cctxt ~data_dir Read_write configuration
   in
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration
