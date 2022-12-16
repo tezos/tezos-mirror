@@ -79,11 +79,12 @@ let test_normalize_script =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script =
-    sf
-      "file:./tests_python/contracts_%s/opcodes/comb-literals.tz"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
+    Michelson_script.(
+      find
+        ~prefix:(Michelson_script.pytest_prefix protocol)
+        ["opcodes"; "comb-literals"]
+        protocol
+      |> path)
   in
   let* () =
     modes
