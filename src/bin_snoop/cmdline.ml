@@ -96,6 +96,7 @@ type command =
       matching : string;
       codegen_options : codegen_options;
     }
+  | Codegen_inferred of {solution : string; codegen_options : codegen_options}
   | No_command
 
 (* -------------------------------------------------------------------------- *)

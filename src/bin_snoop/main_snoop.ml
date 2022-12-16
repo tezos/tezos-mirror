@@ -291,7 +291,7 @@ and infer_cmd_full_auto model_name workload_data solver
       graph
       (overrides_map, scores_list, report)
   in
-  perform_save_solution map scores_list infer_opts ;
+  perform_save_solution model_name map scores_list infer_opts ;
   match (infer_opts.report, report) with
   | Cmdline.NoReport, _ -> ()
   | Cmdline.ReportToStdout, Some report ->
@@ -324,7 +324,11 @@ and process_output measure model_name problem solution infer_opts =
   let scores_label = (model_name, Bench.name) in
   perform_csv_export scores_label solution infer_opts ;
   let map = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
-  perform_save_solution map [(scores_label, solution.scores)] infer_opts ;
+  perform_save_solution
+    model_name
+    map
+    [(scores_label, solution.scores)]
+    infer_opts ;
   perform_plot measure model_name problem solution infer_opts
 
 and perform_csv_export scores_label solution
@@ -342,13 +346,17 @@ and perform_csv_export scores_label solution
             Inference.(scores_to_csv_column scores_label scores) ;
           Csv.append_columns ~filename solution_csv)
 
-and perform_save_solution (solution : float Free_variable.Map.t)
+and perform_save_solution inference_model_name
+    (solution : float Free_variable.Map.t)
     (scores_list : ((string * Namespace.t) * Inference.scores) list)
     (infer_opts : Cmdline.infer_parameters_options) =
   match infer_opts.save_solution with
   | None -> ()
   | Some filename ->
-      Codegen.(save_solution {map = solution; scores_list} filename) ;
+      Codegen.(
+        save_solution
+          {inference_model_name; map = solution; scores_list}
+          filename) ;
       Format.eprintf "Saved solution to %s@." filename
 
 and perform_plot measure model_name problem solution
@@ -415,12 +423,7 @@ let codegen_cmd solution model_name codegen_options =
       in
       Format.printf "%a@." Codegen.pp_model code
 
-let codegen_all_cmd solution regexp codegen_options =
-  let () = Format.eprintf "regexp: %s@." regexp in
-  let regexp = Str.regexp regexp in
-  let ok (name, _) = Str.string_match regexp name 0 in
-  let sol = Codegen.load_solution solution in
-  let models = List.filter ok (Registration.all_registered_models ()) in
+let generate_code_for_models sol models codegen_options =
   let transform =
     match codegen_options with
     | Cmdline.No_transform -> ((module Costlang.Identity) : Costlang.transform)
@@ -431,8 +434,83 @@ let codegen_all_cmd solution regexp codegen_options =
         let module Transform = Fixed_point_transform.Apply (P) in
         ((module Transform) : Costlang.transform)
   in
-  let result = Codegen.codegen_module models sol transform in
+  Codegen.codegen_module models sol transform
+
+let codegen_all_cmd solution regexp codegen_options =
+  let () = Format.eprintf "regexp: %s@." regexp in
+  let regexp = Str.regexp regexp in
+  let ok (name, _) = Str.string_match regexp name 0 in
+  let sol = Codegen.load_solution solution in
+  let models = List.filter ok (Registration.all_registered_models ()) in
+  let result = generate_code_for_models sol models codegen_options in
   Codegen.pp_module Format.std_formatter result
+
+let fvs_of_codegen_model model =
+  let (Model.For_codegen model) = model in
+  match model with
+  | Model.Packaged {model; _} ->
+      let module Model = (val model) in
+      let module FV = Model.Def (Costlang.Free_variables) in
+      FV.model
+  | Model.Preapplied _ -> Free_variable.Set.empty
+
+let codegen_infer_cmd solution codegen_options =
+  let solution = Codegen.load_solution solution in
+
+  Format.eprintf "Inference model: %s@." solution.inference_model_name ;
+
+  let all_benchmarks =
+    Registration.Name_table.to_seq Registration.bench_table
+  in
+
+  let ( let* ) = Option.bind in
+  let or_else m f = match m with Some x -> Some x | None -> f () in
+
+  let found_codegen_models =
+    let get_codegen_from_bench (bench_name, (module Bench : Benchmark.S)) =
+      (* The inference model matches. *)
+      let* _model =
+        List.assoc_opt ~equal:( = ) solution.inference_model_name Bench.models
+      in
+      (* We assume a benchmark has up to one codegen model, *)
+      (* which has the same name as the benchmark and may be qualified with "__alpha" *)
+      let codegen_name = Namespace.basename bench_name in
+      let codegen_name_alpha = codegen_name ^ "__alpha" in
+      let find_codegen name =
+        let* model =
+          Registration.String_table.find_opt Registration.codegen_table name
+        in
+        Some (name, model)
+      in
+      or_else (find_codegen codegen_name) (fun () ->
+          find_codegen codegen_name_alpha)
+    in
+    Seq.filter_map get_codegen_from_bench all_benchmarks
+  in
+
+  (* Model's free variables must be included in the solution's keys *)
+  let codegen_models =
+    let model_fvs_included_in_sol model =
+      let fvs = fvs_of_codegen_model model in
+      Free_variable.Set.for_all
+        (fun fv -> Free_variable.Map.mem fv solution.map)
+        fvs
+    in
+    Seq.filter
+      (fun (model_name, model) ->
+        let ok = model_fvs_included_in_sol model in
+        if not ok then Format.eprintf "Skipping model %s@." model_name ;
+        ok)
+      found_codegen_models
+  in
+
+  let generated_code =
+    generate_code_for_models
+      solution
+      (List.of_seq codegen_models)
+      codegen_options
+  in
+  Codegen.pp_module Format.std_formatter generated_code
 
 (* -------------------------------------------------------------------------- *)
 (* Entrypoint *)
@@ -463,4 +541,6 @@ let () =
       | Cmdline.Codegen {solution; model_name; codegen_options} ->
           codegen_cmd solution model_name codegen_options
       | Cmdline.Codegen_all {solution; matching; codegen_options} ->
-          codegen_all_cmd solution matching codegen_options)
+          codegen_all_cmd solution matching codegen_options
+      | Cmdline.Codegen_inferred {solution; codegen_options} ->
+          codegen_infer_cmd solution codegen_options)
