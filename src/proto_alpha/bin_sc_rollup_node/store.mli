@@ -92,13 +92,6 @@ module Commitments :
      and type value := Sc_rollup.Commitment.t
      and type 'a store := 'a store
 
-(** Storage containing the inbox level of the last commitment produced by the
-    rollup node. *)
-module Last_stored_commitment_level :
-  Store_sigs.Mutable_value
-    with type value := Raw_level.t
-     and type 'a store := 'a store
-
 (** Storage mapping commitment hashes to the level when they were published by
     the rollup node. It only contains hashes of commitments published by this
     rollup node. *)
