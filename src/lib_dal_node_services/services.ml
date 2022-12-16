@@ -50,21 +50,43 @@ module Types = struct
 
   type header_status = [`Not_selected | `Unseen | header_attestation_status]
 
+  type slot_header = {
+    slot_id : slot_id;
+    commitment : Cryptobox.Commitment.t;
+    status : header_status;
+  }
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4442
      Add missing profiles. *)
   type profile = Attestor of Tezos_crypto.Signature.public_key_hash
 
   (* Auxiliary functions.  *)
 
+  let header_attestation_statuses =
+    [`Waiting_for_attestations; `Attested; `Unattested]
+
   let header_attestation_status_to_string = function
     | `Waiting_for_attestations -> "waiting_for_attestations"
     | `Attested -> "attested"
     | `Unattested -> "unattested"
 
+  let header_attestation_status_of_string = function
+    | "waiting_for_attestations" -> Some `Waiting_for_attestations
+    | "attested" -> Some `Attested
+    | "unattested" -> Some `Unattested
+    | _ -> None
+
+  let header_statuses = `Not_selected :: `Unseen :: header_attestation_statuses
+
   let header_status_to_string = function
     | `Not_selected -> "not_selected"
     | `Unseen -> "unseen"
     | #header_attestation_status as e -> header_attestation_status_to_string e
+
+  let header_status_of_string = function
+    | "not_selected" -> Some `Not_selected
+    | "unseen" -> Some `Unseen
+    | s -> header_attestation_status_of_string s
 
   (* Encodings associated  to the types. *)
 
@@ -78,6 +100,22 @@ module Types = struct
       (obj2 (req "slot_level" int32) (req "slot_index" uint8))
 
   let slot_encoding = Data_encoding.bytes
+
+  let header_status_encoding =
+    let open Data_encoding in
+    string_enum
+      (List.map (fun t -> (header_status_to_string t, t)) header_statuses)
+
+  let slot_header_encoding =
+    let open Data_encoding in
+    conv
+      (fun {slot_id; commitment; status} -> (slot_id, (commitment, status)))
+      (fun (slot_id, (commitment, status)) -> {slot_id; commitment; status})
+      (merge_objs
+         slot_id_encoding
+         (obj2
+            (req "commitment" Cryptobox.Commitment.encoding)
+            (req "status" header_status_encoding)))
 
   let equal_profile (Attestor p1) (Attestor p2) =
     Tezos_crypto.Signature.Public_key_hash.( = ) p1 p2
@@ -97,6 +135,16 @@ module Types = struct
           (function Attestor attest -> Some ((), attest))
           (function (), attest -> Attestor attest);
       ]
+
+  (* String parameters queries. *)
+
+  let slot_id_query =
+    let open Tezos_rpc in
+    let open Query in
+    query (fun slot_level slot_index -> (slot_level, slot_index))
+    |+ opt_field "slot_level" Arg.int32 fst
+    |+ opt_field "slot_index" Arg.int snd
+    |> seal
 end
 
 let post_slots :
@@ -178,6 +226,22 @@ let get_commitment_by_published_level_and_index :
     Tezos_rpc.Path.(
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slot_indices"
       /: Tezos_rpc.Arg.int / "commitment")
+
+let get_commitment_headers :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.slot_header list
+    ; prefix : unit
+    ; params : unit * Cryptobox.commitment
+    ; query : Types.level option * Types.slot_index option >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Return the known headers for the the slot whose commitment is given."
+    ~query:Types.slot_id_query
+    ~output:(Data_encoding.list Types.slot_header_encoding)
+    Tezos_rpc.Path.(
+      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "headers")
 
 let patch_profile :
     < meth : [`PATCH]

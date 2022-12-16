@@ -77,9 +77,17 @@ module Types : sig
   (** The slot header was successfully included in a block. see
       {!header_attestation_status} for more details. *)
 
-  (** DAL node can track one or many profiles that correspond to various modes 
+  (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in *)
   type profile = Attestor of Tezos_crypto.Signature.public_key_hash
+
+  (** Information associated to a slot header in the RPC services of the DAL
+      node. *)
+  type slot_header = {
+    slot_id : slot_id;
+    commitment : Cryptobox.Commitment.t;
+    status : header_status;
+  }
 
   val slot_id_encoding : slot_id Data_encoding.t
 
@@ -87,8 +95,17 @@ module Types : sig
       {!header_attestation_status}. *)
   val header_attestation_status_to_string : header_attestation_status -> string
 
+  (** Convert the string to the correponding value of type
+      {!header_attestation_status}. Return {!None} in case of mismatch. *)
+  val header_attestation_status_of_string :
+    string -> header_attestation_status option
+
   (** Return the string representation for values of type {!header_status}. *)
   val header_status_to_string : header_status -> string
+
+  (** Convert the string to the correponding value of type
+    {!header_status}. Return {!None} in case of mismatch. *)
+  val header_status_of_string : string -> header_status option
 
   val profile_encoding : profile Data_encoding.t
 
@@ -147,6 +164,16 @@ val get_commitment_by_published_level_and_index :
   ; prefix : unit
   ; params : (unit * Types.level) * Types.slot_index
   ; query : unit >
+  service
+
+(** Return the known headers for the slot whose commitment is given. *)
+val get_commitment_headers :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.slot_header list
+  ; prefix : unit
+  ; params : unit * Cryptobox.commitment
+  ; query : Types.level option * Types.slot_index option >
   service
 
 (** Update the list of profiles tracked by the DAL node *)
