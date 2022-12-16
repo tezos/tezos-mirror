@@ -120,7 +120,6 @@ module type TEZOS_CONTEXT_UNIX = sig
     expected_context_hash:Tezos_crypto.Context_hash.t ->
     nb_context_elements:int ->
     fd:Lwt_unix.file_descr ->
-    legacy:bool ->
     in_memory:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
@@ -1131,7 +1130,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   open Tezos_context_dump
   module Context_dumper = Context_dump.Make (Dumpable_context)
-  module Context_dumper_legacy = Context_dump.Make_legacy (Dumpable_context)
 
   (* provides functions dump_context and restore_context *)
   let dump_context idx data ~fd ~on_disk ~progress_display_mode =
@@ -1148,20 +1146,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     Lwt.return res
 
   let restore_context idx ~expected_context_hash ~nb_context_elements ~fd
-      ~legacy ~in_memory ~progress_display_mode =
-    if legacy then
-      Context_dumper_legacy.restore_context_fd
-        idx
-        ~expected_context_hash
-        ~fd
-        ~nb_context_elements
-        ~progress_display_mode
-    else
-      Context_dumper.restore_context_fd
-        idx
-        ~in_memory
-        ~expected_context_hash
-        ~fd
-        ~nb_context_elements
-        ~progress_display_mode
+      ~in_memory ~progress_display_mode =
+    Context_dumper.restore_context_fd
+      idx
+      ~in_memory
+      ~expected_context_hash
+      ~fd
+      ~nb_context_elements
+      ~progress_display_mode
 end

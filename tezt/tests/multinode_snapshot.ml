@@ -374,6 +374,23 @@ let test_storage_snapshot =
   (* ########################################################################### *)
   Log.info "Check consistency 1" ;
 
+  (* Make sure that a snapshot freshly imported, that has its
+     savepoint set on the head, can export a valid snapshot. *)
+  let* () =
+    let node = node_rolling in
+    Log.info
+      "Check fresh import can be exported (node_rolling, %s)."
+      (Node.name node) ;
+    let* () =
+      export
+        node
+        Rolling_history
+        ~export_level:snapshot_level
+        ~snapshot:"from_fresh_import.rolling"
+    in
+    unit
+  in
+
   (*
     Check consistency of imported snapshots
     Do not factorize calls to ease debugging

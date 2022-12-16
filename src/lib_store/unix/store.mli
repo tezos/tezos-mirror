@@ -1102,9 +1102,9 @@ module Unsafe : sig
   (** [restore_from_snapshot ?notify ~store_dir ~context_index
       ~genesis ~genesis_context_hash ~floating_blocks_stream
       ~new_head_with_metadata ~new_head_resulting_context_hash
-      ~protocol_levels ~history_mode] initialises a coherent store in
-      [store_dir] with all the given info retrieved from a
-      snapshot. *)
+      ~predecessor_header ~protocol_levels ~history_mode] initialises
+      a coherent store in [store_dir] with all the given info
+      retrieved from a snapshot. *)
   val restore_from_snapshot :
     ?notify:(unit -> unit Lwt.t) ->
     [`Store_dir] Naming.directory ->
@@ -1113,6 +1113,7 @@ module Unsafe : sig
     floating_blocks_stream:Block_repr.block Lwt_stream.t ->
     new_head_with_metadata:Block_repr.block ->
     new_head_resulting_context_hash:Context_hash.t ->
+    predecessor_header:Block_header.t ->
     protocol_levels:Protocol_levels.protocol_info Protocol_levels.t ->
     history_mode:History_mode.t ->
     unit tzresult Lwt.t

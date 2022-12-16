@@ -64,7 +64,6 @@ module type TEZOS_CONTEXT_UNIX = sig
     expected_context_hash:Tezos_crypto.Context_hash.t ->
     nb_context_elements:int ->
     fd:Lwt_unix.file_descr ->
-    legacy:bool ->
     in_memory:bool ->
     progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t

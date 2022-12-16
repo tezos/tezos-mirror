@@ -79,6 +79,10 @@ Node
   of version ``4`` exported with previous versions of Octez can still
   be imported. Snapshots of version ``5`` are not backward compatible.
 
+- Removed the compatibility with storage snapshots of version ``2``
+  and ``3``. These snapshot versions from Octez 12 cannot be imported
+  anymore.
+
 Client
 ------
 
