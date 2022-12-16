@@ -179,10 +179,14 @@ module Make (Interpreter : Interpreter.S) :
     let snapshot_ctxt_index = Context.index snapshot_ctxt in
     let snapshot = Sc_rollup.Inbox.take_snapshot snapshot_inbox in
     let* dal_slots_history =
-      Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
+      if Node_context.dal_enabled node_ctxt then
+        Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
+      else return Dal.Slots_history.genesis
     in
     let* dal_slots_history_cache =
-      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
+      if Node_context.dal_enabled node_ctxt then
+        Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
+      else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
     in
     (* We fetch the value of protocol constants at block snapshot_hash
        where the game started. *)

@@ -113,6 +113,9 @@ let metadata node_ctxt =
   let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
   Sc_rollup.Metadata.{address; origination_level}
 
+let dal_enabled node_ctxt =
+  node_ctxt.protocol_constants.parametric.dal.feature_enable
+
 let readonly (node_ctxt : _ t) =
   {
     node_ctxt with
