@@ -24,58 +24,6 @@
 (*****************************************************************************)
 open Protocol
 open Alpha_context
-module Raw_store = Store
-
-module Store = struct
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
-     Use file. *)
-  module L2_head =
-    Store.Make_mutable_value
-      (struct
-        let path = ["l2_head"]
-      end)
-      (struct
-        type value = Sc_rollup_block.t
-
-        let name = "l2_block"
-
-        let encoding = Sc_rollup_block.encoding
-      end)
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
-     Use file. *)
-  module Last_finalized_head =
-    Store.Make_mutable_value
-      (struct
-        let path = ["finalized_head"]
-      end)
-      (struct
-        type value = Sc_rollup_block.t
-
-        let name = "l2_block"
-
-        let encoding = Sc_rollup_block.encoding
-      end)
-
-  (** Table from L1 levels to blocks hashes. *)
-  module Levels_to_hashes =
-    Store.Make_updatable_map
-      (struct
-        let path = ["tezos"; "levels"]
-      end)
-      (struct
-        type key = int32
-
-        let to_path_representation = Int32.to_string
-      end)
-      (struct
-        type value = Block_hash.t
-
-        let name = "block_hash"
-
-        let encoding = Block_hash.encoding
-      end)
-end
 
 let hash_of_level_opt Node_context.{store; cctxt; _} level =
   let open Lwt_syntax in
@@ -101,7 +49,7 @@ let hash_of_level node_ctxt level =
 
 let level_of_hash {Node_context.l1_ctxt; store; _} hash =
   let open Lwt_result_syntax in
-  let*! block = Raw_store.L2_blocks.find store hash in
+  let*! block = Store.L2_blocks.find store hash in
   match block with
   | Some {header = {level; _}; _} -> return (Raw_level.to_int32 level)
   | None ->
@@ -113,16 +61,16 @@ let save_level store Layer1.{hash; level} =
 
 let save_l2_block store (head : Sc_rollup_block.t) =
   let open Lwt_syntax in
-  let* () = Raw_store.L2_blocks.add store head.header.block_hash head in
+  let* () = Store.L2_blocks.add store head.header.block_hash head in
   Store.L2_head.set store head
 
-let is_processed store head = Raw_store.L2_blocks.mem store head
+let is_processed store head = Store.L2_blocks.mem store head
 
 let last_processed_head_opt store = Store.L2_head.find store
 
 let mark_finalized_head store head_hash =
   let open Lwt_syntax in
-  let* block = Raw_store.L2_blocks.find store head_hash in
+  let* block = Store.L2_blocks.find store head_hash in
   match block with
   | None -> return_unit
   | Some block -> Store.Last_finalized_head.set store block
@@ -139,7 +87,7 @@ let block_before store tick =
   | None -> return_none
   | Some head ->
       let rec search block_hash =
-        let*! block = Raw_store.L2_blocks.find store block_hash in
+        let*! block = Store.L2_blocks.find store block_hash in
         match block with
         | None -> failwith "Missing block %a" Block_hash.pp block_hash
         | Some block ->
