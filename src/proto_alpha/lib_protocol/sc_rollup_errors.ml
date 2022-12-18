@@ -543,10 +543,11 @@ let () =
       | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
       | _ -> None)
     (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker) ;
+  let description = "Conflicting commitments does not have a common ancestor" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_not_valid_commitments_conflict"
-    ~title:"Conflicting commitments does not have a common ancestor"
+    ~title:description
     ~pp:(fun ppf (c1, s1, c2, s2) ->
       Format.fprintf
         ppf
@@ -574,10 +575,11 @@ let () =
       | _ -> None)
     (fun (c1, s1, c2, s2) ->
       Sc_rollup_not_valid_commitments_conflict (c1, s1, c2, s2)) ;
+  let description = "Given commitment is not staked by given staker" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_wrong_staker_for_conflict_commitment"
-    ~title:"Given commitment is not staked by given staker"
+    ~title:description
     ~pp:(fun ppf (staker, commitment) ->
       Format.fprintf
         ppf
