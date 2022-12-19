@@ -427,13 +427,14 @@ let test_rollup_node_running ~kind =
   test_full_scenario
     {
       variant = None;
-      tags = [];
+      tags = ["running"];
       description = "the smart contract rollup node runs on correct address";
     }
     ~kind
   @@ fun _protocol rollup_node rollup_client sc_rollup _tezos_node _tezos_client
     ->
-  let metrics_addr = "localhost:" ^ string_of_int (Port.fresh ()) in
+  let metrics_port = string_of_int (Port.fresh ()) in
+  let metrics_addr = "localhost:" ^ metrics_port in
   let* () = Sc_rollup_node.run rollup_node ["--metrics-addr"; metrics_addr] in
   let* sc_rollup_from_rpc =
     sc_rollup_node_rpc rollup_node "global/smart_rollup_address"
@@ -454,7 +455,13 @@ let test_rollup_node_running ~kind =
          "Expecting %s, got %s when the client asks for the sc rollup address"
          sc_rollup
          sc_rollup_from_client)
-  else unit
+  else
+    let url = "http://" ^ metrics_addr ^ "/metrics" in
+    let*! metrics = RPC.Curl.get_raw url in
+    let regexp = Str.regexp "\\(#HELP.*\n.*#TYPE.*\n.*\\)+" in
+    if not (Str.string_match regexp metrics 0) then
+      Test.fail "Unable to read metrics"
+    else unit
 
 (** Genesis information and last cemented commitment at origination are correct
 ----------------------------------------------------------
