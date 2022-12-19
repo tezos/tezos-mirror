@@ -501,6 +501,12 @@ let reward ctxt winner =
     (`Contract winner_contract)
     reward
 
+let remove_if_staker_is_still_there ctxt rollup staker =
+  let open Lwt_result_syntax in
+  let* is_staker, ctxt = Sc_rollup_stake_storage.is_staker ctxt rollup staker in
+  if is_staker then Stake_storage.remove_staker ctxt rollup staker
+  else return (ctxt, [])
+
 let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
     (game_result : Sc_rollup_game_repr.game_result) =
   let open Lwt_result_syntax in
@@ -513,10 +519,18 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
           let Sc_rollup_game_repr.Index.{alice; bob} = stakers in
           if Signature.Public_key_hash.(alice = loser) then bob else alice
         in
-        let* ctxt, balance_updates_winner = reward ctxt winning_staker in
         let* ctxt = remove_game ctxt rollup stakers in
         let* ctxt, balance_updates_loser =
-          Stake_storage.remove_staker ctxt rollup losing_staker
+          remove_if_staker_is_still_there ctxt rollup losing_staker
+        in
+        let* ctxt, balance_updates_winner =
+          (* The winner is rewarded only if he defeated himself the loser.
+             Another way to check this is to reward if the game result's reason
+             is not a forfeit.
+          *)
+          match balance_updates_loser with
+          | [] -> return (ctxt, [])
+          | _ -> reward ctxt winning_staker
         in
         let balances_updates = balance_updates_loser @ balance_updates_winner in
         return (ctxt, balances_updates)
