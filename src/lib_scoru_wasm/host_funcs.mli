@@ -230,6 +230,9 @@ module Aux : sig
       int32 Lwt.t
 
     val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
+
+    val write_debug :
+      debug:bool -> memory:memory -> src:int32 -> num_bytes:int32 -> unit Lwt.t
   end
 
   module Make (Memory_access : Memory_access) :

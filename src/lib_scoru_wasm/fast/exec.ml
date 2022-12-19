@@ -48,8 +48,8 @@ let compute ~enable_debugging builtins durable buffers =
     match !main_mem with Some x -> x () | None -> assert false
   in
 
-  let host_state = Funcs.{retrieve_mem; buffers; durable; enable_debugging} in
-  let host_funcs = Funcs.make builtins host_state in
+  let host_state = Funcs.{retrieve_mem; buffers; durable} in
+  let host_funcs = Funcs.make ~debug:enable_debugging builtins host_state in
 
   let with_durable f =
     let+ durable = f host_state.durable in
