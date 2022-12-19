@@ -213,12 +213,10 @@ let make ~debug (module Builtins : Builtins.S) state =
   let reveal_preimage =
     fn
       (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
-      (fun hash_addr hash_size dest max_bytes ->
+      (fun hash_addr hash_size dst max_bytes ->
         let mem = state.retrieve_mem () in
         let hash_size = Int32.to_int hash_size in
         let hash_addr = Int32.to_int hash_addr in
-        let dest = Int32.to_int dest in
-        let max_bytes = Int32.to_int max_bytes in
         (* If hash_size is too large we fail and fallback to another execution
            mode.*)
         if hash_size > Host_funcs.Aux.input_output_max_size then
@@ -235,28 +233,24 @@ let make ~debug (module Builtins : Builtins.S) state =
                 Memory.get mem (hash_addr + i)
                 |> Unsigned.UInt8.to_int |> Char.chr)
           in
-          let+ payload = Builtins.reveal_preimage hash in
-          let revealed_bytes = min (String.length payload) max_bytes in
-          let payload = String.sub payload 0 revealed_bytes in
-          String.iteri
-            (fun i c ->
-              Char.code c |> Unsigned.UInt8.of_int |> Memory.set mem (dest + i))
-            payload ;
-          Int32.of_int revealed_bytes)
+          let* payload = Builtins.reveal_preimage hash in
+          Host_funcs.Aux.reveal
+            ~memory:mem
+            ~dst
+            ~max_bytes
+            ~payload:(Bytes.of_string payload))
   in
   let reveal_metadata =
     fn
       (i32 @-> i32 @-> returning1 i32)
-      (fun dest max_bytes ->
+      (fun dst max_bytes ->
         let mem = state.retrieve_mem () in
-        let dest = Int32.to_int dest in
-        let+ payload = Builtins.reveal_metadata () in
-        String.iteri
-          (fun i c ->
-            (* XXX: Check note about bounds above please! *)
-            Char.code c |> Unsigned.UInt8.of_int |> Memory.set mem (dest + i))
-          payload ;
-        Int32.(min max_bytes (of_int (String.length payload))))
+        let* payload = Builtins.reveal_metadata () in
+        Host_funcs.Aux.reveal
+          ~memory:mem
+          ~dst
+          ~max_bytes
+          ~payload:(Bytes.of_string payload))
   in
 
   List.map
