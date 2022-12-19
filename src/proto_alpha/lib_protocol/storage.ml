@@ -1759,40 +1759,17 @@ module Sc_rollup = struct
          (Public_key_hash_index)
       (Sc_rollup_staker_index_repr)
 
-  module Stakers_by_rollup =
-    Make_carbonated_data_set_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["stakers_by_rollup"]
-         end))
-         (Make_index (Sc_rollup_staker_index_repr.Index))
-
   module Stakers =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
            let name = ["stakers"]
          end))
-         (Public_key_hash_index)
+         (Make_index (Sc_rollup_staker_index_repr.Index))
       (struct
-        type t = Sc_rollup_commitment_repr.Hash.t
+        type t = Raw_level_repr.t
 
-        let encoding = Sc_rollup_commitment_repr.Hash.encoding
-      end)
-
-  let stakers (ctxt : Raw_context.t) (rollup : Sc_rollup_repr.t) =
-    Stakers.list_key_values (ctxt, rollup)
-
-  module Staker_count =
-    Indexed_context.Make_carbonated_map
-      (Registered)
-      (struct
-        let name = ["staker_count"]
-      end)
-      (struct
-        type t = int32
-
-        let encoding = Data_encoding.int32
+        let encoding = Raw_level_repr.encoding
       end)
 
   module Commitments_versioned =
@@ -1813,32 +1790,6 @@ module Sc_rollup = struct
     include Make_versioned (Sc_rollup_commitment_repr) (Commitments_versioned)
   end
 
-  module Commitment_stake_count =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["commitment_stake_count"]
-         end))
-         (Make_index (Sc_rollup_commitment_repr.Hash))
-      (struct
-        type t = int32
-
-        let encoding = Data_encoding.int32
-      end)
-
-  module Commitment_count_per_inbox_level =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["commitment_count_per_inbox_level"]
-         end))
-         (Make_index (Raw_level_repr.Index))
-      (struct
-        type t = int32
-
-        let encoding = Data_encoding.int32
-      end)
-
   module Commitment_indexed_context =
     Make_indexed_subcontext
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -1847,19 +1798,32 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_commitment_repr.Hash))
 
-  module Commitment_subcontext =
-    Make_subcontext (Registered) (Commitment_indexed_context.Raw_context)
+  module Commitment_stakers =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitments_stakers"]
+         end))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
       (struct
-        let name = ["commitment_stakers"]
+        type t = Sc_rollup_staker_index_repr.t list
+
+        let encoding = Data_encoding.list Sc_rollup_staker_index_repr.encoding
       end)
 
-  let clean_commitment_stakers ctxt rollup commitment_hash =
-    Commitment_indexed_context.remove (ctxt, rollup) commitment_hash
+  module Commitments_per_inbox_level =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitments_per_inbox_level"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+      (struct
+        type t = Sc_rollup_commitment_repr.Hash.t list
 
-  module Commitment_stakers =
-    Make_carbonated_data_set_storage
-      (Commitment_subcontext)
-      (Make_index (Sc_rollup_staker_index_repr.Index))
+        let encoding =
+          Data_encoding.list Sc_rollup_commitment_repr.Hash.encoding
+      end)
 
   module Commitment_first_publication_level =
     Make_indexed_carbonated_data_storage

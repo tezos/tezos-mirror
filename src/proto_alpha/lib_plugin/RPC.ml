@@ -2018,7 +2018,7 @@ module Sc_rollup = struct
           "The hash of the commitment on which the operator has staked on for \
            a smart-contract rollup"
         ~query:RPC_query.empty
-        ~output:(obj1 (req "hash" Sc_rollup.Commitment.Hash.encoding))
+        ~output:(obj1 (opt "hash" Sc_rollup.Commitment.Hash.encoding))
         RPC_path.(
           path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg
           / "staked_on_commitment")
@@ -2065,7 +2065,7 @@ module Sc_rollup = struct
             list
               (obj2
                  (req "staker" Staker.encoding)
-                 (req "commitment" Commitment.Hash.encoding))))
+                 (opt "commitment" Commitment.Hash.encoding))))
       in
       RPC_service.get_service
         ~description:
@@ -2210,10 +2210,10 @@ module Sc_rollup = struct
     Registration.register2 ~chunked:false S.staked_on_commitment
     @@ fun ctxt address staker () () ->
     let open Lwt_result_syntax in
-    let+ branch, _ctxt =
+    let* _ctxt, res =
       Alpha_context.Sc_rollup.Stake_storage.find_staker ctxt address staker
     in
-    branch
+    return res
 
   let register_commitment () =
     Registration.register2 ~chunked:false S.commitment
@@ -2250,7 +2250,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.stakers_commitments
       (fun context rollup () () ->
-        Sc_rollup.Storage.stakers_commitments_uncarbonated context rollup)
+        Sc_rollup.Stake_storage.stakers_commitments_uncarbonated context rollup)
 
   let register_conflicts () =
     Registration.register1

@@ -89,14 +89,6 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
       genesis_commitment_hash
       origination_level
   in
-  (* There is no staker for the genesis_commitment. *)
-  let* ctxt, commitment_staker_count_size_diff, _commitment_staker_existed =
-    Store.Commitment_stake_count.add
-      (ctxt, address)
-      genesis_commitment_hash
-      Int32.zero
-  in
-
   (* Those stores [Store.Commitment_first_publication_level] and
      [Store.Commitment_count_per_inbox_level] are populated with dummy values,
      in order the [sc_rollup_state_storage.deallocate_commitment_metadata]
@@ -108,13 +100,12 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
       origination_level
       origination_level
   in
-  let* ctxt, commitment_count_per_inbox_level_diff, _existed =
-    Store.Commitment_count_per_inbox_level.add
+  let* ctxt, commitments_per_inbox_level_diff =
+    Store.Commitments_per_inbox_level.init
       (ctxt, address)
       origination_level
-      Int32.one
+      [genesis_commitment_hash]
   in
-  let* ctxt, stakers_size_diff = Store.Staker_count.init ctxt address 0l in
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
@@ -122,11 +113,8 @@ let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
     Z.of_int
       (origination_size + stored_kind_size + addresses_size + lcc_size_diff
      + commitment_size_diff + commitment_added_size_diff
-     + commitment_staker_count_size_diff
-     + commitment_first_publication_level_diff
-     + commitment_first_publication_level_diff
-     + commitment_count_per_inbox_level_diff + stakers_size_diff
-     + param_ty_size_diff + pvm_kind_size + genesis_info_size)
+     + commitment_first_publication_level_diff + param_ty_size_diff
+     + pvm_kind_size + genesis_info_size + commitments_per_inbox_level_diff)
   in
   return (address, size, genesis_commitment_hash, ctxt)
 

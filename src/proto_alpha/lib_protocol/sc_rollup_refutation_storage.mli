@@ -185,9 +185,11 @@ val apply_game_result :
 (**/**)
 
 module Internal_for_tests : sig
-  (** [get_conflict_point context rollup staker1 staker2] returns the first point
-      of disagreement between the given stakers. The returned commitments are
-      distinct, and have the same [parent] commitment.
+  (** [get_conflict_point context rollup staker1 staker2] returns the
+      first point of disagreement between the [staker1] and the
+      [staker2]
+      The returned commitments are distinct, and have the same [parent]
+      commitment.
 
       May fail with:
       {ul

@@ -47,18 +47,42 @@ val find_staker_index_unsafe :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Signature.public_key_hash ->
+  (Raw_context.t * t option) tzresult Lwt.t
+
+(** Same as {!find_staker_index_unsafe} but fails if the value is absent. *)
+val get_staker_index_unsafe :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Signature.public_key_hash ->
   (Raw_context.t * t) tzresult Lwt.t
 
 (** Same as {!find_staker_index_unsafe} but checks for the existence of the
-[rollup] before. *)
+    [rollup] before. *)
 val find_staker_index :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Signature.public_key_hash ->
-  (Raw_context.t * t) tzresult Lwt.t
+  (Raw_context.t * t option) tzresult Lwt.t
 
+(** [remove_staker ctxt rollup staker] cleans every storage associated
+    to [staker] and it's index.
+    The staker will be no longer considered active until a new index is given
+    to it, through a new call to {!fresh_staker_index}. *)
 val remove_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Signature.public_key_hash ->
-  (Raw_context.t * int) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
+
+(** [list_stakers_uncarbonated ctxt rollup] lists the active stakers on
+    [rollup]. *)
+val list_stakers_uncarbonated :
+  Raw_context.t -> Sc_rollup_repr.t -> Signature.public_key_hash list Lwt.t
+
+(** [is_active ctxt rollup staker_index] returns true iff [staker_index]
+    is an active staker. *)
+val is_active :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  t ->
+  (Raw_context.t * bool) tzresult Lwt.t

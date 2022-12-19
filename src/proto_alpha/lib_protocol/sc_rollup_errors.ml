@@ -89,6 +89,9 @@ type error +=
   | (* `Permanent *)
       Sc_rollup_wrong_staker_for_conflict_commitment of
       Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
+  | (* `Permanent *)
+      Sc_rollup_invalid_commitment_to_cement of
+      Sc_rollup_commitment_repr.Hash.t
 
 let () =
   register_error_kind
@@ -598,4 +601,22 @@ let () =
           Some (staker, commitment)
       | _ -> None)
     (fun (staker, commitment) ->
-      Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment))
+      Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment)) ;
+  let description = "Given commitment can not be cemented" in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_invalid_commitment_to_cement"
+    ~title:description
+    ~pp:(fun ppf commitment ->
+      Format.fprintf
+        ppf
+        "The commitment %a can not be cemented"
+        Sc_rollup_commitment_repr.Hash.pp
+        commitment)
+    ~description
+    Data_encoding.(
+      obj1 (req "commitment" Sc_rollup_commitment_repr.Hash.encoding))
+    (function
+      | Sc_rollup_invalid_commitment_to_cement commitment -> Some commitment
+      | _ -> None)
+    (fun commitment -> Sc_rollup_invalid_commitment_to_cement commitment)
