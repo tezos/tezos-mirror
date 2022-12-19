@@ -53,6 +53,12 @@ val progress_display_mode_encoding : progress_display_mode Data_encoding.t
 (** The number of steps that the animation cycles through. *)
 val number_of_frames : int
 
+(** [three_dots ?out msg] prints the given [msg], on the give
+    [out]put, followed by the "three little dots" animations. It
+    returns a canceller that must be called once the animation must be
+    terminated. *)
+val three_dots : ?out:Lwt_unix.file_descr -> string -> (unit -> unit) Lwt.t
+
 (** [display_progress ?every ?out ~progress_display_mode ~pp_print_step f] calls
     [pp_print_step] when the first argument of [f] is called and
     increments the number of steps which will be given to

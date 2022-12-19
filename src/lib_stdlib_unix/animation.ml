@@ -74,6 +74,29 @@ let make_with_animation ppf ~make ~on_retry seed =
   Format.fprintf ppf "%s%s\n%!" clean init ;
   Lwt.return result
 
+let three_dots ?(out = Lwt_unix.stdout) msg =
+  let clear_line fmt = Format.fprintf fmt "\027[2K\r" in
+  let pp_cpt = ref 0 in
+  let dot_array = [|""; "."; ".."; "..."|] in
+  let dots () = dot_array.(!pp_cpt mod 4) in
+  let oc = Unix.out_channel_of_descr (Lwt_unix.unix_file_descr out) in
+  let fmt = Format.formatter_of_out_channel oc in
+  let rec tick_promise () =
+    let* () = Lwt_unix.sleep 1. in
+    incr pp_cpt ;
+    clear_line fmt ;
+    Format.fprintf fmt "%s%s%!" msg (dots ()) ;
+    tick_promise ()
+  in
+  let loop = tick_promise () in
+  let pp_done () =
+    clear_line fmt ;
+    Format.fprintf fmt "%s Done@\n%!" msg
+  in
+  Lwt.return (fun () ->
+      Lwt.cancel loop ;
+      pp_done ())
+
 let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
     ~progress_display_mode ~pp_print_step f =
   if every <= 0 then
