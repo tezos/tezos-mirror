@@ -25,40 +25,94 @@
 
 open Tezos_dal_node_lib
 
-let make_cb () =
-  let parameters =
-    Cryptobox.
-      {
-        number_of_shards = 256;
-        slot_size = 1 lsl 16;
-        redundancy_factor = 4;
-        page_size = 4096;
-      }
-  in
-  let initialisation_parameters =
-    Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-      ~slot_size:parameters.slot_size
-  in
-  Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
+let parameters =
+  Cryptobox.
+    {
+      number_of_shards = 256;
+      slot_size = 1 lsl 16;
+      redundancy_factor = 4;
+      page_size = 4096;
+    }
+
+let initialisation_parameters =
+  Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
+    ~slot_size:parameters.slot_size
+
+let () = Cryptobox.Internal_for_tests.load_parameters initialisation_parameters
+
+let dal, parameters =
   match Cryptobox.make parameters with
   | Ok cryptobox -> (cryptobox, parameters)
   | Error (`Fail str) -> Stdlib.failwith ("DAL INIT ERROR: " ^ str)
 
-let test_rw () =
-  Lwt_utils_unix.with_tempdir "dal_shard_store_dir" @@ fun base_dir ->
-  let open Lwt_result_syntax in
-  let dal, parameters = make_cb () in
-  let*! store = Shard_store.init (Filename.concat base_dir "shard_store") in
+let shards_from_bytes dal b =
   let polynomial =
-    match
-      Cryptobox.polynomial_from_slot dal (Bytes.make parameters.slot_size 'a')
-    with
+    match Cryptobox.polynomial_from_slot dal b with
     | Ok v -> v
     | Error _ -> Stdlib.failwith "DAL ERROR: polynomial_from_slot failed"
   in
-  let share_size = Cryptobox.encoded_share_size dal in
   let commitment = Cryptobox.commit dal polynomial in
   let shards = Cryptobox.shards_from_polynomial dal polynomial in
+  (commitment, shards)
+
+let with_store f =
+  let open Lwt_result_syntax in
+  Lwt_utils_unix.with_tempdir "dal_shard_store_dir" @@ fun base_dir ->
+  let* store =
+    Shard_store.init ~max_mutexes:50 (Filename.concat base_dir "shard_store")
+  in
+  f dal parameters store
+
+let test_read_fail () =
+  with_store @@ fun dal parameters store ->
+  let open Lwt_result_syntax in
+  let share_size = Cryptobox.encoded_share_size dal in
+  let commitment, _ =
+    shards_from_bytes dal (Bytes.make parameters.slot_size 'a')
+  in
+  let*! failed_shards = Shard_store.read_shards ~share_size store commitment in
+  let () =
+    match failed_shards with
+    | Error [Shard_store.Resource_not_found s]
+      when s = Cryptobox.Commitment.to_b58check commitment ->
+        ()
+    | _ -> assert false
+  in
+  let*! failed_shard = Shard_store.read_shard ~share_size store commitment 0 in
+  let () =
+    match failed_shard with
+    | Error [Shard_store.Resource_not_found s]
+      when s = Filename.concat (Cryptobox.Commitment.to_b58check commitment) "0"
+      ->
+        ()
+    | _ -> assert false
+  in
+  return_unit
+
+let test_wrong_shard_size () =
+  with_store @@ fun dal parameters store ->
+  let open Lwt_result_syntax in
+  let commitment, shards =
+    shards_from_bytes dal (Bytes.make parameters.slot_size 'a')
+  in
+  let* () = Shard_store.write_shards store commitment shards in
+  let*! failed_shards =
+    Shard_store.read_shards ~share_size:22 store commitment
+  in
+  let () =
+    match failed_shards with
+    | Error [Tezos_base.Data_encoding_wrapper.Decoding_error _s] -> ()
+    | _ -> assert false
+  in
+  return_unit
+
+let test_rw () =
+  with_store @@ fun dal parameters store ->
+  let open Lwt_result_syntax in
+  let share_size = Cryptobox.encoded_share_size dal in
+  let commitment, shards =
+    shards_from_bytes dal (Bytes.make parameters.slot_size 'a')
+  in
   let* () = Shard_store.write_shards store commitment shards in
   let* shards_extracted =
     Shard_store.read_shards ~share_size store commitment
@@ -73,6 +127,12 @@ let test_rw () =
     = Cryptobox.IntMap.bindings shards) ;
   return_unit
 
-let tests_rw = ("Test Read Write", [Tztest.tztest "Read/write" `Quick test_rw])
+let tests_store =
+  ( "Test Store",
+    [
+      Tztest.tztest "Read/write" `Quick test_rw;
+      Tztest.tztest "Read unknown shard/commitement" `Quick test_read_fail;
+      Tztest.tztest "Read wrong share size" `Quick test_wrong_shard_size;
+    ] )
 
-let () = Alcotest_lwt.run "Shard_store" [tests_rw] |> Lwt_main.run
+let () = Alcotest_lwt.run "Shard_store" [tests_store] |> Lwt_main.run

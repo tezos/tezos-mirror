@@ -254,7 +254,7 @@ let run ~data_dir cctxt =
            | Some (_pkh, pk_opt, sk_uri) -> (pk_opt, Some sk_uri))
     |> List.split
   in
-  let*! store = Store.init config in
+  let* store = Store.init config in
   let ctxt = Node_context.init config store in
 
   let* rpc_server =

@@ -62,15 +62,19 @@ let open_slots_stream {slots_watcher; _} =
 
 (** [init config] inits the store on the filesystem using the given [config]. *)
 let init config =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let dir = Configuration.data_dir_path config path in
-  let* slot_headers_store = Slot_headers_store.load dir in
+  let*! slot_headers_store = Slot_headers_store.load dir in
   let slots_watcher = Lwt_watcher.create_input () in
-  let* repo = Repo.v (Irmin_pack.config dir) in
-  let* store = main repo in
-  let* shard_store = Shard_store.init (Filename.concat dir shard_store_path) in
-  let* () = Event.(emit store_is_ready ()) in
-  Lwt.return {shard_store; store; slots_watcher; slot_headers_store}
+  let*! repo = Repo.v (Irmin_pack.config dir) in
+  let*! store = main repo in
+  let* shard_store =
+    Shard_store.init
+      ~max_mutexes:Constants.shards_max_mutexes
+      (Filename.concat dir shard_store_path)
+  in
+  let*! () = Event.(emit store_is_ready ()) in
+  return {shard_store; store; slots_watcher; slot_headers_store}
 
 module Legacy = struct
   module Path : sig

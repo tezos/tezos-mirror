@@ -136,6 +136,8 @@ type 'action io_error = {
   arg : string;  (** Argument given to the unix function: generally a path. *)
 }
 
+type error += Io_error of [`Close | `Open | `Rename] io_error
+
 val tzfail_of_io_error : [`Close | `Open | `Rename] io_error -> 'b tzresult
 
 (** [with_open_file ~flags ~perm filename f] opens the given file
