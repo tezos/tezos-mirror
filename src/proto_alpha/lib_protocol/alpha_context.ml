@@ -109,7 +109,7 @@ module Dal = struct
   include Dal_slot_repr
 
   module Slot_index = struct
-    include Dal_slot_repr.Index
+    include Dal_slot_index_repr
   end
 
   module Attestation = struct
@@ -119,7 +119,7 @@ module Dal = struct
 
   type slot_id = Dal_slot_repr.Header.id = {
     published_level : Raw_level_repr.t;
-    index : Dal_slot_repr.Index.t;
+    index : Dal_slot_index_repr.t;
   }
 
   module Page = struct

@@ -77,14 +77,14 @@ end) : sig
       commitment). *)
   val mk_slot :
     ?level:Raw_level_repr.t ->
-    ?index:Dal_slot_repr.Index.t ->
+    ?index:Dal_slot_index_repr.t ->
     ?fill_function:(int -> char) ->
     unit ->
     (bytes * Cryptobox.polynomial * Dal_slot_repr.Header.t) tzresult
 
   (** Constructs a record value of type Page.id. *)
   val mk_page_id :
-    Raw_level_repr.t -> Dal_slot_repr.Index.t -> int -> Dal_slot_repr.Page.t
+    Raw_level_repr.t -> Dal_slot_index_repr.t -> int -> Dal_slot_repr.Page.t
 
   val no_data : (default_char:char -> int -> bytes option) option
 
@@ -110,7 +110,7 @@ end) : sig
   val next_char : char -> char
 
   (** Increment the given slot index. Returns zero in case of overflow. *)
-  val succ_slot_index : Dal_slot_repr.Index.t -> Dal_slot_repr.Index.t
+  val succ_slot_index : Dal_slot_index_repr.t -> Dal_slot_index_repr.t
 
   (** Auxiliary test function used by both unit and PBT tests: This function
       produces a proof from the given information and verifies the produced

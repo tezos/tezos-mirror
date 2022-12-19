@@ -1588,7 +1588,7 @@ module Dal = struct
           "The slot provided is invalid. Slot index should be between 0 and \
            %d. Found: %a."
           length
-          Dal_slot_repr.Index.pp
+          Dal_slot_index_repr.pp
           slot.Dal_slot_repr.Header.id.index)
       Data_encoding.(
         obj2

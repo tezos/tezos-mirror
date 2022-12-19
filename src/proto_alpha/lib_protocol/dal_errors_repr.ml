@@ -36,8 +36,8 @@ type error +=
       expected : Raw_level_repr.t;
     }
   | Dal_publish_slot_header_invalid_index of {
-      given : Dal_slot_repr.Index.t;
-      maximum : Dal_slot_repr.Index.t;
+      given : Dal_slot_index_repr.t;
+      maximum : Dal_slot_index_repr.t;
     }
   | Dal_publish_slot_header_candidate_with_low_fees of {
       proposed_fees : Tez_repr.t;
@@ -101,8 +101,8 @@ let () =
         ppf
         "%s: Maximum allowed %a."
         description
-        Dal_slot_repr.Index.pp
-        Dal_slot_repr.Index.max_value)
+        Dal_slot_index_repr.pp
+        Dal_slot_index_repr.max_value)
     Data_encoding.unit
     (function Dal_slot_index_above_hard_limit -> Some () | _ -> None)
     (fun () -> Dal_slot_index_above_hard_limit) ;
@@ -165,13 +165,13 @@ let () =
         ppf
         "%s: Given %a. Maximum %a."
         description
-        Dal_slot_repr.Index.pp
+        Dal_slot_index_repr.pp
         given
-        Dal_slot_repr.Index.pp
+        Dal_slot_index_repr.pp
         maximum)
     (obj2
-       (req "given" Dal_slot_repr.Index.encoding)
-       (req "got" Dal_slot_repr.Index.encoding))
+       (req "given" Dal_slot_index_repr.encoding)
+       (req "got" Dal_slot_index_repr.encoding))
     (function
       | Dal_publish_slot_header_invalid_index {given; maximum} ->
           Some (given, maximum)

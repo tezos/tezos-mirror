@@ -64,11 +64,11 @@ val empty : t
 (** [is_attested slot_attestation ~index] returns [true] if the
    [slot_attestation] commits that the slot at [index] is
    available. *)
-val is_attested : t -> Dal_slot_repr.Index.t -> bool
+val is_attested : t -> Dal_slot_index_repr.t -> bool
 
 (** [commit slot_attestation index] commits into [slot_attestation]
    that the slot [index] is available. *)
-val commit : t -> Dal_slot_repr.Index.t -> t
+val commit : t -> Dal_slot_index_repr.t -> t
 
 (** [occupied_size_in_bits slot_attestation] returns the size in bits of an attestation. *)
 val occupied_size_in_bits : t -> int
@@ -76,7 +76,7 @@ val occupied_size_in_bits : t -> int
 (** [expected_size_in_bits ~max_index] returns the expected size (in
    bits) of an attestation considering the maximum index for a slot is
    [max_index]. *)
-val expected_size_in_bits : max_index:Dal_slot_repr.Index.t -> int
+val expected_size_in_bits : max_index:Dal_slot_index_repr.t -> int
 
 (** A shard_index aims to be a positive number. *)
 type shard_index = int
@@ -122,5 +122,5 @@ module Accountability : sig
      the [index] is out of the interval [0;length] where [length] is
      the value provided to the [init] function. *)
   val is_slot_available :
-    t -> threshold:int -> number_of_shards:int -> Dal_slot_repr.Index.t -> bool
+    t -> threshold:int -> number_of_shards:int -> Dal_slot_index_repr.t -> bool
 end

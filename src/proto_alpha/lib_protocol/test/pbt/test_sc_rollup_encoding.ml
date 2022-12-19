@@ -119,6 +119,8 @@ let gen_inbox level =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
+module Index = Dal_slot_index_repr
+
 let gen_dal_slots_history () =
   let open Gen in
   let open Dal_slot_repr in
@@ -134,7 +136,7 @@ let gen_dal_slots_history () =
             succ @@ try of_int32_exn (Int32.of_int level) with _ -> root)
         in
         let index =
-          Index.(of_int_opt slot_index |> Option.value ~default:zero)
+          Index.of_int_opt slot_index |> Option.value ~default:Index.zero
         in
         Header.{id = {published_level; index}; commitment = Commitment.zero})
       list

@@ -80,58 +80,10 @@ module Commitment_proof : sig
   val zero : t
 end
 
-(** An `Index.t` is a possible value for a slot index. We assume this value
-    to be a positive 8-bit integer. Note that this is a hard constraint,
-    which is independent of protocol constants. If a choice is ever made to
-    increase the size of available slots in the protocol, we also need
-    to change this module to accommodate for higher values.
-*)
-module Index : sig
-  type t
-
-  type error += Invalid_slot_index of {given : int; min : int; max : int}
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val zero : t
-
-  val max_value : t
-
-  (** [of_int_opt n] constructs a value of type {!t} from [n]. Returns {!None}
-      in case the given value is not in the interval [zero, max_value]. *)
-  val of_int_opt : int -> t option
-
-  (** [of_int n] constructs a value of type {!t} from [n]. Returns
-      {!Invalid_slot_index} in case the given value is not in the interval [zero,
-      max_value]. *)
-  val of_int : int -> t tzresult
-
-  val to_int : t -> int
-
-  val to_int_list : t list -> int list
-
-  val compare : t -> t -> int
-
-  val equal : t -> t -> bool
-
-  (** [slots_range ~lower ~upper] returns the list of slots indexes between
-      [lower] and [upper].
-
-      If [lower] is negative or [upper] is bigger than [max_value], the function
-      returns {!Invalid_slot_index}. *)
-  val slots_range : lower:int -> upper:int -> t list tzresult
-
-  (** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
-      {None} in case of error instead of {!Invalid_slot_index}. *)
-  val slots_range_opt : lower:int -> upper:int -> t list option
-end
-
 module Header : sig
   (** For Layer-1, a slot is identified by the level at which it is published
       and the slot's index. *)
-  type id = {published_level : Raw_level_repr.t; index : Index.t}
+  type id = {published_level : Raw_level_repr.t; index : Dal_slot_index_repr.t}
 
   (** For Layer-1, a slot is described by its slot {!id} and the
      slot's commitment. *)
@@ -172,7 +124,7 @@ end
 module Page : sig
   type content = Bytes.t
 
-  type slot_index = Index.t
+  type slot_index = Dal_slot_index_repr.t
 
   val pages_per_slot : Dal.parameters -> int
 

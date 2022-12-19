@@ -57,7 +57,7 @@ let encoding = Bitset.encoding
 let empty = Bitset.empty
 
 let is_attested t index =
-  let open Dal_slot_repr.Index in
+  let open Dal_slot_index_repr in
   match Bitset.mem t (to_int index) with
   | Ok b -> b
   | Error _ ->
@@ -67,7 +67,7 @@ let is_attested t index =
       false
 
 let commit t index =
-  let open Dal_slot_repr.Index in
+  let open Dal_slot_index_repr in
   match Bitset.add t (to_int index) with
   | Ok t -> t
   | Error _ ->
@@ -82,7 +82,7 @@ let expected_size_in_bits ~max_index =
   (* We compute an encoding of the data-availability attestations
      which is a (tight) upper bound of what we expect. *)
   let open Bitset in
-  let open Dal_slot_repr.Index in
+  let open Dal_slot_index_repr in
   match add empty @@ to_int max_index with
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
@@ -138,7 +138,7 @@ module Accountability = struct
 
   let is_slot_available shard_bitset_per_slot ~threshold ~number_of_shards index
       =
-    match List.nth shard_bitset_per_slot (Dal_slot_repr.Index.to_int index) with
+    match List.nth shard_bitset_per_slot (Dal_slot_index_repr.to_int index) with
     | None -> false
     | Some bitset ->
         let acc = ref 0 in

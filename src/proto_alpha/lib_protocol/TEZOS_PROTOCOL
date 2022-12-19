@@ -51,6 +51,7 @@
         "Indexable",
         "Entrypoint_repr",
 
+        "Dal_slot_index_repr",
         "Dal_slot_repr",
         "Dal_attestation_repr",
 

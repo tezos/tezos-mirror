@@ -72,7 +72,7 @@ struct
     let add_slot level sindex (cell, cache, slots_info) skip_slot =
       let index =
         Option.value_f
-          (Dal_slot_repr.Index.of_int_opt sindex)
+          (Dal_slot_index_repr.of_int_opt sindex)
           ~default:(fun () -> assert false)
       in
       let* _data, poly, slot = mk_slot ~level ~index () in
