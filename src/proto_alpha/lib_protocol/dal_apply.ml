@@ -90,7 +90,10 @@ let apply_attestation ctxt op =
   | Some shards ->
       Ok (Dal.Attestation.record_attested_shards ctxt attestation shards)
 
-let validate_publish_slot_header ctxt operation =
+let validate_publish_slot_header ctxt _operation =
+  assert_dal_feature_enabled ctxt
+
+let apply_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
   let open Constants in
@@ -130,12 +133,11 @@ let validate_publish_slot_header ctxt operation =
       operation.commitment
       operation.commitment_proof
   in
-  error_unless
-    proof_ok
-    (Dal_publish_slot_header_invalid_proof {slot_header = operation})
-
-let apply_publish_slot_header ctxt operation =
-  assert_dal_feature_enabled ctxt >>? fun () ->
+  let* () =
+    error_unless
+      proof_ok
+      (Dal_publish_slot_header_invalid_proof {slot_header = operation})
+  in
   let slot_header =
     Dal.Slot.Header.
       {
