@@ -36,6 +36,7 @@ type eval_step =
 
 (* Possible commands for the REPL. *)
 type commands =
+  | Time of commands
   | Show_inbox
   | Show_outbox of int32
   | Show_status
@@ -56,24 +57,29 @@ let parse_eval_step = function
 
 let parse_commands s =
   let command = String.split_no_empty ' ' (String.trim s) in
-  match command with
-  | ["show"; "inbox"] -> Show_inbox
-  | ["show"; "outbox"; "at"; "level"; level] -> (
-      match Int32.of_string_opt level with
-      | Some l -> Show_outbox l
-      | None -> Unknown s)
-  | ["show"; "status"] -> Show_status
-  | ["show"; "durable"; "storage"] -> Show_durable_storage
-  | ["show"; "key"; key] -> Show_key key
-  | ["show"; "memory"; "at"; address; "for"; length; "bytes"] -> (
-      match (Int32.of_string_opt address, int_of_string_opt length) with
-      | Some address, Some length -> Show_memory (address, length)
-      | _, _ -> Unknown s)
-  | ["step"; step] -> (
-      match parse_eval_step step with Some s -> Step s | None -> Unknown s)
-  | ["load"; "inputs"] -> Load_inputs
-  | ["stop"] -> Stop
-  | _ -> Unknown s
+  let rec go = function
+    | "time" :: rst ->
+        let cmd = go rst in
+        Time cmd
+    | ["show"; "inbox"] -> Show_inbox
+    | ["show"; "outbox"; "at"; "level"; level] -> (
+        match Int32.of_string_opt level with
+        | Some l -> Show_outbox l
+        | None -> Unknown s)
+    | ["show"; "status"] -> Show_status
+    | ["show"; "durable"; "storage"] -> Show_durable_storage
+    | ["show"; "key"; key] -> Show_key key
+    | ["show"; "memory"; "at"; address; "for"; length; "bytes"] -> (
+        match (Int32.of_string_opt address, int_of_string_opt length) with
+        | Some address, Some length -> Show_memory (address, length)
+        | _, _ -> Unknown s)
+    | ["step"; step] -> (
+        match parse_eval_step step with Some s -> Step s | None -> Unknown s)
+    | ["load"; "inputs"] -> Load_inputs
+    | ["stop"] -> Stop
+    | _ -> Unknown s
+  in
+  go command
 
 (* [compute_step tree] is a wrapper around [Wasm_pvm.compute_step] that also
    returns the number of ticks elapsed (whi is always 1). *)
@@ -395,30 +401,42 @@ let handle_command c tree inboxes level =
   let open Lwt_result_syntax in
   let command = parse_commands c in
   let return ?(tree = tree) () = return (tree, inboxes, level) in
-  match command with
-  | Load_inputs -> load_inputs inboxes level tree
-  | Show_status ->
-      let*! () = show_status tree in
-      return ()
-  | Step kind ->
-      let* tree = step kind tree in
-      return ~tree ()
-  | Show_inbox ->
-      let*! () = show_inbox tree in
-      return ()
-  | Show_outbox level ->
-      let*! () = show_outbox tree level in
-      return ()
-  | Show_durable_storage ->
-      let*! () = show_durable tree in
-      return ()
-  | Show_key key ->
-      let*! () = show_key tree key in
-      return ()
-  | Show_memory (address, length) ->
-      let*! () = show_memory tree address length in
-      return ()
-  | Unknown s ->
-      let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
-      return ()
-  | Stop -> return ()
+  let rec go = function
+    | Time cmd ->
+        let t = Time.System.now () in
+        let* res = go cmd in
+        let t' = Time.System.now () in
+        let*! () =
+          Lwt_io.printf
+            "took %s\n%!"
+            (Format.asprintf "%a" Ptime.Span.pp (Ptime.diff t' t))
+        in
+        Lwt_result_syntax.return res
+    | Load_inputs -> load_inputs inboxes level tree
+    | Show_status ->
+        let*! () = show_status tree in
+        return ()
+    | Step kind ->
+        let* tree = step kind tree in
+        return ~tree ()
+    | Show_inbox ->
+        let*! () = show_inbox tree in
+        return ()
+    | Show_outbox level ->
+        let*! () = show_outbox tree level in
+        return ()
+    | Show_durable_storage ->
+        let*! () = show_durable tree in
+        return ()
+    | Show_key key ->
+        let*! () = show_key tree key in
+        return ()
+    | Show_memory (address, length) ->
+        let*! () = show_memory tree address length in
+        return ()
+    | Unknown s ->
+        let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
+        return ()
+    | Stop -> return ()
+  in
+  go command
