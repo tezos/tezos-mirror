@@ -10,60 +10,60 @@ The following pages describe the formerly Tezos protocols in reverse chronologic
 .. toctree::
    :maxdepth: 2
 
-   014_kathmandu.rst
+   014_kathmandu
 
 
 .. toctree::
    :maxdepth: 2
 
-   013_jakarta.rst
+   013_jakarta
 
 .. toctree::
    :maxdepth: 2
 
-   012_ithaca.rst
+   012_ithaca
 
 .. toctree::
    :maxdepth: 2
 
-   011_hangzhou.rst
+   011_hangzhou
 
 .. toctree::
    :maxdepth: 2
 
-   010_granada.rst
+   010_granada
 
 .. toctree::
    :maxdepth: 2
 
-   009_florence.rst
+   009_florence
 
 .. toctree::
    :maxdepth: 2
 
-   008_edo.rst
+   008_edo
 
 .. toctree::
    :maxdepth: 2
 
-   007_delphi.rst
+   007_delphi
 
 .. toctree::
    :maxdepth: 2
 
-   006_carthage.rst
+   006_carthage
 
 .. toctree::
    :maxdepth: 2
 
-   005_babylon.rst
+   005_babylon
 
 .. toctree::
    :maxdepth: 2
 
-   004_Pt24m4xi.rst
+   004_Pt24m4xi
 
 .. toctree::
    :maxdepth: 2
 
-   003_PsddFKi3.rst
+   003_PsddFKi3

@@ -10,69 +10,69 @@ The following pages describe the former Octez releases in reverse chronological 
 .. toctree::
    :maxdepth: 2
 
-   version-14.rst
+   version-14
 
 .. toctree::
    :maxdepth: 2
 
-   version-13.rst
+   version-13
 
 .. toctree::
    :maxdepth: 2
 
-   version-12.rst
+   version-12
 
 .. toctree::
    :maxdepth: 2
 
-   version-11.rst
+   version-11
 
 .. toctree::
    :maxdepth: 2
 
-   version-10.rst
+   version-10
 
 .. toctree::
    :maxdepth: 2
 
-   version-9.rst
+   version-9
 
 .. toctree::
    :maxdepth: 2
 
-   version-8.rst
+   version-8
 
 .. toctree::
    :maxdepth: 2
 
-   version-7.rst
+   version-7
 
 .. toctree::
    :maxdepth: 2
 
-   january-2020.rst
+   january-2020
 
 .. toctree::
    :maxdepth: 2
 
-   december-2019.rst
+   december-2019
 
 .. toctree::
    :maxdepth: 2
 
-   october-2019.rst
+   october-2019
 
 .. toctree::
    :maxdepth: 2
 
-   september-2019.rst
+   september-2019
 
 .. toctree::
    :maxdepth: 2
 
-   may-2019.rst
+   may-2019
 
 .. toctree::
    :maxdepth: 2
 
-   april-2019.rst
+   april-2019
