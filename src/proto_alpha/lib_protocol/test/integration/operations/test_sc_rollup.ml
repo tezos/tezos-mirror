@@ -2594,7 +2594,7 @@ let test_refute_invalid_reveal () =
   in
   test_refute_set_input p1_info p2_info make_state_before
 
-let full_history_inbox (predecessor_timestamp, predecessor)
+let full_history_inbox (genesis_predecessor_timestamp, genesis_predecessor)
     all_external_messages =
   let open Sc_rollup_helpers in
   let payloads_per_levels =
@@ -2607,15 +2607,17 @@ let full_history_inbox (predecessor_timestamp, predecessor)
           external_messages)
       all_external_messages
   in
-  Sc_rollup_helpers.construct_inbox
-    ~predecessor_timestamp
-    ~predecessor
+  Sc_rollup_helpers.Node_inbox.construct_inbox
+    ~genesis_predecessor_timestamp
+    ~genesis_predecessor
     payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Lwt_result_syntax in
   let open Sc_rollup_helpers in
-  let payloads_histories, history, inbox = full_history_inbox in
+  let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
+    full_history_inbox
+  in
   let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
   (* Create an inclusion proof of the inbox message at [(l, n)]. *)
   let* proof, _ =
@@ -2680,7 +2682,7 @@ let test_automatically_added_internal_messages () =
 
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
-  let*? ((_level_tree_histories, _history, inbox) as full_history_inbox) =
+  let*? ({inbox; _} as full_history_inbox) =
     full_history_inbox
       level_zero_info
       [(level_one_info, level_one, []); (level_two_info, level_two, ["foo"])]

@@ -951,33 +951,10 @@ module Arith_test_pvm = struct
 end
 
 let construct_inbox_proto block list_of_messages contract =
-  let open Lwt_result_syntax in
-  let* block, infos_per_level =
-    List.fold_left_es
-      (fun ((block : Block.t), acc) ({messages; _} : payloads_per_level) ->
-        let predecessor = block.hash in
-        let predecessor_timestamp = block.header.shell.timestamp in
-
-        let* block =
-          match messages with
-          | [] ->
-              let* block = Block.bake block in
-              return block
-          | messages ->
-              let* operation_add_message =
-                Op.sc_rollup_add_messages (B block) contract messages
-              in
-              let* block = Block.bake ~operation:operation_add_message block in
-              return block
-        in
-
-        let acc = (predecessor_timestamp, predecessor) :: acc in
-
-        return (block, acc))
-      (block, [])
-      list_of_messages
-  in
-  return (block, List.rev infos_per_level)
+  Sc_rollup_helpers.Protocol_inbox_with_ctxt.fill_inbox
+    block
+    list_of_messages
+    contract
 
 (** Construct the inbox for the protocol side. *)
 let construct_inbox_proto block list_of_messages contract =
@@ -1037,11 +1014,7 @@ type player_client = {
   player : player;
   states : (Tick.t * State_hash.t) list;
   final_tick : Tick.t;
-  inbox :
-    Sc_rollup.Inbox_merkelized_payload_hashes.History.t
-    Sc_rollup_helpers.Payloads_histories.t
-    * Inbox.History.t
-    * Inbox.t;
+  inbox : Sc_rollup_helpers.Node_inbox.t;
   payloads_per_levels : payloads_per_level list;
   metadata : Metadata.t;
   context : Tezos_context_memory.Context_binary.t;
@@ -1075,12 +1048,10 @@ module Player_client = struct
   (** Construct an inbox based on [list_of_messages] in the player context. *)
   let construct_inbox ~inbox list_of_messages =
     let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
-    let level_tree_histories = Payloads_histories.empty in
+    let payloads_histories = Payloads_histories.empty in
     WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Sc_rollup_helpers.fill_inbox
-         ~inbox
-         history
-         level_tree_histories
+    @@ Sc_rollup_helpers.Node_inbox.fill_inbox
+         {inbox; history; payloads_histories}
          list_of_messages
 
   (** Generate [our_states] for [payloads_per_levels] based on the strategy.
@@ -1292,7 +1263,9 @@ let build_proof ~player_client start_tick (game : Game.t) =
   (* No messages are added between [game.start_level] and the current level
      so we can take the existing inbox of players. Otherwise, we should find the
      inbox of [start_level]. *)
-  let payloads_histories, history, inbox = player_client.inbox in
+  let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
+    player_client.inbox
+  in
   let get_payloads_history witness_hash =
     Payloads_histories.find witness_hash payloads_histories
     |> WithExceptions.Option.get ~loc:__LOC__
@@ -1482,17 +1455,10 @@ let gen_game ~p1_strategy ~p2_strategy =
     gen_arith_pvm_payloads_for_levels ~start_level ~max_level
   in
 
-  let block, infos_per_level =
+  let block, payloads_per_levels =
     construct_inbox_proto block payloads_per_levels contract3
   in
 
-  let payloads_per_levels =
-    Stdlib.List.map2
-      (fun payloads_per_level (predecessor_timestamp, predecessor) ->
-        {payloads_per_level with predecessor_timestamp; predecessor})
-      payloads_per_levels
-      infos_per_level
-  in
   let* p1_client =
     Player_client.gen
       ~inbox
