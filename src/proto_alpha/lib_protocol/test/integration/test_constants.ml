@@ -86,7 +86,9 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
     Alpha_context.Tez.to_mutez constants.cost_per_byte
   in
   let commitment_storage_size =
-    Int64.of_int Sc_rollup_stake_storage.commitment_storage_size_in_bytes
+    Int64.of_int
+      Sc_rollup_stake_storage.Internal_for_tests
+      .commitment_storage_size_in_bytes
   in
   let commitment_storage_cost =
     Int64.mul cost_per_byte_mutez commitment_storage_size
@@ -153,7 +155,7 @@ let _test_sc_rollup_commitment_storage_size () =
   in
   Assert.equal_int
     ~loc:__LOC__
-    Sc_rollup_stake_storage.commitment_storage_size_in_bytes
+    Sc_rollup_stake_storage.Internal_for_tests.commitment_storage_size_in_bytes
     (Bytes.length commitment_bytes
     + Bytes.length level_bytes
     + Bytes.length commitment_stake_count_bytes
