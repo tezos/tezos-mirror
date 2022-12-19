@@ -16,6 +16,7 @@ or available only on test networks, is given in the
 :package-api:`OCaml Documentation
 <tezos-protocol-015-PtLimaPt/Tezos_raw_protocol_015_PtLimaPt/Operation_repr/index.html>`.
 
+.. _validation_passes:
 .. _validation_passes_lima:
 
 Validation Passes
@@ -47,6 +48,7 @@ The current protocol implementation enforces the following invariant:
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
    
+.. _consensus_operations:
 .. _consensus_operations_lima:
 
 Consensus Operations
@@ -67,6 +69,7 @@ phases required to agree on the next block.
   for which a preendorsement quourm cerificate (PQC) has been
   observed.
 
+.. _voting_operations:
 .. _voting_operations_lima:
 
 Voting Operations
@@ -89,6 +92,7 @@ Further details on each operation's implementation and semantics are
 provided in the dedicated entry for :ref:`on-chain
 governance<voting_operations_lima>`.
 
+.. _anonymous_operations:
 .. _anonymous_operations_lima:
 
 Anonymous Operations
@@ -152,6 +156,7 @@ account. This operation is used as a deterrent to ensure that a
 delegate secures its consensus key as much as its manager (or main)
 key.
 
+.. _manager_operations:
 .. _manager_operations_lima:
 
 Manager Operations
@@ -210,6 +215,7 @@ operations:
   ``Tx_rollup_rejection``, ``Tx_rollup_rejection``,
   ``Transfer_ticket``.
 
+.. _manager_operations_batches:
 .. _manager_operations_batches_lima:
 
 Manager Operation Batches

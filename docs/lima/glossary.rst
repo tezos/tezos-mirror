@@ -161,11 +161,13 @@ _`Layer 2`
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
     zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
 
+.. _glossary_michelson:
 .. _glossary_michelson_lima:
 
 Michelson
     The built-in language used by a `smart contract`_.
 
+.. _glossary_minimal_stake:
 .. _glossary_minimal_stake_lima:
 
 _`Minimal stake`

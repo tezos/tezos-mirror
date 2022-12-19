@@ -33,10 +33,6 @@ let protocols =
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO tezos/tezos#2170: adapt rest of this list *)
-    ( "kathmandu",
-      "Kathmandu",
-      Some "/include/rpc_introduction.rst.inc",
-      "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg" );
     ( "lima",
       "Lima",
       Some "/include/rpc_introduction.rst.inc",

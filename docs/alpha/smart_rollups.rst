@@ -100,8 +100,7 @@ There are two ways for an end-user to push an external message to the
 rollups inbox: first, she can inject the dedicated layer-1 operation
 using the Octez client (see command ``send sc rollup message
 <messages> from <src>``) ; second, she can use the batcher
-of a smart rollup node. More details can be found
-:ref:`sending_external_inbox_message`.
+of a smart rollup node. More details can be found in :ref:`sending_external_inbox_message_alpha`.
 
 Internal messages
 """""""""""""""""
@@ -131,7 +130,7 @@ A rollup can do the following requests through the reveal data channel:
 #. **preimage requests** The rollup can request a page, that is 4kB of
    data, provided that it knows a (blake2b) hash of this sequence of
    bytes. The request is fulfilled by the rollup node
-   :ref:`populating_the_reveal_channel`.
+   :ref:`populating_the_reveal_channel_alpha`.
 
 #. **metadata requests** The rollup can request information from the
    protocol, namely the address and the origination level of the
@@ -205,7 +204,7 @@ removal of the invalid commitment. If no one posts such a concurrent
 commitment during the refutation period, the commitment can be
 cemented with a dedicated operation injected in layer-1, and the
 outbox messages can be executed by the layer-1 by an explicit layer-1
-operation (see :ref:`triggering_execution_outbox_message`), typically
+operation (see :ref:`triggering_execution_outbox_message_alpha`), typically
 to transfer assets from the rollup to the layer-1.
 
 Refutation
@@ -493,22 +492,23 @@ Second, the configured rollup node can be run:
 The log should show that the rollup node follows the layer-1 chain and
 processes the inbox of each level.
 
-.. _sending_external_inbox_message:
+.. _sending_external_inbox_message_alpha:
 
 Sending an external inbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _sending_internal_inbox_message:
+
+.. _sending_internal_inbox_message_alpha:
 
 Sending an internal inbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _triggering_execution_outbox_message:
+.. _triggering_execution_outbox_message_alpha:
 
 Triggering the execution of an outbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _populating_the_reveal_channel:
+.. _populating_the_reveal_channel_alpha:
 
 Populating the reveal channel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

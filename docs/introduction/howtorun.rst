@@ -221,14 +221,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PtKathma``, you can
+For instance, if the name is ``mainnet_baker-PtLimaPt``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PtKathma
+    docker logs mainnet_baker-PtLimaPt
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PtKathma -f
+    docker logs mainnet_baker-PtLimaPt -f
 
 This allows you to know if you baked.
 You should see lines such as::

@@ -19,8 +19,7 @@ block without prechecking it first, when the active protocol is Lima.
 
 .. warning::
 
-  The nature of this bug would prevent the correct operation of the
-  :doc:`Lima<../lima/protocol>` protocol
+  The nature of this bug would prevent the correct operation of the Lima protocol
   (due to activate on Tezos Mainnet on block
   `#2,981,889 <https://tzstats.com/2981889>`__)
   with earlier Octez versions, including Octez v15.0.

@@ -54,8 +54,6 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``kathmandunet`` (available from version 14.0)
-
 - ``limanet`` (available from version 15.0)
 
 If you did not initialize your node configuration, or if your configuration
