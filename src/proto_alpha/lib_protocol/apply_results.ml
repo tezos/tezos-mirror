@@ -123,6 +123,7 @@ type _ successful_manager_operation_result =
     }
       -> Kind.transfer_ticket successful_manager_operation_result
   | Dal_publish_slot_header_result : {
+      slot_header : Dal.Slot.Header.t;
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.dal_publish_slot_header successful_manager_operation_result
@@ -787,15 +788,19 @@ module Manager_result = struct
       ~op_case:
         Operation.Encoding.Manager_operations.dal_publish_slot_header_case
       ~encoding:
-        (obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+        (obj2
+           (req "slot_header" Dal.Slot.Header.encoding)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Dal_publish_slot_header_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Dal_publish_slot_header_result {consumed_gas} -> consumed_gas)
+        | Dal_publish_slot_header_result {slot_header; consumed_gas} ->
+            (slot_header, consumed_gas))
       ~kind:Kind.Dal_publish_slot_header_manager_kind
-      ~inj:(fun consumed_gas -> Dal_publish_slot_header_result {consumed_gas})
+      ~inj:(fun (slot_header, consumed_gas) ->
+        Dal_publish_slot_header_result {slot_header; consumed_gas})
 
   let zk_rollup_origination_case =
     make

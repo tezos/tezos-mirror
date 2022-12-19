@@ -111,28 +111,8 @@ module Header = struct
   let pp fmt {id; commitment = c} =
     Format.fprintf fmt "id:(%a), commitment: %a" pp_id id Commitment.pp c
 
-  type error += Dal_commitment_proof_error of string
-
-  let () =
-    let open Data_encoding in
-    register_error_kind
-      `Permanent
-      ~id:"dal_slot_repr.dal_commitment_proof_error"
-      ~title:"Dal commitment proof error"
-      ~description:"Error occurred during Dal commitment proof validation"
-      ~pp:(fun ppf e -> Format.fprintf ppf "Dal commitment proof error: %s" e)
-      (obj1 (req "error" (string Plain)))
-      (function Dal_commitment_proof_error e -> Some e | _ -> None)
-      (fun e -> Dal_commitment_proof_error e)
-
-  let verify_commitment dal_params commitment proof =
-    let open Result_syntax in
-    let* dal =
-      match Dal.make dal_params with
-      | Ok dal -> return dal
-      | Error (`Fail s) -> error (Dal_commitment_proof_error s)
-    in
-    return @@ Dal.verify_commitment dal commitment proof
+  let verify_commitment cryptobox commitment proof =
+    return (Dal.verify_commitment cryptobox commitment proof)
 end
 
 module Slot_index = Dal_slot_index_repr

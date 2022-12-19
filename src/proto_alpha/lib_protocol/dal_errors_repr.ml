@@ -45,7 +45,8 @@ type error +=
   | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
   | Dal_publish_slot_header_invalid_proof of {
-      slot_header : Dal_operations_repr.Publish_slot_header.t;
+      commitment : Dal.commitment;
+      commitment_proof : Dal.commitment_proof;
     }
   | Dal_data_availibility_attestor_not_in_committee of {
       attestor : Signature.Public_key_hash.t;
@@ -59,6 +60,7 @@ type error +=
       current : Raw_level_repr.t;
       given : Raw_level_repr.t;
     }
+  | Dal_cryptobox_error of {explanation : string}
 
 let () =
   let open Data_encoding in
@@ -241,11 +243,15 @@ let () =
     ~title:"DAL publish slot header invalid proof"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
-    Dal_operations_repr.Publish_slot_header.encoding
+    (obj2
+       (req "commitment" Dal.Commitment.encoding)
+       (req "commitment_proof" Dal.Commitment_proof.encoding))
     (function
-      | Dal_publish_slot_header_invalid_proof {slot_header} -> Some slot_header
+      | Dal_publish_slot_header_invalid_proof {commitment; commitment_proof} ->
+          Some (commitment, commitment_proof)
       | _ -> None)
-    (fun slot_header -> Dal_publish_slot_header_invalid_proof {slot_header}) ;
+    (fun (commitment, commitment_proof) ->
+      Dal_publish_slot_header_invalid_proof {commitment; commitment_proof}) ;
   register_error_kind
     `Outdated
     ~id:"Dal_operation_for_old_level"
@@ -310,4 +316,14 @@ let () =
           Some (attestor, level)
       | _ -> None)
     (fun (attestor, level) ->
-      Dal_data_availibility_attestor_not_in_committee {attestor; level})
+      Dal_data_availibility_attestor_not_in_committee {attestor; level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal_cryptobox_error"
+    ~title:"DAL cryptobox error"
+    ~description:"Error occurred while initialising the cryptobox"
+    ~pp:(fun ppf e -> Format.fprintf ppf "Dal commitment proof error: %s" e)
+    (obj1 (req "error" (string Plain)))
+    (function
+      | Dal_cryptobox_error {explanation} -> Some explanation | _ -> None)
+    (fun explanation -> Dal_cryptobox_error {explanation})

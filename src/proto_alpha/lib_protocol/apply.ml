@@ -1474,9 +1474,10 @@ let apply_manager_operation :
           return (ctxt, result, [])
       | None -> tzfail Tx_rollup_errors.Proof_undecodable)
   | Dal_publish_slot_header slot_header ->
-      Dal_apply.apply_publish_slot_header ctxt slot_header >>?= fun ctxt ->
+      Dal_apply.apply_publish_slot_header ctxt slot_header
+      >>?= fun (ctxt, slot_header) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result = Dal_publish_slot_header_result {consumed_gas} in
+      let result = Dal_publish_slot_header_result {slot_header; consumed_gas} in
       return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty} ->
       Sc_rollup_operations.originate

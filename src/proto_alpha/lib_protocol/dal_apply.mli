@@ -49,7 +49,7 @@ val validate_publish_slot_header :
    slot header [slot_header] on top of [ctxt]. Fails if the slot contains
    already a slot header. *)
 val apply_publish_slot_header :
-  t -> Dal.Operations.Publish_slot_header.t -> t tzresult
+  t -> Dal.Operations.Publish_slot_header.t -> (t * Dal.Slot.Header.t) tzresult
 
 (** [finalisation ctxt] should be executed at block finalisation
    time. A set of slots attested at level [ctxt.current_level - lag]

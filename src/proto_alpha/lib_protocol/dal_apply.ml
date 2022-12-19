@@ -90,68 +90,47 @@ let apply_attestation ctxt op =
   | Some shards ->
       Ok (Dal.Attestation.record_attested_shards ctxt attestation shards)
 
-let validate_publish_slot_header ctxt _operation =
-  assert_dal_feature_enabled ctxt
+(* This function should fail if we don't want the operation to be
+   propagated over the L1 gossip network. Because this is a manger
+   operation, there are already checks to ensure the source of
+   operation has enough fees. Among the various checks, there are
+   checks that cannot fail unless the source of the operation is
+   malicious (or if there is a bug). In that case, it is better to
+   ensure fees will be taken. However, for the check of level, this is
+   not true. In particular, in term of UX, we can imagine a source of
+   an operation to emit its operation a bit ahead of time. Hence, we
+   do not want to propagate an operation that has a wrong level. This
+   way, if the operation is emitted in advance, it will stay in the
+   prevalidator/mempool of the node on which the operation will be
+   injected. It will be injected once the validation succeeds,
+   i.e. the operation can be included into the next block. *)
+let validate_publish_slot_header ctxt operation =
+  assert_dal_feature_enabled ctxt >>? fun () ->
+  let current_level = (Level.current ctxt).level in
+  Dal.Operations.Publish_slot_header.check_level ~current_level operation
 
 let apply_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
   let open Constants in
-  let id =
-    match operation with
-    | Dal.Operations.Publish_slot_header.{published_level; slot_index; _} ->
-        Dal.Slot.Header.{published_level; index = slot_index}
-  in
   let Parametric.{dal = {number_of_slots; cryptobox_parameters; _}; _} =
     parametric ctxt
   in
-  let* number_of_slots = slot_of_int_e (number_of_slots - 1) in
-  let* () =
-    error_unless
-      Compare.Int.(
-        Dal.Slot_index.compare id.index number_of_slots <= 0
-        && Dal.Slot_index.compare id.index Dal.Slot_index.zero >= 0)
-      (Dal_publish_slot_header_invalid_index
-         {given = id.index; maximum = number_of_slots})
+  let* cryptobox =
+    match Dal.make cryptobox_parameters with
+    | Ok cryptobox -> return cryptobox
+    | Error (`Fail explanation) -> error (Dal_cryptobox_error {explanation})
   in
   let current_level = (Level.current ctxt).level in
-  let* () =
-    error_when
-      Raw_level.(current_level < id.published_level)
-      (Dal_publish_slot_header_future_level
-         {provided = id.published_level; expected = current_level})
-  in
-  let* () =
-    error_when
-      Raw_level.(current_level > id.published_level)
-      (Dal_publish_slot_header_past_level
-         {provided = id.published_level; expected = current_level})
-  in
-  let* proof_ok =
-    Dal.Slot.Header.verify_commitment
-      cryptobox_parameters
-      operation.commitment
-      operation.commitment_proof
-  in
-  let* () =
-    error_unless
-      proof_ok
-      (Dal_publish_slot_header_invalid_proof {slot_header = operation})
-  in
-  let slot_header =
-    Dal.Slot.Header.
-      {
-        id =
-          {
-            published_level =
-              operation.Dal.Operations.Publish_slot_header.published_level;
-            index = operation.slot_index;
-          };
-        commitment = operation.commitment;
-      }
+  let* slot_header =
+    Dal.Operations.Publish_slot_header.slot_header
+      ~cryptobox
+      ~number_of_slots
+      ~current_level
+      operation
   in
   Dal.Slot.register_slot_header ctxt slot_header >>? fun (ctxt, updated) ->
-  if updated then ok ctxt
+  if updated then ok (ctxt, slot_header)
   else error (Dal_publish_slot_header_duplicate {slot_header})
 
 let finalisation ctxt =

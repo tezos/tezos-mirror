@@ -53,4 +53,26 @@ module Publish_slot_header : sig
   }
 
   val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  (** [check_level ~current_level operation] check whether the
+     [operation.published_level] equals [current_level]. *)
+  val check_level : current_level:Raw_level_repr.t -> t -> unit tzresult
+
+  (** [slot_header ~cryptobox ~number_of_slots ~current_level
+     operation] constructs a valid slot header. This function can fail
+     in the following cases:
+
+      - The [published_level] is not equal to [current_level]
+
+      - The [commitment_proof] is invalid
+
+      - The [slot_index] is invalid *)
+  val slot_header :
+    cryptobox:Dal.t ->
+    number_of_slots:int ->
+    current_level:Raw_level_repr.t ->
+    t ->
+    Dal_slot_repr.Header.t tzresult
 end

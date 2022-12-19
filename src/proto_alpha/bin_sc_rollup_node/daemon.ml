@@ -77,14 +77,14 @@ module Make (PVM : Pvm.S) = struct
             balance_updates
         in
         tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
-    | Dal_publish_slot_header slot_header, Dal_publish_slot_header_result _ ->
-        let {Dal.Slot.Header.header = {id = {index; _}; _}; _} = slot_header in
+    | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
+      ->
         let*! () =
           Store.Dal_slots_headers.add
             node_ctxt.store
             ~primary_key:head
-            ~secondary_key:index
-            slot_header.header
+            ~secondary_key:slot_header.id.index
+            slot_header
         in
         return_unit
     | _, _ ->

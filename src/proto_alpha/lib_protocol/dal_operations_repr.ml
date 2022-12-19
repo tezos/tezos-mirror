@@ -43,4 +43,62 @@ module Publish_slot_header = struct
          (req "slot_index" Dal_slot_index_repr.encoding)
          (req "commitment" Dal_slot_repr.Commitment.encoding)
          (req "commitment_proof" Dal_slot_repr.Commitment_proof.encoding))
+
+  let pp fmt {published_level; slot_index; commitment; commitment_proof = _} =
+    Format.fprintf
+      fmt
+      "published_level: %a, slot_index: %a, commitment: %a"
+      Raw_level_repr.pp
+      published_level
+      Dal_slot_index_repr.pp
+      slot_index
+      Dal.Commitment.pp
+      commitment
+
+  let check_level ~current_level {published_level; _} =
+    let open Result_syntax in
+    let* () =
+      error_when
+        Raw_level_repr.(current_level < published_level)
+        (Dal_errors_repr.Dal_publish_slot_header_future_level
+           {provided = published_level; expected = current_level})
+    in
+    let* () =
+      error_when
+        Raw_level_repr.(current_level > published_level)
+        (Dal_errors_repr.Dal_publish_slot_header_past_level
+           {provided = published_level; expected = current_level})
+    in
+    return_unit
+
+  let slot_header ~cryptobox ~number_of_slots ~current_level
+      ({published_level; slot_index; commitment; commitment_proof} as operation)
+      =
+    let open Result_syntax in
+    let* max_slot_index = Dal_slot_index_repr.of_int (number_of_slots - 1) in
+    let* () =
+      error_unless
+        Compare.Int.(
+          Dal_slot_index_repr.compare slot_index max_slot_index <= 0
+          && Dal_slot_index_repr.compare slot_index Dal_slot_index_repr.zero
+             >= 0)
+        (Dal_errors_repr.Dal_publish_slot_header_invalid_index
+           {given = slot_index; maximum = max_slot_index})
+    in
+    let* () = check_level ~current_level operation in
+    let* proof_ok =
+      Dal_slot_repr.Header.verify_commitment
+        cryptobox
+        operation.commitment
+        operation.commitment_proof
+    in
+    let* () =
+      error_unless
+        proof_ok
+        (Dal_errors_repr.Dal_publish_slot_header_invalid_proof
+           {commitment; commitment_proof})
+    in
+    return
+      Dal_slot_repr.Header.
+        {id = {published_level; index = slot_index}; commitment}
 end

@@ -108,7 +108,7 @@ module Header : sig
      that for the given commitment, the commitment proof is correct
      using the [cryptbox] primitives. *)
   val verify_commitment :
-    parameters -> Commitment.t -> Commitment_proof.t -> bool tzresult
+    Dal.t -> Commitment.t -> Commitment_proof.t -> bool tzresult
 end
 
 (** A DAL slot is decomposed to a successive list of pages with fixed content

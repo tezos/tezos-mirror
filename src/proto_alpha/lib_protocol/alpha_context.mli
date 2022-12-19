@@ -3052,9 +3052,6 @@ module Dal : sig
       val pp : Format.formatter -> t -> unit
 
       val equal : t -> t -> bool
-
-      val verify_commitment :
-        parameters -> Commitment.t -> Commitment_proof.t -> bool tzresult
     end
 
     val register_slot_header : context -> Header.t -> (context * bool) tzresult
@@ -3078,6 +3075,17 @@ module Dal : sig
       }
 
       val encoding : t Data_encoding.t
+
+      val pp : Format.formatter -> t -> unit
+
+      val check_level : current_level:Raw_level.t -> t -> unit tzresult
+
+      val slot_header :
+        cryptobox:cryptobox ->
+        number_of_slots:int ->
+        current_level:Raw_level.t ->
+        t ->
+        Slot.Header.t tzresult
     end
   end
 
@@ -3112,7 +3120,7 @@ module Dal : sig
   end
 
   module Slots_storage : sig
-    val get_slot_headers_history : t -> Slots_history.t tzresult Lwt.t
+    val get_slot_headers_history : context -> Slots_history.t tzresult Lwt.t
   end
 end
 
@@ -3141,7 +3149,8 @@ module Dal_errors : sig
     | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
     | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
     | Dal_publish_slot_header_invalid_proof of {
-        slot_header : Dal.Operations.Publish_slot_header.t;
+        commitment : Dal.Slot.Commitment.t;
+        commitment_proof : Dal.Slot.Commitment_proof.t;
       }
     | Dal_data_availibility_attestor_not_in_committee of {
         attestor : Signature.Public_key_hash.t;
@@ -3155,6 +3164,7 @@ module Dal_errors : sig
         current : Raw_level.t;
         given : Raw_level.t;
       }
+    | Dal_cryptobox_error of {explanation : string}
 end
 
 (** This module re-exports definitions from {!Sc_rollup_storage} and

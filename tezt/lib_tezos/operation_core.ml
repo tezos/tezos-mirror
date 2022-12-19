@@ -425,8 +425,8 @@ module Manager = struct
         let slot_header =
           `O
             [
-              ("index", json_of_int index);
-              ("level", json_of_int level);
+              ("slot_index", json_of_int index);
+              ("published_level", json_of_int level);
               ("commitment", json_of_commitment commitment);
               ("commitment_proof", json_of_commitment_proof proof);
             ]
