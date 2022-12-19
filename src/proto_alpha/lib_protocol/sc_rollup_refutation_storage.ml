@@ -97,107 +97,106 @@ let get_ongoing_games_for_staker ctxt rollup staker =
   in
   return (games, ctxt)
 
-(** [goto_inbox_level ctxt rollup inbox_level commit] Follows the
-    predecessors of [commit] until it arrives at the exact
-    [inbox_level]. The result is the commit hash at the given inbox
-    level. *)
-let goto_inbox_level ctxt rollup inbox_level commit =
+(** [staked_on_commitment ctxt rollup commitments staker_index]
+    returns the hash of the commitment that [staker_index] is staking
+    in [commitments], if any. *)
+let staked_on_commitment ctxt rollup commitments
+    (staker_index : Sc_rollup_staker_index_repr.t) =
   let open Lwt_result_syntax in
-  let rec go ctxt commit =
-    let* info, ctxt =
-      Commitment_storage.get_commitment_unsafe ctxt rollup commit
-    in
-    if Raw_level_repr.(info.Commitment.inbox_level <= inbox_level) then (
-      (* Assert that we're exactly at that level. If this isn't the
-         case, we're most likely in a situation where inbox levels are
-         inconsistent. *)
-      assert (Raw_level_repr.(info.inbox_level = inbox_level)) ;
-      return (commit, ctxt))
-    else (go [@ocaml.tailcall]) ctxt info.predecessor
-  in
-  go ctxt commit
+  (* Look for the commitment [staker_index] staked on. *)
+  List.fold_left_es
+    (fun (ctxt, res) commitment ->
+      match res with
+      | Some _ -> return (ctxt, res)
+      | None ->
+          let* ctxt, stakers =
+            Sc_rollup_stake_storage.stakers_of_commitment ctxt rollup commitment
+          in
+          if List.mem ~equal:Z.equal (staker_index :> Z.t) (stakers :> Z.t list)
+          then return (ctxt, Some commitment)
+          else return (ctxt, None))
+    (ctxt, None)
+    commitments
 
+(** [commitments_are_conflicting ctxt rollup hash1_opt hash2_opt]
+    returns a conflict description iff [hash1_opt] and [hash2_opt] are
+    two different commitments with the same predecessor. *)
+let commitments_are_conflicting ctxt rollup hash1_opt hash2_opt =
+  let open Lwt_result_syntax in
+  match (hash1_opt, hash2_opt) with
+  | Some hash1, Some hash2 when not Commitment_hash.(hash1 = hash2) ->
+      let* commitment1, ctxt =
+        Commitment_storage.get_commitment_unsafe ctxt rollup hash1
+      in
+      let* commitment2, ctxt =
+        Commitment_storage.get_commitment_unsafe ctxt rollup hash2
+      in
+      if Commitment_hash.(commitment1.predecessor = commitment2.predecessor)
+      then
+        let conflict_point =
+          ( {hash = hash1; commitment = commitment1},
+            {hash = hash2; commitment = commitment2} )
+        in
+        return (ctxt, Some conflict_point)
+      else return (ctxt, None)
+  | _ -> return (ctxt, None)
+
+let look_for_conflict ctxt rollup staker1_index staker2_index from_level
+    upto_level delta =
+  let open Lwt_result_syntax in
+  let rec go ctxt from_level =
+    if Raw_level_repr.(from_level >= upto_level) then
+      tzfail Sc_rollup_no_conflict
+    else
+      let* ctxt, commitments =
+        Sc_rollup_stake_storage.commitments_of_inbox_level
+          ctxt
+          rollup
+          from_level
+      in
+      let* ctxt, hash1_opt =
+        staked_on_commitment ctxt rollup commitments staker1_index
+      in
+      let* ctxt, hash2_opt =
+        staked_on_commitment ctxt rollup commitments staker2_index
+      in
+      let* ctxt, conflict_point_opt =
+        commitments_are_conflicting ctxt rollup hash1_opt hash2_opt
+      in
+      match conflict_point_opt with
+      | Some conflict_point -> return (conflict_point, ctxt)
+      | None ->
+          let from_level = Raw_level_repr.add from_level delta in
+          go ctxt from_level
+  in
+  go ctxt from_level
+
+(** [get_conflict_point ctxt rollup staker1 staker2] starts from the
+    LCC's successor and look for the first conflict between [staker1] and
+    [staker2], if any. *)
 let get_conflict_point ctxt rollup staker1 staker2 =
   let open Lwt_result_syntax in
-  (* Ensure the LCC is set. *)
-  let* _lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  (* Find out on which commitments the competitors are staked. *)
-  let* ctxt, commit1_opt = Stake_storage.find_staker ctxt rollup staker1 in
-  let* ctxt, commit2_opt = Stake_storage.find_staker ctxt rollup staker2 in
-  let* commit1, commit2 =
-    match (commit1_opt, commit2_opt) with
-    | Some commit1, Some commit2 -> return (commit1, commit2)
-    | _ -> tzfail Sc_rollup_no_conflict
+  let* ctxt, staker1_index =
+    Sc_rollup_staker_index_storage.get_staker_index_unsafe ctxt rollup staker1
   in
-  let* commit1_info, ctxt =
-    Commitment_storage.get_commitment_unsafe ctxt rollup commit1
+  let* ctxt, staker2_index =
+    Sc_rollup_staker_index_storage.get_staker_index_unsafe ctxt rollup staker2
   in
-  let* commit2_info, ctxt =
-    Commitment_storage.get_commitment_unsafe ctxt rollup commit2
+  let* _lcc, lcc_inbox_level, ctxt =
+    Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
   in
-  (* Make sure that both commits are at the same inbox level. In case
-     they are not move the commit that is farther ahead to the exact
-     inbox level of the other.
-
-     We do this instead of an alternating traversal of either commit
-     to ensure the we can detect wonky inbox level increases. For
-     example, if the inbox levels decrease in different intervals
-     between commits for either history, we risk going past the
-     conflict point and accidentally determined that the commits are
-     not in conflict by joining at the same commit. *)
-  let target_inbox_level =
-    Raw_level_repr.min commit1_info.inbox_level commit2_info.inbox_level
+  let current_level = (Raw_context.current_level ctxt).level in
+  let commitment_period =
+    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
-  let* commit1, ctxt =
-    goto_inbox_level ctxt rollup target_inbox_level commit1
-  in
-  let* commit2, ctxt =
-    goto_inbox_level ctxt rollup target_inbox_level commit2
-  in
-  (* The inbox level of a commitment increases by a fixed amount over
-     the preceding commitment.  We use this fact in the following to
-     efficiently traverse both commitment histories towards the
-     conflict points. *)
-  let rec traverse_in_parallel ctxt commit1 commit2 =
-    (* We know that commit1 <> commit2 at the first call and during
-       recursive calls as well. *)
-    let* commit1_info, ctxt =
-      Commitment_storage.get_commitment_unsafe ctxt rollup commit1
-    in
-    let* commit2_info, ctxt =
-      Commitment_storage.get_commitment_unsafe ctxt rollup commit2
-    in
-    (* This assert should hold because:
-       - We call function [traverse_in_parallel] with two initial commitments
-       whose levels are equal to [target_inbox_level],
-       - In recursive calls, the commitments are replaced by their respective
-       predecessors, and we know that successive commitments in a branch are
-       spaced by [sc_rollup_commitment_period_in_blocks] *)
-    assert (Raw_level_repr.(commit1_info.inbox_level = commit2_info.inbox_level)) ;
-    if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
-    then
-      (* Same predecessor means we've found the conflict points. *)
-      return
-        ( ( {hash = commit1; commitment = commit1_info},
-            {hash = commit2; commitment = commit2_info} ),
-          ctxt )
-    else
-      (* Different predecessors means they run in parallel. *)
-      (traverse_in_parallel [@ocaml.tailcall])
-        ctxt
-        commit1_info.predecessor
-        commit2_info.predecessor
-  in
-  let* () =
-    fail_when
-      (* This case will most dominantly happen when either commit is
-         part of the other's history.  It occurs when the commit that
-         is farther ahead gets dereferenced to its predecessor often
-         enough to land at the other commit. *)
-      Commitment_hash.(commit1 = commit2)
-      Sc_rollup_no_conflict
-  in
-  traverse_in_parallel ctxt commit1 commit2
+  look_for_conflict
+    ctxt
+    rollup
+    staker1_index
+    staker2_index
+    (Raw_level_repr.add lcc_inbox_level commitment_period)
+    current_level
+    commitment_period
 
 let get_game ctxt rollup stakers =
   let open Lwt_result_syntax in

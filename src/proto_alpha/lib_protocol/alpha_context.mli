@@ -4167,6 +4167,15 @@ module Sc_rollup : sig
       Game.Index.t ->
       Game.game_result ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
+
+    module Internal_for_tests : sig
+      val get_conflict_point :
+        context ->
+        t ->
+        Staker.t ->
+        Staker.t ->
+        (conflict_point * context) tzresult Lwt.t
+    end
   end
 
   val rpc_arg : t RPC_arg.t

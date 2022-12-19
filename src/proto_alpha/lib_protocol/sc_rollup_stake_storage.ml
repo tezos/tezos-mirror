@@ -721,6 +721,10 @@ let remove_staker ctxt rollup staker =
   let* ctxt = clean_staker_metadata ctxt rollup staker in
   return (ctxt, balance_updates)
 
+let commitments_of_inbox_level = Commitments_per_inbox_level.get
+
+let stakers_of_commitment = Commitment_stakers.get
+
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake
 

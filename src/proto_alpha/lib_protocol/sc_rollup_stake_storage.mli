@@ -141,6 +141,22 @@ val withdraw_stake :
   Sc_rollup_repr.Staker.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
+(** [commitments_of_inbox_level ctxt rollup inbox_level] returns the list
+    of commitments for [inbox_level]. *)
+val commitments_of_inbox_level :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Raw_level_repr.t ->
+  (Raw_context.t * Sc_rollup_commitment_repr.Hash.t list) tzresult Lwt.t
+
+(** [stakers_of_commitment ctxt rollup commitment_hash] returns the list
+    of stakers staking on [commitment_hash]. *)
+val stakers_of_commitment :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_commitment_repr.Hash.t ->
+  (Raw_context.t * Sc_rollup_staker_index_repr.t list) tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
