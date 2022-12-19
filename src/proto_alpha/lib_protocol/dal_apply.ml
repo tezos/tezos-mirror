@@ -94,8 +94,10 @@ let validate_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
   let open Constants in
-  let Dal.Slot.Header.{id = {index; published_level}; _} =
-    operation.Dal.Slot.Header.header
+  let id =
+    match operation with
+    | Dal.Operations.Publish_slot_header.{published_level; slot_index; _} ->
+        Dal.Slot.Header.{published_level; index = slot_index}
   in
   let Parametric.{dal = {number_of_slots; cryptobox_parameters; _}; _} =
     parametric ctxt
@@ -104,26 +106,29 @@ let validate_publish_slot_header ctxt operation =
   let* () =
     error_unless
       Compare.Int.(
-        Dal.Slot_index.compare index number_of_slots <= 0
-        && Dal.Slot_index.compare index Dal.Slot_index.zero >= 0)
+        Dal.Slot_index.compare id.index number_of_slots <= 0
+        && Dal.Slot_index.compare id.index Dal.Slot_index.zero >= 0)
       (Dal_publish_slot_header_invalid_index
-         {given = index; maximum = number_of_slots})
+         {given = id.index; maximum = number_of_slots})
   in
   let current_level = (Level.current ctxt).level in
   let* () =
     error_when
-      Raw_level.(current_level < published_level)
+      Raw_level.(current_level < id.published_level)
       (Dal_publish_slot_header_future_level
-         {provided = published_level; expected = current_level})
+         {provided = id.published_level; expected = current_level})
   in
   let* () =
     error_when
-      Raw_level.(current_level > published_level)
+      Raw_level.(current_level > id.published_level)
       (Dal_publish_slot_header_past_level
-         {provided = published_level; expected = current_level})
+         {provided = id.published_level; expected = current_level})
   in
   let* proof_ok =
-    Dal.Slot.Header.verify_commitment cryptobox_parameters operation
+    Dal.Slot.Header.verify_commitment
+      cryptobox_parameters
+      operation.commitment
+      operation.commitment_proof
   in
   error_unless
     proof_ok
@@ -131,11 +136,21 @@ let validate_publish_slot_header ctxt operation =
 
 let apply_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  Dal.Slot.register_slot_header ctxt operation.Dal.Slot.Header.header
-  >>? fun (ctxt, updated) ->
+  let slot_header =
+    Dal.Slot.Header.
+      {
+        id =
+          {
+            published_level =
+              operation.Dal.Operations.Publish_slot_header.published_level;
+            index = operation.slot_index;
+          };
+        commitment = operation.commitment;
+      }
+  in
+  Dal.Slot.register_slot_header ctxt slot_header >>? fun (ctxt, updated) ->
   if updated then ok ctxt
-  else
-    error (Dal_publish_slot_header_duplicate {slot_header = operation.header})
+  else error (Dal_publish_slot_header_duplicate {slot_header})
 
 let finalisation ctxt =
   only_if_dal_feature_enabled

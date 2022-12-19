@@ -80,6 +80,7 @@
   Entrypoint_repr
   Dal_slot_index_repr
   Dal_slot_repr
+  Dal_operations_repr
   Dal_attestation_repr
   Sc_rollup_repr
   Sc_rollup_metadata_repr
@@ -361,6 +362,7 @@
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
   dal_slot_repr.ml dal_slot_repr.mli
+  dal_operations_repr.ml dal_operations_repr.mli
   dal_attestation_repr.ml dal_attestation_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
@@ -626,6 +628,7 @@
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
   dal_slot_repr.ml dal_slot_repr.mli
+  dal_operations_repr.ml dal_operations_repr.mli
   dal_attestation_repr.ml dal_attestation_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
@@ -896,6 +899,7 @@
   entrypoint_repr.ml entrypoint_repr.mli
   dal_slot_index_repr.ml dal_slot_index_repr.mli
   dal_slot_repr.ml dal_slot_repr.mli
+  dal_operations_repr.ml dal_operations_repr.mli
   dal_attestation_repr.ml dal_attestation_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli

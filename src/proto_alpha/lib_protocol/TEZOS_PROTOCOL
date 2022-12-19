@@ -53,6 +53,7 @@
 
         "Dal_slot_index_repr",
         "Dal_slot_repr",
+        "Dal_operations_repr",		
         "Dal_attestation_repr",
 
         "Sc_rollup_repr",

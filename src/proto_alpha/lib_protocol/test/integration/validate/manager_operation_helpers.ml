@@ -1137,12 +1137,12 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
     Alpha_context.Raw_level.succ
     @@ Alpha_context.Raw_level.of_int32_exn infos.ctxt.block.header.shell.level
   in
-  let index = Alpha_context.Dal.Slot_index.zero in
+  let slot_index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
-  let proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
   let slot =
-    Alpha_context.Dal.Slot.Header.
-      {header = {id = {published_level; index}; commitment}; proof}
+    Dal.Operations.Publish_slot_header.
+      {published_level; slot_index; commitment; commitment_proof}
   in
   Op.dal_publish_slot_header
     ?fee:oinfos.fee

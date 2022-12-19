@@ -45,7 +45,7 @@ type error +=
   | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
   | Dal_publish_slot_header_invalid_proof of {
-      slot_header : Dal_slot_repr.Header.operation;
+      slot_header : Dal_operations_repr.Publish_slot_header.t;
     }
   | Dal_data_availibility_attestor_not_in_committee of {
       attestor : Signature.Public_key_hash.t;
@@ -241,7 +241,7 @@ let () =
     ~title:"DAL publish slot header invalid proof"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
-    Dal_slot_repr.Header.operation_encoding
+    Dal_operations_repr.Publish_slot_header.encoding
     (function
       | Dal_publish_slot_header_invalid_proof {slot_header} -> Some slot_header
       | _ -> None)

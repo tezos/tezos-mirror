@@ -3043,8 +3043,6 @@ module Dal : sig
 
       type t = {id : id; commitment : Commitment.t}
 
-      type operation = {header : t; proof : Commitment_proof.t}
-
       val id_encoding : id Data_encoding.t
 
       val encoding : t Data_encoding.t
@@ -3055,7 +3053,8 @@ module Dal : sig
 
       val equal : t -> t -> bool
 
-      val verify_commitment : parameters -> operation -> bool tzresult
+      val verify_commitment :
+        parameters -> Commitment.t -> Commitment_proof.t -> bool tzresult
     end
 
     val register_slot_header : context -> Header.t -> (context * bool) tzresult
@@ -3067,6 +3066,19 @@ module Dal : sig
 
     val finalize_pending_slot_headers :
       context -> (context * Attestation.t) tzresult Lwt.t
+  end
+
+  module Operations : sig
+    module Publish_slot_header : sig
+      type t = {
+        published_level : Raw_level.t;
+        slot_index : Slot_index.t;
+        commitment : Slot.Commitment.t;
+        commitment_proof : Slot.Commitment_proof.t;
+      }
+
+      val encoding : t Data_encoding.t
+    end
   end
 
   module Slots_history : sig
@@ -3129,7 +3141,7 @@ module Dal_errors : sig
     | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
     | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
     | Dal_publish_slot_header_invalid_proof of {
-        slot_header : Dal.Slot.Header.operation;
+        slot_header : Dal.Operations.Publish_slot_header.t;
       }
     | Dal_data_availibility_attestor_not_in_committee of {
         attestor : Signature.Public_key_hash.t;
@@ -4693,7 +4705,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header :
-      Dal.Slot.Header.operation
+      Dal.Operations.Publish_slot_header.t
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;

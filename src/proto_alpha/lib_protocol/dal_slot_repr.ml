@@ -61,8 +61,6 @@ module Header = struct
 
   type t = {id : id; commitment : Commitment.t}
 
-  type operation = {header : t; proof : Commitment_proof.t}
-
   let slot_id_equal {published_level; index} s2 =
     Raw_level_repr.equal published_level s2.published_level
     && Dal_slot_index_repr.equal index s2.index
@@ -101,17 +99,6 @@ module Header = struct
       (fun (id, commitment) -> {id; commitment})
       (merge_objs id_encoding (obj1 (req "commitment" Commitment.encoding)))
 
-  let operation_encoding =
-    let open Data_encoding in
-    conv
-      (fun {header = {id; commitment}; proof} -> (id, (commitment, proof)))
-      (fun (id, (commitment, proof)) -> {header = {id; commitment}; proof})
-      (merge_objs
-         id_encoding
-         (obj2
-            (req "commitment" Commitment.encoding)
-            (req "commitment_proof" Commitment_proof.encoding)))
-
   let pp_id fmt {published_level; index} =
     Format.fprintf
       fmt
@@ -138,7 +125,7 @@ module Header = struct
       (function Dal_commitment_proof_error e -> Some e | _ -> None)
       (fun e -> Dal_commitment_proof_error e)
 
-  let verify_commitment dal_params {header = {commitment; _}; proof} =
+  let verify_commitment dal_params commitment proof =
     let open Result_syntax in
     let* dal =
       match Dal.make dal_params with

@@ -89,19 +89,11 @@ module Header : sig
      slot's commitment. *)
   type t = {id : id; commitment : Commitment.t}
 
-  (** A "publish slot header" operation contains a slot header
-     together with a proof that the slot size is smaller than
-     [slot_size]. *)
-  type operation = {header : t; proof : Commitment_proof.t}
-
   (** encoding for values of type {!id}. *)
   val id_encoding : id Data_encoding.t
 
   (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
-
-  (** encoding for values of type {!operation}. *)
-  val operation_encoding : operation Data_encoding.t
 
   (** pretty-printer for values of type {!id}. *)
   val pp_id : Format.formatter -> id -> unit
@@ -112,9 +104,11 @@ module Header : sig
   (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
 
-  (** check that for the given slot header operation, the commitment
-      proof is correct wrt the commitment *)
-  val verify_commitment : parameters -> operation -> bool tzresult
+  (** [verify_commitment cryptobox commitment commitment_proof] check
+     that for the given commitment, the commitment proof is correct
+     using the [cryptbox] primitives. *)
+  val verify_commitment :
+    parameters -> Commitment.t -> Commitment_proof.t -> bool tzresult
 end
 
 (** A DAL slot is decomposed to a successive list of pages with fixed content
