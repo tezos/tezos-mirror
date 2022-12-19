@@ -140,10 +140,6 @@ let data_encoding =
     "data-encoding"
     V.(at_least "0.7.1" && less_than "1.0.0")
 
-let digestif = external_lib ~js_compatible:true "digestif" V.(at_least "0.9.0")
-
-let digestif_c = external_sublib digestif "digestif.c"
-
 let dune_configurator = external_lib "dune-configurator" V.True
 
 let dynlink = external_lib "dynlink" V.True ~opam:""
@@ -186,10 +182,10 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.4.3" && less_than "3.5.0")
+let irmin = external_lib "irmin" V.(at_least "3.5.0" && less_than "3.6.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "3.4.3" && less_than "3.5.0")
+  external_lib "irmin-pack" V.(at_least "3.5.0" && less_than "3.6.0")
 
 let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
@@ -1731,11 +1727,10 @@ let octez_context_disk =
         octez_base |> open_ ~m:"TzPervasives";
         bigstringaf;
         fmt;
-        logs_fmt;
-        digestif_c;
         irmin;
         irmin_pack;
         irmin_pack_unix;
+        logs_fmt;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
         octez_context_sigs;

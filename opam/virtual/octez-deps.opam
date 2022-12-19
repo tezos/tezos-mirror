@@ -32,7 +32,6 @@ depends: [
   "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "digestif" { >= "0.9.0" }
   "dune-configurator"
   "ezjsonm" { >= "1.1.0" }
   "fmt" { >= "0.8.7" }
@@ -44,8 +43,8 @@ depends: [
   "integers"
   "integers_stubs_js"
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
-  "irmin" { >= "3.4.3" & < "3.5.0" }
-  "irmin-pack" { >= "3.4.3" & < "3.5.0" }
+  "irmin" { >= "3.5.0" & < "3.6.0" }
+  "irmin-pack" { >= "3.5.0" & < "3.6.0" }
   "js_of_ocaml" { >= "4.0.0" & < "5.0.0" }
   "js_of_ocaml-lwt" { >= "4.0.0" & < "5.0.0" }
   "json-data-encoding" { >= "0.12" & < "0.13" }

@@ -9,11 +9,10 @@
   tezos-base
   bigstringaf
   fmt
-  logs.fmt
-  digestif.c
   irmin
   irmin-pack
   irmin-pack.unix
+  logs.fmt
   tezos-stdlib-unix
   tezos-stdlib
   tezos-context.sigs
