@@ -32,9 +32,11 @@ type host_state = {
   retrieve_mem : unit -> Memory.t;
   buffers : Eval.buffers;
   mutable durable : Durable.t;
-  enable_debugging : bool;  (** Use `write_output` alternative implementation *)
 }
 
-(** [make builtins host_state] generates a list of host functions that can be
-    imported by WebAssembly modules. *)
-val make : Builtins.t -> host_state -> (string * string * extern) list
+(** [make ~debug builtins host_state] generates a list of host functions that
+    can be imported by WebAssembly modules. If [debug] is true, an
+    implementation for [write_debug] will be picked that prints to the standard
+    output. *)
+val make :
+  debug:bool -> Builtins.t -> host_state -> (string * string * extern) list

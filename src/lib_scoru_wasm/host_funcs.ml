@@ -242,6 +242,9 @@ module Aux = struct
       int32 Lwt.t
 
     val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
+
+    val write_debug :
+      debug:bool -> memory:memory -> src:int32 -> num_bytes:int32 -> unit Lwt.t
   end
 
   module Make (M : Memory_access) : S with type memory = M.t = struct
@@ -561,6 +564,17 @@ module Aux = struct
         else Lwt_result.return ""
       in
       Result.fold ~ok:Fun.id ~error:get_error_message result
+
+    let write_debug_impl ~memory:_ ~src:_ ~num_bytes:_ = Lwt.return_unit
+
+    let alternate_write_debug_impl ~memory ~src ~num_bytes =
+      let open Lwt.Syntax in
+      let* result = read_mem ~memory ~src ~num_bytes in
+      Format.printf "DEBUG: %s\n%!" result ;
+      Lwt.return_unit
+
+    let write_debug ~debug =
+      if debug then alternate_write_debug_impl else write_debug_impl
   end
 
   include Make (Memory_access_interpreter)
@@ -623,48 +637,22 @@ let write_debug_type =
   let output_types = Vector.empty () in
   Types.FuncType (input_types, output_types)
 
-(** [write_debug] is a noop.
-  Switch manually to _alternative_write_debug_impl for printing de debug info
-  *)
-let write_debug_impl durable memories _src _num_bytes =
-  match check_memory memories with
-  | Ok _ -> Lwt.return (durable, [])
-  | Error exn -> raise exn
-
-(* [alternate_write_debug_impl] may be used to replace the default
-   [write_debug_impl] implementation when debugging the PVM/kernel, and
-   prints the debug message.
-
-   NB this does slightly change the semantics of 'write_debug', as it may
-   load the memory pointed to by [src] & [num_bytes].
-*)
-let alternate_write_debug_impl durable memories src num_bytes =
-  let open Lwt.Syntax in
-  let* memory = retrieve_memory memories in
-  let* result = Aux.read_mem ~memory ~src ~num_bytes in
-  Format.printf "DEBUG: %s\n%!" result ;
-  Lwt.return (durable, [])
-
-(* [write_debug] accepts a pointer to the start of a sequence of
+(* [write_debug ~debug] accepts a pointer to the start of a sequence of
    bytes, and a length.
 
    The PVM, however, does not check that these are valid: from its
    point of view, [write_debug] is a no-op. *)
-let write_debug debug =
-  if debug then
-    Host_funcs.Host_func
-      (fun _input_buffer _output_buffer durable memories inputs ->
-        match inputs with
-        | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
-            alternate_write_debug_impl durable memories src num_bytes
-        | _ -> raise Bad_input)
-  else
-    Host_funcs.Host_func
-      (fun _input_buffer _output_buffer durable memories inputs ->
-        match inputs with
-        | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
-            write_debug_impl durable memories src num_bytes
-        | _ -> raise Bad_input)
+let write_debug ~debug =
+  let open Lwt.Syntax in
+  let run = Aux.write_debug ~debug in
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let* memory = retrieve_memory memories in
+      match inputs with
+      | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
+          let+ () = run ~memory ~src ~num_bytes in
+          (durable, [])
+      | _ -> raise Bad_input)
 
 let store_has_name = "tezos_store_has"
 
@@ -1067,7 +1055,7 @@ let lookup_opt name =
 let lookup name =
   match lookup_opt name with Some f -> f | None -> raise Not_found
 
-let register_host_funcs ~enable_debugging registry =
+let register_host_funcs ~debug registry =
   List.fold_left
     (fun _acc (global_name, host_function) ->
       Host_funcs.register ~global_name host_function registry)
@@ -1075,7 +1063,7 @@ let register_host_funcs ~enable_debugging registry =
     [
       (read_input_name, read_input);
       (write_output_name, write_output);
-      (write_debug_name, write_debug enable_debugging);
+      (write_debug_name, write_debug ~debug);
       (store_has_name, store_has);
       (store_list_size_name, store_list_size);
       (store_get_nth_key_name, store_get_nth_key);
@@ -1091,14 +1079,14 @@ let register_host_funcs ~enable_debugging registry =
 
 let all =
   let registry = Host_funcs.empty () in
-  register_host_funcs ~enable_debugging:false registry ;
+  register_host_funcs ~debug:false registry ;
   registry
 
 (* We build the registry at toplevel of the module to prevent recomputing it at
    each initialization tick. *)
 let all_debug =
   let registry = Host_funcs.empty () in
-  register_host_funcs ~enable_debugging:true registry ;
+  register_host_funcs ~debug:true registry ;
   registry
 
 module Internal_for_tests = struct

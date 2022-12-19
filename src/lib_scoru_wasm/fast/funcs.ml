@@ -36,36 +36,9 @@ type host_state = {
   retrieve_mem : unit -> Wasmer.Memory.t;
   buffers : Tezos_webassembly_interpreter.Eval.buffers;
   mutable durable : Durable.t;
-  enable_debugging : bool;
 }
 
-let write_debug_impl state =
-  if state.enable_debugging then (fun key_offset key_length ->
-    let mem = state.retrieve_mem () in
-    let len = Wasmer.Memory.length mem |> Int32.of_int in
-    let key_offset, key_length =
-      match () with
-      | () when key_offset >= len ->
-          (* Start of key is out of bounds *)
-          (0l, 0l)
-      | () when key_length > Int32.sub len key_offset ->
-          (* End of key would exceeds bounds *)
-          (key_offset, Int32.sub len key_offset)
-      | () ->
-          (* Everything is ok *)
-          (key_offset, key_length)
-    in
-    let key_offset = Int32.to_int key_offset in
-    let str =
-      String.init (Int32.to_int key_length) (fun i ->
-          Wasmer.Memory.get mem (key_offset + i)
-          |> Unsigned.UInt8.to_int |> Char.chr)
-    in
-    Printf.printf "DEBUG: %s\n" str ;
-    Lwt.return ())
-  else fun _ _ -> Lwt.return ()
-
-let make (module Builtins : Builtins.S) state =
+let make ~debug (module Builtins : Builtins.S) state =
   let open Wasmer in
   let open Lwt.Syntax in
   let with_mem f =
@@ -138,7 +111,11 @@ let make (module Builtins : Builtins.S) state =
         result)
   in
   let write_debug =
-    fn (i32 @-> i32 @-> returning nothing) (write_debug_impl state)
+    fn
+      (i32 @-> i32 @-> returning nothing)
+      (fun src num_bytes ->
+        with_mem @@ fun memory ->
+        Host_funcs.Aux.write_debug ~memory ~debug ~src ~num_bytes)
   in
   let store_copy =
     fn
