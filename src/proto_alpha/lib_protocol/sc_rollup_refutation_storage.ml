@@ -346,6 +346,10 @@ let start_game ctxt rollup ~player:(player, player_commitment_hash)
   let* ctxt, game_exists = Store.Game_info.mem (ctxt, rollup) stakers in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
   let check_staker_availability ctxt staker =
+    let* is_staker, ctxt =
+      Sc_rollup_stake_storage.is_staker ctxt rollup staker
+    in
+    let* () = fail_unless is_staker Sc_rollup_not_staked in
     let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
     let* () =
       fail_when
