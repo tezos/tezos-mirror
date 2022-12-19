@@ -1,5 +1,3 @@
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-
 .. _howtoget:
 
 How to get Tezos

@@ -149,21 +149,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Kathmandu Protocol doc:
+   :caption: Lima Protocol doc:
 
    active/protocol
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Lima Protocol doc:
-
-   lima/protocol
-   lima/glossary
-   lima/cli-commands
-   lima/rpc
 
 .. toctree::
    :maxdepth: 2

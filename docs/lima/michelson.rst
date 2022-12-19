@@ -29,6 +29,7 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
+.. _address_prefixes:
 .. _address_prefixes_lima:
 
 Semantics of smart contracts and transactions
@@ -308,6 +309,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
+.. _michelson_type_system:
 .. _michelson_type_system_lima:
 
 Introduction to the type system and notations
@@ -1505,6 +1507,7 @@ value that was previously stored in the ``map`` at the same key as
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _OperationsOnBigMaps:
 .. _OperationsOnBigMaps_lima:
 
 Big maps have three possible representations. A map literal is always
@@ -1902,6 +1905,7 @@ until it is actually originated.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
+.. _MichelsonSetDelegate:
 .. _MichelsonSetDelegate_lima:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
@@ -2280,6 +2284,7 @@ comprehensive description of the Sapling protocol.
         with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
         with memo_size `ms`
 
+.. _MichelsonTickets:
 .. _MichelsonTickets_lima:
 
 Operations on tickets
@@ -2405,6 +2410,7 @@ parameter if the sender is the contract's manager.
 
     :: 'S   ->   nat : 'S
 
+.. _MichelsonViews:
 .. _MichelsonViews_lima:
 
 Operations on views
@@ -2719,6 +2725,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
+.. _ConcreteSyntax:
 .. _ConcreteSyntax_lima:
 
 The concrete language is very close to the formal notation of the
@@ -3270,6 +3277,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
+.. _SpecialAnnotations:
 .. _SpecialAnnotations_lima:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions

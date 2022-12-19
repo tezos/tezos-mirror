@@ -73,6 +73,7 @@ The rest of this document is organized as follows: we first describe
 the different validation modes implemented by this Tezos economic
 protocol, and then we delve deeper into the particulars of the validation and application of blocks and the operations supported.
 
+.. _validation_modes:
 .. _validation_modes_lima:
 
 Validation modes
@@ -87,6 +88,7 @@ specified by the protocol environment offers an entry-point so that
 protocol agnostic components, the Octez shell for instance, are able
 to use these different modes.
 
+.. _full_application:
 .. _full_application_lima:
 
 Full Application
@@ -102,6 +104,7 @@ signature is correct, and **all** operations included in the block are
 valid; the correct amount of consensus operations have been included
 in order to satisfy the consensus' threshold, etc.
 
+.. _full_construction:
 .. _full_construction_lima:
 
 Full Construction
@@ -120,6 +123,7 @@ construction is finalized.
 
 In Octez, this mode is mainly used by the baker daemon.
 
+.. _partial_construction:
 .. _partial_construction_lima:
 
 Partial Construction
@@ -136,6 +140,7 @@ potential validity of operations (and whether they can safely included
 into a block), so that the later can **classify** incoming operations,
 and further decide how to process them accordingly.
 
+.. _protocol_classification:
 .. _protocol_classification_lima:
 
 The protocol provides the shell with the following classification of
@@ -170,6 +175,7 @@ by the protocol environment:
   case of an endorsement which was received *too late*, but that could
   still be used to form a consensus quorum.
 
+.. _partial_application:
 .. _partial_application_lima:
 
 Partial Application
@@ -200,6 +206,7 @@ application` modes provides an over-approximation of the branch's
 validity, and as a result intermediate results are not committed on
 disk in order to prevent potential attacks.
 
+.. _block_validation_overview:
 .. _block_validation_overview_lima:
 
 Block Validation
@@ -247,6 +254,7 @@ is an over-approximation, this feature cannot be considered to provide
 a safe guarantee that a block will be valid: in particular, it does
 not validate all kinds of operations.
 
+.. _operation_validity:
 .. _operation_validity_lima:
 
 Operation Validation and Application
@@ -319,7 +327,7 @@ conditions hold:
 Validity of Manager Operation Batches
 .....................................
 
-A :ref:`batch<manager_operations_batches_kathmandu>` of manager
+A :ref:`batch<manager_operations_batches_lima>` of manager
 operations includes one or more manager operations for sequential and
 atomic execution. The atomicity property imposes that the validity of
 a batch should entail the validity of each individual operation in the
@@ -347,6 +355,7 @@ defined as the conjunction of the following conditions:
   solvent enough to cover the announced fees for all the operations in
   the batch.
 
+.. _manager_operations_application:
 .. _manager_operations_application_lima:
 
 Application of Manager Operations
