@@ -251,7 +251,6 @@ Core developers are also provided reference materials for internal APIs of Octez
    :hidden:
 
    protocols/naming
-   protocols/014_kathmandu
    protocols/015_lima
    protocols/016_mumbai
    protocols/alpha
