@@ -23,32 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = int
+(** {1 Slot index}
 
-val max_value : int
+   A slot index is a possible value for a slot index with an upper
+   bound. If a choice is ever made to increase the size of available
+   slots in the protocol, we also need to change this module to
+   accommodate for higher values. *)
+type t
 
-val encoding : int Data_encoding.t
+val max_value : t
 
-val pp : Format.formatter -> int -> unit
+val encoding : t Data_encoding.t
 
-val zero : int
+val pp : Format.formatter -> t -> unit
 
-type error += Invalid_slot_index of {given : int; min : int; max : int}
+val zero : t
 
-val check_is_in_range : int -> (unit, error trace) result
+type error += Invalid_slot_index of {given : t; min : t; max : t}
 
-val of_int : int -> (int, error trace) result
+val check_is_in_range : t -> unit tzresult
 
-val of_int_opt : int -> int option
+(** [of_int n] constructs a value of type {!t} from [n]. Returns
+      {!Invalid_slot_index} in case the given value is not in the interval [zero,
+      max_value]. *)
+val of_int : int -> t tzresult
 
-val to_int : 'a -> 'a
+(** [of_int_opt n] constructs a value of type {!t} from [n]. Returns {!None}
+      in case the given value is not in the interval [zero, max_value]. *)
+val of_int_opt : int -> t option
 
-val to_int_list : 'a -> 'a
+val to_int : t -> int
 
-val compare : int -> int -> int
+val to_int_list : t list -> int list
 
-val equal : int -> int -> bool
+val compare : t -> t -> int
 
-val slots_range : lower:int -> upper:int -> (int list, error trace) result
+val equal : t -> t -> bool
 
-val slots_range_opt : lower:int -> upper:int -> int list option
+(** [slots_range ~lower ~upper] returns the list of slots indexes between
+      [lower] and [upper].
+
+      If [lower] is negative or [upper] is bigger than [max_value], the function
+      returns {!Invalid_slot_index}. *)
+val slots_range : lower:int -> upper:int -> t list tzresult
+
+(** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
+      {None} instead of an error. *)
+val slots_range_opt : lower:int -> upper:int -> t list option

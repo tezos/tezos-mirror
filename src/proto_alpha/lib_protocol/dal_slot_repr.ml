@@ -92,7 +92,7 @@ module Header = struct
       (fun (published_level, index) -> {published_level; index})
       (obj2
          (req "level" Raw_level_repr.encoding)
-         (req "index" Data_encoding.uint8))
+         (req "index" Dal_slot_index_repr.encoding))
 
   let encoding =
     let open Data_encoding in
@@ -118,7 +118,7 @@ module Header = struct
       "published_level: %a, index: %a"
       Raw_level_repr.pp
       published_level
-      Format.pp_print_int
+      Dal_slot_index_repr.pp
       index
 
   let pp fmt {id; commitment = c} =
@@ -235,7 +235,8 @@ module Slot_market = struct
     if
       not
         Compare.Int.(
-          0 <= new_slot_header.id.index && new_slot_header.id.index < t.length)
+          0 <= Dal_slot_index_repr.to_int new_slot_header.id.index
+          && Dal_slot_index_repr.to_int new_slot_header.id.index < t.length)
     then None
     else
       let has_changed = ref false in
