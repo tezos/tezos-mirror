@@ -87,6 +87,16 @@ module Slots_handlers = struct
         | Error (Ok `Not_found) -> return_none
         | Error (Error e) -> fail e)
       ctxt
+
+  let get_commitment_headers ctxt commitment (slot_level, slot_index) () =
+    call_handler
+      (fun store _cryptobox ->
+        Slot_manager.get_commitment_headers
+          commitment
+          ?slot_level
+          ?slot_index
+          store)
+      ctxt
 end
 
 module Profile_handlers = struct
@@ -136,6 +146,10 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.get_profiles
        (Profile_handlers.get_profiles ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.get_commitment_headers
+       (Slots_handlers.get_commitment_headers ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
