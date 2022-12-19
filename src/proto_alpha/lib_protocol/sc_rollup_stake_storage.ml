@@ -320,16 +320,16 @@ let assert_commitment_is_not_past_curfew ctxt rollup inbox_level =
           Raw_level_repr.diff current_level oldest_commit
           > refutation_deadline_blocks)
       then tzfail Sc_rollup_commitment_past_curfew
-      else return ctxt
+      else return (ctxt, 0)
   | None ->
       (* The storage cost is covered by the stake. *)
-      let* ctxt, _diff, _existed =
+      let* ctxt, size_diff, _existed =
         Store.Commitment_first_publication_level.add
           (ctxt, rollup)
           inbox_level
           current_level
       in
-      return ctxt
+      return (ctxt, size_diff)
 
 (** Check invariants on [inbox_level], enforcing overallocation of storage,
     regularity of block production and curfew.
@@ -342,7 +342,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let open Lwt_result_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
-  let* ctxt =
+  let* ctxt, size_diff =
     assert_commitment_is_not_past_curfew
       ctxt
       rollup
@@ -355,7 +355,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
       (Sc_rollup_commitment_from_future
          {current_level; inbox_level = commitment.inbox_level})
   in
-  return ctxt
+  return (ctxt, size_diff)
 
 let is_staker_index_staked_on ctxt rollup
     (staker_index : Sc_rollup_staker_index_repr.t) commitment_hash =
@@ -415,9 +415,29 @@ let find_commitment_to_deallocate ctxt rollup commitment_hash
   in
   aux ctxt commitment_hash num_commitments_to_keep
 
-(* This commitment storage size in bytes will be re-computed at the end
-   of the merge request. *)
-let commitment_storage_size_in_bytes = 0
+(* Maximum storage size in bytes allocated during a {!refine_stake}.
+   The first commitment of a inbox_level allocates the most bytes,
+   subsequent commitments for the same level may cost less (e.g. same
+   commitment published).
+
+   We are looking to assert that the most possible bytes allocated in the
+   storage is covered by the deposit.
+
+   Maximum value computed and observed:
+   - Commitment_first_publication_level:       4
+   - Commitments:                             77
+   - Commitments_added:                        4
+   - Stakers:                                  4
+   - Commitments_per_inbox_level:             36
+   - Commitment_stakers is variable but should not exceed 10 bytes
+
+   That is, 125 bytes are fixed.
+
+   The variable comes from the {!Sc_rollup_staker_index.encoding}. Although,
+   the index of the 10^9-th stakers is 6 bytes, 10 bytes as an over-approxiamtion
+   should be fine (10 bytes also accounts for the list's overhead encoding).
+*)
+let max_commitment_storage_size_in_bytes = 125 + 10
 
 (** [set_staker_commitment ctxt rollup staker_index inbox_level commitment_hash]
     updates the **newest** commitment [staker_index] stakes on.
@@ -466,18 +486,20 @@ let assert_staker_dont_backtrack ctxt rollup staker_index commitments =
 let refine_stake ctxt rollup commitment ~staker_index ~lcc =
   let open Lwt_result_syntax in
   (* Checks the commitment validity, see {!assert_refine_conditions_met}. *)
-  let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
+  let* ctxt, refine_conditions_size_diff =
+    assert_refine_conditions_met ctxt rollup lcc commitment
+  in
   let*? ctxt, commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt commitment
   in
   (* Adds the commitment to the storage. *)
-  let* ctxt, _commitment_size_diff, _commit_existed =
+  let* ctxt, commitment_size_diff, _commit_existed =
     Store.Commitments.add (ctxt, rollup) commitment_hash commitment
   in
   (* Initializes or fetch the level at which the commitment was first
      published. *)
   let publication_level = (Raw_context.current_level ctxt).level in
-  let* _commitment_added_size_diff, commitment_added_level, ctxt =
+  let* commitment_added_size_diff, commitment_added_level, ctxt =
     Commitment_storage.set_commitment_added
       ctxt
       rollup
@@ -485,7 +507,7 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
       publication_level
   in
   (* Updates the [staker_index]'s metadata. *)
-  let* ctxt, _size_diff =
+  let* ctxt, set_staker_commitment_size_diff =
     set_staker_commitment
       ctxt
       rollup
@@ -494,7 +516,7 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
       commitment_hash
   in
   (* Adds the [commitment] to the set of commitments for this inbox level. *)
-  let* ctxt, _commitments_per_inbox_level_size_diff, commitments =
+  let* ctxt, commitments_per_inbox_level_size_diff, commitments =
     Commitments_per_inbox_level.add_or_init
       ctxt
       rollup
@@ -505,6 +527,11 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
      the double get to the list of commitments. *)
   let* ctxt =
     assert_staker_dont_backtrack ctxt rollup staker_index commitments
+  in
+  let _total_size_diff =
+    refine_conditions_size_diff + commitment_size_diff
+    + commitment_added_size_diff + set_staker_commitment_size_diff
+    + commitments_per_inbox_level_size_diff
   in
   return (commitment_hash, commitment_added_level, ctxt)
 
@@ -744,5 +771,6 @@ module Internal_for_tests = struct
     in
     refine_stake ctxt rollup commitment ~staker_index ~lcc
 
-  let commitment_storage_size_in_bytes = commitment_storage_size_in_bytes
+  let max_commitment_storage_size_in_bytes =
+    max_commitment_storage_size_in_bytes
 end

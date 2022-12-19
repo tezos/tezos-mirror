@@ -214,6 +214,6 @@ module Internal_for_tests : sig
     tzresult
     Lwt.t
 
-  (** The storage size requirement (in bytes) of a commitment *)
-  val commitment_storage_size_in_bytes : int
+  (** The maximum storage size requirement (in bytes) of a commitment *)
+  val max_commitment_storage_size_in_bytes : int
 end
