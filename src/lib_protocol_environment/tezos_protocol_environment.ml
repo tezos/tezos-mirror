@@ -57,6 +57,7 @@ module V5 = Environment_V5
 module V6 = Environment_V6
 module V7 = Environment_V7
 module V8 = Environment_V8
+module V9 = Environment_V9
 module Memory_context = Memory_context
 module Proxy_context = Proxy_context
 module Proxy_delegate = Proxy_delegate
