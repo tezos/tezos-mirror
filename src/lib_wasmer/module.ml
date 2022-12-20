@@ -51,7 +51,7 @@ let create store format code =
   in
   let modul = Functions.Module.new_ store (Ctypes.addr wasm) in
   Byte_vector.delete wasm ;
-  check_null_ptr Error.(make_exception Create_configuration) modul ;
+  check_null_ptr Error.(make_exception Instantiate_module) modul ;
   modul
 
 let imports modul =
