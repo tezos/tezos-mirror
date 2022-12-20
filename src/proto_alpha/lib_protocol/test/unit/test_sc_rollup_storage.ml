@@ -437,7 +437,11 @@ let assert_staker_exists ctxt rollup staker =
   let* () = equal_tez ~loc:__LOC__ stake frozen_balance in
   (* Assert [staker] was given an index. *)
   let* ctxt, staker_index_opt =
-    lift @@ Sc_rollup_staker_index_storage.find_staker_index ctxt rollup staker
+    lift
+    @@ Sc_rollup_staker_index_storage.find_staker_index_unsafe
+         ctxt
+         rollup
+         staker
   in
   let* staker_index = Assert.get_some ~loc:__LOC__ staker_index_opt in
   let* _ctxt, exists =
@@ -454,7 +458,11 @@ let assert_staker_dont_exists ctxt rollup staker =
   let* () = equal_tez ~loc:__LOC__ Tez_repr.zero frozen_balance in
   (* Assert [staker] has no index. *)
   let* _ctxt, staker_index_opt =
-    lift @@ Sc_rollup_staker_index_storage.find_staker_index ctxt rollup staker
+    lift
+    @@ Sc_rollup_staker_index_storage.find_staker_index_unsafe
+         ctxt
+         rollup
+         staker
   in
   Assert.is_none ~loc:__LOC__ ~pp:Z.pp_print (staker_index_opt :> Z.t option)
 

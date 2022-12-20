@@ -56,14 +56,6 @@ val get_staker_index_unsafe :
   Signature.public_key_hash ->
   (Raw_context.t * t) tzresult Lwt.t
 
-(** Same as {!find_staker_index_unsafe} but checks for the existence of the
-    [rollup] before. *)
-val find_staker_index :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
-  (Raw_context.t * t option) tzresult Lwt.t
-
 (** [remove_staker ctxt rollup staker] cleans every storage associated
     to [staker] and it's index.
     The staker will be no longer considered active until a new index is given

@@ -97,27 +97,6 @@ let get_ongoing_games_for_staker ctxt rollup staker =
   in
   return (games, ctxt)
 
-(** [staked_on_commitment ctxt rollup commitments staker_index]
-    returns the hash of the commitment that [staker_index] is staking
-    in [commitments], if any. *)
-let staked_on_commitment ctxt rollup commitments
-    (staker_index : Sc_rollup_staker_index_repr.t) =
-  let open Lwt_result_syntax in
-  (* Look for the commitment [staker_index] staked on. *)
-  List.fold_left_es
-    (fun (ctxt, res) commitment ->
-      match res with
-      | Some _ -> return (ctxt, res)
-      | None ->
-          let* ctxt, stakers =
-            Sc_rollup_stake_storage.stakers_of_commitment ctxt rollup commitment
-          in
-          if List.mem ~equal:Z.equal (staker_index :> Z.t) (stakers :> Z.t list)
-          then return (ctxt, Some commitment)
-          else return (ctxt, None))
-    (ctxt, None)
-    commitments
-
 (** [commitments_are_conflicting ctxt rollup hash1_opt hash2_opt]
     returns a conflict description iff [hash1_opt] and [hash2_opt] are
     two different commitments with the same predecessor. *)
@@ -155,10 +134,18 @@ let look_for_conflict ctxt rollup staker1_index staker2_index from_level
           from_level
       in
       let* ctxt, hash1_opt =
-        staked_on_commitment ctxt rollup commitments staker1_index
+        Sc_rollup_stake_storage.find_commitment_of_staker_in_commitments
+          ctxt
+          rollup
+          staker1_index
+          commitments
       in
       let* ctxt, hash2_opt =
-        staked_on_commitment ctxt rollup commitments staker2_index
+        Sc_rollup_stake_storage.find_commitment_of_staker_in_commitments
+          ctxt
+          rollup
+          staker2_index
+          commitments
       in
       let* ctxt, conflict_point_opt =
         commitments_are_conflicting ctxt rollup hash1_opt hash2_opt
@@ -292,12 +279,30 @@ let check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash ~defender
   in
   let* () =
     fail_unless
+      Commitment_hash.(refuter_commitment_hash <> defender_commitment_hash)
+      Sc_rollup_errors.Sc_rollup_no_conflict
+  in
+  let* () =
+    fail_unless
       Commitment_hash.(
         refuter_commitment.predecessor = defender_commitment.predecessor)
       (Sc_rollup_errors.Sc_rollup_not_valid_commitments_conflict
          (refuter_commitment_hash, refuter, defender_commitment_hash, defender))
   in
   return (defender_commitment, ctxt)
+
+let check_staker_availability ctxt rollup staker =
+  let open Lwt_result_syntax in
+  let* is_staker, ctxt = Sc_rollup_stake_storage.is_staker ctxt rollup staker in
+  let* () = fail_unless is_staker Sc_rollup_not_staked in
+  let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
+  let* () =
+    fail_when
+      Compare.List_length_with.(
+        entries >= Constants_storage.sc_rollup_max_number_of_parallel_games ctxt)
+      (Sc_rollup_max_number_of_parallel_games_reached staker)
+  in
+  return ctxt
 
 (** [start_game ctxt rollup ~player:(player, player_commitment_hash)
     ~opponent:(opponent, opponent_commitment_hash)] initialises the game or if
@@ -344,23 +349,8 @@ let start_game ctxt rollup ~player:(player, player_commitment_hash)
   let stakers = Sc_rollup_game_repr.Index.make refuter defender in
   let* ctxt, game_exists = Store.Game_info.mem (ctxt, rollup) stakers in
   let* () = fail_when game_exists Sc_rollup_game_already_started in
-  let check_staker_availability ctxt staker =
-    let* is_staker, ctxt =
-      Sc_rollup_stake_storage.is_staker ctxt rollup staker
-    in
-    let* () = fail_unless is_staker Sc_rollup_not_staked in
-    let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
-    let* () =
-      fail_when
-        Compare.List_length_with.(
-          entries
-          >= Constants_storage.sc_rollup_max_number_of_parallel_games ctxt)
-        (Sc_rollup_max_number_of_parallel_games_reached staker)
-    in
-    return ctxt
-  in
-  let* ctxt = check_staker_availability ctxt stakers.alice in
-  let* ctxt = check_staker_availability ctxt stakers.bob in
+  let* ctxt = check_staker_availability ctxt rollup stakers.alice in
+  let* ctxt = check_staker_availability ctxt rollup stakers.bob in
   let* defender_commitment, ctxt =
     check_conflict_point
       ctxt

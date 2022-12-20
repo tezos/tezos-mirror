@@ -3011,6 +3011,49 @@ let test_conflict_point_on_a_branch () =
   in
   Assert.equal_bool ~loc:__LOC__ true expected_conflict
 
+let test_agreeing_stakers_cannot_play () =
+  let* block, (pA, pB), rollup =
+    init_and_originate
+      ~sc_rollup_challenge_window_in_blocks:1000
+      Context.T2
+      "unit"
+  in
+  let pB_pkh = Account.pkh_of_contract_exn pB in
+  (* pA stakes on a whole branch. *)
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  let* predecessor =
+    Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
+  in
+  let* commitments_and_hashes =
+    let* incr = Incremental.begin_construction block in
+    gen_commitments incr rollup ~predecessor ~num_commitments:10
+  in
+  let commitments, _ = List.split commitments_and_hashes in
+  let* block = publish_commitments block pA rollup commitments in
+  let* block = publish_commitments block pB rollup commitments in
+  let _, agreed_commitment_hash =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.last_opt commitments_and_hashes
+  in
+  let refutation =
+    Sc_rollup.Game.Start
+      {
+        player_commitment_hash = agreed_commitment_hash;
+        opponent_commitment_hash = agreed_commitment_hash;
+      }
+  in
+  let* op = Op.sc_rollup_refute (B block) pA rollup pB_pkh refutation in
+  let* incr = Incremental.begin_construction block in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_no_conflict as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "It should have failed with [Sc_rollup_no_conflict]"
+  in
+  let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -3153,6 +3196,10 @@ let tests =
       "win refutation game by forfeit"
       `Quick
       test_winner_by_forfeit_with_draw;
+    Tztest.tztest
+      "cannot start a game with agreeing stakers"
+      `Quick
+      test_agreeing_stakers_cannot_play;
     Tztest.tztest
       "find conflict point with incomplete branch"
       `Quick

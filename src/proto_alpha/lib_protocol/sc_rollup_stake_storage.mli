@@ -157,6 +157,16 @@ val stakers_of_commitment :
   Sc_rollup_commitment_repr.Hash.t ->
   (Raw_context.t * Sc_rollup_staker_index_repr.t list) tzresult Lwt.t
 
+(** [find_commitment_of_staker_in_commitments ctxt rollup staker_index commitments]
+    selects in [commitments] the hash of the commitment staked by
+    [staker_index], if any. *)
+val find_commitment_of_staker_in_commitments :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_staker_index_repr.t ->
+  Sc_rollup_commitment_repr.Hash.t list ->
+  (Raw_context.t * Sc_rollup_commitment_repr.Hash.t option) tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
@@ -168,7 +178,7 @@ module Internal_for_tests : sig
       specific commitment.
 
       Returns the modified context, the balance updates of the frozen
-      deposit and the index created for [staker]. 
+      deposit and the index created for [staker].
   *)
   val deposit_stake :
     Raw_context.t ->

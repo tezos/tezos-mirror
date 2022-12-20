@@ -63,12 +63,6 @@ let get_staker_index_unsafe ctxt rollup staker =
   | None -> tzfail Sc_rollup_not_staked
   | Some staker_index -> return (ctxt, staker_index)
 
-let find_staker_index ctxt rollup staker =
-  let open Lwt_result_syntax in
-  let* ctxt, res = Storage.Sc_rollup.Last_cemented_commitment.mem ctxt rollup in
-  if not res then tzfail (Sc_rollup_does_not_exist rollup)
-  else find_staker_index_unsafe ctxt rollup staker
-
 let remove_staker ctxt rollup staker =
   let open Lwt_result_syntax in
   let* ctxt, staker_index = get_staker_index_unsafe ctxt rollup staker in

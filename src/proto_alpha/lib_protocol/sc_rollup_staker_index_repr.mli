@@ -31,6 +31,8 @@ val succ : t -> t
 
 val encoding : t Data_encoding.t
 
+val equal : t -> t -> bool
+
 module Index : Storage_description.INDEX with type t = t
 
 module Internal_for_tests : sig
