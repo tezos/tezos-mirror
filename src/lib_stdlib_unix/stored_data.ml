@@ -84,24 +84,11 @@ let write_file file data =
         else Data_encoding.Binary.to_string_exn file.encoding data
       in
       let str = encoder data in
-      let tmp_filename = file.path ^ "_tmp" in
-      (* Write in a new temporary file then swap the files to avoid
-         partial writes. *)
-      let* fd =
-        Lwt_unix.openfile
-          tmp_filename
-          [Unix.O_WRONLY; O_CREAT; O_TRUNC; O_CLOEXEC]
-          0o644
+      let+ result =
+        Lwt_utils_unix.with_atomic_open_out file.path (fun fd ->
+            Lwt_utils_unix.write_string fd str)
       in
-      Lwt.catch
-        (fun () ->
-          let* () = Lwt_utils_unix.write_string fd str in
-          let* () = Lwt_unix.close fd in
-          let* () = Lwt_unix.rename tmp_filename file.path in
-          return_ok_unit)
-        (fun exn ->
-          let* _ = Lwt_utils_unix.safe_close fd in
-          Lwt.fail exn))
+      Result.bind_error result Lwt_utils_unix.tzfail_of_io_error)
 
 let write (Stored_data v) data =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
