@@ -107,7 +107,7 @@ end
 
 module Dal = struct
   include Dal_slot_repr
-  include Dal
+  include Raw_context.Dal
 
   module Slot_index = struct
     include Dal_slot_index_repr

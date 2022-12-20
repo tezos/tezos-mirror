@@ -61,6 +61,10 @@ type error +=
       given : Raw_level_repr.t;
     }
   | Dal_cryptobox_error of {explanation : string}
+  | Dal_register_invalid_slot_header of {
+      length : int;
+      slot_header : Dal_slot_repr.Header.t;
+    }
 
 let () =
   let open Data_encoding in
@@ -326,4 +330,29 @@ let () =
     (obj1 (req "error" (string Plain)))
     (function
       | Dal_cryptobox_error {explanation} -> Some explanation | _ -> None)
-    (fun explanation -> Dal_cryptobox_error {explanation})
+    (fun explanation -> Dal_cryptobox_error {explanation}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal_register_invalid_slot"
+    ~title:"Dal register invalid slot"
+    ~description:
+      "Attempt to register a slot which is invalid (the index is out of \
+       bounds)."
+    ~pp:(fun ppf (length, slot) ->
+      Format.fprintf
+        ppf
+        "The slot provided is invalid. Slot index should be between 0 and %d. \
+         Found: %a."
+        length
+        Dal_slot_index_repr.pp
+        slot.Dal_slot_repr.Header.id.index)
+    Data_encoding.(
+      obj2
+        (req "length" int31)
+        (req "slot_header" Dal_slot_repr.Header.encoding))
+    (function
+      | Dal_register_invalid_slot_header {length; slot_header} ->
+          Some (length, slot_header)
+      | _ -> None)
+    (fun (length, slot_header) ->
+      Dal_register_invalid_slot_header {length; slot_header})

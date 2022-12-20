@@ -394,6 +394,12 @@ module Sc_rollup_in_memory_inbox : sig
 end
 
 module Dal : sig
+  type cryptobox = Dal.t
+
+  val make : t -> cryptobox tzresult
+
+  val number_of_slots : t -> int
+
   (** [record_attested_shards ctxt attestation shards] records that the
      list of shards [shards] were attested (declared available by some
      attestor). The function assumes that a shard belongs to the

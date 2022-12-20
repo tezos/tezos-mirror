@@ -2910,11 +2910,11 @@ module Dal : sig
     number_of_shards : int;
   }
 
-  type t
+  type cryptobox
 
-  type cryptobox := t
+  val make : context -> cryptobox tzresult
 
-  val make : Dal.parameters -> (cryptobox, [`Fail of string]) result
+  val number_of_slots : context -> int
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
