@@ -254,7 +254,7 @@ let plot_scatter opts title input_columns outputs =
               | [((dim1, _) as col1); ((dim2, _) as col2)] ->
                   let dim1 = underscore_to_dash dim1 in
                   let dim2 = underscore_to_dash dim2 in
-                  let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
+                  let title = Format.asprintf "%s\\n(%s, %s)" title dim1 dim2 in
                   scatterplot_3d opts title col1 col2 outputs
               | cols ->
                   let len = List.length cols in
@@ -398,7 +398,9 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
       let* plots =
         plot_scatter
           opts
-          "Validation (chosen basis)"
+          (Format.sprintf
+             "Validation (chosen basis)\\n%s"
+             (Inference.scores_to_string solution.scores))
           columns
           [timings; predicted]
       in
@@ -465,7 +467,9 @@ let validator_empirical opts workload_data (problem : Inference.problem)
   let* plots =
     plot_scatter
       opts
-      "Validation (raw)"
+      (Format.sprintf
+         "Validation (raw)\\n%s"
+         (Inference.scores_to_string solution.scores))
       columns
       [timings; predicted |> Array.map (fun x -> [|x|])]
   in
