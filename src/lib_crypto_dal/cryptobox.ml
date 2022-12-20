@@ -347,7 +347,7 @@ module Inner = struct
     else return t
 
   let slot_as_polynomial_length ~slot_size =
-    1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount))
+    1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
   type parameters = {
     redundancy_factor : int;
