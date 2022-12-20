@@ -196,15 +196,13 @@ end) : S = struct
   let pp ~pp_ptr ~pp_content fmt {content; back_pointers; index} =
     Format.fprintf
       fmt
-      {|
-       content = %a
-       index = %s
-       back_pointers = %a
-    |}
+      "content: %a@,index: %s@,@[<hv 2>back_pointers:@ %a@]"
       pp_content
       content
       (Z.to_string index)
-      (Format.pp_print_list pp_ptr)
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+         pp_ptr)
       (back_pointers_to_list back_pointers)
 
   let encoding ptr_encoding content_encoding =
