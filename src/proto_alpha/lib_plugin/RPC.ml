@@ -2042,13 +2042,6 @@ module Sc_rollup = struct
           path_sc_rollup / "dal_slot_subscriptions" /: Raw_level.rpc_arg)
 
     let ongoing_refutation_games =
-      let query =
-        let open RPC_query in
-        query Sc_rollup.Staker.of_b58check_exn
-        |+ field "staker" RPC_arg.string "" (fun x ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output =
         Sc_rollup.(
           Data_encoding.(
@@ -2059,10 +2052,11 @@ module Sc_rollup = struct
                  (req "bob" Staker.encoding))))
       in
       RPC_service.get_service
-        ~description:"Ongoing refufation games for a given staker"
-        ~query
+        ~description:"Ongoing refutation games for a given staker"
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "games")
+        RPC_path.(
+          path_sc_rollup / "games_with_staker" /: Sc_rollup.Staker.rpc_arg)
 
     let stakers_commitments =
       let output =
@@ -2238,10 +2232,10 @@ module Sc_rollup = struct
         Sc_rollup.list_unaccounted context)
 
   let register_ongoing_refutation_games () =
-    Registration.register1
+    Registration.register2
       ~chunked:false
       S.ongoing_refutation_games
-      (fun context rollup staker () ->
+      (fun context rollup staker () () ->
         let open Lwt_result_syntax in
         let open Sc_rollup.Game.Index in
         let open Sc_rollup.Refutation_storage in
@@ -2351,12 +2345,14 @@ module Sc_rollup = struct
       ()
 
   let ongoing_refutation_games ctxt block sc_rollup_address staker =
-    RPC_context.make_call1
+    RPC_context.make_call2
       S.ongoing_refutation_games
       ctxt
       block
       sc_rollup_address
       staker
+      ()
+      ()
 
   let stakers_commitments ctxt rollup =
     RPC_context.make_call1 S.stakers_commitments ctxt rollup

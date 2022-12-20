@@ -2723,7 +2723,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   let keep_going client =
     let* game =
       RPC.Client.call client
-      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_games
+      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_games_with_staker
            ~staker:bootstrap1_key
            sc_rollup_address
            ()

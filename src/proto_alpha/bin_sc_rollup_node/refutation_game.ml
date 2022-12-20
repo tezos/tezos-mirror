@@ -442,7 +442,6 @@ module Make (Interpreter : Interpreter.S) :
       (cctxt#chain, head_block)
       rollup_address
       self
-      ()
 
   let play_opening_move node_ctxt self conflict =
     let open Lwt_syntax in
