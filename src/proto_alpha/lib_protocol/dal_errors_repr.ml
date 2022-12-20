@@ -231,7 +231,7 @@ let () =
   let description = "A slot header for this slot was already proposed" in
   register_error_kind
     `Permanent
-    ~id:"dal_publish_slot_heade_duplicate"
+    ~id:"dal_publish_slot_header_duplicate"
     ~title:"DAL publish slot header duplicate"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)

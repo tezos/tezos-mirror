@@ -642,7 +642,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     RPC.Client.call client @@ RPC.get_chain_block_operations ()
   in
   let fees_error =
-    Failed {error_id = "proto.alpha.dal_publish_slot_heade_duplicate"}
+    Failed {error_id = "proto.alpha.dal_publish_slot_header_duplicate"}
   in
   let proof_error =
     Failed {error_id = "proto.alpha.dal_publish_slot_header_invalid_proof"}
