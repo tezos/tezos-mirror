@@ -372,10 +372,16 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
               Tezos_crypto.Context_hash.pp
               context_hash) ;
         let finished = function
-          | Ok (stats : Store.Gc.stats) ->
+          | Ok (stats : Irmin_pack_unix.Stats.Latest_gc.stats) ->
+              let total_duration =
+                Irmin_pack_unix.Stats.Latest_gc.total_duration stats
+              in
+              let finalise_duration =
+                Irmin_pack_unix.Stats.Latest_gc.finalise_duration stats
+              in
               Events.(emit ending_gc)
-                ( Time.System.Span.of_seconds_exn stats.duration,
-                  Time.System.Span.of_seconds_exn stats.finalisation_duration )
+                ( Time.System.Span.of_seconds_exn total_duration,
+                  Time.System.Span.of_seconds_exn finalise_duration )
           | Error (`Msg err) -> Events.(emit gc_failure) err
         in
         let commit_key = Store.Commit.key commit in

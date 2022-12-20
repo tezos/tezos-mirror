@@ -26,8 +26,8 @@
 #    new docker image with all the prebuilt dependencies will be
 #    created by the CI.
 #
-# 5. Update the variable `opam_repository_tag` in `scripts/version.sh` 
-#    and the variable `build_deps_image_version` in `.gitlab/ci/templates.yml` 
+# 5. Update the variable `opam_repository_tag` in `scripts/version.sh`
+#    and the variable `build_deps_image_version` in `.gitlab-ci.yml`
 #    with the hash of the newly created commit in `tezos/opam-repository`.
 #
 # 6. Enjoy your new dependencies

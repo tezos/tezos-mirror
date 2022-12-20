@@ -16,7 +16,7 @@ depends: [
   "resto-cohttp-self-serving-client" { >= "1.0" }
   "tezos-rpc-http-client"
   "tezos-shell-services"
-  "uri" { >= "2.2.0" }
+  "uri" { >= "3.1.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -77,7 +77,7 @@ let astring = external_lib ~js_compatible:true "astring" V.True
 let bigstring = external_lib ~js_compatible:true "bigstring" V.True
 
 let bigstringaf =
-  external_lib ~js_compatible:true "bigstringaf" V.(at_least "0.2.0")
+  external_lib ~js_compatible:true "bigstringaf" V.(at_least "0.5.0")
 
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
@@ -107,7 +107,7 @@ let caqti_dynload = external_lib "caqti-dynload" V.True
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
-let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "2.2.0")
+let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "4.0.0")
 
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
@@ -139,10 +139,6 @@ let data_encoding =
     ~main_module:"Data_encoding"
     "data-encoding"
     V.(at_least "0.7.1" && less_than "1.0.0")
-
-let digestif = external_lib ~js_compatible:true "digestif" V.(at_least "0.7.3")
-
-let digestif_c = external_sublib digestif "digestif.c"
 
 let dune_configurator = external_lib "dune-configurator" V.True
 
@@ -186,10 +182,10 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.4.3" && less_than "3.5.0")
+let irmin = external_lib "irmin" V.(at_least "3.5.0" && less_than "3.6.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "3.4.3" && less_than "3.5.0")
+  external_lib "irmin-pack" V.(at_least "3.5.0" && less_than "3.6.0")
 
 let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
@@ -211,7 +207,7 @@ let json_data_encoding =
   external_lib
     ~js_compatible:true
     "json-data-encoding"
-    V.(at_least "0.11" && less_than "0.13")
+    V.(at_least "0.12" && less_than "0.13")
 
 let logs = external_lib "logs" V.True
 
@@ -235,7 +231,7 @@ let lwt_unix = external_sublib lwt "lwt.unix"
 
 let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 
-let mtime = external_lib ~js_compatible:true "mtime" V.(at_least "1.0.0")
+let mtime = external_lib ~js_compatible:true "mtime" V.(at_least "1.2.0")
 
 let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
@@ -299,7 +295,7 @@ let qcheck_alcotest =
 
 let qcheck_core = external_lib "qcheck-core" V.True
 
-let re = external_lib ~js_compatible:true "re" V.(at_least "1.7.2")
+let re = external_lib ~js_compatible:true "re" V.(at_least "1.9.0")
 
 let resto_version = V.(at_least "1.0")
 
@@ -337,19 +333,19 @@ let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
 let tar = external_lib "tar" V.True
 
-let tar_unix = external_lib "tar-unix" V.(exactly "2.0.0")
+let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 
 let tezos_rust_lib =
   opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.2")
 
-let tls = external_lib "tls" V.(at_least "0.10")
+let tls = external_lib "tls" V.(at_least "0.13.0")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 
 (* Declare that we depend on the JS-compatible part of unix. *)
 let unix_js = external_lib ~opam:"base-unix" "unix" ~js_compatible:true V.True
 
-let uri = external_lib ~js_compatible:true "uri" V.(at_least "2.2.0")
+let uri = external_lib ~js_compatible:true "uri" V.(at_least "3.1.0")
 
 let utop = external_lib "utop" V.(at_least "2.8")
 
@@ -1731,11 +1727,10 @@ let octez_context_disk =
         octez_base |> open_ ~m:"TzPervasives";
         bigstringaf;
         fmt;
-        logs_fmt;
-        digestif_c;
         irmin;
         irmin_pack;
         irmin_pack_unix;
+        logs_fmt;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
         octez_context_sigs;
