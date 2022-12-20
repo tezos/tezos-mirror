@@ -3,24 +3,15 @@ module Test = struct
 
   let random_indices bound k =
     Random.self_init () ;
-
-    let rand_elt l =
-      let rec loop i = function
-        | true -> i
-        | false ->
-            let n = Random.int bound in
-            loop n (not @@ List.mem n l)
+    let indices = Array.init k (fun _ -> -1) in
+    for i = 0 to k - 1 do
+      let rec loop () =
+        let n = Random.int bound in
+        if Array.mem n indices then loop () else n
       in
-      loop 0 false
-    in
-
-    let rec aux l n =
-      match List.length l with
-      | x when x = n -> l
-      | _ -> aux (rand_elt l :: l) n
-    in
-
-    aux [] k
+      indices.(i) <- loop ()
+    done ;
+    indices
 
   let bench_DAL_crypto_params () =
     let open Tezos_error_monad.Error_monad.Result_syntax in
@@ -59,7 +50,6 @@ module Test = struct
           random_indices
             (number_of_shards - 1)
             (number_of_shards / redundancy_factor)
-          |> Array.of_list
         in
         let c =
           Seq.filter
