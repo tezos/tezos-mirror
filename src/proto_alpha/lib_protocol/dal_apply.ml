@@ -47,11 +47,11 @@ let slot_of_int_e n =
 let validate_attestation ctxt op =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
+  (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4462
+     Reconsider the ordering of checks. *)
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4163
      check the signature of the attestor as well *)
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4444
-     Move DAL committee check from [apply_attestation] to [validate_attestation]. *)
-  let Dal.Attestation.{attestor = _; attestation; level = given} = op in
+  let Dal.Attestation.{attestor; attestation; level = given} = op in
   let* max_index =
     slot_of_int_e @@ ((Constants.parametric ctxt).dal.number_of_slots - 1)
   in
@@ -69,15 +69,22 @@ let validate_attestation ctxt op =
       Compare.Int32.(delta_levels > 0l)
       (Dal_operation_for_old_level {current; given})
   in
+  let* () =
+    error_when
+      Compare.Int32.(delta_levels < 0l)
+      (Dal_operation_for_future_level {current; given})
+  in
   error_when
-    Compare.Int32.(delta_levels < 0l)
-    (Dal_operation_for_future_level {current; given})
+    (Option.is_none @@ Dal.Attestation.shards_of_attestor ctxt ~attestor)
+    (Dal_data_availibility_attestor_not_in_committee
+       {attestor; level = Level.current ctxt})
 
 let apply_attestation ctxt op =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let Dal.Attestation.{attestor; attestation; level = _} = op in
   match Dal.Attestation.shards_of_attestor ctxt ~attestor with
   | None ->
+      (* This should not happen: operation validation should have failed. *)
       let level = Level.current ctxt in
       error (Dal_data_availibility_attestor_not_in_committee {attestor; level})
   | Some shards ->
