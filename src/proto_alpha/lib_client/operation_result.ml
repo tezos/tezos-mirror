@@ -396,12 +396,12 @@ let pp_manager_operation_content (type kind) source ppf
         sc_rollup
         Tezos_crypto.Signature.Public_key_hash.pp
         staker
-  | Dal_publish_slot_header slot_header ->
+  | Dal_publish_slot_header operation ->
       Format.fprintf
         ppf
         "Data availability slot header publishing:@,Slot: %a"
-        Dal.Slot.Header.pp
-        slot_header.header
+        Dal.Operations.Publish_slot_header.pp
+        operation
   | Zk_rollup_origination _ ->
       Format.fprintf ppf "Epoxy origination:@,From: %a" Contract.pp source
   | Zk_rollup_publish _ ->
@@ -543,6 +543,9 @@ let pp_ticket_receipt ppf ticket_receipt =
         "@,@[<v 2>Ticket updates:@,%a@]"
         (Format.pp_print_list pp_item)
         ticket_updates
+
+let pp_slot_header ppf slot_header =
+  Format.fprintf ppf "@,@[%a@]" Dal.Slot.Header.pp slot_header
 
 let pp_consumed_gas ppf consumed_gas =
   Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
@@ -747,7 +750,8 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_balance_updates ppf balance_updates
   in
   let pp_dal_publish_slot_header_result
-      (Dal_publish_slot_header_result {consumed_gas}) =
+      (Dal_publish_slot_header_result {slot_header; consumed_gas}) =
+    pp_slot_header ppf slot_header ;
     pp_consumed_gas ppf consumed_gas
   in
   let pp_sc_rollup_originate_result

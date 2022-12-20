@@ -2910,7 +2910,13 @@ module Dal : sig
     number_of_shards : int;
   }
 
-  (** This module re-exports definitions from {!Dal_slot_repr.Index}. *)
+  type cryptobox
+
+  val make : context -> cryptobox tzresult
+
+  val number_of_slots : context -> int
+
+  (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
     type t
 
@@ -3037,8 +3043,6 @@ module Dal : sig
 
       type t = {id : id; commitment : Commitment.t}
 
-      type operation = {header : t; proof : Commitment_proof.t}
-
       val id_encoding : id Data_encoding.t
 
       val encoding : t Data_encoding.t
@@ -3048,11 +3052,9 @@ module Dal : sig
       val pp : Format.formatter -> t -> unit
 
       val equal : t -> t -> bool
-
-      val verify_commitment : parameters -> operation -> bool tzresult
     end
 
-    val register_slot_header : context -> Header.t -> (context * bool) tzresult
+    val register_slot_header : context -> Header.t -> context tzresult
 
     val find_slot_headers :
       context -> Raw_level.t -> Header.t list option tzresult Lwt.t
@@ -3061,6 +3063,30 @@ module Dal : sig
 
     val finalize_pending_slot_headers :
       context -> (context * Attestation.t) tzresult Lwt.t
+  end
+
+  module Operations : sig
+    module Publish_slot_header : sig
+      type t = {
+        published_level : Raw_level.t;
+        slot_index : Slot_index.t;
+        commitment : Slot.Commitment.t;
+        commitment_proof : Slot.Commitment_proof.t;
+      }
+
+      val encoding : t Data_encoding.t
+
+      val pp : Format.formatter -> t -> unit
+
+      val check_level : current_level:Raw_level.t -> t -> unit tzresult
+
+      val slot_header :
+        cryptobox:cryptobox ->
+        number_of_slots:int ->
+        current_level:Raw_level.t ->
+        t ->
+        Slot.Header.t tzresult
+    end
   end
 
   module Slots_history : sig
@@ -3094,7 +3120,7 @@ module Dal : sig
   end
 
   module Slots_storage : sig
-    val get_slot_headers_history : t -> Slots_history.t tzresult Lwt.t
+    val get_slot_headers_history : context -> Slots_history.t tzresult Lwt.t
   end
 end
 
@@ -3123,7 +3149,8 @@ module Dal_errors : sig
     | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
     | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
     | Dal_publish_slot_header_invalid_proof of {
-        slot_header : Dal.Slot.Header.operation;
+        commitment : Dal.Slot.Commitment.t;
+        commitment_proof : Dal.Slot.Commitment_proof.t;
       }
     | Dal_data_availibility_attestor_not_in_committee of {
         attestor : Signature.Public_key_hash.t;
@@ -3137,6 +3164,7 @@ module Dal_errors : sig
         current : Raw_level.t;
         given : Raw_level.t;
       }
+    | Dal_cryptobox_error of {explanation : string}
 end
 
 (** This module re-exports definitions from {!Sc_rollup_storage} and
@@ -4687,7 +4715,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header :
-      Dal.Slot.Header.operation
+      Dal.Operations.Publish_slot_header.t
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;

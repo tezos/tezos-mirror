@@ -25,6 +25,7 @@
 
 open Protocol
 module S = Dal_slot_repr
+module Slot_index = Dal_slot_index_repr
 module P = S.Page
 module Hist = S.History
 module Ihist = Hist.Internal_for_tests
@@ -107,7 +108,7 @@ struct
     | Error `Segment_index_out_of_range ->
         fail [Test_failure "compute_proof_segment: Segment_index_out_of_range"]
 
-  let mk_slot ?(level = level_one) ?(index = S.Index.zero)
+  let mk_slot ?(level = level_one) ?(index = Slot_index.zero)
       ?(fill_function = fun _i -> 'x') () =
     let open Result_syntax in
     let slot_data = Bytes.init params.slot_size fill_function in
@@ -142,8 +143,8 @@ struct
 
   let succ_slot_index index =
     Option.value_f
-      S.Index.(of_int_opt (to_int index + 1))
-      ~default:(fun () -> S.Index.zero)
+      Slot_index.(of_int_opt (to_int index + 1))
+      ~default:(fun () -> Slot_index.zero)
 
   let next_char c = Char.(chr ((code c + 1) mod 255))
 

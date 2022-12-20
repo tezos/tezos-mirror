@@ -58,8 +58,11 @@ let dal_enable_param dal_enable =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ~parameter_file ~protocol ?(event_sections_levels = [])
-    ?(node_arguments = []) () =
+let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
+    ?(event_sections_levels = []) ?(node_arguments = []) () =
+  (* Temporary setup to initialise the node. *)
+  let base = Either.right (protocol, None) in
+  let* parameter_file = Protocol.write_parameter_file ~base parameters in
   let* client = Client.init_mockup ~parameter_file ~protocol () in
   let nodes_args =
     Node.
@@ -86,13 +89,26 @@ let setup_node ~parameter_file ~protocol ?(event_sections_levels = [])
   let* () = Node.run node ~event_sections_levels node_arguments in
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in
+  let* additional_account_keys =
+    Client.stresstest_gen_keys additional_bootstrap_accounts client
+  in
+  let additional_bootstrap_accounts =
+    List.map (fun x -> (x, None)) additional_account_keys
+  in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~additional_bootstrap_accounts
+      ~base
+      parameters
+  in
   let* () =
     Client.activate_protocol_and_wait ~parameter_file ~protocol client
   in
   return (node, client, dal_parameters)
 
-let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
-    ?dal_enable ?event_sections_levels ?node_arguments f ~protocol =
+let with_layer1 ?additional_bootstrap_accounts ?(attestation_lag = 1)
+    ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
+    ?node_arguments f ~protocol =
   let parameters =
     make_int_parameter
       ["dal_parametric"; "attestation_lag"]
@@ -108,13 +124,12 @@ let with_layer1 ?(attestation_lag = 1) ?commitment_period ?challenge_window
     @ dal_enable_param dal_enable
     @ [(["sc_rollup_enable"], `Bool true)]
   in
-  let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base parameters in
   let* node, client, dal_parameters =
     setup_node
-      ~parameter_file
+      ?additional_bootstrap_accounts
       ?event_sections_levels
       ?node_arguments
+      ~parameters
       ~protocol
       ()
   in
@@ -381,10 +396,7 @@ let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?level ?fee
   let _commitment, proof =
     Rollup.Dal.(Commitment.dummy_commitment cryptobox "b")
   in
-  let error =
-    rex ~opts:[`Dotall] "The slot header's commitment proof does not check"
-  in
-  publish_slot ~source ?level ?fee ~error ~index ~commitment ~proof
+  publish_slot ~source ?level ?fee ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for the "same"
    slot contents but represented using a different [slot_size] leads
@@ -405,10 +417,7 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?level
   let _commitment, proof =
     Rollup.Dal.(Commitment.dummy_commitment cryptobox' msg)
   in
-  let error =
-    rex ~opts:[`Dotall] "The slot header's commitment proof does not check"
-  in
-  publish_slot ~source ?level ?fee ~error ~index ~commitment ~proof
+  publish_slot ~source ?level ?fee ~index ~commitment ~proof
 
 let publish_slot_header ~source ?(fee = 1200) ~index ~commitment ~proof node
     client =
@@ -521,6 +530,8 @@ let check_dal_raw_context node =
 let test_slot_management_logic _protocol parameters cryptobox node client
     _bootstrap_key =
   Log.info "Inject some invalid slot headers" ;
+  let*! () = Client.reveal ~src:"bootstrap6" client in
+  let* () = Client.bake_for_and_wait client in
   let* (`OpHash _) =
     let error =
       rex ~opts:[`Dotall] "Unexpected level in the future in slot header"
@@ -528,7 +539,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     publish_dummy_slot
       ~source:Constant.bootstrap5
       ~fee:3_000
-      ~level:3
+      ~level:4
       ~index:2
       ~message:"a"
       ~error
@@ -543,31 +554,10 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     publish_dummy_slot
       ~source:Constant.bootstrap5
       ~fee:3_000
-      ~level:1
+      ~level:2
       ~index:2
       ~message:"a"
       ~error
-      cryptobox
-      node
-      client
-  in
-  let* (`OpHash _) =
-    publish_dummy_slot_with_wrong_proof_for_same_content
-      ~source:Constant.bootstrap5
-      ~fee:3_000
-      ~level:2
-      ~index:2
-      cryptobox
-      node
-      client
-  in
-  let* (`OpHash _) =
-    publish_dummy_slot_with_wrong_proof_for_different_slot_size
-      ~source:Constant.bootstrap5
-      ~fee:3_000
-      ~level:2
-      ~index:2
-      parameters
       cryptobox
       node
       client
@@ -613,9 +603,32 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       node
       client
   in
+  let* (`OpHash oph5) =
+    publish_dummy_slot_with_wrong_proof_for_same_content
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:3
+      ~index:2
+      cryptobox
+      node
+      client
+  in
+  (* Check another operation now because we are lacking of bootstrap accounts. *)
+  let* bootstrap6 = Client.show_address ~alias:"bootstrap6" client in
+  let* (`OpHash oph6) =
+    publish_dummy_slot_with_wrong_proof_for_different_slot_size
+      ~source:bootstrap6
+      ~fee:3_000
+      ~level:3
+      ~index:2
+      parameters
+      cryptobox
+      node
+      client
+  in
   let* mempool = Mempool.get_mempool client in
   let expected_mempool =
-    Mempool.{empty with applied = [oph1; oph2; oph3; oph4]}
+    Mempool.{empty with applied = [oph1; oph2; oph3; oph4; oph5; oph6]}
   in
   Check.(
     (mempool = expected_mempool)
@@ -631,6 +644,9 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   let fees_error =
     Failed {error_id = "proto.alpha.dal_publish_slot_heade_duplicate"}
   in
+  let proof_error =
+    Failed {error_id = "proto.alpha.dal_publish_slot_header_invalid_proof"}
+  in
   (* The baker sorts operations fee wise. Consequently order of
      application for the operations will be: oph3 > oph2 > oph4 > oph1
 
@@ -639,6 +655,8 @@ let test_slot_management_logic _protocol parameters cryptobox node client
      Flor slot1, oph2 is applied first. *)
   check_manager_operation_status operations_result fees_error oph1 ;
   check_manager_operation_status operations_result fees_error oph4 ;
+  check_manager_operation_status operations_result proof_error oph5 ;
+  check_manager_operation_status operations_result proof_error oph6 ;
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
   let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in

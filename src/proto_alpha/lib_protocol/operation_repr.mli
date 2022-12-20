@@ -495,7 +495,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header :
-      Dal_slot_repr.Header.operation
+      Dal_operations_repr.Publish_slot_header.t
       -> Kind.dal_publish_slot_header manager_operation
       (** [Sc_rollup_originate] allows an implicit account to originate a new
           smart contract rollup (initialized with a given boot sector).

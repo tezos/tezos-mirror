@@ -1568,38 +1568,19 @@ module Sc_rollup_in_memory_inbox = struct
 end
 
 module Dal = struct
-  type error +=
-    | Dal_register_invalid_slot_header of {
-        length : int;
-        slot_header : Dal_slot_repr.Header.t;
-      }
+  type cryptobox = Dal.t
 
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"dal_register_invalid_slot"
-      ~title:"Dal register invalid slot"
-      ~description:
-        "Attempt to register a slot which is invalid (the index is out of \
-         bounds)."
-      ~pp:(fun ppf (length, slot) ->
-        Format.fprintf
-          ppf
-          "The slot provided is invalid. Slot index should be between 0 and \
-           %d. Found: %a."
-          length
-          Dal_slot_repr.Index.pp
-          slot.Dal_slot_repr.Header.id.index)
-      Data_encoding.(
-        obj2
-          (req "length" int31)
-          (req "slot_header" Dal_slot_repr.Header.encoding))
-      (function
-        | Dal_register_invalid_slot_header {length; slot_header} ->
-            Some (length, slot_header)
-        | _ -> None)
-      (fun (length, slot_header) ->
-        Dal_register_invalid_slot_header {length; slot_header})
+  let make ctxt =
+    let open Result_syntax in
+    let Constants_parametric_repr.{dal = {cryptobox_parameters; _}; _} =
+      ctxt.back.constants
+    in
+    match Dal.make cryptobox_parameters with
+    | Ok cryptobox -> return cryptobox
+    | Error (`Fail explanation) ->
+        error (Dal_errors_repr.Dal_cryptobox_error {explanation})
+
+  let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
 
   let record_attested_shards ctxt attestation shards =
     let dal_attestation_slot_accountability =
@@ -1620,9 +1601,14 @@ module Dal = struct
         let length =
           Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
         in
-        error (Dal_register_invalid_slot_header {length; slot_header})
+        error
+          (Dal_errors_repr.Dal_register_invalid_slot_header
+             {length; slot_header})
     | Some (dal_slot_fee_market, updated) ->
-        ok ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
+        if not updated then
+          error
+            (Dal_errors_repr.Dal_publish_slot_header_duplicate {slot_header})
+        else ok {ctxt with back = {ctxt.back with dal_slot_fee_market}}
 
   let candidates ctxt =
     Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market

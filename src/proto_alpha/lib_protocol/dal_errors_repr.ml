@@ -36,8 +36,8 @@ type error +=
       expected : Raw_level_repr.t;
     }
   | Dal_publish_slot_header_invalid_index of {
-      given : Dal_slot_repr.Index.t;
-      maximum : Dal_slot_repr.Index.t;
+      given : Dal_slot_index_repr.t;
+      maximum : Dal_slot_index_repr.t;
     }
   | Dal_publish_slot_header_candidate_with_low_fees of {
       proposed_fees : Tez_repr.t;
@@ -45,7 +45,8 @@ type error +=
   | Dal_attestation_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
   | Dal_publish_slot_header_invalid_proof of {
-      slot_header : Dal_slot_repr.Header.operation;
+      commitment : Dal.commitment;
+      commitment_proof : Dal.commitment_proof;
     }
   | Dal_data_availibility_attestor_not_in_committee of {
       attestor : Signature.Public_key_hash.t;
@@ -58,6 +59,11 @@ type error +=
   | Dal_operation_for_future_level of {
       current : Raw_level_repr.t;
       given : Raw_level_repr.t;
+    }
+  | Dal_cryptobox_error of {explanation : string}
+  | Dal_register_invalid_slot_header of {
+      length : int;
+      slot_header : Dal_slot_repr.Header.t;
     }
 
 let () =
@@ -101,8 +107,8 @@ let () =
         ppf
         "%s: Maximum allowed %a."
         description
-        Dal_slot_repr.Index.pp
-        Dal_slot_repr.Index.max_value)
+        Dal_slot_index_repr.pp
+        Dal_slot_index_repr.max_value)
     Data_encoding.unit
     (function Dal_slot_index_above_hard_limit -> Some () | _ -> None)
     (fun () -> Dal_slot_index_above_hard_limit) ;
@@ -165,13 +171,13 @@ let () =
         ppf
         "%s: Given %a. Maximum %a."
         description
-        Dal_slot_repr.Index.pp
+        Dal_slot_index_repr.pp
         given
-        Dal_slot_repr.Index.pp
+        Dal_slot_index_repr.pp
         maximum)
     (obj2
-       (req "given" Dal_slot_repr.Index.encoding)
-       (req "got" Dal_slot_repr.Index.encoding))
+       (req "given" Dal_slot_index_repr.encoding)
+       (req "got" Dal_slot_index_repr.encoding))
     (function
       | Dal_publish_slot_header_invalid_index {given; maximum} ->
           Some (given, maximum)
@@ -241,11 +247,15 @@ let () =
     ~title:"DAL publish slot header invalid proof"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
-    Dal_slot_repr.Header.operation_encoding
+    (obj2
+       (req "commitment" Dal.Commitment.encoding)
+       (req "commitment_proof" Dal.Commitment_proof.encoding))
     (function
-      | Dal_publish_slot_header_invalid_proof {slot_header} -> Some slot_header
+      | Dal_publish_slot_header_invalid_proof {commitment; commitment_proof} ->
+          Some (commitment, commitment_proof)
       | _ -> None)
-    (fun slot_header -> Dal_publish_slot_header_invalid_proof {slot_header}) ;
+    (fun (commitment, commitment_proof) ->
+      Dal_publish_slot_header_invalid_proof {commitment; commitment_proof}) ;
   register_error_kind
     `Outdated
     ~id:"Dal_operation_for_old_level"
@@ -310,4 +320,39 @@ let () =
           Some (attestor, level)
       | _ -> None)
     (fun (attestor, level) ->
-      Dal_data_availibility_attestor_not_in_committee {attestor; level})
+      Dal_data_availibility_attestor_not_in_committee {attestor; level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal_cryptobox_error"
+    ~title:"DAL cryptobox error"
+    ~description:"Error occurred while initialising the cryptobox"
+    ~pp:(fun ppf e -> Format.fprintf ppf "Dal commitment proof error: %s" e)
+    (obj1 (req "error" (string Plain)))
+    (function
+      | Dal_cryptobox_error {explanation} -> Some explanation | _ -> None)
+    (fun explanation -> Dal_cryptobox_error {explanation}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal_register_invalid_slot"
+    ~title:"Dal register invalid slot"
+    ~description:
+      "Attempt to register a slot which is invalid (the index is out of \
+       bounds)."
+    ~pp:(fun ppf (length, slot) ->
+      Format.fprintf
+        ppf
+        "The slot provided is invalid. Slot index should be between 0 and %d. \
+         Found: %a."
+        length
+        Dal_slot_index_repr.pp
+        slot.Dal_slot_repr.Header.id.index)
+    Data_encoding.(
+      obj2
+        (req "length" int31)
+        (req "slot_header" Dal_slot_repr.Header.encoding))
+    (function
+      | Dal_register_invalid_slot_header {length; slot_header} ->
+          Some (length, slot_header)
+      | _ -> None)
+    (fun (length, slot_header) ->
+      Dal_register_invalid_slot_header {length; slot_header})

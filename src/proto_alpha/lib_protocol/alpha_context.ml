@@ -107,9 +107,10 @@ end
 
 module Dal = struct
   include Dal_slot_repr
+  include Raw_context.Dal
 
   module Slot_index = struct
-    include Dal_slot_repr.Index
+    include Dal_slot_index_repr
   end
 
   module Attestation = struct
@@ -119,7 +120,7 @@ module Dal = struct
 
   type slot_id = Dal_slot_repr.Header.id = {
     published_level : Raw_level_repr.t;
-    index : Dal_slot_repr.Index.t;
+    index : Dal_slot_index_repr.t;
   }
 
   module Page = struct
@@ -130,6 +131,10 @@ module Dal = struct
     include Dal_slot_repr
     include Dal_slot_storage
     include Raw_context.Dal
+  end
+
+  module Operations = struct
+    include Dal_operations_repr
   end
 
   module Slots_history = Dal_slot_repr.History

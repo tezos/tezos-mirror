@@ -394,6 +394,12 @@ module Sc_rollup_in_memory_inbox : sig
 end
 
 module Dal : sig
+  type cryptobox = Dal.t
+
+  val make : t -> cryptobox tzresult
+
+  val number_of_slots : t -> int
+
   (** [record_attested_shards ctxt attestation shards] records that the
      list of shards [shards] were attested (declared available by some
      attestor). The function assumes that a shard belongs to the
@@ -407,7 +413,7 @@ module Dal : sig
      the candidate is registered. [Some (ctxt,false)] if another
      candidate was already registered previously. Returns an error if
      the slot is invalid. *)
-  val register_slot_header : t -> Dal_slot_repr.Header.t -> (t * bool) tzresult
+  val register_slot_header : t -> Dal_slot_repr.Header.t -> t tzresult
 
   (** [candidates ctxt] returns the current list of slot for which
      there is at least one candidate. *)
@@ -417,7 +423,7 @@ module Dal : sig
      [slot_index] is declared available by the protocol. [false]
      otherwise. If the [index] is out of the interval
      [0;number_of_slots - 1], returns [false]. *)
-  val is_slot_index_available : t -> Dal_slot_repr.Index.t -> bool
+  val is_slot_index_available : t -> Dal_slot_index_repr.t -> bool
 
   (** [shards_of_attestor ctxt ~attestor] returns the shard assignment
      of the DAL committee of the current level for [attestor]. This

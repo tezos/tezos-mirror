@@ -653,12 +653,12 @@ let generate_transfer_ticket =
 
 let generate_dal_publish_slot_header =
   let published_level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
-  let index = Alpha_context.Dal.Slot_index.zero in
+  let slot_index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
-  let proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
   let slot_header =
-    Alpha_context.Dal.Slot.Header.
-      {header = {id = {published_level; index}; commitment}; proof}
+    Alpha_context.Dal.Operations.Publish_slot_header.
+      {published_level; slot_index; commitment; commitment_proof}
   in
   QCheck2.Gen.pure (Dal_publish_slot_header slot_header)
 

@@ -56,95 +56,29 @@ module Commitment_proof = struct
   let zero = Dal.Commitment_proof.zero
 end
 
-module Index = struct
-  type t = int
-
-  let max_value = 255
-
-  let encoding = Data_encoding.uint8
-
-  let pp = Format.pp_print_int
-
-  let zero = 0
-
-  type error += Invalid_slot_index of {given : int; min : int; max : int}
-
-  let () =
-    let open Data_encoding in
-    register_error_kind
-      `Permanent
-      ~id:"dal_slot_repr.index.invalid_index"
-      ~title:"Invalid Dal slot index"
-      ~description:
-        "The given index is out of range of representable slot indices"
-      ~pp:(fun ppf (given, min, max) ->
-        Format.fprintf
-          ppf
-          "The given index %d is out of range of representable slot indices \
-           [%d, %d]"
-          given
-          min
-          max)
-      (obj3 (req "given" int31) (req "min" int31) (req "max" int31))
-      (function
-        | Invalid_slot_index {given; min; max} -> Some (given, min, max)
-        | _ -> None)
-      (fun (given, min, max) -> Invalid_slot_index {given; min; max})
-
-  let check_is_in_range slot_index =
-    error_unless
-      Compare.Int.(slot_index >= zero && slot_index <= max_value)
-      (Invalid_slot_index {given = slot_index; min = zero; max = max_value})
-
-  let of_int slot_index =
-    let open Result_syntax in
-    let* () = check_is_in_range slot_index in
-    return slot_index
-
-  let of_int_opt slot_index = Option.of_result @@ of_int slot_index
-
-  let to_int slot_index = slot_index [@@ocaml.inline always]
-
-  let to_int_list l = l [@@ocaml.inline always]
-
-  let compare = Compare.Int.compare
-
-  let equal = Compare.Int.equal
-
-  let slots_range ~lower ~upper =
-    let open Result_syntax in
-    let* () = check_is_in_range lower in
-    let* () = check_is_in_range upper in
-    return Misc.(lower --> upper)
-
-  let slots_range_opt ~lower ~upper =
-    Option.of_result @@ slots_range ~lower ~upper
-end
-
 module Header = struct
-  type id = {published_level : Raw_level_repr.t; index : Index.t}
+  type id = {published_level : Raw_level_repr.t; index : Dal_slot_index_repr.t}
 
   type t = {id : id; commitment : Commitment.t}
 
-  type operation = {header : t; proof : Commitment_proof.t}
-
   let slot_id_equal {published_level; index} s2 =
     Raw_level_repr.equal published_level s2.published_level
-    && Index.equal index s2.index
+    && Dal_slot_index_repr.equal index s2.index
 
   let equal {id; commitment} s2 =
     slot_id_equal id s2.id && Commitment.equal commitment s2.commitment
 
   let compare_slot_id {published_level; index} s2 =
     let c = Raw_level_repr.compare published_level s2.published_level in
-    if Compare.Int.(c <> 0) then c else Index.compare index s2.index
+    if Compare.Int.(c <> 0) then c
+    else Dal_slot_index_repr.compare index s2.index
 
   let zero_id =
     {
       (* We don't expect to have any published slot at level
          Raw_level_repr.root. *)
       published_level = Raw_level_repr.root;
-      index = Index.zero;
+      index = Dal_slot_index_repr.zero;
     }
 
   let zero = {id = zero_id; commitment = Commitment.zero}
@@ -156,7 +90,7 @@ module Header = struct
       (fun (published_level, index) -> {published_level; index})
       (obj2
          (req "level" Raw_level_repr.encoding)
-         (req "index" Data_encoding.uint8))
+         (req "index" Dal_slot_index_repr.encoding))
 
   let encoding =
     let open Data_encoding in
@@ -165,59 +99,28 @@ module Header = struct
       (fun (id, commitment) -> {id; commitment})
       (merge_objs id_encoding (obj1 (req "commitment" Commitment.encoding)))
 
-  let operation_encoding =
-    let open Data_encoding in
-    conv
-      (fun {header = {id; commitment}; proof} -> (id, (commitment, proof)))
-      (fun (id, (commitment, proof)) -> {header = {id; commitment}; proof})
-      (merge_objs
-         id_encoding
-         (obj2
-            (req "commitment" Commitment.encoding)
-            (req "commitment_proof" Commitment_proof.encoding)))
-
   let pp_id fmt {published_level; index} =
     Format.fprintf
       fmt
       "published_level: %a, index: %a"
       Raw_level_repr.pp
       published_level
-      Format.pp_print_int
+      Dal_slot_index_repr.pp
       index
 
   let pp fmt {id; commitment = c} =
     Format.fprintf fmt "id:(%a), commitment: %a" pp_id id Commitment.pp c
 
-  type error += Dal_commitment_proof_error of string
-
-  let () =
-    let open Data_encoding in
-    register_error_kind
-      `Permanent
-      ~id:"dal_slot_repr.dal_commitment_proof_error"
-      ~title:"Dal commitment proof error"
-      ~description:"Error occurred during Dal commitment proof validation"
-      ~pp:(fun ppf e -> Format.fprintf ppf "Dal commitment proof error: %s" e)
-      (obj1 (req "error" (string Plain)))
-      (function Dal_commitment_proof_error e -> Some e | _ -> None)
-      (fun e -> Dal_commitment_proof_error e)
-
-  let verify_commitment dal_params {header = {commitment; _}; proof} =
-    let open Result_syntax in
-    let* dal =
-      match Dal.make dal_params with
-      | Ok dal -> return dal
-      | Error (`Fail s) -> error (Dal_commitment_proof_error s)
-    in
-    return @@ Dal.verify_commitment dal commitment proof
+  let verify_commitment cryptobox commitment proof =
+    ok (Dal.verify_commitment cryptobox commitment proof)
 end
 
-module Slot_index = Index
+module Slot_index = Dal_slot_index_repr
 
 module Page = struct
   type content = Bytes.t
 
-  type slot_index = Index.t
+  type slot_index = Dal_slot_index_repr.t
 
   let pages_per_slot = Dal.pages_per_slot
 
@@ -282,7 +185,7 @@ module Slot_market = struct
      Think harder about this data structure and whether it can be
      optimized. *)
 
-  module Slot_index_map = Map.Make (Index)
+  module Slot_index_map = Map.Make (Dal_slot_index_repr)
 
   type t = {length : int; slot_headers : Header.t Slot_index_map.t}
 
@@ -299,7 +202,8 @@ module Slot_market = struct
     if
       not
         Compare.Int.(
-          0 <= new_slot_header.id.index && new_slot_header.id.index < t.length)
+          0 <= Dal_slot_index_repr.to_int new_slot_header.id.index
+          && Dal_slot_index_repr.to_int new_slot_header.id.index < t.length)
     then None
     else
       let has_changed = ref false in
