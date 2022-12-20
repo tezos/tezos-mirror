@@ -1622,7 +1622,10 @@ module Dal = struct
         in
         error (Dal_register_invalid_slot_header {length; slot_header})
     | Some (dal_slot_fee_market, updated) ->
-        ok ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
+        if not updated then
+          error
+            (Dal_errors_repr.Dal_publish_slot_header_duplicate {slot_header})
+        else ok {ctxt with back = {ctxt.back with dal_slot_fee_market}}
 
   let candidates ctxt =
     Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market

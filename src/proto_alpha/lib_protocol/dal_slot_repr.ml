@@ -112,7 +112,7 @@ module Header = struct
     Format.fprintf fmt "id:(%a), commitment: %a" pp_id id Commitment.pp c
 
   let verify_commitment cryptobox commitment proof =
-    return (Dal.verify_commitment cryptobox commitment proof)
+    ok (Dal.verify_commitment cryptobox commitment proof)
 end
 
 module Slot_index = Dal_slot_index_repr

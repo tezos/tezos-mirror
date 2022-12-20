@@ -407,7 +407,7 @@ module Dal : sig
      the candidate is registered. [Some (ctxt,false)] if another
      candidate was already registered previously. Returns an error if
      the slot is invalid. *)
-  val register_slot_header : t -> Dal_slot_repr.Header.t -> (t * bool) tzresult
+  val register_slot_header : t -> Dal_slot_repr.Header.t -> t tzresult
 
   (** [candidates ctxt] returns the current list of slot for which
      there is at least one candidate. *)

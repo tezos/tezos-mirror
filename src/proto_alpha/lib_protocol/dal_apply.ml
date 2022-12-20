@@ -129,9 +129,8 @@ let apply_publish_slot_header ctxt operation =
       ~current_level
       operation
   in
-  Dal.Slot.register_slot_header ctxt slot_header >>? fun (ctxt, updated) ->
-  if updated then ok (ctxt, slot_header)
-  else error (Dal_publish_slot_header_duplicate {slot_header})
+  let* ctxt = Dal.Slot.register_slot_header ctxt slot_header in
+  return (ctxt, slot_header)
 
 let finalisation ctxt =
   only_if_dal_feature_enabled
