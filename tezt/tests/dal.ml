@@ -1012,9 +1012,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* Slots waiting for attestation. *)
   let* () = check_get_commitment get_commitment_succeeds ok in
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds "waiting_for_attestations")
-      ok
+    check_get_commitment_headers (get_headers_succeeds "waiting_attestation") ok
   in
   (* slot_2_a is not selected. *)
   let* () =

@@ -52,30 +52,22 @@ module Types : sig
   (** An ID associated to a slot or to its commitment. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
-  (** The status of a header successfully included in a block. The status can
-      take one of the values below. *)
-  type header_attestation_status =
-    [ `Waiting_for_attestations
+  (** The status of a header a DAL node is aware of: *)
+  type header_status =
+    [ `Waiting_attestation
       (** The slot header was included and applied in an L1 block but remains to
           be attested. *)
     | `Attested
       (** The slot header was included in an L1 block and attested. *)
     | `Unattested
       (** The slot header was included in an L1 block but not timely attested. *)
-    ]
-
-  (** The status of a header a DAL node is aware of: *)
-  type header_status =
-    [ `Not_selected
+    | `Not_selected
       (** The slot header was included in an L1 block but was not selected as
           the slot header for that slot index. *)
-    | `Unseen
-      (** The slot header was never seen in an L1 block. For instance, this
+    | `Unseen ]
+  (** The slot header was never seen in an L1 block. For instance, this
           could happen if the RPC `PATCH /slots/<commitment>` was called but the
           corresponding slot header was never included into a block. *)
-    | header_attestation_status ]
-  (** The slot header was successfully included in a block. see
-      {!header_attestation_status} for more details. *)
 
   (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in *)
@@ -91,21 +83,7 @@ module Types : sig
 
   val slot_id_encoding : slot_id Data_encoding.t
 
-  (** Return the string representation for values of type
-      {!header_attestation_status}. *)
-  val header_attestation_status_to_string : header_attestation_status -> string
-
-  (** Convert the string to the correponding value of type
-      {!header_attestation_status}. Return {!None} in case of mismatch. *)
-  val header_attestation_status_of_string :
-    string -> header_attestation_status option
-
-  (** Return the string representation for values of type {!header_status}. *)
-  val header_status_to_string : header_status -> string
-
-  (** Convert the string to the correponding value of type
-    {!header_status}. Return {!None} in case of mismatch. *)
-  val header_status_of_string : string -> header_status option
+  val header_status_encoding : header_status Data_encoding.t
 
   val profile_encoding : profile Data_encoding.t
 
