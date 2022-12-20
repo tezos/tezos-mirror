@@ -1023,7 +1023,7 @@ let prepare_first_block ~level ~timestamp ctxt =
       let sc_rollup =
         Constants_parametric_repr.
           {
-            enable = c.sc_rollup.enable;
+            enable = true;
             arith_pvm_enable = false;
             origination_size = c.sc_rollup.origination_size;
             challenge_window_in_blocks = 80_640;

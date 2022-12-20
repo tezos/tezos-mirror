@@ -232,7 +232,7 @@ let constants_mainnet =
     sc_rollup =
       (let commitment_period_in_blocks = 60 in
        {
-         enable = false;
+         enable = true;
          arith_pvm_enable = false;
          (* The following value is chosen to prevent spam. *)
          origination_size = 6_314;
