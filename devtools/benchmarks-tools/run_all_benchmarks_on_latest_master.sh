@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+# Using bash so that we are able to use the time program.
 
 #############################################################################
 #                                                                           #
@@ -44,17 +45,20 @@ dated_log "Starting benchmarks processes"
 # commit.
 cd /data/tezos-benchmarks/tezos
 rm -rf _opam
-echo "Pulling repository."
+dated_log "Pulling repository."
 git pull
 HEADCOMMIT=$(git describe --always --dirty --long)
-echo "HEAD is $HEADCOMMIT"
+dated_log "HEAD is $HEADCOMMIT"
 
 SNOOP_RESULT_DIR="snoop_results/_snoop_${TODAY}_${HEADCOMMIT}"
 
 # Create the result directory and register its name for tools that depend on it.
+# Also create a status file for a quick check from human beings.
 cd ..
 echo "$SNOOP_RESULT_DIR" > current_run_dir
+mkdir -p snoop_results
 mkdir "$SNOOP_RESULT_DIR"
+echo $$ > "$SNOOP_RESULT_DIR"/STARTED
 
 # Build dependencies.
 # opam's solver can timeout sometimes, which does not mean that the remaining
@@ -65,7 +69,7 @@ cd tezos
 dated_log "Compiling dependencies"
 . "/home/mclaren/.cargo/env"
 make BLST_PORTABLE=y build-dev-deps || true
-if [ -d _opam/share/zcash-params ]; then echo "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
+if [ -d _opam/share/zcash-params ]; then dated_log "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
 eval "$(opam env)"
 
 # Build Tezos
@@ -82,9 +86,17 @@ cd ..
 mv tezos/_snoop/*_results "$SNOOP_RESULT_DIR"/
 chmod +rx "$SNOOP_RESULT_DIR"/*_results
 
-# Change the file containing the name of the result directory.
-# This allows to use current_run_dir and last_run_dir as markers of the
-# benchmarks being run (current_run_dir) or finished (last_run_dir).
+# Save results in the cloud.
+dated_log "Uploading results"
+aws s3 cp "$SNOOP_RESULT_DIR"/ s3://snoop-playground/mclaren/complete_results/"$SNOOP_RESULT_DIR"/ --recursive
+dated_log "Uploading CSVs"
+aws s3 cp "$SNOOP_RESULT_DIR"/inference_results/ s3://snoop-playground/mclaren/inference_csvs/"$SNOOP_RESULT_DIR"/ --recursive --exclude "*" --include "*.csv"
+dated_log "Results and CSVs uploaded"
+
+# Update the directory of the last successful run, and its status.
 mv current_run_dir last_run_dir
+echo $$ > "$SNOOP_RESULT_DIR"/SUCCESS
+aws s3 cp "$SNOOP_RESULT_DIR"/SUCCESS s3://snoop-playground/mclaren/complete_results/"$SNOOP_RESULT_DIR"/
 
 dated_log "End of benchmarks processes"
+exit 0

@@ -27,6 +27,8 @@ On the reference machine, the benchmarks directory should look like this:
           - inference_results/
           - cron_res
           - cron_res_errors
+          - STARTED
+          - SUCCESS
   - tezos/
       - _snoop/
           - michelson_data/
@@ -38,18 +40,32 @@ On the reference machine, the benchmarks directory should look like this:
   - cron_res_errors
   - current_run_dir
   - last_run_dir
+  - anomalies
 ```
 
-- `cronjob.sh` is the main script run by Cron. Its sources are in this repository and needs to be copied to the reference machine whenever it is updated.
-- `run_all_benchmarks_on_latest_master.sh` is the script actually launching the benchmarks and called by `cronjob.sh`. Its sources are in this repository and needs to be copied to the reference machine whenever it is updated.
+- `cronjob.sh` is the main script run by Cron. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
+- `run_all_benchmarks_on_latest_master.sh` is the script actually launching the benchmarks and called by `cronjob.sh`. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
 - `rustup-init.sh` and `zcash_params` handle some external dependencies. How to maintain these files is under discussion.
-- `snoop_results` contains the result of the benchmarks, with one sub-directory per benchmarks run.
+- `snoop_results` contains the result of the benchmarks, with one sub-directory per benchmark run.
+  - `STARTED` and `SUCCESS` are marker files that can be used by human beings to have a quick look at the benchmarks process status (they contain the PID).
+  - Other files are created by being moved from other locations, as described below.
 - `tezos` is a clone of https://gitlab.com/tezos/tezos. It is updated automatically in `run_all_benchmarks_on_latest_master.sh`, but it needs to be created prior to the very first Cron job.
-  - `michelson_data` and `sapling_data` contain data that are very long to generate but rarely change between two benchmarks runs. For now, we decided not to regenerate them, and keep the same data from one run to the other. When to update them is under discussion.
+  - `michelson_data` and `sapling_data` contain data that are very long to generate but rarely change between two benchmark runs. For now, we decided not to regenerate them, and keep the same data from one run to the other. When to update them is under discussion.
   - Also note that in this directory, `benchmark_results` and `inference_results` only exist during a run of the benchmarks. They are moved to `snoop_results` at the end.
-- `cron_res` and `cron_res_errors` are the log files of a benchmarks run. They are only present during a run, and moved to `snoop_results` at the end.
+- `cron_res` and `cron_res_errors` are the log files of a benchmark run. They are only present during a run, and moved to `snoop_results` at the end.
 - `current_run_dir` and `last_run_dir` are marker files each containing the name of a benchmarks results directory:
   - `current_run_dir` is present as long as benchmarks are running, or when they failed for some reason;
-  - `last_run_dir` records the last benchmarks process that completed successfully.
+  - `last_run_dir` records the last benchmark process that was completed successfully;
+  - their intent is close to that of the status files (`STARTED` and `SUCCESS`), but they are used for scripting and the status files are more convenient for human beings.
+- `anomalies` logs some events that prevent the benchmarks from being run correctly. For instance if the processes are triggered while the previous haven't completed yet.
 
-`cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but only know their final destination after fetching the most recent `master` commit.
+`cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but we only know their final destination after fetching the most recent `master` commit.
+
+## Cleaning up after a failure
+
+If the benchmark processes failed, some cleaning up is needed before the next run.
+* Remove `current_run_dir`: the file indicates that benchmark processes are still running. This is not mandatory since the file will be overwritten by the next run, but it can confuse humans checking the benchmarks status if it is kept.
+* Move `cron_res` and `cron_res_errors` to their benchmark results directory: they are log files of a specific run, they're supposed to go into the latter's directory. It should be in `snoop_results/_snoop_<DATE>_<COMMIT>`; the directory can be created if it does not exist.  
+  In particular, `cron_res` really needs to be moved or deleted, as the next run will check its absence at the very beginning of the benchmark processes.
+* Similarly, move results, i.e. `tezos/_snoop/{benchmark,inference}_results`, to their benchmark results directory: `snoop_results/_snoop_<DATE>_<COMMIT>`. This needs to be done too, otherwise the next run will simply reuse these results.
+* Finally, upload results to `s3` if this was the cause of the failure: it could happen because of a network error for instance. The commands to run can be found in `run_all_benchmarks_on_latest_master.sh`.
