@@ -628,11 +628,23 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_baking_rights
+         ~delegate:Constant.bootstrap5.public_key_hash
+         ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_current_level ()
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_endorsing_rights ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_endorsing_rights
+         ~delegate:Constant.bootstrap4.public_key_hash
+         ()
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
