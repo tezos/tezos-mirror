@@ -245,4 +245,6 @@ module Internal_for_tests = struct
     in
     let cell_ptr = hash payloads in
     Skip_list.find ~deref ~cell_ptr ~target_index:index
+
+  let make_proof proof = proof
 end
