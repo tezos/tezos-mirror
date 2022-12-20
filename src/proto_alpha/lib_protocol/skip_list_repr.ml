@@ -457,23 +457,22 @@ end) : S = struct
         | cell_ptr, cell_ptr' :: path ->
             assume_some (deref cell_ptr) @@ fun cell ->
             assume_some (deref cell_ptr') @@ fun cell' ->
-            if mem equal_ptr cell_ptr' cell.back_pointers then return true
-            else
-              assume_some (M.return @@ best_skip cell target_index powers)
+            if mem equal_ptr cell_ptr' cell.back_pointers then
+              assume_some (return @@ best_skip cell target_index powers)
               @@ fun best_idx ->
-              assume_some (M.return @@ back_pointer cell best_idx)
+              assume_some (return @@ back_pointer cell best_idx)
               @@ fun best_ptr ->
               let minimal = equal_ptr best_ptr cell_ptr' in
-              if minimal then return true
-              else
-                let index' = cell'.index in
-                valid_path index' cell_ptr' path
+              let index' = cell'.index in
+              if minimal then valid_path index' cell_ptr' path else return false
+            else return false
       in
       match path with
       | [] -> return false
       | first_cell_ptr :: path ->
-          if equal_ptr first_cell_ptr cell_ptr then return true
-          else valid_path cell_index cell_ptr path
+          if equal_ptr first_cell_ptr cell_ptr then
+            valid_path cell_index cell_ptr path
+          else return false
 
     let search (type ptr) ~(deref : ptr -> ('content, ptr) cell option M.t)
         ~compare ~cell =
