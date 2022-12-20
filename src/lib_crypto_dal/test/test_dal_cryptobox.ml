@@ -22,12 +22,14 @@ module Test = struct
     let number_of_pages = slot_size / page_size in
     let msg_size = slot_size / 16 in
     (* [msg] is initialized with random bytes. *)
-    let msg = Bytes.create msg_size in
-    let slot = Bytes.create slot_size in
+    let msg = Bytes.make msg_size '\000' in
+    let slot = Bytes.make slot_size '\000' in
+    for i = 0 to (msg_size / 8) - 1 do
+      Bytes.set_int64_le msg (i * 8) (Random.bits64 ())
+    done ;
 
-    (* We include [msg] in a slot, with additional zero padding *)
+    (* We include [msg] in a slot, with additional padding with null bytes *)
     Bytes.blit msg 0 slot 0 msg_size ;
-    Bytes.fill slot msg_size (slot_size - msg_size) '0' ;
 
     let parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
