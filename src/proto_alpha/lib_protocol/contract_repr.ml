@@ -131,7 +131,8 @@ let encoding_gen ~id_extra ~title_extra ~can_be ~cases ~to_b58check ~of_b58data
             (fun s ->
               match of_b58check_gen ~of_b58data s with
               | Ok s -> s
-              | Error _ -> Json.cannot_destruct "Invalid contract notation.")
+              | Error _ ->
+                  Json.cannot_destruct "Invalid contract notation %S." s)
             (string Plain))
 
 let encoding =
