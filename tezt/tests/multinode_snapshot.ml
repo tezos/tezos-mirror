@@ -317,6 +317,21 @@ let test_storage_snapshot export_format =
       ~snapshot:"node_archive_batch_1.full"
   and* () =
     export
+      node_full
+      Full_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_full_batch_1.full"
+  and* () =
+    export
+      node_rolling
+      Rolling_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_rolling_batch_1.rolling"
+  in
+  let* () =
+    export
       node_archive
       Rolling_history
       ~export_level:snapshot_level
@@ -325,24 +340,10 @@ let test_storage_snapshot export_format =
   and* () =
     export
       node_full
-      Full_history
-      ~export_level:snapshot_level
-      ~export_format
-      ~snapshot:"node_full_batch_1.full"
-  and* () =
-    export
-      node_full
       Rolling_history
       ~export_level:snapshot_level
       ~export_format
       ~snapshot:"node_full_batch_1.rolling"
-  and* () =
-    export
-      node_rolling
-      Rolling_history
-      ~export_level:snapshot_level
-      ~export_format
-      ~snapshot:"node_rolling_batch_1.rolling"
   in
 
   Log.info "Import all kinds of snapshots" ;
@@ -918,6 +919,21 @@ let test_storage_snapshot export_format =
       ~snapshot:"node_archive_batch_3.full"
   and* () =
     export
+      node_full
+      Full_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_full_batch_3.full"
+  and* () =
+    export
+      node_rolling
+      Rolling_history
+      ~export_level:snapshot_level
+      ~export_format
+      ~snapshot:"node_rolling_batch_3.rolling"
+  in
+  let* () =
+    export
       node_archive
       Rolling_history
       ~export_level:snapshot_level
@@ -926,24 +942,10 @@ let test_storage_snapshot export_format =
   and* () =
     export
       node_full
-      Full_history
-      ~export_level:snapshot_level
-      ~export_format
-      ~snapshot:"node_full_batch_3.full"
-  and* () =
-    export
-      node_full
       Rolling_history
       ~export_level:snapshot_level
       ~export_format
       ~snapshot:"node_full_batch_3.rolling"
-  and* () =
-    export
-      node_rolling
-      Rolling_history
-      ~export_level:snapshot_level
-      ~export_format
-      ~snapshot:"node_rolling_batch_3.rolling"
   in
 
   (* ########################################################################### *)
