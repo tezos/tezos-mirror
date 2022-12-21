@@ -73,6 +73,8 @@ val chain_dir :
 
 val lock_file : [`Chain_dir] directory -> [`Lockfile] file
 
+val gc_lockfile : [`Chain_dir] directory -> [`Gc_lockfile] file
+
 val reconstruction_lock_file :
   [`Chain_dir] directory -> [`Reconstruction_lockfile] file
 
