@@ -2115,23 +2115,15 @@ module Sc_rollup = struct
           /: Sc_rollup.Staker.rpc_arg / "timeout")
 
     let timeout_reached =
-      let query =
-        let open RPC_query in
-        query (fun x y ->
-            Sc_rollup.Staker.(of_b58check_exn x, of_b58check_exn y))
-        |+ field "staker1" RPC_arg.string "" (fun (x, _) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |+ field "staker2" RPC_arg.string "" (fun (_, x) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output = Data_encoding.option Sc_rollup.Game.game_result_encoding in
       RPC_service.get_service
         ~description:
           "Returns whether the timeout creates a result for the game."
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "timeout_reached")
+        RPC_path.(
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
+          /: Sc_rollup.Staker.rpc_arg / "timeout_reached")
 
     let can_be_cemented =
       let query =
@@ -2281,10 +2273,10 @@ module Sc_rollup = struct
         | Error _ -> return_none)
 
   let register_timeout_reached () =
-    Registration.register1
+    Registration.register3
       ~chunked:false
       S.timeout_reached
-      (fun context rollup (staker1, staker2) () ->
+      (fun context rollup staker1 staker2 () () ->
         let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
@@ -2365,13 +2357,15 @@ module Sc_rollup = struct
     RPC_context.make_call2 S.conflicts ctxt block sc_rollup_address staker () ()
 
   let timeout_reached ctxt block sc_rollup_address staker1 staker2 =
-    RPC_context.make_call1
+    RPC_context.make_call3
       S.timeout_reached
       ctxt
       block
       sc_rollup_address
       staker1
       staker2
+      ()
+      ()
 
   let initial_pvm_state_hash ctxt block sc_rollup_address =
     RPC_context.make_call1
