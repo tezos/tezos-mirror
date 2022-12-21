@@ -2126,20 +2126,15 @@ module Sc_rollup = struct
           /: Sc_rollup.Staker.rpc_arg / "timeout_reached")
 
     let can_be_cemented =
-      let query =
-        let open RPC_query in
-        query Sc_rollup.Commitment.Hash.of_b58check_exn
-        |+ field "commitment" RPC_arg.string "" (fun x ->
-               Format.asprintf "%a" Sc_rollup.Commitment.Hash.pp x)
-        |> seal
-      in
       let output = Data_encoding.bool in
       RPC_service.get_service
         ~description:
           "Returns true if and only if the provided commitment can be cemented."
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "can_be_cemented")
+        RPC_path.(
+          path_sc_rollup / "commitment" /: Sc_rollup.Commitment.Hash.rpc_arg
+          / "can_be_cemented")
 
     let root =
       RPC_service.get_service
@@ -2285,10 +2280,10 @@ module Sc_rollup = struct
         | Error _ -> return_none)
 
   let register_can_be_cemented () =
-    Registration.register1
+    Registration.register2
       ~chunked:false
       S.can_be_cemented
-      (fun context rollup commitment_hash () ->
+      (fun context rollup commitment_hash () () ->
         let open Lwt_result_syntax in
         let*! res =
           Sc_rollup.Stake_storage.cement_commitment
@@ -2377,12 +2372,14 @@ module Sc_rollup = struct
       ()
 
   let can_be_cemented ctxt block sc_rollup_address commitment_hash =
-    RPC_context.make_call1
+    RPC_context.make_call2
       S.can_be_cemented
       ctxt
       block
       sc_rollup_address
       commitment_hash
+      ()
+      ()
 end
 
 module Dal = struct
