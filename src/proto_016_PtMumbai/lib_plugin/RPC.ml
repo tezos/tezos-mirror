@@ -3254,17 +3254,19 @@ module Endorsing_rights = struct
         List.fold_left_map_es endorsing_rights_at_level ctxt levels
         >|=? fun (_ctxt, rights_per_level) ->
         let rights_per_level =
-          match q.consensus_keys with
-          | [] -> rights_per_level
-          | _ :: _ as consensus_keys ->
+          match (q.consensus_keys, q.delegates) with
+          | [], [] -> rights_per_level
+          | _, _ ->
+              let is_requested p =
+                List.exists
+                  (Tezos_crypto.Signature.Public_key_hash.equal p.consensus_key)
+                  q.consensus_keys
+                || List.exists
+                     (Tezos_crypto.Signature.Public_key_hash.equal p.delegate)
+                     q.delegates
+              in
               List.filter_map
                 (fun rights_at_level ->
-                  let is_requested p =
-                    List.exists
-                      (Tezos_crypto.Signature.Public_key_hash.equal
-                         p.consensus_key)
-                      consensus_keys
-                  in
                   match
                     List.filter is_requested rights_at_level.delegates_rights
                   with

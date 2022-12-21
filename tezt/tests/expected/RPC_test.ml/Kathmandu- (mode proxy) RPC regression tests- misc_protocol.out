@@ -68,6 +68,10 @@
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "round": 10, "estimated_time": "[TIMESTAMP]" } ]
 
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/helpers/baking_rights?delegate=[PUBLIC_KEY_HASH]'
+[ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "round": 2, "estimated_time": "[TIMESTAMP]" } ]
+
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
   "expected_commitment": false }
@@ -85,6 +89,12 @@
           "first_slot": 1, "endorsing_power": 55 },
         { "delegate": "[PUBLIC_KEY_HASH]",
           "first_slot": 0, "endorsing_power": 58 } ] } ]
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/helpers/endorsing_rights?delegate=[PUBLIC_KEY_HASH]'
+[ { "level": 1,
+    "delegates":
+      [ { "delegate": "[PUBLIC_KEY_HASH]",
+          "first_slot": 11, "endorsing_power": 50 } ] } ]
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
 { "first": 1, "last": 8 }
