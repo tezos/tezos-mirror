@@ -441,17 +441,56 @@ let register_garbage_collect_callback w =
   let nv = Worker.state w in
   let chain_store = nv.parameters.chain_store in
   let index = Store.(context_index (Chain.global_store chain_store)) in
-  let gc block_hash =
+  let gc_lockfile_path =
+    Naming.(file_path (gc_lockfile (Store.Chain.chain_dir chain_store)))
+  in
+  let gc_synchronous_call block_hash =
     let* block = Store.Block.read_block chain_store block_hash in
     let* resulting_context_hash =
       Store.Block.resulting_context_hash chain_store block
     in
-    Block_validator.context_garbage_collection
-      nv.parameters.block_validator
-      index
-      resulting_context_hash
+    let* () =
+      Block_validator.context_garbage_collection
+        nv.parameters.block_validator
+        index
+        resulting_context_hash
+        ~gc_lockfile_path
+    in
+    let kind =
+      Block_validator_process.kind nv.parameters.block_validator_process
+    in
+    (* The callback call will block until the GC is completed: either
+       using the Irmin function directly in single-process or using
+       the lockfile through the validator process used to notify the
+       GC completion. *)
+    match kind with
+    | Single_process ->
+        (* If the GC is running in the same instance, we can directly
+           wait for its completion. *)
+        let*! () = Context_ops.wait_gc_completion index in
+        return_unit
+    | External_process ->
+        (* Otherwise, we wait for the lockfile, which is locked by the
+           external process when the GC starts and released when the
+           GC ends. *)
+        let* gc_lockfile =
+          protect (fun () ->
+              let*! fd =
+                Lwt_unix.openfile
+                  gc_lockfile_path
+                  [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+                  0o644
+              in
+              return fd)
+        in
+        Lwt.finalize
+          (fun () ->
+            let*! () = Lwt_unix.lockf gc_lockfile Unix.F_RLOCK 0 in
+            let*! () = Lwt_unix.lockf gc_lockfile Unix.F_ULOCK 0 in
+            return_unit)
+          (fun () -> Lwt_unix.close gc_lockfile)
   in
-  Store.Chain.register_gc_callback nv.parameters.chain_store gc
+  Store.Chain.register_gc_callback nv.parameters.chain_store gc_synchronous_call
 
 let may_synchronise_context synchronisation_state chain_store =
   if

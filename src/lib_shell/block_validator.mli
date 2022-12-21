@@ -142,12 +142,19 @@ val fetch_and_compile_protocol :
   Tezos_crypto.Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
-(** [context_garbage_collection bv chain_store context_hash] moves the
-   contexts below the give [context_hash] from the upper layer
-   to the lower layer. For full and rolling nodes, this is considered
-   as a garbage collection. *)
+(** [context_garbage_collection bv chain_store context_hash
+    ~gc_lockfile_path] moves the contexts below the give
+    [context_hash] from the upper layer to the lower layer. For full
+    and rolling nodes, this is considered as a garbage
+    collection. When a garbage collection occurs in another process, a
+    lock, located at [gc_lockfile_path], is taken to ensure
+    synchronous GC calls. *)
 val context_garbage_collection :
-  t -> Context_ops.index -> Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t
+  t ->
+  Context_ops.index ->
+  Tezos_crypto.Context_hash.t ->
+  gc_lockfile_path:string ->
+  unit tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

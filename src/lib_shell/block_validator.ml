@@ -552,12 +552,13 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
       (* validation cases *)
       assert false
 
-let context_garbage_collection w index context_hash =
+let context_garbage_collection w index context_hash ~gc_lockfile_path =
   let bv = Worker.state w in
   Block_validator_process.context_garbage_collection
     bv.validation_process
     index
     context_hash
+    ~gc_lockfile_path
 
 let fetch_and_compile_protocol w =
   let bv = Worker.state w in

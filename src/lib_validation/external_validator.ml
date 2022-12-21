@@ -490,9 +490,32 @@ let run ~readonly input output =
                       context_hash))
         in
         loop cache None
-    | External_validation.Context_garbage_collection {context_hash} ->
+    | External_validation.Context_garbage_collection
+        {context_hash; gc_lockfile_path} ->
         let*! () = Events.(emit context_gc_request context_hash) in
         let*! () = Context.gc context_index context_hash in
+        let*! lockfile =
+          Lwt_unix.openfile
+            gc_lockfile_path
+            [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+            0o644
+        in
+        let*! () =
+          Lwt.catch
+            (fun () -> Lwt_unix.lockf lockfile Unix.F_LOCK 0)
+            (fun exn ->
+              let*! () = Lwt_unix.close lockfile in
+              Lwt.fail exn)
+        in
+        let gc_waiter () =
+          Lwt.finalize
+            (fun () ->
+              let*! () = Context.wait_gc_completion context_index in
+              let*! () = Lwt_unix.lockf lockfile Unix.F_ULOCK 0 in
+              Lwt.return_unit)
+            (fun () -> Lwt_unix.close lockfile)
+        in
+        let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
         let*! () =
           External_validation.send
             output
