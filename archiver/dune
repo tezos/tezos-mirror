@@ -11,61 +11,187 @@
   (select
    PtCJ7pwo_machine.ml
    from
-   (tezos-client-001-PtCJ7pwo -> PtCJ7pwo_machine.real.ml))
+   (tezos-client-001-PtCJ7pwo -> PtCJ7pwo_machine.real.ml)
+   (-> PtCJ7pwo_machine.no.ml))
   (select
    PsYLVpVv_machine.ml
    from
-   (tezos-client-002-PsYLVpVv -> PsYLVpVv_machine.real.ml))
+   (tezos-client-002-PsYLVpVv -> PsYLVpVv_machine.real.ml)
+   (-> PsYLVpVv_machine.no.ml))
   (select
    PsddFKi3_machine.ml
    from
-   (tezos-client-003-PsddFKi3 -> PsddFKi3_machine.real.ml))
+   (tezos-client-003-PsddFKi3 -> PsddFKi3_machine.real.ml)
+   (-> PsddFKi3_machine.no.ml))
   (select
    Pt24m4xi_machine.ml
    from
-   (tezos-client-004-Pt24m4xi -> Pt24m4xi_machine.real.ml))
+   (tezos-client-004-Pt24m4xi -> Pt24m4xi_machine.real.ml)
+   (-> Pt24m4xi_machine.no.ml))
   (select
    PsBabyM1_machine.ml
    from
-   (tezos-client-005-PsBabyM1 -> PsBabyM1_machine.real.ml))
+   (tezos-client-005-PsBabyM1 -> PsBabyM1_machine.real.ml)
+   (-> PsBabyM1_machine.no.ml))
   (select
    PsCARTHA_machine.ml
    from
-   (tezos-client-006-PsCARTHA -> PsCARTHA_machine.real.ml))
+   (tezos-client-006-PsCARTHA -> PsCARTHA_machine.real.ml)
+   (-> PsCARTHA_machine.no.ml))
   (select
    PsDELPH1_machine.ml
    from
-   (tezos-client-007-PsDELPH1 -> PsDELPH1_machine.real.ml))
+   (tezos-client-007-PsDELPH1 -> PsDELPH1_machine.real.ml)
+   (-> PsDELPH1_machine.no.ml))
   (select
    PtEdo2Zk_machine.ml
    from
-   (tezos-client-008-PtEdo2Zk -> PtEdo2Zk_machine.real.ml))
+   (tezos-client-008-PtEdo2Zk -> PtEdo2Zk_machine.real.ml)
+   (-> PtEdo2Zk_machine.no.ml))
   (select
    PsFLoren_machine.ml
    from
-   (tezos-client-009-PsFLoren -> PsFLoren_machine.real.ml))
+   (tezos-client-009-PsFLoren -> PsFLoren_machine.real.ml)
+   (-> PsFLoren_machine.no.ml))
   (select
    PtGRANAD_machine.ml
    from
-   (tezos-client-010-PtGRANAD -> PtGRANAD_machine.real.ml))
+   (tezos-client-010-PtGRANAD -> PtGRANAD_machine.real.ml)
+   (-> PtGRANAD_machine.no.ml))
   (select
    PtHangz2_machine.ml
    from
-   (tezos-client-011-PtHangz2 -> PtHangz2_machine.real.ml))
+   (tezos-client-011-PtHangz2 -> PtHangz2_machine.real.ml)
+   (-> PtHangz2_machine.no.ml))
   (select
    Psithaca_machine.ml
    from
-   (tezos-client-012-Psithaca -> Psithaca_machine.real.ml))
+   (tezos-client-012-Psithaca -> Psithaca_machine.real.ml)
+   (-> Psithaca_machine.no.ml))
   (select
    PtJakart_machine.ml
    from
-   (tezos-client-013-PtJakart -> PtJakart_machine.real.ml))
+   (tezos-client-013-PtJakart -> PtJakart_machine.real.ml)
+   (-> PtJakart_machine.no.ml))
   (select
    PtKathma_machine.ml
    from
-   (tezos-client-014-PtKathma -> PtKathma_machine.real.ml)))
+   (tezos-client-014-PtKathma -> PtKathma_machine.real.ml)
+   (-> PtKathma_machine.no.ml)))
  (modules_without_implementation archiver)
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base -open Tezos_client_base_unix
     -open Tezos_rpc_http_client_unix -open Tezos_rpc_http -open Teztale_lib)))
+
+(rule
+ (action
+  (write-file PtCJ7pwo_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtCJ7pwo_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PsYLVpVv_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PsYLVpVv_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PsddFKi3_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PsddFKi3_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file Pt24m4xi_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file Pt24m4xi_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PsBabyM1_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PsBabyM1_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PsCARTHA_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PsCARTHA_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PsDELPH1_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PsDELPH1_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PtEdo2Zk_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtEdo2Zk_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PsFLoren_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PsFLoren_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PtGRANAD_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtGRANAD_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PtHangz2_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtHangz2_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file Psithaca_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file Psithaca_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PtJakart_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtJakart_machine.no.ml "module M = struct end")))
+
+(rule
+ (action
+  (write-file PtKathma_machine.mli "module M : sig end")))
+
+(rule
+ (action
+  (write-file PtKathma_machine.no.ml "module M = struct end")))

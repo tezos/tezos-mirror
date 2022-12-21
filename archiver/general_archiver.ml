@@ -185,21 +185,6 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
       endorsements_recorder
 end
 
-module M001 = Define (PtCJ7pwo_machine.Services)
-module M002 = Define (PsYLVpVv_machine.Services)
-module M003 = Define (PsddFKi3_machine.Services)
-module M004 = Define (Pt24m4xi_machine.Services)
-module M005 = Define (PsBabyM1_machine.Services)
-module M006 = Define (PsCARTHA_machine.Services)
-module M007 = Define (PsDELPH1_machine.Services)
-module M008 = Define (PtEdo2Zk_machine.Services)
-module M009 = Define (PsFLoren_machine.Services)
-module M010 = Define (PtGRANAD_machine.Services)
-module M011 = Define (PtHangz2_machine.Services)
-module M012 = Define (Psithaca_machine.Services)
-module M013 = Define (PtJakart_machine.Services)
-module M014 = Define (PtKathma_machine.Services)
-
 module Loops (Archiver : Archiver.S) = struct
   let mecanism chain starting ctxt f =
     let rec loop current ending =

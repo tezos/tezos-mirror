@@ -183,3 +183,5 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         info.header.protocol_data.contents.priority,
         info.hash )
 end
+
+module M = General_archiver.Define (Services)

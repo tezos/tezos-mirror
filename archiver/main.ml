@@ -269,4 +269,19 @@ let select_commands _ctxt Client_config.{chain; _} =
           main_server state cctxt);
     ]
 
+module M001 = PtCJ7pwo_machine.M
+module M002 = PsYLVpVv_machine.M
+module M003 = PsddFKi3_machine.M
+module M004 = Pt24m4xi_machine.M
+module M005 = PsBabyM1_machine.M
+module M006 = PsCARTHA_machine.M
+module M007 = PsDELPH1_machine.M
+module M008 = PtEdo2Zk_machine.M
+module M009 = PsFLoren_machine.M
+module M010 = PtGRANAD_machine.M
+module M011 = PtHangz2_machine.M
+module M012 = Psithaca_machine.M
+module M013 = PtJakart_machine.M
+module M014 = PtKathma_machine.M
+
 let () = Client_main_run.run (module Client_config) ~select_commands

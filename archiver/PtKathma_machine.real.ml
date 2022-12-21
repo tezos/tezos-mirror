@@ -256,3 +256,5 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     return
       (metadata.protocol_data.baker, header.shell.timestamp, round, header.hash)
 end
+
+module M = General_archiver.Define (Services)
