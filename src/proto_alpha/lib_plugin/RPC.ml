@@ -2015,10 +2015,12 @@ module Sc_rollup = struct
     let staked_on_commitment =
       RPC_service.get_service
         ~description:
-          "The hash of the commitment on which the operator has staked on for \
-           a smart-contract rollup"
+          "The hash of the newest commitment on which the operator has staked \
+           on for a smart-contract rollup. The hash can be absent if the \
+           staked commitment is before the last cemented commitment, and \
+           therefore the hash no longer exists in the context."
         ~query:RPC_query.empty
-        ~output:(obj1 (opt "hash" Sc_rollup.Commitment.Hash.encoding))
+        ~output:(option Sc_rollup.Commitment.Hash.encoding)
         RPC_path.(
           path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg
           / "staked_on_commitment")
@@ -2069,8 +2071,10 @@ module Sc_rollup = struct
       in
       RPC_service.get_service
         ~description:
-          "List of stakers for a given rollup, associated to the commitments \
-           they are staked on"
+          "List of stakers for a given rollup, associated to the commitment \
+           hash they are staked on. The hash can be absent if the staked \
+           commitment is before the last cemented commitment, and therefore \
+           the hash no longer exists in the context."
         ~query:RPC_query.empty
         ~output
         RPC_path.(path_sc_rollup / "stakers_commitments")

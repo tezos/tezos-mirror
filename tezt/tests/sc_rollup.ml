@@ -350,8 +350,9 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
          ~sc_rollup
          staker
   in
-  let hash = JSON.(json |-> "hash" |> as_string) in
-  return hash
+  match JSON.(json |> as_string_opt) with
+  | Some hash -> return hash
+  | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
 let hash (hash, (_ : Sc_rollup_client.commitment), _level) = hash
 
