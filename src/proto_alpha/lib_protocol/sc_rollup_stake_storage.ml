@@ -53,7 +53,7 @@ module Set_out_of_list (S : sig
   val remove : t -> key -> (Raw_context.t * int) tzresult Lwt.t
 end) =
 struct
-  let add_or_init ctxt rollup key value =
+  let add ctxt rollup key value =
     let open Lwt_result_syntax in
     let* ctxt, values_opt = S.find (ctxt, rollup) key in
     match values_opt with
@@ -80,6 +80,12 @@ struct
     return (ctxt, Option.value ~default:[] values_opt)
 
   let remove ctxt rollup key = S.remove (ctxt, rollup) key
+
+  let mem ctxt rollup key value =
+    let open Lwt_result_syntax in
+    let* ctxt, values = get ctxt rollup key in
+    let exists = List.mem ~equal:S.equal_value value values in
+    return (ctxt, exists)
 end
 
 module Commitments_per_inbox_level = Set_out_of_list (struct
@@ -114,13 +120,6 @@ module Commitment_stakers = Set_out_of_list (struct
   let remove = Store.Commitment_stakers.remove_existing
 end)
 
-let is_staker ctxt rollup staker =
-  let open Lwt_result_syntax in
-  let* ctxt, res =
-    Sc_rollup_staker_index_storage.find_staker_index_unsafe ctxt rollup staker
-  in
-  return (Option.is_some res, ctxt)
-
 (* Looks for the commitment [staker] stakes on, in the list of commitments
    posted for this level. *)
 let rec find_commitment_of_staker_in_commitments ctxt rollup staker_index =
@@ -128,9 +127,10 @@ let rec find_commitment_of_staker_in_commitments ctxt rollup staker_index =
   function
   | [] -> return (ctxt, None)
   | commitment_hash :: rst ->
-      let* ctxt, stakers = Commitment_stakers.get ctxt rollup commitment_hash in
-      if List.mem ~equal:Sc_rollup_staker_index_repr.equal staker_index stakers
-      then return (ctxt, Some commitment_hash)
+      let* ctxt, exists =
+        Commitment_stakers.mem ctxt rollup commitment_hash staker_index
+      in
+      if exists then return (ctxt, Some commitment_hash)
       else find_commitment_of_staker_in_commitments ctxt rollup staker_index rst
 
 let get_commitment_of_staker_in_commitments ctxt rollup staker_index commitments
@@ -371,15 +371,6 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   in
   return (ctxt, size_diff)
 
-let is_staker_index_staked_on ctxt rollup
-    (staker_index : Sc_rollup_staker_index_repr.t) commitment_hash =
-  let open Lwt_result_syntax in
-  let* ctxt, stakers = Commitment_stakers.get ctxt rollup commitment_hash in
-  let exists =
-    List.mem ~equal:Sc_rollup_staker_index_repr.equal staker_index stakers
-  in
-  return (ctxt, exists)
-
 let is_staked_on ctxt rollup staker commitment_hash =
   let open Lwt_result_syntax in
   let* ctxt, staker_index_opt =
@@ -388,7 +379,7 @@ let is_staked_on ctxt rollup staker commitment_hash =
   match staker_index_opt with
   | None -> return (ctxt, false)
   | Some staker_index ->
-      is_staker_index_staked_on ctxt rollup staker_index commitment_hash
+      Commitment_stakers.mem ctxt rollup commitment_hash staker_index
 
 let deallocate_commitment_contents ctxt rollup node =
   let open Lwt_result_syntax in
@@ -480,7 +471,7 @@ let set_staker_commitment ctxt rollup staker_index inbox_level commitment_hash =
   in
   (* Adds [staker_index] to the set of stakers staking on [commitment_hash]. *)
   let* ctxt, size_diff_commitment_stakers, _stakers =
-    Commitment_stakers.add_or_init ctxt rollup commitment_hash staker_index
+    Commitment_stakers.add ctxt rollup commitment_hash staker_index
   in
   return (ctxt, size_diff_stakers + size_diff_commitment_stakers)
 
@@ -494,7 +485,7 @@ let assert_staker_dont_backtrack ctxt rollup staker_index commitments =
     List.fold_left_es
       (fun (ctxt, staked_on_commitments) commitment ->
         let* ctxt, is_staked_on =
-          is_staker_index_staked_on ctxt rollup staker_index commitment
+          Commitment_stakers.mem ctxt rollup commitment staker_index
         in
         if is_staked_on then return (ctxt, commitment :: staked_on_commitments)
         else return (ctxt, staked_on_commitments))
@@ -544,7 +535,7 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
   in
   (* Adds the [commitment] to the set of commitments for this inbox level. *)
   let* ctxt, commitments_per_inbox_level_size_diff, commitments =
-    Commitments_per_inbox_level.add_or_init
+    Commitments_per_inbox_level.add
       ctxt
       rollup
       commitment.inbox_level

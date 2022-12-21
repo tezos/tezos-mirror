@@ -1766,11 +1766,7 @@ module Sc_rollup = struct
            let name = ["stakers"]
          end))
          (Make_index (Sc_rollup_staker_index_repr.Index))
-      (struct
-        type t = Raw_level_repr.t
-
-        let encoding = Raw_level_repr.encoding
-      end)
+      (Raw_level_repr)
 
   module Commitments_versioned =
     Make_indexed_carbonated_data_storage
@@ -1841,11 +1837,7 @@ module Sc_rollup = struct
            let name = ["commitment_added"]
          end))
          (Make_index (Sc_rollup_commitment_repr.Hash))
-      (struct
-        type t = Raw_level_repr.t
-
-        let encoding = Raw_level_repr.encoding
-      end)
+      (Raw_level_repr)
 
   module Game_info_versioned =
     Make_indexed_carbonated_data_storage

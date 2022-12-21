@@ -95,16 +95,9 @@ val cement_commitment :
   Sc_rollup_commitment_repr.Hash.t ->
   (Raw_context.t * Sc_rollup_commitment_repr.t) tzresult Lwt.t
 
-(** [is_staker context rollup staker] returns [true] iff [staker] has a
-    deposit on the given [rollup]. *)
-val is_staker :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Sc_rollup_repr.Staker.t ->
-  (bool * Raw_context.t) tzresult Lwt.t
-
-(** [find_staker context rollup staker] returns the latest commitment
-    [staker] staked one, if it was not cemented. *)
+(** [find_staker context rollup staker] returns the most recent commitment
+    [staker] staked on, or [None] if its last staked commitment is older
+    than the last cemented commitment. *)
 val find_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->

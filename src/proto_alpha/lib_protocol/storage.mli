@@ -776,7 +776,7 @@ module Sc_rollup : sig
        and type value = Sc_rollup_staker_index_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** Contains the newest commitment staked by an active staker. *)
+  (** Contains the most recent inbox level staked by an active staker. *)
   module Stakers :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_staker_index_repr.t

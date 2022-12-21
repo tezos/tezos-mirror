@@ -79,3 +79,6 @@ let list_stakers_uncarbonated ctxt rollup =
 
 let is_active ctxt rollup staker_index =
   Storage.Sc_rollup.Stakers.mem (ctxt, rollup) staker_index
+
+let is_staker ctxt rollup staker =
+  Storage.Sc_rollup.Staker_index.mem (ctxt, rollup) staker

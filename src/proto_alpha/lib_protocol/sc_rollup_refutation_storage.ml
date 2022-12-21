@@ -293,7 +293,9 @@ let check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash ~defender
 
 let check_staker_availability ctxt rollup staker =
   let open Lwt_result_syntax in
-  let* is_staker, ctxt = Sc_rollup_stake_storage.is_staker ctxt rollup staker in
+  let* ctxt, is_staker =
+    Sc_rollup_staker_index_storage.is_staker ctxt rollup staker
+  in
   let* () = fail_unless is_staker Sc_rollup_not_staked in
   let* ctxt, entries = Store.Game.list_key_values ((ctxt, rollup), staker) in
   let* () =
@@ -394,8 +396,12 @@ let start_game ctxt rollup ~player:(player, player_commitment_hash)
 let check_stakes ctxt rollup (stakers : Sc_rollup_game_repr.Index.t) =
   let open Lwt_result_syntax in
   let open Sc_rollup_game_repr in
-  let* alice_stake, ctxt = Stake_storage.is_staker ctxt rollup stakers.alice in
-  let* bob_stake, ctxt = Stake_storage.is_staker ctxt rollup stakers.bob in
+  let* ctxt, alice_stake =
+    Sc_rollup_staker_index_storage.is_staker ctxt rollup stakers.alice
+  in
+  let* ctxt, bob_stake =
+    Sc_rollup_staker_index_storage.is_staker ctxt rollup stakers.bob
+  in
   let game_over loser = Loser {loser; reason = Conflict_resolved} in
   match (alice_stake, bob_stake) with
   | true, true -> return (None, ctxt)
@@ -496,7 +502,9 @@ let reward ctxt winner =
 
 let remove_if_staker_is_still_there ctxt rollup staker =
   let open Lwt_result_syntax in
-  let* is_staker, ctxt = Sc_rollup_stake_storage.is_staker ctxt rollup staker in
+  let* ctxt, is_staker =
+    Sc_rollup_staker_index_storage.is_staker ctxt rollup staker
+  in
   if is_staker then Stake_storage.remove_staker ctxt rollup staker
   else return (ctxt, [])
 
