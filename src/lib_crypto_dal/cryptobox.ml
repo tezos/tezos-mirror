@@ -175,14 +175,6 @@ module Inner = struct
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
 
-    let shards_encoding =
-      conv
-        (fun s ->
-          List.of_seq (Seq.map (fun {index; share} -> (index, share)) s))
-        (fun l ->
-          (Seq.map (fun (index, share) -> {index; share})) (List.to_seq l))
-        (list (tup2 int31 share_encoding))
-
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
   end

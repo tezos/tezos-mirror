@@ -147,9 +147,6 @@ type shard = {index : int; share : share}
 (** An encoding of a share. *)
 val shard_encoding : shard Data_encoding.t
 
-(** An encoding for a sequence of shares. *)
-val shards_encoding : shard Seq.t Data_encoding.t
-
 (** [encoded_share_size t] returns the size of a share in byte depending on [t] *)
 val encoded_share_size : t -> int
 
