@@ -422,13 +422,15 @@ module Sc_rollup = struct
       ()
       ()
 
-  let timeout ctxt sc_rollup stakers =
-    Environment.RPC_context.make_call1
+  let timeout ctxt sc_rollup staker1 staker2 =
+    Environment.RPC_context.make_call3
       Plugin.RPC.Sc_rollup.S.timeout
       rpc_ctxt
       ctxt
       sc_rollup
-      stakers
+      staker1
+      staker2
+      ()
       ()
 
   let ongoing_games_for_staker ctxt sc_rollup staker =

@@ -2105,22 +2105,14 @@ module Sc_rollup = struct
           path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "conflicts")
 
     let timeout =
-      let query =
-        let open RPC_query in
-        query (fun x y ->
-            Sc_rollup.Staker.(of_b58check_exn x, of_b58check_exn y))
-        |+ field "staker1" RPC_arg.string "" (fun (x, _) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |+ field "staker2" RPC_arg.string "" (fun (_, x) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output = Data_encoding.option Sc_rollup.Game.timeout_encoding in
       RPC_service.get_service
         ~description:"Returns the timeout of players."
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "timeout")
+        RPC_path.(
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
+          /: Sc_rollup.Staker.rpc_arg / "timeout")
 
     let timeout_reached =
       let query =
@@ -2275,10 +2267,10 @@ module Sc_rollup = struct
           staker)
 
   let register_timeout () =
-    Registration.register1
+    Registration.register3
       ~chunked:false
       S.timeout
-      (fun context rollup (staker1, staker2) () ->
+      (fun context rollup staker1 staker2 () () ->
         let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res =

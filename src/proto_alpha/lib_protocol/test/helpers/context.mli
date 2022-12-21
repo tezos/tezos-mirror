@@ -266,8 +266,8 @@ module Sc_rollup : sig
   val timeout :
     t ->
     Sc_rollup.t ->
-    Tezos_crypto.Signature.Public_key_hash.t
-    * Tezos_crypto.Signature.Public_key_hash.t ->
+    Tezos_crypto.Signature.Public_key_hash.t ->
+    Tezos_crypto.Signature.Public_key_hash.t ->
     Sc_rollup.Game.timeout option tzresult Lwt.t
 
   val ongoing_games_for_staker :
