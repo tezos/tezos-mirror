@@ -27,8 +27,7 @@ The Community
 ~~~~~~~~~~~~~
 
 - The website of the `Tezos Foundation <https://tezos.foundation/>`_.
-- `Tezos sub-reddit <https://www.reddit.com/r/tezos/>`_ is an
-  important meeting point of the community.
+- `Tezos Agora <https://www.tezosagora.org>`_ is the premier meeting point for the community.
 - Several community-built block explorers are available:
 
     - https://tzstats.com
@@ -42,7 +41,6 @@ The Community
 
     - https://www.tezos.help
     - https://tezoscommons.org/
-    - https://tqtezos.com/
 
 - More resources can be found in the :doc:`support` page.
 
@@ -52,7 +50,7 @@ Mainnet
 
 The Tezos network is the current incarnation of the Tezos blockchain.
 It runs with real tez that have been allocated to the
-donors of July 2017 ICO (see :ref:`activate_fundraiser_account`).
+donors of July 2017 fundraiser (see :ref:`activate_fundraiser_account`).
 
 The Tezos network has been live and open since June 30th 2018.
 
@@ -75,6 +73,6 @@ See the list of test networks in :ref:`test network <test-networks>`.
 This website
 ~~~~~~~~~~~~
 
-This website (https://tezos.gitlab.io/) provides online developer documentation. This documentation is about Octez, although it also documents Tezos in general.
+This website (https://tezos.gitlab.io/) provides online developer documentation. This documentation is about :ref:`octez`, although it also documents Tezos in general.
 
 The developer documentation is automatically generated from the master branch of the :ref:`Octez <octez>` repository.

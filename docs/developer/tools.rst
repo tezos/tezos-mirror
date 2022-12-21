@@ -1,5 +1,5 @@
-Core-dev tools
-==============
+Core Development tools
+======================
 
 The development and maintenance process of the Octez code base is facilitated by some specialized tools.
 Some of these tools are included in the Octez code base, because of a close coupling with the code itself (see :doc:`repository_scope` for the policy of selecting such tools).
