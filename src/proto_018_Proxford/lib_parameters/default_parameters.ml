@@ -326,6 +326,7 @@ let constants_sandbox =
     consensus_committee_size = 256;
     consensus_threshold = 0;
     limit_of_delegation_over_baking = 19;
+    max_operations_time_to_live = 8;
   }
 
 let constants_test =
@@ -362,6 +363,7 @@ let constants_test =
       19
       (* Not 9 so that multiplication by a percentage and
          divisions by a limit do not easily get intermingled. *);
+    max_operations_time_to_live = 8;
   }
 
 let test_commitments =
