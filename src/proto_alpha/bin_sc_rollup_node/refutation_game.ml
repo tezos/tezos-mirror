@@ -465,7 +465,6 @@ module Make (Interpreter : Interpreter.S) :
         (cctxt#chain, head_block)
         rollup_address
         self
-        ()
     in
     let*! res = List.iter_es (play_opening_move node_ctxt self) conflicts in
     match res with
