@@ -57,10 +57,14 @@ type validator_kind =
     }
       -> validator_kind
 
+type simple_kind = External_process | Single_process
+
 (** Internal representation of the block validator process *)
 type t
 
 val init : validator_environment -> validator_kind -> t tzresult Lwt.t
+
+val kind : t -> simple_kind
 
 (** [close vp] closes the given [vp]. In the case of an [External]
    validator process, we first ask the validator to shutdown. If it is

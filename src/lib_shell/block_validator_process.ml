@@ -45,9 +45,13 @@ type validator_kind =
     }
       -> validator_kind
 
+type simple_kind = External_process | Single_process
+
 (* A common interface for the two type of validation *)
 module type S = sig
   type t
+
+  val kind : simple_kind
 
   val close : t -> unit Lwt.t
 
@@ -191,6 +195,8 @@ module Internal_validator_process = struct
         cache = None;
         preapply_result = None;
       }
+
+  let kind = Single_process
 
   let close _ = Events.(emit close ())
 
@@ -559,6 +565,8 @@ module External_validator_process = struct
     sandbox_parameters : Data_encoding.json option;
     dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   }
+
+  let kind = External_process
 
   (* The shutdown_timeout is used when closing the block validator
      process. It aims to allow it to shutdown gracefully. This delay
@@ -977,6 +985,10 @@ let init validator_environment validator_kind =
         (module External_validator_process)
       in
       return (E {validator_process; validator})
+
+let kind (E {validator_process; _}) =
+  let (module M) = validator_process in
+  M.kind
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
 
