@@ -53,25 +53,6 @@ module Set_out_of_list (S : sig
   val remove : t -> key -> (Raw_context.t * int) tzresult Lwt.t
 end) =
 struct
-  let add ctxt rollup key value =
-    let open Lwt_result_syntax in
-    let* ctxt, values_opt = S.find (ctxt, rollup) key in
-    match values_opt with
-    | None ->
-        (* Initialize the list of values. *)
-        let values = [value] in
-        let* ctxt, size = S.init (ctxt, rollup) key values in
-        return (ctxt, size, values)
-    | Some existing_values ->
-        (* Adds [value] to [existing_values] if the values does not
-           already exist. *)
-        let exists = List.mem ~equal:S.equal_value value existing_values in
-        if exists then return (ctxt, 0, existing_values)
-        else
-          let values = value :: existing_values in
-          let* ctxt, diff_size, _existed = S.add (ctxt, rollup) key values in
-          return (ctxt, diff_size, values)
-
   let find ctxt rollup key = S.find (ctxt, rollup) key
 
   let get ctxt rollup key =
@@ -86,6 +67,16 @@ struct
     let* ctxt, values = get ctxt rollup key in
     let exists = List.mem ~equal:S.equal_value value values in
     return (ctxt, exists)
+
+  let add ctxt rollup key value =
+    let open Lwt_result_syntax in
+    let* ctxt, existing_values = get ctxt rollup key in
+    let exists = List.mem ~equal:S.equal_value value existing_values in
+    if exists then return (ctxt, 0, existing_values)
+    else
+      let values = value :: existing_values in
+      let* ctxt, diff_size, _existed = S.add (ctxt, rollup) key values in
+      return (ctxt, diff_size, values)
 end
 
 module Commitments_per_inbox_level = Set_out_of_list (struct
