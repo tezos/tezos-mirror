@@ -218,18 +218,18 @@ type consensus_watermark =
   | Preendorsement of Chain_id.t
   | Dal_attestation of Chain_id.t
 
-let bytes_of_consensus_watermark = function
+let to_watermark = function
   | Preendorsement chain_id ->
-      Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
+      Signature.Custom
+        (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
   | Dal_attestation chain_id
   (* We reuse the watermark of an endorsement. This is because this
      operation is temporary and aims to be merged with an endorsement
      later on. Moreover, there is a leak of abstraction with the shell
      which makes adding a new watermark a bit awkward. *)
   | Endorsement chain_id ->
-      Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
-
-let to_watermark w = Signature.Custom (bytes_of_consensus_watermark w)
+      Signature.Custom
+        (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
 
 let of_watermark = function
   | Signature.Custom b ->
@@ -237,15 +237,11 @@ let of_watermark = function
         match Bytes.get b 0 with
         | '\x12' ->
             Option.map
-              (fun chain_id -> Endorsement chain_id)
+              (fun chain_id -> Preendorsement chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | '\x13' ->
             Option.map
-              (fun chain_id -> Preendorsement chain_id)
-              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
-        | '\x14' ->
-            Option.map
-              (fun chain_id -> Dal_attestation chain_id)
+              (fun chain_id -> Endorsement chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
