@@ -90,8 +90,10 @@ type error +=
       Sc_rollup_wrong_staker_for_conflict_commitment of
       Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
   | (* `Permanent *)
-      Sc_rollup_invalid_commitment_to_cement of
-      Sc_rollup_commitment_repr.Hash.t
+      Sc_rollup_invalid_commitment_to_cement of {
+      valid_candidate : Sc_rollup_commitment_repr.Hash.t;
+      invalid_candidate : Sc_rollup_commitment_repr.Hash.t;
+    }
 
 let () =
   register_error_kind
@@ -607,16 +609,27 @@ let () =
     `Permanent
     ~id:"Sc_rollup_invalid_commitment_to_cement"
     ~title:description
-    ~pp:(fun ppf commitment ->
+    ~pp:(fun ppf (valid_candidate, invalid_candidate) ->
       Format.fprintf
         ppf
-        "The commitment %a can not be cemented"
+        "The commitment %a can not be cemented. %a is a valid candidate to \
+         cementation, but %a is not."
         Sc_rollup_commitment_repr.Hash.pp
-        commitment)
+        invalid_candidate
+        Sc_rollup_commitment_repr.Hash.pp
+        valid_candidate
+        Sc_rollup_commitment_repr.Hash.pp
+        invalid_candidate)
     ~description
     Data_encoding.(
-      obj1 (req "commitment" Sc_rollup_commitment_repr.Hash.encoding))
+      obj2
+        (req "valid_candidate" Sc_rollup_commitment_repr.Hash.encoding)
+        (req "invalid_candidate" Sc_rollup_commitment_repr.Hash.encoding))
     (function
-      | Sc_rollup_invalid_commitment_to_cement commitment -> Some commitment
+      | Sc_rollup_invalid_commitment_to_cement
+          {valid_candidate; invalid_candidate} ->
+          Some (valid_candidate, invalid_candidate)
       | _ -> None)
-    (fun commitment -> Sc_rollup_invalid_commitment_to_cement commitment)
+    (fun (valid_candidate, invalid_candidate) ->
+      Sc_rollup_invalid_commitment_to_cement
+        {valid_candidate; invalid_candidate})

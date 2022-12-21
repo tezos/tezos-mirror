@@ -585,21 +585,21 @@ let is_cementable_candidate_commitment ctxt rollup lcc commitment_hash =
     let* ctxt, stakers_on_commitment =
       Commitment_stakers.get ctxt rollup commitment_hash
     in
-    let* ctxt, active_stakers =
+    let* ctxt, active_stakers_index =
       (* Filter the list of active stakers on this commitment. *)
       List.fold_left_es
-        (fun (ctxt, active_stakers) staker ->
+        (fun (ctxt, active_stakers_index) staker ->
           let* ctxt, is_staker_active =
             Sc_rollup_staker_index_storage.is_active ctxt rollup staker
           in
-          if is_staker_active then return (ctxt, staker :: active_stakers)
-          else return (ctxt, active_stakers))
+          if is_staker_active then return (ctxt, staker :: active_stakers_index)
+          else return (ctxt, active_stakers_index))
         (ctxt, [])
         stakers_on_commitment
     in
     (* The commitment is active if its predecessor is the LCC and
        at least one active steaker has staked on it. *)
-    return (ctxt, Compare.List_length_with.(active_stakers > 0))
+    return (ctxt, Compare.List_length_with.(active_stakers_index > 0))
   else (* Dangling commitment. *)
     return (ctxt, false)
 
@@ -672,7 +672,13 @@ let assert_cement_commitment_met ctxt rollup ~old_lcc ~new_lcc =
   | [candidate_commitment] ->
       if Commitment_hash.equal candidate_commitment new_lcc then
         return (ctxt, new_lcc_commitment, dangling_commitments)
-      else tzfail (Sc_rollup_invalid_commitment_to_cement new_lcc)
+      else
+        tzfail
+          (Sc_rollup_invalid_commitment_to_cement
+             {
+               valid_candidate = candidate_commitment;
+               invalid_candidate = new_lcc;
+             })
   | _ -> tzfail Sc_rollup_disputed
 
 let deallocate_inbox_level ctxt rollup inbox_level new_lcc_hash
