@@ -503,9 +503,9 @@ let time_of_timestamp timestamp =
       | Some tm -> tm)
   | At tm -> tm
 
-let spawn_activate_protocol ?endpoint ?protocol ?protocol_hash ?(fitness = 1)
-    ?(key = Constant.activator.alias) ?(timestamp = Ago default_delay)
-    ?parameter_file client =
+let spawn_activate_protocol ?endpoint ?block ?protocol ?protocol_hash
+    ?(fitness = 1) ?(key = Constant.activator.alias)
+    ?(timestamp = Ago default_delay) ?parameter_file client =
   let timestamp = time_of_timestamp timestamp in
   let protocol_hash, parameter_file =
     match (protocol, protocol_hash, parameter_file) with
@@ -525,27 +525,29 @@ let spawn_activate_protocol ?endpoint ?protocol ?protocol_hash ?(fitness = 1)
   spawn_command
     ?endpoint
     client
-    [
-      "activate";
-      "protocol";
-      protocol_hash;
-      "with";
-      "fitness";
-      string_of_int fitness;
-      "and";
-      "key";
-      key;
-      "and";
-      "parameters";
-      parameter_file;
-      "--timestamp";
-      Time.to_notation timestamp;
-    ]
+    (optional_arg "block" Fun.id block
+    @ [
+        "activate";
+        "protocol";
+        protocol_hash;
+        "with";
+        "fitness";
+        string_of_int fitness;
+        "and";
+        "key";
+        key;
+        "and";
+        "parameters";
+        parameter_file;
+        "--timestamp";
+        Time.to_notation timestamp;
+      ])
 
-let activate_protocol ?endpoint ?protocol ?protocol_hash ?fitness ?key
+let activate_protocol ?endpoint ?block ?protocol ?protocol_hash ?fitness ?key
     ?timestamp ?parameter_file client =
   spawn_activate_protocol
     ?endpoint
+    ?block
     ?protocol
     ?protocol_hash
     ?fitness
