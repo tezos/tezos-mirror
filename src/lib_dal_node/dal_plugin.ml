@@ -64,6 +64,11 @@ module type T = sig
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
+  val get_committee :
+    Client_context.full ->
+    level:int32 ->
+    (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+
   val attested_slot_headers :
     Tezos_crypto.Block_hash.t ->
     block_info ->

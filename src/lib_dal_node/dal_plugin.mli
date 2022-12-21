@@ -77,6 +77,15 @@ module type T = sig
     block_info ->
     (slot_header * operation_application_result) list tzresult Lwt.t
 
+  (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
+      map that associates to the public key hash [pkh] of the member of
+      the committee an interval [(s,n)], meaning that the slots [s;s+1;...;s+n-1]
+      belong to [pkh] *)
+  val get_committee :
+    Client_context.full ->
+    level:int32 ->
+    (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+
   (** [attested_slot_headers hash block_info number_of_slots] reads the metadata
       of the given [block_info] and constructs the list of attested slots
       headers.

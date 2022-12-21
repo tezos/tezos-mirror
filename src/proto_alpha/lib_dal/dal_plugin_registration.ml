@@ -96,6 +96,19 @@ module Plugin = struct
            let slot_index = Dal.Slot_index.to_int slot_index in
            return Dal_plugin.({published_level; slot_index; commitment}, status))
 
+  let get_committee ctxt ~level =
+    let open Lwt_result_syntax in
+    let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    let*? level = Raw_level.of_int32 level |> Environment.wrap_tzresult in
+    let+ pkh_to_shards =
+      Plugin.RPC.Dal.dal_shards cpctxt (cpctxt#chain, cpctxt#block) ~level ()
+    in
+    List.fold_left
+      (fun acc (pkh, s) ->
+        Tezos_crypto.Signature.Public_key_hash.Map.add pkh s acc)
+      Tezos_crypto.Signature.Public_key_hash.Map.empty
+      pkh_to_shards
+
   let attested_slot_headers hash (block : block_info) ~number_of_slots =
     let open Result_syntax in
     let* metadata =
