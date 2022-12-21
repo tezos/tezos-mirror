@@ -358,6 +358,11 @@ module Dal : sig
       ?slot_index:int ->
       commitment ->
       (Dal_node.t, slot_header list) RPC_core.t
+
+    (** Call RPC "GET /profile/<public_key_hash>/<level>/assigned-shard-indices" to
+        get shard ids assigned to the given public key hash at the given level. *)
+    val get_assigned_shard_indices :
+      level:int -> pkh:string -> (Dal_node.t, int list) RPC_core.t
   end
 
   val make :
