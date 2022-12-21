@@ -1,0 +1,7 @@
+build:
+  image: ocaml/opam:debian-ocaml-4.14
+  before_script:
+    - sudo apt update
+  script:
+    - opam-2.1 install --deps-only -y ./teztale.opam
+    - dune build
