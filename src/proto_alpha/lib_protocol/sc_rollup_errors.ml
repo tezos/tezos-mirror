@@ -326,9 +326,14 @@ let () =
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_staker_backtracked"
-    ~title:"Staker backtracked"
+    ~title:description
     ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The staker backtracked, that is, it tried to publish a commitment for \
+         an inbox level where it already published another conflicting \
+         commitment. The staker is not allowed to changed its mind.")
     Data_encoding.empty
     (function Sc_rollup_staker_backtracked -> Some () | _ -> None)
     (fun () -> Sc_rollup_staker_backtracked) ;

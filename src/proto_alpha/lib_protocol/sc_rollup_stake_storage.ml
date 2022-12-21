@@ -45,8 +45,6 @@ module Set_out_of_list (S : sig
 
   val find : t -> key -> (Raw_context.t * value list option) tzresult Lwt.t
 
-  val init : t -> key -> value list -> (Raw_context.t * int) tzresult Lwt.t
-
   val add :
     t -> key -> value list -> (Raw_context.t * int * bool) tzresult Lwt.t
 
@@ -88,8 +86,6 @@ module Commitments_per_inbox_level = Set_out_of_list (struct
 
   let find = Store.Commitments_per_inbox_level.find
 
-  let init = Store.Commitments_per_inbox_level.init
-
   let add = Store.Commitments_per_inbox_level.add
 
   let remove = Store.Commitments_per_inbox_level.remove_existing
@@ -103,8 +99,6 @@ module Commitment_stakers = Set_out_of_list (struct
   let equal_value = Sc_rollup_staker_index_repr.equal
 
   let find = Store.Commitment_stakers.find
-
-  let init = Store.Commitment_stakers.init
 
   let add = Store.Commitment_stakers.add
 
@@ -343,7 +337,7 @@ let assert_commitment_is_not_past_curfew ctxt rollup inbox_level =
     that the maximum cost of storage allocated by each staker is at most the size
     of their deposit.
  *)
-let assert_refine_conditions_met ctxt rollup lcc commitment =
+let assert_refine_conditions_met ~current_level ctxt rollup lcc commitment =
   let open Lwt_result_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
@@ -353,7 +347,6 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
       rollup
       Commitment.(commitment.inbox_level)
   in
-  let current_level = (Raw_context.current_level ctxt).level in
   let* () =
     fail_unless
       Raw_level_repr.(commitment.Commitment.inbox_level < current_level)
@@ -449,11 +442,11 @@ let find_commitment_to_deallocate ctxt rollup commitment_hash =
 let max_commitment_storage_size_in_bytes = 125 + 10
 
 (** [set_staker_commitment ctxt rollup staker_index inbox_level commitment_hash]
-    updates the **newest** commitment [staker_index] stakes on.
+    updates the **latest** commitment [staker_index] stakes on.
     Adds [staker_index] to the set of stakers staking on [commitment_hash]. *)
 let set_staker_commitment ctxt rollup staker_index inbox_level commitment_hash =
   let open Lwt_result_syntax in
-  (* Update the newest commitment [staker_index] stakes on. *)
+  (* Update the latest commitment [staker_index] stakes on. *)
   let* ctxt, size_diff_stakers =
     let* ctxt, last_level = Store.Stakers.get (ctxt, rollup) staker_index in
     if Raw_level_repr.(last_level < inbox_level) then
@@ -494,9 +487,15 @@ let assert_staker_dont_backtrack ctxt rollup staker_index commitments =
    Add a test checking that L2 nodes can catch up after going offline. *)
 let refine_stake ctxt rollup commitment ~staker_index ~lcc =
   let open Lwt_result_syntax in
+  let publication_level = (Raw_context.current_level ctxt).level in
   (* Checks the commitment validity, see {!assert_refine_conditions_met}. *)
   let* ctxt, refine_conditions_size_diff =
-    assert_refine_conditions_met ctxt rollup lcc commitment
+    assert_refine_conditions_met
+      ctxt
+      rollup
+      lcc
+      commitment
+      ~current_level:publication_level
   in
   let*? ctxt, commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt commitment
@@ -507,7 +506,6 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
   in
   (* Initializes or fetch the level at which the commitment was first
      published. *)
-  let publication_level = (Raw_context.current_level ctxt).level in
   let* commitment_added_size_diff, commitment_added_level, ctxt =
     Commitment_storage.set_commitment_added
       ctxt
@@ -704,14 +702,19 @@ let deallocate_inbox_level ctxt rollup inbox_level new_lcc_hash
 
 let update_saved_cemented_commitments ctxt rollup old_lcc =
   let open Lwt_result_syntax in
-  let* commitment_to_deallocate, ctxt =
+  let* too_old_cemented_commitment_hash_opt, ctxt =
     find_commitment_to_deallocate ctxt rollup old_lcc
   in
-  match commitment_to_deallocate with
+  match too_old_cemented_commitment_hash_opt with
   | None -> return ctxt
-  | Some old_lcc ->
-      if Commitment_hash.(equal old_lcc zero) then return ctxt
-      else deallocate_commitment_contents ctxt rollup old_lcc
+  | Some too_old_cemented_commitment_hash ->
+      if Commitment_hash.(equal too_old_cemented_commitment_hash zero) then
+        return ctxt
+      else
+        deallocate_commitment_contents
+          ctxt
+          rollup
+          too_old_cemented_commitment_hash
 
 let cement_commitment ctxt rollup new_lcc =
   let open Lwt_result_syntax in

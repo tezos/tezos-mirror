@@ -97,7 +97,7 @@ val cement_commitment :
 
 (** [find_staker context rollup staker] returns the most recent commitment
     [staker] staked on, or [None] if its last staked commitment is older
-    than the last cemented commitment. *)
+    or equal than the last cemented commitment. *)
 val find_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->

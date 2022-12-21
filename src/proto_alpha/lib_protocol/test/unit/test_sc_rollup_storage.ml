@@ -327,11 +327,7 @@ let advance_level_for_cement ctxt rollup (commitment : Commitment_repr.t) =
   let target_level = Raw_level_repr.add commitment_added challenge_window in
   if cur_level > target_level then return ctxt
   else
-    let offset =
-      let open Raw_level_repr in
-      let open Int32 in
-      (* succ @@  *) sub (to_int32 target_level) (to_int32 cur_level)
-    in
+    let offset = Raw_level_repr.diff target_level cur_level in
     return (Raw_context.Internal_for_tests.add_level ctxt (Int32.to_int offset))
 
 let advance_level_n_refine_stake ctxt rollup staker commitment =
@@ -382,6 +378,10 @@ let commitment ?compressed_state ?predecessor ?inbox_level ?number_of_ticks () =
   in
   (commitment, Commitment_repr.hash_uncarbonated commitment)
 
+(** [commitments ~predecessor ?start_at_level ctxt n] creates a branch of
+    commitment starting at [valid_inbox_level ctxt start_at_level] and with
+    [predecessor] as commitment's predecessor. The branch is [n] elements
+    deep. *)
 let commitments ~predecessor ?(start_at = 1l) ctxt n =
   let n = Int32.(add (of_int n) start_at) in
   let rec go predecessor acc l =
@@ -571,10 +571,34 @@ module Stake_storage_tests = struct
 
   (** Test that deposit initializes the metadata for the staker. *)
   let test_deposit () =
-    let* ctxt, rollup, _genesis_hash, staker =
-      originate_rollup_and_deposit_with_one_staker ()
+    let* ctxt, staker = new_context_1 () in
+    let contract_staker = Contract_repr.Implicit staker in
+    let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
+    let* ctxt_after_deposit, _balance_updates, _staker_index =
+      lift
+      @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
+           ctxt
+           rollup
+           staker
     in
-    assert_staker_exists ctxt rollup staker
+    (* Assert [staker]'s metadata exists. *)
+    let* () = assert_staker_exists ctxt_after_deposit rollup staker in
+    let stake = Constants_storage.sc_rollup_stake_amount ctxt in
+    (* Assert [staker]'s balance decreased of [stake]. *)
+    let* () =
+      assert_balance_decreased
+        ctxt
+        ctxt_after_deposit
+        (`Contract contract_staker)
+        stake
+    in
+    let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+    let bonds_account = `Frozen_bonds (contract_staker, bond_id) in
+    (* Assert [bond_account]'s balance increased of [stake]. *)
+    let* () =
+      assert_balance_increased ctxt ctxt_after_deposit bonds_account stake
+    in
+    return_unit
 
   (** Test that deposit fails if the staker is underfunded. *)
   let test_deposit_by_underfunded_staker () =
@@ -674,34 +698,6 @@ module Stake_storage_tests = struct
          ctxt
          rollup
          staker)
-
-  let test_deposit_freeze_stake () =
-    let* ctxt, staker = new_context_1 () in
-    let contract_staker = Contract_repr.Implicit staker in
-    let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
-    let* ctxt_after_deposit, _balance_updates, _staker_index =
-      lift
-      @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
-           ctxt
-           rollup
-           staker
-    in
-    let stake = Constants_storage.sc_rollup_stake_amount ctxt in
-    (* Assert [staker] balance decreased of [stake]. *)
-    let* () =
-      assert_balance_decreased
-        ctxt
-        ctxt_after_deposit
-        (`Contract contract_staker)
-        stake
-    in
-    let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-    let bonds_account = `Frozen_bonds (contract_staker, bond_id) in
-    (* Assert [bond_account] balance increased of [stake]. *)
-    let* () =
-      assert_balance_increased ctxt ctxt_after_deposit bonds_account stake
-    in
-    return_unit
 
   (** {2. Publish unit tests.} *)
 
@@ -2603,7 +2599,6 @@ module Stake_storage_tests = struct
       Tztest.tztest "deposit then withdraw" `Quick test_deposit_then_withdraw;
       Tztest.tztest "deposit on two rollups" `Quick test_deposit_on_two_rollups;
       Tztest.tztest "deposit twice fails" `Quick test_deposit_twice_fails;
-      Tztest.tztest "deposit freeze stake" `Quick test_deposit_freeze_stake;
       (* Publish tests: *)
       Tztest.tztest "publish" `Quick test_publish;
       Tztest.tztest "publish twice" `Quick test_publish_twice;
