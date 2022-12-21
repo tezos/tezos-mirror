@@ -53,8 +53,8 @@ state-passing machine where:
 .. TODO #4155:
 
    When creating a new environment, update references to V<N> in the
-   paragraph below.
-   
+   paragraph below (only in the doc for Alpha!).
+
 However, the *concrete* API exported from the Tezos economic protocol
 does not implement this business logic *monolithically*, as described
 above, but it rather presents a more fine-grained API. The rationale

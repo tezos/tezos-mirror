@@ -1,3 +1,5 @@
+# TODO #2170: search for old/preceding protocol name AND number, and adapt
+
 # You can set these variables from the command line.
 SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
@@ -71,7 +73,7 @@ odoc-lite: docexes
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms \
-	  --include="src/proto_014*" --include="src/proto_015*" \
+	  --include="src/proto_015*" --include="src/proto_016*" \
 	  --exclude="src/proto_0*" \
 		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
 	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2971

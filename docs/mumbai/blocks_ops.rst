@@ -14,7 +14,7 @@ those available to end-users on Tezos Mainnet. The complete list of
 operations, including those corresponding to features in development
 or available only on test networks, is given in the
 :package-api:`OCaml Documentation
-<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Operation_repr/index.html>`.
+<tezos-protocol-016-PtMumbai/Tezos_raw_protocol_016_PtMumbai/Operation_repr/index.html>`.
 
 .. _validation_passes_mumbai:
 
