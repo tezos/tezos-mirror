@@ -3304,7 +3304,7 @@ module Sc_rollup : sig
     val add_payload :
       History.t -> t -> Inbox_message.serialized -> (History.t * t) tzresult
 
-    type proof
+    type proof = private t list
 
     val proof_encoding : proof Data_encoding.t
 
@@ -3315,6 +3315,8 @@ module Sc_rollup : sig
 
     module Internal_for_tests : sig
       val find_predecessor_payload : History.t -> index:Z.t -> t -> t option
+
+      val make_proof : t list -> proof
     end
   end
 
