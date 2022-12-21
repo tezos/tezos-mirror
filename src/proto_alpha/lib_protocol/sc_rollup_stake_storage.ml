@@ -565,6 +565,20 @@ let publish_commitment ctxt rollup staker commitment =
   in
   return (commitment_hash, publication_level, ctxt, balances_updates)
 
+(** [active_stakers_index ctxt rollup stakers] filters [stakers] to return
+    only the active ones. *)
+let active_stakers_index ctxt rollup stakers =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun (ctxt, active_stakers_index) staker ->
+      let* ctxt, is_staker_active =
+        Sc_rollup_staker_index_storage.is_active ctxt rollup staker
+      in
+      if is_staker_active then return (ctxt, staker :: active_stakers_index)
+      else return (ctxt, active_stakers_index))
+    (ctxt, [])
+    stakers
+
 let is_cementable_candidate_commitment ctxt rollup lcc commitment_hash =
   let open Lwt_result_syntax in
   let* commitment, ctxt =
@@ -575,16 +589,7 @@ let is_cementable_candidate_commitment ctxt rollup lcc commitment_hash =
       Commitment_stakers.get ctxt rollup commitment_hash
     in
     let* ctxt, active_stakers_index =
-      (* Filter the list of active stakers on this commitment. *)
-      List.fold_left_es
-        (fun (ctxt, active_stakers_index) staker ->
-          let* ctxt, is_staker_active =
-            Sc_rollup_staker_index_storage.is_active ctxt rollup staker
-          in
-          if is_staker_active then return (ctxt, staker :: active_stakers_index)
-          else return (ctxt, active_stakers_index))
-        (ctxt, [])
-        stakers_on_commitment
+      active_stakers_index ctxt rollup stakers_on_commitment
     in
     (* The commitment is active if its predecessor is the LCC and
        at least one active steaker has staked on it. *)
@@ -592,23 +597,41 @@ let is_cementable_candidate_commitment ctxt rollup lcc commitment_hash =
   else (* Dangling commitment. *)
     return (ctxt, false)
 
-let cementable_candidate_commitments_of_inbox_level ctxt rollup lcc inbox_level
-    =
+let cementable_candidate_commitments_of_inbox_level ctxt rollup ~old_lcc
+    ~new_lcc inbox_level =
   let open Lwt_result_syntax in
   let* ctxt, commitments =
     Commitments_per_inbox_level.get ctxt rollup inbox_level
   in
-  List.fold_left_es
-    (fun (ctxt, candidate_commitments, dangling_commitments) commitment ->
-      let* ctxt, is_candidate =
-        is_cementable_candidate_commitment ctxt rollup lcc commitment
+  match commitments with
+  | [candidate_commitment] when Commitment_hash.(new_lcc = candidate_commitment)
+    ->
+      (* The check that [new_lcc.predecessor = old] is done by the caller.
+         In 99.99% there will be only one candidate commitment, we minimize
+         the cost in this case. *)
+      let* ctxt, stakers_on_commitment =
+        Commitment_stakers.get ctxt rollup candidate_commitment
       in
-      if is_candidate then
-        return (ctxt, commitment :: candidate_commitments, dangling_commitments)
-      else
-        return (ctxt, candidate_commitments, commitment :: dangling_commitments))
-    (ctxt, [], [])
-    commitments
+      let* ctxt, active_stakers_index_on_commitment =
+        active_stakers_index ctxt rollup stakers_on_commitment
+      in
+      if Compare.List_length_with.(active_stakers_index_on_commitment > 0) then
+        return (ctxt, [candidate_commitment], [])
+      else return (ctxt, [], [candidate_commitment])
+  | commitments ->
+      List.fold_left_es
+        (fun (ctxt, candidate_commitments, dangling_commitments) commitment ->
+          let* ctxt, is_candidate =
+            is_cementable_candidate_commitment ctxt rollup old_lcc commitment
+          in
+          if is_candidate then
+            return
+              (ctxt, commitment :: candidate_commitments, dangling_commitments)
+          else
+            return
+              (ctxt, candidate_commitments, commitment :: dangling_commitments))
+        (ctxt, [], [])
+        commitments
 
 (** [assert_cement_commitment_met ctxt rollup ~old_lcc new_lcc] asserts that
     the following list of properties are respected:
@@ -651,7 +674,8 @@ let assert_cement_commitment_met ctxt rollup ~old_lcc ~new_lcc =
     cementable_candidate_commitments_of_inbox_level
       ctxt
       rollup
-      old_lcc
+      ~old_lcc
+      ~new_lcc
       new_lcc_commitment.inbox_level
   in
   match candidate_commitments with
