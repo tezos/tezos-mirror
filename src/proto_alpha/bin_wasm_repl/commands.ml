@@ -143,7 +143,13 @@ let eval_kernel_run tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
-      let* tree = eval_to_snapshot ~max_steps:Int64.max_int tree in
+      let* tree, _ =
+        Wasm_fast.compute_step_many
+          ~builtins
+          ~stop_at_snapshot:true
+          ~max_steps:Int64.max_int
+          tree
+      in
       let+ info_after = Wasm.get_info tree in
       ( tree,
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
@@ -155,6 +161,7 @@ let eval_until_input_requested tree =
       let* info_before = Wasm.get_info tree in
       let* tree =
         eval_until_input_requested
+          ~fast_exec:true
           ~debug_flag:true
           ~max_steps:Int64.max_int
           tree
