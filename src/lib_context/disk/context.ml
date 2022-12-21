@@ -229,6 +229,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   module P = Store.Backend
 
   module Checks = struct
+    module Conf = struct
+      include Conf
+    end
+
     module Maker = struct
       module Maker = Irmin_pack_unix.Maker (Conf)
       include Maker.Make (Schema)

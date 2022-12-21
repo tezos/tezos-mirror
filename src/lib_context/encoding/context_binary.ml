@@ -37,4 +37,6 @@ module Conf = struct
   let contents_length_header = Some `Varint
 
   let forbid_empty_dir_persistence = true
+
+  let integrity_checks = `Minimal
 end
