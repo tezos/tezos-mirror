@@ -124,6 +124,20 @@ module Registration = struct
   let register2 ~chunked s f =
     register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
         f context a1 a2 q i)
+
+  let register3_fullctxt ~chunked s f =
+    patched_services :=
+      RPC_directory.register
+        ~chunked
+        !patched_services
+        s
+        (fun (((ctxt, arg1), arg2), arg3) q i ->
+          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          f ctxt arg1 arg2 arg3 q i)
+
+  let register3 ~chunked s f =
+    register3_fullctxt ~chunked s (fun {context; _} a1 a2 a3 q i ->
+        f context a1 a2 a3 q i)
 end
 
 let unparsing_mode_encoding =
