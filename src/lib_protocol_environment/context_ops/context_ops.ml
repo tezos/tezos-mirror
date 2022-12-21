@@ -203,6 +203,11 @@ let gc context_index context_hash =
   | Disk_index index -> Context.gc index context_hash
   | Memory_index index -> Tezos_context_memory.Context.gc index context_hash
 
+let wait_gc_completion context_index =
+  match context_index with
+  | Disk_index index -> Context.wait_gc_completion index
+  | Memory_index index -> Tezos_context_memory.Context.wait_gc_completion index
+
 let sync = function
   | Disk_index index -> Context.sync index
   | Memory_index index -> Tezos_context_memory.Context.sync index
