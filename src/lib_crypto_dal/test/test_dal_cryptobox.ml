@@ -62,7 +62,9 @@ module Test = struct
           |> Array.of_list
         in
         let c =
-          Cryptobox.IntMap.filter (fun i _ -> Array.mem i c_indices) enc_shards
+          Seq.filter
+            (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
+            enc_shards
         in
         let* decoded_slot = Cryptobox.polynomial_from_shards t c in
         let decoded_msg =
@@ -71,16 +73,12 @@ module Test = struct
         assert (Bytes.equal msg decoded_msg) ;
         let comm = Cryptobox.commit t p in
         let shard_proofs = Cryptobox.prove_shards t p in
-        match Cryptobox.IntMap.find 0 enc_shards with
+        match
+          Seq.find (fun ({index; _} : Cryptobox.shard) -> index = 0) enc_shards
+        with
         | None -> Ok ()
-        | Some eval ->
-            let check =
-              Cryptobox.verify_shard
-                t
-                comm
-                {index = 0; share = eval}
-                shard_proofs.(0)
-            in
+        | Some shard ->
+            let check = Cryptobox.verify_shard t comm shard shard_proofs.(0) in
             assert check ;
             let pi = Cryptobox.prove_commitment t p in
             let check = Cryptobox.verify_commitment t comm pi in

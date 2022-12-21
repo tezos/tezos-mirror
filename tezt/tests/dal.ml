@@ -1087,21 +1087,16 @@ let test_dal_node_rebuild_from_shards _protocol _parameters _cryptobox node
   let* shards =
     RPC.call dal_node (Rollup.Dal.RPC.shards ~slot_header downloaded_shard_ids)
   in
-  let shards =
-    List.fold_left
-      (fun acc shard ->
-        let shard =
-          match Data_encoding.Json.from_string shard with
-          | Ok s -> s
-          | Error _ -> Test.fail "shard RPC sent invalid json"
-        in
-        let shard =
-          Data_encoding.Json.destruct Cryptobox.shard_encoding shard
-        in
-        Cryptobox.IntMap.add shard.index shard.share acc)
-      Cryptobox.IntMap.empty
-      shards
+  let shard_of_json shard =
+    let shard =
+      match Data_encoding.Json.from_string shard with
+      | Ok s -> s
+      | Error _ -> Test.fail "shard RPC sent invalid json"
+    in
+    let shard = Data_encoding.Json.destruct Cryptobox.shard_encoding shard in
+    ({index = shard.index; share = shard.share} : Cryptobox.shard)
   in
+  let shards = shards |> List.to_seq |> Seq.map shard_of_json in
   let cryptobox = Rollup.Dal.make parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with

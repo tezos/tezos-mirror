@@ -106,6 +106,8 @@ let test_wrong_shard_size () =
   in
   return_unit
 
+module IntMap = Map.Make (Int)
+
 let test_rw () =
   with_store @@ fun dal parameters store ->
   let open Lwt_result_syntax in
@@ -118,13 +120,16 @@ let test_rw () =
     Shard_store.read_shards ~share_size store commitment
   in
   print_endline
-  @@ Format.sprintf
-       "%d %d"
-       (Cryptobox.IntMap.cardinal shards)
-       (Cryptobox.IntMap.cardinal shards_extracted) ;
+  @@ Format.sprintf "%d %d" (Seq.length shards) (Seq.length shards_extracted) ;
+  let map_shards =
+    Seq.map (fun ({index; share} : Cryptobox.shard) -> (index, share))
+  in
   assert (
-    Cryptobox.IntMap.bindings shards_extracted
-    = Cryptobox.IntMap.bindings shards) ;
+    IntMap.(
+      equal
+        ( = )
+        (of_seq (map_shards shards_extracted))
+        (of_seq (map_shards shards)))) ;
   return_unit
 
 let tests_store =

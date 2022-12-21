@@ -126,8 +126,7 @@ let save store watcher slot_header shards =
   let* () = Shard_store.write_shards store slot_header shards in
   let*! () =
     let slot_header_b58 = Cryptobox.Commitment.to_b58check slot_header in
-    Event.(
-      emit stored_slot_shards (slot_header_b58, Cryptobox.IntMap.cardinal shards))
+    Event.(emit stored_slot_shards (slot_header_b58, Seq.length shards))
   in
   Lwt_watcher.notify watcher slot_header ;
   return_unit
@@ -184,10 +183,7 @@ let get_slot cryptobox store slot_header =
   let* shards = Shard_store.read_shards ~share_size store slot_header in
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_bytes cryptobox polynomial in
-  let*! () =
-    Event.(
-      emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
-  in
+  let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
 let get_slot_pages cryptobox store slot_header =
