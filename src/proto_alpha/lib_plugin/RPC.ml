@@ -2058,7 +2058,7 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(
-          path_sc_rollup / "games_with_staker" /: Sc_rollup.Staker.rpc_arg)
+          path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "games")
 
     let stakers_commitments =
       let output =
