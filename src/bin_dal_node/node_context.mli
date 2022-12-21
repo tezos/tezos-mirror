@@ -39,9 +39,10 @@ type status = Ready of ready_ctxt | Starting
     field are available through accessors *)
 type t
 
-(** [init config] creates a [t] with a status set to [Starting] with a given dal
-    node configuration.*)
-val init : Configuration.t -> Store.node_store -> t
+(** [init config store cctx] creates a [t] with a status set to [Starting]
+    using the given dal node configuration [config], node store [store],
+    and tezos node client context [cctx]. *)
+val init : Configuration.t -> Store.node_store -> Client_context.full -> t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
@@ -73,6 +74,9 @@ val get_status : t -> status
 
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.node_store
+
+(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context *)
+val get_tezos_node_cctxt : t -> Client_context.full
 
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
