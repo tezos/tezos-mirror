@@ -3928,8 +3928,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let restore_and_apply_context snapshot_importer protocol_levels
       ?user_expected_block ~dst_context_dir ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~progress_display_mode ~legacy ~patch_context snapshot_metadata genesis
-      chain_id =
+      ~progress_display_mode ~legacy ~patch_context ~check_consistency
+      snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
     let* ({
             block_header;
@@ -4026,6 +4026,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~chain_id
             ~time:genesis.Genesis.time
             ~protocol:genesis.protocol
+        in
+        let*! () =
+          if check_consistency then
+            Context.Checks.Pack.Integrity_check.run
+              ~root:dst_context_dir
+              ~auto_repair:false
+              ~always:false
+              ~heads:(Some [Context_hash.to_b58check imported_context_hash])
+          else Lwt.return_unit
         in
         return (genesis_ctxt_hash, context_index)
     in
@@ -4148,6 +4157,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | None -> return_unit
     in
     let*! () =
+      if not check_consistency then Event.(emit warn_no_check ())
+      else Event.(emit suggest_no_check ())
+    in
+    let*! () =
       import_log_notice
         ~snapshot_version
         ~snapshot_metadata
@@ -4181,6 +4194,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~progress_display_mode
         ~legacy
         ~patch_context
+        ~check_consistency
         snapshot_metadata
         genesis
         chain_id

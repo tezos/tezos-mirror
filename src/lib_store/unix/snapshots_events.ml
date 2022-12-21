@@ -113,6 +113,16 @@ module Event = struct
       ~msg:"cleaning up artifacts after failure"
       ()
 
+  let suggest_no_check =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"suggest_no_check"
+      ~msg:
+        "Note: the import of a snapshot can be sped up using the '--no-check' \
+         option. Only use this option if you fully trust the snapshot source."
+      ()
+
   (* Info *)
   let validate_protocol_sources =
     declare_1
@@ -122,4 +132,16 @@ module Event = struct
       ~msg:"validating protocol {hash} against sources"
       ~pp1:Protocol_hash.pp
       ("hash", Protocol_hash.encoding)
+
+  (* Warning *)
+  let warn_no_check =
+    declare_0
+      ~section
+      ~level:Warning
+      ~name:"warn_no_check"
+      ~msg:
+        "Warning: to speed up the import, the consistency of the imported data \
+         will not be fully checked. It is not recommended to use this option \
+         with a snapshot downloaded from an untrusted source"
+      ()
 end
