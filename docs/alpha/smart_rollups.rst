@@ -805,6 +805,7 @@ Setting-up Rust
 simple as running the following command.
 
 ::
+
    rustup target add wasm32-unknown-unknown
 
 Rust also proposes the ``wasm64-unknown-unknown`` compilation
