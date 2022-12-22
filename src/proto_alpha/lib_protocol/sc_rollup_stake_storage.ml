@@ -196,9 +196,9 @@ let deposit_stake ctxt rollup staker =
   let* ctxt, staker_balance =
     Contract_storage.get_balance_carbonated ctxt staker_contract
   in
-  let* () =
-    fail_when
-      Tez_repr.(staker_balance < stake)
+  let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
+  let* ctxt, balance_updates =
+    trace
       (Sc_rollup_staker_funds_too_low
          {
            staker;
@@ -206,14 +206,11 @@ let deposit_stake ctxt rollup staker =
            staker_balance;
            min_expected_balance = stake;
          })
-  in
-  let bond_id = Bond_id_repr.Sc_rollup_bond_id rollup in
-  let* ctxt, balance_updates =
-    Token.transfer
-      ctxt
-      (`Contract staker_contract)
-      (`Frozen_bonds (staker_contract, bond_id))
-      stake
+    @@ Token.transfer
+         ctxt
+         (`Contract staker_contract)
+         (`Frozen_bonds (staker_contract, bond_id))
+         stake
   in
   (* Initialize the index of [staker]. *)
   let* ctxt, staker_index =
