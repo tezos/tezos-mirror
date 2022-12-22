@@ -558,7 +558,7 @@ let () =
       | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
       | _ -> None)
     (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker) ;
-  let description = "Conflicting commitments do not have a common ancestor" in
+  let description = "Conflicting commitments does not have a common ancestor" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_not_valid_commitments_conflict"
@@ -614,7 +614,7 @@ let () =
       | _ -> None)
     (fun (staker, commitment) ->
       Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment)) ;
-  let description = "Given commitment can not be cemented" in
+  let description = "Given commitment cannot be cemented" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_invalid_commitment_to_cement"
@@ -622,7 +622,7 @@ let () =
     ~pp:(fun ppf (valid_candidate, invalid_candidate) ->
       Format.fprintf
         ppf
-        "The commitment %a can not be cemented. %a is a valid candidate to \
+        "The commitment %a cannot be cemented. %a is a valid candidate to \
          cementation, but %a is not."
         Sc_rollup_commitment_repr.Hash.pp
         invalid_candidate

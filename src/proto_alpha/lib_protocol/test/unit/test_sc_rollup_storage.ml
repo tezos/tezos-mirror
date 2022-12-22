@@ -1175,9 +1175,10 @@ module Stake_storage_tests = struct
     let cant_cement ctxt =
       List.iter_es (fun commitment ->
           let hash = Commitment_repr.hash_uncarbonated commitment in
-          assert_fails
+          assert_fails_with
             ~loc:__LOC__
-            (cement_commitment ctxt rollup commitment hash))
+            (cement_commitment ctxt rollup commitment hash)
+            Sc_rollup_errors.Sc_rollup_disputed)
     in
     let* () = cant_cement ctxt honest_commitments in
     let* () = cant_cement ctxt dishonest_commitments in

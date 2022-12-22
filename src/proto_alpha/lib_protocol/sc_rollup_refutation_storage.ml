@@ -120,6 +120,27 @@ let commitments_are_conflicting ctxt rollup hash1_opt hash2_opt =
       else return (ctxt, None)
   | _ -> return (ctxt, None)
 
+(** [look_for_conflict ctxt rollup staker1_index staker2_index from_level
+    upto_level delta] looks for the first conflict of [staker1_index]
+    and [staker2_index].
+
+    It starts at [from_level] which the last cemented inbox level on the
+    [rollup], and climbs the staking's storage through a recursive
+    function.
+
+    Two important notes:
+    {ol
+      {li The code can do at most (max_lookahead / commitment_period) recursive
+          calls, which can be a lot;}
+      {li Therefore, this code must be called only via a RPC, used by the
+          rollup-node. The {!check_conflict_point} used by the protocol is
+          on the other hand, very cheap.}
+    }
+
+    FIXME: https://gitlab.com/tezos/tezos/-/issues/4477
+    As it should be used only via an RPC (and by the rollup-node), we should
+    move this function (and other related functions) outside the protocol.
+*)
 let look_for_conflict ctxt rollup staker1_index staker2_index from_level
     upto_level delta =
   let open Lwt_result_syntax in

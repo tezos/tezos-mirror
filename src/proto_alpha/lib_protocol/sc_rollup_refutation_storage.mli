@@ -189,7 +189,7 @@ module Internal_for_tests : sig
       first point of disagreement between the [staker1] and the
       [staker2]
       The returned commitments are distinct, and have the same [parent]
-      commitment.
+      commitment; hence the same inbox level.
 
       May fail with:
       {ul

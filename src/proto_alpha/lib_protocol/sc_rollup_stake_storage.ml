@@ -30,7 +30,7 @@ module Commitment_storage = Sc_rollup_commitment_storage
 module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
-(** As the set encoded with a list are proportional to the number of
+(** As the sets encoded with a list are proportional to the number of
     stakers on the rollup, we admit that it will be a small set. We
     also admit that a small list respecting the set properties is more
     efficient than using a real {!Set.S}. *)
@@ -105,7 +105,7 @@ module Commitment_stakers = Set_out_of_list (struct
   let remove = Store.Commitment_stakers.remove_existing
 end)
 
-(* Looks for the commitment [staker] stakes on, in the list of commitments
+(* Looks for the commitment [staker] is staking on, in the list of commitments
    posted for this level. *)
 let rec find_commitment_of_staker_in_commitments ctxt rollup staker_index =
   let open Lwt_result_syntax in
