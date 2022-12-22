@@ -13,6 +13,11 @@ init_sandboxed_client() {
     rpc=$((18730 + id))
     client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
+    if [ -n "$SCORU_DATA_DIR" ]; then
+        rollup_node_dir="$SCORU_DATA_DIR"
+    else
+        rollup_node_dir="$(mktemp -d -t tezos-smart-rollup-node.XXXXXXXX)"
+    fi
     signer="$local_signer -d $client_dir"
     if [ -n "$USE_TLS" ]; then
         client="$local_client -base-dir $client_dir -endpoint https://$host:$rpc"
@@ -184,8 +189,9 @@ main () {
         echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol_without_number
         chmod +x $client_dir/bin/octez-baker-$protocol_without_number
 
+
         echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
-        echo "exec $sc_rollup_node \"\$@\""  >> $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
+        echo "exec $sc_rollup_node \"\$@\" -data-dir $rollup_node_dir"  >> $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
         chmod +x $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
 
         echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
