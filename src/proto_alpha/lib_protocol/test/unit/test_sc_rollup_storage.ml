@@ -224,6 +224,12 @@ let assert_fails_with ~loc k expected_err =
   let res = Environment.wrap_tzresult res in
   Assert.proto_error ~loc res (( = ) expected_err)
 
+let assert_fails_with_f ~loc k pred =
+  let open Lwt_result_syntax in
+  let*! res = k in
+  let res = Environment.wrap_tzresult res in
+  Assert.proto_error ~loc res pred
+
 let assert_fails ~loc k =
   let open Lwt_result_syntax in
   let*! res = k in
@@ -1175,10 +1181,17 @@ module Stake_storage_tests = struct
     let cant_cement ctxt =
       List.iter_es (fun commitment ->
           let hash = Commitment_repr.hash_uncarbonated commitment in
-          assert_fails_with
+          assert_fails_with_f
             ~loc:__LOC__
             (cement_commitment ctxt rollup commitment hash)
-            Sc_rollup_errors.Sc_rollup_disputed)
+            (let open Sc_rollup_errors in
+            function
+            | Sc_rollup_disputed | Sc_rollup_invalid_commitment_to_cement _
+            | Sc_rollup_parent_not_lcc
+            | Raw_context.Storage_error (Missing_key _) (* missing commitment *)
+              ->
+                true
+            | _ -> false))
     in
     let* () = cant_cement ctxt honest_commitments in
     let* () = cant_cement ctxt dishonest_commitments in
