@@ -41,7 +41,6 @@ let () =
 
 module Term = struct
   open Cmdliner
-  open Shared_arg.Term
 
   let ( let+ ) t f = Term.(const f $ t)
 
@@ -90,21 +89,23 @@ module Term = struct
     Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      let*! () = Context.Checks.Pack.Integrity_check.run ~root ~auto_repair in
+      let*! () =
+        Tezos_context.Context.Checks.Pack.Integrity_check.run ~root ~auto_repair
+      in
       return_unit)
 
   let stat_index config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      Context.Checks.Index.Stat.run ~root ;
+      Tezos_context.Context.Checks.Index.Stat.run ~root ;
       return_unit)
 
   let stat_pack config_file data_dir =
     Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      let*! () = Context.Checks.Pack.Stat.run ~root in
+      let*! () = Tezos_context.Context.Checks.Pack.Stat.run ~root in
       return_unit)
 
   let index_dir_exists context_dir output =
@@ -118,7 +119,11 @@ module Term = struct
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let* () = index_dir_exists root output in
-      Context.Checks.Pack.Reconstruct_index.run ~root ~output ~index_log_size () ;
+      Tezos_context.Context.Checks.Pack.Reconstruct_index.run
+        ~root
+        ~output
+        ~index_log_size
+        () ;
       return_unit)
 
   let to_context_hash chain_store (hash : Tezos_crypto.Block_hash.t) =
@@ -159,7 +164,7 @@ module Term = struct
       let* root = root config_file data_dir in
       let* head = current_head config_file data_dir block in
       let*! () =
-        Context.Checks.Pack.Integrity_check_inodes.run
+        Tezos_context.Context.Checks.Pack.Integrity_check_inodes.run
           ~root
           ~heads:(Some [head])
       in
@@ -169,7 +174,10 @@ module Term = struct
     Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
-      Context.Checks.Pack.Integrity_check_index.run ~root ~auto_repair () ;
+      Tezos_context.Context.Checks.Pack.Integrity_check_index.run
+        ~root
+        ~auto_repair
+        () ;
       return_unit)
 
   let find_head config_file data_dir head =
@@ -250,26 +258,33 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> integrity_check)
-            $ setup_logs $ config_file $ data_dir $ auto_repair));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ auto_repair));
       Cmd.v
         (Cmd.info
            ~doc:"print high-level statistics about the index store"
            "stat-index")
         Term.(
           ret
-            (const (fun () -> stat_index) $ setup_logs $ config_file $ data_dir));
+            (const (fun () -> stat_index)
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir));
       Cmd.v
         (Cmd.info
            ~doc:"print high-level statistics about the pack file"
            "stat-pack")
         Term.(
-          ret (const (fun () -> stat_pack) $ setup_logs $ config_file $ data_dir));
+          ret
+            (const (fun () -> stat_pack)
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir));
       Cmd.v
         (Cmd.info ~doc:"reconstruct index from pack file" "reconstruct-index")
         Term.(
           ret
             (const (fun () -> reconstruct_index)
-            $ setup_logs $ config_file $ data_dir $ dest $ index_log_size));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ dest $ index_log_size));
       Cmd.v
         (Cmd.info
            ~doc:
@@ -280,7 +295,8 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> integrity_check_inodes)
-            $ setup_logs $ config_file $ data_dir $ head));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ head));
       Cmd.v
         (Cmd.info
            ~doc:"checks the index for corruptions"
@@ -288,7 +304,8 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> check_index)
-            $ setup_logs $ config_file $ data_dir $ auto_repair));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ auto_repair));
       Cmd.v
         (Cmd.info
            ~doc:"prints the current head's context commit hash"
@@ -296,7 +313,8 @@ module Term = struct
         Term.(
           ret
             (const (fun () -> find_head)
-            $ setup_logs $ config_file $ data_dir $ head));
+            $ setup_logs $ Shared_arg.Term.config_file
+            $ Shared_arg.Term.data_dir $ head));
     ]
 end
 
