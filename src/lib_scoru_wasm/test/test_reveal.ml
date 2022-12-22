@@ -219,18 +219,21 @@ module Preimage_map = Map.Make (String)
 let apply_fast ?(images = Preimage_map.empty) tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
-  let module Builtins = struct
-    let reveal_preimage hash =
-      match Preimage_map.find hash images with
-      | None -> Stdlib.failwith "Failed to find preimage"
-      | Some preimage -> Lwt.return preimage
-
-    let reveal_metadata () = Stdlib.failwith "reveal_preimage is not available"
-  end in
-  let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
+  let reveal_step =
+    Tezos_scoru_wasm.Builtins.
+      {
+        reveal_preimage =
+          (fun hash ->
+            match Preimage_map.find hash images with
+            | None -> Stdlib.failwith "Failed to find preimage"
+            | Some preimage -> Lwt.return preimage);
+        reveal_metadata =
+          (fun () -> Stdlib.failwith "reveal_preimage is not available");
+      }
+  in
   let+ tree =
     Wasm_utils.eval_until_input_requested
-      ~builtins
+      ~reveal_step
         (* We override the builtins to provide our own [reveal_preimage]
            implementation. This allows us to rune Fast Exec with
            kernels that want to reveal stuff. *)

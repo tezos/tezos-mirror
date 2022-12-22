@@ -39,4 +39,7 @@ type host_state = {
     implementation for [write_debug] will be picked that prints to the standard
     output. *)
 val make :
-  debug:bool -> Builtins.t -> host_state -> (string * string * extern) list
+  reveal_step:Builtins.reveal_step ->
+  write_debug:Builtins.write_debug ->
+  host_state ->
+  (string * string * extern) list

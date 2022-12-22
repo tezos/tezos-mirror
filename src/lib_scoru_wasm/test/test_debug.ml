@@ -53,7 +53,10 @@ let write_debug ~debug ~init ~values memories =
   Eval.invoke
     ~module_reg
     ~caller:module_key
-    (if debug then Host_funcs.all_debug else Host_funcs.all)
+    (if debug then
+     Host_funcs.all_debug
+       ~write_debug:(Printer (fun str -> Lwt_io.printf "%s" str))
+    else Host_funcs.all)
     ~input
     ~init
     Host_funcs.Internal_for_tests.write_debug

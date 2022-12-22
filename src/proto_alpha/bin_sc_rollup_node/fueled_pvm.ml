@@ -113,39 +113,46 @@ module Make (PVM : Pvm.S) = struct
       let dal_attestation_lag =
         node_ctxt.protocol_constants.parametric.dal.attestation_lag
       in
-      let module Builtins = struct
-        let reveal_preimage hash =
-          let hash =
-            (* The payload represents the encoded [Sc_rollup_reveal_hash.t]. We must
-               decode it properly, instead of converting it byte-for-byte. *)
-            Data_encoding.Binary.of_string_exn
-              Sc_rollup_reveal_hash.encoding
-              hash
-          in
-          let*! data =
-            get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
-          in
-          match data with
-          | Error error ->
-              (* The [Error_wrapper] must be caught upstream and converted into a
-                 tzresult. *)
-              Lwt.fail (Error_wrapper error)
-          | Ok data -> Lwt.return data
-
-        let reveal_metadata () =
-          Lwt.return
-            (Data_encoding.Binary.to_string_exn
-               Sc_rollup.Metadata.encoding
-               metadata)
-      end in
-      let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S) in
+      let reveal_step =
+        Tezos_scoru_wasm.Builtins.
+          {
+            reveal_preimage =
+              (fun hash ->
+                let hash =
+                  (* The payload represents the encoded [Sc_rollup_reveal_hash.t]. We must
+                     decode it properly, instead of converting it byte-for-byte. *)
+                  Data_encoding.Binary.of_string_exn
+                    Sc_rollup_reveal_hash.encoding
+                    hash
+                in
+                let*! data =
+                  get_reveal ~data_dir:node_ctxt.data_dir reveal_map hash
+                in
+                match data with
+                | Error error ->
+                    (* The [Error_wrapper] must be caught upstream and converted into a
+                       tzresult. *)
+                    Lwt.fail (Error_wrapper error)
+                | Ok data -> Lwt.return data);
+            reveal_metadata =
+              (fun () ->
+                Lwt.return
+                  (Data_encoding.Binary.to_string_exn
+                     Sc_rollup.Metadata.encoding
+                     metadata));
+          }
+      in
       let eval_tick fuel failing_ticks state =
         let max_steps = F.max_ticks fuel in
         let normal_eval ?(max_steps = max_steps) state =
           Lwt.catch
             (fun () ->
               let*! state, executed_ticks =
-                PVM.eval_many ~builtins ~max_steps state
+                PVM.eval_many
+                  ~reveal_step
+                  ~write_debug:(Printer Event.kernel_debug)
+                  ~max_steps
+                  state
               in
               return (state, executed_ticks, failing_ticks))
             (function

@@ -28,10 +28,10 @@ open Wasm_pvm_state.Internal_state
 
 include (Wasm_vm : Wasm_vm_sig.S)
 
-let compute_until_snapshot ~max_steps ~debug_flag pvm_state =
+let compute_until_snapshot ~max_steps ?write_debug pvm_state =
   Wasm_vm.compute_step_many_until
     ~max_steps
-    ~debug_flag
+    ?write_debug
     (fun pvm_state ->
       Lwt.return
       @@
@@ -40,13 +40,13 @@ let compute_until_snapshot ~max_steps ~debug_flag pvm_state =
       | _ -> Wasm_vm.should_compute pvm_state)
     pvm_state
 
-let compute_fast ~enable_debugging builtins pvm_state =
+let compute_fast ~reveal_step ~write_debug pvm_state =
   let open Lwt.Syntax in
   (* Execute! *)
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4123
      Support performing multiple calls to [Eval.compute]. *)
   let* durable =
-    Exec.compute ~enable_debugging builtins pvm_state.durable pvm_state.buffers
+    Exec.compute ~reveal_step ~write_debug pvm_state.durable pvm_state.buffers
   in
   (* Compute the new tick counter. *)
   let ticks = pvm_state.max_nb_ticks in
@@ -55,39 +55,33 @@ let compute_fast ~enable_debugging builtins pvm_state =
   let tick_state = Padding in
   (* Assemble state *)
   let pvm_state = {pvm_state with durable; current_tick; tick_state} in
-  let+ pvm_state =
-    Wasm_vm.compute_step_with_debug ~debug_flag:enable_debugging pvm_state
-  in
+  let+ pvm_state = Wasm_vm.compute_step_with_debug ~write_debug pvm_state in
   (pvm_state, Z.to_int64 ticks)
 
-let rec compute_step_many accum_ticks ?builtins
-    ?(after_fast_exec = fun () -> ()) ?(stop_at_snapshot = false) ?debug_flag
-    ~max_steps pvm_state =
+let rec compute_step_many accum_ticks ?reveal_step
+    ?(write_debug = Builtins.Noop) ?(after_fast_exec = fun () -> ())
+    ?(stop_at_snapshot = false) ~max_steps pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
   let eligible_for_fast_exec =
     Z.Compare.(pvm_state.max_nb_ticks <= Z.of_int64 max_steps)
   in
-  let enable_debugging = Option.value ~default:false debug_flag in
   let backup pvm_state =
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
-        ?builtins
+        ?reveal_step
+        ~write_debug
         ~stop_at_snapshot
-        ?debug_flag
         ~max_steps
         pvm_state
     in
     (pvm_state, Int64.add accum_ticks ticks)
   in
-  match builtins with
-  | Some builtins when eligible_for_fast_exec -> (
+  match reveal_step with
+  | Some reveal_step when eligible_for_fast_exec -> (
       let goto_snapshot_and_retry () =
         let* pvm_state, ticks =
-          compute_until_snapshot
-            ~debug_flag:enable_debugging
-            ~max_steps
-            pvm_state
+          compute_until_snapshot ~write_debug ~max_steps pvm_state
         in
         match pvm_state.tick_state with
         | Snapshot when not stop_at_snapshot ->
@@ -97,10 +91,10 @@ let rec compute_step_many accum_ticks ?builtins
             if may_compute_more && max_steps > 0L then
               (compute_step_many [@tailcall])
                 accum_ticks
-                ~builtins
+                ~reveal_step
+                ~write_debug
                 ~stop_at_snapshot
                 ~after_fast_exec
-                ?debug_flag
                 ~max_steps
                 pvm_state
             else Lwt.return (pvm_state, accum_ticks)
@@ -108,7 +102,7 @@ let rec compute_step_many accum_ticks ?builtins
       in
       let go_like_the_wind () =
         let+ pvm_state, ticks =
-          compute_fast ~enable_debugging builtins pvm_state
+          compute_fast ~write_debug ~reveal_step pvm_state
         in
         after_fast_exec () ;
         (pvm_state, Int64.(add ticks accum_ticks))

@@ -246,7 +246,11 @@ module Aux = struct
     val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
 
     val write_debug :
-      debug:bool -> memory:memory -> src:int32 -> num_bytes:int32 -> unit Lwt.t
+      implem:Builtins.write_debug ->
+      memory:memory ->
+      src:int32 ->
+      num_bytes:int32 ->
+      unit Lwt.t
   end
 
   module Make (M : Memory_access) : S with type memory = M.t = struct
@@ -578,14 +582,15 @@ module Aux = struct
 
     let write_debug_impl ~memory:_ ~src:_ ~num_bytes:_ = Lwt.return_unit
 
-    let alternate_write_debug_impl ~memory ~src ~num_bytes =
+    let alternate_write_debug_impl ~f ~memory ~src ~num_bytes =
       let open Lwt.Syntax in
       let* result = read_mem ~memory ~src ~num_bytes in
-      Format.printf "DEBUG: %s\n%!" result ;
-      Lwt.return_unit
+      f result
 
-    let write_debug ~debug =
-      if debug then alternate_write_debug_impl else write_debug_impl
+    let write_debug ~implem =
+      match implem with
+      | Builtins.Noop -> write_debug_impl
+      | Printer f -> alternate_write_debug_impl ~f
   end
 
   include Make (Memory_access_interpreter)
@@ -653,9 +658,9 @@ let write_debug_type =
 
    The PVM, however, does not check that these are valid: from its
    point of view, [write_debug] is a no-op. *)
-let write_debug ~debug =
+let write_debug ~implem =
   let open Lwt.Syntax in
-  let run = Aux.write_debug ~debug in
+  let run = Aux.write_debug ~implem in
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
       let* memory = retrieve_memory memories in
@@ -1066,7 +1071,7 @@ let lookup_opt name =
 let lookup name =
   match lookup_opt name with Some f -> f | None -> raise Not_found
 
-let register_host_funcs ~debug registry =
+let register_host_funcs ~write_debug:implem registry =
   List.fold_left
     (fun _acc (global_name, host_function) ->
       Host_funcs.register ~global_name host_function registry)
@@ -1074,7 +1079,7 @@ let register_host_funcs ~debug registry =
     [
       (read_input_name, read_input);
       (write_output_name, write_output);
-      (write_debug_name, write_debug ~debug);
+      (write_debug_name, write_debug ~implem);
       (store_has_name, store_has);
       (store_list_size_name, store_list_size);
       (store_get_nth_key_name, store_get_nth_key);
@@ -1090,14 +1095,14 @@ let register_host_funcs ~debug registry =
 
 let all =
   let registry = Host_funcs.empty () in
-  register_host_funcs ~debug:false registry ;
+  register_host_funcs ~write_debug:Noop registry ;
   registry
 
 (* We build the registry at toplevel of the module to prevent recomputing it at
    each initialization tick. *)
-let all_debug =
+let all_debug ~write_debug =
   let registry = Host_funcs.empty () in
-  register_host_funcs ~debug:true registry ;
+  register_host_funcs ~write_debug registry ;
   registry
 
 module Internal_for_tests = struct

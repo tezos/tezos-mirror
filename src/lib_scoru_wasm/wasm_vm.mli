@@ -41,7 +41,8 @@ include Wasm_vm_sig.S
   *)
 val compute_step_many_until :
   ?max_steps:int64 ->
-  debug_flag:bool ->
+  ?reveal_step:Builtins.reveal_step ->
+  ?write_debug:Builtins.write_debug ->
   (pvm_state -> bool Lwt.t) ->
   pvm_state ->
   (pvm_state * int64) Lwt.t
