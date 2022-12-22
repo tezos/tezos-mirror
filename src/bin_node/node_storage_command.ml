@@ -25,7 +25,9 @@
 
 let ( // ) = Filename.concat
 
-type error += Existing_index_dir of string
+type error +=
+  | Existing_index_dir of string
+  | Cannot_resolve_block_alias of string * string
 
 module Event = struct
   include Internal_event.Simple
@@ -50,14 +52,26 @@ end
 let () =
   register_error_kind
     `Permanent
-    ~id:"existingIndexDir"
+    ~id:"main.storage.existing_index_dir"
     ~title:"Existing context/index directory"
     ~description:"The index directory cannot be overwritten"
     ~pp:(fun ppf path ->
       Format.fprintf ppf "Existing index directory '%s'." path)
     Data_encoding.(obj1 (req "indexdir_path" string))
     (function Existing_index_dir path -> Some path | _ -> None)
-    (fun path -> Existing_index_dir path)
+    (fun path -> Existing_index_dir path) ;
+  register_error_kind
+    `Permanent
+    ~id:"main.storage.cannot_resolve_block_alias"
+    ~title:"Cannot resolve block alias"
+    ~description:"Cannot resolve block alias"
+    ~pp:(fun ppf (alias, error) ->
+      Format.fprintf ppf "Failed to resolve the block alias %s: %s" alias error)
+    Data_encoding.(obj2 (req "alias" string) (req "error" string))
+    (function
+      | Cannot_resolve_block_alias (alias, error) -> Some (alias, error)
+      | _ -> None)
+    (fun (alias, error) -> Cannot_resolve_block_alias (alias, error))
 
 module Term = struct
   open Cmdliner
@@ -151,7 +165,7 @@ module Term = struct
     match block with
     | Some block -> (
         match Block_services.parse_block block with
-        | Error err -> failwith "%s: %s" block err
+        | Error err -> tzfail (Cannot_resolve_block_alias (block, err))
         | Ok block -> Store.Chain.block_of_identifier chain_store block)
     | None ->
         let*! current_head = Store.Chain.current_head chain_store in
