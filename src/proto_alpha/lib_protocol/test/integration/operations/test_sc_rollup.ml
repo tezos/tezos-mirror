@@ -790,10 +790,10 @@ let test_publish_cement_and_recover_bond () =
   let* () = recover_bond_not_staked i contract rollup in
   return_unit
 
-(** [test_publish_fails_on_backtrack] creates a rollup and then
+(** [test_publish_fails_on_double_stake] creates a rollup and then
     publishes two different commitments with the same staker. We check
     that the second publish fails. *)
-let test_publish_fails_on_backtrack () =
+let test_publish_fails_on_double_stake () =
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract = contracts in
@@ -809,11 +809,11 @@ let test_publish_fails_on_backtrack () =
   let* i = Incremental.begin_construction b in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
-        (Sc_rollup_errors.Sc_rollup_staker_backtracked as e)
+        (Sc_rollup_errors.Sc_rollup_staker_double_stake as e)
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_staker_backtracked]"
+    | _ -> failwith "It should have failed with [Sc_rollup_staker_double_stake]"
   in
   let* (_ : Incremental.t) =
     Incremental.add_operation ~expect_apply_failure i operation2
@@ -3069,9 +3069,9 @@ let tests =
       `Quick
       test_publish_cement_and_recover_bond;
     Tztest.tztest
-      "publish will fail if staker is backtracking"
+      "publish will fail if staker is double staking"
       `Quick
-      test_publish_fails_on_backtrack;
+      test_publish_fails_on_double_stake;
     Tztest.tztest
       "cement will fail if commitment is contested"
       `Quick

@@ -33,7 +33,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_not_staked_on_lcc_or_ancestor
   | (* `Temporary *) Sc_rollup_parent_not_lcc
   | (* `Temporary *) Sc_rollup_remove_lcc_or_ancestor
-  | (* `Temporary *) Sc_rollup_staker_backtracked
+  | (* `Temporary *) Sc_rollup_staker_double_stake
   | (* `Temporary *) Sc_rollup_too_far_ahead
   | (* `Temporary *)
       Sc_rollup_commitment_from_future of {
@@ -327,21 +327,22 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_remove_lcc_or_ancestor -> Some () | _ -> None)
     (fun () -> Sc_rollup_remove_lcc_or_ancestor) ;
-  let description = "Staker backtracked." in
+  let description = "Staker tried to double stake." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_staker_backtracked"
+    ~id:"Sc_rollup_staker_double_stake"
     ~title:description
     ~description
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
-        "The staker backtracked, that is, it tried to publish a commitment for \
-         an inbox level where it already published another conflicting \
-         commitment. The staker is not allowed to changed its mind.")
+        "The staker tried to double stake, that is, it tried to publish a \
+         commitment for an inbox level where it already published another \
+         conflicting commitment. The staker is not allowed to changed its \
+         mind.")
     Data_encoding.empty
-    (function Sc_rollup_staker_backtracked -> Some () | _ -> None)
-    (fun () -> Sc_rollup_staker_backtracked) ;
+    (function Sc_rollup_staker_double_stake -> Some () | _ -> None)
+    (fun () -> Sc_rollup_staker_double_stake) ;
   let description =
     "Commitment is too far ahead of the last cemented commitment."
   in

@@ -464,10 +464,10 @@ let set_staker_commitment ctxt rollup staker_index inbox_level commitment_hash =
   in
   return (ctxt, size_diff_stakers + size_diff_commitment_stakers)
 
-(** [assert_staker_dont_backtrack ctxt rollup staker_index commitments]
+(** [assert_staker_dont_double_stake ctxt rollup staker_index commitments]
     asserts that [staker_index] do not stake on multiple commitments in
     [commitments]. *)
-let assert_staker_dont_backtrack ctxt rollup staker_index commitments =
+let assert_staker_dont_double_stake ctxt rollup staker_index commitments =
   let open Lwt_result_syntax in
   (* Compute the list of commitments [staker_index] stakes on. *)
   let* ctxt, staked_on_commitments =
@@ -484,7 +484,7 @@ let assert_staker_dont_backtrack ctxt rollup staker_index commitments =
   let* () =
     fail_when
       Compare.List_length_with.(staked_on_commitments > 1)
-      Sc_rollup_errors.Sc_rollup_staker_backtracked
+      Sc_rollup_errors.Sc_rollup_staker_double_stake
   in
   return ctxt
 
@@ -536,10 +536,10 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level =
       commitment.inbox_level
       commitment_hash
   in
-  (* Checks that the staker is not backtracking, done at the end to avoid
+  (* Checks that the staker is not double staking, done at the end to avoid
      the double get to the list of commitments. *)
   let* ctxt =
-    assert_staker_dont_backtrack ctxt rollup staker_index commitments
+    assert_staker_dont_double_stake ctxt rollup staker_index commitments
   in
   let total_size_diff =
     refine_conditions_size_diff + commitment_size_diff

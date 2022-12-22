@@ -766,7 +766,7 @@ module Stake_storage_tests = struct
       assert_fails_with
         ~loc:__LOC__
         (publish_commitment ctxt rollup staker new_commitment)
-        Sc_rollup_errors.Sc_rollup_staker_backtracked
+        Sc_rollup_errors.Sc_rollup_staker_double_stake
     in
     return_unit
 
