@@ -73,6 +73,9 @@ let test_sc_rollup_challenge_window_lt_max_lookahead () =
   in
   Assert.lt_int32 ~loc:__LOC__ challenge_window max_lookahead
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4481
+   Improve this to catch more regressions in term of storage consumption *)
+
 (* Check that
     [commitment_storage_cost * max_lookahead / commitment_period < stake_amount]
 
