@@ -379,7 +379,9 @@ module Dal : sig
   end
 
   module Committee : sig
-    type t
+    type member = {attestor : string; first_shard_index : int; power : int}
+
+    type t = member list
 
     val typ : t Check.typ
 
