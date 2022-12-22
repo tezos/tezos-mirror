@@ -110,7 +110,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
   on_stdout baker (handle_raw_stdout baker) ;
   baker
 
-let run (baker : t) =
+let run ?event_level (baker : t) =
   (match baker.status with
   | Not_running -> ()
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
@@ -149,7 +149,7 @@ let run (baker : t) =
     trigger_ready baker None ;
     unit
   in
-  run baker {ready = false} arguments ~on_terminate ?runner
+  run ?event_level baker {ready = false} arguments ~on_terminate ?runner
 
 let check_event ?where baker name promise =
   let* result = promise in

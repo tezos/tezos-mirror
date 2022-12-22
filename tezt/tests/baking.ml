@@ -207,7 +207,7 @@ let encode_unsigned_operation_to_binary client op =
       rpc
         POST
         ["chains"; "main"; "blocks"; "head"; "helpers"; "forge"; "operations"]
-        ~data:op
+        ~data:(Data op)
         client)
   in
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))

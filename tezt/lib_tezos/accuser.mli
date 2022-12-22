@@ -29,7 +29,7 @@
 type t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Create an accuser.
 

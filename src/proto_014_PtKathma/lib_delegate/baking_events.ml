@@ -568,6 +568,20 @@ module Actions = struct
       ~pp1:Tezos_crypto.Block_hash.pp
       ("block", Tezos_crypto.Block_hash.encoding)
 
+  let prepare_forging_block =
+    declare_3
+      ~section
+      ~name:"prepare_forging_block"
+      ~level:Debug
+      ~msg:
+        "prepare forging block at level {level}, round {round} for {delegate}"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ~pp3:Baking_state.pp_delegate
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("delegate", Baking_state.delegate_encoding)
+
   let forging_block =
     declare_3
       ~section

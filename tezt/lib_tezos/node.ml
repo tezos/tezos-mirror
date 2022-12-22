@@ -495,7 +495,7 @@ let update_identity node identity =
         (fun resolver -> Lwt.wakeup_later resolver (Some identity))
         pending
 
-let handle_event node {name; value} =
+let handle_event node {name; value; timestamp = _} =
   match name with
   | "node_is_ready.v0" -> set_ready node
   | "head_increment.v0" | "branch_switch.v0" -> (

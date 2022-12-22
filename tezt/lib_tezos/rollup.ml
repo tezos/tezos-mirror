@@ -291,15 +291,17 @@ module Tx_rollup = struct
 
   let message_hash ?hooks ~message client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
-    let data : JSON.u = `O [("message", json_of_message message)] in
+    let data : RPC_core.data =
+      Data (`O [("message", json_of_message message)])
+    in
     RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client
     |> Runnable.map parse
 
   let inbox_merkle_tree_hash ?hooks ~message_hashes client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
     let make_message (`Hash message) : JSON.u = `String message in
-    let data =
-      `O [("message_hashes", `A (List.map make_message message_hashes))]
+    let data : RPC_core.data =
+      Data (`O [("message_hashes", `A (List.map make_message message_hashes))])
     in
     RPC.Tx_rollup.Forge.Inbox.merkle_tree_hash ?hooks ~data client
     |> Runnable.map parse
@@ -307,12 +309,13 @@ module Tx_rollup = struct
   let inbox_merkle_tree_path ?hooks ~message_hashes ~position client =
     let parse json = JSON.(json |-> "path") in
     let make_message (`Hash message) : JSON.u = `String message in
-    let data =
-      `O
-        [
-          ("message_hashes", `A (List.map make_message message_hashes));
-          ("position", `Float (float_of_int position));
-        ]
+    let data : RPC_core.data =
+      Data
+        (`O
+          [
+            ("message_hashes", `A (List.map make_message message_hashes));
+            ("position", `Float (float_of_int position));
+          ])
     in
     RPC.Tx_rollup.Forge.Inbox.merkle_tree_path ?hooks ~data client
     |> Runnable.map parse
@@ -320,12 +323,13 @@ module Tx_rollup = struct
   let commitment_merkle_tree_hash ?hooks ~message_result_hashes client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
     let make_message (`Hash message) : JSON.u = `String message in
-    let data =
-      `O
-        [
-          ( "message_result_hashes",
-            `A (List.map make_message message_result_hashes) );
-        ]
+    let data : RPC_core.data =
+      Data
+        (`O
+          [
+            ( "message_result_hashes",
+              `A (List.map make_message message_result_hashes) );
+          ])
     in
     let runnable =
       RPC.Tx_rollup.Forge.Commitment.merkle_tree_hash ?hooks ~data client
@@ -336,13 +340,14 @@ module Tx_rollup = struct
       =
     let parse json = JSON.(json |-> "path") in
     let make_message (`Hash message) : JSON.u = `String message in
-    let data =
-      `O
-        [
-          ( "message_result_hashes",
-            `A (List.map make_message message_result_hashes) );
-          ("position", `Float (float_of_int position));
-        ]
+    let data : RPC_core.data =
+      Data
+        (`O
+          [
+            ( "message_result_hashes",
+              `A (List.map make_message message_result_hashes) );
+            ("position", `Float (float_of_int position));
+          ])
     in
     let runnable =
       RPC.Tx_rollup.Forge.Commitment.merkle_tree_path ?hooks ~data client
@@ -351,20 +356,21 @@ module Tx_rollup = struct
 
   let withdraw_list_hash ?hooks ~withdrawals client =
     let parse json = JSON.(json |-> "hash" |> as_string) in
-    let data =
-      `O [("withdraw_list", `A (List.map json_of_withdraw withdrawals))]
+    let data : RPC_core.data =
+      Data (`O [("withdraw_list", `A (List.map json_of_withdraw withdrawals))])
     in
     RPC.Tx_rollup.Forge.Withdraw.withdraw_list_hash ?hooks ~data client
     |> Runnable.map parse
 
   let message_result_hash ?hooks ~context_hash ~withdraw_list_hash client =
     let parse json = JSON.(json |-> "hash" |> as_string) in
-    let data =
-      `O
-        [
-          ("context_hash", `String context_hash);
-          ("withdraw_list_hash", `String withdraw_list_hash);
-        ]
+    let data : RPC_core.data =
+      Data
+        (`O
+          [
+            ("context_hash", `String context_hash);
+            ("withdraw_list_hash", `String withdraw_list_hash);
+          ])
     in
     RPC.Tx_rollup.Forge.Commitment.message_result_hash ?hooks ~data client
     |> Runnable.map parse
@@ -613,7 +619,7 @@ module Dal = struct
           ~origin:"dal_node_split_slot_rpc"
           (encode_bytes_to_hex_string slot)
       in
-      let data = JSON.unannotate slot in
+      let data : RPC_core.data = Data (JSON.unannotate slot) in
       make ~data POST ["slot"; "split"] @@ fun json ->
       JSON.(json |-> "commitment" |> as_string, json |-> "proof" |> as_string)
 
@@ -638,7 +644,9 @@ module Dal = struct
       json |> JSON.encode
 
     let shards ~slot_header shard_ids =
-      let data = `A (List.map (fun i -> `Float (float_of_int i)) shard_ids) in
+      let data : RPC_core.data =
+        Data (`A (List.map (fun i -> `Float (float_of_int i)) shard_ids))
+      in
       make ~data POST ["shards"; slot_header] (fun json ->
           JSON.(json |> as_list |> List.map encode))
 
@@ -651,7 +659,7 @@ module Dal = struct
              (encode_bytes_to_hex_string payload)
              pagination_scheme)
       in
-      let data = JSON.unannotate preimage in
+      let data : RPC_core.data = Data (JSON.unannotate preimage) in
       make ~data PUT ["plugin"; "dac"; "store_preimage"] @@ fun json ->
       JSON.
         ( json |-> "root_hash" |> as_string,
@@ -705,16 +713,17 @@ module Dal = struct
           ~origin:"Rollup.RPC.post_slots"
           (encode_bytes_to_hex_string slot)
       in
-      let data = JSON.unannotate slot in
+      let data : RPC_core.data = Data (JSON.unannotate slot) in
       make ~data POST ["slots"] JSON.as_string
 
     let patch_slot commitment ~slot_level ~slot_index =
-      let data =
-        `O
-          [
-            ("slot_level", `Float (float_of_int slot_level));
-            ("slot_index", `Float (float_of_int slot_index));
-          ]
+      let data : RPC_core.data =
+        Data
+          (`O
+            [
+              ("slot_level", `Float (float_of_int slot_level));
+              ("slot_index", `Float (float_of_int slot_index));
+            ])
       in
       make ~data PATCH ["slots"; commitment] as_empty_object_or_fail
 
@@ -752,7 +761,7 @@ module Dal = struct
              | _ -> failwith "invalid case")
 
     let patch_profile profile =
-      let data = json_of_profile profile in
+      let data = Client.Data (json_of_profile profile) in
       make ~data PATCH ["profiles"] as_empty_object_or_fail
 
     let get_profiles () = make GET ["profiles"] profiles_of_json

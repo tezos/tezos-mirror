@@ -93,7 +93,7 @@ let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
     Client.stresstest_gen_keys additional_bootstrap_accounts client
   in
   let additional_bootstrap_accounts =
-    List.map (fun x -> (x, None)) additional_account_keys
+    List.map (fun x -> (x, None, false)) additional_account_keys
   in
   let* parameter_file =
     Protocol.write_parameter_file

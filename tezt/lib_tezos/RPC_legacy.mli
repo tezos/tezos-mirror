@@ -116,7 +116,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -125,7 +125,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -134,7 +134,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
     end
@@ -145,7 +145,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -154,7 +154,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
 
@@ -163,7 +163,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
     end
@@ -174,7 +174,7 @@ module Tx_rollup : sig
         ?hooks:Process.hooks ->
         ?chain:string ->
         ?block:string ->
-        data:JSON.u ->
+        data:Client.data ->
         Client.t ->
         JSON.t Runnable.process
     end

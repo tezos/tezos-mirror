@@ -51,7 +51,7 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 val wait_for_ready : t -> unit Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
@@ -60,7 +60,7 @@ val on_event : t -> (event -> unit) -> unit
 
     The resulting promise is fulfilled as soon as the baker has been spawned.  It
     continues running in the background.*)
-val run : t -> unit Lwt.t
+val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass

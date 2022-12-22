@@ -45,27 +45,45 @@ let make ~branch ~signer ~kind contents =
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
 
-let raw t client =
+let raw ?protocol t client =
   match t.raw with
-  | None ->
-      let* raw =
-        RPC.Client.call client
-        @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
-        |> Lwt.map JSON.as_string
-      in
-      t.raw <- Some (`Hex raw) ;
-      return (`Hex raw)
+  | None -> (
+      match protocol with
+      | None ->
+          let* raw =
+            RPC.Client.call client
+            @@ RPC.post_chain_block_helpers_forge_operations
+                 ~data:(Data (json t))
+                 ()
+            |> Lwt.map JSON.as_string
+          in
+          t.raw <- Some (`Hex raw) ;
+          return (`Hex raw)
+      | Some p -> (
+          let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+          match Data_encoding.Registration.find name with
+          | None -> Test.fail "%s encoding was not found" name
+          | Some registered -> (
+              match
+                Data_encoding.Registration.bytes_of_json registered (json t)
+              with
+              | None ->
+                  Test.fail
+                    "encoding of %s with %s failed"
+                    (Ezjsonm.to_string (json t))
+                    name
+              | Some bytes -> return (Hex.of_bytes bytes))))
   | Some raw -> return raw
 
-let hex ?signature t client =
-  let* (`Hex raw) = raw t client in
+let hex ?protocol ?signature t client =
+  let* (`Hex raw) = raw ?protocol t client in
   match signature with
   | None -> return (`Hex raw)
   | Some signature ->
       let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
       return (`Hex (raw ^ signature))
 
-let sign ({kind; signer; _} as t) client =
+let sign ?protocol ({kind; signer; _} as t) client =
   let watermark =
     match kind with
     | Consensus {chain_id} ->
@@ -73,7 +91,7 @@ let sign ({kind; signer; _} as t) client =
           (Tezos_crypto.Chain_id.of_b58check_exn chain_id)
     | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
-  let* hex = hex t client in
+  let* hex = hex ?protocol t client in
   let bytes = Hex.to_bytes hex in
   return (Account.sign_bytes ~watermark ~signer bytes)
 
@@ -90,14 +108,14 @@ let hash t client : [`OpHash of string] Lwt.t =
   let hash = Tezos_operation.hash op in
   return (`OpHash (Tezos_crypto.Operation_hash.to_string hash))
 
-let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
-    [`OpHash of string] Lwt.t =
+let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
+    client : [`OpHash of string] Lwt.t =
   let* signature =
     match signature with
     | None -> sign t client
     | Some signature -> return signature
   in
-  let* (`Hex op) = hex ~signature t client in
+  let* (`Hex op) = hex ?protocol ~signature t client in
   let inject_rpc =
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
@@ -111,7 +129,7 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let runnable = RPC.Client.spawn client @@ inject_rpc (`String op) in
+  let runnable = RPC.Client.spawn client @@ inject_rpc (Data (`String op)) in
   match error with
   | None ->
       let* () = waiter in
@@ -122,11 +140,11 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
       let* () = Process.check_error ~msg process in
       hash t client
 
-let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
-    [`OpHash of string] list Lwt.t =
+let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error
+    ?use_tmp_file t client : [`OpHash of string] list Lwt.t =
   let forge op =
-    let* signature = sign op client in
-    hex ~signature op client
+    let* signature = sign ?protocol op client in
+    hex ?protocol ~signature op client
   in
   let* ops = Lwt_list.map_s forge t in
   let waiter =
@@ -138,7 +156,9 @@ let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let rpc = RPC.post_private_injection_operations ~force ~ops () in
+  let rpc =
+    RPC.post_private_injection_operations ?use_tmp_file ~force ~ops ()
+  in
   match error with
   | None ->
       let* ophs = RPC.Client.call client rpc in
@@ -362,6 +382,7 @@ module Manager = struct
         dest : string;
         parameters : transfer_parameters option;
       }
+    | Origination of {code : JSON.u; storage : JSON.u; balance : int}
     | Dal_publish_slot_header of {
         level : int;
         index : int;
@@ -387,6 +408,9 @@ module Manager = struct
 
   let dal_publish_slot_header ~level ~index ~commitment ~proof =
     Dal_publish_slot_header {level; index; commitment; proof}
+
+  let origination ?(init_balance = 0) ~code ~init_storage () =
+    Origination {code; storage = init_storage; balance = init_balance}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
@@ -421,6 +445,13 @@ module Manager = struct
           ("destination", `String dest);
         ]
         @ parameters
+    | Origination {code; storage; balance} ->
+        let script = `O [("code", code); ("storage", storage)] in
+        [
+          ("kind", `String "origination");
+          ("balance", json_of_tez balance);
+          ("script", script);
+        ]
     | Dal_publish_slot_header {level; index; commitment; proof} ->
         let slot_header =
           `O
@@ -493,7 +524,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Reveal _ | Dal_publish_slot_header _ | Delegation _ ->
+    | Reveal _ | Origination _ | Dal_publish_slot_header _ | Delegation _ ->
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in

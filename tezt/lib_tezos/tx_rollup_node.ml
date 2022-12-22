@@ -161,7 +161,7 @@ let update_level node current_level =
           pending :: node.persistent_state.pending_level)
     pending
 
-let handle_event node {name; value} =
+let handle_event node {name; value; timestamp = _} =
   match name with
   | "tx_rollup_node_is_ready.v0" -> set_ready node
   | "tx_rollup_node_tezos_block_processed.v0" -> (

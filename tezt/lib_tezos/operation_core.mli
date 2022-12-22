@@ -74,20 +74,32 @@ val make : branch:string -> signer:Account.key -> kind:kind -> JSON.u -> t
 (** [json t] gives the json representation of an unsigned operation. *)
 val json : t -> JSON.u
 
-(** [hex ?(signature=None) t client] computes the binary
-   representation of an operation as an hexadecimal string. If
-   [signature] is given, the hexadecimal represents the signed
-   version of the operation. [client] is used to construct the binary
-   representation of [t].
+(** [hex ?(protocol=None) ?(signature=None) t client] computes the binary
+    representation of an operation as a hexadecimal string. If [protocol] is
+    given, the binary representation is computed using the encoding of operation
+    from the [protocol]. Otherwise, a call to the [forge_operations] RPC is done
+    to compute the binary representation. If [signature] is given, the
+    hexadecimal represents the signed version of the operation. [client] is used
+    to construct the binary representation of [t].
 
-   @param signature controls whether a signature should be attached
-   to the operation. *)
-val hex : ?signature:Tezos_crypto.Signature.t -> t -> Client.t -> Hex.t Lwt.t
+    @param protocol controls whether the encoding of a protocol should be used
+    to compute the binary representation of the operation rather than calling
+    the [forge_operations] RPC to compute it.
+
+    @param signature controls whether a signature should be attached
+    to the operation. *)
+val hex :
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  Hex.t Lwt.t
 
 (** [sign t client] signs the raw representation of operation [t] by
    its signer (see {!val:make}). [client] is used to construct the
    binary representation of [t]. *)
-val sign : t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
+val sign :
+  ?protocol:Protocol.t -> t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
 
 (** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
@@ -106,6 +118,10 @@ val sign : t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
    the prevalidator. If [false], the call fails if the prevalidator
    classified the operation with an error.
 
+   @param protocol Allow using the operation encoding rather than using the
+   [forge_operations] RPC to compute the hexadecimal representation of the
+   operations.
+
    @param signature Allows to give manually the signature of the
    operation. The operation is signed when the signature is omitted.
 
@@ -114,22 +130,27 @@ val sign : t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
 val inject :
   ?request:[`Inject | `Notify] ->
   ?force:bool ->
+  ?protocol:Protocol.t ->
   ?signature:Tezos_crypto.Signature.t ->
   ?error:rex ->
   t ->
   Client.t ->
   [`OpHash of string] Lwt.t
 
-(** [inject_operations] is similar as [inject] for a list of
-   operations. This function calls the RPC
-   {!val:RPC.post_private_injection_operations} which is faster than
-   calling the RPC used by {!val:inject} several times. Note that this
-   function should be used mainly when the time for injecting
-   operations matters. *)
+(** [inject_operations ?protocol ?request ?force ?error ?use_tmp_file ops
+    client] is similar as [inject] for a list of operations. This function calls
+    the RPC {!val:RPC.post_private_injection_operations} which is faster than
+    calling the RPC used by {!val:inject} several times. Note that this function
+    should be used mainly when the time for injecting operations matters.
+
+    @param use_tmp_file see {!val:RPC.post_private_injection_operations} for
+    more information. *)
 val inject_operations :
+  ?protocol:Protocol.t ->
   ?request:[`Inject | `Notify] ->
   ?force:bool ->
   ?error:rex ->
+  ?use_tmp_file:bool ->
   t list ->
   Client.t ->
   [`OpHash of string] list Lwt.t
@@ -264,6 +285,11 @@ module Manager : sig
      builds a transfer operation. Note that the amount is expressed in
      mutez. *)
   val transfer : ?dest:Account.key -> ?amount:int -> unit -> payload
+
+  (** [origination ?(init_balance=0) ~code ~init_storage ()]
+     builds an origination operation. *)
+  val origination :
+    ?init_balance:int -> code:JSON.u -> init_storage:JSON.u -> unit -> payload
 
   (** [call ~dest ~amount:0 ~entrypoint ~arg ()] builds a smart contract call
       operation to the [entrypoint] with the provided Michelson argument

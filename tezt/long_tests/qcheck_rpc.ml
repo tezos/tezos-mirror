@@ -471,7 +471,7 @@ module Test = struct
         ~log_command:false
         ~log_status_on_exit:false
         ~log_output:false
-        ?data:input
+        ?data:(Option.map (fun x : RPC_core.data -> Data x) input)
         meth
         full_path
         client

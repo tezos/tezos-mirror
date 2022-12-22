@@ -27,6 +27,8 @@ open Base
 
 type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
 
+type data = Client.data
+
 let show_verb = function
   | GET -> "GET"
   | PUT -> "PUT"
@@ -45,7 +47,7 @@ type ('endpoint, 'result) t = {
   verb : verb;
   path : string list;
   query_string : (string * string) list;
-  data : JSON.u option;
+  data : Client.data option;
   decode : JSON.t -> 'result;
   get_host : 'endpoint -> string;
   get_port : 'endpoint -> int;
@@ -98,7 +100,10 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
       ~headers:(Cohttp.Header.of_list headers)
       ?body:
         (Option.map
-           (fun body -> Cohttp_lwt.Body.of_string (JSON.encode_u body))
+           (function
+             | Client.Data body ->
+                 Cohttp_lwt.Body.of_string (JSON.encode_u body)
+             | File filename -> Cohttp_lwt.Body.of_string (read_file filename))
            rpc.data)
       (cohttp_of_verb rpc.verb)
       uri

@@ -34,6 +34,9 @@ type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
     ['result] is the type of values returned by the RPC after decoding. *)
 type ('endpoint, 'result) t
 
+(** Data type for RPCs. *)
+type data = Client.data
+
 (** Make an RPC description.
 
     Usage: [make ~get_host ~get_port verb path decode]
@@ -58,7 +61,7 @@ type ('endpoint, 'result) t
 
     Use one of the [call] functions below to actually call the RPC. *)
 val make :
-  ?data:JSON.u ->
+  ?data:data ->
   ?query_string:(string * string) list ->
   get_host:('endpoint -> string) ->
   get_port:('endpoint -> int) ->

@@ -1,0 +1,19 @@
+parameter int;
+storage unit;
+code {
+       CAR;
+       DUP;
+       GT;
+       LOOP
+         {
+           PUSH int 1;
+           SWAP;
+           SUB;
+           DUP;
+           GT
+         };
+       DROP;
+       UNIT;
+       NIL operation;
+       PAIR
+     }

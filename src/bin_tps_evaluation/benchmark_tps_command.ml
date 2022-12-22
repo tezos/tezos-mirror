@@ -43,8 +43,8 @@ let get_minimal_block_delay protocol protocol_constants =
 (** Set max prechecked manager operations count. *)
 let set_max_prechecked_manager_operations n client =
   let path = ["chains"; "main"; "mempool"; "filter"] in
-  let data =
-    `O [("max_prechecked_manager_operations", `Float (Float.of_int n))]
+  let data : RPC_core.data =
+    Data (`O [("max_prechecked_manager_operations", `Float (Float.of_int n))])
   in
   let* _ = Client.rpc ~data POST path client in
   Lwt.return_unit

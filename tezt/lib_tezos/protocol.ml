@@ -91,7 +91,7 @@ let default_bootstrap_accounts =
 
 let write_parameter_file :
     ?bootstrap_accounts:(Account.key * int option) list ->
-    ?additional_bootstrap_accounts:(Account.key * int option) list ->
+    ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
@@ -149,10 +149,12 @@ let write_parameter_file :
     in
     let additional_bootstrap_accounts =
       List.map
-        (fun ((account : Account.key), default_balance) ->
+        (fun ((account : Account.key), default_balance, is_revealed) ->
           `A
             [
-              `String account.public_key_hash;
+              `String
+                (if is_revealed then account.public_key
+                else account.public_key_hash);
               `String
                 (string_of_int
                    (Option.value ~default:4000000000000 default_balance));

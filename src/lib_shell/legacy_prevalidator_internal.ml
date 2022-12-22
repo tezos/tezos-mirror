@@ -575,7 +575,7 @@ module Make_s
               (acc_filter_state, acc_validation_state, acc_mempool)
           else (
             shell.pending <- Pending_ops.remove oph shell.pending ;
-            let+ new_filter_state, new_validation_state, new_mempool, to_handle
+            let* new_filter_state, new_validation_state, new_mempool, to_handle
                 =
               classify_operation
                 shell
@@ -585,6 +585,7 @@ module Make_s
                 acc_mempool
                 op
             in
+            let+ () = Events.(emit operation_reclassified) oph in
             List.iter (handle_classification ~notifier shell) to_handle ;
             Ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
         shell.pending

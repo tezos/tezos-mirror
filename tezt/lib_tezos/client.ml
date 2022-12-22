@@ -219,19 +219,23 @@ let string_of_query_string = function
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
+type data = Data of JSON.u | File of string
+
 let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
-      ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth
-      path client : JSON.t Runnable.process =
+      ?endpoint ?hooks ?env ?data ?query_string ?protocol_hash meth path client
+      : JSON.t Runnable.process =
     let process =
       let data =
-        Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
-      in
-      let filename =
-        Option.fold ~none:[] ~some:(fun x -> ["with"; "file:" ^ x]) filename
+        Option.fold
+          ~none:[]
+          ~some:(function
+            | Data data -> ["with"; JSON.encode_u data]
+            | File file -> ["with"; "file:" ^ file])
+          data
       in
       let query_string =
         Option.fold ~none:"" ~some:string_of_query_string query_string
@@ -248,9 +252,7 @@ module Spawn = struct
         ?env
         ?protocol_hash
         client
-        (better_error
-        @ ["rpc"; string_of_meth meth; full_path]
-        @ data @ filename)
+        (better_error @ ["rpc"; string_of_meth meth; full_path] @ data)
     in
     let parse process =
       let* output = Process.check_and_read_stdout process in
@@ -260,8 +262,7 @@ module Spawn = struct
 end
 
 let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
-    ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path
-    client =
+    ?endpoint ?hooks ?env ?data ?query_string ?protocol_hash meth path client =
   let*? res =
     Spawn.rpc
       ?log_command
@@ -272,7 +273,6 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?hooks
       ?env
       ?data
-      ?filename
       ?query_string
       ?protocol_hash
       meth
@@ -282,7 +282,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
   res
 
 let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-    ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path client =
+    ?hooks ?env ?data ?query_string ?protocol_hash meth path client =
   let*! res =
     Spawn.rpc
       ?log_command
@@ -293,7 +293,6 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
       ?hooks
       ?env
       ?data
-      ?filename
       ?query_string
       ?protocol_hash
       meth
@@ -2515,26 +2514,40 @@ let stresstest_gen_keys ?endpoint ?alias_prefix n client =
   Lwt.return additional_bootstraps
 
 let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
-    ?parameter_file protocol =
-  match additional_bootstrap_accounts with
-  | None -> return parameter_file
-  | Some additional_account_keys ->
-      let additional_bootstraps =
-        List.map
-          (fun x -> (x, default_accounts_balance))
-          additional_account_keys
-      in
-      let* parameter_file =
-        Protocol.write_parameter_file
-          ~additional_bootstrap_accounts:additional_bootstraps
-          ~base:
-            (Option.fold
-               ~none:(Either.right protocol)
-               ~some:Either.left
-               parameter_file)
-          []
-      in
-      return (Some parameter_file)
+    ?additional_revealed_bootstrap_accounts ?parameter_file protocol =
+  if
+    Option.is_none additional_bootstrap_accounts
+    && Option.is_none additional_revealed_bootstrap_accounts
+  then return parameter_file
+  else
+    let additional_accounts acc ~revealed = function
+      | None -> acc
+      | Some accounts ->
+          List.fold_left
+            (fun acc x -> (x, default_accounts_balance, revealed) :: acc)
+            acc
+            accounts
+    in
+    let additional_unreveal_bootstrap_accounts =
+      additional_accounts [] ~revealed:false additional_bootstrap_accounts
+    in
+    let additional_bootstrap_accounts =
+      additional_accounts
+        additional_unreveal_bootstrap_accounts
+        ~revealed:true
+        additional_revealed_bootstrap_accounts
+    in
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~additional_bootstrap_accounts
+        ~base:
+          (Option.fold
+             ~none:(Either.right protocol)
+             ~some:Either.left
+             parameter_file)
+        []
+    in
+    return (Some parameter_file)
 
 let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
@@ -2562,8 +2575,8 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
-    ?default_accounts_balance ?parameter_file ?timestamp ?keys tag ~protocol ()
-    =
+    ?additional_revealed_bootstrap_account_count ?default_accounts_balance
+    ?parameter_file ?timestamp ?keys tag ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -2585,10 +2598,18 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
         let* r = stresstest_gen_keys n client in
         return (Some r)
   in
+  let* additional_revealed_bootstrap_accounts =
+    match additional_revealed_bootstrap_account_count with
+    | None -> return None
+    | Some n ->
+        let* r = stresstest_gen_keys n client in
+        return (Some r)
+  in
   let* parameter_file =
     get_parameter_file
       ?additional_bootstrap_accounts
       ?default_accounts_balance
+      ?additional_revealed_bootstrap_accounts
       ?parameter_file
       (protocol, None)
   in

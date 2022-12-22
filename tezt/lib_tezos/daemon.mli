@@ -93,7 +93,7 @@ module Make : functor (X : PARAMETERS) -> sig
         -> event_handler
 
   (** Raw events. *)
-  type event = {name : string; value : JSON.t}
+  type event = {name : string; value : JSON.t; timestamp : float}
 
   (** Daemon states. *)
   type t = {

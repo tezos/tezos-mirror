@@ -235,7 +235,7 @@ let forge_operation ?protocol ~branch ~batch client =
     match protocol with
     | None ->
         RPC.Client.call client
-        @@ RPC.post_chain_block_helpers_forge_operations ~data:op_json ()
+        @@ RPC.post_chain_block_helpers_forge_operations ~data:(Data op_json) ()
         >|= JSON.as_string
     | Some p ->
         let name = Protocol.encoding_prefix p ^ ".operation.unsigned" in
@@ -265,7 +265,9 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
     | None -> Lwt.return_unit
     | Some node -> Node.wait_for_request ~request:`Inject node
   in
-  let* oph_json = RPC.Client.call client @@ inject ~async (`String signed_op) in
+  let* oph_json =
+    RPC.Client.call client @@ inject ~async (Data (`String signed_op))
+  in
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
 

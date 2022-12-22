@@ -81,7 +81,9 @@ let run_manager_operations_and_check_proto_error ~expected_proto_error
     (Ezjsonm.value_to_string ~minify:false op_json) ;
   let* response =
     RPC.(
-      call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+      call_json
+        node
+        (post_chain_block_helpers_scripts_run_operation (Data op_json)))
   in
   check_response_contains_proto_error ~expected_proto_error response ;
   unit
@@ -135,7 +137,8 @@ let test_run_proposals =
   Log.info "%s" (Ezjsonm.value_to_string ~minify:false op_json) ;
   Log.info "Call the [run_operation] RPC on this operation." ;
   let* _output =
-    RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+    RPC.(
+      call node (post_chain_block_helpers_scripts_run_operation (Data op_json)))
   in
   unit
 
@@ -208,7 +211,7 @@ let test_batch_inconsistent_sources protocols =
       let* response =
         RPC.call_json
           node
-          (RPC.post_chain_block_helpers_scripts_run_operation batch_json)
+          (RPC.post_chain_block_helpers_scripts_run_operation (Data batch_json))
       in
       check_response_contains_proto_error ~expected_proto_error response ;
       unit)
@@ -372,7 +375,9 @@ let test_bad_revelations =
     let* op_json = Operation.make_run_operation_input op client in
     let* response =
       RPC.(
-        call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+        call_json
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     check_response_contains_proto_error
       ~expected_proto_error:incorrect_reveal_position_error
@@ -394,7 +399,9 @@ let test_bad_revelations =
     let* op_json = Operation.make_run_operation_input op client in
     let* response =
       RPC.(
-        call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+        call_json
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     check_response_contains_proto_error
       ~expected_proto_error:inconsistent_hash_error
@@ -413,7 +420,9 @@ let test_bad_revelations =
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* output =
-      RPC.call node (RPC.post_chain_block_helpers_scripts_run_operation op_json)
+      RPC.call
+        node
+        (RPC.post_chain_block_helpers_scripts_run_operation (Data op_json))
     in
     let operation_result =
       JSON.(output |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
@@ -490,7 +499,10 @@ let test_correct_batch =
     (Ezjsonm.value_to_string ~minify:false batch_json) ;
   Log.info "Call the [run_operation] RPC on the batch." ;
   let* _output =
-    RPC.(call node (post_chain_block_helpers_scripts_run_operation batch_json))
+    RPC.(
+      call
+        node
+        (post_chain_block_helpers_scripts_run_operation (Data batch_json)))
   in
   unit
 
@@ -539,7 +551,8 @@ let test_misc_manager_ops_from_fresh_account =
   in
   let* _run_operation_output =
     let* op_json = Operation.make_run_operation_input reveal_op client in
-    RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+    RPC.(
+      call node (post_chain_block_helpers_scripts_run_operation (Data op_json)))
   in
   Log.info "Inject the crafted revelation and bake a block to apply it." ;
   let* _oph = Operation.inject reveal_op client in
@@ -557,7 +570,10 @@ let test_misc_manager_ops_from_fresh_account =
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* _output =
-      RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+      RPC.(
+        call
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     unit
   in
@@ -572,7 +588,10 @@ let test_misc_manager_ops_from_fresh_account =
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* _output =
-      RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+      RPC.(
+        call
+          node
+          (post_chain_block_helpers_scripts_run_operation (Data op_json)))
     in
     unit
   in
