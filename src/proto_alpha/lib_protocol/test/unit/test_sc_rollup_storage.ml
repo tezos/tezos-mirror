@@ -421,6 +421,18 @@ let cement_commitments ctxt rollup commitments =
     ctxt
     commitments
 
+let publish_and_cement_commitment ctxt rollup staker commitment =
+  let hash = Commitment_repr.hash_uncarbonated commitment in
+  let* ctxt = publish_commitment ctxt rollup staker commitment in
+  cement_commitment ctxt rollup commitment hash
+
+let publish_and_cement_commitments ctxt rollup staker commitments =
+  List.fold_left_es
+    (fun ctxt commitment ->
+      publish_and_cement_commitment ctxt rollup staker commitment)
+    ctxt
+    commitments
+
 let withdraw ctxt rollup staker =
   let* ctxt, _balance_updates =
     Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
@@ -947,6 +959,38 @@ module Stake_storage_tests = struct
       ~loc:__LOC__
       (publish_commitment ctxt rollup staker commitment)
       (Sc_rollup_errors.Sc_rollup_unknown_commitment commitment.predecessor)
+
+  (** Test that publishing a commitment at the LCC or behind it fails. *)
+  let test_publish_behind_or_at_lcc_fails () =
+    let* ctxt, rollup, genesis_hash, staker =
+      originate_rollup_and_deposit_with_one_staker ()
+    in
+    let commitments = commitments ~predecessor:genesis_hash ctxt 10 in
+    let* ctxt =
+      lift @@ publish_and_cement_commitments ctxt rollup staker commitments
+    in
+    let* _ctxt, last_cemented_inbox_level, _ =
+      lift
+      @@ Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
+           ctxt
+           rollup
+    in
+    (* Trying to publish a commitment behind or at lcc will fail. *)
+    List.iter_es
+      (fun commitment ->
+        assert_fails_with
+          ~loc:__LOC__
+          (Sc_rollup_stake_storage.publish_commitment
+             ctxt
+             rollup
+             staker
+             commitment)
+          (Sc_rollup_errors.Sc_rollup_commitment_too_old
+             {
+               commitment_inbox_level = commitment.inbox_level;
+               last_cemented_inbox_level;
+             }))
+      commitments
 
   (** {2. Cement unit tests.} *)
 
@@ -2634,6 +2678,10 @@ module Stake_storage_tests = struct
         "publish needs a predecessor"
         `Quick
         test_publish_without_predecessor_fails;
+      Tztest.tztest
+        "publish behind or at LCC"
+        `Quick
+        test_publish_behind_or_at_lcc_fails;
       (* Cement tests: *)
       Tztest.tztest "cement" `Quick test_cement;
       Tztest.tztest

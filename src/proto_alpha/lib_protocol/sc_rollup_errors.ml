@@ -94,6 +94,11 @@ type error +=
       valid_candidate : Sc_rollup_commitment_repr.Hash.t;
       invalid_candidate : Sc_rollup_commitment_repr.Hash.t;
     }
+  | (* `Permanent *)
+      Sc_rollup_commitment_too_old of {
+      last_cemented_inbox_level : Raw_level_repr.t;
+      commitment_inbox_level : Raw_level_repr.t;
+    }
 
 let () =
   register_error_kind
@@ -637,4 +642,33 @@ let () =
       | _ -> None)
     (fun (valid_candidate, invalid_candidate) ->
       Sc_rollup_invalid_commitment_to_cement
-        {valid_candidate; invalid_candidate})
+        {valid_candidate; invalid_candidate}) ;
+
+  let description = "Published commitment is too old" in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_commitment_too_old"
+    ~title:description
+    ~pp:(fun ppf (last_cemented_inbox_level, commitment_inbox_level) ->
+      Format.fprintf
+        ppf
+        "The published commitment is for the inbox level %a, the last cemented \
+         commitment inbox level is %a. You cannot publish a commitment behind \
+         the last cemented commitment."
+        Raw_level_repr.pp
+        last_cemented_inbox_level
+        Raw_level_repr.pp
+        commitment_inbox_level)
+    ~description
+    Data_encoding.(
+      obj2
+        (req "last_cemented_inbox_level" Raw_level_repr.encoding)
+        (req "commitment_inbox_level" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_commitment_too_old
+          {last_cemented_inbox_level; commitment_inbox_level} ->
+          Some (last_cemented_inbox_level, commitment_inbox_level)
+      | _ -> None)
+    (fun (last_cemented_inbox_level, commitment_inbox_level) ->
+      Sc_rollup_commitment_too_old
+        {last_cemented_inbox_level; commitment_inbox_level})

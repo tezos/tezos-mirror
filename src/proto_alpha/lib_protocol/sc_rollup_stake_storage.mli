@@ -183,7 +183,7 @@ module Internal_for_tests : sig
     tzresult
     Lwt.t
 
-  (** [refine_stake ?lcc context rollup commitment staker] makes [staker]
+  (** [refine_stake context rollup commitment staker] makes [staker]
       stakes on [commitment].
 
       Because we do not assume any form of coordination between validators, we
@@ -203,12 +203,8 @@ module Internal_for_tests : sig
 
       Returns the hashed commitment, at the first level this commitment was
       published, and the modified context.
-
-      [?lcc] can be [None] in this exposted internal for tests function, the
-      production's function requires [lcc] to exist.
   *)
   val refine_stake :
-    ?lcc:Sc_rollup_commitment_repr.Hash.t ->
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->

@@ -337,8 +337,16 @@ let assert_commitment_is_not_past_curfew ctxt rollup inbox_level =
     that the maximum cost of storage allocated by each staker is at most the size
     of their deposit.
  *)
-let assert_refine_conditions_met ~current_level ctxt rollup lcc commitment =
+let assert_refine_conditions_met ~current_level ~lcc_inbox_level ctxt rollup lcc
+    commitment =
   let open Lwt_result_syntax in
+  let commitment_inbox_level = commitment.Commitment.inbox_level in
+  let* () =
+    fail_unless
+      Raw_level_repr.(commitment_inbox_level > lcc_inbox_level)
+      (Sc_rollup_commitment_too_old
+         {last_cemented_inbox_level = lcc_inbox_level; commitment_inbox_level})
+  in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
   let* ctxt, size_diff =
@@ -349,7 +357,7 @@ let assert_refine_conditions_met ~current_level ctxt rollup lcc commitment =
   in
   let* () =
     fail_unless
-      Raw_level_repr.(commitment.Commitment.inbox_level < current_level)
+      Raw_level_repr.(commitment_inbox_level < current_level)
       (Sc_rollup_commitment_from_future
          {current_level; inbox_level = commitment.inbox_level})
   in
@@ -485,7 +493,7 @@ let assert_staker_dont_backtrack ctxt rollup staker_index commitments =
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
    Add a test checking that L2 nodes can catch up after going offline. *)
-let refine_stake ctxt rollup commitment ~staker_index ~lcc =
+let refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level =
   let open Lwt_result_syntax in
   let publication_level = (Raw_context.current_level ctxt).level in
   (* Checks the commitment validity, see {!assert_refine_conditions_met}. *)
@@ -496,6 +504,7 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
       lcc
       commitment
       ~current_level:publication_level
+      ~lcc_inbox_level
   in
   let*? ctxt, commitment_hash =
     Sc_rollup_commitment_storage.hash ctxt commitment
@@ -544,7 +553,9 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc =
 
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_result_syntax in
-  let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
+  let* lcc, lcc_inbox_level, ctxt =
+    Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
+  in
   let* () =
     fail_when
       Sc_rollup_repr.Number_of_ticks.(
@@ -561,7 +572,7 @@ let publish_commitment ctxt rollup staker commitment =
     | Some staker_index -> return (ctxt, [], staker_index)
   in
   let* commitment_hash, publication_level, ctxt =
-    refine_stake ctxt rollup ~staker_index commitment ~lcc
+    refine_stake ctxt rollup ~staker_index commitment ~lcc ~lcc_inbox_level
   in
   return (commitment_hash, publication_level, ctxt, balances_updates)
 
@@ -787,21 +798,15 @@ let stakers_of_commitment = Commitment_stakers.get
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake
 
-  let refine_stake ?lcc ctxt rollup staker commitment =
+  let refine_stake ctxt rollup staker commitment =
     let open Lwt_result_syntax in
-    let* lcc =
-      match lcc with
-      | None ->
-          let* lcc, _ctxt =
-            Commitment_storage.last_cemented_commitment ctxt rollup
-          in
-          return lcc
-      | Some lcc -> return lcc
+    let* lcc, lcc_inbox_level, _ctxt =
+      Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
     in
     let* _ctxt, staker_index =
       Sc_rollup_staker_index_storage.get_staker_index_unsafe ctxt rollup staker
     in
-    refine_stake ctxt rollup commitment ~staker_index ~lcc
+    refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level
 
   let max_commitment_storage_size_in_bytes =
     max_commitment_storage_size_in_bytes
