@@ -544,12 +544,12 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level =
   let* ctxt =
     assert_staker_dont_backtrack ctxt rollup staker_index commitments
   in
-  let _total_size_diff =
+  let total_size_diff =
     refine_conditions_size_diff + commitment_size_diff
     + commitment_added_size_diff + set_staker_commitment_size_diff
     + commitments_per_inbox_level_size_diff
   in
-  return (commitment_hash, commitment_added_level, ctxt)
+  return (commitment_hash, commitment_added_level, ctxt, total_size_diff)
 
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_result_syntax in
@@ -571,7 +571,7 @@ let publish_commitment ctxt rollup staker commitment =
     | None -> deposit_stake ctxt rollup staker
     | Some staker_index -> return (ctxt, [], staker_index)
   in
-  let* commitment_hash, publication_level, ctxt =
+  let* commitment_hash, publication_level, ctxt, _size_diff =
     refine_stake ctxt rollup ~staker_index commitment ~lcc ~lcc_inbox_level
   in
   return (commitment_hash, publication_level, ctxt, balances_updates)
@@ -806,7 +806,11 @@ module Internal_for_tests = struct
     let* _ctxt, staker_index =
       Sc_rollup_staker_index_storage.get_staker_index_unsafe ctxt rollup staker
     in
-    refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level
+    let* commitment_hash, publication_level, ctxt, size_diff =
+      refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level
+    in
+    assert (Compare.Int.(size_diff < max_commitment_storage_size_in_bytes)) ;
+    return (commitment_hash, publication_level, ctxt)
 
   let max_commitment_storage_size_in_bytes =
     max_commitment_storage_size_in_bytes
