@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    DAL
+   Invocation:   dune exec tezt/manual_tests/main.exe -- --file dal.ml --test-arg output-file=<file>
+   Subject:      Test getting informaton about the DAL distribution.
+*)
+
 let dal_distribution =
   Protocol.register_test
     ~__FILE__
@@ -56,7 +63,8 @@ let dal_distribution =
     let* constants =
       RPC.Client.call client (RPC.get_chain_block_context_constants ())
     in
-    JSON.(constants |-> "dal" |-> "number_of_shards" |> as_int) |> return
+    JSON.(constants |-> "dal_parametric" |-> "number_of_shards" |> as_int)
+    |> return
   in
   let results =
     Array.init levels (fun _ ->
