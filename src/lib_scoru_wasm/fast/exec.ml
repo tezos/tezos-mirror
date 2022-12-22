@@ -71,9 +71,13 @@ let compute ~enable_debugging builtins durable buffers =
 
   main_mem := Some (fun () -> Wasmer.Exports.mem0 exports) ;
 
-  let* () = kernel_run () in
-
-  Wasmer.Instance.delete instance ;
+  let* () =
+    Lwt.finalize kernel_run (fun () ->
+        (* Make sure that the instance is deleted regardless of whether
+           [kernel_run] succeeds or not. *)
+        Wasmer.Instance.delete instance ;
+        Lwt.return_unit)
+  in
 
   let* durable = Wasm_vm.patch_flags_on_eval_successful host_state.durable in
   (* TODO: #4283
