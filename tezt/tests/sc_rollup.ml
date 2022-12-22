@@ -156,7 +156,10 @@ let setup_l1 ?commitment_period ?challenge_window ?timeout protocol =
     make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
     @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
-    @ [(["sc_rollup_enable"], `Bool true)]
+    @ [
+        (["sc_rollup_enable"], `Bool true);
+        (["sc_rollup_arith_pvm_enable"], `Bool true);
+      ]
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in

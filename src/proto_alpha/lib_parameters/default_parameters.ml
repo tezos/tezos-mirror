@@ -212,6 +212,7 @@ let constants_mainnet =
       (let commitment_period_in_blocks = 30 in
        {
          enable = false;
+         arith_pvm_enable = false;
          (* The following value is chosen to prevent spam. *)
          origination_size = 6_314;
          challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;

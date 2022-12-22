@@ -1024,6 +1024,7 @@ let prepare_first_block ~level ~timestamp ctxt =
         Constants_parametric_repr.
           {
             enable = c.sc_rollup.enable;
+            arith_pvm_enable = false;
             origination_size = c.sc_rollup.origination_size;
             challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756

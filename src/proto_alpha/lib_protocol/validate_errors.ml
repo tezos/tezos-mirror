@@ -1152,6 +1152,7 @@ module Manager = struct
     | Gas_quota_exceeded_init_deserialize
     | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
+    | Sc_rollup_arith_pvm_disabled
     | Zk_rollup_feature_disabled
 
   let () =
@@ -1270,6 +1271,20 @@ module Manager = struct
       Data_encoding.unit
       (function Sc_rollup_feature_disabled -> Some () | _ -> None)
       (fun () -> Sc_rollup_feature_disabled) ;
+
+    let scoru_arith_pvm_disabled_description =
+      "Arith PVM is disabled in this network."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"operation.arith_pvm_disabled"
+      ~title:"The Arith PVM is disabled"
+      ~description:scoru_arith_pvm_disabled_description
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "%s" scoru_arith_pvm_disabled_description)
+      Data_encoding.unit
+      (function Sc_rollup_arith_pvm_disabled -> Some () | _ -> None)
+      (fun () -> Sc_rollup_arith_pvm_disabled) ;
     let zkru_disabled_description =
       "ZK rollups will be enabled in a future proposal."
     in
