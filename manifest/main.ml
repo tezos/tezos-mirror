@@ -5690,7 +5690,7 @@ let _octez_node =
          octez_store |> open_;
          octez_store_unix_reconstruction |> open_;
          octez_store_unix_snapshots |> open_;
-         octez_context |> open_;
+         octez_context;
          octez_validation |> open_;
          octez_shell_context |> open_;
          octez_workers |> open_;
