@@ -297,12 +297,14 @@ let assert_commitment_is_not_past_curfew ctxt rollup inbox_level =
         Int32.of_int
         @@ Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
       in
-      if
-        Compare.Int32.(
-          Raw_level_repr.diff current_level oldest_commit
-          > refutation_deadline_blocks)
-      then tzfail Sc_rollup_commitment_past_curfew
-      else return (ctxt, 0)
+      let+ () =
+        fail_when
+          Compare.Int32.(
+            Raw_level_repr.diff current_level oldest_commit
+            > refutation_deadline_blocks)
+          Sc_rollup_commitment_past_curfew
+      in
+      (ctxt, 0)
   | None ->
       (* The storage cost is covered by the stake. *)
       let* ctxt, size_diff, _existed =
