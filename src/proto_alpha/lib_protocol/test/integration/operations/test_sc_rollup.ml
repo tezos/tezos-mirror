@@ -535,6 +535,25 @@ let publish_commitments block staker rollup commitments =
     block
     commitments
 
+let cement_commitment ?challenge_window_in_blocks block rollup staker hash =
+  let* challenge_window_in_blocks =
+    match challenge_window_in_blocks with
+    | Some x -> return x
+    | None ->
+        let* constants = Context.get_constants (B block) in
+        return constants.parametric.sc_rollup.challenge_window_in_blocks
+  in
+  let* block = Block.bake_n challenge_window_in_blocks block in
+  let* cement = Op.sc_rollup_cement (B block) staker rollup hash in
+  Block.bake ~operation:cement block
+
+let cement_commitments ?challenge_window_in_blocks block rollup staker hashes =
+  List.fold_left_es
+    (fun block hash ->
+      cement_commitment ?challenge_window_in_blocks block rollup staker hash)
+    block
+    hashes
+
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* block = publish_commitment incr originator rollup commitment in
   let* constants = Context.get_constants (B block) in
@@ -552,8 +571,6 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
   return (hash, incr)
-
-(* let publish_commitments block rollup commitments staker = publish_ *)
 
 let publish_and_cement_commitments incr ~baker ~originator rollup commitments =
   List.fold_left_es
@@ -3054,6 +3071,81 @@ let test_agreeing_stakers_cannot_play () =
   let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
   return_unit
 
+let test_start_game_on_cemented_commitment () =
+  let* block, (pA, pB), rollup =
+    init_and_originate
+      ~sc_rollup_challenge_window_in_blocks:1000
+      Context.T2
+      "unit"
+  in
+  let* constants = Context.get_constants (B block) in
+  let pA_pkh = Account.pkh_of_contract_exn pA in
+  let pB_pkh = Account.pkh_of_contract_exn pB in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  let* predecessor =
+    Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
+  in
+  let* commitments_and_hashes =
+    let* incr = Incremental.begin_construction block in
+    gen_commitments incr rollup ~predecessor ~num_commitments:10
+  in
+  (* pA and pB publishes and cements 10 commitments. *)
+  let commitments, hashes = List.split commitments_and_hashes in
+  let* block = publish_commitments block pA rollup commitments in
+  let* block = publish_commitments block pB rollup commitments in
+  let* block =
+    cement_commitments
+      ~challenge_window_in_blocks:
+        constants.parametric.sc_rollup.challenge_window_in_blocks
+      block
+      rollup
+      pA
+      hashes
+  in
+
+  (* We now check that pA and pB cannot start a refutation against on
+     cemented commitments. *)
+  List.iter_es
+    (fun hash ->
+      (* The refutation game checks that [pA] stakes on [hash] and
+         [pB] on [hash]. As the storage keeps in the storage only
+         the metadata for active commitments, any game started on a cemented
+         commitment will fail with "<tz1> not staked on <hash>". *)
+      let refutation =
+        Sc_rollup.Game.Start
+          {player_commitment_hash = hash; opponent_commitment_hash = hash}
+      in
+      let* pA_against_pB =
+        Op.sc_rollup_refute (B block) pA rollup pB_pkh refutation
+      in
+      let* pB_against_pA =
+        Op.sc_rollup_refute (B block) pB rollup pA_pkh refutation
+      in
+      let expect_apply_failure = function
+        | Environment.Ecoproto_error
+            (Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment _
+            as e)
+          :: _ ->
+            Assert.test_error_encodings e ;
+            return_unit
+        | _ ->
+            failwith
+              "It should have failed with \
+               [Sc_rollup_wrong_staker_for_conflict_commitment]"
+      in
+      let* incr = Incremental.begin_construction block in
+      (* Even if there is no conflict, the refutation game will reject
+         it before that. This test behaves as a regression test to prevent
+         to break this property. *)
+      let* (_ : Incremental.t) =
+        Incremental.add_operation ~expect_apply_failure incr pA_against_pB
+      in
+      let* (_ : Incremental.t) =
+        Incremental.add_operation ~expect_apply_failure incr pB_against_pA
+      in
+      return_unit)
+    hashes
+
 let tests =
   [
     Tztest.tztest
@@ -3204,4 +3296,8 @@ let tests =
       "find conflict point with incomplete branch"
       `Quick
       test_conflict_point_on_a_branch;
+    Tztest.tztest
+      "cannot start a game on a cemented commitment"
+      `Quick
+      test_start_game_on_cemented_commitment;
   ]
