@@ -66,6 +66,8 @@ module Error : sig
               out of bounds of a value. Has code `-4`. *)
     | Store_value_size_exceeded
         (** Writing a value has exceeded 2^31 bytes. Has code `-5`. *)
+    | Store_invalid_subkey_index
+        (** Trying to get the nth subkey, where n is too big. *)
     | Memory_invalid_access
         (** An address is out of bound of the memory. Has code `-6`. *)
     | Input_output_too_large
