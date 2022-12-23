@@ -4964,7 +4964,7 @@ module Protocol = Protocol
         ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
     in
     let tx_rollup =
-      only_if active @@ fun () ->
+      only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       public_lib
         (sf "tezos-tx-rollup-%s" name_dash)
         ~path:(path // "lib_tx_rollup")
