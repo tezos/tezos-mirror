@@ -31,10 +31,10 @@ module Events = Delegate_events.Denunciator
 module B_Events = Delegate_events.Baking_scheduling
 
 module HLevel = Hashtbl.Make (struct
-  type t = Tezos_crypto.Chain_id.t * Raw_level.t * Round.t
+  type t = Chain_id.t * Raw_level.t * Round.t
 
   let equal (c, l, r) (c', l', r') =
-    Tezos_crypto.Chain_id.equal c c' && Raw_level.equal l l' && Round.equal r r'
+    Chain_id.equal c c' && Raw_level.equal l l' && Round.equal r r'
 
   let hash (c, lvl, r) = Hashtbl.hash (c, lvl, r)
 end)

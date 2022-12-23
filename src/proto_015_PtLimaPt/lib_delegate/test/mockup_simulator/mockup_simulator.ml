@@ -76,7 +76,7 @@ type state = {
 
 let accounts = Mockup.Protocol_parameters.default_value.bootstrap_accounts
 
-let chain_id = Tezos_crypto.Chain_id.of_string_exn "main"
+let chain_id = Chain_id.of_string_exn "main"
 
 let genesis_block_hash =
   Block_hash.of_b58check_exn

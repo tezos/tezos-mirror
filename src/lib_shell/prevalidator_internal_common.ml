@@ -27,10 +27,9 @@
 let advertisement_delay = 0.1
 
 module Name = struct
-  type t = Tezos_crypto.Chain_id.t * Protocol_hash.t
+  type t = Chain_id.t * Protocol_hash.t
 
-  let encoding =
-    Data_encoding.tup2 Tezos_crypto.Chain_id.encoding Protocol_hash.encoding
+  let encoding = Data_encoding.tup2 Chain_id.encoding Protocol_hash.encoding
 
   let base = ["prevalidator"]
 
@@ -38,13 +37,13 @@ module Name = struct
     Format.fprintf
       fmt
       "%a:%a"
-      Tezos_crypto.Chain_id.pp_short
+      Chain_id.pp_short
       chain_id
       Protocol_hash.pp_short
       proto_hash
 
   let equal (c1, p1) (c2, p2) =
-    Tezos_crypto.Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
+    Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
 end
 
 open Prevalidator_worker_state

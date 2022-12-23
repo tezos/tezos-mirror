@@ -103,7 +103,7 @@ module Chain_validator : sig
   val update_sync_status :
     metrics:t -> Chain_validator_worker_state.synchronisation_status -> unit
 
-  val init : string list -> Tezos_crypto.Chain_id.t -> t
+  val init : string list -> Chain_id.t -> t
 
   val update_proto_metrics_callback :
     metrics:t -> cycle:float -> consumed_gas:float -> round:float -> unit

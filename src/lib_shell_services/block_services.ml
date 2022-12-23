@@ -31,7 +31,7 @@ module Proof = Tezos_context_sigs.Context.Proof_types
 module Merkle_proof_encoding =
   Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 let metadata_rpc_arg =
   let construct = function `Always -> "always" | `Never -> "never" in
@@ -54,13 +54,13 @@ let parse_chain s =
     match s with
     | "main" -> Ok `Main
     | "test" -> Ok `Test
-    | h -> Ok (`Hash (Tezos_crypto.Chain_id.of_b58check_exn h))
+    | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
   with _ -> Error "Cannot parse chain identifier."
 
 let chain_to_string = function
   | `Main -> "main"
   | `Test -> "test"
-  | `Hash h -> Tezos_crypto.Chain_id.to_b58check h
+  | `Hash h -> Chain_id.to_b58check h
 
 let chain_arg =
   let name = "chain_id" in
@@ -395,7 +395,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             Proto.block_header_data_encoding)
 
   type block_header = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     hash : Block_hash.t;
     shell : Block_header.shell_header;
     protocol_data : Proto.block_header_data;
@@ -411,7 +411,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
          (merge_objs
             (obj3
                (req "protocol" (constant protocol_hash))
-               (req "chain_id" Tezos_crypto.Chain_id.encoding)
+               (req "chain_id" Chain_id.encoding)
                (req "hash" Block_hash.encoding))
             raw_block_header_encoding)
 
@@ -491,7 +491,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     | Receipt of Proto.operation_receipt
 
   type operation = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
@@ -541,14 +541,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       (merge_objs
          (obj3
             (req "protocol" (constant protocol_hash))
-            (req "chain_id" Tezos_crypto.Chain_id.encoding)
+            (req "chain_id" Chain_id.encoding)
             (req "hash" Operation_hash.encoding))
          (merge_objs
             (dynamic_size Operation.shell_header_encoding)
             (dynamic_size operation_data_encoding)))
 
   type block_info = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     hash : Block_hash.t;
     header : raw_block_header;
     metadata : block_metadata option;
@@ -563,7 +563,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         {chain_id; hash; header; metadata; operations})
       (obj6
          (req "protocol" (constant protocol_hash))
-         (req "chain_id" Tezos_crypto.Chain_id.encoding)
+         (req "chain_id" Chain_id.encoding)
          (req "hash" Block_hash.encoding)
          (req "header" (dynamic_size raw_block_header_encoding))
          (opt "metadata" (dynamic_size block_metadata_encoding))

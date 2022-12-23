@@ -43,7 +43,7 @@ module type T = sig
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
-       and type Chain_id.t = Tezos_crypto.Chain_id.t
+       and type Chain_id.t = Tezos_crypto.Hashed.Chain_id.t
        and type Block_hash.t = Tezos_crypto.Hashed.Block_hash.t
        and type Operation_hash.t = Tezos_crypto.Hashed.Operation_hash.t
        and type Operation_list_hash.t =
@@ -684,7 +684,7 @@ struct
 
   let wrap_tzresult r = Result.map_error wrap_tztrace r
 
-  module Chain_id = Tezos_crypto.Chain_id
+  module Chain_id = Tezos_crypto.Hashed.Chain_id
   module Block_hash = Tezos_crypto.Hashed.Block_hash
   module Operation_hash = Tezos_crypto.Hashed.Operation_hash
   module Operation_list_hash = Tezos_crypto.Hashed.Operation_list_hash

@@ -25,12 +25,12 @@
 
 module Request : sig
   type validation_view = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     block : Block_hash.t;
     peer : P2p_peer.Id.t option;
   }
 
-  type preapplication_view = {chain_id : Tezos_crypto.Chain_id.t; level : int32}
+  type preapplication_view = {chain_id : Chain_id.t; level : int32}
 
   type view =
     | Validation of validation_view

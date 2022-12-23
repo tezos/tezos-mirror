@@ -57,4 +57,4 @@ let destroy_state =
     ~name:"destroy_state"
     ~msg:"destroy {chain_id}"
     ~level:Debug
-    ("chain_id", Tezos_crypto.Chain_id.encoding)
+    ("chain_id", Chain_id.encoding)

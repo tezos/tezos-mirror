@@ -88,7 +88,7 @@ type chain_db
 val activate : t -> Store.Chain.t -> P2p_reader.callback -> chain_db
 
 (** Look for the database of an active chain. *)
-val get_chain : t -> Tezos_crypto.Chain_id.t -> chain_db option
+val get_chain : t -> Chain_id.t -> chain_db option
 
 (** [deactivate chain_db] sends a [Deactivate chain_id] message to all active
     neighbors for this chain. This notifies them that this node isn't interested

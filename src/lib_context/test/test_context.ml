@@ -63,7 +63,7 @@ let genesis_protocol =
 
 let genesis_time = Time.Protocol.of_seconds 0L
 
-let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis_block
+let chain_id = Chain_id.of_block_hash genesis_block
 
 (** Test functors *)
 

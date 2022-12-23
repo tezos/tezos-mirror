@@ -24,11 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val get_chain_id :
-  Store.t -> Chain_services.chain -> Tezos_crypto.Chain_id.t Lwt.t
+val get_chain_id : Store.t -> Chain_services.chain -> Chain_id.t Lwt.t
 
 val get_chain_id_opt :
-  Store.t -> Chain_services.chain -> Tezos_crypto.Chain_id.t option Lwt.t
+  Store.t -> Chain_services.chain -> Chain_id.t option Lwt.t
 
 val get_chain_store_exn :
   Store.t -> Chain_services.chain -> Store.chain_store Lwt.t

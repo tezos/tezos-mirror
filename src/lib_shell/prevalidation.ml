@@ -92,7 +92,7 @@ module type CHAIN_STORE = sig
     Store.Block.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t
 
-  val chain_id : chain_store -> Tezos_crypto.Chain_id.t
+  val chain_id : chain_store -> Chain_id.t
 end
 
 module type T = sig

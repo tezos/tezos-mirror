@@ -218,7 +218,7 @@ let apply_with_gas header ?(operations = []) (pred : Block.t) =
   (let open Environment.Error_monad in
   begin_validation_and_application
     pred.context
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     (Application header)
     ~predecessor:pred.header.shell
   >>=? fun vstate ->

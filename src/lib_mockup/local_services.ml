@@ -79,7 +79,7 @@ let () =
 module type MENV = sig
   include Registration.MOCKUP
 
-  val chain_id : Tezos_crypto.Chain_id.t
+  val chain_id : Chain_id.t
 
   val rpc_context : Tezos_protocol_environment.rpc_context
 
@@ -155,13 +155,13 @@ module Make (E : MENV) = struct
         Tezos_rpc.Answer.return (block_hash, block_header.timestamp))
 
   let chain_chain_id = function
-    | `Main -> Tezos_crypto.Chain_id.hash_string ["main"]
-    | `Test -> Tezos_crypto.Chain_id.hash_string ["test"]
+    | `Main -> Chain_id.hash_string ["main"]
+    | `Test -> Chain_id.hash_string ["test"]
     | `Hash cid -> cid
 
   let check_chain ?caller_name (chain : Block_services.chain) =
     unless
-      (Tezos_crypto.Chain_id.equal E.chain_id (chain_chain_id chain))
+      (Chain_id.equal E.chain_id (chain_chain_id chain))
       (fun () ->
         let msg =
           let open Format in
@@ -175,17 +175,17 @@ module Make (E : MENV) = struct
                   fprintf
                     ppf
                     "main (%a)"
-                    Tezos_crypto.Chain_id.pp
-                    (Tezos_crypto.Chain_id.hash_string ["main"])
+                    Chain_id.pp
+                    (Chain_id.hash_string ["main"])
               | `Test ->
                   fprintf
                     ppf
                     "test (%a)"
-                    Tezos_crypto.Chain_id.pp
-                    (Tezos_crypto.Chain_id.hash_string ["test"])
-              | `Hash chain_id -> Tezos_crypto.Chain_id.pp ppf chain_id)
+                    Chain_id.pp
+                    (Chain_id.hash_string ["test"])
+              | `Hash chain_id -> Chain_id.pp ppf chain_id)
             chain
-            Tezos_crypto.Chain_id.pp
+            Chain_id.pp
             E.chain_id
         in
         Lwt.fail_with msg)
@@ -997,8 +997,7 @@ let build_shell_directory (base_dir : string)
     [rpc_context] is data used when honoring an RPC.
  *)
 let build_directory (base_dir : string) (mem_only : bool)
-    (mockup_env : Registration.mockup_environment)
-    (chain_id : Tezos_crypto.Chain_id.t)
+    (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) protocol_data :
     unit Tezos_rpc.Directory.t =
   let write_context rpc_context protocol_data =

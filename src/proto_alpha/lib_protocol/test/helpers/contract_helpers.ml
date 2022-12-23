@@ -79,7 +79,7 @@ let default_step_constants =
       self = default_self;
       amount = Tez.zero;
       balance = Tez.zero;
-      chain_id = Tezos_crypto.Chain_id.zero;
+      chain_id = Chain_id.zero;
       now = Script_timestamp.of_zint Z.zero;
       level = Script_int.zero_n;
     }

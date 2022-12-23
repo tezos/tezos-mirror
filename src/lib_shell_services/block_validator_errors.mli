@@ -37,7 +37,7 @@ type block_error =
       originating_block : Block_hash.t;
     }
   | Expired_chain of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       expiration : Time.Protocol.t;
       timestamp : Time.Protocol.t;
     }

@@ -28,7 +28,7 @@ open Alpha_context
 
 type block_info = {
   hash : Block_hash.t;
-  chain_id : Tezos_crypto.Chain_id.t;
+  chain_id : Chain_id.t;
   predecessor : Block_hash.t;
   fitness : Bytes.t list;
   timestamp : Time.Protocol.t;

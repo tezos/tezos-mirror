@@ -90,7 +90,7 @@ val generate_seed_nonce :
 
 val register_nonce :
   #Protocol_client_context.full ->
-  chain_id:Tezos_crypto.Chain_id.t ->
+  chain_id:Chain_id.t ->
   Block_hash.t ->
   Nonce.t ->
   unit tzresult Lwt.t
@@ -108,7 +108,7 @@ val reveal_potential_nonces : t -> Baking_state.proposal -> unit tzresult Lwt.t
 val start_revelation_worker :
   Protocol_client_context.full ->
   Baking_configuration.nonce_config ->
-  Tezos_crypto.Chain_id.t ->
+  Chain_id.t ->
   Constants.t ->
   Baking_state.proposal Lwt_stream.t ->
   Lwt_canceler.t Lwt.t

@@ -117,7 +117,7 @@ let () =
 
 (************************* State errors ***********************************)
 
-type error += Unknown_chain of Tezos_crypto.Chain_id.t
+type error += Unknown_chain of Chain_id.t
 
 type error += Bad_data_dir
 
@@ -131,9 +131,8 @@ let () =
     ~title:"Unknown chain"
     ~description:
       "The chain identifier could not be found in the chain identifiers table."
-    ~pp:(fun ppf id ->
-      Format.fprintf ppf "Unknown chain %a" Tezos_crypto.Chain_id.pp id)
-    Data_encoding.(obj1 (req "chain" Tezos_crypto.Chain_id.encoding))
+    ~pp:(fun ppf id -> Format.fprintf ppf "Unknown chain %a" Chain_id.pp id)
+    Data_encoding.(obj1 (req "chain" Chain_id.encoding))
     (function Unknown_chain x -> Some x | _ -> None)
     (fun x -> Unknown_chain x) ;
   register_error_kind
@@ -376,7 +375,7 @@ let () =
 
 (************************ Validator errors ********************************)
 
-type error += Inactive_chain of Tezos_crypto.Chain_id.t
+type error += Inactive_chain of Chain_id.t
 
 type error += Checkpoint_error of Block_hash.t * P2p_peer.Id.t option
 
@@ -392,9 +391,9 @@ let () =
         ppf
         "Tried to validate a block from chain %a, that is not currently \
          considered active."
-        Tezos_crypto.Chain_id.pp
+        Chain_id.pp
         chain)
-    Data_encoding.(obj1 (req "inactive_chain" Tezos_crypto.Chain_id.encoding))
+    Data_encoding.(obj1 (req "inactive_chain" Chain_id.encoding))
     (function Inactive_chain chain -> Some chain | _ -> None)
     (fun chain -> Inactive_chain chain) ;
   register_error_kind

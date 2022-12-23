@@ -353,12 +353,7 @@ module Interpreter_helpers = struct
   let originate_contract_hash file storage src b baker =
     originate_contract_hash file storage src b baker >|=? fun (dst, b) ->
     let anti_replay =
-      Format.asprintf
-        "%a%a"
-        Contract_hash.pp
-        dst
-        Tezos_crypto.Chain_id.pp
-        Tezos_crypto.Chain_id.zero
+      Format.asprintf "%a%a" Contract_hash.pp dst Chain_id.pp Chain_id.zero
     in
     (dst, b, anti_replay)
 

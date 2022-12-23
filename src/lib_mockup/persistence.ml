@@ -53,7 +53,7 @@ module Make (Registration : Registration.S) = struct
   module Persistent_mockup_environment = struct
     type t = {
       protocol_hash : Protocol_hash.t;
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       rpc_context : Tezos_protocol_environment.rpc_context;
       protocol_data : bytes;
     }
@@ -67,7 +67,7 @@ module Make (Registration : Registration.S) = struct
           {protocol_hash; chain_id; rpc_context; protocol_data})
         (obj4
            (req "protocol_hash" Protocol_hash.encoding)
-           (req "chain_id" Tezos_crypto.Chain_id.encoding)
+           (req "chain_id" Chain_id.encoding)
            (req "context" rpc_context_encoding)
            (req "protocol_data" Variable.bytes))
 

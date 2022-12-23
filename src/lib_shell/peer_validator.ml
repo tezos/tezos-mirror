@@ -29,24 +29,16 @@
 open Peer_validator_worker_state
 
 module Name = struct
-  type t = Tezos_crypto.Chain_id.t * P2p_peer.Id.t
+  type t = Chain_id.t * P2p_peer.Id.t
 
-  let encoding =
-    Data_encoding.tup2 Tezos_crypto.Chain_id.encoding P2p_peer.Id.encoding
+  let encoding = Data_encoding.tup2 Chain_id.encoding P2p_peer.Id.encoding
 
   let base = ["validator"; "peer"]
 
   let pp ppf (chain, peer) =
-    Format.fprintf
-      ppf
-      "%a:%a"
-      Tezos_crypto.Chain_id.pp_short
-      chain
-      P2p_peer.Id.pp_short
-      peer
+    Format.fprintf ppf "%a:%a" Chain_id.pp_short chain P2p_peer.Id.pp_short peer
 
-  let equal (c1, p1) (c2, p2) =
-    Tezos_crypto.Chain_id.equal c1 c2 && P2p_peer.Id.equal p1 p2
+  let equal (c1, p1) (c2, p2) = Chain_id.equal c1 c2 && P2p_peer.Id.equal p1 p2
 end
 
 module Request = struct

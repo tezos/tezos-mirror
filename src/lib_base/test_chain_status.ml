@@ -30,7 +30,7 @@ type t =
       expiration : Time.Protocol.t;
     }
   | Running of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Tezos_crypto.Hashed.Chain_id.t;
       genesis : Tezos_crypto.Hashed.Block_hash.t;
       protocol : Tezos_crypto.Hashed.Protocol_hash.t;
       expiration : Time.Protocol.t;
@@ -68,7 +68,7 @@ let encoding =
            ~title:"Running"
            (obj5
               (req "status" (constant "running"))
-              (req "chain_id" Tezos_crypto.Chain_id.encoding)
+              (req "chain_id" Tezos_crypto.Hashed.Chain_id.encoding)
               (req "genesis" Tezos_crypto.Hashed.Block_hash.encoding)
               (req "protocol" Tezos_crypto.Hashed.Protocol_hash.encoding)
               (req "expiration" Time.Protocol.encoding))
@@ -98,7 +98,7 @@ let pp ppf = function
         protocol
         Tezos_crypto.Hashed.Block_hash.pp
         genesis
-        Tezos_crypto.Chain_id.pp
+        Tezos_crypto.Hashed.Chain_id.pp
         chain_id
         Time.System.pp_hum
         (Time.System.of_protocol_exn expiration)

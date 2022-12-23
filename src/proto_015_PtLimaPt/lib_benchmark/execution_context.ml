@@ -53,7 +53,7 @@ let context_init ~rng_state = context_init_memory ~rng_state
 let make ~rng_state =
   context_init_memory ~rng_state >>=? fun context ->
   let amount = Alpha_context.Tez.one in
-  let chain_id = Tezos_crypto.Chain_id.zero in
+  let chain_id = Tezos_crypto.Hashed.Chain_id.zero in
   let now = Script_timestamp.of_zint Z.zero in
   let level = Script_int.zero_n in
   let open Script_interpreter in

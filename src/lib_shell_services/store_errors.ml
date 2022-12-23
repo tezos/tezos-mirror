@@ -369,7 +369,7 @@ type error +=
   | Missing_commit_info of string
   | Inconsistent_chain_store
   | Fork_testchain_not_allowed
-  | Cannot_fork_testchain of Tezos_crypto.Chain_id.t
+  | Cannot_fork_testchain of Chain_id.t
   | Cannot_load_testchain of string
   | Missing_activation_block of Block_hash.t * Protocol_hash.t * History_mode.t
   | Inconsistent_protocol_commit_info of Block_hash.t * Protocol_hash.t
@@ -874,9 +874,9 @@ let () =
       Format.fprintf
         ppf
         "Failed to fork the testchain: the testchain %a already exists."
-        Tezos_crypto.Chain_id.pp
+        Chain_id.pp
         chain_id)
-    Data_encoding.(obj1 (req "chain_id" Tezos_crypto.Chain_id.encoding))
+    Data_encoding.(obj1 (req "chain_id" Chain_id.encoding))
     (function Cannot_fork_testchain chain_id -> Some chain_id | _ -> None)
     (fun chain_id -> Cannot_fork_testchain chain_id) ;
   Error_monad.register_error_kind

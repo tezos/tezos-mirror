@@ -68,7 +68,7 @@ module type S = sig
   (** Overwrites an on-disk mockup environment. *)
   val overwrite_mockup :
     protocol_hash:Protocol_hash.t ->
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Chain_id.t ->
     rpc_context:Tezos_protocol_environment.rpc_context ->
     protocol_data:bytes ->
     base_dir:string ->

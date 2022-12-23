@@ -27,15 +27,15 @@
 open Chain_validator_worker_state
 
 module Name = struct
-  type t = Tezos_crypto.Chain_id.t
+  type t = Chain_id.t
 
-  let encoding = Tezos_crypto.Chain_id.encoding
+  let encoding = Chain_id.encoding
 
   let base = ["validator"; "chain"]
 
-  let pp = Tezos_crypto.Chain_id.pp_short
+  let pp = Chain_id.pp_short
 
-  let equal = Tezos_crypto.Chain_id.equal
+  let equal = Chain_id.equal
 end
 
 module Request = struct
@@ -72,7 +72,7 @@ module Types = struct
     block_validator : Block_validator.t;
     block_validator_process : Block_validator_process.t;
     global_valid_block_input : Store.Block.t Lwt_watcher.input;
-    global_chains_input : (Tezos_crypto.Chain_id.t * bool) Lwt_watcher.input;
+    global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
     start_prevalidator : bool;
     prevalidator_limits : Shell_limits.prevalidator_limits;
     peer_validator_limits : Shell_limits.peer_validator_limits;
@@ -116,7 +116,7 @@ let shutdown_child nv active_chains =
     (fun ({parameters = {chain_store; global_chains_input; _}; _}, shutdown) ->
       let test_chain_id = Store.Chain.chain_id chain_store in
       Lwt_watcher.notify global_chains_input (test_chain_id, false) ;
-      Tezos_crypto.Chain_id.Table.remove active_chains test_chain_id ;
+      Chain_id.Table.remove active_chains test_chain_id ;
       let* r = Store.Chain.shutdown_testchain nv.parameters.chain_store in
       match r with
       | Error _err ->
@@ -159,7 +159,7 @@ let notify_new_block w peer {Block_validator.block; resulting_context_hash} =
   let nv = Worker.state w in
   Option.iter
     (fun id ->
-      List.assoc ~equal:Tezos_crypto.Chain_id.equal id (Worker.list table)
+      List.assoc ~equal:Chain_id.equal id (Worker.list table)
       |> Option.iter (fun w ->
              let nv = Worker.state w in
              Lwt_watcher.notify nv.valid_block_input block))
@@ -918,10 +918,7 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
     }
   in
   let* w = Worker.launch table chain_id parameters (module Handlers) in
-  Tezos_crypto.Chain_id.Table.add
-    active_chains
-    (Store.Chain.chain_id chain_store)
-    w ;
+  Chain_id.Table.add active_chains (Store.Chain.chain_id chain_store) w ;
   register_garbage_collect_callback w ;
   register_split_callback w ;
   Lwt_watcher.notify global_chains_input (Store.Chain.chain_id chain_store, true) ;
@@ -969,7 +966,7 @@ let child w =
     (Worker.state w).child
     (fun ({parameters = {chain_store; _}; _}, _) ->
       List.assoc
-        ~equal:Tezos_crypto.Chain_id.equal
+        ~equal:Chain_id.equal
         (Store.Chain.chain_id chain_store)
         (Worker.list table))
 

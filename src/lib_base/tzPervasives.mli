@@ -94,6 +94,7 @@ module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 module Block_hash = Tezos_crypto.Hashed.Block_hash
 module Block_metadata_hash = Tezos_crypto.Hashed.Block_metadata_hash
+module Chain_id = Tezos_crypto.Hashed.Chain_id
 module Context_hash = Tezos_crypto.Hashed.Context_hash
 module Operation_hash = Tezos_crypto.Hashed.Operation_hash
 module Operation_list_hash = Tezos_crypto.Hashed.Operation_list_hash

@@ -46,7 +46,7 @@ val begin_construction :
   protocol_data:block_header_data ->
   Abstract_context_index.t ->
   Baking_state.block_info ->
-  Tezos_crypto.Chain_id.t ->
+  Chain_id.t ->
   incremental tzresult Lwt.t
 
 val add_operation :

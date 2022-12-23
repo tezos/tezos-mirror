@@ -63,7 +63,7 @@ module Protocol_constants_overrides = struct
     liquidity_baking_sunset_level : int32 option;
     liquidity_baking_escape_ema_threshold : int32 option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
-    chain_id : Tezos_crypto.Chain_id.t option;
+    chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
   }
 
@@ -197,7 +197,7 @@ module Protocol_constants_overrides = struct
                   (opt "liquidity_baking_sunset_level" int32)
                   (opt "liquidity_baking_escape_ema_threshold" int32))
                (obj2
-                  (opt "chain_id" Tezos_crypto.Chain_id.encoding)
+                  (opt "chain_id" Chain_id.encoding)
                   (opt "initial_timestamp" Time.Protocol.encoding)))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
@@ -477,12 +477,7 @@ module Protocol_constants_overrides = struct
             override_value = o.liquidity_baking_escape_ema_threshold;
             pp = pp_print_int32;
           };
-        O
-          {
-            name = "chain_id";
-            override_value = o.chain_id;
-            pp = Tezos_crypto.Chain_id.pp;
-          };
+        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
             name = "timestamp";

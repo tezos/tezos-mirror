@@ -135,7 +135,7 @@ type global_state = {
   (* client context *)
   cctxt : Protocol_client_context.full;
   (* chain id *)
-  chain_id : Tezos_crypto.Chain_id.t;
+  chain_id : Chain_id.t;
   (* baker configuration *)
   config : Baking_configuration.t;
   (* protocol constants *)
@@ -835,7 +835,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     fmt
     "@[<v 2>Global state:@ chain_id: %a@ @[<v 2>config:@ %a@]@ \
      validation_mode: %a@ @[<v 2>delegates:@ %a@]@]"
-    Tezos_crypto.Chain_id.pp
+    Chain_id.pp
     chain_id
     Baking_configuration.pp
     config

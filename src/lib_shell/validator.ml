@@ -34,8 +34,8 @@ type t = {
   prevalidator_limits : Shell_limits.prevalidator_limits;
   start_testchain : bool;
   valid_block_input : Store.Block.t Lwt_watcher.input;
-  chains_input : (Tezos_crypto.Chain_id.t * bool) Lwt_watcher.input;
-  active_chains : Chain_validator.t Tezos_crypto.Chain_id.Table.t;
+  chains_input : (Chain_id.t * bool) Lwt_watcher.input;
+  active_chains : Chain_validator.t Chain_id.Table.t;
 }
 
 let create state db peer_validator_limits block_validator_limits
@@ -63,14 +63,14 @@ let create state db peer_validator_limits block_validator_limits
       chain_validator_limits;
       valid_block_input;
       chains_input;
-      active_chains = Tezos_crypto.Chain_id.Table.create 7;
+      active_chains = Chain_id.Table.create 7;
     }
 
 let activate v ~start_prevalidator ~validator_process chain_store =
   let open Lwt_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let* () = Validator_event.(emit activate_chain) chain_id in
-  match Tezos_crypto.Chain_id.Table.find v.active_chains chain_id with
+  match Chain_id.Table.find v.active_chains chain_id with
   | Some chain -> return_ok chain
   | None ->
       Chain_validator.create
@@ -89,14 +89,12 @@ let activate v ~start_prevalidator ~validator_process chain_store =
 
 let get {active_chains; _} chain_id =
   let open Result_syntax in
-  match Tezos_crypto.Chain_id.Table.find active_chains chain_id with
+  match Chain_id.Table.find active_chains chain_id with
   | Some nv -> return nv
   | None -> tzfail (Validation_errors.Inactive_chain chain_id)
 
 let get_active_chains {active_chains; _} =
-  let l =
-    Tezos_crypto.Chain_id.Table.fold (fun c _ acc -> c :: acc) active_chains []
-  in
+  let l = Chain_id.Table.fold (fun c _ acc -> c :: acc) active_chains [] in
   List.rev l
 
 let read_block store h =
@@ -165,7 +163,7 @@ let shutdown {active_chains; block_validator; _} =
          (fun (id, nv) ->
            let* () = Validator_event.(emit shutdown_chain_validator) id in
            Chain_validator.shutdown nv)
-         (Tezos_crypto.Chain_id.Table.to_seq active_chains)
+         (Chain_id.Table.to_seq active_chains)
   in
   (* Shutdown the chain_validator (peer_validators, prevalidator,
      etc.) before the block_validator *)
@@ -193,7 +191,7 @@ let inject_operation v ?chain_id ~force op =
       match o with
       | None ->
           if force then
-            Tezos_crypto.Chain_id.Table.iter_es
+            Chain_id.Table.iter_es
               (fun _chain_id chain ->
                 inject_operation_on
                   chain

@@ -906,11 +906,7 @@ let get_contract_address_maybe_chain_id ~descr ~loc ~chain_id contract =
   in
   if descr.requires_chain_id then
     let chain_id_bytes =
-      bytes
-        ~loc
-        (Data_encoding.Binary.to_bytes_exn
-           Tezos_crypto.Chain_id.encoding
-           chain_id)
+      bytes ~loc (Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id)
     in
     pair ~loc chain_id_bytes address
   else address
@@ -1184,9 +1180,7 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
                 contract_bytes
             in
             let cid =
-              Data_encoding.Binary.of_bytes_exn
-                Tezos_crypto.Chain_id.encoding
-                chain_id_bytes
+              Data_encoding.Binary.of_bytes_exn Chain_id.encoding chain_id_bytes
             in
             if counter = stored_counter then
               if multisig_contract = contract && chain_id = cid then

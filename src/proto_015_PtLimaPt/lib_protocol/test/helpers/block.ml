@@ -204,8 +204,7 @@ module Forge = struct
     in
     let signature =
       Tezos_crypto.Signature.V0.sign
-        ~watermark:
-          Block_header.(to_watermark (Block_header Tezos_crypto.Chain_id.zero))
+        ~watermark:Block_header.(to_watermark (Block_header Chain_id.zero))
         signer_account.sk
         unsigned_bytes
     in
@@ -404,7 +403,7 @@ let initial_alpha_context ?(commitments = []) constants
     ~typecheck
     ~level
     ~timestamp
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     ctxt
   >|= Environment.wrap_tzresult
 
@@ -445,7 +444,7 @@ let genesis_with_parameters parameters =
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  let chain_id = Tezos_crypto.Chain_id.of_block_hash hash in
+  let chain_id = Chain_id.of_block_hash hash in
   Main.init chain_id ctxt shell >|= Environment.wrap_tzresult
   >|=? fun {context; _} ->
   {
@@ -679,7 +678,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   initial_context
     ?commitments
     ?bootstrap_contracts
-    (Tezos_crypto.Chain_id.of_block_hash hash)
+    (Chain_id.of_block_hash hash)
     constants
     shell
     initial_accounts
@@ -724,7 +723,7 @@ let get_application_vstate (pred : t) (operations : Protocol.operation trace) =
   let open Environment.Error_monad in
   begin_validation_and_application
     pred.context
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     (Application header)
     ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
@@ -746,7 +745,7 @@ let get_construction_vstate ?(policy = By_round 0) ?timestamp
   in
   begin_validation_and_application
     pred.context
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     mode
     ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
@@ -771,7 +770,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     | Application ->
         begin_validation_and_application
           pred.context
-          Tezos_crypto.Chain_id.zero
+          Chain_id.zero
           (Application header)
           ~predecessor:pred.header.shell
         >|= Environment.wrap_tzresult

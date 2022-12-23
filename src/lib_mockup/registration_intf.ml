@@ -25,7 +25,7 @@
 
 (** Type of a mockup environment *)
 type t = {
-  chain : Tezos_crypto.Chain_id.t;
+  chain : Chain_id.t;
   rpc_context : Tezos_protocol_environment.rpc_context;
   protocol_data : bytes;
 }

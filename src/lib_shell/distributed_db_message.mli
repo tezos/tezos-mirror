@@ -29,11 +29,11 @@
     corresponding request. Thus, we are able to discrimate between
     expected responses from the unexpected ones. *)
 type t =
-  | Get_current_branch of Tezos_crypto.Chain_id.t
-  | Current_branch of Tezos_crypto.Chain_id.t * Block_locator.t
-  | Deactivate of Tezos_crypto.Chain_id.t
-  | Get_current_head of Tezos_crypto.Chain_id.t
-  | Current_head of Tezos_crypto.Chain_id.t * Block_header.t * Mempool.t
+  | Get_current_branch of Chain_id.t
+  | Current_branch of Chain_id.t * Block_locator.t
+  | Deactivate of Chain_id.t
+  | Get_current_head of Chain_id.t
+  | Current_head of Chain_id.t * Block_header.t * Mempool.t
   | Get_block_headers of Block_hash.t list
   | Block_header of Block_header.t
   | Get_operations of Operation_hash.t list
@@ -43,10 +43,10 @@ type t =
   | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
       Block_hash.t * int * Operation.t list * Operation_list_list_hash.path
-  | Get_checkpoint of Tezos_crypto.Chain_id.t
-  | Checkpoint of Tezos_crypto.Chain_id.t * Block_header.t
-  | Get_protocol_branch of Tezos_crypto.Chain_id.t * int
-  | Protocol_branch of Tezos_crypto.Chain_id.t * int * Block_locator.t
+  | Get_checkpoint of Chain_id.t
+  | Checkpoint of Chain_id.t * Block_header.t
+  | Get_protocol_branch of Chain_id.t * int
+  | Protocol_branch of Chain_id.t * int * Block_locator.t
   | Get_predecessor_header of Block_hash.t * int32
   | Predecessor_header of Block_hash.t * int32 * Block_header.t
 

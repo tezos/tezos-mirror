@@ -858,7 +858,7 @@ module type ARG = sig
 
   val chain_db : Distributed_db.chain_db
 
-  val chain_id : Tezos_crypto.Chain_id.t
+  val chain_id : Chain_id.t
 end
 
 module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)

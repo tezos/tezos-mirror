@@ -46,7 +46,7 @@
 val make :
   Shell_limits.prevalidator_limits ->
   Distributed_db.chain_db ->
-  Tezos_crypto.Chain_id.t ->
+  Chain_id.t ->
   (module Legacy_mempool_plugin.FILTER) ->
   Prevalidator_internal_common.t
 

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Chain_id = struct
-  let of_string s = Tezos_crypto.Chain_id.hash_string ~key:"mockup" [s]
+  let of_string s = Chain_id.hash_string ~key:"mockup" [s]
 
   let dummy = of_string "chain"
 

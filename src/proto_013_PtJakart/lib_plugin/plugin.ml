@@ -1697,7 +1697,7 @@ module RPC = struct
              (req "input" Script.expr_encoding)
              (req "amount" Tez.encoding)
              (opt "balance" Tez.encoding)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "self" Contract.encoding)
@@ -1746,7 +1746,7 @@ module RPC = struct
           (req "contract" Contract.encoding)
           (req "entrypoint" Entrypoint.simple_encoding)
           (req "input" Script.expr_encoding)
-          (req "chain_id" Tezos_crypto.Chain_id.encoding)
+          (req "chain_id" Chain_id.encoding)
           (opt "source" Contract.encoding)
           (opt "payer" Contract.encoding)
           (opt "gas" Gas.Arith.z_integral_encoding)
@@ -1762,7 +1762,7 @@ module RPC = struct
              (req "view" string)
              (req "input" Script.expr_encoding)
              (dft "unlimited_gas" bool false)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
@@ -1910,7 +1910,7 @@ module RPC = struct
           ~input:
             (obj2
                (req "operation" Operation.encoding)
-               (req "chain_id" Tezos_crypto.Chain_id.encoding))
+               (req "chain_id" Chain_id.encoding))
           ~output:Apply_results.operation_data_and_metadata_encoding
           Tezos_rpc.Path.(path / "run_operation")
 
@@ -1943,7 +1943,7 @@ module RPC = struct
             (obj4
                (opt "blocks_before_activation" int32)
                (req "operation" Operation.encoding)
-               (req "chain_id" Tezos_crypto.Chain_id.encoding)
+               (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
           ~output:Apply_results.operation_data_and_metadata_encoding
           Tezos_rpc.Path.(path / "simulate_operation")
@@ -1956,7 +1956,7 @@ module RPC = struct
             (obj4
                (opt "blocks_before_activation" int32)
                (req "operation" Operation.encoding)
-               (req "chain_id" Tezos_crypto.Chain_id.encoding)
+               (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
           ~output:Apply_results.operation_data_and_metadata_encoding
           Tezos_rpc.Path.(path / "simulate_tx_rollup_operation")

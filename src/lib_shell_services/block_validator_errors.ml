@@ -37,7 +37,7 @@ type block_error =
       originating_block : Block_hash.t;
     }
   | Expired_chain of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       expiration : Time.Protocol.t;
       timestamp : Time.Protocol.t;
     }
@@ -139,7 +139,7 @@ let block_error_encoding =
         ~title:"Expired_chain"
         (obj4
            (req "error" (constant "expired_chain"))
-           (req "chain_id" Tezos_crypto.Chain_id.encoding)
+           (req "chain_id" Chain_id.encoding)
            (req "expiration" Time.Protocol.encoding)
            (req "timestamp" Time.Protocol.encoding))
         (function
@@ -276,7 +276,7 @@ let pp_block_error ppf = function
         (Time.System.of_protocol_exn timestamp)
         Time.System.pp_hum
         (Time.System.of_protocol_exn expiration)
-        Tezos_crypto.Chain_id.pp_short
+        Chain_id.pp_short
         chain_id
   | Unexpected_number_of_validation_passes n ->
       Format.fprintf ppf "Invalid number of validation passes (found: %d)" n

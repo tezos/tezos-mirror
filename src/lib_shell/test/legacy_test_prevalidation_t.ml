@@ -70,7 +70,7 @@ module Init = struct
     Protocol_hash.of_b58check_exn
       "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
-  let chain_id = Tezos_crypto.Chain_id.zero
+  let chain_id = Chain_id.zero
 
   let genesis_time = Time.Protocol.of_seconds 0L
 

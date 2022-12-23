@@ -321,7 +321,7 @@ module RPC = struct
              (req "input" Script.expr_encoding)
              (req "amount" Tez.encoding)
              (req "balance" Tez.encoding)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
@@ -382,7 +382,7 @@ module RPC = struct
           (req "contract" Contract.encoding)
           (req "entrypoint" string)
           (req "input" Script.expr_encoding)
-          (req "chain_id" Tezos_crypto.Chain_id.encoding)
+          (req "chain_id" Chain_id.encoding)
           (opt "source" Contract.encoding)
           (opt "payer" Contract.encoding)
           (opt "gas" Gas.Arith.z_integral_encoding)
@@ -520,7 +520,7 @@ module RPC = struct
           ~input:
             (obj2
                (req "operation" Operation.encoding)
-               (req "chain_id" Tezos_crypto.Chain_id.encoding))
+               (req "chain_id" Chain_id.encoding))
           ~output:Apply_results.operation_data_and_metadata_encoding
           RPC_path.(path / "run_operation")
 

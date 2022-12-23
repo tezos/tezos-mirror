@@ -253,7 +253,7 @@ module type PROTOCOL = sig
 
   val begin_validation :
     Context.t ->
-    Tezos_crypto.Chain_id.t ->
+    Tezos_crypto.Hashed.Chain_id.t ->
     mode ->
     predecessor:Block_header.shell_header ->
     cache:Context.source_of_cache ->
@@ -261,7 +261,7 @@ module type PROTOCOL = sig
 
   val begin_application :
     Context.t ->
-    Tezos_crypto.Chain_id.t ->
+    Tezos_crypto.Hashed.Chain_id.t ->
     mode ->
     predecessor:Block_header.shell_header ->
     cache:Context.source_of_cache ->
@@ -272,7 +272,7 @@ module type PROTOCOL = sig
 
     val init :
       Context.t ->
-      Tezos_crypto.Chain_id.t ->
+      Tezos_crypto.Hashed.Chain_id.t ->
       head_hash:Tezos_crypto.Hashed.Block_hash.t ->
       head:Block_header.shell_header ->
       cache:Context.source_of_cache ->

@@ -26,7 +26,7 @@
 
 module Proof = Tezos_context_sigs.Context.Proof_types
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 type chain_prefix = unit * chain
 
@@ -139,7 +139,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   }
 
   type block_header = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     hash : Block_hash.t;
     shell : Block_header.shell_header;
     protocol_data : Proto.block_header_data;
@@ -160,7 +160,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     | Receipt of Proto.operation_receipt
 
   type operation = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
@@ -168,7 +168,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   }
 
   type block_info = {
-    chain_id : Tezos_crypto.Chain_id.t;
+    chain_id : Chain_id.t;
     hash : Block_hash.t;
     header : raw_block_header;
     metadata : block_metadata option;

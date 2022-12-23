@@ -306,7 +306,7 @@ module Gen = struct
 
   let chain_id_gen : string t =
     let open QCheck2.Gen in
-    let open Tezos_crypto in
+    let open Tezos_crypto.Hashed in
     let non_alias =
       list string >|= Chain_id.hash_string >|= Chain_id.to_string
     in

@@ -88,7 +88,7 @@ let sign ?protocol ({kind; signer; _} as t) client =
     match kind with
     | Consensus {chain_id} ->
         Tezos_crypto.Signature.Endorsement
-          (Tezos_crypto.Chain_id.of_b58check_exn chain_id)
+          (Tezos_crypto.Hashed.Chain_id.of_b58check_exn chain_id)
     | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
   let* hex = hex ?protocol t client in

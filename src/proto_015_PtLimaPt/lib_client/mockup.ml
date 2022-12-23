@@ -35,7 +35,7 @@ module Protocol_constants_overrides = struct
   (** Equivalent of [Constants.parametric] with additionally [chain_id] and [timestamp]. *)
   type t = {
     parametric : Constants.Parametric.t;
-    chain_id : Tezos_crypto.Chain_id.t option;
+    chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
   }
 
@@ -49,7 +49,7 @@ module Protocol_constants_overrides = struct
       (merge_objs
          Constants.Parametric.encoding
          (obj2
-            (opt "chain_id" Tezos_crypto.Chain_id.encoding)
+            (opt "chain_id" Chain_id.encoding)
             (opt "initial_timestamp" Time.Protocol.encoding)))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :

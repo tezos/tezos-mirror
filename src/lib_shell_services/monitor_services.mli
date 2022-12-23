@@ -26,13 +26,13 @@
 open Tezos_rpc.Context
 
 type chain_status =
-  | Active_main of Tezos_crypto.Chain_id.t
+  | Active_main of Chain_id.t
   | Active_test of {
-      chain : Tezos_crypto.Chain_id.t;
+      chain : Chain_id.t;
       protocol : Protocol_hash.t;
       expiration_date : Time.Protocol.t;
     }
-  | Stopping of Tezos_crypto.Chain_id.t
+  | Stopping of Chain_id.t
 
 val bootstrapped :
   #streamed ->
@@ -44,8 +44,7 @@ val valid_blocks :
   ?protocols:Protocol_hash.t list ->
   ?next_protocols:Protocol_hash.t list ->
   unit ->
-  (((Tezos_crypto.Chain_id.t * Block_hash.t) * Block_header.t) Lwt_stream.t
-  * stopper)
+  (((Chain_id.t * Block_hash.t) * Block_header.t) Lwt_stream.t * stopper)
   tzresult
   Lwt.t
 
@@ -81,7 +80,7 @@ module S : sig
       ; next_protocols : Protocol_hash.t list
       ; protocols : Protocol_hash.t list >,
       unit,
-      (Tezos_crypto.Chain_id.t * Block_hash.t) * Block_header.t )
+      (Chain_id.t * Block_hash.t) * Block_header.t )
     Tezos_rpc.Service.t
 
   val heads :

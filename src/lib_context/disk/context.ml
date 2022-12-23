@@ -793,8 +793,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let _interrupted_gc = Store.Gc.cancel index.repo in
     Store.Repo.close index.repo
 
-  let get_branch chain_id =
-    Format.asprintf "%a" Tezos_crypto.Chain_id.pp chain_id
+  let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
   let empty index = {index; tree = Store.Tree.empty (); parents = []; ops = 0}
 
@@ -816,7 +815,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let compute_testchain_chain_id genesis =
     let genesis_hash = Block_hash.hash_bytes [Block_hash.to_bytes genesis] in
-    Tezos_crypto.Chain_id.of_block_hash genesis_hash
+    Chain_id.of_block_hash genesis_hash
 
   let compute_testchain_genesis forked_block =
     let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in

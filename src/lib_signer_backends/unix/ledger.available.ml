@@ -872,12 +872,7 @@ end
 let pp_ledger_chain_id fmt s =
   match s with
   | "\x00\x00\x00\x00" -> Format.fprintf fmt "'Unspecified'"
-  | other ->
-      Format.fprintf
-        fmt
-        "%a"
-        Tezos_crypto.Chain_id.pp
-        (Tezos_crypto.Chain_id.of_string_exn other)
+  | other -> Format.fprintf fmt "%a" Chain_id.pp (Chain_id.of_string_exn other)
 
 (** Commands for both ledger applications. *)
 let generic_commands group =
@@ -1249,9 +1244,7 @@ let baking_commands group =
                  | s -> (
                      try return (`Int32 (Int32.of_string s))
                      with _ -> (
-                       try
-                         return
-                           (`Chain_id (Tezos_crypto.Chain_id.of_b58check_exn s))
+                       try return (`Chain_id (Chain_id.of_b58check_exn s))
                        with _ ->
                          failwith
                            "Parameter %S should be a 32-bits integer or a \
@@ -1294,7 +1287,7 @@ let baking_commands group =
                   logand 0xFFl (shift_right i32 (n * 8))
                   |> Int32.to_int |> char_of_int
                 in
-                Tezos_crypto.Chain_id.of_string_exn
+                Chain_id.of_string_exn
                   (Stringext.of_array (Array.init 4 (fun i -> byte (3 - i))))
               in
               let* main_chain_id =
@@ -1318,7 +1311,7 @@ let baking_commands group =
                    Watermark: %ld%a -> %ld%a"
                   pp_ledger_chain_id
                   current_ci
-                  Tezos_crypto.Chain_id.pp
+                  Chain_id.pp
                   main_chain_id
                   current_mh
                   pp_round_opt
@@ -1336,9 +1329,7 @@ let baking_commands group =
               let* pk =
                 Ledger_commands.public_key_returning_instruction
                   (`Setup
-                    ( Tezos_crypto.Chain_id.to_string main_chain_id,
-                      main_hwm,
-                      test_hwm ))
+                    (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
                   hidapi
                   curve
                   path

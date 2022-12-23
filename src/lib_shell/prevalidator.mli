@@ -83,8 +83,7 @@ val flush :
 
 (** Returns the list of prevalidation contexts running and their associated
     chain *)
-val running_workers :
-  unit -> (Tezos_crypto.Chain_id.t * Protocol_hash.t * t) list
+val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
 
 (** Worker status and events *)
 

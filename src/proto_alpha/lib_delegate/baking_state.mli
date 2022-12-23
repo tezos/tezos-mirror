@@ -80,7 +80,7 @@ type cache = {
 
 type global_state = {
   cctxt : Protocol_client_context.full;
-  chain_id : Tezos_crypto.Chain_id.t;
+  chain_id : Chain_id.t;
   config : Baking_configuration.t;
   constants : Constants.t;
   round_durations : Round.round_durations;

@@ -676,7 +676,7 @@ module type TEZOS_CONTEXT = sig
   (** Close the index. Does not fail when the context is already closed. *)
   val close : index -> unit Lwt.t
 
-  val compute_testchain_chain_id : Block_hash.t -> Tezos_crypto.Chain_id.t
+  val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
 
   val compute_testchain_genesis : Block_hash.t -> Block_hash.t
 
@@ -689,7 +689,7 @@ module type TEZOS_CONTEXT = sig
 
   val commit_genesis :
     index ->
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Chain_id.t ->
     time:Time.Protocol.t ->
     protocol:Protocol_hash.t ->
     Context_hash.t tzresult Lwt.t
@@ -795,7 +795,7 @@ module type TEZOS_CONTEXT = sig
   val export_snapshot : index -> Context_hash.t -> path:string -> unit Lwt.t
 
   val set_head :
-    index -> Tezos_crypto.Chain_id.t -> Context_hash.t -> unit Lwt.t
+    index -> Tezos_crypto.Hashed.Chain_id.t -> Context_hash.t -> unit Lwt.t
 
   val set_master : index -> Context_hash.t -> unit Lwt.t
 
@@ -828,7 +828,7 @@ module type TEZOS_CONTEXT = sig
     expiration:Time.Protocol.t ->
     context Lwt.t
 
-  val clear_test_chain : index -> Tezos_crypto.Chain_id.t -> unit Lwt.t
+  val clear_test_chain : index -> Chain_id.t -> unit Lwt.t
 
   val find_predecessor_block_metadata_hash :
     context -> Block_metadata_hash.t option Lwt.t

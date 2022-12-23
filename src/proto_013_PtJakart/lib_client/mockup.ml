@@ -92,7 +92,7 @@ module Protocol_constants_overrides = struct
     sc_rollup_challenge_window_in_blocks : int option;
     sc_rollup_max_available_messages : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
-    chain_id : Tezos_crypto.Chain_id.t option;
+    chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
     initial_seed : State_hash.t option option;
   }
@@ -319,7 +319,7 @@ module Protocol_constants_overrides = struct
                      (opt
                         "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                         Constants.ratio_encoding)
-                     (opt "chain_id" Tezos_crypto.Chain_id.encoding)
+                     (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
                      (opt "initial_seed" (option State_hash.encoding)))
                   (merge_objs
@@ -740,12 +740,7 @@ module Protocol_constants_overrides = struct
             override_value = o.sc_rollup_challenge_window_in_blocks;
             pp = pp_print_int;
           };
-        O
-          {
-            name = "chain_id";
-            override_value = o.chain_id;
-            pp = Tezos_crypto.Chain_id.pp;
-          };
+        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
             name = "timestamp";

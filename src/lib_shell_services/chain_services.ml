@@ -26,7 +26,7 @@
 
 open Data_encoding
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 let chain_arg = Block_services.chain_arg
 
@@ -71,7 +71,7 @@ module S = struct
     Tezos_rpc.Service.get_service
       ~description:"The chain unique identifier."
       ~query:Tezos_rpc.Query.empty
-      ~output:Tezos_crypto.Chain_id.encoding
+      ~output:Chain_id.encoding
       Tezos_rpc.Path.(path / "chain_id")
 
   (* DEPRECATED: use `chains/<CHAIN_ID>/levels/{checkpoint, savepoint,

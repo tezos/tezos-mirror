@@ -68,7 +68,7 @@ module type S = sig
 
   val preapply_block :
     t ->
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Chain_id.t ->
     timestamp:Time.Protocol.t ->
     protocol_data:bytes ->
     live_blocks:Block_hash.Set.t ->
@@ -100,15 +100,11 @@ module type S = sig
 
   val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
-  val commit_genesis :
-    t -> chain_id:Tezos_crypto.Chain_id.t -> Context_hash.t tzresult Lwt.t
+  val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
   val init_test_chain :
-    t ->
-    Tezos_crypto.Chain_id.t ->
-    Store.Block.t ->
-    Block_header.t tzresult Lwt.t
+    t -> Chain_id.t -> Store.Block.t -> Block_header.t tzresult Lwt.t
 
   val reconfigure_event_logging :
     t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
@@ -145,8 +141,8 @@ module Internal_validator_process = struct
         ~msg:"requesting validation of {block} for chain {chain}"
         ~pp1:Block_hash.pp
         ("block", Block_hash.encoding)
-        ~pp2:Tezos_crypto.Chain_id.pp
-        ("chain", Tezos_crypto.Chain_id.encoding)
+        ~pp2:Chain_id.pp
+        ("chain", Chain_id.encoding)
 
     let validation_success =
       declare_2

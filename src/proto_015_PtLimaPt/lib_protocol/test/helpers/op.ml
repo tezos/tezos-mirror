@@ -88,8 +88,7 @@ let endorsement ?delegate ?slot ?level ?round ?block_payload_hash
   Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Endorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
        delegate.sk
        signing_context
        op)
@@ -122,8 +121,7 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
   Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Preendorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
        delegate.sk
        signing_context
        op)

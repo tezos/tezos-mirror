@@ -111,8 +111,7 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash
   let op = Single (Endorsement consensus_content) in
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Endorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
        signer
        pred_branch
        op)
@@ -148,8 +147,7 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
   let op = Single (Preendorsement consensus_content) in
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Preendorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
        signer
        pred_branch
        op)

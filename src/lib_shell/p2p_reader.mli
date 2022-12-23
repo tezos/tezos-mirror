@@ -170,7 +170,7 @@ type chain_db = {
 
 (** Lookup for block header in any active chains *)
 val read_block_header :
-  t -> Block_hash.t -> (Tezos_crypto.Chain_id.t * Block_header.t) option Lwt.t
+  t -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
 (** [run ~register ~unregister p2p state protocol_db active_chains peer_id conn]
     runs an answering worker on a p2p connection [connection]. [peer_id] is
@@ -185,7 +185,7 @@ val run :
   p2p ->
   Store.t ->
   Distributed_db_requester.Raw_protocol.t ->
-  chain_db Tezos_crypto.Chain_id.Table.t ->
+  chain_db Chain_id.Table.t ->
   P2p_peer.Id.t ->
   connection ->
   unit

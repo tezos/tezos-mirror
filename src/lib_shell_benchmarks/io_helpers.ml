@@ -43,7 +43,7 @@ let prepare_genesis base_dir =
   let* context_hash =
     Tezos_context.Context.commit_genesis
       index
-      ~chain_id:(Tezos_crypto.Chain_id.of_block_hash genesis_block)
+      ~chain_id:(Chain_id.of_block_hash genesis_block)
       ~time:(Time.Protocol.of_seconds 0L)
       ~protocol:Protocol_hash.zero
   in

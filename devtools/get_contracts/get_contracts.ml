@@ -778,7 +778,7 @@ let commands =
         Printf.printf "Getting main chain storage and head...\n%!" ;
         let chain_store = Tezos_store.Store.main_chain_store store in
         let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
-        Format.printf "Chain id: %a\n%!" Tezos_crypto.Chain_id.pp chain_id ;
+        Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
         let*! head = Tezos_store.Store.Chain.current_head chain_store in
         Format.printf
           "Head block: %a\n%!"

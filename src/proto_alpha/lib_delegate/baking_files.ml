@@ -32,6 +32,6 @@ let resolve_location ~chain_id (kind : 'a) : 'a location =
     | `State -> "baker_state"
     | `Nonce -> "nonce"
   in
-  Format.asprintf "%a_%s" Tezos_crypto.Chain_id.pp_short chain_id basename
+  Format.asprintf "%a_%s" Chain_id.pp_short chain_id basename
 
 let filename x = x

@@ -69,7 +69,7 @@ module Protocol_constants_overrides = struct
     ratio_of_frozen_deposits_slashed_per_double_endorsement :
       Constants.ratio option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
-    chain_id : Tezos_crypto.Chain_id.t option;
+    chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
   }
 
@@ -229,7 +229,7 @@ module Protocol_constants_overrides = struct
                   (opt
                      "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                      Constants.ratio_encoding)
-                  (opt "chain_id" Tezos_crypto.Chain_id.encoding)
+                  (opt "chain_id" Chain_id.encoding)
                   (opt "initial_timestamp" Time.Protocol.encoding)))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
@@ -544,12 +544,7 @@ module Protocol_constants_overrides = struct
               o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
             pp = Constants.pp_ratio;
           };
-        O
-          {
-            name = "chain_id";
-            override_value = o.chain_id;
-            pp = Tezos_crypto.Chain_id.pp;
-          };
+        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
             name = "timestamp";

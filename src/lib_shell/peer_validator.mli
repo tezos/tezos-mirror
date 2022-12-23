@@ -43,8 +43,7 @@ val notify_branch : t -> Block_locator.t -> unit
 
 val notify_head : t -> Block_hash.t -> Block_header.t -> unit
 
-val running_workers :
-  unit -> ((Tezos_crypto.Chain_id.t * P2p_peer.Id.t) * t) list
+val running_workers : unit -> ((Chain_id.t * P2p_peer.Id.t) * t) list
 
 val status : t -> Worker_types.worker_status
 

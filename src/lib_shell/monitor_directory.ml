@@ -75,7 +75,7 @@ let build_rpc_directory validator mainchain_validator =
                 match o with
                 | None -> false
                 | Some this_chain_id ->
-                    Tezos_crypto.Chain_id.equal this_chain_id that_chain_id)
+                    Chain_id.equal this_chain_id that_chain_id)
               chains
       in
       let in_protocols (chain_store, block) =
@@ -176,7 +176,7 @@ let build_rpc_directory validator mainchain_validator =
         let convert (chain_id, b) =
           if not b then Lwt.return (Monitor_services.Stopping chain_id)
           else if
-            Tezos_crypto.Chain_id.equal
+            Chain_id.equal
               (Store.Chain.chain_id (Store.main_chain_store store))
               chain_id
           then Lwt.return (Monitor_services.Active_main chain_id)
@@ -193,7 +193,7 @@ let build_rpc_directory validator mainchain_validator =
                         (Format.asprintf
                            "Monitor.active_chains: no expiration date for the \
                             chain %a"
-                           Tezos_crypto.Chain_id.pp
+                           Chain_id.pp
                            chain_id))
                     (Store.Chain.expiration chain_store)
                 in

@@ -43,7 +43,7 @@ type error += Cannot_serialize_operation_metadata
 
 (************************* State errors ***********************************)
 
-type error += Unknown_chain of Tezos_crypto.Chain_id.t
+type error += Unknown_chain of Chain_id.t
 
 type error += Bad_data_dir
 
@@ -78,6 +78,6 @@ type error += Unknown_ancestor | Known_invalid
 
 (************************ Validator errors ********************************)
 
-type error += Inactive_chain of Tezos_crypto.Chain_id.t
+type error += Inactive_chain of Chain_id.t
 
 type error += Checkpoint_error of Block_hash.t * P2p_peer.Id.t option

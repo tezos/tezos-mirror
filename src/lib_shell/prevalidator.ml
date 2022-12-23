@@ -28,11 +28,11 @@ include Prevalidator_internal_common
 open Prevalidator_worker_state
 
 module ChainProto_registry = Map.Make (struct
-  type t = Tezos_crypto.Chain_id.t * Protocol_hash.t
+  type t = Chain_id.t * Protocol_hash.t
 
   let compare (c1, p1) (c2, p2) =
     let pc = Protocol_hash.compare p1 p2 in
-    if pc = 0 then Tezos_crypto.Chain_id.compare c1 c2 else pc
+    if pc = 0 then Chain_id.compare c1 c2 else pc
 end)
 
 let chain_proto_registry : t ChainProto_registry.t ref =

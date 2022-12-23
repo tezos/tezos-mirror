@@ -24,13 +24,13 @@
 (*****************************************************************************)
 
 type chain_status =
-  | Active_main of Tezos_crypto.Chain_id.t
+  | Active_main of Chain_id.t
   | Active_test of {
-      chain : Tezos_crypto.Chain_id.t;
+      chain : Chain_id.t;
       protocol : Protocol_hash.t;
       expiration_date : Time.Protocol.t;
     }
-  | Stopping of Tezos_crypto.Chain_id.t
+  | Stopping of Chain_id.t
 
 let chain_status_encoding =
   let open Data_encoding in
@@ -40,14 +40,14 @@ let chain_status_encoding =
       case
         (Tag 0)
         ~title:"Main"
-        (obj1 (req "chain_id" Tezos_crypto.Chain_id.encoding))
+        (obj1 (req "chain_id" Chain_id.encoding))
         (function Active_main chain_id -> Some chain_id | _ -> None)
         (fun chain_id -> Active_main chain_id);
       case
         (Tag 1)
         ~title:"Test"
         (obj3
-           (req "chain_id" Tezos_crypto.Chain_id.encoding)
+           (req "chain_id" Chain_id.encoding)
            (req "test_protocol" Protocol_hash.encoding)
            (req "expiration_date" Time.Protocol.encoding))
         (function
@@ -59,7 +59,7 @@ let chain_status_encoding =
       case
         (Tag 2)
         ~title:"Stopping"
-        (obj1 (req "stopping" Tezos_crypto.Chain_id.encoding))
+        (obj1 (req "stopping" Chain_id.encoding))
         (function Stopping chain_id -> Some chain_id | _ -> None)
         (fun chain_id -> Stopping chain_id);
     ]
@@ -109,7 +109,7 @@ module S = struct
       ~output:
         (merge_objs
            (obj2
-              (req "chain_id" Tezos_crypto.Chain_id.encoding)
+              (req "chain_id" Chain_id.encoding)
               (req "hash" Block_hash.encoding))
            Block_header.encoding)
       Tezos_rpc.Path.(path / "valid_blocks")

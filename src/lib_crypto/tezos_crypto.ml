@@ -28,6 +28,7 @@ module Intfs = S
 module Hashed = struct
   module Block_hash = Block_hash
   module Block_metadata_hash = Block_metadata_hash
+  module Chain_id = Chain_id
   module Context_hash = Context_hash
   module Operation_hash = Operation_hash
   module Operation_list_hash = Operation_list_hash
@@ -49,7 +50,6 @@ end
 module Aggregate_signature = Aggregate_signature
 module Base58 = Base58
 module Blake2B = Blake2B
-module Chain_id = Chain_id
 module Crypto_box = Crypto_box
 module Hacl = Hacl
 module Helpers = Helpers

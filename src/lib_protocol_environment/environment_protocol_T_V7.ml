@@ -101,7 +101,7 @@ module type T = sig
 
   val begin_validation :
     context ->
-    Tezos_crypto.Chain_id.t ->
+    Tezos_crypto.Hashed.Chain_id.t ->
     mode ->
     predecessor:Block_header.shell_header ->
     validation_state tzresult Lwt.t
@@ -117,7 +117,7 @@ module type T = sig
 
   val begin_application :
     context ->
-    Tezos_crypto.Chain_id.t ->
+    Tezos_crypto.Hashed.Chain_id.t ->
     mode ->
     predecessor:Block_header.shell_header ->
     application_state tzresult Lwt.t
@@ -136,7 +136,7 @@ module type T = sig
   val rpc_services : rpc_context Tezos_rpc.Directory.t
 
   val init :
-    Tezos_crypto.Chain_id.t ->
+    Tezos_crypto.Hashed.Chain_id.t ->
     context ->
     Block_header.shell_header ->
     validation_result tzresult Lwt.t
@@ -146,7 +146,7 @@ module type T = sig
   type cache_key
 
   val value_of_key :
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     predecessor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
@@ -186,7 +186,7 @@ module type T = sig
 
     val init :
       context ->
-      Tezos_crypto.Chain_id.t ->
+      Tezos_crypto.Hashed.Chain_id.t ->
       head_hash:Tezos_crypto.Hashed.Block_hash.t ->
       head:Block_header.shell_header ->
       (validation_info * t) tzresult Lwt.t

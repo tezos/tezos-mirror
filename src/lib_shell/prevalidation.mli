@@ -180,9 +180,9 @@ module Internal_for_tests : sig
       Store.Block.t ->
       Tezos_protocol_environment.Context.t tzresult Lwt.t
 
-    (** [chain_id store] returns the {!Tezos_crypto.Chain_id.t} to which [store]
+    (** [chain_id store] returns the {!Chain_id.t} to which [store]
         corresponds *)
-    val chain_id : chain_store -> Tezos_crypto.Chain_id.t
+    val chain_id : chain_store -> Chain_id.t
   end
 
   (** A variant of [Make] above that is parameterized by {!CHAIN_STORE},

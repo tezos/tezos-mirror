@@ -193,7 +193,7 @@ module Term = struct
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.block in
+      let chain_id = Chain_id.of_block_hash genesis.block in
       let data_dir =
         (* The --data-dir argument overrides the potentially given
            configuration file. *)
@@ -253,7 +253,7 @@ module Term = struct
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.block in
+      let chain_id = Chain_id.of_block_hash genesis.block in
       let data_dir =
         (* The --data-dir argument overrides the potentially given
            configuration file. *)

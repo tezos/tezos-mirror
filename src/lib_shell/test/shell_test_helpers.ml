@@ -65,7 +65,7 @@ let genesis : Genesis.t =
     protocol = genesis_protocol_hash;
   }
 
-let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis_block_hash
+let chain_id = Chain_id.of_block_hash genesis_block_hash
 
 let patch_context ctxt =
   let open Lwt_syntax in

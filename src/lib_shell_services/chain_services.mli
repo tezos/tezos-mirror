@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 val parse_chain : string -> (chain, string) result
 
@@ -40,8 +40,7 @@ val path : (unit, prefix) Tezos_rpc.Path.path
 
 open Tezos_rpc.Context
 
-val chain_id :
-  #simple -> ?chain:chain -> unit -> Tezos_crypto.Chain_id.t tzresult Lwt.t
+val chain_id : #simple -> ?chain:chain -> unit -> Chain_id.t tzresult Lwt.t
 
 val checkpoint :
   #simple ->
@@ -99,13 +98,7 @@ end
 
 module S : sig
   val chain_id :
-    ( [`GET],
-      prefix,
-      prefix,
-      unit,
-      unit,
-      Tezos_crypto.Chain_id.t )
-    Tezos_rpc.Service.t
+    ([`GET], prefix, prefix, unit, unit, Chain_id.t) Tezos_rpc.Service.t
 
   val checkpoint :
     ( [`GET],

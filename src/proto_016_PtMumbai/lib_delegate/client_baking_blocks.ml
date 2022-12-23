@@ -29,7 +29,7 @@ open Protocol_client_context
 
 type block_info = {
   hash : Block_hash.t;
-  chain_id : Tezos_crypto.Chain_id.t;
+  chain_id : Chain_id.t;
   predecessor : Block_hash.t;
   fitness : Bytes.t list;
   timestamp : Time.Protocol.t;
@@ -82,7 +82,7 @@ module Block_seen_event = struct
   type t = {
     hash : Block_hash.t;
     header : Tezos_base.Block_header.t;
-    occurrence : [`Valid_blocks of Tezos_crypto.Chain_id.t | `Heads];
+    occurrence : [`Valid_blocks of Chain_id.t | `Heads];
   }
 
   let make hash header occurrence = {hash; header; occurrence}
@@ -123,7 +123,7 @@ module Block_seen_event = struct
                        (Tag 1)
                        (obj2
                           (req "occurrence-kind" (constant "valid-blocks"))
-                          (req "chain-id" Tezos_crypto.Chain_id.encoding))
+                          (req "chain-id" Chain_id.encoding))
                        (function
                          | `Valid_blocks ch -> Some ((), ch) | _ -> None)
                        (fun ((), ch) -> `Valid_blocks ch);

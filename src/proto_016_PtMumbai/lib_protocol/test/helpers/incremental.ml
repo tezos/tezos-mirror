@@ -123,7 +123,7 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
   in
   begin_validation_and_application
     predecessor.context
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     mode
     ~predecessor:predecessor.header.shell
   >|= fun state ->

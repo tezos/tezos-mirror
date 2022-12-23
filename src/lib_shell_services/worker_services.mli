@@ -30,7 +30,7 @@ module Prevalidators : sig
 
   val list :
     #simple ->
-    (Tezos_crypto.Chain_id.t
+    (Chain_id.t
     * Worker_types.worker_status
     * Worker_types.worker_information
     * int)
@@ -50,7 +50,7 @@ module Prevalidators : sig
         unit,
         unit,
         unit,
-        (Tezos_crypto.Chain_id.t
+        (Chain_id.t
         * Worker_types.worker_status
         * Worker_types.worker_information
         * int)
@@ -135,7 +135,7 @@ module Chain_validators : sig
 
   val list :
     #simple ->
-    (Tezos_crypto.Chain_id.t
+    (Chain_id.t
     * Worker_types.worker_status
     * Worker_types.worker_information
     * int)
@@ -158,7 +158,7 @@ module Chain_validators : sig
         unit,
         unit,
         unit,
-        (Tezos_crypto.Chain_id.t
+        (Chain_id.t
         * Worker_types.worker_status
         * Worker_types.worker_information
         * int)
