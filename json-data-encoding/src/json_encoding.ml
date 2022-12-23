@@ -164,7 +164,12 @@ module type S = sig
     't ->
     repr_value
 
-  val destruct : ?bson_relaxation:bool -> 't encoding -> repr_value -> 't
+  val destruct :
+    ?ignore_extra_fields:bool ->
+    ?bson_relaxation:bool ->
+    't encoding ->
+    repr_value ->
+    't
 
   val custom :
     ?is_object:bool ->
@@ -331,8 +336,13 @@ struct
      interface). Hence, we set it to false on recursive calls that are actually
      nested, no matter its value. *)
   let rec destruct :
-      type t. bson_relaxation:bool -> t encoding -> Repr.value -> t =
-   fun ~bson_relaxation enc ->
+      type t.
+      ignore_extra_fields:bool ->
+      bson_relaxation:bool ->
+      t encoding ->
+      Repr.value ->
+      t =
+   fun ~ignore_extra_fields ~bson_relaxation enc ->
     match enc with
     | Null -> (
         fun v ->
@@ -344,14 +354,15 @@ struct
           match Repr.view v with
           | `O [] -> ()
           | `O ((f, _) :: _) ->
-              raise (Cannot_destruct ([`Field f], Unexpected_field f))
+              if ignore_extra_fields then ()
+              else raise (Cannot_destruct ([`Field f], Unexpected_field f))
           | k -> raise @@ unexpected k "an empty object")
     | Ignore -> ( fun v -> match Repr.view v with _ -> ())
     | Option t -> (
         fun v ->
           match Repr.view v with
           | `Null -> None
-          | _ -> Some (destruct ~bson_relaxation t v))
+          | _ -> Some (destruct ~ignore_extra_fields ~bson_relaxation t v))
     | Constant str -> (
         fun v ->
           match Repr.view v with
@@ -398,15 +409,18 @@ struct
                 raise (Cannot_destruct ([], exn))
               else f
           | k -> raise (unexpected k "float"))
-    | Describe {encoding = t} -> destruct ~bson_relaxation t
+    | Describe {encoding = t} ->
+        destruct ~ignore_extra_fields ~bson_relaxation t
     | Custom ({read}, _) -> read (module Repr)
-    | Conv (_, fto, t, _) -> fun v -> fto (destruct ~bson_relaxation t v)
-    | Mu {self} as enc -> destruct ~bson_relaxation (self enc)
+    | Conv (_, fto, t, _) ->
+        fun v -> fto (destruct ~ignore_extra_fields ~bson_relaxation t v)
+    | Mu {self} as enc ->
+        destruct ~ignore_extra_fields ~bson_relaxation (self enc)
     | Array t -> (
         let array_of_cells cells =
           Array.mapi
             (fun i cell ->
-              try destruct ~bson_relaxation:false t cell
+              try destruct ~ignore_extra_fields ~bson_relaxation:false t cell
               with Cannot_destruct (path, err) ->
                 raise (Cannot_destruct (`Index i :: path, err)))
             (Array.of_list cells)
@@ -431,7 +445,7 @@ struct
             (fun cell ->
               try
                 incr i ;
-                destruct ~bson_relaxation:false t cell
+                destruct ~ignore_extra_fields ~bson_relaxation:false t cell
               with Cannot_destruct (path, err) ->
                 raise (Cannot_destruct (`Index !i :: path, err)))
             (List.to_seq cells)
@@ -450,7 +464,7 @@ struct
           | `A cells -> seq_of_cells cells
           | k -> raise @@ unexpected k "array")
     | Obj _ as t -> (
-        let d = destruct_obj t in
+        let d = destruct_obj ~ignore_extra_fields t in
         fun v ->
           match Repr.view v with
           | `O fields -> (
@@ -462,7 +476,7 @@ struct
               | _ -> r)
           | k -> raise @@ unexpected k "object")
     | Objs _ as t -> (
-        let d = destruct_obj t in
+        let d = destruct_obj ~ignore_extra_fields t in
         fun v ->
           match Repr.view v with
           | `O fields -> (
@@ -474,7 +488,7 @@ struct
               | _ -> r)
           | k -> raise @@ unexpected k "object")
     | Tup _ as t -> (
-        let r, i = destruct_tup 0 t in
+        let r, i = destruct_tup ~ignore_extra_fields 0 t in
         let tup_of_cells cells =
           let cells = Array.of_list cells in
           let len = Array.length cells in
@@ -492,7 +506,7 @@ struct
           | `A cells -> tup_of_cells cells
           | k -> raise @@ unexpected k "array")
     | Tups _ as t -> (
-        let r, i = destruct_tup 0 t in
+        let r, i = destruct_tup ~ignore_extra_fields 0 t in
         let tups_of_cells cells =
           let cells = Array.of_list cells in
           let len = Array.length cells in
@@ -515,51 +529,60 @@ struct
             | [] ->
                 raise (Cannot_destruct ([], No_case_matched (List.rev errs)))
             | Case {encoding; inj} :: rest -> (
-                try inj (destruct ~bson_relaxation encoding v)
+                try
+                  inj
+                    (destruct ~ignore_extra_fields ~bson_relaxation encoding v)
                 with err -> do_cases (err :: errs) rest)
           in
           do_cases [] cases
 
-  and destruct_tup : type t. int -> t encoding -> (Repr.value array -> t) * int
-      =
-   fun i t ->
+  and destruct_tup :
+      type t.
+      ignore_extra_fields:bool ->
+      int ->
+      t encoding ->
+      (Repr.value array -> t) * int =
+   fun ~ignore_extra_fields i t ->
     match t with
     | Tup t ->
         ( (fun arr ->
-            try destruct ~bson_relaxation:false t arr.(i)
+            try destruct ~ignore_extra_fields ~bson_relaxation:false t arr.(i)
             with Cannot_destruct (path, err) ->
               raise (Cannot_destruct (`Index i :: path, err))),
           succ i )
     | Tups (t1, t2) ->
-        let r1, i = destruct_tup i t1 in
-        let r2, i = destruct_tup i t2 in
+        let r1, i = destruct_tup ~ignore_extra_fields i t1 in
+        let r2, i = destruct_tup ~ignore_extra_fields i t2 in
         ((fun arr -> (r1 arr, r2 arr)), i)
     | Conv (_, fto, t, _) ->
-        let r, i = destruct_tup i t in
+        let r, i = destruct_tup ~ignore_extra_fields i t in
         ((fun arr -> fto (r arr)), i)
-    | Mu {self} as enc -> destruct_tup i (self enc)
-    | Describe {encoding} -> destruct_tup i encoding
+    | Mu {self} as enc -> destruct_tup ~ignore_extra_fields i (self enc)
+    | Describe {encoding} -> destruct_tup ~ignore_extra_fields i encoding
     | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_tups"
 
   and destruct_obj :
       type t.
+      ignore_extra_fields:bool ->
       t encoding ->
       (string * Repr.value) list ->
       t * (string * Repr.value) list * bool =
-   fun t ->
+   fun ~ignore_extra_fields t ->
     let rec assoc acc n = function
       | [] -> raise Not_found
       | (f, v) :: rest when n = f -> (v, List.rev_append acc rest)
       | oth :: rest -> assoc (oth :: acc) n rest
     in
     match t with
-    | Empty -> fun fields -> ((), fields, false)
+    | Empty -> fun fields -> ((), fields, ignore_extra_fields)
     | Ignore -> fun fields -> ((), fields, true)
     | Obj (Req {name = n; encoding = t}) -> (
         fun fields ->
           try
             let v, rest = assoc [] n fields in
-            (destruct ~bson_relaxation:false t v, rest, false)
+            ( destruct ~ignore_extra_fields ~bson_relaxation:false t v,
+              rest,
+              ignore_extra_fields )
           with
           | Not_found -> raise (Cannot_destruct ([], Missing_field n))
           | Cannot_destruct (path, err) ->
@@ -568,34 +591,38 @@ struct
         fun fields ->
           try
             let v, rest = assoc [] n fields in
-            (Some (destruct ~bson_relaxation:false t v), rest, false)
+            ( Some (destruct ~ignore_extra_fields ~bson_relaxation:false t v),
+              rest,
+              ignore_extra_fields )
           with
-          | Not_found -> (None, fields, false)
+          | Not_found -> (None, fields, ignore_extra_fields)
           | Cannot_destruct (path, err) ->
               raise (Cannot_destruct (`Field n :: path, err)))
     | Obj (Dft {name = n; encoding = t; default = d}) -> (
         fun fields ->
           try
             let v, rest = assoc [] n fields in
-            (destruct ~bson_relaxation:false t v, rest, false)
+            ( destruct ~ignore_extra_fields ~bson_relaxation:false t v,
+              rest,
+              ignore_extra_fields )
           with
-          | Not_found -> (d, fields, false)
+          | Not_found -> (d, fields, ignore_extra_fields)
           | Cannot_destruct (path, err) ->
               raise (Cannot_destruct (`Field n :: path, err)))
     | Objs (o1, o2) ->
-        let d1 = destruct_obj o1 in
-        let d2 = destruct_obj o2 in
+        let d1 = destruct_obj ~ignore_extra_fields o1 in
+        let d2 = destruct_obj ~ignore_extra_fields o2 in
         fun fields ->
           let r1, rest, ign1 = d1 fields in
           let r2, rest, ign2 = d2 rest in
           ((r1, r2), rest, ign1 || ign2)
     | Conv (_, fto, t, _) ->
-        let d = destruct_obj t in
+        let d = destruct_obj ~ignore_extra_fields t in
         fun fields ->
           let r, rest, ign = d fields in
           (fto r, rest, ign)
-    | Mu {self} as enc -> destruct_obj (self enc)
-    | Describe {encoding} -> destruct_obj encoding
+    | Mu {self} as enc -> destruct_obj ~ignore_extra_fields (self enc)
+    | Describe {encoding} -> destruct_obj ~ignore_extra_fields encoding
     | Union cases ->
         fun fields ->
           let rec do_cases errs = function
@@ -603,14 +630,17 @@ struct
                 raise (Cannot_destruct ([], No_case_matched (List.rev errs)))
             | Case {encoding; inj} :: rest -> (
                 try
-                  let r, rest, ign = destruct_obj encoding fields in
+                  let r, rest, ign =
+                    destruct_obj ~ignore_extra_fields encoding fields
+                  in
                   (inj r, rest, ign)
                 with err -> do_cases (err :: errs) rest)
           in
           do_cases [] cases
     | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_objs"
 
-  let destruct ?(bson_relaxation = false) e v = destruct ~bson_relaxation e v
+  let destruct ?(ignore_extra_fields = false) ?(bson_relaxation = false) e v =
+    destruct ~ignore_extra_fields ~bson_relaxation e v
 
   let custom ?(is_object = false) write read ~schema =
     let read : type tf. (module Json_repr.Repr with type value = tf) -> tf -> 't

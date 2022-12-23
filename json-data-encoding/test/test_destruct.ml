@@ -37,32 +37,57 @@ let unexpected_root = `O [("c", `Float 1.)]
 let unexpected_field =
   `O [("b", `O [("x", `Float 0.); ("y", `String ""); ("w", `O [])])]
 
+let list_encoding = list (obj2 (req "foo" float) (req "bar" float))
+
+let list_test =
+  `A
+    [
+      `O [("foo", `Float 1.0); ("bar", `Float 2.0)];
+      `O [("foo", `Float 0.0); ("bar", `Float 0.0); ("baz", `Float 1.2)];
+    ]
+
 let test_empty_case () =
-  match destruct object_encoding empty_case with
+  (match destruct object_encoding empty_case with
   | exception Cannot_destruct (p, Unexpected_field f) ->
       assert (p = [`Field "a"; `Field f]) ;
       assert (f = "foo" || f = "bar")
-  | _ -> assert false
+  | _ -> assert false) ;
+  let r = destruct ~ignore_extra_fields:true object_encoding empty_case in
+  assert (r = (Some (), None))
 
 let test_unexpected_root () =
-  match destruct object_encoding unexpected_root with
+  (match destruct object_encoding unexpected_root with
   | exception Cannot_destruct (p, Unexpected_field f) ->
       assert (p = [`Field "c"]) ;
       assert (f = "c")
-  | _ -> assert false
+  | _ -> assert false) ;
+  let r = destruct ~ignore_extra_fields:true object_encoding unexpected_root in
+  assert (r = (None, None))
 
 let test_unexpected_field () =
-  match destruct object_encoding unexpected_field with
+  (match destruct object_encoding unexpected_field with
   | exception Cannot_destruct (p, Unexpected_field f) ->
       assert (p = [`Field "b"; `Field "w"]) ;
       assert (f = "w")
-  | _ -> assert false
+  | _ -> assert false) ;
+  let r = destruct ~ignore_extra_fields:true object_encoding unexpected_field in
+  assert (r = (None, Some (0., "", None)))
+
+let test_list () =
+  (match destruct list_encoding list_test with
+  | exception Cannot_destruct (p, Unexpected_field f) ->
+      assert (p = [`Index 1; `Field "baz"]) ;
+      assert (f = "baz")
+  | _ -> assert false) ;
+  let r = destruct ~ignore_extra_fields:true list_encoding list_test in
+  assert (r = [(1.0, 2.0); (0.0, 0.0)])
 
 let tests =
   [
     ("empty", `Quick, test_empty_case);
     ("unexpected_root", `Quick, test_unexpected_root);
     ("unexpected_field", `Quick, test_unexpected_field);
+    ("list", `Quick, test_list);
   ]
 
 let () = Alcotest.run "json-data-encoding" [("exn", tests)]
