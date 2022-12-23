@@ -83,6 +83,15 @@ Node
   and ``3``. These snapshot versions from Octez 12 cannot be imported
   anymore.
 
+- Added optional query parameter ``validation_pass`` to RPCs ``GET
+  /chains/main/mempool/pending_operations`` and ``GET
+  /chains/<chain_id>/mempool/monitor_operation``. This new parameter causes the
+  RPC to only return operations for the given validation pass (``0`` for
+  consensus operations, ``1`` for voting operations, ``2`` for anonymous
+  operations, ``3`` for manager operations). If ``validation_pass`` is
+  unspecified, operations for all validation passes are returned, making this
+  extension backward-compatible. (MR :gl:`!6724`)
+
 Client
 ------
 

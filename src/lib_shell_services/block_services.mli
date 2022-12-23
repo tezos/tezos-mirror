@@ -413,7 +413,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     - Default [branch_delayed] is [true].
     - Default [branch_refused] is [true].
     - Default [refused] is [true].
-    - Default [outdated] is [true]. *)
+    - Default [outdated] is [true].
+    - Default [validation_passes] is [[]] *)
     val pending_operations :
       #simple ->
       ?chain:chain ->
@@ -423,6 +424,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?branch_refused:bool ->
       ?refused:bool ->
       ?outdated:bool ->
+      ?validation_passes:int list ->
       unit ->
       t tzresult Lwt.t
 
@@ -456,6 +458,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?branch_refused:bool ->
       ?refused:bool ->
       ?outdated:bool ->
+      ?validation_passes:int list ->
       unit ->
       (((Tezos_crypto.Operation_hash.t * Next_proto.operation)
        * error trace option)
@@ -739,7 +742,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_delayed : bool
           ; branch_refused : bool
           ; refused : bool
-          ; outdated : bool >,
+          ; outdated : bool
+          ; validation_passes : int list >,
           unit,
           Mempool.t_with_version )
         Tezos_rpc.Service.t
@@ -781,7 +785,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; branch_delayed : bool
           ; branch_refused : bool
           ; refused : bool
-          ; outdated : bool >,
+          ; outdated : bool
+          ; validation_passes : int list >,
           unit,
           ((Tezos_crypto.Operation_hash.t * Next_proto.operation)
           * error trace option)
