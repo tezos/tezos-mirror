@@ -1,6 +1,6 @@
 (tests
  (names test_generated test_big_streaming test_mu test_list_map
-   test_seq_is_lazy)
+   test_seq_is_lazy test_destruct)
  (modes native js)
  (libraries json-data-encoding crowbar alcotest)
  (package json-data-encoding))
@@ -29,3 +29,8 @@
  (alias runtest_js)
  (action
   (run node %{dep:./test_seq_is_lazy.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./test_destruct.bc.js})))

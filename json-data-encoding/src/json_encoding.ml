@@ -343,7 +343,8 @@ struct
         fun v ->
           match Repr.view v with
           | `O [] -> ()
-          | `O [(f, _)] -> raise (Cannot_destruct ([], Unexpected_field f))
+          | `O ((f, _) :: _) ->
+              raise (Cannot_destruct ([`Field f], Unexpected_field f))
           | k -> raise @@ unexpected k "an empty object")
     | Ignore -> ( fun v -> match Repr.view v with _ -> ())
     | Option t -> (
@@ -455,7 +456,9 @@ struct
           | `O fields -> (
               let r, rest, ign = d fields in
               match rest with
-              | (field, _) :: _ when not ign -> raise @@ Unexpected_field field
+              | (field, _) :: _ when not ign ->
+                  raise
+                  @@ Cannot_destruct ([`Field field], Unexpected_field field)
               | _ -> r)
           | k -> raise @@ unexpected k "object")
     | Objs _ as t -> (
@@ -465,7 +468,9 @@ struct
           | `O fields -> (
               let r, rest, ign = d fields in
               match rest with
-              | (field, _) :: _ when not ign -> raise @@ Unexpected_field field
+              | (field, _) :: _ when not ign ->
+                  raise
+                  @@ Cannot_destruct ([`Field field], Unexpected_field field)
               | _ -> r)
           | k -> raise @@ unexpected k "object")
     | Tup _ as t -> (
