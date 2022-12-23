@@ -559,7 +559,7 @@ let () =
       | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
       | _ -> None)
     (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker) ;
-  let description = "Conflicting commitments does not have a common ancestor" in
+  let description = "Conflicting commitments do not have a common ancestor" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_not_valid_commitments_conflict"
