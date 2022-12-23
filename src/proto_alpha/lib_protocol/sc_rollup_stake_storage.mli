@@ -27,52 +27,39 @@
 (** [remove_staker context rollup staker] forcibly removes the given [staker]
     and confiscates their frozen deposits.
 
-    Any commitments no longer staked on are removed and storage reclaimed by
-    [remove_staker]. Because of this there is no need to explicitly reject
-    commitments.
-
-    May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-      {li [Sc_rollup_not_staked] if [staker] is not staked}
-      {li [Sc_rollup_remove_lcc] if [staker] is staked on a cemented commitment}
-    } *)
+    Removes [staker] from the list of active stakers on the [rollup] and
+    clean its metadata.
+*)
 val remove_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-(** This is a wrapper around [deposit_stake] and [refine_stake] that
-    deposits a stake and then refines it to the specified commitment,
-    creating that commitment if necessary. Before calling
-    [deposit_stake] it checks that the staker is not already staked, and
-    if so will skip that step and go straight to calling [refine_stake].
+(** [publish_commitment context rollup staker commitment] published [commitment].
 
-    May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-      {li [Sc_rollup_too_far_ahead] if [staker] would be more than
-        [sc_rollup_max_future_commitments] ahead of the Last Cemented Commitment}
-      {li [Sc_rollup_commitment_past_curfew] if current level is
-        more than {!Constants_storage.sc_rollup_challenge_window_in_blocks}
-        after the first commit for the same inbox level.}
-      {li [Sc_rollup_commitment_from_future] if [commitment]'s inbox level is
-        greater or equal than current level
-      {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
-        less than [sc_rollup_commitment_period] blocks ahead}
-      {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor
-        of [commitment]}
-      {li [Sc_rollup_unknown_commitment] if the parent of the given commitment
-        does not exist}
-      {li [Sc_rollup_staker_funds_too_low] if [staker] is not previously a
-        staker, and does not have enough funds to cover the deposit}
+    Starts by depositing a stake for [staker] if [staker] is not a known
+    staker of [rollup]. Then, [staker] will use its stake to stake on
+    [commitment].
+
+    For publishing to succeed, the following must hold:
+    {ol
+      {li A deposit exists (or can be deposited) for [staker].}
+      {li The commitment respects the commitment period and is not published
+           in advance.}
+      {li The commitment is not past the curfew, i.e., stakers has a limit on the
+          available time to publish, if a staker already published for this
+          inbox level.}
+      {li The [commitment.predecessor] exists.}
+      {li The [commitment] contains at least one tick.}
     }
 
-    Returns the hash of the given commitment, and the level when the commitment
-    was first published by some staker.
+    Returns the hash of the given commitment, the level when the commitment
+    was first published by some staker, the modified context and the balance
+    updates if a stake was deposited.
 
-    This function does not authenticate the staker. *)
+    This function does not authenticate the staker.
+*)
 val publish_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
@@ -88,9 +75,6 @@ val publish_commitment :
 (** [cement_commitment context rollup commitment] cements the given
     commitment whose hash is given (and returns the corresponding commitment).
 
-    Subsequent calls to [refine_stake] and [cement_commitment] must use
-    a [context] with greater level, or behavior is undefined.
-
     For cementing to succeed, the following must hold:
     {ol
       {li The deadline for [commitment] must have passed.}
@@ -99,132 +83,113 @@ val publish_commitment :
       {li All stakers must be indirectly staked on [commitment].}
     }
 
-    If successful, [last_cemented_commitment] is set to the given [commitment] and
-    the appropriate amount of inbox messages is consumed. The old LCC is also
-    deallocated.
+    If successful, Last Cemented commitment is set to the given [commitment],
+    and deallocate the old cemented commitment accordingly to the number
+    of stored cemented commitments.
 
-    May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-      {li [Sc_rollup_unknown_commitment] if [commitment] does not exist}
-      {li [Sc_rollup_parent_not_lcc] if [commitment] is not the child of the last cemented commitment}
-      {li [Sc_rollup_commitment_too_recent] if [commitment] has not passed its deadline}
-      {li [Sc_rollup_no_stakers] if there are zero stakers}
-      {li [Sc_rollup_disputed] if at least one staker is not staked on [commitment]}
-    } *)
+    Clean the storage for the metadata added for this inbox level.
+*)
 val cement_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_commitment_repr.Hash.t ->
   (Raw_context.t * Sc_rollup_commitment_repr.t) tzresult Lwt.t
 
-(** [is_staker ctxt rollup staker] returns [true] iff [staker] has a
-    deposit on the given [rollup].
-
-    May fail with:
-    {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}}
-
-*)
-val is_staker :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Sc_rollup_repr.Staker.t ->
-  (bool * Raw_context.t) tzresult Lwt.t
-
-(** [find_staker_unsafe ctxt rollup staker] returns the branch on which the stake
-    is deposited for the [rollup]'s [staker].
-    This function *must* be called only after they have checked for the existence
-    of the rollup, and therefore it is not necessary for it to check for the
-    existence of the rollup again. Otherwise, use the safe function
-    {!find_staker}.
-
-    May fail with [Sc_rollup_not_staked] if [staker] is not staked. *)
-val find_staker_unsafe :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Sc_rollup_repr.Staker.t ->
-  (Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
-
-(** Same as {!find_staker_unsafe} but checks for the existence of the [rollup]
-    before. *)
+(** [find_staker context rollup staker] returns the most recent commitment
+    [staker] staked on, or [None] if its last staked commitment is older
+    or equal than the last cemented commitment. *)
 val find_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
-  (Sc_rollup_commitment_repr.Hash.t * Raw_context.t) tzresult Lwt.t
+  (Raw_context.t * Sc_rollup_commitment_repr.Hash.t option) tzresult Lwt.t
 
-(** The storage size requirement (in bytes) of a commitment *)
-val commitment_storage_size_in_bytes : int
+(** [is_staked_on context rollup staker commitment_hash] returns true
+    iff [staker] is an active staker and has staked on [commitment_hash]. *)
+val is_staked_on :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_repr.Staker.t ->
+  Sc_rollup_commitment_repr.Hash.t ->
+  (Raw_context.t * bool) tzresult Lwt.t
 
-(** [withdraw_stake context rollup staker] removes [staker] and returns
-      any deposit previously frozen by [deposit_stake].
+(** [stakers_commitments_uncarbonated ctxt rollup] returns the list of
+    active stakers and the hash of the commitment they stake with the
+    maximum inbox level. The commitment associated to a staker can
+    absent if it is no longer in the storage, i.e. cemented. *)
+val stakers_commitments_uncarbonated :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Sc_rollup_repr.Staker.t * Sc_rollup_commitment_repr.Hash.t option) list
+  tzresult
+  Lwt.t
 
-      May fail with:
-      {ul
-        {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-        {li [Sc_rollup_not_staked_on_lcc] if [staker] is not staked on the last
-            cemented commitment}
-      }
-
-      Note that it is not possible to be staked on a Cemented commitment other
-      than the Last, because of Cementation Rule #4. See [cement_commitment]
-      for details.
-
-      By design, the operation wrapping this might {i not} be authenticated,
-      as it may be necessary for nodes on the honest branch to refund stakers on
-      the LCC. They must do so by using [withdraw_stake] as they are implicitly
-      staked on the LCC and can not dispute it. *)
+(** [withdraw_stake context rollup staker] removes [staker] and cleans
+    its metadata. [staker] is allowed to withdraw if it latest staked
+    commitment is older than the last cemented commitment.
+*)
 val withdraw_stake :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
+(** [commitments_of_inbox_level ctxt rollup inbox_level] returns the list
+    of commitments for [inbox_level]. *)
+val commitments_of_inbox_level :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Raw_level_repr.t ->
+  (Raw_context.t * Sc_rollup_commitment_repr.Hash.t list) tzresult Lwt.t
+
+(** [stakers_of_commitment ctxt rollup commitment_hash] returns the list
+    of stakers staking on [commitment_hash]. *)
+val stakers_of_commitment :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_commitment_repr.Hash.t ->
+  (Raw_context.t * Sc_rollup_staker_index_repr.t list) tzresult Lwt.t
+
+(** [find_commitment_of_staker_in_commitments ctxt rollup staker_index commitments]
+    selects in [commitments] the hash of the commitment staked by
+    [staker_index], if any. *)
+val find_commitment_of_staker_in_commitments :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_staker_index_repr.t ->
+  Sc_rollup_commitment_repr.Hash.t list ->
+  (Raw_context.t * Sc_rollup_commitment_repr.Hash.t option) tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
-  (** [deposit_stake context rollup staker] stakes [staker] at the last
-      cemented commitment, freezing [sc_rollup_stake_amount] from [staker]'s
-      account balance. It also returns the last cemented commitment of the
-      [rollup] on which the staker just deposited.
-
-      Warning: must be called only if [rollup] exists and [staker] is not to be
-      found in {!Store.Stakers.}
-
-      May fail with:
-      {ul
-        {li [Sc_rollup_staker_funds_too_low] if [staker] does not have enough
-            funds to cover the deposit}
-      }
+  (** [deposit_stake context rollup staker] stakes [staker] on the [rollup] by
+      freezing [sc_rollup_stake_amount] from [staker]'s account balance and
+      initializing [staker]'s metadata.
 
       This should usually be followed by [refine_stake] to stake on a
       specific commitment.
 
-      This function does not authenticate the staker. *)
+      Returns the modified context, the balance updates of the frozen
+      deposit and the index created for [staker].
+  *)
   val deposit_stake :
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
     (Raw_context.t
     * Receipt_repr.balance_updates
-    * Sc_rollup_commitment_repr.Hash.t)
+    * Sc_rollup_staker_index_repr.t)
     tzresult
     Lwt.t
 
-  (** [refine_stake context rollup staker ?staked_on commitment] moves the stake
-      of [staker] on [?staked_on] to [commitment]. The function exposed
-      in [Internal_for_tests] allows [staked_on] to be [None] and fetches
-      the real value from the storage, but, the production code uses the
-      already existing commitment on which the staker is staked.
+  (** [refine_stake context rollup commitment staker] makes [staker]
+      stakes on [commitment].
 
       Because we do not assume any form of coordination between validators, we
       do not distinguish between {i adding new} commitments and {i staking on
       existing commitments}. The storage of commitments is content-addressable
       to minimize storage duplication.
-
-      Subsequent calls to [refine_stake] and [cement_commitment] must use
-      a [context] with greater level, or this function call will fail.
 
       The first time a commitment hash is staked on, it is assigned a deadline,
       which is counted in Tezos blocks (levels). Further stakes on the block does
@@ -233,28 +198,21 @@ module Internal_for_tests : sig
       and then re-entered, a later deadline may be assigned. Assuming one honest
       staker is always available, this only affects invalid commitments.
 
-      May fail with:
-      {ul
-        {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
-        {li [Sc_rollup_too_far_ahead] if [staker] would be more than
-          [sc_rollup_max_future_commitments] ahead of the Last Cemented Commitment}
-        {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
-          less than [sc_rollup_commitment_period] blocks ahead}
-        {li [Sc_rollup_not_staked] if [staker] is not staked}
-        {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor of [commitment]}
-        {li [Sc_rollup_unknown_commitment] if the parent of the given commitment does not exist}
-      }
+      See {!publish_commitment} to see the list of properties this function
+      enforces.
 
-      Returns the hash of the given commitment.
-
-      This function does not authenticate the staker. *)
+      Returns the hashed commitment, at the first level this commitment was
+      published, and the modified context.
+  *)
   val refine_stake :
     Raw_context.t ->
     Sc_rollup_repr.t ->
     Sc_rollup_repr.Staker.t ->
-    ?staked_on:Sc_rollup_commitment_repr.Hash.t ->
     Sc_rollup_commitment_repr.t ->
     (Sc_rollup_commitment_repr.Hash.t * Raw_level_repr.t * Raw_context.t)
     tzresult
     Lwt.t
+
+  (** The maximum storage size requirement (in bytes) of a commitment *)
+  val max_commitment_storage_size_in_bytes : int
 end

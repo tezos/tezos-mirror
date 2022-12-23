@@ -33,7 +33,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_not_staked_on_lcc_or_ancestor
   | (* `Temporary *) Sc_rollup_parent_not_lcc
   | (* `Temporary *) Sc_rollup_remove_lcc_or_ancestor
-  | (* `Temporary *) Sc_rollup_staker_backtracked
+  | (* `Temporary *) Sc_rollup_staker_double_stake
   | (* `Temporary *) Sc_rollup_too_far_ahead
   | (* `Temporary *)
       Sc_rollup_commitment_from_future of {
@@ -89,6 +89,16 @@ type error +=
   | (* `Permanent *)
       Sc_rollup_wrong_staker_for_conflict_commitment of
       Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
+  | (* `Permanent *)
+      Sc_rollup_invalid_commitment_to_cement of {
+      valid_candidate : Sc_rollup_commitment_repr.Hash.t;
+      invalid_candidate : Sc_rollup_commitment_repr.Hash.t;
+    }
+  | (* `Permanent *)
+      Sc_rollup_commitment_too_old of {
+      last_cemented_inbox_level : Raw_level_repr.t;
+      commitment_inbox_level : Raw_level_repr.t;
+    }
 
 let () =
   register_error_kind
@@ -317,16 +327,22 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_remove_lcc_or_ancestor -> Some () | _ -> None)
     (fun () -> Sc_rollup_remove_lcc_or_ancestor) ;
-  let description = "Staker backtracked." in
+  let description = "Staker tried to double stake." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_staker_backtracked"
-    ~title:"Staker backtracked"
+    ~id:"Sc_rollup_staker_double_stake"
+    ~title:description
     ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The staker tried to double stake, that is, it tried to publish a \
+         commitment for an inbox level where it already published another \
+         conflicting commitment. The staker is not allowed to changed its \
+         mind.")
     Data_encoding.empty
-    (function Sc_rollup_staker_backtracked -> Some () | _ -> None)
-    (fun () -> Sc_rollup_staker_backtracked) ;
+    (function Sc_rollup_staker_double_stake -> Some () | _ -> None)
+    (fun () -> Sc_rollup_staker_double_stake) ;
   let description =
     "Commitment is too far ahead of the last cemented commitment."
   in
@@ -543,10 +559,11 @@ let () =
       | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
       | _ -> None)
     (fun staker -> Sc_rollup_max_number_of_parallel_games_reached staker) ;
+  let description = "Conflicting commitments do not have a common ancestor" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_not_valid_commitments_conflict"
-    ~title:"Conflicting commitments does not have a common ancestor"
+    ~title:description
     ~pp:(fun ppf (c1, s1, c2, s2) ->
       Format.fprintf
         ppf
@@ -574,10 +591,11 @@ let () =
       | _ -> None)
     (fun (c1, s1, c2, s2) ->
       Sc_rollup_not_valid_commitments_conflict (c1, s1, c2, s2)) ;
+  let description = "Given commitment is not staked by given staker" in
   register_error_kind
     `Permanent
     ~id:"Sc_rollup_wrong_staker_for_conflict_commitment"
-    ~title:"Given commitment is not staked by given staker"
+    ~title:description
     ~pp:(fun ppf (staker, commitment) ->
       Format.fprintf
         ppf
@@ -596,4 +614,62 @@ let () =
           Some (staker, commitment)
       | _ -> None)
     (fun (staker, commitment) ->
-      Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment))
+      Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment)) ;
+  let description = "Given commitment cannot be cemented" in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_invalid_commitment_to_cement"
+    ~title:description
+    ~pp:(fun ppf (valid_candidate, invalid_candidate) ->
+      Format.fprintf
+        ppf
+        "The commitment %a cannot be cemented. %a is a valid candidate to \
+         cementation, but %a is not."
+        Sc_rollup_commitment_repr.Hash.pp
+        invalid_candidate
+        Sc_rollup_commitment_repr.Hash.pp
+        valid_candidate
+        Sc_rollup_commitment_repr.Hash.pp
+        invalid_candidate)
+    ~description
+    Data_encoding.(
+      obj2
+        (req "valid_candidate" Sc_rollup_commitment_repr.Hash.encoding)
+        (req "invalid_candidate" Sc_rollup_commitment_repr.Hash.encoding))
+    (function
+      | Sc_rollup_invalid_commitment_to_cement
+          {valid_candidate; invalid_candidate} ->
+          Some (valid_candidate, invalid_candidate)
+      | _ -> None)
+    (fun (valid_candidate, invalid_candidate) ->
+      Sc_rollup_invalid_commitment_to_cement
+        {valid_candidate; invalid_candidate}) ;
+
+  let description = "Published commitment is too old" in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_commitment_too_old"
+    ~title:description
+    ~pp:(fun ppf (last_cemented_inbox_level, commitment_inbox_level) ->
+      Format.fprintf
+        ppf
+        "The published commitment is for the inbox level %a, the last cemented \
+         commitment inbox level is %a. You cannot publish a commitment behind \
+         the last cemented commitment."
+        Raw_level_repr.pp
+        last_cemented_inbox_level
+        Raw_level_repr.pp
+        commitment_inbox_level)
+    ~description
+    Data_encoding.(
+      obj2
+        (req "last_cemented_inbox_level" Raw_level_repr.encoding)
+        (req "commitment_inbox_level" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_commitment_too_old
+          {last_cemented_inbox_level; commitment_inbox_level} ->
+          Some (last_cemented_inbox_level, commitment_inbox_level)
+      | _ -> None)
+    (fun (last_cemented_inbox_level, commitment_inbox_level) ->
+      Sc_rollup_commitment_too_old
+        {last_cemented_inbox_level; commitment_inbox_level})

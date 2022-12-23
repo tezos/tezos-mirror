@@ -350,8 +350,9 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
          ~sc_rollup
          staker
   in
-  let hash = JSON.(json |-> "hash" |> as_string) in
-  return hash
+  match JSON.(json |> as_string_opt) with
+  | Some hash -> return hash
+  | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
 let hash (hash, (_ : Sc_rollup_client.commitment), _level) = hash
 
@@ -600,14 +601,14 @@ let test_stakers_commitments ~kind =
   let check staker_commitment_1 staker_commitment_2 =
     Check.(
       (staker_commitment_1 = staker_commitment_2)
-        (tuple2 string string)
+        string
         ~error_msg:"expected value %L, got %R")
   in
-  List.iteri
-    (fun i staker_commitment ->
-      if i = 0 then check staker_commitment (staker_1, commitment_1)
-      else if i = 1 then check staker_commitment (staker_2, commitment_2)
-      else ())
+  List.iter
+    (fun (staker, commitment) ->
+      if staker = staker_1 then check commitment commitment_1
+      else if staker = staker_2 then check commitment commitment_2
+      else failwith "Unexpected staker")
     stakers_commitments ;
   unit
 
@@ -3066,10 +3067,10 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
       ~staker2:operator2.public_key_hash
       client
   in
-  (* Attempting to cement defeated branch will fail. *)
-  let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
   (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
-  cement [c31; c311]
+  let* () = cement [c31; c311] in
+  (* Attempting to cement defeated branch will fail. *)
+  cement ~fail:commit_doesnt_exit [c32; c321]
 
 (** Given a commitment tree constructed by {test_forking_scenario}, this test
     starts a dispute and makes a first valid dissection move.

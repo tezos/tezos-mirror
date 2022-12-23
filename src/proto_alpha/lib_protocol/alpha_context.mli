@@ -3838,11 +3838,6 @@ module Sc_rollup : sig
       (bool * context) tzresult Lwt.t
   end
 
-  module Storage : sig
-    val stakers_commitments_uncarbonated :
-      context -> t -> (Staker.t * Commitment.Hash.t) list tzresult Lwt.t
-  end
-
   val originate :
     context ->
     kind:Kind.t ->
@@ -4088,7 +4083,10 @@ module Sc_rollup : sig
 
   module Stake_storage : sig
     val find_staker :
-      context -> t -> Staker.t -> (Commitment.Hash.t * context) tzresult Lwt.t
+      context ->
+      t ->
+      Staker.t ->
+      (context * Commitment.Hash.t option) tzresult Lwt.t
 
     val publish_commitment :
       context ->
@@ -4110,6 +4108,9 @@ module Sc_rollup : sig
       t ->
       Staker.t ->
       (context * Receipt.balance_updates) tzresult Lwt.t
+
+    val stakers_commitments_uncarbonated :
+      context -> t -> (Staker.t * Commitment.Hash.t option) list tzresult Lwt.t
   end
 
   module Refutation_storage : sig
@@ -4166,6 +4167,15 @@ module Sc_rollup : sig
       Game.Index.t ->
       Game.game_result ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
+
+    module Internal_for_tests : sig
+      val get_conflict_point :
+        context ->
+        t ->
+        Staker.t ->
+        Staker.t ->
+        (conflict_point * context) tzresult Lwt.t
+    end
   end
 
   val rpc_arg : t RPC_arg.t

@@ -1,8 +1,8 @@
 
 ./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type bytes with kernel  --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3169.941 units (will add 100 for safety)
-Estimated storage: 6532 bytes added (will add 20 for safety)
+Estimated gas: 2748.037 units (will add 100 for safety)
+Estimated storage: 6552 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,28 +12,28 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000675
+    Fee to the baker: ꜩ0.000633
     Expected counter: 1
-    Gas limit: 3270
-    Storage limit: 6552 bytes
+    Gas limit: 2849
+    Storage limit: 6572 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000675
-      payload fees(the block proposer) ....... +ꜩ0.000675
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000633
+      payload fees(the block proposer) ....... +ꜩ0.000633
     Smart contract rollup origination:
       Kind: arith
       Parameter type: bytes
       Kernel Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3169.941
-      Storage size: 6532 bytes
+      Consumed gas: 2748.037
+      Storage size: 6552 bytes
       Address: [SMART_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.633
-        storage fees ........................... +ꜩ1.633
+        [PUBLIC_KEY_HASH] ... -ꜩ1.638
+        storage fees ........................... +ꜩ1.638
 
 
-./octez-client --wait none send sc rollup message 'hex:["3337204b5431427663427559354d4e5350704778754e59704473336668426738514a3151554a4e"]' from bootstrap2
+./octez-client --wait none send sc rollup message 'hex:["3337204b54314332756d56796773744c5456396d7945733445416d4778634c5664673637324574"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 1001.327 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -58,7 +58,7 @@ This sequence of operations was run:
       Consumed gas: 1001.361
 
 
-./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x030002296844a1f6f698d66fd7e6e09e306a2a1723407f1bc4938b5baa2730040583ed296844a1f6f698d66fd7e6e09e306a2a1723407f1bc4938b5baa2730040583ed00100007d0030170000382066f7574707574810130c847a5c2aba11c9a05ba4f50b87cbf46235ff3d5f0513e34da8b6b891259d7ec8b0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0b9543ec7505c0d34f509d4f3e29af8c2de75d2a22ff591850e07401737bc956cc097354cf34106c0e824fd1b44d759ce74dc917914c3ab5b23d62120d4ff1dabd3296844a1f6f698d66fd7e6e09e306a2a1723407f1bc4938b5baa2730040583ed0000000500000000002300250124a8de819e9ab9dcadac94c3d49981dc4b864f2f000000000764656661756c74 --burn-cap 10
+./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300021bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d1bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d00100007d0030170000382066f7574707574810130c8bcacb1531b6e96b5ffc7a75859c34f1f1f9330f5e1b24f183f07e7068710de540c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0c235965dde95e47330643d042f34eb7354baf4786f0e9f0b0c42243ddae431a8c097354cf34106c0e824fd1b44d759ce74dc917914c3ab5b23d62120d4ff1dabd31bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d0000000500000000002300250125da0a10a3eddbd3377e9a13656edd869bb9cdbe000000000764656661756c74 --burn-cap 10
 Node is bootstrapped.
 Estimated gas: 6400.612 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
