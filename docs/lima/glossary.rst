@@ -161,10 +161,7 @@ _`Layer 2`
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
     zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
 
-.. _glossary_michelson:
-.. _glossary_michelson_lima:
-
-Michelson
+_`Michelson`
     The built-in language used by a `smart contract`_.
 
 .. _glossary_minimal_stake:
@@ -174,8 +171,8 @@ _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
     delegate to have baking_ and voting rights in a cycle_.
 
-_`Operations`
-    The main operations in the protocol are transactions (to transfer funds
+_`Operation kinds`
+    The main kinds of operations in the protocol are transactions (to transfer funds
     or to execute smart contracts), accusations, activations, delegations,
     endorsements and originations.
 
@@ -198,11 +195,10 @@ _`Roll`
     deprecated; see `Minimal stake`_.
 
 _`Smart contract`
-    Account_ which is associated to a :ref:`Michelson
-    <glossary_michelson_lima>` script. They are created with an
-    explicit origination_ operation and are therefore sometimes called
-    originated accounts. The address of a smart contract always starts
-    with the letters ``KT1``.
+    Account_ which is associated to a Michelson_ script. They are
+    created with an explicit origination_ operation and are therefore
+    sometimes called originated accounts. The address of a smart
+    contract always starts with the letters ``KT1``.
 
 _`Smart Optimistic Rollups`
     Smart optimistic rollups constitute a `layer 2`_ solution that can be used to deploy either a general-purpose polyvalent layer 2 blockchain
