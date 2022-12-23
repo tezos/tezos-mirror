@@ -43,7 +43,7 @@ proportional with their delegated stake, which includes the balances
 of all the accounts that delegate to it, and also the balance of the
 delegate itself. To participate in consensus or in governance, a
 delegate needs to have at least a minimal stake, which is given by the
-``TOKENS_PER_ROLL`` :ref:`protocol constant
+``MINIMAL_STAKE`` :ref:`protocol constant
 <protocol_constants_mumbai>`.
 
 Delegates place security deposits that may be forfeited in case they do not
@@ -103,7 +103,7 @@ At the end of cycle ``n-1-PRESERVED_CYCLES``, the snapshot for cycle
 PRNG having as seed the :ref:`random seed<random_seed_mumbai>` for
 cycle ``n``.
 
-Only the stake of active delegates with the minimal stake of ``TOKENS_PER_ROLL`` is snapshot.
+Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE`` is snapshot.
 
 .. _rights_mumbai:
 
@@ -152,7 +152,7 @@ Proof-of-stake parameters
      - 16384 blocks
    * - ``PRESERVED_CYCLES``
      - 5 cycles
-   * - ``TOKENS_PER_ROLL``
+   * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
    * - ``BLOCKS_PER_STAKE_SNAPSHOT``
      - 1024 blocks
