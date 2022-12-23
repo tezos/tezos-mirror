@@ -103,7 +103,7 @@ let get_ongoing_games_for_staker ctxt rollup staker =
 let commitments_are_conflicting ctxt rollup hash1_opt hash2_opt =
   let open Lwt_result_syntax in
   match (hash1_opt, hash2_opt) with
-  | Some hash1, Some hash2 when not Commitment_hash.(hash1 = hash2) ->
+  | Some hash1, Some hash2 when Commitment_hash.(hash1 <> hash2) ->
       let* commitment1, ctxt =
         Commitment_storage.get_commitment_unsafe ctxt rollup hash1
       in

@@ -177,8 +177,6 @@ let get_contract_and_stake ctxt staker =
     withdraw a staker's bond. *)
 let assert_staked_on_lcc_or_ancestor ctxt rollup ~staker_index lcc_inbox_level =
   let open Lwt_result_syntax in
-  (* [staker] needs to stake on a commitment older than [lcc] (or on
-     LCC) to withdraw. *)
   let* ctxt, last_staked_level =
     Store.Stakers.get (ctxt, rollup) staker_index
   in
@@ -257,9 +255,9 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   in
   return ctxt
 
-(** Enfore that a commitment's inbox level increases by an exact fixed amount over its predecessor.
-    This property is used in several places - not obeying it causes severe breakage.
-*)
+(** Enfore that a commitment's inbox level increases by an exact fixed
+    amount over its predecessor.  This property is used in several
+    places - not obeying it causes severe breakage. *)
 let assert_commitment_period ctxt rollup commitment =
   let open Lwt_result_syntax in
   let pred_hash = Commitment.(commitment.predecessor) in
@@ -267,23 +265,9 @@ let assert_commitment_period ctxt rollup commitment =
     Commitment_storage.get_commitment_unsafe ctxt rollup pred_hash
   in
   let pred_level = Commitment.(pred.inbox_level) in
-  (* We want to check the following inequalities on [commitment.inbox_level],
-     [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_period].
-
-     - Greater-than-or-equal (>=), to ensure inbox_levels are monotonically
-     increasing along each branch of commitments. Together with
-     [assert_commitment_not_too_far_ahead] this is sufficient to limit the
-     depth of the commitment tree, which is also the number of commitments stored
-     per staker. This constraint must be enforced at submission time.
-
-     - Equality (=), so that L2 blocks are produced at a regular rate.  This
-     ensures that there is only ever one branch of correct commitments,
-     simplifying refutation logic. This could also be enforced at refutation time
-     rather than submission time, but doing it here works too.
-
-     Because [a >= b && a = b] is equivalent to [a = b], we can just keep the latter as
-     an optimization.
-  *)
+  (* Commitments needs to be posted for inbox levels every [commitment_period].
+     Therefore, [commitment.inbox_level] must be
+     [predecessor_commitment.inbox_level + commitment_period]. *)
   let sc_rollup_commitment_period =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
@@ -295,22 +279,24 @@ let assert_commitment_period ctxt rollup commitment =
   in
   return ctxt
 
-(** [assert_commitment_is_not_past_curfew ctxt rollup inbox_level] will look in the
-    storage [Commitment_first_publication_level] for the level of the oldest commit for
-    [inbox_level] and if it is more than [sc_rollup_challenge_window_in_blocks]
-    ago it fails with [Sc_rollup_commitment_past_curfew]. Otherwise it adds the
+(** [assert_commitment_is_not_past_curfew ctxt rollup inbox_level]
+    will look in the storage [Commitment_first_publication_level] for
+    the level of the oldest commit for [inbox_level] and if it is more
+    than [sc_rollup_challenge_window_in_blocks] ago it fails with
+    [Sc_rollup_commitment_past_curfew]. Otherwise it adds the
     respective storage (if it is not set) and returns the context. *)
 let assert_commitment_is_not_past_curfew ctxt rollup inbox_level =
   let open Lwt_result_syntax in
-  let refutation_deadline_blocks =
-    Int32.of_int @@ Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
-  in
   let current_level = (Raw_context.current_level ctxt).level in
   let* ctxt, oldest_commit =
     Store.Commitment_first_publication_level.find (ctxt, rollup) inbox_level
   in
   match oldest_commit with
   | Some oldest_commit ->
+      let refutation_deadline_blocks =
+        Int32.of_int
+        @@ Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+      in
       if
         Compare.Int32.(
           Raw_level_repr.diff current_level oldest_commit
@@ -370,10 +356,10 @@ let is_staked_on ctxt rollup staker commitment_hash =
   | Some staker_index ->
       Commitment_stakers.mem ctxt rollup commitment_hash staker_index
 
-let deallocate_commitment_contents ctxt rollup node =
+let deallocate_commitment_contents ctxt rollup commitment_hash =
   let open Lwt_result_syntax in
   let* ctxt, _size_freed =
-    Store.Commitments.remove_existing (ctxt, rollup) node
+    Store.Commitments.remove_existing (ctxt, rollup) commitment_hash
   in
   return ctxt
 
@@ -510,7 +496,7 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level =
   let* ctxt, commitment_size_diff, _commit_existed =
     Store.Commitments.add (ctxt, rollup) commitment_hash commitment
   in
-  (* Initializes or fetch the level at which the commitment was first
+  (* Initializes or fetches the level at which the commitment was first
      published. *)
   let* commitment_added_size_diff, commitment_added_level, ctxt =
     Commitment_storage.set_commitment_added
@@ -615,8 +601,8 @@ let cementable_candidate_commitments_of_inbox_level ctxt rollup ~old_lcc
   | [candidate_commitment] when Commitment_hash.(new_lcc = candidate_commitment)
     ->
       (* The check that [new_lcc.predecessor = old] is done by the caller.
-         In 99.99% there will be only one candidate commitment, we minimize
-         the cost in this case. *)
+         In 99.99% of cases there will be only one candidate commitment,
+         we minimize the cost in this case. *)
       let* ctxt, stakers_on_commitment =
         Commitment_stakers.get ctxt rollup candidate_commitment
       in
