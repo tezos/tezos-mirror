@@ -820,6 +820,7 @@ module Constants : sig
 
     type sc_rollup = {
       enable : bool;
+      arith_pvm_enable : bool;
       origination_size : int;
       challenge_window_in_blocks : int;
       stake_amount : Tez.t;
@@ -1003,6 +1004,8 @@ module Constants : sig
   val tx_rollup_sunset_level : context -> int32
 
   val sc_rollup_enable : context -> bool
+
+  val sc_rollup_arith_pvm_enable : context -> bool
 
   val dal_enable : context -> bool
 
@@ -3660,6 +3663,8 @@ module Sc_rollup : sig
     val of_string : string -> t option
 
     val to_string : t -> string
+
+    val equal : t -> t -> bool
   end
 
   module ArithPVM : sig

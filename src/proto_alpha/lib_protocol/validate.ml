@@ -2228,6 +2228,12 @@ module Manager = struct
   let assert_sc_rollup_feature_enabled vi =
     error_unless (Constants.sc_rollup_enable vi.ctxt) Sc_rollup_feature_disabled
 
+  let assert_pvm_kind_enabled vi kind =
+    error_when
+      ((not (Constants.sc_rollup_arith_pvm_enable vi.ctxt))
+      && Sc_rollup.Kind.(equal kind Example_arith))
+      Sc_rollup_arith_pvm_disabled
+
   let assert_not_zero_messages messages =
     match messages with
     | [] -> error Sc_rollup_errors.Sc_rollup_add_zero_messages
@@ -2410,9 +2416,11 @@ module Manager = struct
       | Tx_rollup_dispatch_tickets _ ->
           validate_tx_rollup_dispatch_tickets vi remaining_gas operation
       | Tx_rollup_rejection _ -> validate_tx_rollup_rejection vi operation
-      | Sc_rollup_originate _ | Sc_rollup_cement _ | Sc_rollup_publish _
-      | Sc_rollup_refute _ | Sc_rollup_timeout _
-      | Sc_rollup_execute_outbox_message _ ->
+      | Sc_rollup_originate {kind; _} ->
+          let* () = assert_sc_rollup_feature_enabled vi in
+          assert_pvm_kind_enabled vi kind
+      | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_refute _
+      | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _ ->
           assert_sc_rollup_feature_enabled vi
       | Sc_rollup_add_messages {messages; _} ->
           let* () = assert_sc_rollup_feature_enabled vi in

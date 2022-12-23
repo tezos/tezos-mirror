@@ -451,7 +451,13 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
       enable = flags.toru;
     }
   in
-  let sc_rollup = {params.constants.sc_rollup with enable = flags.scoru} in
+  let sc_rollup =
+    {
+      params.constants.sc_rollup with
+      enable = flags.scoru;
+      arith_pvm_enable = flags.scoru;
+    }
+  in
   let zk_rollup = {params.constants.zk_rollup with enable = flags.zkru} in
   let constants =
     {

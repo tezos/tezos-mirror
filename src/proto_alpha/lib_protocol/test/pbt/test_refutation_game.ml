@@ -231,6 +231,7 @@ let create_ctxt () =
   let* block, (account1, account2, account3) =
     Context.init3
       ~sc_rollup_enable:true
+      ~sc_rollup_arith_pvm_enable:true
       ~consensus_threshold:0
       ~bootstrap_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
       ()

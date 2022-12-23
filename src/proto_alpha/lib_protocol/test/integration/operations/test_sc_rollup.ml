@@ -147,6 +147,7 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
         {
           Context.default_test_constants.sc_rollup with
           enable = true;
+          arith_pvm_enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
           timeout_period_in_blocks;
         };
@@ -166,6 +167,30 @@ let test_disable_feature_flag () =
   let expect_failure = function
     | Environment.Ecoproto_error
         (Validate_errors.Manager.Sc_rollup_feature_disabled as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
+  in
+  let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
+  return_unit
+
+(** [test_disable_arith_pvm_feature_flag ()] tries to originate a Arith smart
+    rollup when the Arith PVM feature flag is deactivated and checks that it
+    fails. *)
+let test_disable_arith_pvm_feature_flag () =
+  let* b, contract =
+    Context.init1 ~sc_rollup_enable:true ~sc_rollup_arith_pvm_enable:false ()
+  in
+  let* i = Incremental.begin_construction b in
+  let kind = Sc_rollup.Kind.Example_arith in
+  let* op, _ =
+    let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
+    Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
+  in
+  let expect_failure = function
+    | Environment.Ecoproto_error
+        (Validate_errors.Manager.Sc_rollup_arith_pvm_disabled as e)
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
@@ -2678,6 +2703,10 @@ let tests =
       "check effect of disabled feature flag"
       `Quick
       test_disable_feature_flag;
+    Tztest.tztest
+      "check effect of disabled arith pvm flag"
+      `Quick
+      test_disable_arith_pvm_feature_flag;
     Tztest.tztest
       "can publish a commit, cement it and withdraw stake"
       `Quick

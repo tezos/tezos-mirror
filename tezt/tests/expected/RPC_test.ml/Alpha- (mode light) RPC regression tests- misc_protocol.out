@@ -49,7 +49,7 @@
       "availability_threshold": 50, "blocks_per_epoch": 2,
       "redundancy_factor": 8, "page_size": 128, "slot_size": 32768,
       "number_of_shards": 64 }, "sc_rollup_enable": false,
-  "sc_rollup_origination_size": 6314,
+  "sc_rollup_arith_pvm_enable": false, "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160,
   "sc_rollup_stake_amount": "10000000000",
   "sc_rollup_commitment_period_in_blocks": 30,
