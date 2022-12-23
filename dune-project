@@ -229,8 +229,6 @@
 (package (name tezos-tree-encoding-test)(allow_empty))
 (package (name tezos-tx-rollup-014-PtKathma))
 (package (name tezos-tx-rollup-015-PtLimaPt))
-(package (name tezos-tx-rollup-016-PtMumbai))
-(package (name tezos-tx-rollup-alpha))
 (package (name tezos-validation))
 (package (name tezos-version))
 (package (name tezos-wasmer))

@@ -146,8 +146,6 @@ clean-old-names:
 	@rm -f tezos-tx-rollup-client-015-PtLimaPt
 	@rm -f tezos-baker-alpha
 	@rm -f tezos-accuser-alpha
-	@rm -f tezos-tx-rollup-node-alpha
-	@rm -f tezos-tx-rollup-client-alpha
 	@rm -f tezos-sc-rollup-node-alpha
 	@rm -f tezos-sc-rollup-client-alpha
 	@rm -f tezos-snoop
@@ -202,8 +200,6 @@ endif
 	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-PtLimaPt tezos-tx-rollup-client-015-PtLimaPt
 	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-alpha tezos-baker-alpha
 	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-alpha tezos-accuser-alpha
-	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-node-alpha tezos-tx-rollup-node-alpha
-	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-alpha tezos-tx-rollup-client-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
