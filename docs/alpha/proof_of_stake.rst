@@ -52,6 +52,16 @@ Delegates place security deposits that may be forfeited in case they do not
 follow (some particular rules of) the protocol. Security deposits are deduced
 from the delegates' own balance.
 
+The key used by a delegate to sign blocks and consensus operations is called the
+*consensus key*. By default, this is the delegate's private key, called its
+*manager key*. However, a delegate may specify another, dedicated key for this
+role. See :ref:`this page<consensus_key>` for further important details. In particular,
+both the delegate key and the consensus key give total control over the
+delegate's funds: indeed, the consensus key may sign a *drain* operation to
+transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant RPCs<../api/openapi>`,
+like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
+manager and consensus keys are listed.
+
 
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
