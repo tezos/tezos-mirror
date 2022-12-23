@@ -240,6 +240,8 @@ module Custom : sig
 
     val tag : layout -> tag
 
+    val title : layout -> string option
+
     val partial_encoding : layout -> input Encoding.t
 
     val classify : input -> layout

@@ -858,8 +858,8 @@ let%expect_test _ =
     weirder-list (Determined from data, 8-bit tag)
     **********************************************
 
-    case 0 (tag 0)
-    ==============
+    c0 (tag 0)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -870,8 +870,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 8 (tag 8)
-    ==============
+    c1 (tag 8)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -882,8 +882,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 16 (tag 16)
-    ================
+    c2 (tag 16)
+    ===========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -894,8 +894,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 24 (tag 24)
-    ================
+    c3 (tag 24)
+    ===========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -906,8 +906,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 32 (tag 32)
-    ================
+    c (tag 32)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -920,8 +920,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 40 (tag 40)
-    ================
+    s (tag 40)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -934,8 +934,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 48 (tag 48)
-    ================
+    t (tag 48)
+    ==========
 
     +-----------------+----------------------+-------------------------+
     | Name            | Size                 | Contents                |
@@ -950,8 +950,8 @@ let%expect_test _ =
     +-----------------+----------------------+-------------------------+
 
 
-    case 56 (tag 56)
-    ================
+    s (tag 56)
+    ==========
 
     +------+--------+------------------------+
     | Name | Size   | Contents               |
@@ -1005,7 +1005,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 0" },
+                       "name": "c0" },
                      { "tag": 8,
                        "fields":
                          [ { "name": "Tag",
@@ -1014,7 +1014,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 8" },
+                       "name": "c1" },
                      { "tag": 16,
                        "fields":
                          [ { "name": "Tag",
@@ -1023,7 +1023,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 16" },
+                       "name": "c2" },
                      { "tag": 24,
                        "fields":
                          [ { "name": "Tag",
@@ -1032,7 +1032,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 24" },
+                       "name": "c3" },
                      { "tag": 32,
                        "fields":
                          [ { "name": "Tag",
@@ -1044,7 +1044,7 @@ let%expect_test _ =
                              "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 32" },
+                       "name": "c" },
                      { "tag": 40,
                        "fields":
                          [ { "name": "Tag",
@@ -1056,7 +1056,7 @@ let%expect_test _ =
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 1, "kind": "Fixed" } } ],
-                       "name": "case 40" },
+                       "name": "s" },
                      { "tag": 48,
                        "fields":
                          [ { "name": "Tag",
@@ -1071,13 +1071,13 @@ let%expect_test _ =
                            { "layout": { "size": "Uint16", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 2, "kind": "Fixed" } } ],
-                       "name": "case 48" },
+                       "name": "t" },
                      { "tag": 56,
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
-                             "kind": "named" } ], "name": "case 56" } ] } } ] } |}] ;
+                             "kind": "named" } ], "name": "s" } ] } } ] } |}] ;
   dump
     Data_encoding.(
       let bu mue =
@@ -1167,8 +1167,8 @@ let%expect_test _ =
     weirb-list (Determined from data, 8-bit tag)
     ********************************************
 
-    case 0 (tag 0)
-    ==============
+    b (tag 0)
+    =========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1181,8 +1181,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 2 (tag 2)
-    ==============
+    bb (tag 2)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1198,8 +1198,8 @@ let%expect_test _ =
     weirder-list (Determined from data, 8-bit tag)
     **********************************************
 
-    case 0 (tag 0)
-    ==============
+    c0 (tag 0)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1210,8 +1210,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 8 (tag 8)
-    ==============
+    c1 (tag 8)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1222,8 +1222,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 16 (tag 16)
-    ================
+    c2 (tag 16)
+    ===========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1234,8 +1234,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 24 (tag 24)
-    ================
+    c3 (tag 24)
+    ===========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1246,8 +1246,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 32 (tag 32)
-    ================
+    c (tag 32)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1260,8 +1260,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 40 (tag 40)
-    ================
+    s (tag 40)
+    ==========
 
     +-----------------+----------------------+------------------------+
     | Name            | Size                 | Contents               |
@@ -1274,8 +1274,8 @@ let%expect_test _ =
     +-----------------+----------------------+------------------------+
 
 
-    case 48 (tag 48)
-    ================
+    t (tag 48)
+    ==========
 
     +-----------------+----------------------+-------------------------+
     | Name            | Size                 | Contents                |
@@ -1290,8 +1290,8 @@ let%expect_test _ =
     +-----------------+----------------------+-------------------------+
 
 
-    case 56 (tag 56)
-    ================
+    s (tag 56)
+    ==========
 
     +------+--------+------------------------+
     | Name | Size   | Contents               |
@@ -1303,7 +1303,7 @@ let%expect_test _ =
     X_49 (Determined from data, 8-bit tag)
     **************************************
 
-    case 0 (tag 0)
+    case_0 (tag 0)
     ==============
 
     +------+--------+------------------------+
@@ -1313,7 +1313,7 @@ let%expect_test _ =
     +------+--------+------------------------+
 
 
-    case 1 (tag 1)
+    case_1 (tag 1)
     ==============
 
     +-----------------+----------+-------------------------------------+
@@ -1325,7 +1325,7 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case 2 (tag 2)
+    case_2 (tag 2)
     ==============
 
     +-----------------+----------+-------------------------------------+
@@ -1337,7 +1337,7 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case 3 (tag 3)
+    case_3 (tag 3)
     ==============
 
     +-----------------+----------+-------------------------------------+
@@ -1349,7 +1349,7 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case 4 (tag 4)
+    case_4 (tag 4)
     ==============
 
     +-----------------+----------+-------------------------------------+
@@ -1361,7 +1361,7 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case 5 (tag 5)
+    case_5 (tag 5)
     ==============
 
     +-----------------+----------+-------------------------------------+
@@ -1373,7 +1373,7 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case 6 (tag 6)
+    case_6 (tag 6)
     ==============
 
     +-----------------+----------+-------------------------------------+
@@ -1385,7 +1385,7 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case 7 (tag 7)
+    case_7 (tag 7)
     ==============
 
     +-----------------------+----------+---------------------------+
@@ -1419,7 +1419,7 @@ let%expect_test _ =
                              "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weirder-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 0" },
+                       "name": "b" },
                      { "tag": 2,
                        "fields":
                          [ { "name": "Tag",
@@ -1431,7 +1431,7 @@ let%expect_test _ =
                              "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 2" } ] } },
+                       "name": "bb" } ] } },
            { "description": { "title": "weirder-list" },
              "encoding":
                { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
@@ -1444,7 +1444,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 0" },
+                       "name": "c0" },
                      { "tag": 8,
                        "fields":
                          [ { "name": "Tag",
@@ -1453,7 +1453,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 8" },
+                       "name": "c1" },
                      { "tag": 16,
                        "fields":
                          [ { "name": "Tag",
@@ -1462,7 +1462,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 16" },
+                       "name": "c2" },
                      { "tag": 24,
                        "fields":
                          [ { "name": "Tag",
@@ -1471,7 +1471,7 @@ let%expect_test _ =
                              "kind": "named" },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 24" },
+                       "name": "c3" },
                      { "tag": 32,
                        "fields":
                          [ { "name": "Tag",
@@ -1483,7 +1483,7 @@ let%expect_test _ =
                              "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weirb-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
-                       "name": "case 32" },
+                       "name": "c" },
                      { "tag": 40,
                        "fields":
                          [ { "name": "Tag",
@@ -1495,7 +1495,7 @@ let%expect_test _ =
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 1, "kind": "Fixed" } } ],
-                       "name": "case 40" },
+                       "name": "s" },
                      { "tag": 48,
                        "fields":
                          [ { "name": "Tag",
@@ -1510,13 +1510,13 @@ let%expect_test _ =
                            { "layout": { "size": "Uint16", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 2, "kind": "Fixed" } } ],
-                       "name": "case 48" },
+                       "name": "t" },
                      { "tag": 56,
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
-                             "kind": "named" } ], "name": "case 56" } ] } },
+                             "kind": "named" } ], "name": "s" } ] } },
            { "description": { "title": "X_49" },
              "encoding":
                { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
@@ -1526,7 +1526,7 @@ let%expect_test _ =
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
-                             "kind": "named" } ], "name": "case 0" },
+                             "kind": "named" } ], "name": "case_0" },
                      { "tag": 1,
                        "fields":
                          [ { "name": "Tag",
@@ -1541,7 +1541,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 1 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 1" },
+                       "name": "case_1" },
                      { "tag": 2,
                        "fields":
                          [ { "name": "Tag",
@@ -1556,7 +1556,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 2 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 2" },
+                       "name": "case_2" },
                      { "tag": 3,
                        "fields":
                          [ { "name": "Tag",
@@ -1571,7 +1571,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 3 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 3" },
+                       "name": "case_3" },
                      { "tag": 4,
                        "fields":
                          [ { "name": "Tag",
@@ -1586,7 +1586,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 4 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 4" },
+                       "name": "case_4" },
                      { "tag": 5,
                        "fields":
                          [ { "name": "Tag",
@@ -1601,7 +1601,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 5 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 5" },
+                       "name": "case_5" },
                      { "tag": 6,
                        "fields":
                          [ { "name": "Tag",
@@ -1616,7 +1616,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 6 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 6" },
+                       "name": "case_6" },
                      { "tag": 7,
                        "fields":
                          [ { "name": "Tag",
@@ -1629,7 +1629,7 @@ let%expect_test _ =
                                    { "name": "weirder-list", "kind": "Ref" },
                                  "kind": "Seq" }, "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case 7" } ] } } ] } |}] ;
+                       "name": "case_7" } ] } } ] } |}] ;
   let obj2_opt_zero =
     Data_encoding.(
       obj2 (opt "l" (constant "left")) (opt "r" (constant "right")))
