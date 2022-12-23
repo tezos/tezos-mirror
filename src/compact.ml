@@ -149,7 +149,7 @@ let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
                  let tag = tag layout in
                  let title =
                    match C.title layout with
-                   | None -> Format.sprintf "case%d" tag
+                   | None -> Format.sprintf "case_%d" tag
                    | Some s -> s
                  in
                  (* Note: the projection function is never used. This is

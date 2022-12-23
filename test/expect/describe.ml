@@ -1303,8 +1303,8 @@ let%expect_test _ =
     X_49 (Determined from data, 8-bit tag)
     **************************************
 
-    case0 (tag 0)
-    =============
+    case_0 (tag 0)
+    ==============
 
     +------+--------+------------------------+
     | Name | Size   | Contents               |
@@ -1313,8 +1313,8 @@ let%expect_test _ =
     +------+--------+------------------------+
 
 
-    case1 (tag 1)
-    =============
+    case_1 (tag 1)
+    ==============
 
     +-----------------+----------+-------------------------------------+
     | Name            | Size     | Contents                            |
@@ -1325,8 +1325,8 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case2 (tag 2)
-    =============
+    case_2 (tag 2)
+    ==============
 
     +-----------------+----------+-------------------------------------+
     | Name            | Size     | Contents                            |
@@ -1337,8 +1337,8 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case3 (tag 3)
-    =============
+    case_3 (tag 3)
+    ==============
 
     +-----------------+----------+-------------------------------------+
     | Name            | Size     | Contents                            |
@@ -1349,8 +1349,8 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case4 (tag 4)
-    =============
+    case_4 (tag 4)
+    ==============
 
     +-----------------+----------+-------------------------------------+
     | Name            | Size     | Contents                            |
@@ -1361,8 +1361,8 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case5 (tag 5)
-    =============
+    case_5 (tag 5)
+    ==============
 
     +-----------------+----------+-------------------------------------+
     | Name            | Size     | Contents                            |
@@ -1373,8 +1373,8 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case6 (tag 6)
-    =============
+    case_6 (tag 6)
+    ==============
 
     +-----------------+----------+-------------------------------------+
     | Name            | Size     | Contents                            |
@@ -1385,8 +1385,8 @@ let%expect_test _ =
     +-----------------+----------+-------------------------------------+
 
 
-    case7 (tag 7)
-    =============
+    case_7 (tag 7)
+    ==============
 
     +-----------------------+----------+---------------------------+
     | Name                  | Size     | Contents                  |
@@ -1526,7 +1526,7 @@ let%expect_test _ =
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
-                             "kind": "named" } ], "name": "case0" },
+                             "kind": "named" } ], "name": "case_0" },
                      { "tag": 1,
                        "fields":
                          [ { "name": "Tag",
@@ -1541,7 +1541,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 1 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case1" },
+                       "name": "case_1" },
                      { "tag": 2,
                        "fields":
                          [ { "name": "Tag",
@@ -1556,7 +1556,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 2 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case2" },
+                       "name": "case_2" },
                      { "tag": 3,
                        "fields":
                          [ { "name": "Tag",
@@ -1571,7 +1571,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 3 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case3" },
+                       "name": "case_3" },
                      { "tag": 4,
                        "fields":
                          [ { "name": "Tag",
@@ -1586,7 +1586,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 4 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case4" },
+                       "name": "case_4" },
                      { "tag": 5,
                        "fields":
                          [ { "name": "Tag",
@@ -1601,7 +1601,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 5 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case5" },
+                       "name": "case_5" },
                      { "tag": 6,
                        "fields":
                          [ { "name": "Tag",
@@ -1616,7 +1616,7 @@ let%expect_test _ =
                                    { "kind": "exactly", "exactly": 6 } },
                              "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case6" },
+                       "name": "case_6" },
                      { "tag": 7,
                        "fields":
                          [ { "name": "Tag",
@@ -1629,7 +1629,7 @@ let%expect_test _ =
                                    { "name": "weirder-list", "kind": "Ref" },
                                  "kind": "Seq" }, "kind": "anon",
                              "data_kind": { "kind": "Variable" } } ],
-                       "name": "case7" } ] } } ] } |}] ;
+                       "name": "case_7" } ] } } ] } |}] ;
   let obj2_opt_zero =
     Data_encoding.(
       obj2 (opt "l" (constant "left")) (opt "r" (constant "right")))
