@@ -38,22 +38,25 @@ let unexpected_field =
   `O [("b", `O [("x", `Float 0.); ("y", `String ""); ("w", `O [])])]
 
 let test_empty_case () =
-  try ignore (destruct object_encoding empty_case)
-  with Cannot_destruct (p, Unexpected_field f) ->
-    assert (p = [`Field "a"; `Field f]) ;
-    assert (f = "foo" || f = "bar")
+  match destruct object_encoding empty_case with
+  | exception Cannot_destruct (p, Unexpected_field f) ->
+      assert (p = [`Field "a"; `Field f]) ;
+      assert (f = "foo" || f = "bar")
+  | _ -> assert false
 
 let test_unexpected_root () =
-  try ignore (destruct object_encoding unexpected_root)
-  with Cannot_destruct (p, Unexpected_field f) ->
-    assert (p = [`Field "c"]) ;
-    assert (f = "c")
+  match destruct object_encoding unexpected_root with
+  | exception Cannot_destruct (p, Unexpected_field f) ->
+      assert (p = [`Field "c"]) ;
+      assert (f = "c")
+  | _ -> assert false
 
 let test_unexpected_field () =
-  try ignore (destruct object_encoding unexpected_field)
-  with Cannot_destruct (p, Unexpected_field f) ->
-    assert (p = [`Field "b"; `Field "w"]) ;
-    assert (f = "w")
+  match destruct object_encoding unexpected_field with
+  | exception Cannot_destruct (p, Unexpected_field f) ->
+      assert (p = [`Field "b"; `Field "w"]) ;
+      assert (f = "w")
+  | _ -> assert false
 
 let tests =
   [
