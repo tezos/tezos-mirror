@@ -244,13 +244,13 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let* lcc, ctxt = Commitment_storage.get_commitment_unsafe ctxt rollup lcc in
   let min_level = Commitment.(lcc.inbox_level) in
   let max_level = Commitment.(commitment.inbox_level) in
+  let sc_rollup_max_lookahead =
+    Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt
+  in
   let* () =
     fail_when
-      (let sc_rollup_max_lookahead =
-         Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt
-       in
-       Compare.Int32.(
-         sc_rollup_max_lookahead < Raw_level_repr.diff max_level min_level))
+      Compare.Int32.(
+        sc_rollup_max_lookahead < Raw_level_repr.diff max_level min_level)
       Sc_rollup_too_far_ahead
   in
   return ctxt
