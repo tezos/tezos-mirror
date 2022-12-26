@@ -29,7 +29,7 @@ type dal = {
   feature_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
-  availability_threshold : int;
+  attestation_threshold : int;
   blocks_per_epoch : int32;
   cryptobox_parameters : Dal.parameters;
 }
@@ -41,27 +41,27 @@ let dal_encoding =
            feature_enable;
            number_of_slots;
            attestation_lag;
-           availability_threshold;
+           attestation_threshold;
            cryptobox_parameters;
            blocks_per_epoch;
          } ->
       ( ( feature_enable,
           number_of_slots,
           attestation_lag,
-          availability_threshold,
+          attestation_threshold,
           blocks_per_epoch ),
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              number_of_slots,
              attestation_lag,
-             availability_threshold,
+             attestation_threshold,
              blocks_per_epoch ),
            cryptobox_parameters ) ->
       {
         feature_enable;
         number_of_slots;
         attestation_lag;
-        availability_threshold;
+        attestation_threshold;
         blocks_per_epoch;
         cryptobox_parameters;
       })
@@ -70,7 +70,7 @@ let dal_encoding =
           (req "feature_enable" bool)
           (req "number_of_slots" int16)
           (req "attestation_lag" int16)
-          (req "availability_threshold" int16)
+          (req "attestation_threshold" int16)
           (req "blocks_per_epoch" int32))
        Dal.parameters_encoding)
 

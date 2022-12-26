@@ -46,7 +46,7 @@
   "tx_rollup_sunset_level": 3473409,
   "dal_parametric":
     { "feature_enable": false, "number_of_slots": 16, "attestation_lag": 1,
-      "availability_threshold": 50, "blocks_per_epoch": 2,
+      "attestation_threshold": 50, "blocks_per_epoch": 2,
       "redundancy_factor": 8, "page_size": 128, "slot_size": 32768,
       "number_of_shards": 64 }, "sc_rollup_enable": false,
   "sc_rollup_arith_pvm_enable": false, "sc_rollup_origination_size": 6314,

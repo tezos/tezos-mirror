@@ -37,7 +37,7 @@ type proto_parameters = {
   feature_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
-  availability_threshold : int;
+  attestation_threshold : int;
   cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
   blocks_per_epoch : int32;
 }

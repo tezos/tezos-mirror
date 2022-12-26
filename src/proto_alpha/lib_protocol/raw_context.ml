@@ -1015,7 +1015,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
             attestation_lag = c.dal.endorsement_lag;
-            availability_threshold = c.dal.availability_threshold;
+            attestation_threshold = c.dal.availability_threshold;
             blocks_per_epoch = 32l;
             cryptobox_parameters;
           }
@@ -1616,7 +1616,7 @@ module Dal = struct
 
   let is_slot_index_available ctxt =
     let threshold =
-      ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
+      ctxt.back.constants.Constants_parametric_repr.dal.attestation_threshold
     in
     let number_of_shards =
       ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
