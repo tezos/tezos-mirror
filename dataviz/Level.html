@@ -2,145 +2,76 @@
 
 <html lang="en">
 
-<head>
+  <head>
     <meta charset="utf-8">
     <title>Endorsement reception delays</title>
     <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7.4.4/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.27.2/axios.min.js"
-        integrity="sha512-odNmoc1XJy5x1TMVMdC7EMs3IVdItLPlCeL5vSUPN2llYKMJ2eByTTAIiiuqLg+GdNr9hF6z81p27DArRFKT7A=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            integrity="sha512-odNmoc1XJy5x1TMVMdC7EMs3IVdItLPlCeL5vSUPN2llYKMJ2eByTTAIiiuqLg+GdNr9hF6z81p27DArRFKT7A=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  </head>
 
-</head>
-
-<body>
+  <body>
     <script type="text/javascript" src="./js/populate_sort_data.js"></script>
     <script type="text/javascript" src="./js/local_config.js"></script>
+    <script>
+      let location_web = String(window.location.href).split('?')[0];
+    </script>
     <form>
-        <h1>Endorsement reception delays</h1>
-        <label for="selectedLevel">Level</label>
-        <tr>
-            <td rowspan="2">
-                <input name="level" id="selectedLevel" type="number" />
-            </td>
-            <td>
-                <input id="plus" type="button" value=" Next " onclick="this.form.level.value++;">
-            </td>
-        </tr>
-        <tr>
-            <td><input id="moins" type=button value=" Previous " onclick="this.form.level.value--;"></td>
-        </tr>
-        <tr>
-            <td><input id="go" type=button value=" Go "></td>
-        </tr>
+      <h1>Endorsement reception delays</h1>
+      <label for="selectedLevel">Level</label>
+      <tr>
+        <td rowspan="2">
+          <input name="level" id="selectedLevel" type="number" />
+        </td>
+        <td>
+          <input id="plus" type="button" value=" Next" onclick="this.form.level.value++;
+								window.location = location_web + '?block=' + this.form.level.value;">
+        </td>
+      </tr>
+      <tr>
+        <td><input id="moins" type="button" value="Previous" onclick="this.form.level.value--;
+								      window.location = location_web + '?block=' + this.form.level.value;"></td>
+      </tr>
+      <tr>
+        <td><input id="go" type="button" value="Go" onclick="window.location = location_web + '?block=' + this.form.level.value;"></td>
+      </tr>
     </form>
     <script>
-        function main() {
-            try {
-                // parameter from URL  
-                const params = new Proxy(new URLSearchParams(window.location.search), { // to input parameters in URL
-                    get: (searchParams, prop) => searchParams.get(prop),
-                });
-                // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
-                let block_value; // "some_value"
-                let most_recent_bloc = getHead(server_adress);
-                if (!(isNaN(parseInt(params.block)))&& most_recent_bloc>=parseInt(params.block)) {
-                    block_value = parseInt(params.block);
-                    document.getElementById("selectedLevel").value = block_value;
-                    let dict_data = populate_v1(server_adress, block_value, block_value).then(dict_data => {
-                        console.log(dict_data)
-                        let ditribution_delays = delays_distribution_of_operations(dict_data, true)
-                        console.log(ditribution_delays)
-                        let logs_operation = classify_operations(dict_data)
-                        let result = get_info_block(dict_data);
-                        let t_delay_block = result[0]
-                        let t_baker = result[1]
-                        let max_round = result[2]
-                        resume_obs(logs_operation, t_baker);
-                        replaceDelegate(logs_operation);
-                        for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [ditribution_delays[0][block_value][i], ditribution_delays[1][block_value][i]], block_value, i, t_delay_block[i]);
-                        }
+      // parameter from URL
+      const params = new URLSearchParams(window.location.search);
+      let block_value = parseInt(params.get('block'));
 
-                    });
-                } else {//take most recent height 
-                    var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
-                    var b = a.then(level => {
-                        return populate_v1(server_adress, level, level);
-                    });
-                    Promise.all([a, b]).then(([block_value, dict_data]) => {
-                        console.log([block_value, dict_data])
-                        document.getElementById("selectedLevel").value = block_value;
-                        let ditribution_delays = delays_distribution_of_operations(dict_data, true)
-                        console.log(ditribution_delays)
-                        let logs_operation = classify_operations(dict_data)
-                        let result = get_info_block(dict_data);
-                        let t_delay_block = result[0]
-                        let t_baker = result[1]
-                        let max_round = result[2]
-                        resume_obs(logs_operation, t_baker);
-                        replaceDelegate(logs_operation);
-                        for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [ditribution_delays[0][block_value][i], ditribution_delays[1][block_value][i]], block_value, i, t_delay_block[i]);
-                        }
-
-                    });
-
-                }
-
-                $('#go').click(function (e) {
-                    let location_web = String(window.location.href).split('?')[0];
-                    window.location = location_web + "?block=" + document.getElementById('selectedLevel').value;
-                })
-
-                $('#plus').click(function (e) {
-
-                    var va = document.getElementById('selectedLevel').value; e.target.value;
-                    let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
-                        let ditribution_delays = delays_distribution_of_operations(dict_data, true)
-                        let logs_operation = classify_operations(dict_data)
-                        let result = get_info_block(dict_data);
-                        let t_delay_block = result[0]
-                        let t_baker = result[1]
-                        let max_round = result[2]
-                        resume_obs(logs_operation, t_baker);
-                        replaceDelegate(logs_operation);
-                        for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delay_block[i]);
-                        }
-                    });
-                });
-
-                $('#moins').click(function (e) {
-
-                    var va = document.getElementById('selectedLevel').value; e.target.value;
-                    let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
-                        let distrib_t = delays_distribution_of_operations(dict_data, true)
-                        let logs_operation = classify_operations(dict_data)
-                        let result = get_info_block(dict_data);
-                        let t_delay_block = result[0]
-                        let t_baker = result[1]
-                        let max_round = result[2]
-                        console.log(t_baker)
-                        resume_obs(logs_operation, t_baker);
-                        replaceDelegate(logs_operation);
-                        for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delay_block[i]);
-                        }
-                    });
-                });
-
-            } catch (erreur) {
-                console.log(erreur);
-            }
-        }
-        main()
-
+      getHead(server_adress).then(most_recent_block => {
+          if (isNaN(block_value) || most_recent_block<block_value)
+	      block_value = most_recent_block;
+          document.getElementById("selectedLevel").value = block_value;
+          populate_v1(server_adress, block_value, block_value).then(dict_data => {
+              let ditribution_delays = delays_distribution_of_operations(dict_data, true)
+              console.log(ditribution_delays)
+              let logs_operation = classify_operations(dict_data)
+              let result = get_info_block(dict_data);
+              let t_delay_block = result[0]
+              let t_baker = result[1]
+              let max_round = result[2]
+              resume_obs(logs_operation, t_baker);
+              replaceDelegate(logs_operation);
+              for (let i = 0; i <= max_round; i++) {
+                  chart_delays_for_a_block('p',
+					   [ditribution_delays[0][block_value][i], ditribution_delays[1][block_value][i]],
+					   block_value,
+					   i,
+					   t_delay_block[i]);
+              }
+          });
+      });
     </script>
     <p></p>
     <br>
     <br>
     <div id="tab_delegates"></div>
     <div id="resume"></div>
-</body>
+  </body>
+</html>
