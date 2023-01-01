@@ -1,1 +1,1 @@
-const server_adress = "http://kathmandunet.kaml.fr:8880/";
+const server_adress = "https://teztale.tzalpha.net/";
