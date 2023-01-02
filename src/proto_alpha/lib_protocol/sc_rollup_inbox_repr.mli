@@ -258,9 +258,6 @@ val inclusion_proof_encoding : inclusion_proof Data_encoding.t
 
 val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
 
-(** [number_of_proof_steps proof] returns the length of [proof]. *)
-val number_of_proof_steps : inclusion_proof -> int
-
 (** [verify_inclusion_proof proof snapshot] returns [A] iff [proof] is a minimal
     and valid proof that [A] is included in [snapshot], fails otherwise. [A] is
     part of the proof. *)

@@ -372,9 +372,6 @@ val pp_status : Format.formatter -> status -> unit
 
 val status_encoding : status Data_encoding.t
 
-(** Decide the loser of the game, if it exists. *)
-val loser_of_results : alice_result:bool -> bob_result:bool -> player option
-
 (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
    Providing DAL parameters here is not resilient to their change during
    protocol upgrade. *)
