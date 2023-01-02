@@ -1037,7 +1037,7 @@ let prepare_first_block ~level ~timestamp ctxt =
               c.sc_rollup.max_outbox_messages_per_level;
             number_of_sections_in_dissection =
               c.sc_rollup.number_of_sections_in_dissection;
-            timeout_period_in_blocks = c.sc_rollup.timeout_period_in_blocks;
+            timeout_period_in_blocks = 40_320;
             max_number_of_stored_cemented_commitments =
               c.sc_rollup.max_number_of_stored_cemented_commitments;
             max_number_of_parallel_games = 32;
