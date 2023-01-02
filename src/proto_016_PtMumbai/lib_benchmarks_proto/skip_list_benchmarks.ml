@@ -23,9 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides benchmarks for skip list operations for basis = 2. *)
+(** This module provides benchmarks for skip list operations for basis = 4. *)
 
 open Protocol
+
+module Skip_list = Skip_list_repr.Make (struct
+  (** The benchmarks must be run again if [basis] is changed. *)
+  let basis = 4
+end)
 
 let ns = Namespace.make Registration_helpers.ns "skip_list"
 
@@ -34,10 +39,7 @@ let fv s = Free_variable.of_namespace (ns s)
 (** Benchmark for the [Skip_list_repr.next] function. It is used for estimating
     the parameters for [Skip_list_cost_model.model_next]. *)
 module Next : Benchmark.S = struct
-  include Skip_list_repr.Make (struct
-    (** The benchmarks must be run again if [basis] is changed. *)
-    let basis = 2
-  end)
+  include Skip_list
 
   let name = ns "next"
 
@@ -102,10 +104,7 @@ module Hash_cell = struct
 
   let tags = ["skip_list"]
 
-  module Skip_list = Skip_list_repr.Make (struct
-    let basis = 2
-  end)
-
+  include Skip_list
   module Hash = Sc_rollup_inbox_repr.Hash
 
   let hash merkelized =
