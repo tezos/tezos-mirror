@@ -769,8 +769,8 @@ val get_chain_block_context_contract_all_ticket_balances :
 val get_chain_block_context_sc_rollups_all :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/games_with_staker/<staker>] *)
-val get_chain_block_context_sc_rollups_sc_rollup_games_with_staker :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/staker/<staker>/games] *)
+val get_chain_block_context_sc_rollups_sc_rollup_staker_games :
   ?chain:string -> ?block:string -> staker:string -> string -> unit -> JSON.t t
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/all/inbox] *)
@@ -798,7 +798,7 @@ val get_chain_block_context_sc_rollups_sc_rollup_commitment :
   unit ->
   JSON.t t
 
-(** RPC: [GET: chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<rollup_hash>/staker/<staker>/staked_on_commitment] *)
+(** RPC: [GET: chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/staker/<staker>/staked_on_commitment] *)
 val get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment :
   ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t
 

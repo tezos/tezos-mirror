@@ -382,7 +382,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         (cctxt#chain, cctxt#block)
         rollup_address
         commitment_hash
-        ()
     else return_false
 
   let cement_commitment (node_ctxt : _ Node_context.t) commitment_hash =
