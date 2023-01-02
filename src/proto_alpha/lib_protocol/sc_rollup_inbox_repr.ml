@@ -235,6 +235,10 @@ module V1 = struct
 
   let old_levels_messages inbox = inbox.old_levels_messages
 
+  let current_witness inbox =
+    let {hash; _} = Skip_list.content inbox.old_levels_messages in
+    hash
+
   let encoding =
     Data_encoding.(
       conv

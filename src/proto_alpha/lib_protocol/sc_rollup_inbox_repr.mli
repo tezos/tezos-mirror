@@ -193,6 +193,11 @@ module V1 : sig
   (** [old_levels_messages inbox] returns the latest skip list cell of the inbox
       history that is not up to change (i.e. not the current level tree). *)
   val old_levels_messages : t -> history_proof
+
+  (** [current_witness inbox] returns the current witness of the inbox, i.e. the
+      merkelized payload hash. *)
+  val current_witness :
+    t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
