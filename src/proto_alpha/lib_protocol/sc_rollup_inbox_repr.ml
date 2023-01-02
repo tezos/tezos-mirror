@@ -513,9 +513,9 @@ let verify_payloads_proof {proof; payload} head_cell_hash n =
          "Provided message counter is out of the valid range [0 -- (max_index \
           + 1)] ")
 
-(** [produce_payloads_proof get_paylooads_history head_cell_hash ~index]
+(** [produce_payloads_proof get_payloads_history head_cell_hash ~index]
 
-    [get_paylooads_history cell_hash] is a function that returns an
+    [get_payloads_history cell_hash] is a function that returns an
     {!Sc_rollup_inbox_merkelized_payload_hashes_repr.History.t}. The returned
     history must contains the cell with hash [cell_hash], all its ancestor cell
     and their associated payload.
@@ -533,10 +533,10 @@ let verify_payloads_proof {proof; payload} head_cell_hash n =
    - else a proof that [index] is out of bound for [head_cell]. It returns the
    proof and no payload.
 *)
-let produce_payloads_proof get_paylooads_history head_cell_hash ~index =
+let produce_payloads_proof get_payloads_history head_cell_hash ~index =
   let open Lwt_result_syntax in
   (* We first retrieve the history of cells for this level. *)
-  let*! payloads_history = get_paylooads_history head_cell_hash in
+  let*! payloads_history = get_payloads_history head_cell_hash in
   (* We then fetch the actual head cell in the history. *)
   let*? head_cell =
     match
