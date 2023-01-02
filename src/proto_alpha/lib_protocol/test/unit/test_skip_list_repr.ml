@@ -356,7 +356,7 @@ let test_skip_list_nat_check_invalid_path (basis, i) =
   M.check_invalid_paths i
 
 let test_minimal_back_path () =
-  let basis = 2 in
+  let basis = 4 in
   let module M = TestNat (struct
     let basis = basis
   end) in
@@ -373,10 +373,10 @@ let test_minimal_back_path () =
   in
   let cases =
     [
-      (6, 1, [6; 3; 1]);
+      (6, 1, [6; 3; 2; 1]);
       (6, 3, [6; 3]);
       (10, 3, [10; 7; 3]);
-      (10, 5, [10; 7; 5]);
+      (10, 5, [10; 7; 6; 5]);
       (10, 7, [10; 7]);
       (10, 9, [10; 9]);
     ]
@@ -390,7 +390,7 @@ let test_minimal_back_path () =
 
 let test_search_non_minimal_back_path () =
   let open Lwt_result_syntax in
-  let basis = 2 in
+  let basis = 4 in
   let module M = TestNat (struct
     let basis = basis
   end) in
@@ -612,7 +612,7 @@ let tests =
       ~name:"Skip list: produce paths with `back_path` and check"
       ~count:10
       QCheck2.Gen.(
-        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
         let* i = 0 -- 100 in
         let* j = 0 -- i in
         return (basis, i, j))
@@ -621,7 +621,7 @@ let tests =
       ~name:"Skip list: find cell with `find` and `check`"
       ~count:10
       QCheck2.Gen.(
-        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
         let* i = 0 -- 100 in
         let* j = 0 -- i in
         return (basis, i, j))
@@ -630,7 +630,7 @@ let tests =
       ~name:"Skip list: `find` won't produce invalid value"
       ~count:10
       QCheck2.Gen.(
-        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
         let* i = 0 -- 100 in
         return (basis, i))
       test_skip_list_nat_check_invalid_find;
@@ -638,7 +638,7 @@ let tests =
       ~name:"Skip list: `back_path` won't produce invalid paths"
       ~count:10
       QCheck2.Gen.(
-        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
         let* i = 0 -- 100 in
         return (basis, i))
       test_skip_list_nat_check_invalid_path;
@@ -650,7 +650,7 @@ let tests =
       ~name:"Skip list: produce paths with `search` and check"
       ~count:10
       QCheck2.Gen.(
-        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
         let* i = 0 -- 100 in
         let* j = 0 -- i in
         return (basis, i, j))
@@ -659,7 +659,7 @@ let tests =
       ~name:"Skip list: `search` won't produce invalid paths"
       ~count:10
       QCheck2.Gen.(
-        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* basis = frequency [(5, pure 4); (1, 2 -- 73)] in
         let* i = 0 -- 10 in
         return (basis, i))
       test_skip_list_nat_check_invalid_path_with_search;
