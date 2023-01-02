@@ -434,7 +434,7 @@ module Hash_chain = struct
       link_chunks chunks
 
     (** Main function for computing a hash chain from a byte sequence. Returns the
-        chain head hash.[for_each_page] may be supplied to run post processing 
+        chain head hash.[for_each_page] may be supplied to run post processing
         tasks on each page, for example, to persisit a serialized page to disk.
       *)
     let serialize_payload ~for_each_page payload =

@@ -60,19 +60,19 @@ val equal : t -> t -> bool
       by the hash module corresponding to their hashing scheme. *)
 val compare : t -> t -> int
 
-(* The encoding of reveal hashes. *)
+(** The encoding of reveal hashes. *)
 val encoding : t Data_encoding.t
 
-(* [hash_string ~scheme ?key strings] hashes [strings] using the
-   supported hashing [scheme] given in input. *)
+(** [hash_string ~scheme ?key strings] hashes [strings] using the
+    supported hashing [scheme] given in input. *)
 val hash_string : scheme:supported_hashes -> ?key:string -> string list -> t
 
-(* [hash_bytes ~scheme ?key strings] hashes [bytes] using the
-   supported hashing [scheme] given in input. *)
+(** [hash_bytes ~scheme ?key strings] hashes [bytes] using the
+    supported hashing [scheme] given in input. *)
 val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> t
 
-(* [scheme_of_hash] hash returns the supported hashing scheme
-   that was used to obtain [hash]. *)
+(** [scheme_of_hash] hash returns the supported hashing scheme
+    that was used to obtain [hash]. *)
 val scheme_of_hash : t -> supported_hashes
 
 val of_hex : string -> t option
