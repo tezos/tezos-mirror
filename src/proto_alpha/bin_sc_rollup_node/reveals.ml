@@ -91,7 +91,7 @@ let file_contents filename =
     (fun _ -> tzfail @@ Could_not_open_preimage_file filename)
 
 let path data_dir pvm_name hash =
-  let hash = Format.asprintf "%a" Reveal_hash.pp hash in
+  let hash = Protocol.Sc_rollup_reveal_hash.to_hex hash in
   Filename.(concat (concat data_dir pvm_name) hash)
 
 let get ~data_dir ~pvm_kind ~hash =

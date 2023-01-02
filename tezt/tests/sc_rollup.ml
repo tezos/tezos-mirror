@@ -68,6 +68,12 @@ let read_kernel name : string =
    block finality time is 2. *)
 let block_finality_time = 2
 
+let reveal_hash_hex data =
+  let (`Hex hash) =
+    Hex.of_string Tezos_crypto.Blake2B.(hash_string [data] |> to_string)
+  in
+  "00" ^ hash
+
 type sc_rollup_constants = {
   origination_size : int;
   challenge_window_in_blocks : int;
@@ -2385,9 +2391,7 @@ let test_reveals_fails_on_wrong_hash ~kind =
       description = "reveal data fails with wrong hash";
     }
   @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
-  (* This value has been obtained from the logs of the test
-     "Alpha: arith - rollup node correctly handles reveals." *)
-  let hash = "scrrh13sj3sMk3Ne75xd4dnYGH4TF4dHzAcmXpEPkdJrQ3fBEGN4jtoF" in
+  let hash = reveal_hash_hex "Some data" in
   let pvm_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "arith"
   in
@@ -2436,9 +2440,9 @@ let test_reveals_4k =
     }
   @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
   let data = String.make 4096 'z' in
-  let hash = "scrrh14ZQQhSPAYTCdcHw8FYrXCtLqtyukNXj4UuTe33wPpoixYP4mbU" in
+  let hash_hex = reveal_hash_hex data in
   let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
-  let filename = Filename.concat pvm_dir hash in
+  let filename = Filename.concat pvm_dir hash_hex in
   let () = Sys.mkdir pvm_dir 0o700 in
   let () = with_open_out filename @@ fun cout -> output_string cout data in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
@@ -2448,7 +2452,7 @@ let test_reveals_4k =
     in
     Test.fail "Node terminated before reveal"
   in
-  let* () = send_text_messages client ["hash:" ^ hash] in
+  let* () = send_text_messages client ["hash:" ^ hash_hex] in
   let sync =
     let* _level =
       Sc_rollup_node.wait_for_level
@@ -2472,7 +2476,7 @@ let test_reveals_above_4k =
     }
   @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
   let data = String.make 4097 'z' in
-  let hash = "scrrh13kjkToxe8quiXqyjx4GHrdmNLPwiMf4Mdi7CMbV24amzSTT97g" in
+  let hash = reveal_hash_hex data in
   let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
   let filename = Filename.concat pvm_dir hash in
   let () = Sys.mkdir pvm_dir 0o700 in

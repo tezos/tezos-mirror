@@ -1226,7 +1226,7 @@ module Make (Context : P) :
 
   let evaluate_preimage_request hash =
     let open Monad.Syntax in
-    match Sc_rollup_reveal_hash.of_b58check_opt hash with
+    match Sc_rollup_reveal_hash.of_hex hash with
     | None -> stop_evaluating false
     | Some hash ->
         let* () = Required_reveal.set (Some (Reveal_raw_data hash)) in

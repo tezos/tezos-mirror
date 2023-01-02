@@ -48,7 +48,11 @@ let () =
       | _ -> None)
     (fun b58_hash -> Could_not_serialize_rollup_external_message b58_hash)
 
-module type REVEAL_HASH = module type of Sc_rollup_reveal_hash
+module type REVEAL_HASH = sig
+  include module type of Sc_rollup_reveal_hash
+
+  val to_hex : t -> string
+end
 
 module Make
     (Hashing_scheme : REVEAL_HASH) (Encoding_metadata : sig
@@ -98,7 +102,7 @@ struct
     | Error _ ->
         error
         @@ Could_not_serialize_rollup_external_message
-             (Hashing_scheme.to_b58check root_hash)
+             (Hashing_scheme.to_hex root_hash)
 
   let of_bytes encoded_message =
     Data_encoding.Binary.of_bytes_opt dac_message_encoding encoded_message
@@ -106,7 +110,15 @@ end
 
 module Reveal_hash =
   Make
-    (Sc_rollup_reveal_hash)
+    (struct
+      include Sc_rollup_reveal_hash
+
+      let to_hex hash =
+        let (`Hex hash) =
+          Hex.of_string @@ Data_encoding.Binary.to_string_exn encoding hash
+        in
+        hash
+    end)
     (struct
       let tag = 42
 

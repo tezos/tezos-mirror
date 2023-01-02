@@ -176,8 +176,6 @@ module Merkle_tree = struct
 
     let hashes_encoding = Data_encoding.list hash_encoding
 
-    let to_b58check = Hashing_scheme.to_b58check
-
     (* The preamble of a serialized page contains 1 byte denoting the version,
        and 4 bytes encoding the size of the rest of the page. In total, 5
        bytes. *)
@@ -408,7 +406,7 @@ module Hash_chain = struct
     let hash bytes =
       Hashing_scheme.hash_bytes ~scheme:Hashing_scheme.scheme [bytes]
 
-    let to_b58check = Hashing_scheme.to_b58check
+    let to_hex = Hashing_scheme.to_hex
 
     let link_chunks chunks : (Hashing_scheme.t * bytes) list =
       let rec link_chunks_rev linked_pages rev_pages =
@@ -464,7 +462,7 @@ module Hash_chain = struct
         let content_limit =
           (4 * 1024) - 100 (* We reserve 100 bytes for the continuation hash. *)
 
-        let serialize_hash = Sc_rollup_reveal_hash.to_b58check
+        let serialize_hash = Sc_rollup_reveal_hash.to_hex
 
         let serialize_page page =
           Format.asprintf

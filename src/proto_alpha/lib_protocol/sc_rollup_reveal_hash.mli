@@ -60,12 +60,6 @@ val equal : t -> t -> bool
       by the hash module corresponding to their hashing scheme. *)
 val compare : t -> t -> int
 
-(* [of_b58check_opt base58_hash] returns the reveal-hash, if any,
-   whose base58 encoding is [base58_hash]. To avoid ambiguity,
-   the [S.HASH] modules supported should avoid using the same prefix
-   for the base58 encoding. *)
-val of_b58check_opt : string -> t option
-
 (* The encoding of reveal hashes. *)
 val encoding : t Data_encoding.t
 
@@ -77,9 +71,10 @@ val hash_string : scheme:supported_hashes -> ?key:string -> string list -> t
    supported hashing [scheme] given in input. *)
 val hash_bytes : scheme:supported_hashes -> ?key:bytes -> bytes list -> t
 
-(* [to_b58check hash] returns the base58 encoded reveal hash. *)
-val to_b58check : t -> string
-
 (* [scheme_of_hash] hash returns the supported hashing scheme
    that was used to obtain [hash]. *)
 val scheme_of_hash : t -> supported_hashes
+
+val of_hex : string -> t option
+
+val to_hex : t -> string

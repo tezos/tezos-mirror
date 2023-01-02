@@ -481,7 +481,7 @@ module Hash_chain = struct
         let content = String.sub page 0 3996 in
         let hash =
           Stdlib.Option.get
-          @@ Sc_rollup_reveal_hash.of_b58check_opt
+          @@ Sc_rollup_reveal_hash.of_hex
                (take_after page (3996 + String.length " hash:"))
         in
         `Node (hash, content)
@@ -509,12 +509,12 @@ module Hash_chain = struct
         assert_equal_bytes ~loc:__LOC__ "Contents not equal" payload content
       in
       let expected_hash =
-        Pagination_scheme.to_b58check @@ Pagination_scheme.hash content
+        Pagination_scheme.to_hex @@ Pagination_scheme.hash content
       in
       Assert.equal_string
         ~loc:__LOC__
         expected_hash
-        (Pagination_scheme.to_b58check actual_hash)
+        (Pagination_scheme.to_hex actual_hash)
 
     let test_make_chain_hash_long () =
       let open Lwt_result_syntax in
@@ -529,13 +529,13 @@ module Hash_chain = struct
       let* () =
         Assert.equal_string
           ~loc:__LOC__
-          (Pagination_scheme.to_b58check next_hash)
+          (Pagination_scheme.to_hex next_hash)
           head_succ
       in
       Assert.equal_string
         ~loc:__LOC__
-        (Pagination_scheme.to_b58check next_hash)
-        (Pagination_scheme.to_b58check @@ Pagination_scheme.hash content)
+        (Pagination_scheme.to_hex next_hash)
+        (Pagination_scheme.to_hex @@ Pagination_scheme.hash content)
 
     let test_serialize () =
       let module Backend = Hashes_Map_backend () in

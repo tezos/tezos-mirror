@@ -67,9 +67,6 @@ module Map = Map.Make (struct
   let compare = compare
 end)
 
-let of_b58check_opt b58_hash =
-  b58_hash |> Blake2B.of_b58check_opt |> Option.map (fun hash -> Blake2B hash)
-
 (* Size of the hash is the size of the inner hash plus one byte for the
    tag used to identify the hashing scheme. *)
 let size ~(scheme : supported_hashes) =
@@ -96,8 +93,17 @@ let hash_string ~(scheme : supported_hashes) ?key strings =
 let hash_bytes ~(scheme : supported_hashes) ?key bytes =
   match scheme with Blake2B -> Blake2B (Blake2B.hash_bytes ?key bytes)
 
-let to_b58check hash =
-  match hash with Blake2B hash -> Blake2B.to_b58check hash
-
 let scheme_of_hash hash =
   match hash with Blake2B _hash -> (Blake2B : supported_hashes)
+
+let to_hex hash =
+  let (`Hex hash) =
+    (* The [encoding] of a hash here never, so [to_string_exn] is safe. *)
+    Hex.of_string @@ Data_encoding.Binary.to_string_exn encoding hash
+  in
+  hash
+
+let of_hex hex =
+  let open Option_syntax in
+  let* hash = Hex.to_bytes (`Hex hex) in
+  Data_encoding.Binary.of_bytes_opt encoding hash
