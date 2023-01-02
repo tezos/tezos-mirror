@@ -210,7 +210,7 @@ let constants_mainnet =
       };
     dal = default_dal;
     sc_rollup =
-      (let commitment_period_in_blocks = 30 in
+      (let commitment_period_in_blocks = 60 in
        {
          enable = false;
          arith_pvm_enable = false;

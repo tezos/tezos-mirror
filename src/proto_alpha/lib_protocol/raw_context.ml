@@ -1030,8 +1030,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
                The following constants need to be refined. *)
             stake_amount = c.sc_rollup.stake_amount;
-            commitment_period_in_blocks =
-              c.sc_rollup.commitment_period_in_blocks;
+            commitment_period_in_blocks = 60;
             max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
             max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
             max_outbox_messages_per_level =
