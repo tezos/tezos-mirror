@@ -1051,6 +1051,12 @@ val spawn_originate_contract_at :
   Protocol.t ->
   string * Process.t
 
+(** Run [octez-client remember contract <alias> <address>]. *)
+val remember_contract : alias:string -> address:string -> t -> unit Lwt.t
+
+(** Same as [remember_contract], but do not wait for the process to exit. *)
+val spawn_remember_contract : alias:string -> address:string -> t -> Process.t
+
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)
 type stresstest_contract_parameters = {
@@ -1965,6 +1971,199 @@ module Zk_rollup : sig
     burn_cap:int ->
     unit Lwt.t
 end
+
+(** {2 Commands for working with Sapling transactions} *)
+
+(** Run [octez-client sapling gen key <name>].
+
+    Returns mnemonic of the generated key. *)
+val sapling_gen_key :
+  name:string -> ?force:bool -> ?unencrypted:bool -> t -> string list Lwt.t
+
+(** Same as [sapling_gen_key], but do not wait for the process to exit. *)
+val spawn_sapling_gen_key :
+  name:string -> ?force:bool -> ?unencrypted:bool -> t -> Process.t
+
+(** Run [octez-client sapling use key <sapling-key> for contract <contract>]. *)
+val sapling_use_key :
+  sapling_key:string -> contract:string -> ?memo_size:int -> t -> unit Lwt.t
+
+(** Same as [sapling_use_key], but do not wait for the process to exit. *)
+val spawn_sapling_use_key :
+  sapling_key:string -> contract:string -> ?memo_size:int -> t -> Process.t
+
+(** Run [octez-client sapling import key <new>]. *)
+val sapling_import_key :
+  new_:string ->
+  ?force:bool ->
+  ?unencrypted:bool ->
+  ?mnemonic:string list ->
+  t ->
+  unit Lwt.t
+
+(** Same as [sapling_import_key], but do not wait for the process to exit. *)
+val spawn_sapling_import_key :
+  new_:string ->
+  ?force:bool ->
+  ?unencrypted:bool ->
+  ?mnemonic:string list ->
+  t ->
+  Process.t
+
+(** Run [octez-client sapling derive key <new> from <name> at index <child-index>]. *)
+val sapling_derive_key :
+  new_:string ->
+  name:string ->
+  child_index:int ->
+  ?force:bool ->
+  ?for_contract:string ->
+  ?unencrypted:bool ->
+  ?memo_size:int ->
+  t ->
+  string Lwt.t
+
+(** Same as [sapling_derive_key], but do not wait for the process to exit. *)
+val spawn_sapling_derive_key :
+  new_:string ->
+  name:string ->
+  child_index:int ->
+  ?force:bool ->
+  ?for_contract:string ->
+  ?unencrypted:bool ->
+  ?memo_size:int ->
+  t ->
+  Process.t
+
+(** Run [octez-client sapling gen address <name>].
+
+    Returns the generated address and its index. *)
+val sapling_gen_address :
+  name:string -> ?address_index:int -> t -> (string * int) Lwt.t
+
+(** Same as [sapling_gen_address], but do not wait for the process to exit. *)
+val spawn_sapling_gen_address :
+  name:string -> ?address_index:int -> t -> Process.t
+
+(** Run [octez-client sapling export key <name> in <file>]. *)
+val sapling_export_key : name:string -> file:string -> t -> unit Lwt.t
+
+(** Same as [sapling_export_key], but do not wait for the process to exit. *)
+val spawn_sapling_export_key : name:string -> file:string -> t -> Process.t
+
+(** Run [octez-client sapling get balance for <sapling-key> in contract <contract>]. *)
+val sapling_get_balance :
+  sapling_key:string -> contract:string -> ?verbose:bool -> t -> Tez.t Lwt.t
+
+(** Same as [sapling_get_balance], but do not wait for the process to exit. *)
+val spawn_sapling_get_balance :
+  sapling_key:string -> contract:string -> ?verbose:bool -> t -> Process.t
+
+(** Run [octez-client sapling list keys]. *)
+val sapling_list_keys : t -> string list Lwt.t
+
+(** Same as [sapling_list_keys], but do not wait for the process to exit. *)
+val spawn_sapling_list_keys : t -> Process.t
+
+(** Run [octez-client sapling shield <qty> from <src-tz> to <dst-sap> using <sapling contract>].
+
+    Returns [(balance_diff, fees)] where [balance_diff] is [sapling_contract]'s diff in balance and
+    [fees] is the amount of fees paid. *)
+val sapling_shield :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  qty:Tez.t ->
+  src_tz:string ->
+  dst_sap:string ->
+  sapling_contract:string ->
+  ?message:string ->
+  t ->
+  (Tez.t * Tez.t) Lwt.t
+
+(** Same as [sapling_shield], but do not wait for the process to exit. *)
+val spawn_sapling_shield :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  qty:Tez.t ->
+  src_tz:string ->
+  dst_sap:string ->
+  sapling_contract:string ->
+  ?message:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client sapling unshield <qty> from <src-sap> to <dst-tz> using <sapling_contract>].
+
+    Returns [(balance_diff, fees)] where [balance_diff] is [sapling_contract]'s diff in balance and
+    [fees] is the amount of fees payed.
+ *)
+val sapling_unshield :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  qty:Tez.t ->
+  src_sap:string ->
+  dst_tz:string ->
+  sapling_contract:string ->
+  t ->
+  (Tez.t * Tez.t) Lwt.t
+
+(** Same as [sapling_unshield], but do not wait for the process to exit. *)
+val spawn_sapling_unshield :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  qty:Tez.t ->
+  src_sap:string ->
+  dst_tz:string ->
+  sapling_contract:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client sapling forge transaction <qty> from <src-sap> to <dst-sap> using <sapling contract>]. *)
+val sapling_forge_transaction :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  qty:Tez.t ->
+  src_sap:string ->
+  dst_sap:string ->
+  sapling_contract:string ->
+  ?file:string ->
+  ?json:bool ->
+  t ->
+  unit Lwt.t
+
+(** Same as [sapling_forge_transaction], but do not wait for the process to exit. *)
+val spawn_sapling_forge_transaction :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  qty:Tez.t ->
+  src_sap:string ->
+  dst_sap:string ->
+  sapling_contract:string ->
+  ?file:string ->
+  ?json:bool ->
+  t ->
+  Process.t
+
+(** Run [octez-client sapling submit <file> from <alias-tz> using <sapling contract>]. *)
+val sapling_submit :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  file:string ->
+  alias_tz:string ->
+  sapling_contract:string ->
+  ?json:bool ->
+  t ->
+  unit Lwt.t
+
+(** Same as [sapling_submit], but do not wait for the process to exit. *)
+val spawn_sapling_submit :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  file:string ->
+  alias_tz:string ->
+  sapling_contract:string ->
+  ?json:bool ->
+  t ->
+  Process.t
 
 (** {2 High-Level Functions} *)
 

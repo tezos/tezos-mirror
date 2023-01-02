@@ -1350,6 +1350,12 @@ let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
   in
   Lwt.return (alias, res)
 
+let spawn_remember_contract ~alias ~address client =
+  spawn_command client ["remember"; "contract"; alias; address]
+
+let remember_contract ~alias ~address client =
+  spawn_remember_contract ~alias ~address client |> Process.check
+
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
@@ -2896,4 +2902,309 @@ let spawn_multiple_fa1_2_transfers ?burn_cap ~src ~transfers_json ?as_ client =
 
 let multiple_fa1_2_transfers ?burn_cap ~src ~transfers_json ?as_ client =
   spawn_multiple_fa1_2_transfers ?burn_cap ~src ~transfers_json ?as_ client
+  |> Process.check
+
+let spawn_sapling_gen_key ~name ?(force = false) ?(unencrypted = false) client =
+  spawn_command client
+  @@ ["sapling"; "gen"; "key"; name]
+  @ optional_switch "force" force
+  @ optional_switch "unencrypted" unencrypted
+
+let sapling_gen_key ~name ?force ?unencrypted client =
+  let* client_output =
+    spawn_sapling_gen_key ~name ?force ?unencrypted client
+    |> Process.check_and_read_stdout
+  in
+  let pattern =
+    rex
+      "It is important to save this mnemonic in a secure place:\n\n\
+       ([\\w\\s]+)\n\n\
+       The mnemonic"
+  in
+  match client_output =~* pattern with
+  | Some mnemonic ->
+      return
+        (mnemonic |> String.split_on_char '\n'
+        |> List.concat_map (String.split_on_char ' ')
+        |> List.map String.trim)
+  | None ->
+      Test.fail "[sapling_gen_key] Cannot parse client output: %S" client_output
+
+let spawn_sapling_use_key ~sapling_key ~contract ?memo_size client =
+  spawn_command client
+  @@ ["sapling"; "use"; "key"; sapling_key; "for"; "contract"; contract]
+  @ optional_arg "memo-size" string_of_int memo_size
+
+let sapling_use_key ~sapling_key ~contract ?memo_size client =
+  spawn_sapling_use_key ~sapling_key ~contract ?memo_size client
+  |> Process.check
+
+let spawn_sapling_import_key ~new_ ?(force = false) ?(unencrypted = false)
+    ?mnemonic client =
+  spawn_command client
+  @@ ["sapling"; "import"; "key"; new_]
+  @ optional_switch "force" force
+  @ optional_switch "unencrypted" unencrypted
+  @ optional_arg "mnemonic" (String.concat " ") mnemonic
+
+let sapling_import_key ~new_ ?force ?unencrypted ?mnemonic client =
+  spawn_sapling_import_key ~new_ ?force ?unencrypted ?mnemonic client
+  |> Process.check
+
+let spawn_sapling_derive_key ~new_ ~name ~child_index ?(force = false)
+    ?for_contract ?(unencrypted = false) ?memo_size client =
+  spawn_command client
+  @@ [
+       "sapling";
+       "derive";
+       "key";
+       new_;
+       "from";
+       name;
+       "at";
+       "index";
+       string_of_int child_index;
+     ]
+  @ optional_switch "force" force
+  @ optional_arg "for-contract" Fun.id for_contract
+  @ optional_switch "unencrypted" unencrypted
+  @ optional_arg "memo-size" string_of_int memo_size
+
+let sapling_derive_key ~new_ ~name ~child_index ?force ?for_contract
+    ?unencrypted ?memo_size client =
+  let* client_output =
+    spawn_sapling_derive_key
+      ~new_
+      ~name
+      ~child_index
+      ?force
+      ?for_contract
+      ?unencrypted
+      ?memo_size
+      client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "with path (\\S+)" with
+  | Some path -> return path
+  | None ->
+      Test.fail
+        "[sapling_derive_key] Cannot parse client output: %S"
+        client_output
+
+let spawn_sapling_gen_address ~name ?address_index client =
+  spawn_command client
+  @@ ["sapling"; "gen"; "address"; name]
+  @ optional_arg "address-index" string_of_int address_index
+
+let sapling_gen_address ~name ?address_index client =
+  let* client_output =
+    spawn_sapling_gen_address ~name ?address_index client
+    |> Process.check_and_read_stdout
+  in
+  let address, index =
+    match
+      ( client_output =~* rex ".*?(zet1\\w{65}.*)",
+        client_output =~* rex "at index (\\d+)" )
+    with
+    | Some address, Some index -> (address, int_of_string index)
+    | _ ->
+        Test.fail
+          "[sapling_gen_address] Cannot parse client output: %S"
+          client_output
+  in
+  return (address, index)
+
+let spawn_sapling_export_key ~name ~file client =
+  spawn_command client @@ ["sapling"; "export"; "key"; name; "in"; file]
+
+let sapling_export_key ~name ~file client =
+  spawn_sapling_export_key ~name ~file client |> Process.check
+
+let spawn_sapling_get_balance ~sapling_key ~contract ?(verbose = false) client =
+  spawn_command client
+  @@ [
+       "sapling";
+       "get";
+       "balance";
+       "for";
+       sapling_key;
+       "in";
+       "contract";
+       contract;
+     ]
+  @ optional_switch "verbose" verbose
+
+let sapling_get_balance ~sapling_key ~contract ?verbose client =
+  let* client_output =
+    spawn_sapling_get_balance ~sapling_key ~contract ?verbose client
+    |> Process.check_and_read_stdout
+  in
+  match client_output =~* rex "Total Sapling funds ?(\\d*)ꜩ" with
+  | Some balance -> return (Tez.parse_floating balance)
+  | None ->
+      Test.fail
+        "[sapling_get_balance] Cannot parse client output: %S"
+        client_output
+
+let spawn_sapling_list_keys client =
+  spawn_command client @@ ["sapling"; "list"; "keys"]
+
+let sapling_list_keys client =
+  let* client_output =
+    spawn_sapling_list_keys client |> Process.check_and_read_stdout
+  in
+  return (client_output |> String.trim |> String.split_on_char '\n')
+
+(* These regexs only work from protocol J, before there is no field
+   `storage fees`. *)
+let sapling_extract_balance_diff_and_fees ~sapling_contract client_output =
+  let fees =
+    let re = ".*fees.* \\.* \\+ꜩ?(\\d*[.\\d*]*)" in
+    let res = matches client_output (rex re) in
+    List.map Tez.parse_floating res |> List.fold_left Tez.( + ) Tez.zero
+  in
+  let amount_pos =
+    let re = sapling_contract ^ ".*\\+ꜩ?(\\d*[.\\d*]*)" in
+    match matches client_output (rex re) with
+    | [s] -> Tez.parse_floating s
+    | _ -> Tez.zero
+  in
+  let amount_neg =
+    let re = sapling_contract ^ ".*\\-ꜩ?(\\d*[.\\d*]*)" in
+    match matches client_output (rex re) with
+    | [s] -> Tez.parse_floating s
+    | _ -> Tez.zero
+  in
+  (Tez.(amount_pos - amount_neg), fees)
+
+let spawn_sapling_shield ?(wait = "none") ?burn_cap ~qty ~src_tz ~dst_sap
+    ~sapling_contract ?message client =
+  spawn_command client
+  @@ [
+       "--wait";
+       wait;
+       "sapling";
+       "shield";
+       Tez.to_string qty;
+       "from";
+       src_tz;
+       "to";
+       dst_sap;
+       "using";
+       sapling_contract;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "message" Fun.id message
+
+let sapling_shield ?wait ?burn_cap ~qty ~src_tz ~dst_sap ~sapling_contract
+    ?message client =
+  let* client_output =
+    spawn_sapling_shield
+      ?wait
+      ?burn_cap
+      ~qty
+      ~src_tz
+      ~dst_sap
+      ~sapling_contract
+      ?message
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (sapling_extract_balance_diff_and_fees ~sapling_contract client_output)
+
+let spawn_sapling_unshield ?(wait = "none") ?burn_cap ~qty ~src_sap ~dst_tz
+    ~sapling_contract client =
+  spawn_command client
+  @@ [
+       "--wait";
+       wait;
+       "sapling";
+       "unshield";
+       Tez.to_string qty;
+       "from";
+       src_sap;
+       "to";
+       dst_tz;
+       "using";
+       sapling_contract;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let sapling_unshield ?wait ?burn_cap ~qty ~src_sap ~dst_tz ~sapling_contract
+    client =
+  let* client_output =
+    spawn_sapling_unshield
+      ?wait
+      ?burn_cap
+      ~qty
+      ~src_sap
+      ~dst_tz
+      ~sapling_contract
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (sapling_extract_balance_diff_and_fees ~sapling_contract client_output)
+
+let spawn_sapling_forge_transaction ?(wait = "none") ?burn_cap ~qty ~src_sap
+    ~dst_sap ~sapling_contract ?file ?(json = false) client =
+  spawn_command client
+  @@ [
+       "--wait";
+       wait;
+       "sapling";
+       "forge";
+       "transaction";
+       Tez.to_string qty;
+       "from";
+       src_sap;
+       "to";
+       dst_sap;
+       "using";
+       sapling_contract;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "file" Fun.id file
+  @ optional_switch "json" json
+
+let sapling_forge_transaction ?wait ?burn_cap ~qty ~src_sap ~dst_sap
+    ~sapling_contract ?file ?json client =
+  spawn_sapling_forge_transaction
+    ?wait
+    ?burn_cap
+    ~qty
+    ~src_sap
+    ~dst_sap
+    ~sapling_contract
+    ?file
+    ?json
+    client
+  |> Process.check
+
+let spawn_sapling_submit ?(wait = "none") ?burn_cap ~file ~alias_tz
+    ~sapling_contract ?(json = false) client =
+  spawn_command client
+  @@ [
+       "--wait";
+       wait;
+       "sapling";
+       "submit";
+       file;
+       "from";
+       alias_tz;
+       "using";
+       sapling_contract;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_switch "json" json
+
+let sapling_submit ?wait ?burn_cap ~file ~alias_tz ~sapling_contract ?json
+    client =
+  spawn_sapling_submit
+    ?wait
+    ?burn_cap
+    ~file
+    ~alias_tz
+    ~sapling_contract
+    ?json
+    client
   |> Process.check
