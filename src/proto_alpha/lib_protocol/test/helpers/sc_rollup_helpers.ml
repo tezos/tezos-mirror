@@ -632,6 +632,12 @@ let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
     ~origination_proof
 
+let latest_level_proof inbox =
+  Sc_rollup.Inbox.Internal_for_tests.level_proof_of_history_proof
+  @@ Sc_rollup.Inbox.old_levels_messages inbox
+
+let latest_level_proof_hash inbox = (latest_level_proof inbox).hash
+
 module Node_inbox = struct
   type t = {
     inbox : Sc_rollup.Inbox.t;
@@ -719,6 +725,24 @@ module Node_inbox = struct
          ~get_history:(get_history history)
          inbox_snapshot
          (level, message_counter)
+
+  let produce_and_expose_proof node_inbox node_inbox_snapshot
+      (level, message_counter) =
+    let open Lwt_result_syntax in
+    let* proof, input =
+      produce_proof node_inbox node_inbox_snapshot (level, message_counter)
+    in
+    let exposed_proof = Sc_rollup.Inbox.Internal_for_tests.expose_proof proof in
+    return (exposed_proof, input)
+
+  let produce_payloads_proof {payloads_histories; _}
+      (head_cell_hash : Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t)
+      message_counter =
+    Lwt.map Environment.wrap_tzresult
+    @@ Sc_rollup.Inbox.Internal_for_tests.produce_payloads_proof
+         (get_payloads_history payloads_histories)
+         head_cell_hash
+         ~index:message_counter
 
   let produce_inclusion_proof {history; _} inbox_snapshot level =
     Lwt.map Environment.wrap_tzresult

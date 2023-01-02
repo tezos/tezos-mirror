@@ -3267,7 +3267,7 @@ module Sc_rollup : sig
 
     type t = Internal of internal_inbox_message | External of string
 
-    type serialized
+    type serialized = private string
 
     val encoding : t Data_encoding.t
 
@@ -3290,6 +3290,8 @@ module Sc_rollup : sig
     type t
 
     val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
 
     val equal : t -> t -> bool
 
@@ -3320,6 +3322,8 @@ module Sc_rollup : sig
       History.t -> t -> Inbox_message.serialized -> (History.t * t) tzresult
 
     type proof = private t list
+
+    val pp_proof : Format.formatter -> proof -> unit
 
     val proof_encoding : proof Data_encoding.t
 
@@ -3522,6 +3526,10 @@ module Sc_rollup : sig
       }
 
       val level_proof_of_history_proof : history_proof -> level_proof
+
+      val expose_proof : proof -> inclusion_proof * payloads_proof
+
+      val make_proof : inclusion_proof -> payloads_proof -> proof
     end
 
     val add_external_messages : context -> string list -> context tzresult Lwt.t
