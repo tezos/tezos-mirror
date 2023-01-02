@@ -531,18 +531,20 @@ let pp_invoke_step_kont out = function
         reveal
         base_destination
         max_bytes
-  | Inv_stop {code = vs, es; fresh_frame} ->
+  | Inv_stop {code = vs, es; fresh_frame; remaining_ticks} ->
       Format.fprintf
         out
         "%@[<v 2>Inv_stop {values = %a;@;\
          instructions = %a;@;\
-         fresh_frame = %a}@]"
+         fresh_frame = %a;@;\
+         remaining_ticks = %s}@]"
         (pp_vector Values.pp_value)
         vs
         (pp_vector pp_admin_instr)
         es
         (pp_opt pp_frame_stack)
         fresh_frame
+        (Z.to_string remaining_ticks)
 
 let pp_label_step_kont out = function
   | Eval.LS_Start label_kont ->

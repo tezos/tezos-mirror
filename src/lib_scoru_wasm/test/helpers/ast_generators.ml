@@ -788,8 +788,9 @@ let inv_reveal_tick ~module_reg =
 let inv_stop_gen ~module_reg =
   let* vs = small_vector_gen value_gen in
   let* es = small_vector_gen (admin_instr_gen ~module_reg) in
-  let+ fresh_frame = option (ongoing_frame_stack_gen ~module_reg) in
-  Eval.Inv_stop {code = (vs, es); fresh_frame}
+  let* fresh_frame = option (ongoing_frame_stack_gen ~module_reg) in
+  let+ remaining_ticks = map Z.of_int small_nat in
+  Eval.Inv_stop {code = (vs, es); fresh_frame; remaining_ticks}
 
 let invoke_step_gen ~module_reg =
   oneof

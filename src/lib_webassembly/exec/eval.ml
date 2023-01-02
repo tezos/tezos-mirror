@@ -363,7 +363,11 @@ type invoke_step_kont =
       max_bytes : int32;
       code : code;
     }
-  | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+  | Inv_stop of {
+      code : code;
+      fresh_frame : ongoing frame_stack option;
+      remaining_ticks : Z.t;
+    }
 
 let vector_pop_map v f at =
   if 1l <= Vector.num_elements v then
@@ -506,8 +510,12 @@ let vmtake n vs = match n with Some n -> Vector.split vs n |> fst | None -> vs
 
 let invoke_step ~init ?(durable = Durable_storage.empty)
     (module_reg : module_reg) c buffers frame at = function
-  | Inv_stop _ ->
+  | Inv_stop {remaining_ticks; _} when remaining_ticks <= Z.zero ->
       raise (Evaluation_step_error (Invoke_step "Inv_stop cannot reduce"))
+  | Inv_stop stop ->
+      Lwt.return
+        ( durable,
+          Inv_stop {stop with remaining_ticks = Z.pred stop.remaining_ticks} )
   | Inv_start {func; code = vs, es} -> (
       let (FuncType (ins, out)) = func_type_of func in
       let n1, n2 =
@@ -541,7 +549,7 @@ let invoke_step ~init ?(durable = Durable_storage.empty)
               in
               match host_func with
               | Host_func f ->
-                  let+ durable, res =
+                  let+ durable, res, remaining_ticks =
                     f
                       buffers.input
                       buffers.output
@@ -550,7 +558,9 @@ let invoke_step ~init ?(durable = Durable_storage.empty)
                       args
                   in
                   let vs' = Vector.prepend_list res vs' in
-                  (durable, Inv_stop {code = (vs', es); fresh_frame = None})
+                  ( durable,
+                    Inv_stop
+                      {code = (vs', es); fresh_frame = None; remaining_ticks} )
               | Reveal_func f -> (
                   let* result = f available_memories args in
                   match result with
@@ -569,7 +579,12 @@ let invoke_step ~init ?(durable = Durable_storage.empty)
                       let vs' = Vector.prepend_list [err_code] vs' in
                       Lwt.return
                         ( durable,
-                          Inv_stop {code = (vs', es); fresh_frame = None} )))
+                          Inv_stop
+                            {
+                              code = (vs', es);
+                              fresh_frame = None;
+                              remaining_ticks = Z.zero;
+                            } )))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
       {
@@ -648,6 +663,7 @@ let invoke_step ~init ?(durable = Durable_storage.empty)
                                 (From_block (f.it.body, 0l) @@ f.at) );
                         };
                   };
+              remaining_ticks = Z.zero;
             } )
   | Inv_reveal_tick _ ->
       (* This is a reveal tick, not an evaluation tick. The PVM should
@@ -1451,7 +1467,9 @@ let label_step :
   | LS_Consolidate_top (label', tick, es', stack) ->
       let+ tick = concat_step tick in
       (durable, LS_Consolidate_top (label', tick, es', stack))
-  | LS_Craft_frame (Label_stack (label, stack), Inv_stop {code; fresh_frame}) ->
+  | LS_Craft_frame
+      (Label_stack (label, stack), Inv_stop {code; fresh_frame; remaining_ticks})
+    when remaining_ticks <= Z.zero ->
       let label_kont = Label_stack ({label with label_code = code}, stack) in
       Lwt.return
         ( durable,
@@ -1589,6 +1607,8 @@ let reveal_step reveal module_reg payload =
       in
       let vs, es = inv.code in
       let vs = Vector.cons (Num (I32 bytes_count)) vs in
+      (* This value should be benchmarked *)
+      let ticks_to_consume = Z.zero in
       {
         config with
         step_kont =
@@ -1596,7 +1616,13 @@ let reveal_step reveal module_reg payload =
             ( frame,
               top,
               LS_Craft_frame
-                (label, Inv_stop {code = (vs, es); fresh_frame = None}) );
+                ( label,
+                  Inv_stop
+                    {
+                      code = (vs, es);
+                      fresh_frame = None;
+                      remaining_ticks = ticks_to_consume;
+                    } ) );
       }
   | _ -> raise (Reveal_error Reveal_step)
 

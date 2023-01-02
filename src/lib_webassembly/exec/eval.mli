@@ -123,7 +123,11 @@ type invoke_step_kont =
       max_bytes : int32;
       code : code;
     }
-  | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+  | Inv_stop of {
+      code : code;
+      fresh_frame : ongoing frame_stack option;
+      remaining_ticks : Z.t;
+    }
 
 type label_step_kont =
   | LS_Start : ongoing label_kont -> label_step_kont

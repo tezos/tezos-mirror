@@ -595,6 +595,8 @@ module Aux = struct
   include Make (Memory_access_interpreter)
 end
 
+let default_ticks = Z.zero
+
 let value i = Values.(Num (I32 i))
 
 let read_input_type =
@@ -620,7 +622,7 @@ let read_input =
           let* x =
             Aux.read_input ~input_buffer ~memory ~info_addr ~dst ~max_bytes
           in
-          Lwt.return (durable, [value x])
+          Lwt.return (durable, [value x], default_ticks)
       | _ -> raise Bad_input)
 
 let write_output_name = "tezos_write_output"
@@ -640,7 +642,7 @@ let write_output =
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
           let* memory = retrieve_memory memories in
           let* x = Aux.write_output ~output_buffer ~memory ~src ~num_bytes in
-          Lwt.return (durable, [value x])
+          Lwt.return (durable, [value x], default_ticks)
       | _ -> raise Bad_input)
 
 let write_debug_name = "tezos_write_debug"
@@ -666,7 +668,7 @@ let write_debug ~implem =
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
           let+ () = run ~memory ~src ~num_bytes in
-          (durable, [])
+          (durable, [], default_ticks)
       | _ -> raise Bad_input)
 
 let store_has_name = "tezos_store_has"
@@ -692,7 +694,7 @@ let store_has =
               ~key_offset
               ~key_length
           in
-          (durable, [value r])
+          (durable, [value r], default_ticks)
       | _ -> raise Bad_input)
 
 let store_delete_name = "tezos_store_delete"
@@ -718,7 +720,7 @@ let store_delete =
               ~key_offset
               ~key_length
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], default_ticks)
       | _ -> raise Bad_input)
 
 let store_value_size_name = "tezos_store_value_size"
@@ -746,7 +748,7 @@ let store_value_size =
               ~key_offset
               ~key_length
           in
-          (durable, [value res])
+          (durable, [value res], default_ticks)
       | _ -> raise Bad_input)
 
 let store_list_size_name = "tezos_store_list_size"
@@ -773,7 +775,9 @@ let store_list_size =
               ~key_offset
               ~key_length
           in
-          (Durable.to_storage durable, [Values.(Num (I64 result))])
+          ( Durable.to_storage durable,
+            [Values.(Num (I64 result))],
+            default_ticks )
       | _ -> raise Bad_input)
 
 let store_get_nth_key_name = "tezos_store_get_nth_key_list"
@@ -817,7 +821,7 @@ let store_get_nth_key =
               ~dst
               ~max_size
           in
-          (durable, [value result])
+          (durable, [value result], default_ticks)
       | _ -> raise Bad_input)
 
 let store_copy_name = "tezos_store_copy"
@@ -853,7 +857,7 @@ let store_copy =
               ~to_key_offset
               ~to_key_length
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], default_ticks)
       | _ -> raise Bad_input)
 
 let store_move_name = "tezos_store_move"
@@ -889,7 +893,7 @@ let store_move =
               ~to_key_offset
               ~to_key_length
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], default_ticks)
       | _ -> raise Bad_input)
 
 let store_read_name = "tezos_store_read"
@@ -932,7 +936,7 @@ let store_read =
               ~dest
               ~max_bytes
           in
-          (durable, [value len])
+          (durable, [value len], default_ticks)
       | _ -> raise Bad_input)
 
 let reveal_preimage_name = "tezos_reveal_preimage"
@@ -1025,7 +1029,7 @@ let store_write =
               ~src
               ~num_bytes
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], default_ticks)
       | _ -> raise Bad_input)
 
 let lookup_opt name =
