@@ -96,7 +96,7 @@ let read_input () =
       ~memory
       ~info_addr:4l
       ~dst:50l
-      ~max_bytes:36000l
+      ~max_bytes:3600l
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5l) ;
@@ -120,7 +120,7 @@ let read_input_no_messages () =
       ~memory
       ~info_addr:4l
       ~dst:50l
-      ~max_bytes:36000l
+      ~max_bytes:3600l
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 0l) ;
@@ -227,6 +227,74 @@ let test_write_input_beyond_memory_bounds () =
   let length = 100l in
   write_outside_bounds_doesnt_dequeue_gen 0l address length
 
+(* Note that this case should never happen, the size of messages in enforced by
+   the protocol. *)
+let test_read_input_too_big_payload () =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let message_size = Host_funcs.Aux.input_output_max_size * 2 in
+  let original_message = Bytes.make message_size 'a' in
+  let message =
+    {
+      Input_buffer.raw_level = 0l;
+      message_counter = Z.of_int 0;
+      payload = original_message;
+    }
+  in
+  let* () = Input_buffer.enqueue input_buffer message in
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~memory
+      ~info_addr:0l
+      ~dst:10l
+      ~max_bytes:(Int32.of_int Host_funcs.Aux.input_output_max_size)
+  in
+  assert (result = Int32.of_int Host_funcs.Aux.input_output_max_size) ;
+  let* message_in_memory = Partial_memory.load_bytes memory 10l message_size in
+  assert (not (Bytes.equal (Bytes.of_string message_in_memory) original_message)) ;
+  let expected_message = String.make Host_funcs.Aux.input_output_max_size 'a' in
+  assert (
+    String.equal
+      (String.sub message_in_memory 0 (Int32.to_int result))
+      expected_message) ;
+  return_ok_unit
+
+let test_read_input_max_size_above_limit () =
+  let open Lwt_syntax in
+  let lim = Types.(MemoryType {min = 1l; max = Some 2l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let message_size = Host_funcs.Aux.input_output_max_size * 2 in
+  let original_message = Bytes.make message_size 'a' in
+  let message =
+    {
+      Input_buffer.raw_level = 0l;
+      message_counter = Z.of_int 0;
+      payload = original_message;
+    }
+  in
+  let* () = Input_buffer.enqueue input_buffer message in
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~memory
+      ~info_addr:0l
+      ~dst:10l
+      ~max_bytes:(Int32.of_int message_size)
+  in
+  assert (result = Int32.of_int Host_funcs.Aux.input_output_max_size) ;
+  let* message_in_memory = Partial_memory.load_bytes memory 10l message_size in
+  assert (not (Bytes.equal (Bytes.of_string message_in_memory) original_message)) ;
+  let expected_message = String.make Host_funcs.Aux.input_output_max_size 'a' in
+  assert (
+    String.equal
+      (String.sub message_in_memory 0 (Int32.to_int result))
+      expected_message) ;
+  return_ok_unit
+
 let tests =
   [
     tztest "Write input" `Quick write_input;
@@ -249,4 +317,12 @@ let tests =
       "Write input beyond memory bounds doesn't dequeue the input"
       `Quick
       test_write_input_beyond_memory_bounds;
+    tztest
+      "Payload bigger than max size constant are truncated"
+      `Quick
+      test_read_input_too_big_payload;
+    tztest
+      "Payload bigger and expected max size constant are truncated"
+      `Quick
+      test_read_input_max_size_above_limit;
   ]
