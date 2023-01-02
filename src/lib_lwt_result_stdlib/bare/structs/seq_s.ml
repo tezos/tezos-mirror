@@ -30,7 +30,7 @@ open Monad
    shadow it when needed. *)
 open Lwt_syntax
 
-type +'a node = Nil | Cons of 'a * 'a t
+type +'a node = 'a Lwt_seq.node = Nil | Cons of 'a * 'a t
 
 and 'a t = unit -> 'a node Lwt.t
 
