@@ -439,7 +439,9 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let*? found_old_levels_messages =
     Environment.wrap_tzresult
-    @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+    @@ Inbox.Internal_for_tests.verify_inclusion_proof
+         proof
+         proto_inbox_snapshot
   in
   Assert.equal
     ~loc:__LOC__
@@ -471,7 +473,9 @@ let test_inclusion_proof_verification (payloads_per_levels, level) =
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let result =
     Environment.wrap_tzresult
-    @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+    @@ Inbox.Internal_for_tests.verify_inclusion_proof
+         proof
+         proto_inbox_snapshot
   in
   assert_inbox_proof_error "invalid inclusion proof" result
 

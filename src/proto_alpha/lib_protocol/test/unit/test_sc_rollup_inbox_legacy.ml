@@ -451,8 +451,14 @@ let test_inclusion_proofs_depending_on_history_capacity
          "Should not be able to get inbox inclusion proofs without a history \
           (i.e., a history with no capacity). ")
   in
-  let*? hp1'' = verify_inclusion_proof ip1 hp1 |> Environment.wrap_tzresult in
-  let*? hp2'' = verify_inclusion_proof ip2 hp2 |> Environment.wrap_tzresult in
+  let*? hp1'' =
+    I.Internal_for_tests.verify_inclusion_proof ip1 hp1
+    |> Environment.wrap_tzresult
+  in
+  let*? hp2'' =
+    I.Internal_for_tests.verify_inclusion_proof ip2 hp2
+    |> Environment.wrap_tzresult
+  in
   fail_unless
     (hp1' = hp1'' && hp2' = hp2'' && hp1' = hp2')
     (err "Inclusion proofs are expected to be valid.")

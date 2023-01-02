@@ -385,8 +385,7 @@ let inclusion_proof_encoding =
   let open Data_encoding in
   list history_proof_encoding
 
-let pp_inclusion_proof fmt proof =
-  Format.pp_print_list pp_history_proof fmt proof
+let pp_inclusion_proof = Format.pp_print_list pp_history_proof
 
 (* See the main docstring for this type (in the mli file) for
    definitions of the three proof parameters [starting_point],
@@ -408,11 +407,7 @@ let pp_inclusion_proof fmt proof =
 type proof = {inclusion_proof : inclusion_proof; message_proof : payloads_proof}
 
 let pp_proof fmt {inclusion_proof; message_proof = _} =
-  Format.fprintf
-    fmt
-    "inclusion proof: %a@"
-    (Format.pp_print_list pp_history_proof)
-    inclusion_proof
+  Format.fprintf fmt "inclusion proof: %a@" pp_inclusion_proof inclusion_proof
 
 let proof_encoding =
   let open Data_encoding in
@@ -817,13 +812,35 @@ let genesis ~predecessor_timestamp ~predecessor level =
   return {level; old_levels_messages = Skip_list.genesis level_proof}
 
 module Internal_for_tests = struct
+  type nonrec inclusion_proof = inclusion_proof
+
+  let pp_inclusion_proof = pp_inclusion_proof
+
   let produce_inclusion_proof = produce_inclusion_proof
+
+  let verify_inclusion_proof = verify_inclusion_proof
 
   let serialized_proof_of_string x = x
 
   let get_level_of_history_proof (history_proof : history_proof) =
     let ({level; _} : level_proof) = Skip_list.content history_proof in
     level
+
+  type nonrec payloads_proof = payloads_proof = {
+    proof : Sc_rollup_inbox_merkelized_payload_hashes_repr.proof;
+    payload : Sc_rollup_inbox_message_repr.serialized option;
+  }
+
+  let produce_payloads_proof = produce_payloads_proof
+
+  let verify_payloads_proof = verify_payloads_proof
+
+  type nonrec level_proof = level_proof = {
+    hash : Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t;
+    level : Raw_level_repr.t;
+  }
+
+  let level_proof_of_history_proof = Skip_list.content
 end
 
 type inbox = t
