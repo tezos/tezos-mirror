@@ -60,6 +60,36 @@ end
 module DAC = struct
   module Hash_storage = Dac_preimage_data_manager.Reveal_hash
 
+  let hash_to_hex hash =
+    let (`Hex hash) =
+      Hex.of_string
+      @@ Data_encoding.Binary.to_string_exn
+           Protocol.Sc_rollup_reveal_hash.encoding
+           hash
+    in
+    hash
+
+  let hash_of_hex hex =
+    let open Option_syntax in
+    let* hash = Hex.to_bytes (`Hex hex) in
+    Data_encoding.Binary.of_bytes_opt
+      Protocol.Sc_rollup_reveal_hash.encoding
+      hash
+
+  (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
+     encoding over b58check encoding for JSON. *)
+  let root_hash_encoding =
+    let binary = Protocol.Sc_rollup_reveal_hash.encoding in
+    Data_encoding.(
+      splitted
+        ~binary
+        ~json:
+          (conv_with_guard
+             hash_to_hex
+             (fun str ->
+               Result.of_option ~error:"Not a valid hash" (hash_of_hex str))
+             (string Plain)))
+
   let store_preimage_request_encoding =
     Data_encoding.(
       obj2

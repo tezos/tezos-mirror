@@ -126,9 +126,9 @@ module Make (Hashing_scheme : REVEAL_HASH) = struct
     let bytes_to_sign =
       Data_encoding.Binary.to_bytes_opt Hashing_scheme.encoding root_hash
     in
-    let b58_root_hash = Hashing_scheme.to_b58check root_hash in
+    let root_hash = Hashing_scheme.to_hex root_hash in
     match bytes_to_sign with
-    | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes b58_root_hash
+    | None -> tzfail @@ Cannot_convert_root_page_hash_to_bytes root_hash
     | Some bytes_to_sign -> (
         let* rev_indexed_signatures =
           rev_collect_indexed_signatures cctxt dac_sk_uris bytes_to_sign
@@ -140,7 +140,7 @@ module Make (Hashing_scheme : REVEAL_HASH) = struct
           Tezos_crypto.Aggregate_signature.aggregate_signature_opt signatures
         in
         match final_signature with
-        | None -> tzfail @@ Cannot_compute_aggregate_signature b58_root_hash
+        | None -> tzfail @@ Cannot_compute_aggregate_signature root_hash
         | Some signature -> return @@ (signature, witnesses))
 
   let verify ~public_keys_opt root_page_hash signature witnesses =
@@ -152,7 +152,7 @@ module Make (Hashing_scheme : REVEAL_HASH) = struct
     | None ->
         tzfail
         @@ Cannot_convert_root_page_hash_to_bytes
-             (Hashing_scheme.to_b58check root_page_hash)
+             (Hashing_scheme.to_hex root_page_hash)
     | Some bytes ->
         let* pk_msg_list =
           public_keys_opt
@@ -165,7 +165,7 @@ module Make (Hashing_scheme : REVEAL_HASH) = struct
                      if is_witness then
                        tzfail
                        @@ Public_key_for_witness_not_available
-                            (i, Hashing_scheme.to_b58check root_page_hash)
+                            (i, Hashing_scheme.to_hex root_page_hash)
                      else return None
                  | Some public_key ->
                      if is_witness then return @@ Some (public_key, None, bytes)

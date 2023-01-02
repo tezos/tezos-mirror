@@ -102,6 +102,21 @@ let () =
       | Merkle_tree_branching_factor_not_high_enough -> Some () | _ -> None)
     (fun () -> Merkle_tree_branching_factor_not_high_enough)
 
+module Sc_rollup_reveal_hash_extended = struct
+  include Sc_rollup_reveal_hash
+
+  let scheme = Sc_rollup_reveal_hash.Blake2B
+
+  let to_hex hash =
+    let (`Hex hash) =
+      Hex.of_string
+      @@ Data_encoding.Binary.to_string_exn
+           Protocol.Sc_rollup_reveal_hash.encoding
+           hash
+    in
+    hash
+end
+
 (** Encoding of DAC payload as a Merkle tree with an arbitrary branching
     factor greater or equal to 2. The serialization process works as follows:
     {ul
@@ -175,8 +190,6 @@ module Merkle_tree = struct
     let hash_encoding = Hashing_scheme.encoding
 
     let hashes_encoding = Data_encoding.list hash_encoding
-
-    let to_b58check = Hashing_scheme.to_b58check
 
     (* The preamble of a serialized page contains 1 byte denoting the version,
        and 4 bytes encoding the size of the rest of the page. In total, 5
@@ -370,11 +383,7 @@ module Merkle_tree = struct
 
   module V0 =
     Make
-      (struct
-        include Sc_rollup_reveal_hash
-
-        let scheme = Sc_rollup_reveal_hash.Blake2B
-      end)
+      (Sc_rollup_reveal_hash_extended)
       (Make_version (struct
         (* Cntents_version_tag used in contents pages is 0. *)
         let contents_version = 0
@@ -451,11 +460,7 @@ module Hash_chain = struct
 
   module V0 =
     Make
-      (struct
-        include Sc_rollup_reveal_hash
-
-        let scheme = Sc_rollup_reveal_hash.Blake2B
-      end)
+      (Sc_rollup_reveal_hash_extended)
       (struct
         type h = Sc_rollup_reveal_hash.t
 

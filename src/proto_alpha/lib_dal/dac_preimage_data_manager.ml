@@ -44,7 +44,9 @@ let () =
 module type REVEAL_HASH = module type of Sc_rollup_reveal_hash
 
 module Make (Hash : REVEAL_HASH) = struct
-  let path data_dir hash = Filename.(concat data_dir @@ Hash.to_b58check hash)
+  let path data_dir hash =
+    let hash = Hash.to_hex hash in
+    Filename.(concat data_dir hash)
 
   let save_bytes data_dir hash page_contents =
     let open Lwt_result_syntax in
@@ -55,7 +57,7 @@ module Make (Hash : REVEAL_HASH) = struct
     in
     match result with
     | Ok () -> return ()
-    | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_b58check hash)
+    | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_hex hash)
 end
 
 module Reveal_hash = Make (Sc_rollup_reveal_hash)

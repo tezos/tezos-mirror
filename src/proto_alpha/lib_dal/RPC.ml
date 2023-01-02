@@ -66,10 +66,26 @@ module DAC = struct
         (req "payload" Data_encoding.(bytes Hex))
         (req "pagination_scheme" Dac_pages_encoding.pagination_scheme_encoding))
 
+  (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
+     encoding over b58check encoding for JSON. *)
+  let root_hash_encoding =
+    let binary = Protocol.Sc_rollup_reveal_hash.encoding in
+    Data_encoding.(
+      splitted
+        ~binary
+        ~json:
+          (conv_with_guard
+             Protocol.Sc_rollup_reveal_hash.to_hex
+             (fun str ->
+               Result.of_option
+                 ~error:"Not a valid hash"
+                 (Protocol.Sc_rollup_reveal_hash.of_hex str))
+             (string Plain)))
+
   let store_preimage_response_encoding =
     Data_encoding.(
       obj2
-        (req "root_hash" Protocol.Sc_rollup_reveal_hash.encoding)
+        (req "root_hash" root_hash_encoding)
         (req "external_message" (bytes Hex)))
 
   let external_message_query =

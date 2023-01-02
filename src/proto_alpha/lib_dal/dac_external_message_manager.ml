@@ -98,7 +98,7 @@ struct
     | Error _ ->
         error
         @@ Could_not_serialize_rollup_external_message
-             (Hashing_scheme.to_b58check root_hash)
+             (Hashing_scheme.to_hex root_hash)
 
   let of_bytes encoded_message =
     Data_encoding.Binary.of_bytes_opt dac_message_encoding encoded_message

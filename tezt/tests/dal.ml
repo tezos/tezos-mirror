@@ -1657,7 +1657,7 @@ let test_dal_node_handles_dac_store_preimage_merkle_V0 _protocol dal_node
      [Tezos_dal_alpha.Dac_pages_encoding.Merkle_tree.V0.serialize_payload "test"].
   *)
   let expected_rh =
-    "scrrh13xwafZc5revvm5mittZFsBWb8ynFdH7ZRwpgUzCbtCCZo2orjs"
+    "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
   in
   check_valid_root_hash expected_rh actual_rh ;
   let filename =
@@ -1696,7 +1696,7 @@ let test_dal_node_handles_dac_store_preimage_hash_chain_V0 _protocol dal_node
      [Tezos_dal_alpha.Dac_pages_encoding.Hash_chain.V0.serialize_payload "test"].
   *)
   let expected_rh =
-    "scrrh13qW2L3g9ubEMjvWj5Rk2eqknXDsvnkZKVErFsavKTaFLgRgsXe"
+    "00928b20366943e2afd11ebc0eae2e53a93bf177a4fcf35bcc64d503704e65e202"
   in
   check_valid_root_hash expected_rh actual_rh ;
   let filename =
@@ -1747,7 +1747,7 @@ let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
          ~pagination_scheme:"Hash_chain_V0")
   in
   let expected_rh =
-    "scrrh144gSwSgX2cSw3v8p9h5rf6L6Ryvx4ewEhBDhkz7ErY9EChS47a"
+    "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428e7aa3"
   in
   check_valid_root_hash expected_rh actual_rh ;
   let* () =
@@ -1789,7 +1789,7 @@ let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
          ~pagination_scheme:"Hash_chain_V0")
   in
   let errorneous_hash =
-    "scrrh144gSwSgX2cSw3v8p9h5rf6L6Ryvx4ewEhBDhkz7ErY9EChS47a"
+    "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
   in
   let* genesis_info =
     RPC.Client.call ~hooks client
