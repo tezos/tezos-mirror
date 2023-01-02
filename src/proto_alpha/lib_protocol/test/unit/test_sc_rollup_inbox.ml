@@ -48,6 +48,30 @@ let assert_equal_payload ~__LOC__ found (expected : Message.serialized) =
     (Message.unsafe_to_string expected)
     (Message.unsafe_to_string found)
 
+let assert_equal_payload_option ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    (Option.equal (fun v1 v2 ->
+         String.equal
+           (Message.unsafe_to_string v1)
+           (Message.unsafe_to_string v2)))
+    "Input returned by the production is not the expected one"
+    (Format.pp_print_option
+       ~none:(fun fmt () -> Format.pp_print_string fmt "None")
+       (fun fmt v ->
+         Format.fprintf fmt "Some \"%s\"" (Message.unsafe_to_string v)))
+    found
+    expected
+
+let assert_inbox_message ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    (Option.equal Sc_rollup.inbox_message_equal)
+    "Input returns by the production is not the expected one"
+    (Format.pp_print_option Sc_rollup.pp_inbox_message)
+    found
+    expected
+
 let assert_equal_payload_hash ~__LOC__ found expected =
   Assert.equal
     ~loc:__LOC__
@@ -72,15 +96,24 @@ let assert_equal_merkelized_payload ~__LOC__ ~found ~expected =
   assert_merkelized_payload ~__LOC__ ~payload_hash ~index found
 
 let assert_merkelized_payload_proof_error ~__LOC__ expected_msg result =
-  Assert.error ~loc:__LOC__ result (function
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
       | Environment.Ecoproto_error
           (Sc_rollup_inbox_merkelized_payload_hashes_repr
            .Merkelized_payload_hashes_proof_error msg) ->
           expected_msg = msg
       | _ -> false)
 
-let assert_inbox_proof_error ?(loc = __LOC__) expected_msg result =
-  Assert.error ~loc result (function
+let assert_equal_history_proof ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    Inbox.equal_history_proof
+    "history_proof are not equal"
+    Inbox.pp_history_proof
+    expected
+    found
+
+let assert_inbox_proof_error ~__LOC__ expected_msg result =
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
       | Environment.Ecoproto_error (Sc_rollup_inbox_repr.Inbox_proof_error msg)
         ->
           expected_msg = msg
@@ -217,6 +250,17 @@ module Node_inbox = struct
         payloads_per_levels
     in
     return {inbox; payloads_histories; history}
+
+  let produce_proof {payloads_histories; history; _} inbox_snapshot
+      (level, message_counter) =
+    Lwt.map Environment.wrap_tzresult
+    @@ Inbox.produce_proof
+         ~get_payloads_history:
+           (Sc_rollup_helpers.get_payloads_history payloads_histories)
+         ~get_history:(fun hash ->
+           Lwt.return @@ Inbox.History.find hash history)
+         inbox_snapshot
+         (level, message_counter)
 end
 
 module Protocol_inbox = struct
@@ -407,9 +451,7 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
     make_proof @@ prefix @ suffix
   in
   let assert_fails ~__LOC__ proof =
-    let res =
-      Environment.wrap_tzresult @@ Merkelized_payload_hashes.verify_proof proof
-    in
+    let res = Merkelized_payload_hashes.verify_proof proof in
     assert_merkelized_payload_proof_error ~__LOC__ "invalid proof" res
   in
   let* () = assert_fails ~__LOC__ proof_with_missing_cell in
@@ -437,19 +479,16 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
     Protocol_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
-  let*? found_old_levels_messages =
+  let*? verified_old_levels_messages =
     Environment.wrap_tzresult
     @@ Inbox.Internal_for_tests.verify_inclusion_proof
          proof
          proto_inbox_snapshot
   in
-  Assert.equal
-    ~loc:__LOC__
-    Inbox.equal_history_proof
-    "snapshot is the same in the proto and node"
-    Inbox.pp_history_proof
+  assert_equal_history_proof
+    ~__LOC__
+    verified_old_levels_messages
     node_old_level_messages
-    found_old_levels_messages
 
 let test_inclusion_proof_verification (payloads_per_levels, level) =
   let open Lwt_result_wrap_syntax in
@@ -472,12 +511,9 @@ let test_inclusion_proof_verification (payloads_per_levels, level) =
      added an empty level. *)
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let result =
-    Environment.wrap_tzresult
-    @@ Inbox.Internal_for_tests.verify_inclusion_proof
-         proof
-         proto_inbox_snapshot
+    Inbox.Internal_for_tests.verify_inclusion_proof proof proto_inbox_snapshot
   in
-  assert_inbox_proof_error "invalid inclusion proof" result
+  assert_inbox_proof_error ~__LOC__ "invalid inclusion proof" result
 
 let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
   let open Lwt_result_wrap_syntax in
@@ -490,11 +526,9 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
     Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
   let node_inbox_snapshot = Inbox.take_snapshot node_inbox.inbox in
-  let*@ proof, input =
-    Inbox.produce_proof
-      ~get_payloads_history:
-        (Sc_rollup_helpers.get_payloads_history node_inbox.payloads_histories)
-      ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
+  let* proof, input_of_produced_proof =
+    Node_inbox.produce_proof
+      node_inbox
       node_inbox_snapshot
       (level, message_counter)
   in
@@ -505,34 +539,16 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let* () =
-    Assert.equal
-      ~loc:__LOC__
-      Inbox.equal_history_proof
-      "snapshot is the same in the proto and node"
-      Inbox.pp_history_proof
-      node_inbox_snapshot
-      proto_inbox_snapshot
+    assert_equal_history_proof ~__LOC__ node_inbox_snapshot proto_inbox_snapshot
   in
-  let*? v_input =
+  let*? input_in_proof =
     Environment.wrap_tzresult
     @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
   in
   let* () =
-    Assert.equal
-      ~loc:__LOC__
-      (Option.equal Sc_rollup.inbox_message_equal)
-      "Input returns by the production is the expected one."
-      (Format.pp_print_option Sc_rollup.pp_inbox_message)
-      input
-      v_input
+    assert_inbox_message ~__LOC__ input_of_produced_proof input_in_proof
   in
-  Assert.equal
-    ~loc:__LOC__
-    (Option.equal Sc_rollup.inbox_message_equal)
-    "Input returns by the verification is the expected one."
-    (Format.pp_print_option Sc_rollup.pp_inbox_message)
-    exp_message
-    v_input
+  assert_inbox_message ~__LOC__ exp_message input_in_proof
 
 let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
     =
@@ -542,14 +558,10 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   let*? node_inbox =
     Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
-  let get_payloads_history =
-    Sc_rollup_helpers.get_payloads_history node_inbox.payloads_histories
-  in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
-  let*@ proof, _input =
-    Inbox.produce_proof
-      ~get_payloads_history
-      ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
+  let* proof, _input =
+    Node_inbox.produce_proof
+      node_inbox
       node_inbox_snapshot
       (level, message_counter)
   in
@@ -567,14 +579,13 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   in
   let* () =
     let result =
-      Environment.wrap_tzresult
-      @@ Inbox.verify_proof
-           (level, invalid_message_counter)
-           proto_inbox_snapshot
-           proof
+      Inbox.verify_proof
+        (level, invalid_message_counter)
+        proto_inbox_snapshot
+        proof
     in
     assert_inbox_proof_error
-      ~loc:__LOC__
+      ~__LOC__
       "found index in message_proof is incorrect"
       result
   in
@@ -584,10 +595,9 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let* () =
     let result =
-      Environment.wrap_tzresult
-      @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
+      Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
     in
-    assert_inbox_proof_error ~loc:__LOC__ "invalid inclusion proof" result
+    assert_inbox_proof_error ~__LOC__ "invalid inclusion proof" result
   in
 
   return_unit
@@ -643,12 +653,14 @@ let merkelized_payload_hashes_tests =
   [
     Tztest.tztest_qcheck2
       ~count:1000
-      ~name:"Merkelized messages: Add messages then retrieve them from history."
+      ~name:
+        "Add payloads to merkelized payload hashes then retrieve them from \
+         history."
       (gen_payloads ())
       test_merkelized_payload_hashes_history;
     Tztest.tztest_qcheck2
       ~count:1000
-      ~name:"Merkelized messages: Produce proof and verify its validity."
+      ~name:"Produce a merkelized payload hashes proof and verify its validity."
       (gen_payloads_and_index ())
       test_merkelized_payload_hashes_proof;
     Tztest.tztest_qcheck2

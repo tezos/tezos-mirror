@@ -376,8 +376,15 @@ let wrap_messages ?(predecessor_timestamp = Timestamp.of_seconds 0L)
   let inputs = make_inputs predecessor_timestamp predecessor messages level in
   {payloads; predecessor_timestamp; predecessor; messages; level; inputs}
 
-let make_empty_level ?predecessor_timestamp ?predecessor level =
-  wrap_messages ?predecessor_timestamp ?predecessor level []
+(** An empty inbox level is a SOL,info_per_level and EOL. *)
+let make_empty_level ?predecessor_timestamp ?predecessor inbox_level =
+  wrap_messages ?predecessor_timestamp ?predecessor inbox_level []
+
+let gen_messages inbox_level gen_message =
+  let open QCheck2.Gen in
+  let* input = gen_message in
+  let* inputs = small_list gen_message in
+  return (wrap_messages inbox_level (input :: inputs))
 
 let gen_payloads_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
@@ -394,13 +401,7 @@ let gen_payloads_for_levels ~start_level ~max_level gen_message =
         let* empty_level = bool in
         let* level_messages =
           if empty_level then return (make_empty_level inbox_level)
-          else
-            let* messages =
-              let* input = gen_message in
-              let* inputs = small_list gen_message in
-              return (input :: inputs)
-            in
-            return (wrap_messages inbox_level messages)
+          else gen_messages inbox_level gen_message
         in
         aux (level_messages :: acc) (n - 1)
   in
