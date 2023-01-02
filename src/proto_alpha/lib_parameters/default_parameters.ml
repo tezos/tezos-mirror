@@ -57,6 +57,25 @@ let sc_rollup_max_outbox_messages_per_level = 100
 *)
 let sc_rollup_timeout_period_in_blocks = 40_320
 
+(** We want to allow a max lookahead in blocks of 4 weeks, so the rollup
+    can still move forward even if its impossible to cement commitments.
+
+    As there is a challenge window of 2 weeks, and because the maximum
+    duration of a game is 2 weeks, the hypothetical maximum time
+    to cement a block is a month, (4 * 60 * 24 * 30).
+
+    Be careful, this constant has an impact of the maximum cost of
+    a rollup on the storage:
+    [maximum_cost_in_storage =
+       (sc_rollup_max_lookahead_in_blocks / commitment_period) *
+       max_commitment_storage_size_in_bytes *
+       cost_per_byte]
+
+    With the current values:
+    [maximum_cost_in_storage = 348.3 tez]
+*)
+let sc_rollup_max_lookahead_in_blocks = 172_800l
+
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
 
    Think harder about those values. *)
@@ -222,7 +241,7 @@ let constants_mainnet =
          (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
             The following constants need to be refined. *)
          stake_amount = Tez.of_mutez_exn 10_000_000_000L;
-         max_lookahead_in_blocks = 30_000l;
+         max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
          max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
          max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
          (* The default number of required sections in a dissection *)
