@@ -1032,7 +1032,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             stake_amount = c.sc_rollup.stake_amount;
             commitment_period_in_blocks = 60;
             max_lookahead_in_blocks = 172_800l;
-            max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
+            max_active_outbox_levels = 80_640l;
             max_outbox_messages_per_level =
               c.sc_rollup.max_outbox_messages_per_level;
             number_of_sections_in_dissection =
