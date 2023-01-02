@@ -238,8 +238,6 @@ let constants_mainnet =
          origination_size = 6_314;
          challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
          commitment_period_in_blocks;
-         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-            The following constants need to be refined. *)
          stake_amount = Tez.of_mutez_exn 10_000_000_000L;
          max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
          max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
