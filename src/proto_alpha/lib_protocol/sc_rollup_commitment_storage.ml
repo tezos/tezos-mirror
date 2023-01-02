@@ -80,11 +80,6 @@ let get_predecessor_opt_unsafe ctxt rollup node =
   let* commitment, ctxt = get_commitment_opt_unsafe ctxt rollup node in
   return (Option.map (fun (c : Commitment.t) -> c.predecessor) commitment, ctxt)
 
-let get_predecessor_unsafe ctxt rollup node =
-  let open Lwt_result_syntax in
-  let* commitment, ctxt = get_commitment_unsafe ctxt rollup node in
-  return (commitment.predecessor, ctxt)
-
 let check_if_commitments_are_related ctxt rollup ~descendant ~ancestor =
   let open Lwt_result_syntax in
   let rec aux ctxt current_commitment_hash =

@@ -71,7 +71,6 @@ module Sc_rollup = struct
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests
-      include Sc_rollup_inbox_storage.Internal_for_tests
     end
   end
 

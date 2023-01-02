@@ -59,17 +59,3 @@ val add_info_per_level :
 (** [finalize_inbox_level ctxt] ends the internal representation for the block.
 *)
 val finalize_inbox_level : Raw_context.t -> Raw_context.t Lwt.t
-
-(**/**)
-
-module Internal_for_tests : sig
-  (** Push a [Start_of_level] internal inbox message in the inbox. *)
-  val add_start_of_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-  (** Push a [End_of_level] internal inbox message in the inbox. *)
-  val add_end_of_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-  (** Push a [Info_per_level] internal inbox message in the inbox. *)
-  val add_info_per_level :
-    Raw_context.t -> Time.t -> Block_hash.t -> Raw_context.t tzresult Lwt.t
-end

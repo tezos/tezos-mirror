@@ -839,13 +839,6 @@ let validity_second_final_move ~pvm ~dal_parameters ~dal_attestation_lag
     ~start_chunk:agreed_start_chunk
     ~stop_chunk:refuted_stop_chunk
 
-let loser_of_results ~alice_result ~bob_result =
-  match (alice_result, bob_result) with
-  | true, true -> None
-  | false, false -> None
-  | false, true -> Some Alice
-  | true, false -> Some Bob
-
 let cost_play ~step ~choice =
   match step with
   | Dissection states ->

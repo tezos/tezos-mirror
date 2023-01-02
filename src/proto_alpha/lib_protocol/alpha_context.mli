@@ -3423,8 +3423,6 @@ module Sc_rollup : sig
 
     val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
 
-    val number_of_proof_steps : inclusion_proof -> int
-
     val verify_inclusion_proof :
       inclusion_proof -> history_proof -> history_proof tzresult
 
@@ -3476,13 +3474,6 @@ module Sc_rollup : sig
         (inclusion_proof * history_proof) tzresult Lwt.t
 
       val serialized_proof_of_string : string -> serialized_proof
-
-      val add_start_of_level : context -> context tzresult Lwt.t
-
-      val add_end_of_level : context -> context tzresult Lwt.t
-
-      val add_info_per_level :
-        context -> Time.t -> Block_hash.t -> context tzresult Lwt.t
     end
 
     val add_external_messages : context -> string list -> context tzresult Lwt.t
@@ -4025,8 +4016,6 @@ module Sc_rollup : sig
     val pp_status : Format.formatter -> status -> unit
 
     val status_encoding : status Data_encoding.t
-
-    val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
     val initial :
       Inbox.history_proof ->

@@ -382,8 +382,6 @@ let inclusion_proof_encoding =
 let pp_inclusion_proof fmt proof =
   Format.pp_print_list pp_history_proof fmt proof
 
-let number_of_proof_steps proof = List.length proof
-
 (* See the main docstring for this type (in the mli file) for
    definitions of the three proof parameters [starting_point],
    [message] and [snapshot]. In the below we deconstruct

@@ -201,17 +201,3 @@ let init_inbox ~predecessor ctxt =
           pp_trace
           err) ;
       return ctxt
-
-module Internal_for_tests = struct
-  let add_start_of_level ctxt =
-    add_internal_message ctxt Sc_rollup_inbox_message_repr.Start_of_level
-
-  let add_end_of_level ctxt =
-    add_internal_message ctxt Sc_rollup_inbox_message_repr.End_of_level
-
-  let add_info_per_level ctxt predecessor_timestamp predecessor =
-    add_internal_message
-      ctxt
-      (Sc_rollup_inbox_message_repr.Info_per_level
-         {predecessor_timestamp; predecessor})
-end

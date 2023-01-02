@@ -211,16 +211,6 @@ val get_predecessor_opt_unsafe :
   Commitment_hash.t ->
   (Commitment_hash.t Option.t * Raw_context.t) tzresult Lwt.t
 
-(** [get_predecessor_unsafe ctxt rollup commitment_hash] returns the [rollup]
-    commitment predecessor of [commitment_hash] in the [ctxt]. It is unsafe
-    as the current commitment is retrived using {!get_commitment_unsafe}.
-    It does not check for the existence of the [rollup]. *)
-val get_predecessor_unsafe :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  Commitment_hash.t ->
-  (Commitment_hash.t * Raw_context.t) tzresult Lwt.t
-
 (** [check_if_commitments_are_related ~descendant ~ancestor] checks whether a
     commitment with hash [~ancestor] exists as a predecessor of [~descendant],
     among the list of commitments stored for [rollup] in [ctxt]. *)
