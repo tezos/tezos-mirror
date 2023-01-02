@@ -29,10 +29,11 @@ open Protocol.Alpha_context
 
 let tx_rollup_finality_period = 40_000
 
-(** The challenge window is about a week with 30s block-time (604800s / 30s).
+(** The challenge window is about two weeks with 15s block-time,
+    (4 * 60 * 24 * 14).
     WARNING: changing this value also impacts
     [sc_rollup_max_active_outbox_levels]. See below. *)
-let sc_rollup_challenge_window_in_blocks = 20_160
+let sc_rollup_challenge_window_in_blocks = 80_640
 
 (** Number of active levels kept for executing outbox messages.
 
