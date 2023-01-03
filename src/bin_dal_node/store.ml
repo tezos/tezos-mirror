@@ -254,6 +254,12 @@ module Legacy = struct
 
   let decode_commitment = Cryptobox.Commitment.of_b58check_opt
 
+  let encode_header_status =
+    Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
+
+  let decode_header_status =
+    Data_encoding.Binary.of_string_opt Services.Types.header_status_encoding
+
   let decode_slot_id =
     Data_encoding.Binary.of_string_exn Services.Types.slot_id_encoding
 
@@ -298,15 +304,14 @@ module Legacy = struct
               ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
               slots_store
               status_path
-              (Services.Types.header_attestation_status_to_string
-                 `Waiting_for_attestations)
+              (encode_header_status `Waiting_attestation)
         | Dal_plugin.Failed ->
             let path = Path.Level.other_header_status index commitment in
             set
               ~msg:(Path.to_string ~prefix:"add_slot_headers:" path)
               slots_store
               path
-              (Services.Types.header_status_to_string `Not_selected))
+              (encode_header_status `Not_selected))
       slot_headers
 
   let update_slot_headers_attestation ~published_level ~number_of_slots store
@@ -314,9 +319,8 @@ module Legacy = struct
     let open Lwt_syntax in
     let module S = Set.Make (Int) in
     let attested = List.fold_left (fun s e -> S.add e s) S.empty attested in
-    let to_str = Services.Types.header_attestation_status_to_string in
-    let attested_str = to_str `Attested in
-    let unattested_str = to_str `Unattested in
+    let attested_str = encode_header_status `Attested in
+    let unattested_str = encode_header_status `Unattested in
     List.iter_s
       (fun slot_index ->
         let index = Services.Types.{slot_level = published_level; slot_index} in
@@ -407,12 +411,7 @@ module Legacy = struct
               match status_opt with
               | None -> return acc
               | Some status_str -> (
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4466
-                     Use more compact encodings to reduce allocated storage. *)
-                  match
-                    Services.Types.header_attestation_status_of_string
-                      status_str
-                  with
+                  match decode_header_status status_str with
                   | None -> failwith "Attestation status decoding failed"
                   | Some status ->
                       return
@@ -435,7 +434,7 @@ module Legacy = struct
         match status_opt with
         | None -> return acc
         | Some status_str -> (
-            match Services.Types.header_status_of_string status_str with
+            match decode_header_status status_str with
             | None -> failwith "Attestation status decoding failed"
             | Some status ->
                 return @@ ({Services.Types.slot_id; commitment; status} :: acc)))
@@ -452,6 +451,6 @@ module Legacy = struct
     (* Retrieve the headers that haven't been "accepted" on L1. *)
     let* accu = get_other_headers_of_commitment commitment indices store [] in
     (* Retrieve the headers that have "accepted" on L1 (i.e. with
-       [`Waiting_for_attestation], [`Attested] or [`Unattested] statuses). *)
+       [`Waiting_attestation], [`Attested] or [`Unattested] statuses). *)
     get_accepted_headers_of_commitment commitment indices store accu
 end

@@ -45,10 +45,8 @@ module Types = struct
   (* Declaration of types used as inputs and/or outputs. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
-  type header_attestation_status =
-    [`Waiting_for_attestations | `Attested | `Unattested]
-
-  type header_status = [`Not_selected | `Unseen | header_attestation_status]
+  type header_status =
+    [`Waiting_attestation | `Attested | `Unattested | `Not_selected | `Unseen]
 
   type slot_header = {
     slot_id : slot_id;
@@ -61,32 +59,6 @@ module Types = struct
   type profile = Attestor of Tezos_crypto.Signature.public_key_hash
 
   (* Auxiliary functions.  *)
-
-  let header_attestation_statuses =
-    [`Waiting_for_attestations; `Attested; `Unattested]
-
-  let header_attestation_status_to_string = function
-    | `Waiting_for_attestations -> "waiting_for_attestations"
-    | `Attested -> "attested"
-    | `Unattested -> "unattested"
-
-  let header_attestation_status_of_string = function
-    | "waiting_for_attestations" -> Some `Waiting_for_attestations
-    | "attested" -> Some `Attested
-    | "unattested" -> Some `Unattested
-    | _ -> None
-
-  let header_statuses = `Not_selected :: `Unseen :: header_attestation_statuses
-
-  let header_status_to_string = function
-    | `Not_selected -> "not_selected"
-    | `Unseen -> "unseen"
-    | #header_attestation_status as e -> header_attestation_status_to_string e
-
-  let header_status_of_string = function
-    | "not_selected" -> Some `Not_selected
-    | "unseen" -> Some `Unseen
-    | s -> header_attestation_status_of_string s
 
   (* Encodings associated  to the types. *)
 
@@ -101,10 +73,41 @@ module Types = struct
 
   let slot_encoding = Data_encoding.bytes
 
-  let header_status_encoding =
+  let header_status_encoding : header_status Data_encoding.t =
     let open Data_encoding in
-    string_enum
-      (List.map (fun t -> (header_status_to_string t, t)) header_statuses)
+    union
+      [
+        case
+          ~title:"waiting_attestation"
+          (Tag 0)
+          (obj1 (req "status" (constant "waiting_attestation")))
+          (function `Waiting_attestation -> Some () | _ -> None)
+          (function () -> `Waiting_attestation);
+        case
+          ~title:"attested"
+          (Tag 1)
+          (obj1 (req "status" (constant "attested")))
+          (function `Attested -> Some () | _ -> None)
+          (function () -> `Attested);
+        case
+          ~title:"unattested"
+          (Tag 2)
+          (obj1 (req "status" (constant "unattested")))
+          (function `Unattested -> Some () | _ -> None)
+          (function () -> `Unattested);
+        case
+          ~title:"not_selected"
+          (Tag 3)
+          (obj1 (req "status" (constant "not_selected")))
+          (function `Not_selected -> Some () | _ -> None)
+          (function () -> `Not_selected);
+        case
+          ~title:"unseen"
+          (Tag 4)
+          (obj1 (req "status" (constant "unseen")))
+          (function `Unseen -> Some () | _ -> None)
+          (function () -> `Unseen);
+      ]
 
   let slot_header_encoding =
     let open Data_encoding in
@@ -113,9 +116,9 @@ module Types = struct
       (fun (slot_id, (commitment, status)) -> {slot_id; commitment; status})
       (merge_objs
          slot_id_encoding
-         (obj2
-            (req "commitment" Cryptobox.Commitment.encoding)
-            (req "status" header_status_encoding)))
+         (merge_objs
+            (obj1 (req "commitment" Cryptobox.Commitment.encoding))
+            header_status_encoding))
 
   let equal_profile (Attestor p1) (Attestor p2) =
     Tezos_crypto.Signature.Public_key_hash.( = ) p1 p2
