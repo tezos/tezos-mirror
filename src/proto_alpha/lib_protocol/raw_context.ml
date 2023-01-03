@@ -1622,7 +1622,7 @@ module Dal = struct
       ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
         .number_of_shards
     in
-    Dal_attestation_repr.Accountability.is_slot_available
+    Dal_attestation_repr.Accountability.is_slot_attested
       ctxt.back.dal_attestation_slot_accountability
       ~threshold
       ~number_of_shards

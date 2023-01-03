@@ -136,7 +136,7 @@ module Accountability = struct
             else bitset)
       shard_bitset_per_slot
 
-  let is_slot_available shard_bitset_per_slot ~threshold ~number_of_shards index
+  let is_slot_attested shard_bitset_per_slot ~threshold ~number_of_shards index
       =
     match List.nth shard_bitset_per_slot (Dal_slot_index_repr.to_int index) with
     | None -> false
