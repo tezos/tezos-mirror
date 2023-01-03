@@ -63,12 +63,15 @@ module Test = struct
         assert (Bytes.equal msg decoded_msg) ;
         let comm = Cryptobox.commit t p in
         let shard_proofs = Cryptobox.prove_shards t p in
+        let shard_index = Random.int number_of_shards in
         match
-          Seq.find (fun ({index; _} : Cryptobox.shard) -> index = 0) enc_shards
+          Seq.find
+            (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
+            enc_shards
         with
         | None -> Ok ()
         | Some shard ->
-            let check = Cryptobox.verify_shard t comm shard shard_proofs.(0) in
+            let check = Cryptobox.verify_shard t comm shard shard_proofs.(shard_index) in
             assert check ;
             let pi = Cryptobox.prove_commitment t p in
             let check = Cryptobox.verify_commitment t comm pi in
