@@ -243,7 +243,8 @@ module Aux = struct
       payload:bytes ->
       int32 Lwt.t
 
-    val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
+    val read_mem_for_debug :
+      memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
 
     val write_debug :
       implem:Builtins.write_debug ->
@@ -559,32 +560,19 @@ module Aux = struct
       in
       extract_error_code res
 
-    let read_mem ~memory ~src ~num_bytes =
+    let read_mem_for_debug ~memory ~src ~num_bytes =
       let open Lwt.Syntax in
-      let mem_size = I32.of_int_s @@ I64.to_int_s @@ M.bound memory in
       let get_error_message = function
         | err -> Printf.sprintf "Error code: %ld" @@ Error.code err
       in
-      let+ result =
-        if src < mem_size then
-          let truncated =
-            Int32.(src |> sub (min (add src num_bytes) mem_size))
-          in
-          let int_len =
-            assert (num_bytes > 0l) ;
-            assert (num_bytes < Int32.max_int) ;
-            Int32.to_int truncated
-          in
-          M.load_bytes memory src int_len
-        else Lwt_result.return ""
-      in
+      let+ result = M.load_bytes memory src (I32.to_int_u num_bytes) in
       Result.fold ~ok:Fun.id ~error:get_error_message result
 
     let write_debug_impl ~memory:_ ~src:_ ~num_bytes:_ = Lwt.return_unit
 
     let alternate_write_debug_impl ~f ~memory ~src ~num_bytes =
       let open Lwt.Syntax in
-      let* result = read_mem ~memory ~src ~num_bytes in
+      let* result = read_mem_for_debug ~memory ~src ~num_bytes in
       f result
 
     let write_debug ~implem =
