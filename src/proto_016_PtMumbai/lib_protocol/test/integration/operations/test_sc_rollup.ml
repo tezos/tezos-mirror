@@ -1961,7 +1961,7 @@ let test_timeout () =
   in
   let* block = add_op block refute in
   let* pkh1_timeout, pkh2_timeout =
-    let+ timeout = Context.Sc_rollup.timeout (B block) rollup (pkh1, pkh2) in
+    let+ timeout = Context.Sc_rollup.timeout (B block) rollup pkh1 pkh2 in
     let timeout = WithExceptions.Option.get ~loc:__LOC__ timeout in
     if game_index.alice = pkh1 then (timeout.alice, timeout.bob)
     else (timeout.bob, timeout.alice)

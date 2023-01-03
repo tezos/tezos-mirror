@@ -3592,7 +3592,6 @@ let commands_rw () =
             (cctxt#chain, cctxt#block)
             rollup
             staker1
-            ()
         in
         let* alice, bob =
           let* answer =

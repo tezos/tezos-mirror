@@ -405,7 +405,7 @@ module Make (Interpreter : Interpreter.S) :
     let* _hash = Injector.add_pending_operation ~source timeout_operation in
     return_unit
 
-  let timeout_reached ~self head_block node_ctxt players =
+  let timeout_reached ~self head_block node_ctxt staker1 staker2 =
     let open Lwt_result_syntax in
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
     let* game_result =
@@ -413,8 +413,8 @@ module Make (Interpreter : Interpreter.S) :
         cctxt
         (cctxt#chain, head_block)
         rollup_address
-        players
-        ()
+        staker1
+        staker2
     in
     let open Sc_rollup.Game in
     match game_result with
@@ -425,13 +425,12 @@ module Make (Interpreter : Interpreter.S) :
 
   let play head_block node_ctxt self game staker1 staker2 =
     let open Lwt_result_syntax in
-    let players = (staker1, staker2) in
     let index = Sc_rollup.Game.Index.make staker1 staker2 in
     match turn ~self game index with
     | Our_turn {opponent} -> play_next_move node_ctxt game self opponent
     | Their_turn ->
         let* timeout_reached =
-          timeout_reached ~self head_block node_ctxt players
+          timeout_reached ~self head_block node_ctxt staker1 staker2
         in
         unless timeout_reached @@ fun () -> play_timeout node_ctxt self index
 
@@ -442,7 +441,6 @@ module Make (Interpreter : Interpreter.S) :
       (cctxt#chain, head_block)
       rollup_address
       self
-      ()
 
   let play_opening_move node_ctxt self conflict =
     let open Lwt_syntax in
@@ -459,7 +457,6 @@ module Make (Interpreter : Interpreter.S) :
         (cctxt#chain, head_block)
         rollup_address
         self
-        ()
     in
     let*! res = List.iter_es (play_opening_move node_ctxt self) conflicts in
     match res with

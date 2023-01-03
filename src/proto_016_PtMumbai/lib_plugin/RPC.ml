@@ -124,6 +124,20 @@ module Registration = struct
   let register2 ~chunked s f =
     register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
         f context a1 a2 q i)
+
+  let register3_fullctxt ~chunked s f =
+    patched_services :=
+      RPC_directory.register
+        ~chunked
+        !patched_services
+        s
+        (fun (((ctxt, arg1), arg2), arg3) q i ->
+          Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+          f ctxt arg1 arg2 arg3 q i)
+
+  let register3 ~chunked s f =
+    register3_fullctxt ~chunked s (fun {context; _} a1 a2 a3 q i ->
+        f context a1 a2 a3 q i)
 end
 
 let unparsing_mode_encoding =
@@ -2038,13 +2052,6 @@ module Sc_rollup = struct
           path_sc_rollup / "dal_slot_subscriptions" /: Raw_level.rpc_arg)
 
     let ongoing_refutation_games =
-      let query =
-        let open RPC_query in
-        query Sc_rollup.Staker.of_b58check_exn
-        |+ field "staker" RPC_arg.string "" (fun x ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output =
         Sc_rollup.(
           Data_encoding.(
@@ -2055,10 +2062,11 @@ module Sc_rollup = struct
                  (req "bob" Staker.encoding))))
       in
       RPC_service.get_service
-        ~description:"Ongoing refufation games for a given staker"
-        ~query
+        ~description:"Ongoing refutation games for a given staker"
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "games")
+        RPC_path.(
+          path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "games")
 
     let stakers_commitments =
       let output =
@@ -2078,74 +2086,47 @@ module Sc_rollup = struct
         RPC_path.(path_sc_rollup / "stakers_commitments")
 
     let conflicts =
-      let query =
-        let open RPC_query in
-        query Sc_rollup.Staker.of_b58check_exn
-        |+ field "staker" RPC_arg.string "" (fun x ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output =
         Sc_rollup.(Data_encoding.list Refutation_storage.conflict_encoding)
       in
       RPC_service.get_service
         ~description:"List of stakers in conflict with the given staker"
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "conflicts")
+        RPC_path.(
+          path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "conflicts")
 
     let timeout =
-      let query =
-        let open RPC_query in
-        query (fun x y ->
-            Sc_rollup.Staker.(of_b58check_exn x, of_b58check_exn y))
-        |+ field "staker1" RPC_arg.string "" (fun (x, _) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |+ field "staker2" RPC_arg.string "" (fun (_, x) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output = Data_encoding.option Sc_rollup.Game.timeout_encoding in
       RPC_service.get_service
         ~description:"Returns the timeout of players."
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "timeout")
+        RPC_path.(
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
+          /: Sc_rollup.Staker.rpc_arg / "timeout")
 
     let timeout_reached =
-      let query =
-        let open RPC_query in
-        query (fun x y ->
-            Sc_rollup.Staker.(of_b58check_exn x, of_b58check_exn y))
-        |+ field "staker1" RPC_arg.string "" (fun (x, _) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |+ field "staker2" RPC_arg.string "" (fun (_, x) ->
-               Format.asprintf "%a" Sc_rollup.Staker.pp x)
-        |> seal
-      in
       let output = Data_encoding.option Sc_rollup.Game.game_result_encoding in
       RPC_service.get_service
         ~description:
           "Returns whether the timeout creates a result for the game."
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "timeout_reached")
+        RPC_path.(
+          path_sc_rollup / "staker1" /: Sc_rollup.Staker.rpc_arg / "staker2"
+          /: Sc_rollup.Staker.rpc_arg / "timeout_reached")
 
     let can_be_cemented =
-      let query =
-        let open RPC_query in
-        query Sc_rollup.Commitment.Hash.of_b58check_exn
-        |+ field "commitment" RPC_arg.string "" (fun x ->
-               Format.asprintf "%a" Sc_rollup.Commitment.Hash.pp x)
-        |> seal
-      in
       let output = Data_encoding.bool in
       RPC_service.get_service
         ~description:
           "Returns true if and only if the provided commitment can be cemented."
-        ~query
+        ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "can_be_cemented")
+        RPC_path.(
+          path_sc_rollup / "commitment" /: Sc_rollup.Commitment.Hash.rpc_arg
+          / "can_be_cemented")
 
     let root =
       RPC_service.get_service
@@ -2234,10 +2215,10 @@ module Sc_rollup = struct
         Sc_rollup.list_unaccounted context)
 
   let register_ongoing_refutation_games () =
-    Registration.register1
+    Registration.register2
       ~chunked:false
       S.ongoing_refutation_games
-      (fun context rollup staker () ->
+      (fun context rollup staker () () ->
         let open Lwt_result_syntax in
         let open Sc_rollup.Game.Index in
         let open Sc_rollup.Refutation_storage in
@@ -2255,20 +2236,20 @@ module Sc_rollup = struct
         Sc_rollup.Storage.stakers_commitments_uncarbonated context rollup)
 
   let register_conflicts () =
-    Registration.register1
+    Registration.register2
       ~chunked:false
       S.conflicts
-      (fun context rollup staker () ->
+      (fun context rollup staker () () ->
         Sc_rollup.Refutation_storage.conflicting_stakers_uncarbonated
           context
           rollup
           staker)
 
   let register_timeout () =
-    Registration.register1
+    Registration.register3
       ~chunked:false
       S.timeout
-      (fun context rollup (staker1, staker2) () ->
+      (fun context rollup staker1 staker2 () () ->
         let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res =
@@ -2279,10 +2260,10 @@ module Sc_rollup = struct
         | Error _ -> return_none)
 
   let register_timeout_reached () =
-    Registration.register1
+    Registration.register3
       ~chunked:false
       S.timeout_reached
-      (fun context rollup (staker1, staker2) () ->
+      (fun context rollup staker1 staker2 () () ->
         let open Lwt_result_syntax in
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
@@ -2291,10 +2272,10 @@ module Sc_rollup = struct
         | Error _ -> return_none)
 
   let register_can_be_cemented () =
-    Registration.register1
+    Registration.register2
       ~chunked:false
       S.can_be_cemented
-      (fun context rollup commitment_hash () ->
+      (fun context rollup commitment_hash () () ->
         let open Lwt_result_syntax in
         let*! res =
           Sc_rollup.Stake_storage.cement_commitment
@@ -2347,27 +2328,31 @@ module Sc_rollup = struct
       ()
 
   let ongoing_refutation_games ctxt block sc_rollup_address staker =
-    RPC_context.make_call1
+    RPC_context.make_call2
       S.ongoing_refutation_games
       ctxt
       block
       sc_rollup_address
       staker
+      ()
+      ()
 
   let stakers_commitments ctxt rollup =
     RPC_context.make_call1 S.stakers_commitments ctxt rollup
 
   let conflicts ctxt block sc_rollup_address staker =
-    RPC_context.make_call1 S.conflicts ctxt block sc_rollup_address staker
+    RPC_context.make_call2 S.conflicts ctxt block sc_rollup_address staker () ()
 
   let timeout_reached ctxt block sc_rollup_address staker1 staker2 =
-    RPC_context.make_call1
+    RPC_context.make_call3
       S.timeout_reached
       ctxt
       block
       sc_rollup_address
       staker1
       staker2
+      ()
+      ()
 
   let initial_pvm_state_hash ctxt block sc_rollup_address =
     RPC_context.make_call1
@@ -2379,12 +2364,14 @@ module Sc_rollup = struct
       ()
 
   let can_be_cemented ctxt block sc_rollup_address commitment_hash =
-    RPC_context.make_call1
+    RPC_context.make_call2
       S.can_be_cemented
       ctxt
       block
       sc_rollup_address
       commitment_hash
+      ()
+      ()
 end
 
 module Dal = struct
