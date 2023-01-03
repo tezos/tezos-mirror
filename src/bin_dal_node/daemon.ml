@@ -189,13 +189,7 @@ module Handler = struct
       let* shards =
         RPC_server_legacy.shards_rpc n_cctxt slot_header downloaded_shard_ids
       in
-      let shards =
-        List.fold_left
-          (fun acc shard ->
-            Cryptobox.IntMap.add shard.Cryptobox.index shard.share acc)
-          Cryptobox.IntMap.empty
-          shards
-      in
+      let shards = List.to_seq shards in
       let* () =
         Slot_manager.save_shards
           (Node_context.get_store ctxt).shard_store

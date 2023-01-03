@@ -92,5 +92,5 @@ val save_shards :
   Cryptobox.commitment Lwt_watcher.input ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  Cryptobox.share Cryptobox.IntMap.t ->
+  Cryptobox.shard Seq.t ->
   unit tzresult Lwt.t

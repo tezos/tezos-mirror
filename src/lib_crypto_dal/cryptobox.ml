@@ -118,7 +118,6 @@ module Inner = struct
 
   (* Domains for the Fast Fourier Transform (FTT). *)
   module Domains = Bls12_381_polynomial.Domain
-  module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
 
   type slot = bytes
 
@@ -139,8 +138,6 @@ module Inner = struct
   type page = bytes
 
   type share = Scalar.t array
-
-  type _shards_map = share IntMap.t
 
   type shard = {index : int; share : share}
 
@@ -177,12 +174,6 @@ module Inner = struct
         (fun {index; share} -> (index, share))
         (fun (index, share) -> {index; share})
         (tup2 int31 share_encoding)
-
-    let shards_encoding =
-      conv
-        IntMap.bindings
-        (fun bindings -> IntMap.of_seq (List.to_seq bindings))
-        (list (tup2 int31 share_encoding))
 
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
@@ -509,49 +500,37 @@ module Inner = struct
   let shards_from_polynomial t p =
     let codeword = encode t p in
     let len_shard = t.n / t.number_of_shards in
-    let rec loop i map =
-      if i = t.number_of_shards then map
+    let rec loop index seq =
+      if index = t.number_of_shards then seq
       else
-        let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        let share = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
         for j = 0 to len_shard - 1 do
-          shard.(j) <- codeword.((t.number_of_shards * j) + i)
+          share.(j) <- codeword.((t.number_of_shards * j) + index)
         done ;
-        loop (i + 1) (IntMap.add i shard map)
+        loop (index + 1) (Seq.cons {index; share} seq)
     in
-    loop 0 IntMap.empty
+    loop 0 Seq.empty
 
   (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
   let compute_n t eval_a' shards =
     let w = Domains.get t.domain_n 1 in
     let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
-    let open Result_syntax in
-    let c = ref 0 in
-    let* () =
-      IntMap.iter_e
-        (fun z_i arr ->
-          if !c >= t.k then Ok ()
-          else
-            let rec loop j =
-              match j with
-              | j when j = Array.length arr -> Ok ()
-              | _ -> (
-                  let c_i = arr.(j) in
-                  let z_i = (t.number_of_shards * j) + z_i in
-                  let x_i = Scalar.pow w (Z.of_int z_i) in
-                  let tmp = Evaluations.get eval_a' z_i in
-                  Scalar.mul_inplace tmp tmp x_i ;
-                  match Scalar.inverse_exn_inplace tmp tmp with
-                  | exception _ -> Error (`Invert_zero "can't inverse element")
-                  | () ->
-                      Scalar.mul_inplace tmp tmp c_i ;
-                      n_poly.(z_i) <- tmp ;
-                      c := !c + 1 ;
-                      loop (j + 1))
-            in
-            loop 0)
-        shards
-    in
-    Ok n_poly
+    Seq.iter
+      (fun {index; share} ->
+        for j = 0 to Array.length share - 1 do
+          let c_i = share.(j) in
+          let z_i = (t.number_of_shards * j) + index in
+          let x_i = Scalar.pow w (Z.of_int z_i) in
+          let tmp = Evaluations.get eval_a' z_i in
+          Scalar.mul_inplace tmp tmp x_i ;
+          (* The call below never fails by construction, so we don't
+             catch exceptions *)
+          Scalar.inverse_exn_inplace tmp tmp ;
+          Scalar.mul_inplace tmp tmp c_i ;
+          n_poly.(z_i) <- tmp
+        done)
+      shards ;
+    n_poly
 
   let encoded_share_size t =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
@@ -560,8 +539,7 @@ module Inner = struct
     (share_scalar_len * Scalar.size_in_bytes) + 4
 
   let polynomial_from_shards t shards =
-    let open Result_syntax in
-    if t.k > IntMap.cardinal shards * t.shard_size then
+    if t.k > Seq.length shards * t.shard_size then
       Error
         (`Not_enough_shards
           (Printf.sprintf
@@ -591,31 +569,28 @@ module Inner = struct
          This also reduces the depth of the recursion tree of the poly_mul
          function from log(k) to log(number_of_shards), so that the decoding time
          reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
-      let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
-      let f1, f2 =
-        IntMap.bindings shards
+      let mul acc i =
+        Polynomials.mul_xn
+          acc
+          t.shard_size
+          (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)))
+      in
+
+      let partition_products seq =
+        Seq.fold_left
+          (fun (l, r) {index; _} -> (mul r index, l))
+          (Polynomials.one, Polynomials.one)
+          seq
+      in
+
+      let shards =
         (* We always consider the first k codeword vector components. *)
-        |> Tezos_stdlib.TzList.take_n (t.k / t.shard_size)
-        |> split
+        Seq.take (t.k / t.shard_size) shards
       in
-      let f11, f12 = split f1 in
-      let f21, f22 = split f2 in
 
-      let prod =
-        List.fold_left
-          (fun acc (i, _) ->
-            Polynomials.mul_xn
-              acc
-              t.shard_size
-              (Scalar.negate (Domains.get t.domain_n (i * t.shard_size))))
-          Polynomials.one
-      in
-      let p11 = prod f11 in
-      let p12 = prod f12 in
-      let p21 = prod f21 in
-      let p22 = prod f22 in
+      let p1, p2 = partition_products shards in
 
-      let a_poly = fft_mul t.domain_2k [p11; p12; p21; p22] in
+      let a_poly = fft_mul t.domain_2k [p1; p2] in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
@@ -624,7 +599,7 @@ module Inner = struct
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
       (* 4. Computing N(x). *)
-      let* n_poly = compute_n t eval_a' shards in
+      let n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
       let b = Evaluations.interpolation_fft2 t.domain_n n_poly in

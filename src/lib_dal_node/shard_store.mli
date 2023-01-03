@@ -46,10 +46,7 @@ val init : max_mutexes:int -> string -> t tzresult Lwt.t
 (** [write_shards store commitment shards] stores the set [shards] on [store]
     associated with [commitment]. In case of IO error, [Io_error] is returned. *)
 val write_shards :
-  t ->
-  Cryptobox.Commitment.t ->
-  Cryptobox.share Cryptobox.IntMap.t ->
-  unit tzresult Lwt.t
+  t -> Cryptobox.Commitment.t -> Cryptobox.shard Seq.t -> unit tzresult Lwt.t
 
 (** [read_shards ~share_size dal_constants store commitment] fetches the set of
     shards associated with [commitment] in [store]. The expected size of shards
@@ -58,7 +55,7 @@ val read_shards :
   share_size:int ->
   t ->
   Cryptobox.Commitment.t ->
-  Cryptobox.share Cryptobox.IntMap.t tzresult Lwt.t
+  Cryptobox.shard Seq.t tzresult Lwt.t
 
 (** [read_shard ~share_size store commitment shard_id] fetches the shard
     associated to [commitment] in [store] with id [shard_id]. In case of IO

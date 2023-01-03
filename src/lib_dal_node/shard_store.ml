@@ -106,8 +106,8 @@ let write_shards store commitment shards =
   let open Lwt_result_syntax in
   let commitment_dir = commitment_dir store commitment in
   let*! () = mkdir_if_not_exists commitment_dir in
-  shards |> Cryptobox.IntMap.to_seq
-  |> Seq.iter_es (fun (index, share) ->
+  shards
+  |> Seq.iter_es (fun ({index; share} : Cryptobox.shard) ->
          let filepath = Filename.concat commitment_dir (string_of_int index) in
          if Mutexes.mem store.mutexes filepath then return_unit
          else
@@ -166,7 +166,7 @@ let read_shards ~share_size store commitment =
     | Some shard_file ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4289
            handle error cases for [int_of_string] *)
-        let shard_index = int_of_string shard_file in
+        let index = int_of_string shard_file in
         let filepath = Filename.concat dir shard_file in
         let* share =
           read_share_from_disk
@@ -176,9 +176,9 @@ let read_shards ~share_size store commitment =
             ~share_size
             filepath
         in
-        read (Cryptobox.IntMap.add shard_index share acc)
+        read (Seq.cons ({index; share} : Cryptobox.shard) acc)
   in
-  read Cryptobox.IntMap.empty
+  read Seq.empty
 
 let read_shards_subset ~share_size store commitment shards =
   let open Lwt_result_syntax in

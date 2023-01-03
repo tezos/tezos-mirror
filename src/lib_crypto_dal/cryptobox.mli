@@ -93,8 +93,6 @@ module Commitment : sig
   val rpc_arg : commitment Resto.Arg.t
 end
 
-module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
-
 (** A slot is a byte sequence corresponding to some data. *)
 type slot = bytes
 
@@ -149,9 +147,6 @@ type shard = {index : int; share : share}
 (** An encoding of a share. *)
 val shard_encoding : shard Data_encoding.t
 
-(** An encoding for a map of shares. *)
-val shards_encoding : share IntMap.t Data_encoding.t
-
 (** [encoded_share_size t] returns the size of a share in byte depending on [t] *)
 val encoded_share_size : t -> int
 
@@ -163,12 +158,12 @@ val encoded_share_size : t -> int
      can be recomputed. *)
 val polynomial_from_shards :
   t ->
-  share IntMap.t ->
+  shard Seq.t ->
   (polynomial, [> `Invert_zero of string | `Not_enough_shards of string]) result
 
 (** [shards_from_polynomial t polynomial] computes all the shards
      encoding the original [polynomial]. *)
-val shards_from_polynomial : t -> polynomial -> share IntMap.t
+val shards_from_polynomial : t -> polynomial -> shard Seq.t
 
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
