@@ -942,6 +942,7 @@ let octez_stdlib_unix =
         octez_event_logging |> open_;
         octez_stdlib |> open_;
         data_encoding |> open_;
+        aches_lwt;
         lwt_unix;
         ipaddr_unix;
         re;

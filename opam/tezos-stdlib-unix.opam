@@ -15,6 +15,7 @@ depends: [
   "tezos-event-logging"
   "tezos-stdlib"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
   "lwt" { >= "5.6.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "re" { >= "1.9.0" }
