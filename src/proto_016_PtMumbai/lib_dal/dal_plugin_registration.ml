@@ -52,7 +52,7 @@ module Plugin = struct
         Dal_plugin.feature_enable;
         number_of_slots;
         attestation_lag;
-        availability_threshold;
+        attestation_threshold = availability_threshold;
         cryptobox_parameters;
         blocks_per_epoch =
           (* This is a protocol constant in future protocol. *)

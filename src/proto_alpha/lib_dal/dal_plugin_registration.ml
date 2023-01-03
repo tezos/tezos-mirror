@@ -42,7 +42,7 @@ module Plugin = struct
       Constants.Parametric.feature_enable;
       number_of_slots;
       attestation_lag;
-      availability_threshold;
+      attestation_threshold;
       cryptobox_parameters;
       blocks_per_epoch;
     } =
@@ -53,7 +53,7 @@ module Plugin = struct
         Dal_plugin.feature_enable;
         number_of_slots;
         attestation_lag;
-        availability_threshold;
+        attestation_threshold;
         cryptobox_parameters;
         blocks_per_epoch;
       }

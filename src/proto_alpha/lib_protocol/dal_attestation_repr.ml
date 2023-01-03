@@ -124,7 +124,7 @@ module Accountability = struct
       bitset
       shards
 
-  let record_shards_availability shard_bitset_per_slot attested_slots shards =
+  let record_attested_shards shard_bitset_per_slot attested_slots shards =
     List.mapi
       (fun slot bitset ->
         match Bitset.mem attested_slots slot with
@@ -136,7 +136,7 @@ module Accountability = struct
             else bitset)
       shard_bitset_per_slot
 
-  let is_slot_available shard_bitset_per_slot ~threshold ~number_of_shards index
+  let is_slot_attested shard_bitset_per_slot ~threshold ~number_of_shards index
       =
     match List.nth shard_bitset_per_slot (Dal_slot_index_repr.to_int index) with
     | None -> false

@@ -83,8 +83,7 @@ type shard_index = int
 
 module Shard_map : Map.S with type key = shard_index
 
-(** This module is used to record the various data-availability
-   attestations.
+(** This module is used to record the shard attestations.
 
    For each attestor, a list of shards is associated. For each
    attested slot (see {!type:t}) we record that those shards were
@@ -95,32 +94,32 @@ module Shard_map : Map.S with type key = shard_index
 module Accountability : sig
   type attested_slots = t
 
-  (** The data-structure used to record the shards-slots availability. *)
+  (** The data-structure used to record the shards attestations. *)
   type t
 
   (** DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3145
 
      Consider using the [Bounded] module. In particular, change the
-     semantics of [is_slot_available] accordingly. *)
+     semantics of [is_slot_attested] accordingly. *)
 
   (** [init ~length] initialises a new accountability data-structure
      with at most [length] slots and where for every slot, no shard is
      available. *)
   val init : length:int -> t
 
-  (** [record_shards_availability t slots shards] records that for all
-     slots declared available in [slots], shard indices in [shards]
-     are available. It is the responsibility of the caller to ensure
+  (** [record_attested_shards t slots shards] records that for all
+     slots declared available in [slots], the shard indices in [shards]
+     are deemed available. It is the responsibility of the caller to ensure
      the shard indices are positive numbers. A negative shard index is
      ignored. *)
-  val record_shards_availability : t -> attested_slots -> shard_index list -> t
+  val record_attested_shards : t -> attested_slots -> shard_index list -> t
 
-  (** [is_slot_available t ~threshold ~number_of_shards slot] returns
+  (** [is_slot_attested t ~threshold ~number_of_shards slot] returns
      [true] if the number of shards recorded in [t] for the [slot] is
      above the [threshold] with respect to the total number of shards
      specified by [number_of_shards]. Returns [false] otherwise or if
      the [index] is out of the interval [0;length] where [length] is
      the value provided to the [init] function. *)
-  val is_slot_available :
+  val is_slot_attested :
     t -> threshold:int -> number_of_shards:int -> Dal_slot_index_repr.t -> bool
 end
