@@ -1275,60 +1275,47 @@ module Chain = struct
   (* Hypothesis:
      \forall x. x \in current_head \union alternate_heads | new_head
      is not a predecessor of x *)
-  let locked_update_and_trim_alternate_heads chain_store chain_state
-      ~new_checkpoint ~new_head =
+  let locked_update_alternate_heads chain_store ~alternate_heads ~prev_head
+      ~new_head =
     let open Lwt_syntax in
-    let* prev_head_descr = Stored_data.get chain_state.current_head_data in
-    let* prev_alternate_heads =
-      Stored_data.get chain_state.alternate_heads_data
-    in
+    let prev_head_descr = Block.descriptor prev_head in
     let new_head_descr = Block.descriptor new_head in
-    let* b =
-      is_ancestor chain_store ~head:new_head_descr ~ancestor:prev_head_descr
+    let* is_prev_head_successor =
+      if Block_hash.(Block.predecessor new_head = fst prev_head_descr) then
+        Lwt.return_true
+      else
+        is_ancestor chain_store ~head:new_head_descr ~ancestor:prev_head_descr
     in
-    match b with
-    | true ->
-        (* If the new head is a successor of prev_head, do nothing
-           particular, just trim alternate heads which are anchored
-           below the checkpoint. *)
+    if is_prev_head_successor then Lwt.return alternate_heads
+    else
+      (* If the new head is not a successor of prev_head. *)
+      (* 2 cases:
+         - new_head is a new branch => not a successor of any alternate_heads;
+         - new_head is a successor of a previous alternate head. *)
+      let* filtered_alternate_heads =
         List.filter_s
           (fun alternate_head ->
-            is_ancestor
-              chain_store
-              ~head:alternate_head
-              ~ancestor:new_checkpoint)
-          prev_alternate_heads
-    | false ->
-        (* If the new head is not a successor of prev_head. *)
-        (* 2 cases:
-           - new_head is a new branch => not a successor of any alternate_heads;
-           - new_head is a successor of a previous alternate head. *)
-        let* filtered_alternate_heads =
-          List.filter_s
-            (fun alternate_head ->
-              let* b =
-                is_ancestor
-                  chain_store
-                  ~head:new_head_descr
-                  ~ancestor:alternate_head
-              in
-              match b with
-              | true ->
-                  (* If the new head is a successor of a former
-                     alternate_head, remove it from the alternate heads,
-                     it will be updated as the current head *)
-                  Lwt.return_false
-              | false ->
-                  (* Only retain alternate_heads that are successor of the
-                     new_checkpoint *)
-                  is_ancestor
-                    chain_store
-                    ~head:alternate_head
-                    ~ancestor:new_checkpoint)
-            prev_alternate_heads
-        in
-        (* Promote prev_head as an alternate head *)
-        Lwt.return (prev_head_descr :: filtered_alternate_heads)
+            let* is_alternate_head_successor =
+              is_ancestor
+                chain_store
+                ~head:new_head_descr
+                ~ancestor:alternate_head
+            in
+            (* If the new head is a successor of a former
+               alternate_head, remove it from the alternate heads,
+               it will be updated as the current head *)
+            Lwt.return (not is_alternate_head_successor))
+          alternate_heads
+      in
+      (* Promote prev_head as an alternate head *)
+      Lwt.return (prev_head_descr :: filtered_alternate_heads)
+
+  let locked_trim_alternate_heads chain_store ~alternate_heads ~new_checkpoint =
+    let open Lwt_syntax in
+    List.filter_s
+      (fun alternate_head ->
+        is_ancestor chain_store ~head:alternate_head ~ancestor:new_checkpoint)
+      alternate_heads
 
   let locked_is_heads_predecessor chain_store chain_state ~new_head =
     let open Lwt_syntax in
@@ -1615,12 +1602,26 @@ module Chain = struct
                   | None -> Lwt.return new_checkpoint
                   | Some h -> Lwt.return (h, new_cementing_highwatermark))
           in
-          let*! new_alternate_heads =
-            locked_update_and_trim_alternate_heads
-              chain_store
-              chain_state
-              ~new_checkpoint
-              ~new_head
+          let*! alternate_heads =
+            Stored_data.get chain_state.alternate_heads_data
+          in
+          let* () =
+            let*! new_alternate_heads =
+              locked_update_alternate_heads
+                chain_store
+                ~alternate_heads
+                ~prev_head:previous_head
+                ~new_head
+            in
+            let*! new_alternate_heads =
+              if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
+                locked_trim_alternate_heads
+                  chain_store
+                  ~alternate_heads:new_alternate_heads
+                  ~new_checkpoint
+              else Lwt.return new_alternate_heads
+            in
+            write_alternate_heads chain_state new_alternate_heads
           in
           let* () =
             if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
@@ -1649,7 +1650,6 @@ module Chain = struct
           let* () =
             Stored_data.write chain_state.current_head_data new_head_descr
           in
-          let* () = write_alternate_heads chain_state new_alternate_heads in
           let* () = Stored_data.write chain_state.target_data new_target in
           (* Update live_data *)
           let*! live_blocks, live_operations =
