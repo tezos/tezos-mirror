@@ -1,8 +1,6 @@
 module Test = struct
-  module Scalar = Bls12_381.Fr
-
+  (* Samples k random integers within the range [0, bound]. *)
   let random_indices bound k =
-    Random.self_init () ;
     let indices = Array.init k (fun _ -> -1) in
     for i = 0 to k - 1 do
       let rec loop () =
@@ -13,29 +11,48 @@ module Test = struct
     done ;
     indices
 
-  let bench_DAL_crypto_params () =
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (* We take mainnet parameters we divide by [16] to speed up the test. *)
-    let number_of_shards = 2048 / 16 in
-    let slot_size = 1048576 / 16 in
-    let page_size = 4096 / 16 in
-    let number_of_pages = slot_size / page_size in
-    let msg_size = slot_size / 16 in
-    (* [msg] is initialized with random bytes. *)
-    let msg = Bytes.make msg_size '\000' in
-    let slot = Bytes.make slot_size '\000' in
-    for i = 0 to (msg_size / 8) - 1 do
-      Bytes.set_int64_le msg (i * 8) (Random.bits64 ())
-    done ;
-
-    (* We include [msg] in a slot, with additional padding with null bytes *)
-    Bytes.blit msg 0 slot 0 msg_size ;
-
+  (* Initializes the DAL parameters *)
+  let init slot_size =
     let parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
         ~slot_size
     in
-    let () = Cryptobox.Internal_for_tests.load_parameters parameters in
+    Cryptobox.Internal_for_tests.load_parameters parameters
+
+  (* Returns a tuple (slot, msg) where
+     - slot of the given [size] padded with null bytes starting
+     from byte index [padding_threshold]
+     - msg is the slot without the padding *)
+  let make_slot ~size ~padding_threshold =
+    (* [msg] is initialized with random bytes. *)
+    let msg = Bytes.make padding_threshold '\000' in
+    let slot = Bytes.make size '\000' in
+    for i = 0 to (padding_threshold / 8) - 1 do
+      Bytes.set_int64_le msg (i * 8) (Random.bits64 ())
+    done ;
+    (* We include [msg] in a slot, with additional padding
+       with null bytes *)
+    Bytes.blit msg 0 slot 0 padding_threshold ;
+    (slot, msg)
+
+  type params = {number_of_shards : int; slot_size : int; page_size : int}
+
+  (* We divide mainnet parameters by [32] to speed up the tests. *)
+  let test_params =
+    {
+      number_of_shards = 2048 / 32;
+      slot_size = (1 lsl 20) / 32;
+      page_size = 4096 / 32;
+    }
+
+  (* Tests that with a fraction 1/redundancy_factor of the shards
+     the decoding succeeds. *)
+  let test_erasure_code () =
+    let {number_of_shards; slot_size; page_size} = test_params in
+    let msg_size = slot_size / 16 in
+    let slot, msg = make_slot ~size:slot_size ~padding_threshold:msg_size in
+    init slot_size ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
     Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_e
       (fun redundancy_factor ->
         let* t =
@@ -43,12 +60,6 @@ module Test = struct
             {redundancy_factor; slot_size; page_size; number_of_shards}
         in
         let* p = Cryptobox.polynomial_from_slot t slot in
-        let cm = Cryptobox.commit t p in
-        let page_index = Random.int number_of_pages in
-        let* pi = Cryptobox.prove_page t p page_index in
-        let page = Bytes.sub slot (page_index * page_size) page_size in
-        let* check = Cryptobox.verify_page t cm ~page_index page pi in
-        assert check ;
         let enc_shards = Cryptobox.shards_from_polynomial t p in
         let c_indices =
           random_indices
@@ -65,7 +76,51 @@ module Test = struct
           Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
         in
         assert (Bytes.equal msg decoded_msg) ;
-        let comm = Cryptobox.commit t p in
+        Ok ())
+      [2; 4; 16]
+    |> function
+    | Ok _ -> assert true
+    | _ -> assert false
+
+  (* Tests that a page is included in a slot. *)
+  let test_page_proofs () =
+    let {number_of_shards; slot_size; page_size} = test_params in
+    let msg_size = slot_size / 16 in
+    let number_of_pages = slot_size / page_size in
+    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+    init slot_size ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    (let* t =
+       Cryptobox.make
+         {redundancy_factor = 2; slot_size; page_size; number_of_shards}
+     in
+     let* p = Cryptobox.polynomial_from_slot t slot in
+     let cm = Cryptobox.commit t p in
+     let page_index = Random.int number_of_pages in
+     let* pi = Cryptobox.prove_page t p page_index in
+     let page = Bytes.sub slot (page_index * page_size) page_size in
+     let* check = Cryptobox.verify_page t cm ~page_index page pi in
+     Ok check)
+    |> function
+    | Ok check -> assert check
+    | _ -> assert false
+
+  (* Tests that a shard comes from the erasure-encoded slot. *)
+  let test_shard_proofs () =
+    let {number_of_shards; slot_size; page_size} = test_params in
+    let msg_size = slot_size / 16 in
+    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+    init slot_size ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_e
+      (fun redundancy_factor ->
+        let* t =
+          Cryptobox.make
+            {redundancy_factor; slot_size; page_size; number_of_shards}
+        in
+        let* p = Cryptobox.polynomial_from_slot t slot in
+        let cm = Cryptobox.commit t p in
+        let enc_shards = Cryptobox.shards_from_polynomial t p in
         let shard_proofs = Cryptobox.prove_shards t p in
         let shard_index = Random.int number_of_shards in
         match
@@ -75,28 +130,49 @@ module Test = struct
         with
         | None -> Ok ()
         | Some shard ->
-            let check = Cryptobox.verify_shard t comm shard shard_proofs.(shard_index) in
+            let check =
+              Cryptobox.verify_shard t cm shard shard_proofs.(shard_index)
+            in
             assert check ;
-            let pi = Cryptobox.prove_commitment t p in
-            let check = Cryptobox.verify_commitment t comm pi in
-            assert check ;
-            Ok ()
-        (* let point = Scalar.random () in *)
-        (* let+ pi_slot = Cryptobox.prove_single trusted_setup p point in
-         *
-         * assert (
-         *   Cryptobox.verify_single
-         *     trusted_setup
-         *     comm
-         *     ~point
-         *     ~evaluation:(Cryptobox.polynomial_evaluate p point)
-         *     pi_slot) *))
-      [2]
-    |> fun x -> match x with Ok () -> () | Error _ -> assert false
+            Ok ())
+      [2; 16]
+    |> function
+    | Ok _ -> assert true
+    | _ -> assert false
+
+  (* Tests that the slot behind the commitment has its size bounded
+     by [t.slot_size]. *)
+  let test_commitment_proof () =
+    let {number_of_shards; slot_size; page_size} = test_params in
+    let msg_size = slot_size / 16 in
+    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+    init slot_size ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    (let* t =
+       Cryptobox.make
+         {redundancy_factor = 2; slot_size; page_size; number_of_shards}
+     in
+     let* p = Cryptobox.polynomial_from_slot t slot in
+     Ok (t, p))
+    |> function
+    | Ok (t, p) ->
+        let cm = Cryptobox.commit t p in
+        let pi = Cryptobox.prove_commitment t p in
+        let check = Cryptobox.verify_commitment t cm pi in
+        assert check
+    | _ -> assert false
 end
 
 let test =
-  [Alcotest.test_case "test_DAL_cryptobox" `Quick Test.bench_DAL_crypto_params]
+  List.map
+    (fun (test_name, test_func) ->
+      Alcotest.test_case test_name `Quick test_func)
+    [
+      ("test_erasure_code", Test.test_erasure_code);
+      ("test_page_proofs", Test.test_page_proofs);
+      ("test_shard_proofs", Test.test_shard_proofs);
+      ("test_commitment_proof", Test.test_commitment_proof);
+    ]
 
 let () =
   (* Seed for deterministic pseudo-randomness:
@@ -104,7 +180,6 @@ let () =
       as seed. Otherwise, a random seed is used.
      WARNING: using [Random.self_init] elsewhere in the tests breaks thedeterminism.
   *)
-  (*Memtrace.trace_if_requested ~context:"Test" () ;*)
   let seed =
     match Sys.getenv_opt "RANDOM_SEED" with
     | None ->
@@ -114,4 +189,4 @@ let () =
   in
 
   Random.init seed ;
-  Alcotest.run "DAL cryptobox" [("test case", test)]
+  Alcotest.run "DAL cryptobox" [("DAL cryptobox", test)]
