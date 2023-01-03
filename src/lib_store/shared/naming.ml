@@ -89,12 +89,6 @@ let genesis_block_file dir =
 let current_head_file dir =
   make_encoded_file dir ~filename:"current_head" block_descriptor_encoding
 
-let alternate_heads_file dir =
-  make_encoded_file
-    dir
-    ~filename:"alternate_heads"
-    (Data_encoding.list block_descriptor_encoding)
-
 let cementing_highwatermark_file dir =
   make_encoded_file
     dir

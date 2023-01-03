@@ -482,48 +482,36 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   let accepted_head = Fitness.(new_fitness > head_fitness) in
   if not accepted_head then return Ignored_head
   else
-    let* o = Store.Chain.set_head chain_store block in
-    match o with
-    | None ->
-        (* None means that the given head is below a new_head and
-           therefore it must not be broadcasted *)
-        return Ignored_head
-    | Some previous ->
-        let*! () = broadcast_head w ~previous block in
-        let* () =
-          may_update_protocol_level chain_store block resulting_context_hash
-        in
-        let*! () =
-          if start_testchain then
-            may_switch_test_chain w active_chains spawn_child block
-          else Lwt.return_unit
-        in
-        Lwt_watcher.notify nv.new_head_input block ;
-        let is_head_increment =
-          Tezos_crypto.Block_hash.equal head_hash block_header.shell.predecessor
-        in
-        let event =
-          if is_head_increment then Head_increment else Branch_switch
-        in
-        let* () =
-          when_ (not is_head_increment) (fun () ->
-              Store.Chain.may_update_ancestor_protocol_level
-                chain_store
-                ~head:block)
-        in
-        let*! () =
-          may_synchronise_context nv.synchronisation_state chain_store
-        in
-        let+ () =
-          may_flush_or_update_prevalidator
-            nv.parameters
-            event
-            nv.prevalidator
-            nv.chain_db
-            ~prev:previous
-            ~block
-        in
+    let* previous = Store.Chain.set_head chain_store block in
+    let*! () = broadcast_head w ~previous block in
+    let* () =
+      may_update_protocol_level chain_store block resulting_context_hash
+    in
+    let*! () =
+      if start_testchain then
+        may_switch_test_chain w active_chains spawn_child block
+      else Lwt.return_unit
+    in
+    Lwt_watcher.notify nv.new_head_input block ;
+    let is_head_increment =
+      Tezos_crypto.Block_hash.equal head_hash block_header.shell.predecessor
+    in
+    let event = if is_head_increment then Head_increment else Branch_switch in
+    let* () =
+      when_ (not is_head_increment) (fun () ->
+          Store.Chain.may_update_ancestor_protocol_level chain_store ~head:block)
+    in
+    let*! () = may_synchronise_context nv.synchronisation_state chain_store in
+    let* () =
+      may_flush_or_update_prevalidator
+        nv.parameters
         event
+        nv.prevalidator
+        nv.chain_db
+        ~prev:previous
+        ~block
+    in
+    return event
 
 let on_notify_branch w peer_id locator =
   let open Lwt_syntax in

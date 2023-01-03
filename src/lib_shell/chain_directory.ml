@@ -70,55 +70,50 @@ let predecessors chain_store ignored length head =
   let head_hash = Store.Block.hash head in
   loop [head_hash] (length - 1) head_hash
 
-let list_blocks chain_store ?(length = 1) ?min_date heads =
+let list_blocks chain_store ?(length = 1) ?min_date blocks =
   let open Lwt_result_syntax in
-  let*! requested_heads =
-    match heads with
+  let*! requested_blocks =
+    match blocks with
     | [] ->
-        let*! heads = Store.Chain.known_heads chain_store in
-        let*! heads =
-          List.filter_map_p
-            (fun (h, _) -> Store.Block.read_block_opt chain_store h)
-            heads
+        let*! head = Store.Chain.current_head chain_store in
+        Lwt.return [head]
+    | blocks ->
+        let*! blocks =
+          List.filter_map_p (Store.Block.read_block_opt chain_store) blocks
         in
-        let heads =
+        let blocks =
           match min_date with
-          | None -> heads
+          | None -> blocks
           | Some min_date ->
               List.filter
                 (fun block ->
                   let timestamp = Store.Block.timestamp block in
                   Time.Protocol.(min_date <= timestamp))
-                heads
+                blocks
         in
-        let sorted_heads =
+        let sorted_blocks =
           List.sort
             (fun b1 b2 ->
               let f1 = Store.Block.fitness b1 in
               let f2 = Store.Block.fitness b2 in
               ~-(Fitness.compare f1 f2))
-            heads
+            blocks
         in
-        Lwt.return (List.map (fun b -> Some b) sorted_heads)
-    | _ :: _ as heads ->
-        List.map_p (Store.Block.read_block_opt chain_store) heads
+        Lwt.return sorted_blocks
   in
   let* _, blocks =
     List.fold_left_es
-      (fun (ignored, acc) head ->
-        match head with
-        | None -> return (ignored, acc)
-        | Some block ->
-            let* predecessors = predecessors chain_store ignored length block in
-            let ignored =
-              List.fold_left
-                (fun acc v -> Tezos_crypto.Block_hash.Set.add v acc)
-                ignored
-                predecessors
-            in
-            return (ignored, predecessors :: acc))
+      (fun (ignored, acc) block ->
+        let* predecessors = predecessors chain_store ignored length block in
+        let ignored =
+          List.fold_left
+            (fun acc v -> Tezos_crypto.Block_hash.Set.add v acc)
+            ignored
+            predecessors
+        in
+        return (ignored, predecessors :: acc))
       (Tezos_crypto.Block_hash.Set.empty, [])
-      requested_heads
+      requested_blocks
   in
   return (List.rev blocks)
 
