@@ -3081,7 +3081,10 @@ module Unsafe = struct
         let chain_store = main_chain_store store in
         Lwt.finalize
           (fun () -> locked_f chain_store)
-          (fun () -> close_store store))
+          (fun () ->
+            let*! () = may_unlock lockfile in
+            let*! () = Lwt_unix.close lockfile in
+            close_store store))
       ~on_error:(fun errs ->
         let*! () = may_unlock lockfile in
         Lwt.return (Error errs))
