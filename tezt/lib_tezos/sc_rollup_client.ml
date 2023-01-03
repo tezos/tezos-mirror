@@ -108,7 +108,7 @@ let spawn_command ?hooks sc_client command =
   Runnable.{value = process; run = Process.check_and_read_stdout}
 
 let sc_rollup_address ?hooks sc_client =
-  spawn_command ?hooks sc_client ["get"; "sc"; "rollup"; "address"]
+  spawn_command ?hooks sc_client ["get"; "smart"; "rollup"; "address"]
   |> Runnable.map String.trim
 
 let state_value ?hooks ?(block = "head") sc_client ~key =

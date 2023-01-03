@@ -3244,7 +3244,7 @@ let commands_rw () =
         | None -> cctxt#error "ticket quantity should not be zero or negative");
     command
       ~group
-      ~desc:"Originate a new smart-contract rollup."
+      ~desc:"Originate a new smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3253,26 +3253,26 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg)
-      (prefixes ["originate"; "sc"; "rollup"; "from"]
+      (prefixes ["originate"; "smart"; "rollup"; "from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
-           ~desc:"Name of the account originating the smart-contract rollup."
+           ~desc:"Name of the account originating the smart rollup."
       @@ prefixes ["of"; "kind"]
       @@ param
-           ~name:"sc_rollup_kind"
-           ~desc:"Kind of the smart-contract rollup to be originated."
+           ~name:"smart_rollup_kind"
+           ~desc:"Kind of the smart rollup to be originated."
            Sc_rollup_params.rollup_kind_parameter
       @@ prefixes ["of"; "type"]
       @@ param
            ~name:"parameters_type"
            ~desc:
-             "The interface of the smart-contract rollup including its \
-              entrypoints and their signatures."
+             "The interface of the smart rollup including its entrypoints and \
+              their signatures."
            data_parameter
       @@ prefixes ["with"; "kernel"]
       @@ param
            ~name:"kernel"
-           ~desc:"The kernel for the smart-contract rollup."
+           ~desc:"The kernel for the smart rollup."
            Sc_rollup_params.boot_sector_parameter
       @@ stop)
       (fun ( fee,
@@ -3317,7 +3317,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Send one or more messages to a smart-contract rollup."
+      ~desc:"Send one or more messages to a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3326,7 +3326,7 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg)
-      (prefixes ["send"; "sc"; "rollup"; "message"]
+      (prefixes ["send"; "smart"; "rollup"; "message"]
       @@ param
            ~name:"messages"
            ~desc:
@@ -3398,7 +3398,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Publish a commitment for a sc rollup"
+      ~desc:"Publish a commitment for a smart rollup"
       (args7
          fee_arg
          dry_run_switch
@@ -3412,17 +3412,17 @@ let commands_rw () =
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
-      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ prefixes ["for"; "smart"; "rollup"]
       @@ param
-           ~name:"sc_rollup"
+           ~name:"smart_rollup_address"
            ~desc:
-             "The address of the sc rollup where the commitment will be \
+             "The address of the smart rollup where the commitment will be \
               published."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"; "compressed"; "state"]
       @@ param
            ~name:"compressed_state"
-           ~desc:"The compressed state of the sc rollup for the commitment."
+           ~desc:"The compressed state of the smart rollup for the commitment."
            Sc_rollup_params.compressed_state_parameter
       @@ prefixes ["at"; "inbox"; "level"]
       @@ param
@@ -3482,7 +3482,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Cement a commitment for a sc rollup."
+      ~desc:"Cement a commitment for a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3494,17 +3494,17 @@ let commands_rw () =
       (prefixes ["cement"; "commitment"]
       @@ param
            ~name:"commitment"
-           ~desc:"The hash of the commitment to be cemented for a sc rollup."
+           ~desc:"The hash of the commitment to be cemented for a smart rollup."
            Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
-      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ prefixes ["for"; "smart"; "rollup"]
       @@ param
-           ~name:"sc_rollup"
+           ~name:"smart_rollup_address"
            ~desc:
-             "The address of the sc rollup where the commitment will be \
+             "The address of the smart rollup of which the commitment will be \
               cemented."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
@@ -3544,7 +3544,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Timeout a staker from dispute on a smart-contract rollup."
+      ~desc:"Timeout a staker from dispute on a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3553,12 +3553,12 @@ let commands_rw () =
          storage_limit_arg
          counter_arg
          fee_parameter_args)
-      (prefixes ["timeout"; "dispute"; "on"; "sc"; "rollup"]
+      (prefixes ["timeout"; "dispute"; "on"; "smart"; "rollup"]
       @@ param
-           ~name:"sc_rollup"
+           ~name:"smart_rollup_address"
            ~desc:
-             "The address of the smart-contract rollup where the staker of the \
-              dispute has timed-out."
+             "The address of the smart rollup where the staker of the dispute \
+              has timed-out."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"]
       @@ Client_keys.Public_key_hash.source_param
@@ -3635,9 +3635,9 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"List originated smart-contract rollups."
+      ~desc:"List originated smart rollups."
       no_options
-      (prefixes ["list"; "sc"; "rollups"] @@ stop)
+      (prefixes ["list"; "smart"; "rollups"] @@ stop)
       (fun () (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
         let* rollups =
@@ -3653,7 +3653,7 @@ let commands_rw () =
     command
       ~group
       ~desc:
-        "Execute a message from a smart-contract rollup's outbox of a cemented \
+        "Execute a message from a smart rollup's outbox of a cemented \
          commitment."
       (args7
          fee_arg
@@ -3663,12 +3663,10 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg)
-      (prefixes ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"]
+      (prefixes ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"]
       @@ param
-           ~name:"rollup"
-           ~desc:
-             "The address of the smart-contract rollup where the message \
-              resides."
+           ~name:"smart_rollup_address"
+           ~desc:"The address of the smart rollup where the message resides."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
@@ -3724,7 +3722,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Recover commitment bond from a smart contract rollup."
+      ~desc:"Recover commitment bond from a smart rollup."
       (args7
          fee_arg
          dry_run_switch
@@ -3737,10 +3735,10 @@ let commands_rw () =
       @@ Client_keys.Public_key_hash.source_param
            ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
-      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ prefixes ["for"; "smart"; "rollup"]
       @@ Tezos_clic.param
-           ~name:"smart contract rollup address"
-           ~desc:"The address of the smart-contract rollup of the bond."
+           ~name:"smart rollup address"
+           ~desc:"The address of the smart rollup of the bond."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param

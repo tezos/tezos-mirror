@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string with kernel  --burn-cap 9999999
+./octez-client --wait none originate smart rollup from bootstrap1 of kind arith of type string with kernel  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2748.037 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 
-./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 4 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
+./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for smart rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 4 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
 Estimated gas: 7197.763 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -69,7 +69,7 @@ This sequence of operations was run:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... +ꜩ10000
 
 
-./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 4 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 2
+./octez-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for smart rollup '[SMART_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 4 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 2
 Node is bootstrapped.
 Estimated gas: 7895.965 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -105,7 +105,7 @@ This sequence of operations was run:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... +ꜩ10000
 
 
-./octez-client --wait none timeout dispute on sc rollup '[SMART_ROLLUP_HASH]' with '[PUBLIC_KEY_HASH]' against '[PUBLIC_KEY_HASH]' from bootstrap1
+./octez-client --wait none timeout dispute on smart rollup '[SMART_ROLLUP_HASH]' with '[PUBLIC_KEY_HASH]' against '[PUBLIC_KEY_HASH]' from bootstrap1
 Node is bootstrapped.
 Estimated gas: 4545.618 units (will add 100 for safety)
 Estimated storage: no bytes added

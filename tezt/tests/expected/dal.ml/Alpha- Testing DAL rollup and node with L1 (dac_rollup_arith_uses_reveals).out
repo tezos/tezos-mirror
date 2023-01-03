@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string with kernel  --burn-cap 9999999
+./octez-client --wait none originate smart rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string with kernel  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2748.037 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -37,7 +37,7 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-client --wait none send sc rollup message 'text:["hash:0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428e7aa3"]' from bootstrap2
+./octez-client --wait none send smart rollup message 'text:["hash:0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428e7aa3"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 1001.427 units (will add 100 for safety)
 Estimated storage: no bytes added

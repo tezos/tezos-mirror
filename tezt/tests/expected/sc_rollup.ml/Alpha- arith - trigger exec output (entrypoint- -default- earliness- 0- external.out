@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type bytes with kernel  --burn-cap 9999999
+./octez-client --wait none originate smart rollup from bootstrap1 of kind arith of type bytes with kernel  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2748.037 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 
-./octez-client --wait none send sc rollup message 'hex:["3337204b54314332756d56796773744c5456396d7945733445416d4778634c5664673637324574"]' from bootstrap2
+./octez-client --wait none send smart rollup message 'hex:["3337204b54314332756d56796773744c5456396d7945733445416d4778634c5664673637324574"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 1001.327 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -58,7 +58,7 @@ This sequence of operations was run:
       Consumed gas: 1001.361
 
 
-./octez-client --wait none execute outbox message of sc rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300021bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d1bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d00100007d0030170000382066f7574707574810130c8bcacb1531b6e96b5ffc7a75859c34f1f1f9330f5e1b24f183f07e7068710de540c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0c235965dde95e47330643d042f34eb7354baf4786f0e9f0b0c42243ddae431a8c097354cf34106c0e824fd1b44d759ce74dc917914c3ab5b23d62120d4ff1dabd31bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d0000000500000000002300250125da0a10a3eddbd3377e9a13656edd869bb9cdbe000000000764656661756c74 --burn-cap 10
+./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300021bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d1bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d00100007d0030170000382066f7574707574810130c8bcacb1531b6e96b5ffc7a75859c34f1f1f9330f5e1b24f183f07e7068710de540c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c0c235965dde95e47330643d042f34eb7354baf4786f0e9f0b0c42243ddae431a8c097354cf34106c0e824fd1b44d759ce74dc917914c3ab5b23d62120d4ff1dabd31bca32698f75f6b3c784f41ec1bed48c4a58ffcd22aadcdcb0f9ed4b5af9827d0000000500000000002300250125da0a10a3eddbd3377e9a13656edd869bb9cdbe000000000764656661756c74 --burn-cap 10
 Node is bootstrapped.
 Estimated gas: 6400.612 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)

@@ -98,7 +98,7 @@ kernel.
 
 There are two ways for an end-user to push an external message to the
 rollups inbox: first, she can inject the dedicated layer-1 operation
-using the Octez client (see command ``send sc rollup message
+using the Octez client (see command ``send smart rollup message
 <messages> from <src>``) ; second, she can use the batcher
 of a smart rollup node. More details can be found in :ref:`sending_external_inbox_message_alpha`.
 
@@ -330,7 +330,7 @@ the Octez client:
 
 .. code:: sh
 
-    octez-client originate sc rollup from "${OPERATOR_ADDR}" \
+    octez-client originate smart rollup from "${OPERATOR_ADDR}" \
       of kind wasm_2_0_0 \
       of type bytes \
       with kernel "${KERNEL}" \
