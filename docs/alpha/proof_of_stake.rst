@@ -28,20 +28,22 @@ Delegation
 ----------
 
 A *delegate* is any :ref:`implicit account <Implicit account>` registered as
-such by emitting a delegate registration operation. Note that ``tz4`` accounts
-cannot be registered as delegate.
+such. This is done by *self-delegating*, that is, emitting a delegation
+operation (see below) in which the specified delegate is the same as the
+operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
+as delegates.
 
 Any :ref:`account <Account>` (implicit or originated) can specify a delegate
-through a delegation operation.
-Any account can change or revoke its delegate at any time. However, the change
-only becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <Cycle>`.
-The value ``PRESERVED_CYCLES`` is a
-:ref:`protocol constant <protocol_constants_alpha>`.
+through a delegation operation.  Any account can change or revoke its delegate
+at any time, again through a delegation operation. However, the change only
+becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <Cycle>`.  The
+value ``PRESERVED_CYCLES`` is a :ref:`protocol constant
+<protocol_constants_alpha>`.
 
 A delegate participates in consensus and in governance with a weight
-proportional with their delegated stake, which includes the balances
-of all the accounts that delegate to it, and also the balance of the
-delegate itself. To participate in consensus or in governance, a
+proportional to their *delegated stake* -- that is, the balance
+of all the accounts that delegate to it, including the balance of the delegate itself. To
+participate in consensus or in governance, a
 delegate needs to have at least a minimal stake, which is given by the
 ``TOKENS_PER_ROLL`` :ref:`protocol constant
 <protocol_constants_alpha>`.
@@ -49,6 +51,16 @@ delegate needs to have at least a minimal stake, which is given by the
 Delegates place security deposits that may be forfeited in case they do not
 follow (some particular rules of) the protocol. Security deposits are deduced
 from the delegates' own balance.
+
+The key used by a delegate to sign blocks and consensus operations is called the
+*consensus key*. By default, this is the delegate's private key, called its
+*manager key*. However, a delegate may specify another, dedicated key for this
+role. See :ref:`this page<consensus_key>` for further important details. In particular,
+both the delegate key and the consensus key give total control over the
+delegate's funds: indeed, the consensus key may sign a *drain* operation to
+transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant RPCs<../api/openapi>`,
+like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
+manager and consensus keys are listed.
 
 
 Active and passive delegates
@@ -165,6 +177,7 @@ The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
-Another presentation of the Tezos' proof-of-stake mechanism can be
-found in the `Tezos agora wiki entry
-<https://wiki.tezosagora.org/learn/baking/proofofstake/consensus>`_.
+Other presentations of the Tezos' proof-of-stake mechanism can be
+found in the `Tezos Agora wiki entry
+<https://wiki.tezosagora.org/learn/baking/proofofstake>`_ and
+`Open Tezos entry <https://opentezos.com/tezos-basics/liquid-proof-of-stake/>`_.
