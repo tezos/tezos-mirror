@@ -32,6 +32,7 @@ module Error = struct
     | Store_not_a_value
     | Store_invalid_access
     | Store_value_size_exceeded
+    | Store_invalid_subkey_index
     | Memory_invalid_access
     | Input_output_too_large
     | Generic_invalid_access
@@ -52,6 +53,7 @@ module Error = struct
     | Store_readonly_value -> -9l
     | Store_not_a_node -> -10l
     | Full_outbox -> -11l
+    | Store_invalid_subkey_index -> -12l
 end
 
 module type Memory_access = sig
@@ -265,6 +267,7 @@ module Aux = struct
           | Durable.Value_not_found -> fail Error.Store_not_a_value
           | Durable.Tree_not_found -> fail Error.Store_not_a_node
           | Durable.IO_too_large -> fail Error.Input_output_too_large
+          | Durable.Index_too_large _ -> fail Error.Store_invalid_subkey_index
           | Output_buffer.Full_outbox -> fail Error.Full_outbox
           | exn ->
               fail @@ M.exn_to_error ~default:Error.Generic_invalid_access exn)

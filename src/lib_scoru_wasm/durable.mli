@@ -30,6 +30,9 @@ type t
 (** [key] was too long, or contained invalid steps. *)
 exception Invalid_key of string
 
+(** Invalid index for a subkey *)
+exception Index_too_large of int
+
 (** A value was not found in the durable store. *)
 exception Value_not_found
 
