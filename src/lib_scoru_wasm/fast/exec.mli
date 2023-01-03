@@ -28,8 +28,8 @@ open Tezos_webassembly_interpreter
 
 (** [compute durable buffers] applies one call to [kernel_run]. *)
 val compute :
-  enable_debugging:bool ->
-  Builtins.t ->
+  reveal_step:Builtins.reveal_step ->
+  write_debug:Builtins.write_debug ->
   Durable.t ->
   Eval.buffers ->
   Durable.t Lwt.t

@@ -43,7 +43,9 @@ val all : Tezos_webassembly_interpreter.Host_funcs.registry
 
 (** [all_debug] contains the same functions as [all], with the alternative
     implementation of [write_debug]. *)
-val all_debug : Tezos_webassembly_interpreter.Host_funcs.registry
+val all_debug :
+  write_debug:Builtins.write_debug ->
+  Tezos_webassembly_interpreter.Host_funcs.registry
 
 exception Bad_input
 
@@ -234,7 +236,11 @@ module Aux : sig
     val read_mem : memory:memory -> src:int32 -> num_bytes:int32 -> string Lwt.t
 
     val write_debug :
-      debug:bool -> memory:memory -> src:int32 -> num_bytes:int32 -> unit Lwt.t
+      implem:Builtins.write_debug ->
+      memory:memory ->
+      src:int32 ->
+      num_bytes:int32 ->
+      unit Lwt.t
   end
 
   module Make (Memory_access : Memory_access) :

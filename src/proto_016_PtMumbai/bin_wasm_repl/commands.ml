@@ -75,12 +75,15 @@ let parse_commands s =
   | ["stop"] -> Stop
   | _ -> Unknown s
 
+let write_debug =
+  Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_io.printf "%s" msg)
+
 (* [compute_step tree] is a wrapper around [Wasm_pvm.compute_step] that also
    returns the number of ticks elapsed (whi is always 1). *)
 let compute_step tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
-      let+ tree = Wasm.compute_step_with_debug ~debug_flag:true tree in
+      let+ tree = Wasm.compute_step_with_debug ~write_debug tree in
       (tree, 1L))
 
 (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
@@ -118,7 +121,7 @@ let eval_to_result tree =
       in
       let* pvm_state, ticks =
         Tezos_scoru_wasm.Wasm_vm.compute_step_many_until
-          ~debug_flag:true
+          ~write_debug
           ~max_steps:Int64.max_int
           should_compute
           pvm_state
@@ -148,10 +151,7 @@ let eval_until_input_requested tree =
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
       let* tree =
-        eval_until_input_requested
-          ~debug_flag:true
-          ~max_steps:Int64.max_int
-          tree
+        eval_until_input_requested ~write_debug ~max_steps:Int64.max_int tree
       in
       let+ info_after = Wasm.get_info tree in
       ( tree,

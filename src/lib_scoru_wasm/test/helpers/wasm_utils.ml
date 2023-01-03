@@ -65,22 +65,25 @@ let initial_tree ?(max_tick = default_max_tick)
   in
   Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
 
-module Builtins = struct
-  let reveal_preimage _hash =
-    Stdlib.failwith "reveal_preimage is not available out of the box in tests"
+let reveal_step =
+  Tezos_scoru_wasm.Builtins.
+    {
+      reveal_preimage =
+        (fun _hash ->
+          Stdlib.failwith
+            "reveal_preimage is not available out of the box in tests");
+      reveal_metadata =
+        (fun () ->
+          Stdlib.failwith
+            "reveal_metadata is not available out of the box in tests");
+    }
 
-  let reveal_metadata () =
-    Stdlib.failwith "reveal_metadata is not available out of the box in tests"
-end
-
-let builtins = (module Builtins : Tezos_scoru_wasm.Builtins.S)
-
-let eval_until_stuck ?(builtins = builtins) ?(max_steps = 20000L)
-    ?(debug_flag = false) tree =
+let eval_until_stuck ?(reveal_step = reveal_step) ?write_debug
+    ?(max_steps = 20000L) tree =
   let open Lwt.Syntax in
   let rec go counter tree =
     let* tree, _ =
-      Wasm.compute_step_many ~builtins ~debug_flag ~max_steps tree
+      Wasm.compute_step_many ~reveal_step ?write_debug ~max_steps tree
     in
     let* stuck = Wasm.Internal_for_tests.is_stuck tree in
     match stuck with
@@ -94,22 +97,22 @@ let eval_until_stuck ?(builtins = builtins) ?(max_steps = 20000L)
 (* This function relies on the invariant that `compute_step_many` will always
    stop at a Snapshot or an input request, and never start another
    `kernel_run`. *)
-let rec eval_to_snapshot ?(builtins = builtins) ?(max_steps = Int64.max_int)
-    ?(debug_flag = false) tree =
+let rec eval_to_snapshot ?(reveal_step = reveal_step) ?write_debug
+    ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
   let eval tree =
     let* tree, _ =
       Wasm.compute_step_many
-        ~builtins
+        ~reveal_step
+        ?write_debug
         ~stop_at_snapshot:true
-        ~debug_flag
         ~max_steps
         tree
     in
     let* state = Wasm.Internal_for_tests.get_tick_state tree in
     match state with
     | Snapshot | Collect -> return tree
-    | _ -> eval_to_snapshot ~max_steps ~builtins ~debug_flag tree
+    | _ -> eval_to_snapshot ~max_steps ~reveal_step ?write_debug tree
   in
   let* info = Wasm.get_info tree in
   match info.input_request with
@@ -117,9 +120,8 @@ let rec eval_to_snapshot ?(builtins = builtins) ?(max_steps = Int64.max_int)
   | Input_required | Reveal_required _ ->
       Stdlib.failwith "Cannot reach snapshot point"
 
-let rec eval_until_input_requested ?(builtins = builtins) ?after_fast_exec
-    ?(fast_exec = false) ?(max_steps = Int64.max_int) ?(debug_flag = false) tree
-    =
+let rec eval_until_input_requested ?(reveal_step = reveal_step) ?write_debug
+    ?after_fast_exec ?(fast_exec = false) ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
   let run =
     if fast_exec then
@@ -129,13 +131,13 @@ let rec eval_until_input_requested ?(builtins = builtins) ?after_fast_exec
   let* info = Wasm.get_info tree in
   match info.input_request with
   | No_input_required ->
-      let* tree, _ = run ~builtins ~debug_flag ~max_steps tree in
+      let* tree, _ = run ~reveal_step ?write_debug ~max_steps tree in
       eval_until_input_requested
-        ~builtins
+        ~reveal_step
+        ?write_debug
         ?after_fast_exec
         ~fast_exec
         ~max_steps
-        ~debug_flag
         tree
   | Input_required | Reveal_required _ -> return tree
 

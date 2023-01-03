@@ -23,12 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  (** [reveal_preimage hash] reveals the preimage of the given hash. *)
-  val reveal_preimage : string -> string Lwt.t
+type reveal_step = {
+  reveal_preimage : string -> string Lwt.t;
+  reveal_metadata : unit -> string Lwt.t;
+}
 
-  (** [reveal_metadata ()] returns the encoded metadata for the rollup. *)
-  val reveal_metadata : unit -> string Lwt.t
-end
-
-type t = (module S)
+type write_debug = Noop | Printer of (string -> unit Lwt.t)

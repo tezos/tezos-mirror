@@ -56,7 +56,7 @@ let finish_top_level_call_on_state pvm_state =
 
 let execute_on_state phase state =
   Wasm_vm.compute_step_many_until
-    ~debug_flag:false
+    ~write_debug:Noop
     ~max_steps:Int64.max_int
     (should_continue phase)
     state

@@ -272,30 +272,30 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     in
     encode pvm tree
 
-  let compute_step_many ?builtins ?stop_at_snapshot ?debug_flag ~max_steps tree
-      =
+  let compute_step_many ?reveal_step ?write_debug ?stop_at_snapshot ~max_steps
+      tree =
     let open Lwt.Syntax in
     let* pvm_state = decode tree in
     let* pvm_state, executed_ticks =
       Wasm_vm.compute_step_many
-        ?builtins
+        ?reveal_step
+        ?write_debug
         ?stop_at_snapshot
-        ?debug_flag
         ~max_steps
         pvm_state
     in
     let+ tree = encode pvm_state tree in
     (tree, executed_ticks)
 
-  let compute_step_with_debug ~debug_flag tree =
+  let compute_step_with_debug ~write_debug tree =
     let open Lwt.Syntax in
     let* initial_state = decode tree in
     let* final_state =
-      Wasm_vm.compute_step_with_debug ~debug_flag initial_state
+      Wasm_vm.compute_step_with_debug ~write_debug initial_state
     in
     encode final_state tree
 
-  let compute_step tree = compute_step_with_debug ~debug_flag:false tree
+  let compute_step tree = compute_step_with_debug tree ~write_debug:Noop
 
   let get_output output_info tree =
     let open Lwt_syntax in
@@ -398,16 +398,16 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
       pvm.buffers.input
 
-    let compute_step_many_with_hooks ?builtins ?after_fast_exec
-        ?stop_at_snapshot ?debug_flag ~max_steps tree =
+    let compute_step_many_with_hooks ?reveal_step ?write_debug ?after_fast_exec
+        ?stop_at_snapshot ~max_steps tree =
       let open Lwt.Syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* pvm_state, ticks =
         Wasm_vm.Internal_for_tests.compute_step_many_with_hooks
-          ?builtins
+          ?reveal_step
+          ?write_debug
           ?after_fast_exec
           ?stop_at_snapshot
-          ?debug_flag
           ~max_steps
           pvm_state
       in
