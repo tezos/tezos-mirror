@@ -124,7 +124,7 @@ module Accountability = struct
       bitset
       shards
 
-  let record_shards_availability shard_bitset_per_slot attested_slots shards =
+  let record_attested_shards shard_bitset_per_slot attested_slots shards =
     List.mapi
       (fun slot bitset ->
         match Bitset.mem attested_slots slot with

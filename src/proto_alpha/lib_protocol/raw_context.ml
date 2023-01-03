@@ -1585,7 +1585,7 @@ module Dal = struct
 
   let record_attested_shards ctxt attestation shards =
     let dal_attestation_slot_accountability =
-      Dal_attestation_repr.Accountability.record_shards_availability
+      Dal_attestation_repr.Accountability.record_attested_shards
         ctxt.back.dal_attestation_slot_accountability
         attestation
         shards

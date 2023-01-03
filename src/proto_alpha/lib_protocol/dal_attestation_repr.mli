@@ -83,8 +83,7 @@ type shard_index = int
 
 module Shard_map : Map.S with type key = shard_index
 
-(** This module is used to record the various data-availability
-   attestations.
+(** This module is used to record the shard attestations.
 
    For each attestor, a list of shards is associated. For each
    attested slot (see {!type:t}) we record that those shards were
@@ -95,7 +94,7 @@ module Shard_map : Map.S with type key = shard_index
 module Accountability : sig
   type attested_slots = t
 
-  (** The data-structure used to record the shards-slots availability. *)
+  (** The data-structure used to record the shards attestations. *)
   type t
 
   (** DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3145
@@ -108,12 +107,12 @@ module Accountability : sig
      available. *)
   val init : length:int -> t
 
-  (** [record_shards_availability t slots shards] records that for all
-     slots declared available in [slots], shard indices in [shards]
-     are available. It is the responsibility of the caller to ensure
+  (** [record_attested_shards t slots shards] records that for all
+     slots declared available in [slots], the shard indices in [shards]
+     are deemed available. It is the responsibility of the caller to ensure
      the shard indices are positive numbers. A negative shard index is
      ignored. *)
-  val record_shards_availability : t -> attested_slots -> shard_index list -> t
+  val record_attested_shards : t -> attested_slots -> shard_index list -> t
 
   (** [is_slot_attested t ~threshold ~number_of_shards slot] returns
      [true] if the number of shards recorded in [t] for the [slot] is
