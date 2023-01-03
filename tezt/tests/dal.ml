@@ -1358,7 +1358,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
@@ -1509,7 +1509,8 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
 let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -1710,7 +1711,7 @@ let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
     sc_rollup_address _node client _pvm_name =
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
@@ -1786,7 +1787,7 @@ let test_reveals_fails_on_wrong_hash _protocol dal_node sc_rollup_node
   in
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in

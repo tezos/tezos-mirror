@@ -779,15 +779,15 @@ let get_chain_block_context_contract_all_ticket_balances ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups_all ?(chain = "main") ?(block = "head")
-    () =
+let get_chain_block_context_smart_rollups_all ?(chain = "main")
+    ?(block = "head") () =
   make
     GET
-    ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "all"]
+    ["chains"; chain; "blocks"; block; "context"; "smart_rollups"; "all"]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_staker_games ?(chain = "main")
-    ?(block = "head") ~staker sc_rollup () =
+let get_chain_block_context_smart_rollups_smart_rollup_staker_games
+    ?(chain = "main") ?(block = "head") ~staker sc_rollup () =
   make
     GET
     [
@@ -796,8 +796,8 @@ let get_chain_block_context_sc_rollups_sc_rollup_staker_games ?(chain = "main")
       "blocks";
       block;
       "context";
-      "sc_rollups";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "staker";
       staker;
@@ -805,15 +805,8 @@ let get_chain_block_context_sc_rollups_sc_rollup_staker_games ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups_all_inbox ?(chain = "main")
+let get_chain_block_context_smart_rollups_all_inbox ?(chain = "main")
     ?(block = "head") () =
-  make
-    GET
-    ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "all"; "inbox"]
-    Fun.id
-
-let get_chain_block_context_sc_rollups_sc_rollup_genesis_info ?(chain = "main")
-    ?(block = "head") sc_rollup =
   make
     GET
     [
@@ -822,14 +815,30 @@ let get_chain_block_context_sc_rollups_sc_rollup_genesis_info ?(chain = "main")
       "blocks";
       block;
       "context";
-      "sc_rollups";
-      "sc_rollup";
+      "smart_rollups";
+      "all";
+      "inbox";
+    ]
+    Fun.id
+
+let get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+    ?(chain = "main") ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "genesis_info";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_stakers_commitments
+let get_chain_block_context_smart_rollups_smart_rollup_stakers_commitments
     ?(chain = "main") ?(block = "head") sc_rollup =
   make
     GET
@@ -839,14 +848,14 @@ let get_chain_block_context_sc_rollups_sc_rollup_stakers_commitments
       "blocks";
       block;
       "context";
-      "sc_rollups";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "stakers_commitments";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_last_cemented_commitment_hash_with_level
+let get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
     ?(chain = "main") ?(block = "head") sc_rollup =
   make
     GET
@@ -856,15 +865,15 @@ let get_chain_block_context_sc_rollups_sc_rollup_last_cemented_commitment_hash_w
       "blocks";
       block;
       "context";
-      "sc_rollups";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "last_cemented_commitment_hash_with_level";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_commitment ?(chain = "main")
-    ?(block = "head") ~sc_rollup ~hash () =
+let get_chain_block_context_smart_rollups_smart_rollup_commitment
+    ?(chain = "main") ?(block = "head") ~sc_rollup ~hash () =
   make
     GET
     [
@@ -873,15 +882,15 @@ let get_chain_block_context_sc_rollups_sc_rollup_commitment ?(chain = "main")
       "blocks";
       block;
       "context";
-      "sc_rollups";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "commitment";
       hash;
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment
+let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =
   make
     GET
@@ -891,8 +900,8 @@ let get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment
       "blocks";
       block;
       "context";
-      "sc_rollups";
-      "sc_rollup";
+      "smart_rollups";
+      "smart_rollup";
       sc_rollup;
       "staker";
       staker;

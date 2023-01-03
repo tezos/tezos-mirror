@@ -1978,25 +1978,25 @@ module Sc_rollup = struct
 
   module S = struct
     let prefix : RPC_context.t RPC_path.context =
-      RPC_path.(open_root / "context" / "sc_rollups")
+      RPC_path.(open_root / "context" / "smart_rollups")
 
     let path_sc_rollup : (RPC_context.t, RPC_context.t * Sc_rollup.t) RPC_path.t
         =
-      RPC_path.(prefix / "sc_rollup" /: Sc_rollup.Address.rpc_arg)
+      RPC_path.(prefix / "smart_rollup" /: Sc_rollup.Address.rpc_arg)
 
     let path_sc_rollups : RPC_context.t RPC_path.context =
       RPC_path.(prefix / "all")
 
     let kind =
       RPC_service.get_service
-        ~description:"Kind of smart-contract rollup"
+        ~description:"Kind of smart rollup"
         ~query:RPC_query.empty
         ~output:Sc_rollup.Kind.encoding
         RPC_path.(path_sc_rollup / "kind")
 
     let initial_pvm_state_hash =
       RPC_service.get_service
-        ~description:"Initial PVM state hash of smart-contract rollup"
+        ~description:"Initial PVM state hash of smart rollup"
         ~query:RPC_query.empty
         ~output:Sc_rollup.State_hash.encoding
         RPC_path.(path_sc_rollup / "initial_pvm_state_hash")
@@ -2004,8 +2004,7 @@ module Sc_rollup = struct
     let genesis_info =
       RPC_service.get_service
         ~description:
-          "Genesis information (level and commitment hash) for a \
-           smart-contract rollup"
+          "Genesis information (level and commitment hash) for a smart rollup"
         ~query:RPC_query.empty
         ~output:Sc_rollup.Commitment.genesis_info_encoding
         RPC_path.(path_sc_rollup / "genesis_info")
@@ -2013,8 +2012,7 @@ module Sc_rollup = struct
     let last_cemented_commitment_hash_with_level =
       RPC_service.get_service
         ~description:
-          "Level and hash of the last cemented commitment for a smart-contract \
-           rollup"
+          "Level and hash of the last cemented commitment for a smart rollup"
         ~query:RPC_query.empty
         ~output:
           (obj2
@@ -2026,7 +2024,7 @@ module Sc_rollup = struct
       RPC_service.get_service
         ~description:
           "The hash of the commitment on which the operator has staked on for \
-           a smart-contract rollup"
+           a smart rollup"
         ~query:RPC_query.empty
         ~output:(obj1 (req "hash" Sc_rollup.Commitment.Hash.encoding))
         RPC_path.(
@@ -2035,7 +2033,7 @@ module Sc_rollup = struct
 
     let commitment =
       RPC_service.get_service
-        ~description:"Commitment for a smart contract rollup from its hash"
+        ~description:"Commitment for a smart rollup from its hash"
         ~query:RPC_query.empty
         ~output:Sc_rollup.Commitment.encoding
         RPC_path.(
@@ -2130,14 +2128,14 @@ module Sc_rollup = struct
 
     let root =
       RPC_service.get_service
-        ~description:"List of all originated smart contract rollups"
+        ~description:"List of all originated smart rollups"
         ~query:RPC_query.empty
         ~output:(Data_encoding.list Sc_rollup.Address.encoding)
         path_sc_rollups
 
     let inbox =
       RPC_service.get_service
-        ~description:"Inbox for the smart contract rollups"
+        ~description:"Inbox for the smart rollups"
         ~query:RPC_query.empty
         ~output:Sc_rollup.Inbox.encoding
         RPC_path.(path_sc_rollups / "inbox")
