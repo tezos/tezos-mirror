@@ -167,6 +167,7 @@ The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
-Another presentation of the Tezos' proof-of-stake mechanism can be
-found in the `Tezos agora wiki entry
-<https://wiki.tezosagora.org/learn/baking/proofofstake/consensus>`_.
+Other presentations of the Tezos' proof-of-stake mechanism can be
+found in the `Tezos Agora wiki entry
+<https://wiki.tezosagora.org/learn/baking/proofofstake>`_ and
+`Open Tezos entry <https://opentezos.com/tezos-basics/liquid-proof-of-stake/>`_.
