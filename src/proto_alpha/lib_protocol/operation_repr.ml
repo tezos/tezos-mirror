@@ -223,7 +223,9 @@ let to_watermark = function
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
   | Dal_attestation chain_id
-  (* We reuse the watermark of an endorsement. This is because this
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4479
+
+     We reuse the watermark of an endorsement. This is because this
      operation is temporary and aims to be merged with an endorsement
      later on. Moreover, there is a leak of abstraction with the shell
      which makes adding a new watermark a bit awkward. *)
