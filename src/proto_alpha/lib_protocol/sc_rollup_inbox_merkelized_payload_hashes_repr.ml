@@ -38,7 +38,7 @@ let () =
     (fun e -> Merkelized_payload_hashes_proof_error e)
 
 module Skip_list_parameters = struct
-  let basis = 2
+  let basis = 4
 end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)

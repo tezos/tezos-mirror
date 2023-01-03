@@ -268,7 +268,7 @@ module History = struct
   module Pointer_hash = Blake2B.Make (Base58) (Pointer_prefix)
 
   module Skip_list_parameters = struct
-    let basis = 2
+    let basis = 4
   end
 
   type error += Add_element_in_slots_skip_list_violates_ordering
