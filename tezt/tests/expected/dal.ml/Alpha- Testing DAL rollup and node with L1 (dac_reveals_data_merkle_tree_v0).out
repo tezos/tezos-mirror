@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string with kernel  --burn-cap 9999999
+./octez-client --wait none originate smart rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string with kernel  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2748.037 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)

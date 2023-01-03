@@ -47,10 +47,9 @@ let block_arg =
 
 let get_sc_rollup_addresses_command () =
   Tezos_clic.command
-    ~desc:
-      "Retrieve the smart-contract rollup address the node is interacting with."
+    ~desc:"Retrieve the smart rollup address the node is interacting with."
     Tezos_clic.no_options
-    (Tezos_clic.fixed ["get"; "sc"; "rollup"; "address"])
+    (Tezos_clic.fixed ["get"; "smart"; "rollup"; "address"])
     (fun () (cctxt : #Configuration.sc_client_context) ->
       RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
       cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)

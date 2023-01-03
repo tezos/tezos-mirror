@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string with kernel '10 10 10 + +' --burn-cap 9999999
+./octez-client --wait none originate smart rollup from bootstrap1 of kind arith of type string with kernel '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2748.037 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 
-./octez-client --wait none originate sc rollup from bootstrap2 of kind arith of type string with kernel 31 --burn-cap 9999999
+./octez-client --wait none originate smart rollup from bootstrap2 of kind arith of type string with kernel 31 --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2748.037 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)

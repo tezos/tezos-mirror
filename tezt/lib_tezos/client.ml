@@ -2118,7 +2118,7 @@ module Sc_rollup = struct
       (["--wait"; wait]
       @ [
           "originate";
-          "sc";
+          "smart";
           "rollup";
           "from";
           src;
@@ -2160,7 +2160,7 @@ module Sc_rollup = struct
       ?hooks
       client
       (["--wait"; wait]
-      @ ["send"; "sc"; "rollup"; "message"; msg; "from"; src]
+      @ ["send"; "smart"; "rollup"; "message"; msg; "from"; src]
       @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
   let send_message ?hooks ?wait ?burn_cap ~msg ~src client =
@@ -2180,7 +2180,7 @@ module Sc_rollup = struct
             "from";
             src;
             "for";
-            "sc";
+            "smart";
             "rollup";
             sc_rollup;
             "with";
@@ -2213,7 +2213,15 @@ module Sc_rollup = struct
         client
         (["--wait"; wait]
         @ [
-            "cement"; "commitment"; hash; "from"; src; "for"; "sc"; "rollup"; dst;
+            "cement";
+            "commitment";
+            hash;
+            "from";
+            src;
+            "for";
+            "smart";
+            "rollup";
+            dst;
           ]
         @ optional_arg "burn-cap" Tez.to_string burn_cap)
     in
@@ -2231,7 +2239,7 @@ module Sc_rollup = struct
             "timeout";
             "dispute";
             "on";
-            "sc";
+            "smart";
             "rollup";
             dst;
             "with";
@@ -2259,7 +2267,7 @@ module Sc_rollup = struct
             "of";
             staker;
             "for";
-            "sc";
+            "smart";
             "rollup";
             rollup;
             "from";
@@ -2290,7 +2298,7 @@ module Sc_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"; rollup]
+        @ ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"; rollup]
         @ ["from"; src]
         @ ["for"; "commitment"; "hash"; commitment_hash]
         @ ["and"; "output"; "proof"; proof]
