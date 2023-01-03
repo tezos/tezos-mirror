@@ -160,9 +160,9 @@ let make_transactions () =
   in
   List.map (fun (contract, i, s) -> make_transaction i s contract) l
 
-(* This is simple "echo kernel" it spits out the first three inputs (SOL, input,
-   EOL) it receives. It uses the [write_output] host function and so it is used
-   to test this function. *)
+(* This is simple "echo kernel" it spits out the first four inputs (SOL,
+   Info_per_level, input, EOL) it receives. It uses the [write_output] host
+   function and so it is used to test this function. *)
 let test_output () =
   let open Lwt_result_syntax in
   let level_offset = 20 in
@@ -198,11 +198,21 @@ let test_output () =
                                    (i32.const %d)
                                    (i32.const %d)))
             (call $write_output (i32.const %d)
+                                (i32.sub (local.get $size) (i32.const 2)))
+            (local.set $size (call $read_input
+                                   (i32.const %d)
+                                   (i32.const %d)
+                                   (i32.const %d)))
+            (call $write_output (i32.const %d)
                                 (local.get $size))
             drop)
           )
 
     |}
+      level_offset
+      dst
+      max_bytes
+      dst_without_header
       level_offset
       dst
       max_bytes
