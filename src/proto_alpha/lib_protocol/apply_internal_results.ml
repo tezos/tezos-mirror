@@ -333,7 +333,7 @@ module Internal_operation = struct
                 paid_storage_size_diff;
               });
         case
-          ~title:"To_sc_rollup"
+          ~title:"To_smart_rollup"
           (Tag 2)
           (obj2
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)

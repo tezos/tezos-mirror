@@ -38,9 +38,9 @@ module Hash = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "commitment_hash"
+        let name = "Smart_rollup_commitment_hash"
 
-        let title = "The hash of a commitment of a smart contract rollup"
+        let title = "The hash of a commitment of a smart rollup"
 
         let b58check_prefix = hash_prefix
 

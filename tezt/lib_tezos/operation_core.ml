@@ -367,7 +367,7 @@ module Manager = struct
     let refutation = json_of_refutation_step refutation in
     strip_null_fields
       [
-        ("kind", `String "sc_rollup_refute");
+        ("kind", `String "smart_rollup_refute");
         ("rollup", `String sc_rollup);
         ("opponent", `String opponent);
         ("refutation", refutation);

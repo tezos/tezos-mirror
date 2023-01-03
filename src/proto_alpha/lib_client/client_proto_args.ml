@@ -909,8 +909,8 @@ module Sc_rollup_params = struct
         | Some c -> return c
         | None ->
             failwith
-              "Parameter '%s' is an invalid smart contract rollup address \
-               encoded in a base58 string."
+              "Parameter '%s' is an invalid smart rollup address encoded in a \
+               base58 string."
               s)
 
   let sc_rollup_address_param ?(name = "smart rollup address")

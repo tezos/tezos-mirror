@@ -735,8 +735,8 @@ let fetch_messages_from_block client =
     |> List.concat_map JSON.as_list
     |> List.concat_map (fun op -> JSON.(op |-> "contents" |> as_list))
     |> List.filter_map (fun op ->
-           if JSON.(op |-> "kind" |> as_string) = "sc_rollup_add_messages" then
-             Some JSON.(op |-> "message" |> as_list)
+           if JSON.(op |-> "kind" |> as_string) = "smart_rollup_add_messages"
+           then Some JSON.(op |-> "message" |> as_list)
            else None)
     |> List.hd
     |> List.map (fun message -> JSON.(message |> as_string))
@@ -973,7 +973,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let* block = RPC.Client.call client @@ RPC.get_chain_block () in
   let contents1 =
     check_l1_block_contains
-      ~kind:"sc_rollup_add_messages"
+      ~kind:"smart_rollup_add_messages"
       ~what:"add messages operations"
       block
   in
@@ -989,7 +989,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let* block = RPC.Client.call client @@ RPC.get_chain_block () in
   let contents2 =
     check_l1_block_contains
-      ~kind:"sc_rollup_add_messages"
+      ~kind:"smart_rollup_add_messages"
       ~what:"add messages operations"
       block
   in

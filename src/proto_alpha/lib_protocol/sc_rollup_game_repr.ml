@@ -449,7 +449,7 @@ module Index = struct
 
   let rpc_arg =
     let descr =
-      "A pair of stakers that index a smart contract rollup refutation game."
+      "A pair of stakers that index a smart rollup refutation game."
     in
     let construct {alice; bob} =
       Format.sprintf "%s-%s" (Staker.to_b58check alice) (Staker.to_b58check bob)

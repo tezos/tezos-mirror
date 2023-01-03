@@ -192,9 +192,9 @@ module Input_hash =
   Blake2B.Make
     (Base58)
     (struct
-      let name = "Sc_rollup_input_hash"
+      let name = "Smart_rollup_input_hash"
 
-      let title = "A smart contract rollup input hash"
+      let title = "A smart rollup input hash"
 
       let b58check_prefix =
         "\001\118\125\135" (* "scd1(37)" decoded from base 58. *)

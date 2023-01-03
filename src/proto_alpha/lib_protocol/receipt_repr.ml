@@ -235,19 +235,19 @@ let balance_encoding =
            (fun ((), ()) -> Tx_rollup_rejection_punishments);
          case
            (Tag 24)
-           ~title:"Sc_rollup_refutation_punishments"
+           ~title:"Smart_rollup_refutation_punishments"
            (obj2
               (req "kind" (constant "burned"))
-              (req "category" (constant "sc_rollup_refutation_punishments")))
+              (req "category" (constant "smart_rollup_refutation_punishments")))
            (function
              | Sc_rollup_refutation_punishments -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Sc_rollup_refutation_punishments);
          case
            (Tag 25)
-           ~title:"Sc_rollup_refutation_rewards"
+           ~title:"Smart_rollup_refutation_rewards"
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "sc_rollup_refutation_rewards")))
+              (req "category" (constant "smart_rollup_refutation_rewards")))
            (function
              | Sc_rollup_refutation_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Sc_rollup_refutation_rewards);
