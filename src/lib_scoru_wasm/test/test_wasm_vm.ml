@@ -100,16 +100,17 @@ let test_last_input_info_updated_in_set_input_step () =
 
   (* Verify initial empty level supplied and last_input_info updated accordingly *)
   let* _initial_input_info =
-    assert_input_info ~inp_req:No_input_required tree 0 1
+    assert_input_info ~inp_req:No_input_required tree 0 2
   in
 
   let*! tree = eval_until_input_requested tree in
   let*! tree = Wasm_utils.set_sol_input 1l tree in
-  let*! tree = Wasm_utils.set_internal_message 1l Z.one "input1" tree in
-  let*! tree = Wasm_utils.set_internal_message 1l (Z.of_int 2) "input2" tree in
-  let*! tree = Wasm_utils.set_internal_message 1l (Z.of_int 3) "input3" tree in
-  let* _input_info_during_collect = assert_input_info tree 1 3 in
-  let*! tree = Wasm_utils.set_eol_input 1l (Z.of_int 4) tree in
+  let*! tree = Wasm_utils.set_info_per_level_input 1l tree in
+  let*! tree = Wasm_utils.set_internal_message 1l (Z.of_int 2) "input1" tree in
+  let*! tree = Wasm_utils.set_internal_message 1l (Z.of_int 3) "input2" tree in
+  let*! tree = Wasm_utils.set_internal_message 1l (Z.of_int 4) "input3" tree in
+  let* _input_info_during_collect = assert_input_info tree 1 4 in
+  let*! tree = Wasm_utils.set_eol_input 1l (Z.of_int 5) tree in
 
   let*! tick_state = Wasm.Internal_for_tests.get_tick_state tree in
   assert (tick_state == Padding) ;

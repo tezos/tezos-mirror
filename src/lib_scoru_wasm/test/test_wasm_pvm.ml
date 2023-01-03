@@ -571,7 +571,7 @@ let build_snapshot_wasm_state_from_set_input
       new_last_top_level_call
       tree
   in
-  (* The kernel had read two inputs (SOL and EOL). *)
+  (* The kernel had read three inputs (SOL, Info_per_level and EOL). *)
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value
@@ -580,7 +580,7 @@ let build_snapshot_wasm_state_from_set_input
       {
         inbox_level =
           Stdlib.Option.get (Tezos_base.Bounded.Non_negative_int32.of_value 0l);
-        message_counter = Z.one;
+        message_counter = Z.(succ one);
       }
       tree
   in
@@ -1419,13 +1419,13 @@ let test_inbox_cleanup () =
   let max_tick = 1000L in
   let* tree = initial_tree ~max_tick ~from_binary:false module_ in
   let* tree = set_empty_inbox_step 0l tree in
-  (* Before executing: EOL and SOL. *)
-  let* () = check_messages_count tree 2 in
+  (* Before executing: EOL, Info_per_level and SOL. *)
+  let* () = check_messages_count tree 3 in
   (* Go to the very last [Padding] state. *)
   let* tree, _ = Wasm.compute_step_many ~max_steps:Int64.(pred max_tick) tree in
-  (* Before yielding: EOL and SOL still, since the module does not
-     read the content of the inbox. *)
-  let* () = check_messages_count tree 2 in
+  (* Before yielding: EOL, Info_per_level and SOL still, since the module does
+     not read the content of the inbox. *)
+  let* () = check_messages_count tree 3 in
   (* Yield with one more step. *)
   let* tree = Wasm.compute_step tree in
   (* After yielding, the inbox has been cleared. *)
