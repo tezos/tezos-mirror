@@ -913,6 +913,10 @@ module Sc_rollup_params = struct
                encoded in a base58 string."
               s)
 
+  let sc_rollup_address_param ?(name = "smart rollup address")
+      ?(desc = "the address of the targeted smart rollup") next =
+    Tezos_clic.param ~name ~desc sc_rollup_address_parameter next
+
   let rollup_kind_parameter =
     Tezos_clic.parameter (fun _ name ->
         match Sc_rollup.Kind.of_string name with
