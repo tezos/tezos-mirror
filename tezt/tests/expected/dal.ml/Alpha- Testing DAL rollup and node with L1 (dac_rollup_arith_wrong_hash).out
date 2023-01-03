@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 
-./octez-client rpc get '/chains/main/blocks/head/context/sc_rollups/sc_rollup/[SMART_ROLLUP_HASH]/genesis_info'
+./octez-client rpc get '/chains/main/blocks/head/context/smart_rollups/smart_rollup/[SMART_ROLLUP_HASH]/genesis_info'
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
