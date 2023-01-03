@@ -34,7 +34,7 @@ let () =
   in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_outbox_message_repr.error_encoding_outbox_message"
+    ~id:"smart_rollup_outbox_message_repr.error_encoding_outbox_message"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
@@ -46,7 +46,7 @@ let () =
   in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_outbox_message_repr.error_decoding_outbox_message"
+    ~id:"smart_rollup_outbox_message_repr.error_decoding_outbox_message"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg

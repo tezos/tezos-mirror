@@ -31,7 +31,7 @@ type error += Sc_rollup_invalid_serialized_inbox_proof
 let () =
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_proof_check"
+    ~id:"smart_rollup_proof_check"
     ~title:"Invalid proof"
     ~description:"An invalid proof has been submitted"
     ~pp:(fun fmt msg -> Format.fprintf fmt "Invalid proof: %s" msg)
@@ -41,7 +41,7 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_invalid_serialized_inbox_proof"
+    ~id:"smart_rollup_invalid_serialized_inbox_proof"
     ~title:"Invalid serialized inbox proof"
     ~description:"The serialized inbox proof can not be de-serialized"
     ~pp:(fun fmt () -> Format.fprintf fmt "Invalid serialized inbox proof")

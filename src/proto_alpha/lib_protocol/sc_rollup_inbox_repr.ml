@@ -61,7 +61,7 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox.inbox_proof_error"
+    ~id:"internal.smart_rollup_inbox_proof_error"
     ~title:
       "Internal error: error occurred during proof production or validation"
     ~description:"An inbox proof error."
@@ -72,7 +72,7 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox.add_zero_messages"
+    ~id:"internal.smart_rollup_add_zero_messages"
     ~title:"Internal error: trying to add zero messages"
     ~description:
       "Message adding functions must be called with a positive number of \
@@ -90,7 +90,7 @@ let () =
   in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox.inbox_level_reached_message_limit"
+    ~id:"smart_rollup_inbox_level_reached_message_limit"
     ~title:"Inbox level reached messages limit"
     ~description
     ~pp:(fun ppf _ -> Format.pp_print_string ppf description)

@@ -283,24 +283,23 @@ let check_constants constants =
   error_unless
     Compare.Int.(constants.sc_rollup.origination_size >= 0)
     (Invalid_protocol_constants
-       "The smart contract rollup origination size must be non-negative.")
+       "The smart rollup origination size must be non-negative.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.sc_rollup.challenge_window_in_blocks >= 0)
     (Invalid_protocol_constants
-       "The smart contract rollup challenge window in blocks must be \
-        non-negative.")
+       "The smart rollup challenge window in blocks must be non-negative.")
   >>? fun () ->
   error_unless
     Tez_repr.(constants.sc_rollup.stake_amount >= zero)
     (Invalid_protocol_constants
-       "The smart contract rollup max stake amount must be non-negative.")
+       "The smart rollup max stake amount must be non-negative.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.sc_rollup.commitment_period_in_blocks > 0)
     (Invalid_protocol_constants
-       "The smart contract rollup commitment period in blocks must be strictly \
-        greater than 0.")
+       "The smart rollup commitment period in blocks must be strictly greater \
+        than 0.")
   >>? fun () ->
   error_unless
     (let sc_rollup_max_lookahead_in_blocks =
@@ -316,7 +315,7 @@ let check_constants constants =
        sc_rollup_max_lookahead_in_blocks
        > Int32.of_int constants.sc_rollup.challenge_window_in_blocks))
     (Invalid_protocol_constants
-       "The smart contract rollup max lookahead in blocks must be greater than \
+       "The smart rollup max lookahead in blocks must be greater than \
         [sc_rollup_commitment_period_in_blocks] and \
         [sc_rollup_challenge_window_in_blocks].")
   >>? fun () ->

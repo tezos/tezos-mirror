@@ -103,7 +103,7 @@ type error +=
 let () =
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_staker_in_game"
+    ~id:"smart_rollup_staker_in_game"
     ~title:"Staker is already playing a game"
     ~description:"Attempted to start a game where one staker is already busy"
     ~pp:(fun ppf staker ->
@@ -165,7 +165,7 @@ let () =
   let description = "Attempt to timeout game too early" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_timeout_level_not_reached"
+    ~id:"smart_rollup_timeout_level_not_reached"
     ~title:"Attempt to timeout game too early"
     ~description
     ~pp:(fun ppf (blocks_left, staker) ->
@@ -191,7 +191,7 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_game_already_started"
+    ~id:"smart_rollup_game_already_started"
     ~title:"Refutation game already started"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -201,7 +201,7 @@ let () =
   let description = "Refutation game does not exist" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_no_game"
+    ~id:"smart_rollup_no_game"
     ~title:"Refutation game does not exist"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -211,7 +211,7 @@ let () =
   let description = "Attempt to play move but not staker's turn" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_wrong_turn"
+    ~id:"smart_rollup_wrong_turn"
     ~title:"Attempt to play move but not staker's turn"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -223,7 +223,7 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_max_number_of_messages_reached_for_commitment_period"
+    ~id:"smart_rollup_max_number_of_messages_reached_for_commitment_period"
     ~title:"Maximum number of messages reached for commitment period"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -233,10 +233,10 @@ let () =
           Some ()
       | _ -> None)
     (fun () -> Sc_rollup_max_number_of_messages_reached_for_commitment_period) ;
-  let description = "Tried to add zero messages to a SC rollup" in
+  let description = "Tried to add zero messages to a smart rollup" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_errors.sc_rollup_add_zero_messages"
+    ~id:"smart_rollup_add_zero_messages"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -246,48 +246,52 @@ let () =
   let description = "Attempted to cement a disputed commitment." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_disputed"
+    ~id:"smart_rollup_commitment_disputed"
     ~title:"Commitment disputed"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Sc_rollup_disputed -> Some () | _ -> None)
     (fun () -> Sc_rollup_disputed) ;
-  let description = "Attempted to use a rollup that has not been originated." in
+  let description =
+    "Attempted to use a smart rollup that has not been originated."
+  in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_does_not_exist"
-    ~title:"Rollup does not exist"
+    ~id:"smart_rollup_does_not_exist"
+    ~title:"Smart rollup does not exist"
     ~description
     ~pp:(fun ppf x ->
-      Format.fprintf ppf "Rollup %a does not exist" Sc_rollup_repr.pp x)
+      Format.fprintf ppf "Smart rollup %a does not exist" Sc_rollup_repr.pp x)
     Data_encoding.(obj1 (req "rollup" Sc_rollup_repr.encoding))
     (function Sc_rollup_does_not_exist x -> Some x | _ -> None)
     (fun x -> Sc_rollup_does_not_exist x) ;
   let description = "No conflict." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_no_conflict"
+    ~id:"smart_rollup_no_conflict"
     ~title:"No conflict"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Sc_rollup_no_conflict -> Some () | _ -> None)
     (fun () -> Sc_rollup_no_conflict) ;
-  let description = "No stakers." in
+  let description = "No stakers for the targeted smart rollup." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_no_stakers"
+    ~id:"smart_rollup_no_stakers"
     ~title:"No stakers"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Sc_rollup_no_stakers -> Some () | _ -> None)
     (fun () -> Sc_rollup_no_stakers) ;
-  let description = "Unknown staker." in
+  let description =
+    "This implicit account is not a staker of this smart rollup."
+  in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_not_staked"
+    ~id:"smart_rollup_not_staked"
     ~title:"Unknown staker"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -300,8 +304,8 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_not_staked_on_lcc_or_ancestor"
-    ~title:"Rollup not staked on LCC or its ancestor"
+    ~id:"smart_rollup_not_staked_on_lcc_or_ancestor"
+    ~title:"Smart rollup not staked on LCC or its ancestor"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
@@ -310,7 +314,7 @@ let () =
   let description = "Parent is not the last cemented commitment." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_parent_not_lcc"
+    ~id:"smart_rollup_parent_not_lcc"
     ~title:"Parent is not the last cemented commitment"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -320,7 +324,7 @@ let () =
   let description = "Can not remove a staker committed on cemented." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_remove_lcc_or_ancestor"
+    ~id:"smart_rollup_remove_lcc_or_ancestor"
     ~title:"Can not remove a staker"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -330,7 +334,7 @@ let () =
   let description = "Staker tried to double stake." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_staker_double_stake"
+    ~id:"smart_rollup_staker_double_stake"
     ~title:description
     ~description
     ~pp:(fun ppf () ->
@@ -348,7 +352,7 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_too_far_ahead"
+    ~id:"smart_rollup_too_far_ahead"
     ~title:"Commitment too far ahead"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -360,7 +364,7 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_commitment_too_recent"
+    ~id:"smart_rollup_commitment_too_recent"
     ~title:"Commitment too recent"
     ~description
     ~pp:(fun ppf (current_level, min_level) ->
@@ -385,7 +389,7 @@ let () =
   let description = "Unknown commitment." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_unknown_commitment"
+    ~id:"smart_rollup_unknown_commitment"
     ~title:"Unknown commitment"
     ~description
     ~pp:(fun ppf x ->
@@ -401,7 +405,7 @@ let () =
   let description = "Attempted to commit to a bad inbox level." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_bad_inbox_level"
+    ~id:"smart_rollup_bad_inbox_level"
     ~title:"Committing to a bad inbox level"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -411,7 +415,7 @@ let () =
   let description = "Invalid rollup outbox message index" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_invalid_outbox_message_index"
+    ~id:"smart_rollup_invalid_outbox_message_index"
     ~title:"Invalid rollup outbox message index"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -421,7 +425,7 @@ let () =
   let description = "Outbox level expired" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_outbox_level_expired"
+    ~id:"smart_rollup_outbox_level_expired"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -431,7 +435,7 @@ let () =
   let description = "Outbox message already applied" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_outbox_message_already_applied"
+    ~id:"smart_rollup_outbox_message_already_applied"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -440,17 +444,16 @@ let () =
     (fun () -> Sc_rollup_outbox_message_already_applied) ;
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_staker_funds_too_low"
+    ~id:"smart_rollup_staker_funds_too_low"
     ~title:"Staker does not have enough funds to make a deposit"
     ~description:
-      "Staker doesn't have enough funds to make a smart contract rollup \
-       deposit."
+      "Staker doesn't have enough funds to make a smart rollup deposit."
     ~pp:(fun ppf (staker, sc_rollup, staker_balance, min_expected_balance) ->
       Format.fprintf
         ppf
         "Staker (%a) doesn't have enough funds to make the deposit for smart \
-         contract rollup (%a). Staker's balance is %a while a balance of at \
-         least %a is required."
+         rollup (%a). Staker's balance is %a while a balance of at least %a is \
+         required."
         Signature.Public_key_hash.pp
         staker
         Sc_rollup_repr.pp
@@ -462,7 +465,7 @@ let () =
     Data_encoding.(
       obj4
         (req "staker" Signature.Public_key_hash.encoding)
-        (req "sc_rollup" Sc_rollup_repr.encoding)
+        (req "smart_rollup" Sc_rollup_repr.encoding)
         (req "staker_balance" Tez_repr.encoding)
         (req "min_expected_balance" Tez_repr.encoding))
     (function
@@ -476,7 +479,7 @@ let () =
   let description = "Could not serialize commitment." in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_bad_commitment_serialization"
+    ~id:"smart_rollup_bad_commitment_serialization"
     ~title:"Could not serialize commitment."
     ~description:"Unable to hash the commitment serialization."
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -488,7 +491,7 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_commitment_from_future"
+    ~id:"smart_rollup_commitment_from_future"
     ~title:"Commitment from future"
     ~description
     ~pp:(fun ppf (current_level, inbox_level) ->
@@ -513,7 +516,7 @@ let () =
   let description = "Commitment is past the curfew for this level." in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_commitment_past_curfew"
+    ~id:"smart_rollup_commitment_past_curfew"
     ~title:"Commitment past curfew."
     ~description:
       "A commitment exists for this inbox level for longer than the curfew \
@@ -522,10 +525,10 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_commitment_past_curfew -> Some () | _ -> None)
     (fun () -> Sc_rollup_commitment_past_curfew) ;
-  let description = "Error while generating rollup address" in
+  let description = "Error while generating a smart rollup address" in
   register_error_kind
     `Permanent
-    ~id:"rollup.error_smart_contract_rollup_address_generation"
+    ~id:"smart_rollup_address_generation"
     ~title:description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     ~description
@@ -535,7 +538,7 @@ let () =
   let description = "Tried to publish a 0 tick commitment" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_zero_tick_commitment"
+    ~id:"smart_rollup_zero_tick_commitment"
     ~title:description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     ~description
@@ -545,7 +548,7 @@ let () =
   let description = "Maximal number of parallel games reached" in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_maximal_number_of_parallel_games_reached"
+    ~id:"smart_rollup_maximal_number_of_parallel_games_reached"
     ~title:description
     ~pp:(fun ppf staker ->
       Format.fprintf
@@ -562,7 +565,7 @@ let () =
   let description = "Conflicting commitments do not have a common ancestor" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_not_valid_commitments_conflict"
+    ~id:"smart_rollup_not_valid_commitments_conflict"
     ~title:description
     ~pp:(fun ppf (c1, s1, c2, s2) ->
       Format.fprintf
@@ -594,7 +597,7 @@ let () =
   let description = "Given commitment is not staked by given staker" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_wrong_staker_for_conflict_commitment"
+    ~id:"smart_rollup_wrong_staker_for_conflict_commitment"
     ~title:description
     ~pp:(fun ppf (staker, commitment) ->
       Format.fprintf
@@ -618,7 +621,7 @@ let () =
   let description = "Given commitment cannot be cemented" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_invalid_commitment_to_cement"
+    ~id:"smart_rollup_invalid_commitment_to_cement"
     ~title:description
     ~pp:(fun ppf (valid_candidate, invalid_candidate) ->
       Format.fprintf
@@ -648,7 +651,7 @@ let () =
   let description = "Published commitment is too old" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_commitment_too_old"
+    ~id:"smart_rollup_commitment_too_old"
     ~title:description
     ~pp:(fun ppf (last_cemented_inbox_level, commitment_inbox_level) ->
       Format.fprintf

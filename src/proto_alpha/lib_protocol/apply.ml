@@ -201,13 +201,11 @@ let () =
       | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
     (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
 
-  let description =
-    "Smart contract rollups will be enabled in a future proposal."
-  in
+  let description = "Smart rollups are disabled." in
   register_error_kind
     `Permanent
-    ~id:"operation.sc_rollup_disabled"
-    ~title:"Smart contract rollups are disabled"
+    ~id:"operation.smart_rollup_disabled"
+    ~title:"Smart rollups are disabled"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
@@ -257,13 +255,13 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate) ;
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_transfer_to_sc_rollup_from_implicit_account"
-    ~title:"Invalid transfer to sc rollup"
-    ~description:"Invalid transfer to sc rollup from implicit account"
+    ~id:"operations.invalid_transfer_to_smart_rollup_from_implicit_account"
+    ~title:"Invalid transfer to smart rollup"
+    ~description:"Invalid transfer to smart rollup from implicit account"
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Invalid source for transfer operation to smart-contract rollup. Only \
+        "Invalid source for transfer operation to smart rollup. Only \
          originated accounts are allowed.")
     Data_encoding.empty
     (function Invalid_transfer_to_sc_rollup -> Some () | _ -> None)

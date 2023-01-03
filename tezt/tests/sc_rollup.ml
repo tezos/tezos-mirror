@@ -2612,7 +2612,11 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
          ~sc_rollup
          operator
   in
-  let* () = Process.check_error ~msg:(rex "Unknown staker") process in
+  let* () =
+    Process.check_error
+      ~msg:(rex "This implicit account is not a staker of this smart rollup")
+      process
+  in
   let* predecessor, _ =
     last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
   in
