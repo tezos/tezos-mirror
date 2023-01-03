@@ -112,6 +112,9 @@ val checkout_context :
     stored in [node_ctxt]. *)
 val metadata : _ t -> Sc_rollup.Metadata.t
 
+(** Returns [true] if the DAL is enabled for the current protocol. *)
+val dal_enabled : _ t -> bool
+
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)
 val readonly : _ t -> ro

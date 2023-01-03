@@ -79,6 +79,7 @@ module Make (PVM : Pvm.S) = struct
         tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
     | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
       ->
+        assert (Node_context.dal_enabled node_ctxt) ;
         let*! () =
           Store.Dal_slots_headers.add
             node_ctxt.store
@@ -192,7 +193,10 @@ module Make (PVM : Pvm.S) = struct
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
     let* ctxt = Inbox.process_head node_ctxt head in
-    let* () = Dal_slots_tracker.process_head node_ctxt head in
+    let* () =
+      when_ (Node_context.dal_enabled node_ctxt) @@ fun () ->
+      Dal_slots_tracker.process_head node_ctxt head
+    in
     let*! () = State.set_block_level_and_hash node_ctxt.store head in
     let* () = process_l1_block_operations ~finalized:false node_ctxt head in
     (* Avoid storing and publishing commitments if the head is not final. *)
