@@ -31,6 +31,18 @@ Smart Contract Optimistic Rollups
 
 - Require conflicting commitments hashes to start game. (MR :gl:`!7054`)
 
+- Fix bug in skip list. (MR :gl:`!7189`)
+
+- Introduce feature flag for the Arith PVM. (MR :gl:`!7220`)
+
+- Stake on a commitment rather than on a branch. (MR :gl:`!7067`)
+
+- Improve readability of ``assert_commitment_not_too_far_ahead``.
+  (MR :gl:`!7231`)
+
+- Improve readability of ``assert_commitment_is_not_past_curfew``.
+  (MR :gl:`!7230`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
@@ -38,7 +50,7 @@ Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
-:gl:`!7103`)
+:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`)
 
 Breaking Changes
 ----------------
@@ -53,6 +65,8 @@ Operation receipts
 
 Bug Fixes
 ---------
+
+- Fix consensus watermark encoding roundtrip. (MR :gl:`!7210`)
 
 Minor Changes
 -------------
