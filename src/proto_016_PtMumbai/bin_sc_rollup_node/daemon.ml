@@ -51,7 +51,7 @@ module Make (PVM : Pvm.S) = struct
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
-        let*! () =
+        let* () =
           Node_context.set_commitment_published_at_level
             node_ctxt
             commitment_hash
@@ -68,12 +68,12 @@ module Make (PVM : Pvm.S) = struct
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
-        let*! known_commitment =
+        let* known_commitment =
           Node_context.commitment_exists node_ctxt commitment_hash
         in
         if not known_commitment then return_unit
         else
-          let*! republication =
+          let* republication =
             Node_context.commitment_was_published
               node_ctxt
               ~source:Anyone
@@ -227,7 +227,7 @@ module Make (PVM : Pvm.S) = struct
   let rec processed_finalized_block (node_ctxt : _ Node_context.t)
       Layer1.({hash; level} as block) =
     let open Lwt_result_syntax in
-    let*! last_finalized = Node_context.get_finalized_head_opt node_ctxt in
+    let* last_finalized = Node_context.get_finalized_head_opt node_ctxt in
     let already_finalized =
       match last_finalized with
       | Some finalized -> level <= Raw_level.to_int32 finalized.header.level
@@ -241,14 +241,14 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let*! () = Node_context.mark_finalized_head node_ctxt hash in
+    let* () = Node_context.mark_finalized_head node_ctxt hash in
     return_unit
 
   let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
       =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
-    let*! () = Node_context.save_level node_ctxt head in
+    let* () = Node_context.save_level node_ctxt head in
     let* inbox_hash, inbox, inbox_witness, messages, ctxt =
       Inbox.process_head node_ctxt head
     in
@@ -302,7 +302,7 @@ module Make (PVM : Pvm.S) = struct
         head
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
-    let*! () = Node_context.save_l2_head node_ctxt l2_block in
+    let* () = Node_context.save_l2_head node_ctxt l2_block in
     let*! () =
       Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
     in
@@ -330,7 +330,7 @@ module Make (PVM : Pvm.S) = struct
      imply the processing of head~3, etc). *)
   let on_layer_1_head node_ctxt head =
     let open Lwt_result_syntax in
-    let*! old_head = Node_context.last_processed_head_opt node_ctxt in
+    let* old_head = Node_context.last_processed_head_opt node_ctxt in
     let old_head =
       match old_head with
       | Some h ->
@@ -431,7 +431,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = Injector.shutdown () in
     let* () = message "Shutting down Batcher@." in
     let* () = Components.Batcher.shutdown () in
-    let* () = Node_context.close node_ctxt in
+    let* (_ : unit tzresult) = Node_context.close node_ctxt in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 

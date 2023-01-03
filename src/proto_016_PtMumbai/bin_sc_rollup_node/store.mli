@@ -23,74 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3471
-   Use indexed file for append-only instead of Irmin. *)
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3739
-   Refactor the store file to have functors in their own
-   separate module, and return errors within the Error monad. *)
-
 open Protocol
 open Alpha_context
+open Indexed_store
 
-type +'a store
-
-include Store_sigs.Store with type 'a t = 'a store
-
-(** Type of store. The parameter indicates if the store can be written or only
-    read. *)
-type 'a t = ([< `Read | `Write > `Read] as 'a) store
-
-(** Read/write store {!t}. *)
-type rw = Store_sigs.rw t
-
-(** Read only store {!t}. *)
-type ro = Store_sigs.ro t
-
-(** [close store] closes the store. *)
-val close : _ t -> unit Lwt.t
-
-(** [load mode directory] loads a store from the data persisted in [directory].*)
-val load : 'a Store_sigs.mode -> string -> 'a store Lwt.t
-
-(** [readonly store] returns a read-only version of [store]. *)
-val readonly : _ t -> ro
+module Irmin_store : Store_sigs.Store
 
 module L2_blocks :
-  Store_sigs.Append_only_map
+  INDEXED_FILE
     with type key := Block_hash.t
-     and type value := Sc_rollup_block.t
-     and type 'a store := 'a store
+     and type value := (unit, unit) Sc_rollup_block.block
+     and type header := Sc_rollup_block.header
 
 (** Storage for persisting messages downloaded from the L1 node. *)
-module Messages : sig
-  type info = {
-    predecessor : Block_hash.t;
-    predecessor_timestamp : Timestamp.t;
-    messages : Sc_rollup.Inbox_message.t list;
-  }
-
-  include
-    Store_sigs.Append_only_map
-      with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-       and type value := info
-       and type 'a store := 'a store
-end
+module Messages :
+  INDEXED_FILE
+    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+     and type value := Sc_rollup.Inbox_message.t list
+     and type header := Block_hash.t * Timestamp.t * int
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :
-  Store_sigs.Append_only_map
+  SIMPLE_INDEXED_FILE
     with type key := Sc_rollup.Inbox.Hash.t
      and type value := Sc_rollup.Inbox.t
-     and type 'a store := 'a store
+     and type header := unit
 
 (** Storage containing commitments and corresponding commitment hashes that the
     rollup node has knowledge of. *)
 module Commitments :
-  Store_sigs.Append_only_map
+  INDEXABLE_STORE
     with type key := Sc_rollup.Commitment.Hash.t
      and type value := Sc_rollup.Commitment.t
-     and type 'a store := 'a store
 
 (** Storage mapping commitment hashes to the level when they were published by
     the rollup node. It only contains hashes of commitments published by this
@@ -106,27 +70,18 @@ module Commitments_published_at_level : sig
   }
 
   include
-    Store_sigs.Map
+    INDEXABLE_STORE
       with type key := Sc_rollup.Commitment.Hash.t
        and type value := element
-       and type 'a store := 'a store
 end
 
-module L2_head :
-  Store_sigs.Mutable_value
-    with type value := Sc_rollup_block.t
-     and type 'a store := 'a store
+module L2_head : SINGLETON_STORE with type value := Sc_rollup_block.t
 
 module Last_finalized_head :
-  Store_sigs.Mutable_value
-    with type value := Sc_rollup_block.t
-     and type 'a store := 'a store
+  SINGLETON_STORE with type value := Sc_rollup_block.t
 
 module Levels_to_hashes :
-  Store_sigs.Map
-    with type key := int32
-     and type value := Block_hash.t
-     and type 'a store := 'a store
+  INDEXABLE_STORE with type key := int32 and type value := Block_hash.t
 
 (** Published slot headers per block hash,
     stored as a list of bindings from [Dal_slot_index.t]
@@ -137,13 +92,13 @@ module Dal_slots_headers :
     with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
      and type value := Dal.Slot.Header.t
-     and type 'a store := 'a store
+     and type 'a store := 'a Irmin_store.t
 
 module Dal_confirmed_slots_history :
   Store_sigs.Append_only_map
     with type key := Block_hash.t
      and type value := Dal.Slots_history.t
-     and type 'a store := 'a store
+     and type 'a store := 'a Irmin_store.t
 
 (** Confirmed DAL slots histories cache. See documentation of
     {Dal_slot_repr.Slots_history} for more details. *)
@@ -151,7 +106,7 @@ module Dal_confirmed_slots_histories :
   Store_sigs.Append_only_map
     with type key := Block_hash.t
      and type value := Dal.Slots_history.History_cache.t
-     and type 'a store := 'a store
+     and type 'a store := 'a Irmin_store.t
 
 (** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
     of dal slots fetched by the rollup node, as a list of pages. The values of
@@ -164,7 +119,7 @@ module Dal_slot_pages :
     with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t * Dal.Page.Index.t
      and type value := Dal.Page.content
-     and type 'a store := 'a store
+     and type 'a store := 'a Irmin_store.t
 
 (** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing
     status of dal slots content fetched by the rollup node. The values of
@@ -178,4 +133,45 @@ module Dal_processed_slots :
     with type primary_key := Block_hash.t
      and type secondary_key := Dal.Slot_index.t
      and type value := [`Confirmed | `Unconfirmed]
-     and type 'a store := 'a store
+     and type 'a store := 'a Irmin_store.t
+
+type +'a store = {
+  l2_blocks : 'a L2_blocks.t;
+  messages : 'a Messages.t;
+  inboxes : 'a Inboxes.t;
+  commitments : 'a Commitments.t;
+  commitments_published_at_level : 'a Commitments_published_at_level.t;
+  l2_head : 'a L2_head.t;
+  last_finalized_head : 'a Last_finalized_head.t;
+  levels_to_hashes : 'a Levels_to_hashes.t;
+  irmin_store : 'a Irmin_store.t;
+}
+
+(** Type of store. The parameter indicates if the store can be written or only
+    read. *)
+type 'a t = ([< `Read | `Write > `Read] as 'a) store
+
+(** Read/write store {!t}. *)
+type rw = Store_sigs.rw t
+
+(** Read only store {!t}. *)
+type ro = Store_sigs.ro t
+
+(** [close store] closes the store. *)
+val close : _ t -> unit tzresult Lwt.t
+
+(** [load mode ~l2_blocks_cache_size directory] loads a store from the data
+    persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
+    indexes and irmin store will be opened in readonly mode and only read
+    operations will be permitted. This allows to open a store for read access
+    that is already opened in {!Store_sigs.Read_write} mode in another
+    process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
+    will keep in memory. *)
+val load :
+  'a Store_sigs.mode ->
+  l2_blocks_cache_size:int ->
+  string ->
+  'a store tzresult Lwt.t
+
+(** [readonly store] returns a read-only version of [store]. *)
+val readonly : _ t -> ro

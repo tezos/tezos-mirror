@@ -106,7 +106,7 @@ val init :
   'a t tzresult Lwt.t
 
 (** Closes the store, context and Layer 1 monitor. *)
-val close : _ t -> unit Lwt.t
+val close : _ t -> unit tzresult Lwt.t
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
@@ -132,7 +132,7 @@ type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** [is_processed store hash] returns [true] if the block with [hash] has
     already been processed by the daemon. *)
-val is_processed : _ t -> Block_hash.t -> bool Lwt.t
+val is_processed : _ t -> Block_hash.t -> bool tzresult Lwt.t
 
 (** [get_l2_block t hash] returns the Layer 2 block known by the rollup node for
     Layer 1 block [hash]. *)
@@ -140,39 +140,42 @@ val get_l2_block : _ t -> Block_hash.t -> Sc_rollup_block.t tzresult Lwt.t
 
 (** Same as {!get_l2_block} but returns [None] when the Layer 2 block is not
     available. *)
-val find_l2_block : _ t -> Block_hash.t -> Sc_rollup_block.t option Lwt.t
+val find_l2_block :
+  _ t -> Block_hash.t -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** Same as {!get_l2_block} but retrieves the Layer 2 block by its level. *)
 val get_l2_block_by_level : _ t -> int32 -> Sc_rollup_block.t tzresult Lwt.t
 
 (** Same as {!get_l2_block_by_level} but returns [None] when the Layer 2 block
     is not available. *)
-val find_l2_block_by_level : _ t -> int32 -> Sc_rollup_block.t option Lwt.t
+val find_l2_block_by_level :
+  _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** [get_full_l2_block node_ctxt hash] returns the full L2 block for L1 block
     hash [hash]. The result contains the L2 block and its content (inbox,
     messages, commitment). *)
-val get_full_l2_block : _ t -> Block_hash.t -> Sc_rollup_block.full Lwt.t
+val get_full_l2_block :
+  _ t -> Block_hash.t -> Sc_rollup_block.full tzresult Lwt.t
 
 (** [save_level t head] registers the correspondences [head.level |->
     head.hash] in the store. *)
-val save_level : rw -> Layer1.head -> unit Lwt.t
+val save_level : rw -> Layer1.head -> unit tzresult Lwt.t
 
-(** [save_l2_head t l2_block] remembers that the [l2_block.head] is 
+(** [save_l2_head t l2_block] remembers that the [l2_block.head] is
     processed. The system should not have to come back to it. *)
-val save_l2_head : rw -> Sc_rollup_block.t -> unit Lwt.t
+val save_l2_head : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
 (** [last_processed_head_opt store] returns the last processed head if it
     exists. *)
-val last_processed_head_opt : _ t -> Sc_rollup_block.t option Lwt.t
+val last_processed_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** [mark_finalized_head store head] remembers that the [head] is finalized. By
     construction, every block whose level is smaller than [head]'s is also
     finalized. *)
-val mark_finalized_head : rw -> Block_hash.t -> unit Lwt.t
+val mark_finalized_head : rw -> Block_hash.t -> unit tzresult Lwt.t
 
 (** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
-val get_finalized_head_opt : _ t -> Sc_rollup_block.t option Lwt.t
+val get_finalized_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** [hash_of_level node_ctxt level] returns the current block hash for a given
     [level]. *)
@@ -180,7 +183,7 @@ val hash_of_level : _ t -> int32 -> Block_hash.t tzresult Lwt.t
 
 (** [hash_of_level_opt] is like {!hash_of_level} but returns [None] if the
     [level] is not known. *)
-val hash_of_level_opt : _ t -> int32 -> Block_hash.t option Lwt.t
+val hash_of_level_opt : _ t -> int32 -> Block_hash.t option tzresult Lwt.t
 
 (** [level_of_hash node_ctxt hash] returns the level for Tezos block hash [hash]
     if it is known by the Tezos Layer 1 node. *)
@@ -201,16 +204,19 @@ val get_commitment :
 (** Same as {!get_commitment} but returns [None] if this commitment hash is not
     known by the rollup node. *)
 val find_commitment :
-  _ t -> Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t option Lwt.t
+  _ t ->
+  Sc_rollup.Commitment.Hash.t ->
+  Sc_rollup.Commitment.t option tzresult Lwt.t
 
 (** [commitment_exists t hash] returns [true] if the commitment with [hash] is
     known (i.e. stored) by the rollup node. *)
-val commitment_exists : _ t -> Sc_rollup.Commitment.Hash.t -> bool Lwt.t
+val commitment_exists :
+  _ t -> Sc_rollup.Commitment.Hash.t -> bool tzresult Lwt.t
 
 (** [save_commitment t commitment] saves a commitment in the store an returns is
     hash. *)
 val save_commitment :
-  rw -> Sc_rollup.Commitment.t -> Sc_rollup.Commitment.Hash.t Lwt.t
+  rw -> Sc_rollup.Commitment.t -> Sc_rollup.Commitment.Hash.t tzresult Lwt.t
 
 (** [commitment_published_at_level t hash] returns the levels at which the
     commitment was first published and the one at which it was included by in a
@@ -220,7 +226,7 @@ val save_commitment :
 val commitment_published_at_level :
   _ t ->
   Sc_rollup.Commitment.Hash.t ->
-  Store.Commitments_published_at_level.element option Lwt.t
+  Store.Commitments_published_at_level.element option tzresult Lwt.t
 
 (** [save_commitment_published_at_level t hash levels] saves the
     publication/inclusion information for a commitment with [hash]. *)
@@ -228,7 +234,7 @@ val set_commitment_published_at_level :
   rw ->
   Sc_rollup.Commitment.Hash.t ->
   Store.Commitments_published_at_level.element ->
-  unit Lwt.t
+  unit tzresult Lwt.t
 
 type commitment_source = Anyone | Us
 
@@ -237,9 +243,18 @@ type commitment_source = Anyone | Us
     the publication status for commitments we published ourselves [`Us] or that
     [`Anyone] published. *)
 val commitment_was_published :
-  _ t -> source:commitment_source -> Sc_rollup.Commitment.Hash.t -> bool Lwt.t
+  _ t ->
+  source:commitment_source ->
+  Sc_rollup.Commitment.Hash.t ->
+  bool tzresult Lwt.t
 
 (** {3 Inboxes} *)
+
+type messages_info = {
+  predecessor : Block_hash.t;
+  predecessor_timestamp : Timestamp.t;
+  messages : Sc_rollup.Inbox_message.t list;
+}
 
 (** [get_inbox t inbox_hash] retrieves the inbox whose hash is [inbox_hash] from
     the rollup node's storage. *)
@@ -247,11 +262,13 @@ val get_inbox :
   _ t -> Sc_rollup.Inbox.Hash.t -> Sc_rollup.Inbox.t tzresult Lwt.t
 
 (** Same as {!get_inbox} but returns [None] if this inbox is not known. *)
-val find_inbox : _ t -> Sc_rollup.Inbox.Hash.t -> Sc_rollup.Inbox.t option Lwt.t
+val find_inbox :
+  _ t -> Sc_rollup.Inbox.Hash.t -> Sc_rollup.Inbox.t option tzresult Lwt.t
 
 (** [save_inbox t inbox] remembers the [inbox] in the storage. It is associated
     to its hash which is returned. *)
-val save_inbox : rw -> Sc_rollup.Inbox.t -> Sc_rollup.Inbox.Hash.t Lwt.t
+val save_inbox :
+  rw -> Sc_rollup.Inbox.t -> Sc_rollup.Inbox.Hash.t tzresult Lwt.t
 
 (** [inbox_of_head node_ctxt block] returns the latest inbox at the given
     [block]. This function always returns [inbox] for all levels at and
@@ -271,13 +288,19 @@ val genesis_inbox : _ t -> Sc_rollup.Inbox.t tzresult Lwt.t
 val get_messages :
   _ t ->
   Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
-  Store.Messages.info tzresult Lwt.t
+  messages_info tzresult Lwt.t
 
 (** Same as {!get_messages} but returns [None] if the payloads hash is not known. *)
 val find_messages :
   _ t ->
   Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
-  Store.Messages.info option Lwt.t
+  messages_info option tzresult Lwt.t
+
+(** [get_num_messages t witness_hash] retrieves (without reading all the messages
+    from disk) the number of messages for the inbox witness [witness_hash]
+    stored by the rollup node. *)
+val get_num_messages :
+  _ t -> Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t -> int tzresult Lwt.t
 
 (** [save_messages t payloads_hash messages] associates the list of [messages]
     to the [payloads_hash]. The payload hash must be computed by calling,
@@ -285,8 +308,8 @@ val find_messages :
 val save_messages :
   rw ->
   Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
-  Store.Messages.info ->
-  unit Lwt.t
+  messages_info ->
+  unit tzresult Lwt.t
 
 (** {3 DAL} *)
 

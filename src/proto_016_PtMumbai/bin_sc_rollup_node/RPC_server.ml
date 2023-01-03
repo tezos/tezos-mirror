@@ -52,18 +52,19 @@ let get_last_cemented (node_ctxt : _ Node_context.t) =
   return lcc_hash
 
 let get_head_hash_opt node_ctxt =
-  let open Lwt_option_syntax in
-  let+ {header = {block_hash; _}; _} =
-    Node_context.last_processed_head_opt node_ctxt
-  in
-  block_hash
+  let open Lwt_result_syntax in
+  let+ res = Node_context.last_processed_head_opt node_ctxt in
+  Option.map
+    (fun Sc_rollup_block.{header = {block_hash; _}; _} -> block_hash)
+    res
 
 let get_head_level_opt node_ctxt =
-  let open Lwt_option_syntax in
-  let+ {header = {level; _}; _} =
-    Node_context.last_processed_head_opt node_ctxt
-  in
-  Alpha_context.Raw_level.to_int32 level
+  let open Lwt_result_syntax in
+  let+ res = Node_context.last_processed_head_opt node_ctxt in
+  Option.map
+    (fun Sc_rollup_block.{header = {level; _}; _} ->
+      Alpha_context.Raw_level.to_int32 level)
+    res
 
 module Slot_pages_map = struct
   open Protocol
@@ -219,19 +220,17 @@ module Common = struct
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.block
     @@ fun (node_ctxt, block) () () ->
-    let open Lwt_result_syntax in
-    let*! b = Node_context.get_full_l2_block node_ctxt block in
-    return b
+    Node_context.get_full_l2_block node_ctxt block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
     let* l2_block = Node_context.get_l2_block node_ctxt block in
-    let* {messages; _} =
-      Node_context.get_messages node_ctxt l2_block.header.inbox_witness
+    let+ num_messages =
+      Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
     in
-    return @@ Z.of_int (List.length messages)
+    Z.of_int num_messages
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
@@ -239,11 +238,11 @@ module Common = struct
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
-    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt >>= return
+    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.current_tezos_level
-    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt >>= return
+    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.hash
@@ -370,44 +369,41 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     Global_directory.register0 Sc_rollup_services.Global.last_stored_commitment
     @@ fun node_ctxt () () ->
     let open Lwt_result_syntax in
-    let*! res =
-      let open Lwt_option_syntax in
-      let* head = Node_context.last_processed_head_opt node_ctxt in
-      let commitment_hash =
-        Sc_rollup_block.most_recent_commitment head.header
-      in
-      let* commitment =
-        Node_context.find_commitment node_ctxt commitment_hash
-      in
-      return (commitment, commitment_hash)
-    in
-    return res
+    let* head = Node_context.last_processed_head_opt node_ctxt in
+    match head with
+    | None -> return_none
+    | Some head ->
+        let commitment_hash =
+          Sc_rollup_block.most_recent_commitment head.header
+        in
+        let+ commitment =
+          Node_context.find_commitment node_ctxt commitment_hash
+        in
+        Option.map (fun c -> (c, commitment_hash)) commitment
 
   let () =
     Local_directory.register0 Sc_rollup_services.Local.last_published_commitment
     @@ fun node_ctxt () () ->
     let open Lwt_result_syntax in
-    let*! result =
-      let open Lwt_option_syntax in
-      let*? commitment = node_ctxt.lpc in
-      let hash =
-        Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment
-      in
-      (* The corresponding level in Store.Commitments.published_at_level is
-         available only when the commitment has been published and included
-         in a block. *)
-      let*! published_at_level_info =
-        Node_context.commitment_published_at_level node_ctxt hash
-      in
-      let first_published, published =
-        match published_at_level_info with
-        | None -> (None, None)
-        | Some {first_published_at_level; published_at_level} ->
-            (Some first_published_at_level, published_at_level)
-      in
-      return (commitment, hash, first_published, published)
-    in
-    return result
+    match node_ctxt.lpc with
+    | None -> return_none
+    | Some commitment ->
+        let hash =
+          Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment
+        in
+        (* The corresponding level in Store.Commitments.published_at_level is
+           available only when the commitment has been published and included
+           in a block. *)
+        let* published_at_level_info =
+          Node_context.commitment_published_at_level node_ctxt hash
+        in
+        let first_published, published =
+          match published_at_level_info with
+          | None -> (None, None)
+          | Some {first_published_at_level; published_at_level} ->
+              (Some first_published_at_level, published_at_level)
+        in
+        return_some (commitment, hash, first_published, published)
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.status
@@ -497,7 +493,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
 
   let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
     let open Alpha_context in
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let+ finalized_head = Node_context.get_finalized_head_opt node_ctxt in
     let finalized =
       match finalized_head with
@@ -530,7 +526,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
               | Some (Injected info) ->
                   return (Sc_rollup_services.Injected info)
               | Some (Included info) -> (
-                  let*! inbox_info =
+                  let* inbox_info =
                     inbox_info_of_level node_ctxt info.l1_level
                   in
                   let commitment_level =
@@ -540,7 +536,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                   | None ->
                       return (Sc_rollup_services.Included (info, inbox_info))
                   | Some commitment_level -> (
-                      let*! block =
+                      let* block =
                         Node_context.find_l2_block_by_level
                           node_ctxt
                           (Alpha_context.Raw_level.to_int32 commitment_level)
@@ -557,7 +553,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                               block.header.commitment_hash
                           in
                           (* Commitment computed *)
-                          let*! published_at =
+                          let* published_at =
                             Node_context.commitment_published_at_level
                               node_ctxt
                               commitment_hash
