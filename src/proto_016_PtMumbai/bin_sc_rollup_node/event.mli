@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** This module defines functions that emit the events used when the smart
-    contract rollup node is running (see {!Daemon}). *)
+    rollup node is running (see {!Daemon}). *)
 
 open Protocol.Alpha_context
 
@@ -32,12 +32,12 @@ val starting_node : unit -> unit Lwt.t
 
 val node_is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
 
-(** [rollup_exists addr kind] emits the event that the smart contract rollup
+(** [rollup_exists addr kind] emits the event that the smart rollup
     node is interacting with the rollup at address [addr] and of the given
     [kind]. *)
 val rollup_exists : addr:Sc_rollup.t -> kind:Sc_rollup.Kind.t -> unit Lwt.t
 
-(** [shutdown_node exit_status] emits the event that the smart contract rollup
+(** [shutdown_node exit_status] emits the event that the smart rollup
     node is stopping with exit status [exit_status]. *)
 val shutdown_node : int -> unit Lwt.t
 

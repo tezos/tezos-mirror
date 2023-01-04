@@ -26,29 +26,29 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"]
+  let section = ["smart_rollup_node"]
 
   let starting_node =
     declare_0
       ~section
-      ~name:"starting_sc_rollup_node"
-      ~msg:"Starting the smart contract rollup node"
+      ~name:"starting_smart_rollup_node"
+      ~msg:"Starting the smart rollup node"
       ~level:Notice
       ()
 
   let shutdown_node =
     declare_1
       ~section
-      ~name:"stopping_sc_rollup_node"
-      ~msg:"Stopping the smart contract rollup node"
+      ~name:"stopping_smart_rollup_node"
+      ~msg:"Stopping the smart rollup node"
       ~level:Notice
       ("exit_status", Data_encoding.int8)
 
   let node_is_ready =
     declare_2
       ~section
-      ~name:"sc_rollup_node_is_ready"
-      ~msg:"The smart contract rollup node is listening to {addr}:{port}"
+      ~name:"smart_rollup_node_is_ready"
+      ~msg:"The smart rollup node is listening to {addr}:{port}"
       ~level:Notice
       ("addr", Data_encoding.string)
       ("port", Data_encoding.uint16)
@@ -56,10 +56,9 @@ module Simple = struct
   let rollup_exists =
     declare_2
       ~section
-      ~name:"sc_rollup_node_knows_its_rollup"
+      ~name:"smart_rollup_node_knows_its_rollup"
       ~msg:
-        "The smart contract rollup node is interacting with rollup {addr} of \
-         kind {kind}"
+        "The smart rollup node is interacting with rollup {addr} of kind {kind}"
       ~level:Notice
       ("addr", Protocol.Alpha_context.Sc_rollup.Address.encoding)
       ("kind", Data_encoding.string)
@@ -67,7 +66,7 @@ module Simple = struct
   let connection_lost =
     declare_0
       ~section
-      ~name:"sc_rollup_daemon_connection_lost"
+      ~name:"smart_rollup_daemon_connection_lost"
       ~msg:"connection to the node has been lost"
       ~level:Warning
       ()
@@ -75,7 +74,7 @@ module Simple = struct
   let cannot_connect =
     declare_2
       ~section
-      ~name:"sc_rollup_daemon_cannot_connect"
+      ~name:"smart_rollup_daemon_cannot_connect"
       ~msg:"cannot connect to Tezos node ({count}) {error}"
       ~level:Warning
       ("count", Data_encoding.int31)
@@ -85,7 +84,7 @@ module Simple = struct
   let wait_reconnect =
     declare_1
       ~section
-      ~name:"sc_rollup_daemon_wait_reconnect"
+      ~name:"smart_rollup_daemon_wait_reconnect"
       ~msg:"Retrying to connect in {delay}s"
       ~level:Warning
       ("delay", Data_encoding.float)

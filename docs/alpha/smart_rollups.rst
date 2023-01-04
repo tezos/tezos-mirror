@@ -417,7 +417,7 @@ This creates a configuration file:
 
 ::
 
-   Smart-contract rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
+   Smart rollup node configuration written in ${ROLLUP_NODE_DIR}/config.json
 
 Here is the content of the file:
 
@@ -425,8 +425,8 @@ Here is the content of the file:
 
   {
     "data-dir": "${ROLLUP_NODE_DIR}",
-    "sc-rollup-address": "${SOR_ADDR}",
-    "sc-rollup-node-operator": {
+    "smart-rollup-address": "${SOR_ADDR}",
+    "smart-rollup-node-operator": {
       "publish": "${OPERATOR_ADDR}",
       "add_messages": "${OPERATOR_ADDR}",
       "cement": "${OPERATOR_ADDR}",

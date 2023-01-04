@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 
 (** This module defines functions that emit the events used by the smart
-    contract rollup node daemon (see {!Daemon}). *)
+    rollup node daemon (see {!Daemon}). *)
 
 (** [head_processing hash level ~finalized] emits the event that the
     block of the given [hash] and at the given [level] is being processed, and

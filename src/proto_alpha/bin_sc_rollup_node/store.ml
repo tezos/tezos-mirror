@@ -31,7 +31,7 @@ include Store_utils
 open Alpha_context
 
 module IStore = Irmin_store.Make (struct
-  let name = "Tezos smart-contract rollup node"
+  let name = "Tezos smart rollup node"
 end)
 
 include Store_utils.Make (IStore)
