@@ -150,20 +150,11 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           op_stream,
         stopper )
 
-  let baking_right cctxt hash round =
-    let* baking_rights =
-      Plugin.RPC.Baking_rights.get
-        ?levels:None
-        ~max_round:round
-        ~all:true
-        cctxt
-        (cctxt#chain, `Hash (hash, 0))
+  let baker cctxt hash =
+    let* metadata =
+      Block_services.metadata ~chain:cctxt#chain ~block:(`Hash (hash,0)) cctxt ()
     in
-    match List.last_opt baking_rights with
-    | None -> fail_with_exn Not_found
-    | Some {delegate; round = r; timestamp; _} ->
-        assert (round = r) ;
-        return (delegate, timestamp)
+    return metadata.protocol_data.baker
 
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in

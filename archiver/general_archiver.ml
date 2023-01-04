@@ -118,7 +118,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
-    let* (delegate, _) = Services.baking_right cctx hash round in
+    let* delegate = Services.baker cctx hash in
     block_data cctx (delegate, timestamp, round, hash) (Some reception_time)
 
   let () =
