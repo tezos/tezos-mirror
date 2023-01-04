@@ -548,26 +548,31 @@ let int8 = make @@ Int8
 
 let uint8 = make @@ Uint8
 
-let int16 = make @@ Int16 default_endianness
+module Big_endian = struct
+  let int16 = make @@ Int16 default_endianness
 
-let uint16 = make @@ Uint16 default_endianness
+  let uint16 = make @@ Uint16 default_endianness
 
-let int31 = make @@ Int31 default_endianness
+  let int31 = make @@ Int31 default_endianness
 
-let int32 = make @@ Int32 default_endianness
+  let int32 = make @@ Int32 default_endianness
 
-let ranged_int minimum maximum =
-  let minimum = min minimum maximum and maximum = max minimum maximum in
-  if
-    minimum < Binary_size.min_int `Int31 || Binary_size.max_int `Int31 < maximum
-  then invalid_arg "Data_encoding.ranged_int" ;
-  make @@ RangedInt {minimum; endianness = default_endianness; maximum}
+  let ranged_int minimum maximum =
+    let minimum = min minimum maximum and maximum = max minimum maximum in
+    if
+      minimum < Binary_size.min_int `Int31
+      || Binary_size.max_int `Int31 < maximum
+    then invalid_arg "Data_encoding.ranged_int" ;
+    make @@ RangedInt {minimum; endianness = default_endianness; maximum}
+
+  let int64 = make @@ Int64 default_endianness
+end
+
+include Big_endian
 
 let ranged_float minimum maximum =
   let minimum = min minimum maximum and maximum = max minimum maximum in
   make @@ RangedFloat {minimum; maximum}
-
-let int64 = make @@ Int64 default_endianness
 
 module Little_endian = struct
   let int16 = make @@ Int16 Little

@@ -234,6 +234,20 @@ val int32 : int32 encoding
 
 val int64 : int64 encoding
 
+module Big_endian : sig
+  val int16 : int encoding
+
+  val uint16 : int encoding
+
+  val int31 : int encoding
+
+  val int32 : int32 encoding
+
+  val int64 : int64 encoding
+
+  val ranged_int : int -> int -> int encoding
+end
+
 module Little_endian : sig
   val int16 : int encoding
 
