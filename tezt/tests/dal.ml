@@ -1197,12 +1197,12 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
        locally (current = %L, expected = %R)" ;
   unit
 
-let test_dal_node_test_patch_slots _protocol parameters cryptobox _node client
-    dal_node =
+let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
+    client dal_node =
   let failing_patch_slot_rpc slot ~slot_level ~slot_index =
     let* response =
       RPC.call_raw dal_node
-      @@ Rollup.Dal.RPC.patch_slot slot ~slot_level ~slot_index
+      @@ Rollup.Dal.RPC.patch_commitment slot ~slot_level ~slot_index
     in
     return @@ RPC.check_string_response ~code:404 response
   in
@@ -1221,7 +1221,7 @@ let test_dal_node_test_patch_slots _protocol parameters cryptobox _node client
   let patch_slot_rpc ~slot_level ~slot_index =
     RPC.call
       dal_node
-      (Rollup.Dal.RPC.patch_slot commitment ~slot_level ~slot_index)
+      (Rollup.Dal.RPC.patch_commitment commitment ~slot_level ~slot_index)
   in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
@@ -1914,8 +1914,8 @@ let register ~protocols =
     test_dal_node_test_post_commitments
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "dal node PATCH /slots"
-    test_dal_node_test_patch_slots
+    "dal node PATCH /commitments"
+    test_dal_node_test_patch_commitments
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "dal node GET /slots"

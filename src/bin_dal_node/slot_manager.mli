@@ -45,12 +45,12 @@ val add_commitment :
   Cryptobox.t ->
   Cryptobox.commitment tzresult Lwt.t
 
-(** [add_slot_id node_tore cryptobox commitment slot_id] associates a [slot_id] to a
-    [commitment] in [node_store]. The function returns [Error `Not_found] if
-    there is no entry for [commitment] in [node_store]. Otherwise, [Ok ()] is
-    returned.
+(** [associate_slot_id_with_commitment node_store cryptobox commitment slot_id]
+    associates a [slot_id] to a [commitment] in [node_store]. The function
+    returns [Error `Not_found] if there is no entry for [commitment] in
+    [node_store]. Otherwise, [Ok ()] is returned.
 *)
-val add_slot_id :
+val associate_slot_id_with_commitment :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->

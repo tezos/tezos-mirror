@@ -37,11 +37,17 @@ module Slots_handlers = struct
   let post_commitment ctxt () slot =
     call_handler (fun store -> Slot_manager.add_commitment store slot) ctxt
 
-  let patch_slot ctxt commitment () slot_id =
+  let patch_commitment ctxt commitment () slot_id =
     call_handler
       (fun store cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.add_slot_id store cryptobox commitment slot_id in
+        let*! r =
+          Slot_manager.associate_slot_id_with_commitment
+            store
+            cryptobox
+            commitment
+            slot_id
+        in
         match r with Ok () -> return_some () | Error `Not_found -> return_none)
       ctxt
 
@@ -124,8 +130,8 @@ let register_new :
        (Slots_handlers.post_commitment ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
-       Services.patch_slot
-       (Slots_handlers.patch_slot ctxt)
+       Services.patch_commitment
+       (Slots_handlers.patch_commitment ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.get_slot

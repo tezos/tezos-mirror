@@ -317,9 +317,9 @@ module Dal : sig
         in case of success. *)
     val post_commitment : slot -> (Dal_node.t, commitment) RPC_core.t
 
-    (** Call RPC "PATCH /slots" to associate the given level and index to the slot
+    (** Call RPC "PATCH /commitments" to associate the given level and index to the slot
         whose commitment is given. *)
-    val patch_slot :
+    val patch_commitment :
       commitment ->
       slot_level:int ->
       slot_index:int ->

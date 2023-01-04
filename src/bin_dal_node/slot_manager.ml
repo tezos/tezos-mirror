@@ -80,7 +80,7 @@ let add_commitment node_store slot cryptobox =
   in
   return commitment
 
-let add_slot_id node_store cryptobox commitment slot_id =
+let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
   let open Lwt_result_syntax in
   let* () = commitment_should_exist node_store cryptobox commitment in
   let*! () =

@@ -716,7 +716,7 @@ module Dal = struct
       let data : RPC_core.data = Data (JSON.unannotate slot) in
       make ~data POST ["commitments"] JSON.as_string
 
-    let patch_slot commitment ~slot_level ~slot_index =
+    let patch_commitment commitment ~slot_level ~slot_index =
       let data : RPC_core.data =
         Data
           (`O
@@ -725,7 +725,7 @@ module Dal = struct
               ("slot_index", `Float (float_of_int slot_index));
             ])
       in
-      make ~data PATCH ["slots"; commitment] as_empty_object_or_fail
+      make ~data PATCH ["commitments"; commitment] as_empty_object_or_fail
 
     let get_slot commitment =
       make GET ["slots"; commitment] get_bytes_from_json_string_node

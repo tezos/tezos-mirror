@@ -92,7 +92,7 @@ end
 
 (** Add the given slot in the node if not already present. The corresponding
     commitment is returned. See {!val:
-    Slot_manager.add_commitments} for more details. *)
+    Slot_manager.add_commitment} for more details. *)
 val post_commitment :
   < meth : [`POST]
   ; input : Cryptobox.slot
@@ -103,8 +103,8 @@ val post_commitment :
   service
 
 (** Associate a commitment to a level and a slot index. See {!val:
-    Slot_manager.add_slot_id} for more details. *)
-val patch_slot :
+    Slot_manager.associate_slot_id_with_commitment} for more details. *)
+val patch_commitment :
   < meth : [`PATCH]
   ; input : Types.slot_id
   ; output : unit
