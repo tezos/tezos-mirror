@@ -27,13 +27,10 @@ open Data_encoding
 
 let pp encoding s =
   let binary = Result.get_ok @@ Binary.to_string encoding s in
-  Format.printf
-    "%a\n"
-    Format.(
-      pp_print_seq
-        ~pp_sep:(fun _ () -> ())
-        (fun fmt char -> fprintf fmt "\\x%02x" (Char.code char)))
-    (String.to_seq binary)
+  Seq.iter
+    (fun char -> Format.printf "\\x%02x" (Char.code char))
+    (String.to_seq binary) ;
+  Format.printf "\n"
 
 let%expect_test _ =
   pp uint8 0 ;
