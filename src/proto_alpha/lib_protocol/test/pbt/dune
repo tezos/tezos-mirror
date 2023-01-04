@@ -34,7 +34,7 @@
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-sc-rollup-alpha
+  tezos-smart-rollup-alpha
   tezos-crypto-dal
   tezos-base-test-helpers
   tezos-protocol-alpha.parameters)
@@ -47,7 +47,7 @@
   -open Tezos_alpha_test_helpers
   -open Tezos_benchmark_alpha
   -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_sc_rollup_alpha
+  -open Tezos_smart_rollup_alpha
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
   -open Tezos_protocol_alpha_parameters))

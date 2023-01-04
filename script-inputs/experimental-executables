@@ -1,6 +1,6 @@
 octez-dal-node
 octez-wasm-repl-alpha
-octez-sc-rollup-node-alpha
-octez-sc-rollup-client-alpha
+octez-smart-rollup-node-alpha
+octez-smart-rollup-client-alpha
 octez-accuser-alpha
 octez-baker-alpha

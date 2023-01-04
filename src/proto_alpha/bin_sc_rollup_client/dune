@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_client_alpha)
- (public_name octez-sc-rollup-client-alpha)
- (package octez-sc-rollup-client-alpha)
+ (public_name octez-smart-rollup-client-alpha)
+ (package octez-smart-rollup-client-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -17,7 +17,7 @@
   tezos-rpc-http
   tezos-rpc-http-client-unix
   tezos-protocol-alpha
-  tezos-sc-rollup-alpha
+  tezos-smart-rollup-alpha
   uri)
  (link_flags
   (:standard)
@@ -32,4 +32,4 @@
   -open Tezos_client_base_unix
   -open Tezos_rpc_http_client_unix
   -open Tezos_protocol_alpha
-  -open Tezos_sc_rollup_alpha))
+  -open Tezos_smart_rollup_alpha))

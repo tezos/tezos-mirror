@@ -33,10 +33,10 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 
-./octez-sc-rollup-client-alpha rpc get /global/sc_rollup_address
+./octez-smart-rollup-client-alpha rpc get /global/sc_rollup_address
 "[SMART_ROLLUP_HASH]"
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "312d31",
   "312d32",
   "312d33",
@@ -49,7 +49,7 @@ This sequence of operations was run:
   "scmsg2SY3VZWZ8y8491xbXvn8tQtHRCAq3zPJWQ7n4K6Rusw2YKVyNx",
   "scmsg2zdjgY1tnuHMZqMavgPyc7qNj9MMvY4ywd38yauj3WfaiqDieE" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "322d31",
   "322d32",
   "322d33",
@@ -62,7 +62,7 @@ This sequence of operations was run:
   "scmsg2GAoC8FEUfHZfQAKotvjRMpmSknHRpn4w35Y1YWZ4uVZDYvzUL",
   "scmsg2sqy4npoYQq8iWJWQQgrdG126y3Btxn8ZzVPav8JmptWnVowGz" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "332d31",
   "332d32",
   "332d33",
@@ -75,7 +75,7 @@ This sequence of operations was run:
   "scmsg3PVb7jXpE723XWdC1B8L34wVenMTi8r4b62Qja6owSMVo3h73C",
   "scmsg2BZBgg1AFG7Zsar6DD1ZKPK36UakNZNj78npg6SUBoR26FpBdQ" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "342d31",
   "342d32",
   "342d33",
@@ -88,7 +88,7 @@ This sequence of operations was run:
   "scmsg3TMS4Q8jtUhr6YcgkMqwWAXKkXLJMhSRvJcMEgq61t8xftRMFv",
   "scmsg2AWA1jULPBJb7usha9gJg62T5PdiW9Uz1HdHLhaYDRx4qRvLTL" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "352d31",
   "352d32",
   "352d33",
@@ -101,7 +101,7 @@ This sequence of operations was run:
   "scmsg3LQsvXBvj1qDWFRACbLuyAbZK6tHVTUeiYsPSU9KGxyf6ySxrY",
   "scmsg3oXBwG2rAT3cjgDbRNyBnTirrkqTAeVMxMSJ5KUno8daWpY2rL" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "362d31",
   "362d32",
   "362d33",
@@ -114,7 +114,7 @@ This sequence of operations was run:
   "scmsg3MPjHQ6m6BPJaGnAan8kCnadyCbn37DKAZa7LTbTtz3N36JgtW",
   "scmsg2mUAHp9G2cJoqKwr4dpagFK6Wa4cNu7NGPXXB3zTfCpLmCP3Yr" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "372d31",
   "372d32",
   "372d33",
@@ -127,7 +127,7 @@ This sequence of operations was run:
   "scmsg3YhsmhbfMXKmhsjGXej2ySwYFDYKQE1yUs7LcVkZ2ikaotWQKg",
   "scmsg28neefD54Wsf46QgPtv22mKT32oNFv5ToU95DDsufcWFCZoovM" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "382d31",
   "382d32",
   "382d33",
@@ -140,7 +140,7 @@ This sequence of operations was run:
   "scmsg3RM54nLATBFqzCjvSwPybSbiiWJZey2ZiLbe1gjr9v9Vmoc9H3",
   "scmsg2NpFWt1MhyDGhacEUpaeEheC8XWzNC3LaNaECXwzpi39QqPX14" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "392d31",
   "392d32",
   "392d33",
@@ -153,7 +153,7 @@ This sequence of operations was run:
   "scmsg2DBhcJVTm8JRWQHLWDXxiCi2PvUZzixqxkqyYupDZW2XU3cdvJ",
   "scmsg2jKWtDbw5Jsdpc453XsgAVBKyYUzt3pKKsZtQNtvJvhPemp4WN" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "31302d31",
   "31302d32",
   "31302d33",
@@ -166,7 +166,7 @@ This sequence of operations was run:
   "scmsg3YFj784yYxTr4LbNfaLpHGpN5hKJgbBA8gUEJ4vief5KL8U5vS",
   "scmsg2GY9Q5VTRSrjCPewduDXtPtZZ9hhMshPe3zUToBvFHTD9AhKkB" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "31312d31",
   "31312d32",
   "31312d33",
@@ -179,7 +179,7 @@ This sequence of operations was run:
   "scmsg3KLGXHeokSBbJcfsrvRkoAjMt5Yi7nj67WFHh6nkW8Ce8Kd4yn",
   "scmsg2Eaop6LYBSnKMQXqPWijq9fBa4nPw5ZLndHRCH97kumZqLT7pn" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "31322d31",
   "31322d32",
   "31322d33",
@@ -192,7 +192,7 @@ This sequence of operations was run:
   "scmsg3HMVWn75kiJ4Lr3KquJNQTkkFtwg9pmiKMythhUJ5h74Nznjd3",
   "scmsg24y1317Sy46HnzTpvCLRe88LghadZ4eAjkb6EzvEsQVRhPbKzu" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "31332d31",
   "31332d32",
   "31332d33",
@@ -205,7 +205,7 @@ This sequence of operations was run:
   "scmsg2Safqm8tXs1k51v1A7VMyALCDRn5DAgYCJ9kbUD38jwPqtob6B",
   "scmsg28V9X7iiXCDZM4mFCHKsMxuvc8wNopLGkcnZwo14sSs4dW1E73" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "31342d31",
   "31342d32",
   "31342d33",
@@ -218,7 +218,7 @@ This sequence of operations was run:
   "scmsg29adqVUp1NnCAVSZVaKCVbrUdMth3C1yuUvBRZtmW9hsDtm8d1",
   "scmsg2cDM9bscYDvXwkeB6h7RmN82wFgmL3wv5jJmwJukS9ju5zgKWA" ]
 
-./octez-sc-rollup-client-alpha rpc post /local/batcher/injection with '[
+./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[
   "31352d31",
   "31352d32",
   "31352d33",
@@ -231,32 +231,32 @@ This sequence of operations was run:
   "scmsg3qHUB6rys7GmC8XGGKRDrcKX2veZGkT9SkScHyWqLUCjq9PLjx",
   "scmsg3ZVMYBmAPwFfLDNXFDcBGzRChdFzLJ8tUMW46mGPGumZ6aq79q" ]
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/hash
 "[BLOCK_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/5/hash
+./octez-smart-rollup-client-alpha rpc get /global/block/5/hash
 "[BLOCK_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/finalized/level
+./octez-smart-rollup-client-alpha rpc get /global/block/finalized/level
 16
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/num_messages
+./octez-smart-rollup-client-alpha rpc get /global/block/head/num_messages
 "8"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/status
+./octez-smart-rollup-client-alpha rpc get /global/block/head/status
 "Waiting for input message"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/ticks
 "28"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/cemented/outbox/16/messages
+./octez-smart-rollup-client-alpha rpc get /global/block/cemented/outbox/16/messages
 []
 
-./octez-sc-rollup-client-alpha rpc get /global/tezos_head
+./octez-smart-rollup-client-alpha rpc get /global/tezos_head
 "[BLOCK_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/tezos_level
+./octez-smart-rollup-client-alpha rpc get /global/tezos_level
 18

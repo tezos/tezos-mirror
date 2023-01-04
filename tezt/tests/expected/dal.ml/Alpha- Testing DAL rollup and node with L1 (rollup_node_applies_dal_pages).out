@@ -37,7 +37,7 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/dal/slot_headers
+./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/slot_headers
 [ { "level": 3, "index": 0,
     "commitment":
       "sh23Xtg7DY2qvSKgM1TiQDLH4cGZ2tHQwiQ5usHYdBUMzkirZUEVkSKoBDvjQePseeKFnQDGc9" },
@@ -48,7 +48,7 @@ This sequence of operations was run:
     "commitment":
       "sh237VRQLZqf8Uno4hjiiJh8RJxuwhPF4xWnPq2VKuC2ZbwVp3w9nw36iGfLHzpQrbopWx8GFq" } ]
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/dal/confirmed_slot_pages
+./octez-smart-rollup-client-alpha rpc get /global/block/head/dal/confirmed_slot_pages
 []
 
 ./octez-client --wait none send smart rollup message '["dal:3:0:0","dal:3:1:0"]' from bootstrap2
@@ -105,5 +105,5 @@ This sequence of operations was run:
       Consumed gas: 1021.532
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\001."

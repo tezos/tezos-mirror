@@ -289,30 +289,30 @@ opam:octez-proxy-server:
   variables:
     package: octez-proxy-server
 
-opam:octez-sc-rollup-client-PtMumbai:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: octez-sc-rollup-client-PtMumbai
-
-# Ignoring unreleased package octez-sc-rollup-client-alpha.
-
-opam:octez-sc-rollup-node-PtMumbai:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: octez-sc-rollup-node-PtMumbai
-
-# Ignoring unreleased package octez-sc-rollup-node-alpha.
-
 opam:octez-signer:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_2
   variables:
     package: octez-signer
+
+opam:octez-smart-rollup-client-PtMumbai:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-smart-rollup-client-PtMumbai
+
+# Ignoring unreleased package octez-smart-rollup-client-alpha.
+
+opam:octez-smart-rollup-node-PtMumbai:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-smart-rollup-node-PtMumbai
+
+# Ignoring unreleased package octez-smart-rollup-node-alpha.
 
 # Ignoring unreleased package octez-snoop.
 
@@ -1377,15 +1377,6 @@ opam:tezos-sapling:
   variables:
     package: tezos-sapling
 
-opam:tezos-sc-rollup-016-PtMumbai:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-sc-rollup-016-PtMumbai
-
-# Ignoring unreleased package tezos-sc-rollup-alpha.
-
 opam:tezos-scoru-wasm:
   extends:
     - .opam_template
@@ -1453,6 +1444,15 @@ opam:tezos-signer-services:
     - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-signer-services
+
+opam:tezos-smart-rollup-016-PtMumbai:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: tezos-smart-rollup-016-PtMumbai
+
+# Ignoring unreleased package tezos-smart-rollup-alpha.
 
 opam:tezos-stdlib:
   extends:

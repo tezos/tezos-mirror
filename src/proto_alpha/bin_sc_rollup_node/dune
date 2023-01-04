@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_node_alpha)
- (public_name octez-sc-rollup-node-alpha)
- (package octez-sc-rollup-node-alpha)
+ (public_name octez-smart-rollup-node-alpha)
+ (package octez-smart-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -26,7 +26,7 @@
   tezos_dal_node_services
   tezos_dal_node_lib
   tezos-shell-services
-  tezos-sc-rollup-alpha
+  tezos-smart-rollup-alpha
   tezos-layer2-utils-alpha
   tezos_layer2_store
   data-encoding
@@ -59,7 +59,7 @@
   -open Tezos_workers
   -open Tezos_dal_node_lib
   -open Tezos_shell_services
-  -open Tezos_sc_rollup_alpha
+  -open Tezos_smart_rollup_alpha
   -open Tezos_layer2_utils_alpha
   -open Tezos_layer2_store
   -open Tezos_injector_alpha

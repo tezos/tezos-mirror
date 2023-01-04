@@ -37,10 +37,10 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "0"
 
 ./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
@@ -68,19 +68,19 @@ This sequence of operations was run:
       Consumed gas: 1001.273
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\007"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "23"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "23"
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
@@ -108,19 +108,19 @@ This sequence of operations was run:
       Consumed gas: 1001.273
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\n"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "44"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "44"
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
@@ -148,19 +148,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\r"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "66"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "66"
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
@@ -188,19 +188,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\016"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "88"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "88"
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
@@ -228,19 +228,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\019"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "110"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "110"
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
@@ -268,19 +268,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\022"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "132"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "132"
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
@@ -308,19 +308,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\025"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "154"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "154"
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
@@ -348,19 +348,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\028"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "176"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "176"
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
@@ -388,19 +388,19 @@ This sequence of operations was run:
       Consumed gas: 1001.276
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\031"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "198"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "198"
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
@@ -428,11 +428,11 @@ This sequence of operations was run:
       Consumed gas: 1001.279
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value --block head
+./octez-smart-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\""
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
+./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
+./octez-smart-rollup-client-alpha rpc get /global/block/head/total_ticks
 "221"

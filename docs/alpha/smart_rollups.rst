@@ -408,7 +408,7 @@ rollup node is configured with the following command:
 
 .. code:: sh
 
-   octez-sc-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
+   octez-smart-rollup-node-alpha --base-dir "${OCLIENT_DIR}" \
                     init operator config for "${SOR_ADDR}" \
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
@@ -487,7 +487,7 @@ Second, the configured rollup node can be run:
 
 .. code:: sh
 
-   octez-sc-rollup-node-alpha" -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node-alpha" -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
 
 The log should show that the rollup node follows the layer-1 chain and
 processes the inbox of each level.

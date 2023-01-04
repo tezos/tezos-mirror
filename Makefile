@@ -146,8 +146,8 @@ clean-old-names:
 	@rm -f tezos-tx-rollup-client-015-PtLimaPt
 	@rm -f tezos-baker-alpha
 	@rm -f tezos-accuser-alpha
-	@rm -f tezos-sc-rollup-node-alpha
-	@rm -f tezos-sc-rollup-client-alpha
+	@rm -f tezos-smart-rollup-node-alpha
+	@rm -f tezos-smart-rollup-client-alpha
 	@rm -f tezos-snoop
 	@rm -f tezos-dal-node
 # octez-validator should stay in this list for Octez 16.0 because we
