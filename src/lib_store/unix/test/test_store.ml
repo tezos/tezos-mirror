@@ -86,7 +86,7 @@ let test_path chain_store tbl =
   let* () = check_path "A1" "A1" [] in
   let* () = check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] in
   let* () = check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] in
-  let* () = check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] in
+  let* () = check_path "A1" "B3" ["A2"; "B1"; "B2"; "B3"] in
   return_ok_unit
 
 (****************************************************************************)
@@ -117,12 +117,12 @@ let test_ancestor chain_store tbl =
   let* () = check_ancestor "A1" "A1" (vblock tbl "A1") in
   let* () = check_ancestor "A1" "A3" (vblock tbl "A1") in
   let* () = check_ancestor "A3" "A1" (vblock tbl "A1") in
-  let* () = check_ancestor "A6" "B6" (vblock tbl "A3") in
-  let* () = check_ancestor "B6" "A6" (vblock tbl "A3") in
-  let* () = check_ancestor "A4" "B1" (vblock tbl "A3") in
-  let* () = check_ancestor "B1" "A4" (vblock tbl "A3") in
-  let* () = check_ancestor "A3" "B1" (vblock tbl "A3") in
-  let* () = check_ancestor "B1" "A3" (vblock tbl "A3") in
+  let* () = check_ancestor "A6" "B6" (vblock tbl "A2") in
+  let* () = check_ancestor "B6" "A6" (vblock tbl "A2") in
+  let* () = check_ancestor "A4" "B1" (vblock tbl "A2") in
+  let* () = check_ancestor "B1" "A4" (vblock tbl "A2") in
+  let* () = check_ancestor "A2" "B1" (vblock tbl "A2") in
+  let* () = check_ancestor "B1" "A2" (vblock tbl "A2") in
   let* () = check_ancestor "A2" "B1" (vblock tbl "A2") in
   let* () = check_ancestor "B1" "A2" (vblock tbl "A2") in
   return_ok_unit
@@ -171,7 +171,7 @@ let test_locator chain_store tbl =
   in
   let* () = check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"] in
   let* () =
-    check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A3"]
+    check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A2"]
   in
   let* () = check_locator 4 "B8" ["B7"; "B6"; "B5"; "B4"] in
   let* () = check_locator 0 "A5" [] in
@@ -241,6 +241,7 @@ let test_mem chain_store tbl =
     Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A8") ;
     return_unit
   in
+  let*! () = test_mem "A2" in
   let*! () = test_mem "A3" in
   let*! () = test_mem "A6" in
   let*! () = test_not_mem "A7" in
@@ -253,7 +254,8 @@ let test_mem chain_store tbl =
     Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A6") ;
     return_unit
   in
-  let*! () = test_mem "A3" in
+  let*! () = test_mem "A2" in
+  let*! () = test_not_mem "A3" in
   let*! () = test_not_mem "A4" in
   let*! () = test_not_mem "A6" in
   let*! () = test_not_mem "A8" in
@@ -265,7 +267,8 @@ let test_mem chain_store tbl =
     Assert.equal ~loc:__LOC__ prev_head (vblock tbl "B6") ;
     return_unit
   in
-  let*! () = test_mem "A3" in
+  let*! () = test_mem "A2" in
+  let*! () = test_not_mem "A3" in
   let*! () = test_not_mem "A4" in
   let*! () = test_not_mem "A6" in
   let*! () = test_not_mem "A8" in
@@ -317,7 +320,7 @@ let test_new_blocks chain_store tbl =
   in
   let* () = test "A6" "A6" "A6" [] in
   let* () = test "A8" "A6" "A6" ["A7"; "A8"] in
-  let* () = test "A8" "B7" "A3" ["A4"; "A5"; "A6"; "A7"; "A8"] in
+  let* () = test "A8" "B7" "A2" ["A3"; "A4"; "A5"; "A6"; "A7"; "A8"] in
   return_ok_unit
 
 (** Store.Chain.checkpoint *)
