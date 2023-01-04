@@ -707,14 +707,14 @@ module Dal = struct
       | [] -> ()
       | _ -> JSON.error t "Not an empty object"
 
-    let post_slot slot =
+    let post_commitment slot =
       let slot =
         JSON.parse
-          ~origin:"Rollup.RPC.post_slots"
+          ~origin:"Rollup.RPC.post_commitments"
           (encode_bytes_to_hex_string slot)
       in
       let data : RPC_core.data = Data (JSON.unannotate slot) in
-      make ~data POST ["slots"] JSON.as_string
+      make ~data POST ["commitments"] JSON.as_string
 
     let patch_slot commitment ~slot_level ~slot_index =
       let data : RPC_core.data =

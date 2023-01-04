@@ -92,8 +92,8 @@ end
 
 (** Add the given slot in the node if not already present. The corresponding
     commitment is returned. See {!val:
-    Slot_manager.add_slot} for more details. *)
-val post_slots :
+    Slot_manager.add_commitments} for more details. *)
+val post_commitment :
   < meth : [`POST]
   ; input : Cryptobox.slot
   ; output : Cryptobox.commitment

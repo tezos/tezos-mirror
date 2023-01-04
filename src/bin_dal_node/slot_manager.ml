@@ -66,7 +66,7 @@ let commitment_should_exist node_store cryptobox commitment =
 
 (* Main functions *)
 
-let add_slots node_store slot cryptobox =
+let add_commitment node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let commitment = Cryptobox.commit cryptobox polynomial in

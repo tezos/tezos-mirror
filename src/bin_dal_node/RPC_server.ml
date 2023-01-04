@@ -34,8 +34,8 @@ module Slots_handlers = struct
     let store = Node_context.get_store ctxt in
     handler store cryptobox
 
-  let post_slots ctxt () slot =
-    call_handler (fun store -> Slot_manager.add_slots store slot) ctxt
+  let post_commitment ctxt () slot =
+    call_handler (fun store -> Slot_manager.add_commitment store slot) ctxt
 
   let patch_slot ctxt commitment () slot_id =
     call_handler
@@ -120,8 +120,8 @@ let register_new :
   directory
   |> add_service
        Tezos_rpc.Directory.register0
-       Services.post_slots
-       (Slots_handlers.post_slots ctxt)
+       Services.post_commitment
+       (Slots_handlers.post_commitment ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.patch_slot

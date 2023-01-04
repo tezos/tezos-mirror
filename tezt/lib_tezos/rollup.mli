@@ -313,9 +313,9 @@ module Dal : sig
         the input (and output) is expected to be a list. *)
     val slot_headers_of_json : JSON.t -> slot_header list
 
-    (** Call RPC "POST /slots" to store a slot and retrun the commitment in case
-       of success. *)
-    val post_slot : slot -> (Dal_node.t, commitment) RPC_core.t
+    (** Call RPC "POST /commitments" to store a slot and retrun the commitment
+        in case of success. *)
+    val post_commitment : slot -> (Dal_node.t, commitment) RPC_core.t
 
     (** Call RPC "PATCH /slots" to associate the given level and index to the slot
         whose commitment is given. *)

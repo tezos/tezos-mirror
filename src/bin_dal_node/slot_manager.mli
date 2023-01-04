@@ -31,15 +31,15 @@ include module type of Slot_manager_legacy
 
 type error += Invalid_slot_size of {provided : int; expected : int}
 
-(** [add_slots node_store slot cryptobox] computes the given [slot]'s commitment
-    and adds the association "commitment -> slot" in the DAL's [node_store] if
-    the commitment is not already bound to some data.
+(** [add_commitment node_store slot cryptobox] computes the given [slot]'s
+    commitment and adds the association "commitment -> slot" in the DAL's
+    [node_store] if the commitment is not already bound to some data.
 
     The function returns an error {!ref:Invalid_slot_size} if the [slot]'s size
     doesn't match the expected slots' size given in [cryptobox], or the [slot]'s
     commitment otherwise.
 *)
-val add_slots :
+val add_commitment :
   Store.node_store ->
   Cryptobox.slot ->
   Cryptobox.t ->
