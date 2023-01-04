@@ -137,9 +137,8 @@ let bake_timeout_period ?timeout_period_in_blocks block =
   in
   Block.bake_n timeout_period_in_blocks block
 
-(** [context_init tup] initializes a context for testing in which the
-  [sc_rollup_enable] constant is set to true. It returns the created
-  context and contracts. *)
+(** [context_init tup] initializes a context and returns the created
+    context and contracts. *)
 let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
     ?(timeout_period_in_blocks = 10) ?hard_gas_limit_per_operation
     ?hard_gas_limit_per_block tup =
@@ -170,7 +169,7 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
     rollup when the feature flag is deactivated and checks that it
     fails. *)
 let test_disable_feature_flag () =
-  let* b, contract = Context.init1 () in
+  let* b, contract = Context.init1 ~sc_rollup_enable:false () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
   let* op, _ =
@@ -192,9 +191,7 @@ let test_disable_feature_flag () =
     rollup when the Arith PVM feature flag is deactivated and checks that it
     fails. *)
 let test_disable_arith_pvm_feature_flag () =
-  let* b, contract =
-    Context.init1 ~sc_rollup_enable:true ~sc_rollup_arith_pvm_enable:false ()
-  in
+  let* b, contract = Context.init1 ~sc_rollup_arith_pvm_enable:false () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
   let* op, _ =
@@ -2347,10 +2344,11 @@ let test_refute_invalid_metadata () =
 
   let post_commitment_from_metadata block account metadata =
     let*! state1, state2, state3 = make_arith_state metadata in
+    let* inbox_level = next_inbox_level (B block) rollup in
     let commitment : Sc_rollup.Commitment.t =
       {
         predecessor;
-        inbox_level = Raw_level.of_int32_exn 31l;
+        inbox_level;
         number_of_ticks = number_of_ticks_exn 2L;
         compressed_state = state3;
       }
@@ -2394,7 +2392,6 @@ let test_refute_invalid_metadata () =
     Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
   let* block = add_op block start_game_op in
-  Format.eprintf "Foo\n%!" ;
   let dissection : Sc_rollup.Game.refutation =
     let choice = Sc_rollup.Tick.initial in
     let step : Sc_rollup.Game.step =
@@ -2742,14 +2739,7 @@ let test_offline_staker_does_not_prevent_cementation () =
   let* b = Block.bake ~operation:cement_op b in
 
   (* A now goes offline, B takes over. *)
-  let* commitment2 = dummy_commitment (B b) rollup in
-  let commitment2 =
-    {
-      commitment2 with
-      predecessor = hash;
-      inbox_level = Raw_level.of_int32_exn 61l;
-    }
-  in
+  let* commitment2 = dummy_commitment ~predecessor:commitment1 (B b) rollup in
   let* operation2 =
     Op.sc_rollup_publish (B ctxt) contract2 rollup commitment2
   in

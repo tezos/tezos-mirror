@@ -876,10 +876,7 @@ module Stake_storage_tests = struct
            staker
            commitment)
         (Sc_rollup_errors.Sc_rollup_commitment_from_future
-           {
-             current_level = Raw_level_repr.of_int32_exn 1l;
-             inbox_level = Raw_level_repr.of_int32_exn 31l;
-           })
+           {current_level = Raw_level_repr.of_int32_exn 1l; inbox_level})
     in
     let ctxt = advance_level_for_commitment ctxt commitment in
     let* _hash, _publish_level, ctxt, _balance_updates =

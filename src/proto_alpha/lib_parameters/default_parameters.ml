@@ -29,10 +29,11 @@ open Protocol.Alpha_context
 
 let tx_rollup_finality_period = 40_000
 
-(** The challenge window is about a week with 30s block-time (604800s / 30s).
+(** The challenge window is about two weeks with 15s block-time,
+    (4 * 60 * 24 * 14).
     WARNING: changing this value also impacts
     [sc_rollup_max_active_outbox_levels]. See below. *)
-let sc_rollup_challenge_window_in_blocks = 20_160
+let sc_rollup_challenge_window_in_blocks = 80_640
 
 (** Number of active levels kept for executing outbox messages.
 
@@ -48,12 +49,32 @@ let sc_rollup_max_active_outbox_levels =
     pay for at origination time. *)
 let sc_rollup_max_outbox_messages_per_level = 100
 
-(** The timeout period is about a week with 30s block-time (604800s / 30s).
+(** The timeout period is about a week with 15s block-time,
+    (4 * 60 * 24 * 7).
 
     It suffers from the same risk of censorship as
     {!sc_rollup_challenge_windows_in_blocks} so we use the same value.
 *)
-let sc_rollup_timeout_period_in_blocks = 20_160
+let sc_rollup_timeout_period_in_blocks = 40_320
+
+(** We want to allow a max lookahead in blocks of 4 weeks, so the rollup
+    can still move forward even if its impossible to cement commitments.
+
+    As there is a challenge window of 2 weeks, and because the maximum
+    duration of a game is 2 weeks, the hypothetical maximum time
+    to cement a block is a month, (4 * 60 * 24 * 30).
+
+    Be careful, this constant has an impact of the maximum cost of
+    a rollup on the storage:
+    [maximum_cost_in_storage =
+       (sc_rollup_max_lookahead_in_blocks / commitment_period) *
+       max_commitment_storage_size_in_bytes *
+       cost_per_byte]
+
+    With the current values:
+    [maximum_cost_in_storage = 348.3 tez]
+*)
+let sc_rollup_max_lookahead_in_blocks = 172_800l
 
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
 
@@ -209,43 +230,40 @@ let constants_mainnet =
       };
     dal = default_dal;
     sc_rollup =
-      (let commitment_period_in_blocks = 30 in
-       {
-         enable = false;
-         arith_pvm_enable = false;
-         (* The following value is chosen to prevent spam. *)
-         origination_size = 6_314;
-         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-         commitment_period_in_blocks;
-         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-            The following constants need to be refined. *)
-         stake_amount = Tez.of_mutez_exn 10_000_000_000L;
-         max_lookahead_in_blocks = 30_000l;
-         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
-         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
-         (* The default number of required sections in a dissection *)
-         number_of_sections_in_dissection = 32;
-         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
-         (* We store multiple cemented commitments because we want to
-             allow the execution of outbox messages against cemented
-             commitments that are older than the last cemented commitment.
-             The execution of an outbox message is a manager operation,
-             and manager operations are kept in the mempool for one
-             hour. Hence we only need to ensure that an outbox message
-             can be validated against a cemented commitment produced in the
-             last hour. If we assume that the rollup is operating without
-             issues, that is no commitments are being refuted and commitments
-             are published and cemented regularly by one rollup node, we can
-             expect commitments to be cemented approximately every 15
-             minutes, or equivalently we can expect 5 commitments to be
-             published in one hour (at minutes 0, 15, 30, 45 and 60).
-             Therefore, we need to keep 5 cemented commitments to guarantee
-             that the execution of an outbox operation can always be
-             validated against a cemented commitment while it is in the
-             mempool. *)
-         max_number_of_stored_cemented_commitments = 5;
-         max_number_of_parallel_games = 32;
-       });
+      {
+        enable = true;
+        arith_pvm_enable = false;
+        (* The following value is chosen to prevent spam. *)
+        origination_size = 6_314;
+        challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+        commitment_period_in_blocks = 60;
+        stake_amount = Tez.of_mutez_exn 10_000_000_000L;
+        max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
+        max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
+        max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+        (* The default number of required sections in a dissection *)
+        number_of_sections_in_dissection = 32;
+        timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+        (* We store multiple cemented commitments because we want to
+            allow the execution of outbox messages against cemented
+            commitments that are older than the last cemented commitment.
+            The execution of an outbox message is a manager operation,
+            and manager operations are kept in the mempool for one
+            hour. Hence we only need to ensure that an outbox message
+            can be validated against a cemented commitment produced in the
+            last hour. If we assume that the rollup is operating without
+            issues, that is no commitments are being refuted and commitments
+            are published and cemented regularly by one rollup node, we can
+            expect commitments to be cemented approximately every 15
+            minutes, or equivalently we can expect 5 commitments to be
+            published in one hour (at minutes 0, 15, 30, 45 and 60).
+            Therefore, we need to keep 5 cemented commitments to guarantee
+            that the execution of an outbox operation can always be
+            validated against a cemented commitment while it is in the
+            mempool. *)
+        max_number_of_stored_cemented_commitments = 5;
+        max_number_of_parallel_games = 32;
+      };
     zk_rollup =
       {
         enable = false;

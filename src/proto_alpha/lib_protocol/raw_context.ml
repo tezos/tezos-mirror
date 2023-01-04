@@ -1023,22 +1023,19 @@ let prepare_first_block ~level ~timestamp ctxt =
       let sc_rollup =
         Constants_parametric_repr.
           {
-            enable = c.sc_rollup.enable;
+            enable = true;
             arith_pvm_enable = false;
             origination_size = c.sc_rollup.origination_size;
-            challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-               The following constants need to be refined. *)
+            challenge_window_in_blocks = 80_640;
             stake_amount = c.sc_rollup.stake_amount;
-            commitment_period_in_blocks =
-              c.sc_rollup.commitment_period_in_blocks;
-            max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
-            max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
+            commitment_period_in_blocks = 60;
+            max_lookahead_in_blocks = 172_800l;
+            max_active_outbox_levels = 80_640l;
             max_outbox_messages_per_level =
               c.sc_rollup.max_outbox_messages_per_level;
             number_of_sections_in_dissection =
               c.sc_rollup.number_of_sections_in_dissection;
-            timeout_period_in_blocks = c.sc_rollup.timeout_period_in_blocks;
+            timeout_period_in_blocks = 40_320;
             max_number_of_stored_cemented_commitments =
               c.sc_rollup.max_number_of_stored_cemented_commitments;
             max_number_of_parallel_games = 32;
