@@ -792,11 +792,17 @@ range of unsigned 16-bit integers. In binary it has a fixed size of 2 bytes. In
 JSON it is represented as a float. Deserialisation from JSON raises an exception
 if the float representation is not a valid unsigned 16-bit integer.
 
+`Little_endian.uint16 : int encoding` (fixed:2) is a ground encoding similar to
+`uint16` except that it's binary representation is little-endian.
+
 `int16 : int encoding` (fixed:2) is a ground encoding for the `int` type.
 Serialisation through any backend will fail if the integer is not within the
 range of signed 16-bit integers. In binary it has a fixed size of 2 bytes. In
 JSON it is represented as a float. Deserialisation from JSON raises an exception
 if the float representation is not a valid signed 16-bit integer.
+
+`Little_endian.int16 : int encoding` (fixed:2) is a ground encoding similar to
+`int16` except that it's binary representation is little-endian.
 
 `int31 : int encoding` (fixed:4) is a ground encoding for the `int` type.
 Serialisation through any backend will fail if the integer is not within the
@@ -808,6 +814,9 @@ The specific threshold of 31 bit is intended to represent portable native OCaml
 integers. Indeed, in OCaml, the GC reserves one bit to tag integers vs pointers.
 As a result, on 32-bit architectures, integers are represented with 31 bits.
 
+`Little_endian.int31 : int encoding` (fixed:4) is a ground encoding similar to
+`int31` except that it's binary representation is little-endian.
+
 `int32 : int32 encoding` (fixed:4) is a ground encoding for the `int32` type.
 Serialisation through any backend will fail if the integer is not within the
 range of signed 32-bit integers. In binary it has a fixed size of 4 byte. In
@@ -815,11 +824,17 @@ JSON it is represented as a float. Deserialisation from JSON
 raises an exception if the float representation is not a valid signed 32-bit
 integer.
 
+`Little_endian.int32 : int32 encoding` (fixed:4) is a ground encoding similar to
+`int32` except that it's binary representation is little-endian.
+
 `int64 : int64 encoding` (fixed:8) is a ground encoding for the `int64` type.
 Serialisation through any backend will fail if the integer is not within the
 range of signed 64-bit integers. In binary it has a fixed size of 64 byte. In
 JSON it is represented as a string. Specifically, as the string representation
 of the value in decimal notation.
+
+`Little_endian.int64 : int64 encoding` (fixed:8) is a ground encoding similar to
+`int64` except that it's binary representation is little-endian.
 
 `ranged_int : int -> int -> int encoding` (fixed:?) is a combinator for the
 `int` type. The encoding `ranged_int low high` is for encoding ints within the
@@ -842,6 +857,10 @@ Warning: if you change the bounds of a range, you may change the representation
 of the values.
 
 In JSON, it is represented as a float.
+
+`Little_endian.ranged_int : int -> int -> int encoding` (fixed:?) is a encoding
+combinator similar to `ranged_int` except that it's binary representation is
+little-endian.
 
 `n : Zarith.t encoding` (dynamic) is a ground encoding for the `Zarith.t` type.
 Serialisation and deserialisation through any backend fails if the input is
