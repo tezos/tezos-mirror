@@ -161,6 +161,49 @@ module Test = struct
         let check = Cryptobox.verify_commitment t cm pi in
         assert check
     | _ -> assert false
+
+  (* We can craft two slots whose commitments are equal for two different
+     page sizes.*)
+  let test_collision_page_size () =
+    let slot_size = 1 lsl 6 in
+    init slot_size ;
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    (let* t1 =
+       Cryptobox.make
+         {
+           redundancy_factor = 2;
+           slot_size;
+           page_size = 1 lsl 5;
+           number_of_shards = 2;
+         }
+     in
+     let* t2 =
+       Cryptobox.make
+         {
+           redundancy_factor = 2;
+           slot_size;
+           page_size = 1 lsl 6;
+           number_of_shards = 2;
+         }
+     in
+
+     let a = Random.bits () in
+     let slot1 = Bytes.make slot_size '\000' in
+     Bytes.set_uint8 slot1 0 a ;
+     Bytes.set_uint8 slot1 32 a ;
+     let slot2 = Bytes.make slot_size '\000' in
+     Bytes.set_uint8 slot2 0 a ;
+     Bytes.set_uint8 slot2 31 a ;
+
+     let* p1 = Cryptobox.polynomial_from_slot t1 slot1 in
+     let* p2 = Cryptobox.polynomial_from_slot t2 slot2 in
+
+     let cm1 = Cryptobox.commit t1 p1 in
+     let cm2 = Cryptobox.commit t2 p2 in
+     Ok (Cryptobox.Commitment.equal cm1 cm2))
+    |> function
+    | Ok check -> assert check
+    | _ -> assert false
 end
 
 let test =
@@ -172,6 +215,7 @@ let test =
       ("test_page_proofs", Test.test_page_proofs);
       ("test_shard_proofs", Test.test_shard_proofs);
       ("test_commitment_proof", Test.test_commitment_proof);
+      ("test_collision_page_size", Test.test_collision_page_size);
     ]
 
 let () =
