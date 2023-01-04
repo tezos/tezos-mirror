@@ -108,7 +108,7 @@ let encoding =
       "A destination notation compatible with the contract notation as given \
        to an RPC or inside scripts. Can be a base58 implicit contract hash, a \
        base58 originated contract hash, a base58 originated transaction \
-       rollup, or a base58 originated smart-contract rollup."
+       rollup, or a base58 originated smart rollup."
   @@ splitted
        ~binary:
          (union

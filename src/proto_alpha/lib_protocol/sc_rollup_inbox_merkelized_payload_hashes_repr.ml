@@ -55,11 +55,10 @@ module Hash = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "merkelized_payload_hashes_hash"
+        let name = "Smart_rollup_merkelized_payload_hashes_hash"
 
         let title =
-          "The merkelized payload hashes' hash of the smart contract rollup \
-           inbox"
+          "The merkelized payload hashes' hash of the smart rollup inbox"
 
         let b58check_prefix = hash_prefix
 
@@ -122,7 +121,7 @@ module History = struct
   include
     Bounded_history_repr.Make
       (struct
-        let name = "level_inbox_history"
+        let name = "Smart_rollup_level_inbox_history"
       end)
       (Hash)
       (struct

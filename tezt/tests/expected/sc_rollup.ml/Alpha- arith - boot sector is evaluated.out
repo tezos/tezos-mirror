@@ -19,11 +19,11 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000645
       payload fees(the block proposer) ....... +ꜩ0.000645
-    Smart contract rollup origination:
+    Smart rollup origination:
       Kind: arith
       Parameter type: string
       Kernel Blake2B hash: '8eb6ccf70902fcd3fa2040cf27dda202a71d85625516f22a0c9c67fc86057a7b'
-      This smart contract rollup origination was successfully applied
+      This smart rollup origination was successfully applied
       Consumed gas: 2748.037
       Storage size: 6552 bytes
       Address: [SMART_ROLLUP_HASH]
@@ -53,11 +53,11 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000635
       payload fees(the block proposer) ....... +ꜩ0.000635
-    Smart contract rollup origination:
+    Smart rollup origination:
       Kind: arith
       Parameter type: string
       Kernel Blake2B hash: 'b682df8c87f218dfa8151f2eaafe20e6f8d87b243f8fe63de6d49485a8bf6eea'
-      This smart contract rollup origination was successfully applied
+      This smart rollup origination was successfully applied
       Consumed gas: 2748.037
       Storage size: 6552 bytes
       Address: [SMART_ROLLUP_HASH]

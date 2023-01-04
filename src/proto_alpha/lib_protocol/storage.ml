@@ -1590,7 +1590,7 @@ module Sc_rollup = struct
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
       (struct
-        let name = ["sc_rollup"]
+        let name = ["smart_rollup"]
       end)
 
   module Indexed_context =
@@ -1695,7 +1695,7 @@ module Sc_rollup = struct
     include
       Make_single_data_storage (Registered) (Raw_context)
         (struct
-          let name = ["sc_rollup_inbox"]
+          let name = ["inbox"]
         end)
         (struct
           type t = Sc_rollup_inbox_repr.versioned

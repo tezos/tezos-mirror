@@ -19,11 +19,11 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.001052
       payload fees(the block proposer) ....... +ꜩ0.001052
-    Smart contract rollup origination:
+    Smart rollup origination:
       Kind: wasm_2_0_0
       Parameter type: bytes
       Kernel Blake2B hash: '24df9e3c520dd9a9c49b447766e8a604d31138c1aacb4a67532499c6a8b348cc'
-      This smart contract rollup origination was successfully applied
+      This smart rollup origination was successfully applied
       Consumed gas: 2748.037
       Storage size: 6552 bytes
       Address: [SMART_ROLLUP_HASH]

@@ -36,9 +36,9 @@ module Address = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "Sc_rollup_hash"
+        let name = "Smart_rollup_hash"
 
-        let title = "A smart contract rollup address"
+        let title = "A smart rollup address"
 
         let b58check_prefix = decoded_prefix
 
@@ -74,9 +74,9 @@ module State_hash = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "state_hash"
+        let name = "Smart_rollup_state_hash"
 
-        let title = "The hash of the VM state of a smart contract rollup"
+        let title = "The hash of the VM state of a smart rollup"
 
         let b58check_prefix = state_hash_prefix
 
@@ -109,7 +109,7 @@ end
 type t = Address.t
 
 let description =
-  "A smart contract rollup is identified by a base58 address starting with "
+  "A smart rollup is identified by a base58 address starting with "
   ^ Address.prefix
 
 let pp = Address.pp
@@ -117,16 +117,16 @@ let pp = Address.pp
 let encoding =
   let open Data_encoding in
   def
-    "rollup_address"
-    ~title:"A smart contract rollup address"
+    "smart_rollup_address"
+    ~title:"A smart rollup address"
     ~description
     Address.encoding
 
 let rpc_arg =
   RPC_arg.like
     Address.rpc_arg
-    ~descr:"A smart contract rollup address."
-    "sc_rollup_address"
+    ~descr:"A smart rollup address."
+    "smart_rollup_address"
 
 let in_memory_size (_ : t) =
   let open Cache_memory_helpers in

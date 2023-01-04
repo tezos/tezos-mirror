@@ -169,10 +169,10 @@ module Hash = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "serialized_message_hash"
+        let name = "Smart_rollup_serialized_message_hash"
 
         let title =
-          "The hash of a serialized message of the smart contract rollup inbox."
+          "The hash of a serialized message of the smart rollup inbox."
 
         let b58check_prefix = hash_prefix
 
