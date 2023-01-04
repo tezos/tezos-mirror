@@ -254,15 +254,15 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       Atom.ranged_int ~minimum ~endianness ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
   | String_enum (_, arr) -> Atom.string_enum arr state
-  | Array {length_limit; length_encoding = None; elts = e} ->
-      let l =
-        match length_limit with
-        | No_limit -> read_variable_list Array_too_long max_int e state
-        | At_most max_length ->
-            read_variable_list Array_too_long max_length e state
-        | Exactly exact_length -> read_fixed_list exact_length e state
-      in
-      Array.of_list l
+  | Array {length_limit; length_encoding = None; elts = e} -> (
+      match length_limit with
+      | No_limit ->
+          let l, size = read_variable_list Array_too_long max_int e state in
+          Arrconv.array_of_list_size l size
+      | At_most max_length ->
+          let l, size = read_variable_list Array_too_long max_length e state in
+          Arrconv.array_of_list_size l size
+      | Exactly exact_length -> read_fixed_array exact_length e state)
   | Array
       {
         length_limit = At_most max_length;
@@ -277,17 +277,16 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
           raise_read_error Array_too_long
       in
       if len > max_length then raise_read_error Array_too_long ;
-      let l = read_fixed_list len e state in
-      Array.of_list l
+      read_fixed_array len e state
   | Array
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
-      | No_limit -> read_variable_list List_too_long max_int e state
+      | No_limit -> fst (read_variable_list List_too_long max_int e state)
       | At_most max_length ->
-          read_variable_list List_too_long max_length e state
+          fst (read_variable_list List_too_long max_length e state)
       | Exactly exact_length -> read_fixed_list exact_length e state)
   | List
       {
@@ -399,16 +398,16 @@ and read_variable_pair :
 (* Should be rejected by [Encoding.Kind.combine] *)
 
 and read_variable_list :
-    type a. read_error -> int -> a Encoding.t -> state -> a list =
+    type a. read_error -> int -> a Encoding.t -> state -> a list * int =
  fun error max_length e state ->
-  let rec loop max_length acc =
-    if state.remaining_bytes = 0 then List.rev acc
+  let rec loop max_length acc size =
+    if state.remaining_bytes = 0 then (List.rev acc, size)
     else if max_length = 0 then raise_read_error error
     else
       let v = read_rec e state in
-      loop (max_length - 1) (v :: acc)
+      loop (max_length - 1) (v :: acc) (size + 1)
   in
-  loop max_length []
+  loop max_length [] 0
 
 and read_fixed_list : type a. int -> a Encoding.t -> state -> a list =
  fun exact_length e state ->
@@ -420,6 +419,20 @@ and read_fixed_list : type a. int -> a Encoding.t -> state -> a list =
       loop (exact_length - 1) (v :: acc)
   in
   loop exact_length []
+
+and read_fixed_array : type a. int -> a Encoding.t -> state -> a array =
+ fun exact_length e state ->
+  if exact_length = 0 then [||]
+  else if state.remaining_bytes = 0 then raise_read_error Not_enough_data
+  else
+    let v = read_rec e state in
+    let arr = Array.make exact_length v in
+    for i = 1 to exact_length - 1 do
+      if state.remaining_bytes = 0 then raise_read_error Not_enough_data ;
+      let v = read_rec e state in
+      Array.unsafe_set arr i v
+    done ;
+    arr
 
 (** ******************** *)
 

@@ -344,14 +344,16 @@ let rec read_rec :
   | Array {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit ->
-          read_variable_list Array_too_long max_int e state @@ fun (l, state) ->
-          k (Array.of_list l, state)
+          read_variable_list Array_too_long max_int e state
+          @@ fun (l, size, state) ->
+          let arr = Arrconv.array_of_list_size l size in
+          k (arr, state)
       | At_most max_length ->
           read_variable_list Array_too_long max_length e state
-          @@ fun (l, state) -> k (Array.of_list l, state)
-      | Exactly exact_length ->
-          read_fixed_list exact_length e state @@ fun (l, state) ->
-          k (Array.of_list l, state))
+          @@ fun (l, size, state) ->
+          let arr = Arrconv.array_of_list_size l size in
+          k (arr, state)
+      | Exactly exact_length -> read_fixed_array exact_length e state k)
   | Array
       {
         length_limit = At_most max_length;
@@ -360,16 +362,19 @@ let rec read_rec :
       } ->
       read_rec whole length_encoding state @@ fun (len, state) ->
       if len > max_length then raise (Read_error Array_too_long) ;
-      read_fixed_list len e state @@ fun (l, state) -> k (Array.of_list l, state)
+      read_fixed_array len e state k
   | Array
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
-      | No_limit -> read_variable_list List_too_long max_int e state k
+      | No_limit ->
+          read_variable_list List_too_long max_int e state
+          @@ fun (l, _, state) -> k (l, state)
       | At_most max_length ->
-          read_variable_list List_too_long max_length e state k
+          read_variable_list List_too_long max_length e state
+          @@ fun (l, _, state) -> k (l, state)
       | Exactly exact_length -> read_fixed_list exact_length e state k)
   | List
       {
@@ -503,18 +508,18 @@ and read_variable_list :
     int ->
     a Encoding.t ->
     state ->
-    (a list * state -> ret status) ->
+    (a list * int * state -> ret status) ->
     ret status =
  fun error max_length e state k ->
-  let rec loop state acc max_length =
+  let rec loop state acc accsize max_length =
     let size = remaining_bytes_for_variable_encoding state in
-    if size = 0 then k (List.rev acc, state)
+    if size = 0 then k (List.rev acc, accsize, state)
     else if max_length = 0 then raise_read_error error
     else
       read_rec false e state @@ fun (v, state) ->
-      loop state (v :: acc) (max_length - 1)
+      loop state (v :: acc) (accsize + 1) (max_length - 1)
   in
-  loop state [] max_length
+  loop state [] 0 max_length
 
 and read_fixed_list :
     type a ret.
@@ -533,6 +538,37 @@ and read_fixed_list :
       loop state (v :: acc) (exact_length - 1)
   in
   loop state [] exact_length
+
+and read_fixed_array :
+    type a ret.
+    int ->
+    a Encoding.t ->
+    state ->
+    (a array * state -> ret status) ->
+    ret status =
+ fun exact_length e state k ->
+  if exact_length = 0 then k ([||], state)
+  else
+    let () =
+      match state.remaining_bytes with
+      | Some size -> if size = 0 then raise_read_error Not_enough_data
+      | None -> ()
+    in
+    read_rec false e state @@ fun (v, state) ->
+    let arr = Array.make exact_length v in
+    let rec loop state index =
+      if index = exact_length then k (arr, state)
+      else
+        let () =
+          match state.remaining_bytes with
+          | Some size -> if size = 0 then raise_read_error Not_enough_data
+          | None -> ()
+        in
+        read_rec false e state @@ fun (v, state) ->
+        Array.unsafe_set arr index v ;
+        loop state (index + 1)
+    in
+    loop state 1
 
 let read_rec e state k =
   try read_rec false e state k with

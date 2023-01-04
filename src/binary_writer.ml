@@ -268,15 +268,17 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
-  | Array {length_limit; length_encoding = None; elts} -> (
-      match length_limit with
-      | No_limit -> Array.iter (write_rec elts state) value
-      | At_most max_length ->
-          if Array.length value > max_length then raise Array_invalid_length ;
-          Array.iter (write_rec elts state) value
-      | Exactly exact_length ->
-          if Array.length value <> exact_length then raise Array_invalid_length ;
-          Array.iter (write_rec elts state) value)
+  | Array {length_limit; length_encoding = None; elts} ->
+      let () =
+        match length_limit with
+        | No_limit -> ()
+        | At_most max_length ->
+            if Array.length value > max_length then raise Array_invalid_length
+        | Exactly exact_length ->
+            if Array.length value <> exact_length then
+              raise Array_invalid_length
+      in
+      Array.iter (write_rec elts state) value
   | List {length_limit = At_most max_length; length_encoding = Some le; elts}
     -> (
       match guarded_length ~upto:max_length value with
@@ -288,17 +290,18 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
     ->
       assert false
-  | List {length_limit; length_encoding = None; elts} -> (
-      match length_limit with
-      | No_limit -> List.iter (write_rec elts state) value
-      | At_most max_length ->
-          if List.compare_length_with value max_length > 0 then
-            raise List_invalid_length ;
-          List.iter (write_rec elts state) value
-      | Exactly exact_length ->
-          if List.compare_length_with value exact_length <> 0 then
-            raise List_invalid_length ;
-          List.iter (write_rec elts state) value)
+  | List {length_limit; length_encoding = None; elts} ->
+      let () =
+        match length_limit with
+        | No_limit -> ()
+        | At_most max_length ->
+            if List.compare_length_with value max_length > 0 then
+              raise List_invalid_length
+        | Exactly exact_length ->
+            if List.compare_length_with value exact_length <> 0 then
+              raise List_invalid_length
+      in
+      List.iter (write_rec elts state) value
   | Obj (Req {encoding = e; _}) -> write_rec e state value
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) -> (
       match value with
