@@ -273,17 +273,17 @@ function delays_distribution_of_operations_multi_nodes(dict_data, msec = false) 
 
 }
 
-function classify_operations(dict_data, delegate = "", msec = false) {
+function classify_operations(dict_data, delegate = "") {
     let operations_logs = {};
+    operations_logs[0] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [] },
+			   "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [] } } ;
     Object.entries(dict_data).forEach(([height, v]) => {
         console.log(height);
-        let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
-                if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "inconnu": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "inconnu": [] } }
+                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [] } }
             })
             if ("endorsements" in v) {
                 Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
@@ -292,31 +292,22 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                             let round_cib = 0;
                             if ("round" in operation) round_cib = operation["round"];
                             //Valid
-                            if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
-                                let delay;
-                                if (msec == false) {
-                                    delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
-                                } else {
-                                    delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
-
-                                }
-                                if (("kind" in operation)) {
-                                    if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["preendorsements"]["valid"].push(baker_ops["delegate"]);
-                                    } else if (baker_ops["delegate"] == delegate) {
-                                        //operations_logs[round_cib]["pre_approbations"]["valide"].push(height); //We don't look at preendo resume for adress.html
-                                    }
-                                }
-                                else {
-                                    if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["endorsements"]["valid"].push(baker_ops["delegate"]);
-                                    } else if (baker_ops["delegate"] == delegate) {
-                                        operations_logs[round_cib]["endorsements"]["valid"].push(height);
-                                    }
+                            if (("kind" in operation)) {
+                                if (delegate == "") { // To look at operation of a specific delegate 
+                                    operations_logs[round_cib]["preendorsements"]["valid"].push(baker_ops["delegate"]);
+                                } else if (baker_ops["delegate"] == delegate) {
+                                    //operations_logs[round_cib]["pre_approbations"]["valide"].push(height); //We don't look at preendo resume for adress.html
                                 }
                             }
-                            //If the Operation is valid, the reception time does not exist or is null, but the operation is still included in the chain => preendo/endo ESCROW
-                            if ((round_cib in t_baker) && (!("errors" in operation)) && ((!("reception_time" in operation)) || (operation["reception_time"] == null))) {
+                            else {
+                                if (delegate == "") { // To look at operation of a specific delegate 
+                                    operations_logs[round_cib]["endorsements"]["valid"].push(baker_ops["delegate"]);
+                                } else if (baker_ops["delegate"] == delegate) {
+                                    operations_logs[round_cib]["endorsements"]["valid"].push(height);
+                                }
+                            }
+			    //If the Operation is valid, the reception time does not exist or is null, but the operation is still included in the chain => preendo/endo ESCROW
+			    if ((!("errors" in operation)) && ((!("reception_time" in operation)) || (operation["reception_time"] == null))) {
                                 if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
                                     if (delegate == "") { // To look at operation of a specific delegate
                                         operations_logs[round_cib]["preendorsements"]["sequestered"].push(baker_ops["delegate"]);
@@ -333,7 +324,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                                 }
                             }
                             //If the OP is valid, reception time has a value, but the operation is not included in the block => endo forgotten
-                            if ((!("kind" in operation)) && (round_cib in t_baker) && (!("errors" in operation)) && (!("included_in_blocks" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
+                            if ((!("kind" in operation)) && (!("errors" in operation)) && (!("included_in_blocks" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
                                 if (delegate == "") { // To look at operation of a specific delegate 
                                     operations_logs[round_cib]["endorsements"]["lost"].push(baker_ops["delegate"]);
                                 } else if (baker_ops["delegate"] == delegate) {
@@ -351,7 +342,6 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                             operations_logs[0]["endorsements"]["missed"].push(height)
                         }
                     }
-
                 });
             }
         }
