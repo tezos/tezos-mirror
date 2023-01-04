@@ -111,51 +111,7 @@ let compute_step tree =
 (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
-let eval_to_result tree =
-  let open Lwt_syntax in
-  let open Wasm_pvm_state in
-  let should_compute pvm_state =
-    let+ input_request_val = Wasm_vm.get_info pvm_state in
-    match (input_request_val.input_request, pvm_state.tick_state) with
-    | Input_required, _ -> false
-    | ( No_input_required,
-        Eval
-          {
-            config =
-              {
-                step_kont =
-                  Tezos_webassembly_interpreter.Eval.(
-                    SK_Result _ | SK_Trapped _);
-                _;
-              };
-            _;
-          } ) ->
-        false
-    | Reveal_required _, _ | No_input_required, _ -> true
-  in
-  (* Since `compute_step_many_until` is not exported by the PVM but only the VM,
-     we decode and re-encode by hand. *)
-  trap_exn (fun () ->
-      let* pvm_state =
-        Test_encodings_util.Tree_encoding_runner.decode
-          Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-          tree
-      in
-      let* pvm_state, ticks =
-        Tezos_scoru_wasm.Wasm_vm.compute_step_many_until
-          ~reveal_builtins
-          ~write_debug
-          ~max_steps:Int64.max_int
-          should_compute
-          pvm_state
-      in
-      let+ tree =
-        Test_encodings_util.Tree_encoding_runner.encode
-          Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-          pvm_state
-          tree
-      in
-      (tree, ticks))
+let eval_to_result tree = trap_exn (fun () -> eval_to_result tree)
 
 (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
    starts a new one if already at snapshot point). *)

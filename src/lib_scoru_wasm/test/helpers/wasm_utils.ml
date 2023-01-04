@@ -240,6 +240,59 @@ let rec eval_until_init tree =
       let* tree = Wasm.compute_step tree in
       eval_until_init tree
 
+(* [eval_until_cond should_conpute tree] is exactly `compute_step_many_until`,
+   it can fail if [should_compute] doesn't stop on input ticks. *)
+let eval_to_cond ?write_debug ?reveal_builtins should_compute tree =
+  let open Lwt_syntax in
+  (* Since `compute_step_many_until` is not exported by the PVM but only the VM,
+     we decode and re-encode by hand. *)
+  let* pvm_state =
+    Test_encodings_util.Tree_encoding_runner.decode
+      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+      tree
+  in
+  let* pvm_state, ticks =
+    Tezos_scoru_wasm.Wasm_vm.compute_step_many_until
+      ?reveal_builtins
+      ?write_debug
+      ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
+      should_compute
+      pvm_state
+  in
+  let+ tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+      pvm_state
+      tree
+  in
+  (tree, ticks)
+
+(** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
+    or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
+    property that the memory hasn't been flushed yet and can be inspected. *)
+let eval_to_result ?write_debug ?reveal_builtins tree =
+  let open Lwt_syntax in
+  let should_compute pvm_state =
+    let+ input_request_val = Wasm_vm.get_info pvm_state in
+    match (input_request_val.input_request, pvm_state.tick_state) with
+    | Reveal_required _, _ | Input_required, _ -> false
+    | ( No_input_required,
+        Eval
+          {
+            config =
+              {
+                step_kont =
+                  Tezos_webassembly_interpreter.Eval.(
+                    SK_Result _ | SK_Trapped _);
+                _;
+              };
+            _;
+          } ) ->
+        false
+    | No_input_required, _ -> true
+  in
+  eval_to_cond ?write_debug ?reveal_builtins should_compute tree
+
 let set_input_step message message_counter tree =
   let input_info =
     Wasm_pvm_state.
