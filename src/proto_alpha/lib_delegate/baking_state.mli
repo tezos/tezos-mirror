@@ -96,7 +96,7 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 
 module SlotMap : Map.S with type key = Slot.t
 
-type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
+type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
 type delegate_slots = {
   own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
