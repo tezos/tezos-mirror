@@ -87,14 +87,14 @@ let cost_N_KMap_enter_body = S.safe_int 80
    The model should be changed to receive `xs_is_nil` as the first argument. *)
 
 (* model N_KList_enter_body *)
-(* Approximating 1.672196 x term *)
+(* Approximating 1.797068 x term *)
 let cost_N_KList_enter_body xs size_ys =
   match xs with
   | [] ->
       let open S.Syntax in
       let v0 = S.safe_int size_ys in
-      S.safe_int 25 + (v0 + (v0 lsr 1) + (v0 lsr 3))
-  | _ :: _ -> S.safe_int 25
+      S.safe_int 30 + (v0 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4))
+  | _ :: _ -> S.safe_int 30
 
 (* TY_EQ / PARSE_TYPE / UNPARSE_TYPE / TYPECHECKING_CODE / UNPARSING_CODE
    TYPECHECKING_DATA / UNPARSING_DATA / FIND_ENTRYPOINT

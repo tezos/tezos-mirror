@@ -544,7 +544,7 @@ let cost_N_IMul_nat = cost_mul
 
 (* model N_INeg_bls12_381_fr *)
 (* when benchmarking, compile bls12-381 without ADX *)
-let cost_N_INeg_bls12_381_fr = S.safe_int 25
+let cost_N_INeg_bls12_381_fr = S.safe_int 30
 
 (* model N_INeg_bls12_381_g1 *)
 (* when benchmarking, compile bls12-381 without ADX *)
@@ -739,11 +739,11 @@ let cost_N_IXor_nat = cost_linear_op_int
 
 (* model N_IXor_bytes *)
 (* Allocates [max size1 size2] bytes *)
-(* fun size1 -> fun size2 -> (34.0581507316 + (0.232374371286 * (max size1 size2))) *)
+(* fun size1 -> fun size2 -> (38.5110342369 + (0.397946895815 * (max size1 size2))) *)
 let cost_N_IXor_bytes size1 size2 =
   let open S_syntax in
   let v0 = S.safe_int (Compare.Int.max size1 size2) in
-  S.safe_int 35 + (v0 lsr 1)
+  S.safe_int 40 + (v0 lsr 1)
 
 (* model N_KCons *)
 let cost_N_KCons = S.safe_int 10
@@ -910,7 +910,7 @@ let cost_DECODING_SIGNATURE_p256 = S.safe_int 35
 let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 35
 
 (* model DECODING_SIGNATURE_bls *)
-let cost_DECODING_SIGNATURE_bls = S.safe_int 35
+let cost_DECODING_SIGNATURE_bls = S.safe_int 40
 
 (* model DECODING_Chest_key *)
 let cost_DECODING_Chest_key = S.safe_int 5900
@@ -959,7 +959,7 @@ let cost_ENCODING_SIGNATURE_p256 = S.safe_int 45
 let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 45
 
 (* model ENCODING_SIGNATURE_bls *)
-let cost_ENCODING_SIGNATURE_bls = S.safe_int 50
+let cost_ENCODING_SIGNATURE_bls = S.safe_int 55
 
 (* model ENCODING_Chest_key *)
 let cost_ENCODING_Chest_key = S.safe_int 10_000
