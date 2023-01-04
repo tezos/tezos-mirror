@@ -571,6 +571,11 @@ let update_to_level state level_update =
   let delegates = state.global_state.delegates in
   let new_level = new_level_proposal.block.shell.level in
   let chain = `Hash state.global_state.chain_id in
+  (* Sync the context to clean-up potential GC artifacts *)
+  (match state.global_state.validation_mode with
+  | Node -> Lwt.return_unit
+  | Local index -> index.sync_fun ())
+  >>= fun () ->
   (if Int32.(new_level = succ state.level_state.current_level) then
    return state.level_state.next_level_delegate_slots
   else
