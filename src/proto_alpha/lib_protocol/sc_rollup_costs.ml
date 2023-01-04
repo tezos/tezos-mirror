@@ -26,18 +26,6 @@
 module S = Saturation_repr
 
 module Constants = struct
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2648
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_add_message_base = S.safe_int 430
-
-  let cost_add_message_per_byte = S.safe_int 15
-
-  let cost_add_inbox_per_level = S.safe_int 15
-
-  let cost_update_num_and_size_of_messages = S.safe_int 15
-
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.contract_optimized *)
   let cost_decoding_contract_optimized = S.safe_int 70
 

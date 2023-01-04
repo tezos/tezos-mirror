@@ -27,14 +27,6 @@
     functions used when handling SC rollups operations in context. *)
 
 module Constants : sig
-  val cost_add_message_base : Gas_limit_repr.cost
-
-  val cost_add_message_per_byte : Gas_limit_repr.cost
-
-  val cost_add_inbox_per_level : Gas_limit_repr.cost
-
-  val cost_update_num_and_size_of_messages : Gas_limit_repr.cost
-
   val cost_serialize_state_hash : Gas_limit_repr.cost
 
   val cost_serialize_commitment_hash : Gas_limit_repr.cost
