@@ -3370,7 +3370,18 @@ module Sc_rollup : sig
   val pp_input_request : Format.formatter -> input_request -> unit
 
   module Inbox : sig
-    type t
+    module Skip_list : Skip_list_repr.S
+
+    module Hash : S.HASH
+
+    type level_proof = {
+      hash : Inbox_merkelized_payload_hashes.Hash.t;
+      level : Raw_level.t;
+    }
+
+    type history_proof = (level_proof, Hash.t) Skip_list.cell
+
+    type t = {level : Raw_level.t; old_levels_messages : history_proof}
 
     val pp : Format.formatter -> t -> unit
 
@@ -3380,15 +3391,11 @@ module Sc_rollup : sig
 
     val inbox_level : t -> Raw_level.t
 
-    type history_proof
-
     val old_levels_messages : t -> history_proof
 
     val equal_history_proof : history_proof -> history_proof -> bool
 
     val pp_history_proof : Format.formatter -> history_proof -> unit
-
-    module Hash : S.HASH
 
     val hash : t -> Hash.t
 
