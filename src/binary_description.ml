@@ -72,7 +72,7 @@ let fixup_references uf =
     | Enum (i, name) -> Enum (i, (UF.find uf name).title)
     | Seq (layout, len) -> Seq (fixup_layout layout, len)
     | ( Zero_width | Int _ | Bool
-      | RangedInt (_, _)
+      | RangedInt (_, _, _)
       | RangedFloat (_, _)
       | Float | Bytes | String | Padding ) as enc ->
         enc
@@ -257,7 +257,9 @@ let describe (type x) (encoding : x Encoding.t) =
       Binary_schema.Named_field
         ( "Tag",
           `Fixed (Binary_size.tag_size size),
-          Int (size :> Binary_schema.integer_extended) )
+          Int
+            ( (size :> Binary_schema.integer_extended),
+              Encoding.default_endianness ) )
     in
     let cases, references =
       List.fold_right
@@ -429,19 +431,19 @@ let describe (type x) (encoding : x Encoding.t) =
     | Uint8 as encoding ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
-    | Int16 as encoding ->
+    | Int16 _ as encoding ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
-    | Uint16 as encoding ->
+    | Uint16 _ as encoding ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
-    | Int31 as encoding ->
+    | Int31 _ as encoding ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
-    | Int32 as encoding ->
+    | Int32 _ as encoding ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
-    | Int64 as encoding ->
+    | Int64 _ as encoding ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (classify_desc encoding, layout)], references)
     | N as encoding ->
@@ -472,16 +474,18 @@ let describe (type x) (encoding : x Encoding.t) =
     | Ignore -> (Zero_width, references)
     | Constant _ -> (Zero_width, references)
     | Bool -> (Bool, references)
-    | Int8 -> (Int `Int8, references)
-    | Uint8 -> (Int `Uint8, references)
-    | Int16 -> (Int `Int16, references)
-    | Uint16 -> (Int `Uint16, references)
-    | Int31 -> (RangedInt (~-1073741824, 1073741823), references)
-    | Int32 -> (Int `Int32, references)
-    | Int64 -> (Int `Int64, references)
+    | Int8 -> (Int (`Int8, Encoding.default_endianness), references)
+    | Uint8 -> (Int (`Uint8, Encoding.default_endianness), references)
+    | Int16 endianness -> (Int (`Int16, endianness), references)
+    | Uint16 endianness -> (Int (`Uint16, endianness), references)
+    | Int31 endianness ->
+        (RangedInt (~-1073741824, endianness, 1073741823), references)
+    | Int32 endianness -> (Int (`Int32, endianness), references)
+    | Int64 endianness -> (Int (`Int64, endianness), references)
     | N -> (Ref n_reference_name, add_n_reference uf references)
     | Z -> (Ref z_reference_name, add_z_reference uf references)
-    | RangedInt {minimum; maximum} -> (RangedInt (minimum, maximum), references)
+    | RangedInt {minimum; endianness; maximum} ->
+        (RangedInt (minimum, endianness, maximum), references)
     | RangedFloat {minimum; maximum} ->
         (RangedFloat (minimum, maximum), references)
     | Float -> (Float, references)

@@ -136,6 +136,30 @@ module Atom = struct
         (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
     r
 
+  let uint16_le r = read_atom r Binary_size.int16 TzEndian.get_uint16_le
+
+  let int16_le r = read_atom r Binary_size.int16 TzEndian.get_int16_le
+
+  let int32_le r = read_atom r Binary_size.int32 TzEndian.get_int32_le
+
+  let int64_le r = read_atom r Binary_size.int64 TzEndian.get_int64_le
+
+  let uint30_le r =
+    read_atom r Binary_size.uint30 @@ fun buffer ofs ->
+    let v = Int32.to_int (TzEndian.get_int32_le buffer ofs) in
+    if v < 0 then
+      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
+    v
+
+  let int31_le r =
+    read_atom r Binary_size.int31 @@ fun buffer ofs ->
+    let r32 = TzEndian.get_int32_le buffer ofs in
+    let r = Int32.to_int r32 in
+    if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
+      raise_read_error
+        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
+    r
+
   let int = function
     | `Int31 -> int31
     | `Int16 -> int16
@@ -153,6 +177,22 @@ module Atom = struct
       | `Uint8 -> uint8
       | `Uint16 -> uint16
       | `Uint30 -> uint30
+    in
+    read_int resume state @@ fun (ranged, state) ->
+    let ranged = if minimum > 0 then ranged + minimum else ranged in
+    if not (minimum <= ranged && ranged <= maximum) then
+      Error (Invalid_int {min = minimum; v = ranged; max = maximum})
+    else k (ranged, state)
+
+  let ranged_int_le ~minimum ~maximum resume state k =
+    let read_int =
+      match Binary_size.range_to_size ~minimum ~maximum with
+      | `Int8 -> int8
+      | `Int16 -> int16_le
+      | `Int31 -> int31_le
+      | `Uint8 -> uint8
+      | `Uint16 -> uint16_le
+      | `Uint30 -> uint30_le
     in
     read_int resume state @@ fun (ranged, state) ->
     let ranged = if minimum > 0 then ranged + minimum else ranged in
@@ -299,11 +339,16 @@ let rec read_rec :
   | Bool -> Atom.bool resume state k
   | Int8 -> Atom.int8 resume state k
   | Uint8 -> Atom.uint8 resume state k
-  | Int16 -> Atom.int16 resume state k
-  | Uint16 -> Atom.uint16 resume state k
-  | Int31 -> Atom.int31 resume state k
-  | Int32 -> Atom.int32 resume state k
-  | Int64 -> Atom.int64 resume state k
+  | Int16 Big -> Atom.int16 resume state k
+  | Uint16 Big -> Atom.uint16 resume state k
+  | Int31 Big -> Atom.int31 resume state k
+  | Int32 Big -> Atom.int32 resume state k
+  | Int64 Big -> Atom.int64 resume state k
+  | Int16 Little -> Atom.int16_le resume state k
+  | Uint16 Little -> Atom.uint16_le resume state k
+  | Int31 Little -> Atom.int31_le resume state k
+  | Int32 Little -> Atom.int32_le resume state k
+  | Int64 Little -> Atom.int64_le resume state k
   | N -> Atom.n resume state k
   | Z -> Atom.z resume state k
   | Float -> Atom.float resume state k
@@ -318,8 +363,10 @@ let rec read_rec :
   | Padded (e, n) ->
       read_rec false e state @@ fun (v, state) ->
       skip n state @@ fun state -> k (v, state)
-  | RangedInt {minimum; maximum} ->
+  | RangedInt {minimum; endianness = Big; maximum} ->
       Atom.ranged_int ~minimum ~maximum resume state k
+  | RangedInt {minimum; endianness = Little; maximum} ->
+      Atom.ranged_int_le ~minimum ~maximum resume state k
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum resume state k
   | String_enum (_, arr) -> Atom.string_enum arr resume state k

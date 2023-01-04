@@ -89,6 +89,30 @@ module Atom = struct
         (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
     r
 
+  let uint16_le = read_atom Binary_size.int16 TzEndian.get_uint16_le_string
+
+  let int16_le = read_atom Binary_size.int16 TzEndian.get_int16_le_string
+
+  let int32_le = read_atom Binary_size.int32 TzEndian.get_int32_le_string
+
+  let int64_le = read_atom Binary_size.int64 TzEndian.get_int64_le_string
+
+  let uint30_le =
+    read_atom Binary_size.uint30 @@ fun buffer ofs ->
+    let v = Int32.to_int (TzEndian.get_int32_le_string buffer ofs) in
+    if v < 0 then
+      raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
+    v
+
+  let int31_le =
+    read_atom Binary_size.int31 @@ fun buffer ofs ->
+    let r32 = TzEndian.get_int32_le_string buffer ofs in
+    let r = Int32.to_int r32 in
+    if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
+      raise_read_error
+        (Invalid_int {min = -0x4000_0000; v = r; max = 0x3fff_ffff}) ;
+    r
+
   let int = function
     | `Int31 -> int31
     | `Int16 -> int16
@@ -106,6 +130,22 @@ module Atom = struct
       | `Uint8 -> uint8
       | `Uint16 -> uint16
       | `Uint30 -> uint30
+    in
+    let ranged = read_int state in
+    let ranged = if minimum > 0 then ranged + minimum else ranged in
+    if not (minimum <= ranged && ranged <= maximum) then
+      raise_read_error (Invalid_int {min = minimum; v = ranged; max = maximum}) ;
+    ranged
+
+  let ranged_int_le ~minimum ~maximum state =
+    let read_int =
+      match Binary_size.range_to_size ~minimum ~maximum with
+      | `Int8 -> int8
+      | `Int16 -> int16_le
+      | `Int31 -> int31_le
+      | `Uint8 -> uint8
+      | `Uint16 -> uint16_le
+      | `Uint30 -> uint30_le
     in
     let ranged = read_int state in
     let ranged = if minimum > 0 then ranged + minimum else ranged in
@@ -220,11 +260,16 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Bool -> Atom.bool state
   | Int8 -> Atom.int8 state
   | Uint8 -> Atom.uint8 state
-  | Int16 -> Atom.int16 state
-  | Uint16 -> Atom.uint16 state
-  | Int31 -> Atom.int31 state
-  | Int32 -> Atom.int32 state
-  | Int64 -> Atom.int64 state
+  | Int16 Big -> Atom.int16 state
+  | Uint16 Big -> Atom.uint16 state
+  | Int31 Big -> Atom.int31 state
+  | Int32 Big -> Atom.int32 state
+  | Int64 Big -> Atom.int64 state
+  | Int16 Little -> Atom.int16_le state
+  | Uint16 Little -> Atom.uint16_le state
+  | Int31 Little -> Atom.int31_le state
+  | Int32 Little -> Atom.int32_le state
+  | Int64 Little -> Atom.int64_le state
   | N -> Atom.n state
   | Z -> Atom.z state
   | Float -> Atom.float state
@@ -237,7 +282,10 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let v = read_rec e state in
       ignore (Atom.fixed_length_string n state : string) ;
       v
-  | RangedInt {minimum; maximum} -> Atom.ranged_int ~minimum ~maximum state
+  | RangedInt {minimum; endianness = Big; maximum} ->
+      Atom.ranged_int ~minimum ~maximum state
+  | RangedInt {minimum; endianness = Little; maximum} ->
+      Atom.ranged_int_le ~minimum ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
   | String_enum (_, arr) -> Atom.string_enum arr state
   | Array {length_limit; length_encoding = None; elts = e} ->

@@ -92,11 +92,11 @@ let rec check_dup_fields : type a. Mu_visited.t -> SSet.t -> a t -> SSet.t =
   | Bool -> assert false
   | Int8 -> assert false
   | Uint8 -> assert false
-  | Int16 -> assert false
-  | Uint16 -> assert false
-  | Int31 -> assert false
-  | Int32 -> assert false
-  | Int64 -> assert false
+  | Int16 _ -> assert false
+  | Uint16 _ -> assert false
+  | Int31 _ -> assert false
+  | Int32 _ -> assert false
+  | Int64 _ -> assert false
   | N -> assert false
   | Z -> assert false
   | RangedInt _ -> assert false

@@ -101,11 +101,23 @@ module Atom = struct
     | `Int16 | `Uint16 -> TzEndian.set_int16 buffer ofs v
     | `Int8 | `Uint8 -> TzEndian.set_int8 buffer ofs v
 
+  let set_intle kind buffer ofs v =
+    match kind with
+    | `Int31 | `Uint30 -> TzEndian.set_int32_le buffer ofs (Int32.of_int v)
+    | `Int16 | `Uint16 -> TzEndian.set_int16_le buffer ofs v
+    | `Int8 | `Uint8 -> TzEndian.set_int8 buffer ofs v
+
   let int kind state v =
     check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
     let ofs = state.offset in
     may_resize state (Binary_size.integer_to_size kind) ;
     set_int kind state.buffer ofs v
+
+  let intle kind state v =
+    check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
+    let ofs = state.offset in
+    may_resize state (Binary_size.integer_to_size kind) ;
+    set_intle kind state.buffer ofs v
 
   let int8 = int `Int8
 
@@ -131,6 +143,24 @@ module Atom = struct
     may_resize state Binary_size.int64 ;
     TzEndian.set_int64 state.buffer ofs v
 
+  let int16_le = intle `Int16
+
+  let uint16_le = intle `Uint16
+
+  let uint30_le = intle `Uint30
+
+  let int31_le = intle `Int31
+
+  let int32_le state v =
+    let ofs = state.offset in
+    may_resize state Binary_size.int32 ;
+    TzEndian.set_int32_le state.buffer ofs v
+
+  let int64_le state v =
+    let ofs = state.offset in
+    may_resize state Binary_size.int64 ;
+    TzEndian.set_int64_le state.buffer ofs v
+
   let ranged_int ~minimum ~maximum state v =
     check_int_range minimum v maximum ;
     let v = if minimum >= 0 then v - minimum else v in
@@ -141,6 +171,17 @@ module Atom = struct
     | `Int8 -> int8 state v
     | `Int16 -> int16 state v
     | `Int31 -> int31 state v
+
+  let ranged_int_le ~minimum ~maximum state v =
+    check_int_range minimum v maximum ;
+    let v = if minimum >= 0 then v - minimum else v in
+    match Binary_size.range_to_size ~minimum ~maximum with
+    | `Uint8 -> uint8 state v
+    | `Uint16 -> uint16_le state v
+    | `Uint30 -> uint30_le state v
+    | `Int8 -> int8 state v
+    | `Int16 -> int16_le state v
+    | `Int31 -> int31_le state v
 
   let n state v =
     if Z.sign v < 0 then raise Invalid_natural ;
@@ -232,11 +273,16 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Bool -> Atom.bool state value
   | Int8 -> Atom.int8 state value
   | Uint8 -> Atom.uint8 state value
-  | Int16 -> Atom.int16 state value
-  | Uint16 -> Atom.uint16 state value
-  | Int31 -> Atom.int31 state value
-  | Int32 -> Atom.int32 state value
-  | Int64 -> Atom.int64 state value
+  | Int16 Big -> Atom.int16 state value
+  | Uint16 Big -> Atom.uint16 state value
+  | Int31 Big -> Atom.int31 state value
+  | Int32 Big -> Atom.int32 state value
+  | Int64 Big -> Atom.int64 state value
+  | Int16 Little -> Atom.int16_le state value
+  | Uint16 Little -> Atom.uint16_le state value
+  | Int31 Little -> Atom.int31_le state value
+  | Int32 Little -> Atom.int32_le state value
+  | Int64 Little -> Atom.int64_le state value
   | N -> Atom.n state value
   | Z -> Atom.z state value
   | Float -> Atom.float state value
@@ -251,8 +297,10 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Padded (e, n) ->
       write_rec e state value ;
       Atom.fixed_kind_string n state (String.make n '\000')
-  | RangedInt {minimum; maximum} ->
+  | RangedInt {minimum; endianness = Big; maximum} ->
       Atom.ranged_int ~minimum ~maximum state value
+  | RangedInt {minimum; endianness = Little; maximum} ->
+      Atom.ranged_int_le ~minimum ~maximum state value
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum state value
   | String_enum (tbl, arr) -> Atom.string_enum tbl arr state value

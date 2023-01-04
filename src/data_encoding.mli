@@ -90,6 +90,8 @@ module Encoding : sig
 
   type string_json_repr = Hex | Plain
 
+  type endianness = Big | Little
+
   (** {3 Ground descriptors} *)
 
   (** {4 voids} *)
@@ -157,6 +159,22 @@ module Encoding : sig
       of OCaml.
   *)
   val ranged_int : int -> int -> int encoding
+
+  (** Integers with the same ranges and restrictions as above, but in
+      little-endian representation. The JSON representation is unaffected. *)
+  module Little_endian : sig
+    val int16 : int encoding
+
+    val uint16 : int encoding
+
+    val int31 : int encoding
+
+    val int32 : int32 encoding
+
+    val int64 : int64 encoding
+
+    val ranged_int : int -> int -> int encoding
+  end
 
   (** Big number
 

@@ -191,9 +191,9 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
         kind
         left
         right
-  | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 | Uint16
-  | Int31 | Int32 | Int64 | N | Z | RangedInt _ | RangedFloat _ | Float
-  | Bytes _ | String _
+  | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 _
+  | Uint16 _ | Int31 _ | Int32 _ | Int64 _ | N | Z | RangedInt _ | RangedFloat _
+  | Float | Bytes _ | String _
   | Padded (_, _)
   | String_enum (_, _)
   | Array _ | List _ | Obj _ | Tup _ | Union _ | Mu _ | Describe _ | Splitted _
@@ -278,12 +278,14 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Ignore -> unit
   | Int8 -> ranged_int ~minimum:~-(1 lsl 7) ~maximum:((1 lsl 7) - 1) "int8"
   | Uint8 -> ranged_int ~minimum:0 ~maximum:((1 lsl 8) - 1) "uint8"
-  | Int16 -> ranged_int ~minimum:~-(1 lsl 15) ~maximum:((1 lsl 15) - 1) "int16"
-  | Uint16 -> ranged_int ~minimum:0 ~maximum:((1 lsl 16) - 1) "uint16"
-  | RangedInt {minimum; maximum} -> ranged_int ~minimum ~maximum "rangedInt"
-  | Int31 -> int
-  | Int32 -> int32
-  | Int64 -> int64_encoding
+  | Int16 _ ->
+      ranged_int ~minimum:~-(1 lsl 15) ~maximum:((1 lsl 15) - 1) "int16"
+  | Uint16 _ -> ranged_int ~minimum:0 ~maximum:((1 lsl 16) - 1) "uint16"
+  | RangedInt {minimum; endianness = _; maximum} ->
+      ranged_int ~minimum ~maximum "rangedInt"
+  | Int31 _ -> int
+  | Int32 _ -> int32
+  | Int64 _ -> int64_encoding
   | N -> n_encoding
   | Z -> z_encoding
   | Bool -> bool

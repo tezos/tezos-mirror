@@ -56,14 +56,14 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Bool -> Binary_size.bool
   | Int8 -> Binary_size.int8
   | Uint8 -> Binary_size.uint8
-  | Int16 -> Binary_size.int16
-  | Uint16 -> Binary_size.uint16
-  | Int31 -> Binary_size.int31
-  | Int32 -> Binary_size.int32
-  | Int64 -> Binary_size.int64
+  | Int16 _ -> Binary_size.int16
+  | Uint16 _ -> Binary_size.uint16
+  | Int31 _ -> Binary_size.int31
+  | Int32 _ -> Binary_size.int32
+  | Int64 _ -> Binary_size.int64
   | N -> n_length value
   | Z -> z_length value
-  | RangedInt {minimum; maximum} ->
+  | RangedInt {minimum; endianness = _; maximum} ->
       Binary_size.integer_to_size @@ Binary_size.range_to_size ~minimum ~maximum
   | Float -> Binary_size.float
   | RangedFloat _ -> Binary_size.float
@@ -180,14 +180,14 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Bool -> Some Binary_size.bool
   | Int8 -> Some Binary_size.int8
   | Uint8 -> Some Binary_size.uint8
-  | Int16 -> Some Binary_size.int16
-  | Uint16 -> Some Binary_size.uint16
-  | Int31 -> Some Binary_size.int31
-  | Int32 -> Some Binary_size.int32
-  | Int64 -> Some Binary_size.int64
+  | Int16 _ -> Some Binary_size.int16
+  | Uint16 _ -> Some Binary_size.uint16
+  | Int31 _ -> Some Binary_size.int31
+  | Int32 _ -> Some Binary_size.int32
+  | Int64 _ -> Some Binary_size.int64
   | N -> None
   | Z -> None
-  | RangedInt {minimum; maximum} ->
+  | RangedInt {minimum; endianness = _; maximum} ->
       Some
         (Binary_size.integer_to_size
         @@ Binary_size.range_to_size ~minimum ~maximum)
