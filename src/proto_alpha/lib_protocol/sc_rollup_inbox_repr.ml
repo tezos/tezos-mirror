@@ -101,10 +101,10 @@ let () =
 module Int64_map = Map.Make (Int64)
 
 (* 32 *)
-let hash_prefix = "\003\250\174\238\208" (* scib1(55) *)
+let hash_prefix = "\003\255\138\145\110" (* srib1(55) *)
 
 module Hash = struct
-  let prefix = "scib1"
+  let prefix = "srib1"
 
   let encoded_size = 55
 

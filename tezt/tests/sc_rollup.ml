@@ -146,7 +146,7 @@ let parent_not_lcc = "Parent is not the last cemented commitment"
 
 let disputed_commit = "Attempted to cement a disputed commitment"
 
-let commit_doesnt_exit = "Commitment scc\\w+\\sdoes not exist"
+let commit_doesnt_exit = "Commitment src\\w+\\sdoes not exist"
 
 let make_parameter name = function
   | None -> []
@@ -1980,7 +1980,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
   let cemented_commitment_hash =
     Option.map hash rollup_node1_published_commitment
     |> Option.value
-         ~default:"scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG"
+         ~default:"src142qqoZP1iPSALZPSy7ip4StkiF5neWNWviQ8V6uRADsnvuegVH"
   in
   let* () = bake_levels levels_to_cementation client in
   let* cemented_commitment_level =
@@ -3131,7 +3131,7 @@ let test_valid_dispute_dissection =
      didn't add any message in inboxes). If this hash needs to be recomputed,
      run this test with --verbose and grep for 'compressed_state' in the
      produced logs. *)
-  let state_hash = "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf" in
+  let state_hash = "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj" in
 
   let rec aux i acc =
     if i = number_of_sections_in_dissection - 1 then

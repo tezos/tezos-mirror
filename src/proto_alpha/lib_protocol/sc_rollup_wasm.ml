@@ -119,7 +119,7 @@ module V2_0_0 = struct
   *)
   let reference_initial_state_hash =
     Sc_rollup_repr.State_hash.of_b58check_exn
-      "scs11anfGzGUHWbxyaDhYPPE7nntNegMvCFTBcGXuoa3ATg6Mnirwe"
+      "srs11XQCynQfGtuUr4c47rAoazGeTfC33R5FmimBKbnMrWwntHURX1"
 
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
