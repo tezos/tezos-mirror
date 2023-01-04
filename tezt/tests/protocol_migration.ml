@@ -573,7 +573,8 @@ let test_forked_migration_manual ?(migration_level = 4)
   let* () =
     let n = migration_level - 2 in
     Log.info "Baking %d blocks" n ;
-    repeat n (fun () ->
+    Lwt_list.iteri_s
+      (fun n _ ->
         let* () =
           Client.propose_for
             ~key:all_bootstrap_keys
@@ -589,11 +590,17 @@ let test_forked_migration_manual ?(migration_level = 4)
             client_2
             ~force:true
         in
-        Client.endorse_for
-          ~key:all_bootstrap_keys
-          client_2
-          ~protocol:migrate_from
-          ~force:true)
+        let* () =
+          Client.endorse_for
+            ~key:all_bootstrap_keys
+            client_2
+            ~protocol:migrate_from
+            ~force:true
+        in
+        Log.info "Waiting for level %d" (n + 2) ;
+        let* _ = Node.wait_for_level node_1 (n + 2) in
+        return ())
+      (range 1 n)
   in
 
   Log.info "Disconnecting nodes and proposing migration blocks" ;
