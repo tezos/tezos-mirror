@@ -1879,4 +1879,67 @@ let%expect_test _ =
              [ { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
                { "layout": { "kind": "Bytes" }, "kind": "anon",
                  "data_kind": { "kind": "Variable" } } ] }, "fields": [] } |}] ;
+  dump Data_encoding.(tup4 int31 int64 uint8 uint16) ;
+  [%expect
+    {|
+    +-----------------+---------+-------------------------------------------------------------------------+
+    | Name            | Size    | Contents                                                                |
+    +=================+=========+=========================================================================+
+    | Unnamed field 0 | 4 bytes | signed 31-bit big-endian integer in the range -1073741824 to 1073741823 |
+    +-----------------+---------+-------------------------------------------------------------------------+
+    | Unnamed field 1 | 8 bytes | signed 64-bit big-endian integer                                        |
+    +-----------------+---------+-------------------------------------------------------------------------+
+    | Unnamed field 2 | 1 byte  | unsigned 8-bit integer                                                  |
+    +-----------------+---------+-------------------------------------------------------------------------+
+    | Unnamed field 3 | 2 bytes | unsigned 16-bit big-endian integer                                      |
+    +-----------------+---------+-------------------------------------------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout":
+                   { "min": -1073741824, "max": 1073741823, "kind": "RangedInt" },
+                 "kind": "anon", "data_kind": { "size": 4, "kind": "Fixed" } },
+               { "layout": { "size": "Int64", "kind": "Int" }, "kind": "anon",
+                 "data_kind": { "size": 8, "kind": "Fixed" } },
+               { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "anon",
+                 "data_kind": { "size": 1, "kind": "Fixed" } },
+               { "layout": { "size": "Uint16", "kind": "Int" }, "kind": "anon",
+                 "data_kind": { "size": 2, "kind": "Fixed" } } ] },
+       "fields": [] } |}] ;
+  dump
+    Data_encoding.(
+      tup4 Little_endian.int31 Little_endian.int64 uint16 Little_endian.uint16) ;
+  [%expect
+    {|
+    +-----------------+---------+----------------------------------------------------------------------------+
+    | Name            | Size    | Contents                                                                   |
+    +=================+=========+============================================================================+
+    | Unnamed field 0 | 4 bytes | signed 31-bit little-endian integer in the range -1073741824 to 1073741823 |
+    +-----------------+---------+----------------------------------------------------------------------------+
+    | Unnamed field 1 | 8 bytes | signed 64-bit little-endian integer                                        |
+    +-----------------+---------+----------------------------------------------------------------------------+
+    | Unnamed field 2 | 2 bytes | unsigned 16-bit big-endian integer                                         |
+    +-----------------+---------+----------------------------------------------------------------------------+
+    | Unnamed field 3 | 2 bytes | unsigned 16-bit little-endian integer                                      |
+    +-----------------+---------+----------------------------------------------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout":
+                   { "min": -1073741824, "endianness": "Little",
+                     "max": 1073741823, "kind": "RangedInt" }, "kind": "anon",
+                 "data_kind": { "size": 4, "kind": "Fixed" } },
+               { "layout":
+                   { "size": "Int64", "endianness": "Little", "kind": "Int" },
+                 "kind": "anon", "data_kind": { "size": 8, "kind": "Fixed" } },
+               { "layout": { "size": "Uint16", "kind": "Int" }, "kind": "anon",
+                 "data_kind": { "size": 2, "kind": "Fixed" } },
+               { "layout":
+                   { "size": "Uint16", "endianness": "Little", "kind": "Int" },
+                 "kind": "anon", "data_kind": { "size": 2, "kind": "Fixed" } } ] },
+       "fields": [] } |}] ;
   ()
