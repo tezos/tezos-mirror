@@ -63,10 +63,10 @@ module Internal_for_tests = struct
 end
 
 (* 32 *)
-let state_hash_prefix = "\017\144\122\202" (* scs1(54) *)
+let state_hash_prefix = "\017\165\235\240" (* srs1(54) *)
 
 module State_hash = struct
-  let prefix = "scs1"
+  let prefix = "srs1"
 
   let encoded_size = 54
 

@@ -158,10 +158,10 @@ let unsafe_of_string s = s
 let unsafe_to_string s = s
 
 (* 32 *)
-let hash_prefix = "\003\250\174\239\012" (* scib3(55) *)
+let hash_prefix = "\003\255\138\145\170" (* srib3(55) *)
 
 module Hash = struct
-  let prefix = "scib3"
+  let prefix = "srib3"
 
   let encoded_size = 55
 

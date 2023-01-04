@@ -44,10 +44,10 @@ end
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
 
 (* 32 *)
-let hash_prefix = "\003\250\174\238\238" (* scib2(55) *)
+let hash_prefix = "\003\255\138\145\140" (* srib2(55) *)
 
 module Hash = struct
-  let prefix = "scib2"
+  let prefix = "srib2"
 
   let encoded_size = 55
 

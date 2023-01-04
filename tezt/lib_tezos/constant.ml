@@ -108,7 +108,7 @@ let tx_rollup_proof_initial_state =
 
 (** A valid base58 encoded compressed state hash. *)
 let sc_rollup_compressed_state =
-  "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf"
+  "srs11Z9V76SGd97kGmDQXV8tEF67C48GMy77RuaHdF1kWLk6UTmMfj"
 
 (** A valid base58 encoded layer-2 account to be used to test transaction and
     smart contract rollups. *)
