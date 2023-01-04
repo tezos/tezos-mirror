@@ -323,6 +323,11 @@ module Inner = struct
       (* According to the specification the lengths of a slot page are
          in MiB *)
       fail (`Fail "Wrong slot size: expected MiB")
+    else if not (t.page_size >= 32 && t.page_size <= t.slot_size) then
+      (* The size of a page must be greater than 31 bytes (32 > 31 is the next
+         power of two), the size in bytes of a scalar element, and less than
+         [t.slot_size]. *)
+      fail (`Fail "Wrong page size")
     else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
     then
       (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
@@ -347,7 +352,7 @@ module Inner = struct
     else return t
 
   let slot_as_polynomial_length ~slot_size =
-    1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount))
+    1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
   type parameters = {
     redundancy_factor : int;
