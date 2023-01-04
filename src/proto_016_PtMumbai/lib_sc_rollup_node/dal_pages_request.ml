@@ -132,7 +132,7 @@ let slot_pages ~dal_attestation_lag node_ctxt
       ~published_level
       node_ctxt
   in
-  let*! processed =
+  let* processed =
     Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
@@ -149,7 +149,7 @@ let slot_pages ~dal_attestation_lag node_ctxt
         index
   | Some `Unconfirmed -> return (Delayed_write_monad.no_write None)
   | Some `Confirmed ->
-      let*! pages =
+      let* pages =
         Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash
       in
       let pages =
@@ -171,7 +171,7 @@ let page_content ~dal_attestation_lag node_ctxt page_id =
       ~published_level
       node_ctxt
   in
-  let*! processed =
+  let* processed =
     Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
@@ -204,7 +204,7 @@ let page_content ~dal_attestation_lag node_ctxt page_id =
           | None -> tzfail @@ Dal_invalid_page_for_slot page_id))
   | Some `Unconfirmed -> return None
   | Some `Confirmed -> (
-      let*! page_opt =
+      let* page_opt =
         Node_context.find_slot_page
           node_ctxt
           ~confirmed_in_block_hash
@@ -214,7 +214,7 @@ let page_content ~dal_attestation_lag node_ctxt page_id =
       match page_opt with
       | Some v -> return @@ Some v
       | None ->
-          let*! pages =
+          let* pages =
             Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash
           in
           if page_index < 0 || List.compare_length_with pages page_index <= 0

@@ -52,7 +52,7 @@ end
 
 let get_dal_confirmed_slot_pages node_ctxt block =
   let open Lwt_result_syntax in
-  let*! slot_pages =
+  let* slot_pages =
     Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash:block
   in
   (* Slot pages are sorted in lexicographic order of slot index and page
@@ -74,7 +74,7 @@ let get_dal_confirmed_slot_pages node_ctxt block =
 
 let get_dal_slot_page node_ctxt block slot_index slot_page =
   let open Lwt_result_syntax in
-  let*! processed =
+  let* processed =
     Node_context.processed_slot
       node_ctxt
       ~confirmed_in_block_hash:block
@@ -84,7 +84,7 @@ let get_dal_slot_page node_ctxt block slot_index slot_page =
   | None -> return ("Slot page has not been downloaded", None)
   | Some `Unconfirmed -> return ("Slot was not confirmed", None)
   | Some `Confirmed -> (
-      let*! contents_opt =
+      let* contents_opt =
         Node_context.find_slot_page
           node_ctxt
           ~confirmed_in_block_hash:block
@@ -344,10 +344,10 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let*! slots =
+    let+ slots =
       Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
     in
-    return slots
+    slots
 
   let () =
     Block_directory.register0

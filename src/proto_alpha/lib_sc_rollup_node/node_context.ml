@@ -568,7 +568,7 @@ let get_full_l2_block node_ctxt block_hash =
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
-  Error.trace_lwt_with
+  Error.trace_lwt_result_with
     "Could not retrieve slot header for slot index %a published in block %a"
     Dal.Slot_index.pp
     slot_index

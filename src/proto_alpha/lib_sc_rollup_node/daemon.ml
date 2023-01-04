@@ -171,7 +171,7 @@ module Make (PVM : Pvm.S) = struct
         tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
     | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
       when Node_context.dal_supported node_ctxt ->
-        let*! () =
+        let* () =
           Node_context.save_slot_header
             node_ctxt
             ~published_in_block_hash:head.Layer1.hash

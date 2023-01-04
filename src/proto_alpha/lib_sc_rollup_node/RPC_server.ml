@@ -51,11 +51,7 @@ module Slot_pages_map = struct
 end
 
 let get_dal_processed_slots node_ctxt block =
-  let open Lwt_result_syntax in
-  let*! list =
-    Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
-  in
-  return list
+  Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
 
 module Global_directory = Make_directory (struct
   include Sc_rollup_services.Global
@@ -306,7 +302,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let*! slots =
+    let* slots =
       Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
     in
     return slots

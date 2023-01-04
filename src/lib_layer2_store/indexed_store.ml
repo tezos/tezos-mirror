@@ -24,66 +24,7 @@
 (*****************************************************************************)
 
 open Store_sigs
-
-type error +=
-  | Cannot_load_store of string * string
-  | Cannot_write_to_store of string
-  | Cannot_read_from_store of string
-  | Decoding_error of Data_encoding.Binary.read_error
-
-let () =
-  register_error_kind
-    ~id:"layer2_store.cannot_load_store"
-    ~title:"Store cannot be loaded"
-    ~description:"Store cannot be loaded."
-    ~pp:(fun ppf (name, path) ->
-      Format.fprintf ppf "Store %s cannot be loaded from %s." name path)
-    `Permanent
-    Data_encoding.(obj2 (req "name" string) (req "path" string))
-    (function Cannot_load_store (n, p) -> Some (n, p) | _ -> None)
-    (fun (n, p) -> Cannot_load_store (n, p))
-
-let () =
-  register_error_kind
-    ~id:"layer2_store.cannot_write_to_store"
-    ~title:"Value cannot be written to store"
-    ~description:"Value cannot be written to store."
-    ~pp:(fun ppf name ->
-      Format.fprintf ppf "Value cannot be written to store %s." name)
-    `Permanent
-    Data_encoding.(obj1 (req "name" string))
-    (function Cannot_write_to_store n -> Some n | _ -> None)
-    (fun n -> Cannot_write_to_store n)
-
-let () =
-  register_error_kind
-    ~id:"layer2_store.cannot_read_from_store"
-    ~title:"Value cannot be read from store"
-    ~description:"Value cannot be read from store."
-    ~pp:(fun ppf name ->
-      Format.fprintf ppf "Value cannot be read from store %s." name)
-    `Permanent
-    Data_encoding.(obj1 (req "name" string))
-    (function Cannot_read_from_store n -> Some n | _ -> None)
-    (fun n -> Cannot_read_from_store n)
-
-let () =
-  register_error_kind
-    ~id:"layer2_store.decoding_error"
-    ~title:"Cannot decode file"
-    ~description:"A file for a persistent element could not be decoded"
-    ~pp:(fun ppf error ->
-      Format.fprintf
-        ppf
-        "Decoding error: %a"
-        Data_encoding.Json.pp
-        (Data_encoding.Json.construct
-           Data_encoding.Binary.read_error_encoding
-           error))
-    `Permanent
-    Data_encoding.(obj1 (req "error" Data_encoding.Binary.read_error_encoding))
-    (function Decoding_error e -> Some e | _ -> None)
-    (fun e -> Decoding_error e)
+open Store_errors
 
 (* Helper functions to copy byte sequences or integers in [src] to another byte
    sequence [dst] at offset [offset], with named arguments to avoid
@@ -303,7 +244,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
 
   let load (type a) ~path (mode : a mode) : a t tzresult Lwt.t =
     let open Lwt_result_syntax in
-    trace (Cannot_load_store (N.name, path))
+    trace (Cannot_load_store {name = N.name; path})
     @@ protect
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
@@ -453,7 +394,7 @@ end) : SINGLETON_STORE with type value := S.t = struct
 
   let load ~path _mode =
     let open Lwt_result_syntax in
-    trace (Cannot_load_store (S.name, path))
+    trace (Cannot_load_store {name = S.name; path})
     @@ protect
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
@@ -581,7 +522,7 @@ struct
     | Some (Error _ as e) -> Lwt.return e
 
   let locked_write_value store ~offset ~value ~key ~header =
-    trace (Cannot_write_to_store N.name)
+    trace_eval (fun () -> Cannot_write_to_store N.name)
     @@ protect
     @@ fun () ->
     let open Lwt_result_syntax in
@@ -609,7 +550,7 @@ struct
 
   let load (type a) ~path ~cache_size (mode : a mode) : a t tzresult Lwt.t =
     let open Lwt_result_syntax in
-    trace (Cannot_load_store (N.name, path))
+    trace (Cannot_load_store {name = N.name; path})
     @@ protect
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir path in
