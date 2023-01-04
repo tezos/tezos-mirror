@@ -38,9 +38,9 @@ let tezos_snoop = "./octez-snoop"
 
 let tezos_protocol_compiler = "./octez-protocol-compiler"
 
-let sc_rollup_node = "./octez-sc-rollup-node-alpha"
+let sc_rollup_node = "./octez-smart-rollup-node-alpha"
 
-let sc_rollup_client = "./octez-sc-rollup-client-alpha"
+let sc_rollup_client = "./octez-smart-rollup-client-alpha"
 
 let tx_rollup_node = "./octez-tx-rollup-node"
 

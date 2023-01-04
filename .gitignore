@@ -46,10 +46,10 @@ __pycache__
 /octez-tps-evaluation
 /tezos-tps-evaluation-*
 /octez-tps-evaluation-*
-/tezos-sc-rollup-node-*
-/octez-sc-rollup-node-*
-/tezos-sc-rollup-client-*
-/octez-sc-rollup-client-*
+/tezos-smart-rollup-node-*
+/octez-smart-rollup-node-*
+/tezos-smart-rollup-client-*
+/octez-smart-rollup-client-*
 /tezos-dal-node
 /octez-dal-node
 /octez-binaries

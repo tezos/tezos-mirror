@@ -4836,10 +4836,10 @@ module Protocol = Protocol
     let sc_rollup =
       only_if N.(number >= 016) @@ fun () ->
       public_lib
-        (sf "tezos-sc-rollup-%s" name_dash)
+        (sf "tezos-smart-rollup-%s" name_dash)
         ~path:(path // "lib_sc_rollup")
         ~synopsis:
-          "Tezos/Protocol: protocol specific library for `tezos-sc-rollup`"
+          "Tezos/Protocol: protocol specific library for `tezos-smart-rollup`"
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives";
@@ -4855,10 +4855,11 @@ module Protocol = Protocol
     let _sc_rollup_client =
       only_if (active && N.(number >= 016)) @@ fun () ->
       public_exe
-        (sf "octez-sc-rollup-client-%s" short_hash)
+        (sf "octez-smart-rollup-client-%s" short_hash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
-        ~synopsis:"Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"
+        ~synopsis:
+          "Tezos/Protocol: `octez-smart-rollup-client-alpha` client binary"
         ~release_status:executable_release_status
         ~deps:
           [
@@ -4880,10 +4881,10 @@ module Protocol = Protocol
     let _sc_rollup_node =
       only_if (active && N.(number >= 016)) @@ fun () ->
       public_exe
-        (sf "octez-sc-rollup-node-%s" short_hash)
+        (sf "octez-smart-rollup-node-%s" short_hash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
-        ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
+        ~synopsis:"Tezos/Protocol: Smart Rollup node binary"
         ~release_status:executable_release_status
         ~deps:
           [

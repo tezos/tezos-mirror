@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_sc_rollup_alpha)
- (public_name tezos-sc-rollup-alpha)
+ (name tezos_smart_rollup_alpha)
+ (public_name tezos-smart-rollup-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_sc_rollup_016_PtMumbai)
- (public_name tezos-sc-rollup-016-PtMumbai)
+ (name tezos_smart_rollup_016_PtMumbai)
+ (public_name tezos-smart-rollup-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

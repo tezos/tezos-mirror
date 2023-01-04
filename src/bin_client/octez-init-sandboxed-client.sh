@@ -184,13 +184,13 @@ main () {
         echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol_without_number
         chmod +x $client_dir/bin/octez-baker-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
-        echo "exec $sc_rollup_node \"\$@\""  >> $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
-        chmod +x $client_dir/bin/octez-sc-rollup-node-$protocol_without_number
+        echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
+        echo "exec $sc_rollup_node \"\$@\""  >> $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
+        chmod +x $client_dir/bin/octez-smart-rollup-node-$protocol_without_number
 
-        echo '#!/bin/sh' > $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
-        echo "exec $sc_rollup_client \"\$@\""  >> $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
-        chmod +x $client_dir/bin/octez-sc-rollup-client-$protocol_without_number
+        echo '#!/bin/sh' > $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
+        echo "exec $sc_rollup_client \"\$@\""  >> $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
+        chmod +x $client_dir/bin/octez-smart-rollup-client-$protocol_without_number
 
         echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol_without_number
         echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol_without_number

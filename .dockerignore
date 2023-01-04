@@ -23,8 +23,8 @@ tezos-endorser-*
 tezos-accuser-*
 tezos-proxy-server
 tezos-signer
-tezos-sc-rollup-node-*
-tezos-sc-rollup-client-*
+tezos-smart-rollup-node-*
+tezos-smart-rollup-client-*
 octez-node
 octez-tx-rollup-*
 octez-protocol-compiler
@@ -35,8 +35,8 @@ octez-endorser-*
 octez-accuser-*
 octez-proxy-server
 octez-signer
-octez-sc-rollup-node-*
-octez-sc-rollup-client-*
+octez-smart-rollup-node-*
+octez-smart-rollup-client-*
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src

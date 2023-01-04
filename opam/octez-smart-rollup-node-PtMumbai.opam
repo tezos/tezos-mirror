@@ -26,7 +26,7 @@ depends: [
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
   "tezos-shell-services"
-  "tezos-sc-rollup-016-PtMumbai"
+  "tezos-smart-rollup-016-PtMumbai"
   "tezos-layer2-utils-016-PtMumbai"
   "tezos-layer2-store"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
@@ -45,4 +45,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: Smart Contract Rollup node binary"
+synopsis: "Tezos/Protocol: Smart Rollup node binary"
