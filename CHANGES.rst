@@ -113,6 +113,10 @@ Baker
   no effect as when the new protocol activates, previous bakers will
   be permanently idle.
 
+- Fixed an issue where the baker would keep files opened longer than
+  necessary causing unexpected out of space errors making the baker
+  crash.
+
 Accuser
 -------
 

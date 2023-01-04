@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 type t = {
+  sync_fun : unit -> unit Lwt.t;
   checkout_fun :
     Tezos_crypto.Context_hash.t ->
     Tezos_protocol_environment.Context.t option Lwt.t;

@@ -833,6 +833,7 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
   let context_index =
     let open Abstract_context_index in
     {
+      sync_fun = Lwt.return;
       checkout_fun =
         (fun hash ->
           Tezos_crypto.Context_hash.Table.find state.ctxt_table hash
