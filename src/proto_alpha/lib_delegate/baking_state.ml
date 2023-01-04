@@ -241,7 +241,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
     list of slots (i.e., a list of position indexes in the slot map, in
     other words the list of rounds when it will be the proposer), and
     its endorsing power. *)
-type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
+type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
 (* FIXME: determine if the slot map should contain all slots or just
    the first one *)
@@ -782,7 +782,12 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
     List.fold_left
       (fun (own_map, all_map) slot ->
         let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
-        let endorsing_slot = {endorsing_power = List.length slots; slots} in
+        let endorsing_slot =
+          {
+            endorsing_power = List.length slots;
+            first_slot = Stdlib.List.hd slots;
+          }
+        in
         let all_map =
           List.fold_left
             (fun all_map slot -> SlotMap.add slot endorsing_slot all_map)
@@ -916,13 +921,13 @@ let pp_elected_block fmt {proposal; endorsement_qc} =
     proposal.block
     (List.length endorsement_qc)
 
-let pp_endorsing_slot fmt (consensus_key_and_delegate, {slots; endorsing_power})
-    =
+let pp_endorsing_slot fmt
+    (consensus_key_and_delegate, {first_slot; endorsing_power}) =
   Format.fprintf
     fmt
-    "slots: @[<h>[%a]@],@ delegate: %a,@ endorsing_power: %d"
-    Format.(pp_print_list ~pp_sep:pp_print_space Slot.pp)
-    slots
+    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ endorsing_power: %d"
+    Slot.pp
+    first_slot
     pp_consensus_key_and_delegate
     consensus_key_and_delegate
     endorsing_power
