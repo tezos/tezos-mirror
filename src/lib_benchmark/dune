@@ -6,6 +6,7 @@
  (public_name tezos-benchmark)
  (instrumentation (backend bisect_ppx))
  (libraries
+  str
   tezos-base
   tezos-stdlib-unix
   tezos-crypto

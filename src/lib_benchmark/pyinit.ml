@@ -68,3 +68,19 @@ let sklearn_metrics () =
   pyinit () ;
   handle_python_error "While initializing sklearn.metrics" @@ fun () ->
   Py.Import.import_module "sklearn.metrics"
+
+let%expect_test "pyinit can be called twice without failing" =
+  (* Paths are environment specific, do not leak into tests *)
+  let discard_python_path str =
+    let re = Str.regexp {|\(Python library used:\).*|} in
+    Str.replace_first re {|\1REPLACED_FOR_TEST|} str
+  in
+  pyinit () ;
+  [%expect.output] |> discard_python_path |> print_endline ;
+  [%expect
+    {|
+      Initializing python...
+      Python library used:REPLACED_FOR_TEST|}] ;
+  (* Second run is empty, but no failure *)
+  pyinit () ;
+  [%expect {| |}]

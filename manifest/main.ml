@@ -2959,6 +2959,7 @@ let octez_benchmark =
       {language = C; flags = [":standard"]; names = ["snoop_stubs"]}
     ~deps:
       [
+        str;
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
         octez_crypto;
