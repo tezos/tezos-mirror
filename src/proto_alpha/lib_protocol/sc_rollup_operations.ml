@@ -39,10 +39,10 @@ type execute_outbox_message_result = {
 }
 
 let () =
-  let description = "Invalid parameters type for rollup" in
+  let description = "Invalid parameters type for smart rollup" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_invalid_parameters_type"
+    ~id:"smart_rollup_invalid_parameters_type"
     ~title:"Invalid parameters type"
     ~description
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" description)
@@ -52,7 +52,7 @@ let () =
   let description = "Invalid last-cemented-commitment" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_invalid_last_cemented_commitment"
+    ~id:"smart_rollup_invalid_last_cemented_commitment"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -63,7 +63,7 @@ let () =
   let description = "Invalid output proof" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_invalid_output_proof"
+    ~id:"smart_rollup_invalid_output_proof"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -73,7 +73,7 @@ let () =
   let description = "Invalid outbox level" in
   register_error_kind
     `Permanent
-    ~id:"Sc_rollup_invalid_outbox_level"
+    ~id:"smart_rollup_invalid_outbox_level"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)

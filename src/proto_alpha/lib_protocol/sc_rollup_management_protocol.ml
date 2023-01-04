@@ -32,7 +32,7 @@ let () =
   let msg = "Invalid destination" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_management_protocol.sc_rollup_invalid_destination"
+    ~id:"smart_rollup_management_protocol_invalid_destination"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg

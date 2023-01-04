@@ -28,7 +28,7 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox_message_repr.merkelized_payload_hashes_proof_error"
+    ~id:"internal.smart_rollup_merklized_payload_hashes_proof"
     ~title:
       "Internal error: error occurred during proof production or validation"
     ~description:"A merkelized payload hashes proof error."

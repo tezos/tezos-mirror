@@ -63,7 +63,7 @@ let () =
   let msg = "Invalid claim about outbox" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_arith_invalid_claim_about_outbox"
+    ~id:"smart_rollup_arith_invalid_claim_about_outbox"
     ~title:msg
     ~pp:(fun fmt () -> Format.pp_print_string fmt msg)
     ~description:msg
@@ -73,7 +73,7 @@ let () =
   let msg = "Output proof production failed" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_arith_output_proof_production_failed"
+    ~id:"smart_rollup_arith_output_proof_production_failed"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
@@ -83,7 +83,7 @@ let () =
   let msg = "Proof production failed" in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_arith_proof_production_failed"
+    ~id:"smart_rollup_arith_proof_production_failed"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
