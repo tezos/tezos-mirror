@@ -250,6 +250,12 @@ end
 module Sc_rollup_params : sig
   val sc_rollup_address_parameter : (Sc_rollup.t, full) Tezos_clic.parameter
 
+  val sc_rollup_address_param :
+    ?name:string ->
+    ?desc:string ->
+    ('a, full) Tezos_clic.params ->
+    (Sc_rollup.t -> 'a, full) Tezos_clic.params
+
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
 
   val boot_sector_parameter :

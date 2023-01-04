@@ -3413,12 +3413,10 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
              "The address of the smart rollup where the commitment will be \
               published."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"; "compressed"; "state"]
       @@ param
            ~name:"compressed_state"
@@ -3501,12 +3499,10 @@ let commands_rw () =
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
              "The address of the smart rollup of which the commitment will be \
               cemented."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3554,12 +3550,10 @@ let commands_rw () =
          counter_arg
          fee_parameter_args)
       (prefixes ["timeout"; "dispute"; "on"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:
              "The address of the smart rollup where the staker of the dispute \
               has timed-out."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["with"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"staker1"
@@ -3664,10 +3658,8 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["execute"; "outbox"; "message"; "of"; "smart"; "rollup"]
-      @@ param
-           ~name:"smart_rollup_address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:"The address of the smart rollup where the message resides."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
       @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
@@ -3736,10 +3728,8 @@ let commands_rw () =
            ~name:"staker"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "smart"; "rollup"]
-      @@ Tezos_clic.param
-           ~name:"smart rollup address"
+      @@ Sc_rollup_params.sc_rollup_address_param
            ~desc:"The address of the smart rollup of the bond."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ prefixes ["from"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
