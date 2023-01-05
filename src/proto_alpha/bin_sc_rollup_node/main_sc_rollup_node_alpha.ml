@@ -26,11 +26,11 @@
 
 let sc_rollup_address_param =
   Tezos_clic.param
-    ~name:"sc-rollup-address"
-    ~desc:"The smart-contract rollup address"
+    ~name:"smart-rollup-address"
+    ~desc:"The smart rollup address"
     (Tezos_clic.parameter (fun _ s ->
          match Protocol.Alpha_context.Sc_rollup.Address.of_b58check_opt s with
-         | None -> failwith "Invalid smart-contract rollup address"
+         | None -> failwith "Invalid smart rollup address"
          | Some addr -> return addr))
 
 let sc_rollup_node_operator_param =
@@ -39,10 +39,10 @@ let sc_rollup_node_operator_param =
     ~name:"operator"
     ~desc:
       (Printf.sprintf
-         "Public key hash, or alias, of a smart-contract rollup node operator. \
-          An operator can be specialized to a particular purpose by prefixing \
-          its key or alias by said purpose, e.g. publish:alias_of_my_operator. \
-          The possible purposes are: %s."
+         "Public key hash, or alias, of a smart rollup node operator. An \
+          operator can be specialized to a particular purpose by prefixing its \
+          key or alias by said purpose, e.g. publish:alias_of_my_operator. The \
+          possible purposes are: %s."
          (String.concat ", "
          @@ Configuration.(List.map string_of_purpose purposes)))
   @@ Tezos_clic.parameter
@@ -105,8 +105,7 @@ let rpc_addr_arg =
     ~placeholder:"rpc-address|ip"
     ~doc:
       (Format.sprintf
-         "The address the smart-contract rollup node listens to. Default value \
-          is %s"
+         "The address the smart rollup node listens to. Default value is %s"
          default)
     Client_proto_args.string_parameter
 
@@ -115,7 +114,7 @@ let metrics_addr_arg =
     ~long:"metrics-addr"
     ~placeholder:
       "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9933)"
-    ~doc:"The address of the smart-contract rollup node metrics server."
+    ~doc:"The address of the smart rollup node metrics server."
     Client_proto_args.string_parameter
 
 let dal_node_addr_arg =
@@ -125,8 +124,8 @@ let dal_node_addr_arg =
     ~placeholder:"dal-node-address|ip"
     ~doc:
       (Format.sprintf
-         "The address of the dal node from which the smart-contract rollup \
-          node downloads slots. Default value is %s"
+         "The address of the dal node from which the smart rollup node \
+          downloads slots. Default value is %s"
          default)
     Client_proto_args.string_parameter
 
@@ -137,8 +136,7 @@ let rpc_port_arg =
     ~placeholder:"rpc-port"
     ~doc:
       (Format.sprintf
-         "The port the smart-contract rollup node listens to. Default value is \
-          %s"
+         "The port the smart rollup node listens to. Default value is %s"
          default)
     Client_proto_args.int_parameter
 
@@ -149,8 +147,8 @@ let dal_node_port_arg =
     ~placeholder:"dal-node-port"
     ~doc:
       (Format.sprintf
-         "The port of the dal node from which the smart-contract rollup node \
-          downloads slots from. Default value is %s"
+         "The port of the dal node from which the smart rollup node downloads \
+          slots from. Default value is %s"
          default)
     Client_proto_args.int_parameter
 
@@ -161,8 +159,7 @@ let data_dir_arg =
     ~placeholder:"data-dir"
     ~doc:
       (Format.sprintf
-         "The path to the smart-contract rollup node data directory. Default \
-          value is %s"
+         "The path to the smart rollup node data directory. Default value is %s"
          default)
     ~default
     Client_proto_args.string_parameter
@@ -222,7 +219,7 @@ let injector_retention_period_arg =
 let group =
   {
     Tezos_clic.name = "sc_rollup.node";
-    title = "Commands related to the smart-contract rollup node.";
+    title = "Commands related to the smart rollup node.";
   }
 
 let config_init_command =
@@ -230,7 +227,7 @@ let config_init_command =
   let open Tezos_clic in
   command
     ~group
-    ~desc:"Configure the smart-contract rollup node."
+    ~desc:"Configure the smart rollup node."
     (args9
        data_dir_arg
        rpc_addr_arg
@@ -302,7 +299,7 @@ let config_init_command =
       let* () = save ~data_dir config in
       let*! () =
         cctxt#message
-          "Smart-contract rollup node configuration written in %s"
+          "Smart rollup node configuration written in %s"
           (config_filename ~data_dir)
       in
       return_unit)

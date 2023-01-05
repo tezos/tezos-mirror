@@ -32,7 +32,7 @@ type t = {
 
 let content_encoding =
   let open Data_encoding in
-  def "sc_l2_message" ~description:"A hex encoded smart contact rollup message"
+  def "sc_l2_message" ~description:"A hex encoded smart rollup message"
   @@ string' Hex
 
 let encoding =
@@ -57,7 +57,7 @@ module Hash =
     (struct
       let name = "sc_rollup_l2_message"
 
-      let title = "A SCORU L2 message"
+      let title = "A smart rollup layer 2 message"
 
       let b58check_prefix = "\003\250\179\247\196" (* scmsg(55) *)
 

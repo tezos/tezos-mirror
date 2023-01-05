@@ -458,7 +458,7 @@ let test_rollup_node_running ~kind =
   let metrics_addr = "localhost:" ^ string_of_int (Port.fresh ()) in
   let* () = Sc_rollup_node.run rollup_node ["--metrics-addr"; metrics_addr] in
   let* sc_rollup_from_rpc =
-    sc_rollup_node_rpc rollup_node "global/sc_rollup_address"
+    sc_rollup_node_rpc rollup_node "global/smart_rollup_address"
   in
   let sc_rollup_from_rpc =
     match sc_rollup_from_rpc with
@@ -3698,7 +3698,7 @@ let test_rpcs ~kind =
   @@ fun _protocol sc_rollup_node sc_client sc_rollup node client ->
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let*! sc_rollup_address =
-    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "sc_rollup_address"]
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "smart_rollup_address"]
   in
   let sc_rollup_address = JSON.as_string sc_rollup_address in
   Check.((sc_rollup_address = sc_rollup) string)

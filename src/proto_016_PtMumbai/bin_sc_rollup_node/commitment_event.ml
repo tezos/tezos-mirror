@@ -35,7 +35,7 @@ module Simple = struct
     declare_0
       ~section
       ~name:"sc_rollup_commitment_publisher_starting"
-      ~msg:"Starting commitment publisher for the smart contract rollup node"
+      ~msg:"Starting commitment publisher for the smart rollup node"
       ~level:Notice
       ()
 
@@ -43,7 +43,7 @@ module Simple = struct
     declare_0
       ~section
       ~name:"sc_rollup_node_commitment_publisher_stopping"
-      ~msg:"Stopping commitment publisher for the smart contract rollup node"
+      ~msg:"Stopping commitment publisher for the smart rollup node"
       ~level:Notice
       ()
 

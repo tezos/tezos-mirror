@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 
-./octez-smart-rollup-client-alpha rpc get /global/sc_rollup_address
+./octez-smart-rollup-client-alpha rpc get /global/smart_rollup_address
 "[SMART_ROLLUP_HASH]"
 
 ./octez-smart-rollup-client-alpha rpc post /local/batcher/injection with '[

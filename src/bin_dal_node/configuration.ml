@@ -60,7 +60,7 @@ let default_dac_addresses = []
 
 let default_reveal_data_dir =
   Filename.concat
-    (Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-node")
+    (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
     "wasm_2_0_0"
 
 let default_dac =

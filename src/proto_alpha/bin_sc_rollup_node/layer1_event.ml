@@ -32,7 +32,7 @@ module Simple = struct
     declare_0
       ~section
       ~name:"sc_rollup_node_layer_1_starting"
-      ~msg:"Starting layer 1 tracker of the smart contract rollup node"
+      ~msg:"Starting layer 1 tracker of the smart rollup node"
       ~level:Notice
       ()
 
@@ -40,7 +40,7 @@ module Simple = struct
     declare_0
       ~section
       ~name:"sc_rollup_node_layer_1_stopping"
-      ~msg:"Stopping layer 1 tracker of the smart contract rollup node"
+      ~msg:"Stopping layer 1 tracker of the smart rollup node"
       ~level:Notice
       ()
 

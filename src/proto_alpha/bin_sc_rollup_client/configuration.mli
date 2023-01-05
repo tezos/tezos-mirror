@@ -28,7 +28,7 @@ type t = private {
   base_dir : string;
       (** [base_dir] is a directory where client user data is stored. *)
   endpoint : Uri.t;
-      (** [endpoint] is used to communicate with the smart-contract rollup
+      (** [endpoint] is used to communicate with the smart rollup
           node. *)
 }
 

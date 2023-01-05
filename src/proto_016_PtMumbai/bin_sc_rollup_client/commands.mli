@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [all ()] is the list of commands recognized by the smart-contract
+(** [all ()] is the list of commands recognized by the smart
    rollup client. These commands may depend on the client
    configuration. *)
 val all : unit -> Configuration.sc_client_context Tezos_clic.command list

@@ -67,7 +67,7 @@ type t = {
 }
 
 let default_data_dir =
-  Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-node"
+  Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node"
 
 let storage_dir = "storage"
 
@@ -535,14 +535,13 @@ let encoding : t Data_encoding.t =
     (merge_objs
        (obj9
           (req
-             "sc-rollup-address"
-             ~description:"Smart contract rollup address"
+             "smart-rollup-address"
+             ~description:"Smart rollup address"
              Protocol.Alpha_context.Sc_rollup.Address.encoding)
           (req
-             "sc-rollup-node-operator"
+             "smart-rollup-node-operator"
              ~description:
-               "Operators that sign operations of the smart contract rollup, \
-                by purpose"
+               "Operators that sign operations of the smart rollup, by purpose"
              operators_encoding)
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)

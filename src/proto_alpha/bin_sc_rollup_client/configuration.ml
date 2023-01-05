@@ -29,7 +29,7 @@ module Base = Tezos_client_base
 type t = {base_dir : string; endpoint : Uri.t}
 
 let default_base_dir =
-  Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-client"
+  Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-client"
 
 let default_endpoint = "http://localhost:8932"
 
@@ -65,9 +65,8 @@ let base_dir_arg () =
     ~placeholder:"path"
     ~doc:
       (Format.asprintf
-         "@[<v>@[<2>Tezos smart-contract rollup client data directory@,\
-          The directory where the Tezos smart-contract rollup client stores \
-          its data.@,\
+         "@[<v>@[<2>Tezos smart rollup client data directory@,\
+          The directory where the Tezos smart rollup client stores its data.@,\
           If absent, its value defaults to %s@]@]@."
          default_base_dir)
     (Tezos_clic.parameter valid_base_dir)

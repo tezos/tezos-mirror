@@ -63,7 +63,7 @@ let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
   | Not_running ->
       Test.fail
-        "Smart-contract rollup node %s is not running, it has no stderr"
+        "Smart rollup node %s is not running, it has no stderr"
         (name sc_node)
   | Running {process; _} -> Process.check_error ?exit_code ?msg process
 
@@ -71,8 +71,7 @@ let wait sc_node =
   match sc_node.status with
   | Not_running ->
       Test.fail
-        "Smart-contract rollup node %s is not running, cannot wait for it to \
-         terminate"
+        "Smart rollup node %s is not running, cannot wait for it to terminate"
         (name sc_node)
   | Running {process; _} -> Process.wait process
 
@@ -151,11 +150,9 @@ let config_init sc_node ?loser_mode rollup_address =
   let process = spawn_config_init sc_node ?loser_mode rollup_address in
   let* output = Process.check_and_read_stdout process in
   match
-    output
-    =~* rex "Smart-contract rollup node configuration written in ([^\n]*)"
+    output =~* rex "Smart rollup node configuration written in ([^\n]*)"
   with
-  | None ->
-      failwith "Smart-contract rollup node configuration initialization failed"
+  | None -> failwith "Smart rollup node configuration initialization failed"
   | Some filename -> return filename
 
 module Config_file = struct
@@ -204,7 +201,7 @@ let wait_for_ready sc_node =
       let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_ready <-
         resolver :: sc_node.persistent_state.pending_ready ;
-      check_event sc_node "sc_rollup_node_is_ready.v0" promise
+      check_event sc_node "smart_rollup_node_is_ready.v0" promise
 
 let update_level sc_node current_level =
   (match sc_node.status with
@@ -243,7 +240,7 @@ let wait_for_level ?timeout sc_node level =
 
 let handle_event sc_node {name; value; timestamp = _} =
   match name with
-  | "sc_rollup_node_is_ready.v0" -> set_ready sc_node
+  | "smart_rollup_node_is_ready.v0" -> set_ready sc_node
   | "sc_rollup_node_layer_1_new_head_processed.v0" ->
       let level = JSON.(value |-> "level" |> as_int) in
       update_level sc_node level

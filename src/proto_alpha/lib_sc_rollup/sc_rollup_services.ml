@@ -308,21 +308,21 @@ module Global = struct
 
   let sc_rollup_address =
     Tezos_rpc.Service.get_service
-      ~description:"Smart-contract rollup address"
+      ~description:"Smart rollup address"
       ~query:Tezos_rpc.Query.empty
       ~output:Sc_rollup.Address.encoding
-      (path / "sc_rollup_address")
+      (path / "smart_rollup_address")
 
   let current_tezos_head =
     Tezos_rpc.Service.get_service
-      ~description:"Tezos head known to the smart-contract rollup node"
+      ~description:"Tezos head known to the smart rollup node"
       ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Tezos_crypto.Block_hash.encoding)
       (path / "tezos_head")
 
   let current_tezos_level =
     Tezos_rpc.Service.get_service
-      ~description:"Tezos level known to the smart-contract rollup node"
+      ~description:"Tezos level known to the smart rollup node"
       ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Data_encoding.int32)
       (path / "tezos_level")
@@ -404,16 +404,14 @@ module Global = struct
 
     let hash =
       Tezos_rpc.Service.get_service
-        ~description:
-          "Tezos block hash of block known to the smart-contract rollup node"
+        ~description:"Tezos block hash of block known to the smart rollup node"
         ~query:Tezos_rpc.Query.empty
         ~output:Tezos_crypto.Block_hash.encoding
         (path / "hash")
 
     let level =
       Tezos_rpc.Service.get_service
-        ~description:
-          "Level of Tezos block known to the smart-contract rollup node"
+        ~description:"Level of Tezos block known to the smart rollup node"
         ~query:Tezos_rpc.Query.empty
         ~output:Data_encoding.int32
         (path / "level")
