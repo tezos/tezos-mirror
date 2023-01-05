@@ -141,19 +141,6 @@ class TestStopLoopPassword:
         client.transfer(0.1, 'encrypted_account', 'bootstrap1', stdin=stdin)
 
 
-@pytest.mark.client
-class TestChainId:
-    def test_chain_id_block_hash(self, nodeless_client: Client):
-        block_hash = 'BKyFui5WPY1n3e9aKF3qd2kGBKBtHu3rtm5miYFnUagJC1BdHTF'
-        prms = ['compute', 'chain', 'id', 'from', 'block', 'hash', block_hash]
-        assert nodeless_client.run(prms).strip() == 'NetXuwrXPL4VeX5'
-
-    def test_chain_id_seed(self, nodeless_client: Client):
-        seed = 'choucroute'
-        prms = ['compute', 'chain', 'id', 'from', 'seed', seed]
-        assert nodeless_client.run(prms).strip() == 'NetXLGmPi3c5DXf'
-
-
 def _write_config_file(
     client: Client, filename: str, config_dict: Optional[dict]
 ):

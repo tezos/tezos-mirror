@@ -46,6 +46,7 @@ let register_protocol_independent_tests () =
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
+  Client_chain_id.register_protocol_independent () ;
   Config.register () ;
   Demo_counter.register () ;
   Injection.register_protocol_independent () ;
