@@ -117,19 +117,12 @@ let preendorse state proposal =
       proposal.block.protocol <> proposal.block.next_protocol)
   then
     (* We do not preendorse the first transition block *)
-    let new_round_state = {state.round_state with current_phase = Idle} in
-    let new_state = {state with round_state = new_round_state} in
+    let new_state = update_current_phase state Idle in
     Lwt.return (new_state, Do_nothing)
   else
     Events.(emit attempting_preendorse_proposal proposal.block.hash)
     >>= fun () ->
-    let new_state =
-      {
-        state with
-        round_state =
-          {state.round_state with current_phase = Awaiting_preendorsements};
-      }
-    in
+    let new_state = update_current_phase state Awaiting_preendorsements in
     Lwt.return (new_state, make_preendorse_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
@@ -256,14 +249,7 @@ let rec handle_new_proposal state (new_proposal : proposal) =
                     (* We shouldn't preendorse this proposal, but we should at
                        least watch (pre)quorums events on it *)
                     let new_state =
-                      {
-                        new_state with
-                        round_state =
-                          {
-                            new_state.round_state with
-                            current_phase = Awaiting_preendorsements;
-                          };
-                      }
+                      update_current_phase new_state Awaiting_preendorsements
                     in
                     Lwt.return (new_state, Watch_proposal))
           | None ->
@@ -431,10 +417,7 @@ let propose_fresh_block_action ~endorsements ?last_proposal
   let kind = Fresh operation_pool in
   Events.(emit proposing_fresh_block (delegate, round)) >>= fun () ->
   let block_to_bake = {predecessor; round; delegate; kind} in
-  let updated_state =
-    let new_round_state = {state.round_state with current_phase = Idle} in
-    {state with round_state = new_round_state}
-  in
+  let updated_state = update_current_phase state Idle in
   Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
 let propose_block_action state delegate round (proposal : proposal) =
@@ -521,10 +504,7 @@ let propose_block_action state delegate round (proposal : proposal) =
       let block_to_bake =
         {predecessor = proposal.predecessor; round; delegate; kind}
       in
-      let updated_state =
-        let new_round_state = {state.round_state with current_phase = Idle} in
-        {state with round_state = new_round_state}
-      in
+      let updated_state = update_current_phase state Idle in
       Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
 let end_of_round state current_round =
@@ -547,8 +527,7 @@ let end_of_round state current_round =
       (* We don't have any delegate that may propose a new block for
          this round -- We will wait for preendorsements when the next
          level block arrive. Meanwhile, we are idle *)
-      let new_round_state = {new_state.round_state with current_phase = Idle} in
-      let new_state = {state with round_state = new_round_state} in
+      let new_state = update_current_phase new_state Idle in
       do_nothing new_state
   | Some (delegate, _) ->
       let last_proposal = state.level_state.latest_proposal.block in
@@ -611,11 +590,7 @@ let make_endorse_action state proposal =
     update_locked_round state proposal.block.round proposal.block.payload_hash
   in
   let updated_state =
-    {
-      updated_state with
-      round_state =
-        {state.round_state with current_phase = Awaiting_endorsements};
-    }
+    update_current_phase updated_state Awaiting_endorsements
   in
   let endorsements : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal

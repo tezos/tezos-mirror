@@ -358,6 +358,9 @@ type state = {
 
 type t = state
 
+let update_current_phase state new_phase =
+  {state with round_state = {state.round_state with current_phase = new_phase}}
+
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_bake_next_level of {at_round : Round.t}
