@@ -34,13 +34,20 @@ module Make (PVM : Pvm.S) = struct
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
   let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
-      head ~source:_ (operation : kind manager_operation)
+      head ~source (operation : kind manager_operation)
       (result : kind successful_manager_operation_result) =
     let open Lwt_result_syntax in
     match (operation, result) with
     | ( Sc_rollup_publish {commitment; _},
-        Sc_rollup_publish_result {published_at_level; _} ) ->
+        Sc_rollup_publish_result {published_at_level; _} )
+      when Node_context.is_operator node_ctxt source ->
         (* Published commitment --------------------------------------------- *)
+        let is_newest_lpc =
+          match node_ctxt.lpc with
+          | None -> true
+          | Some lpc -> Raw_level.(commitment.inbox_level > lpc.inbox_level)
+        in
+        if is_newest_lpc then node_ctxt.lpc <- Some commitment ;
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
@@ -54,11 +61,12 @@ module Make (PVM : Pvm.S) = struct
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
+        if Raw_level.(inbox_level > node_ctxt.lcc.level) then
+          node_ctxt.lcc <- {commitment; level = inbox_level} ;
         let*! () =
-          Store.Last_cemented_commitment_level.set node_ctxt.store inbox_level
-        in
-        let*! () =
-          Store.Last_cemented_commitment_hash.set node_ctxt.store commitment
+          Commitment_event.last_cemented_commitment_updated
+            commitment
+            inbox_level
         in
         return_unit
     | ( Sc_rollup_refute _,
@@ -182,9 +190,6 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
     let* () = Components.Commitment.process_head node_ctxt block in
-    (* At each block, there may be some refutation related actions to
-       be performed. *)
-    let* () = Components.Refutation_game.process block node_ctxt in
     let*! () = State.mark_finalized_head node_ctxt.store block in
     return_unit
 
@@ -242,13 +247,6 @@ module Make (PVM : Pvm.S) = struct
      imply the processing of head~3, etc). *)
   let on_layer_1_head node_ctxt head =
     let open Lwt_result_syntax in
-    let* () =
-      (* Get information about the last cemented commitment to determine the
-         commitment (if any) to publish next. We do this only once per
-         chain event to avoid spamming the layer1 node. *)
-      Components.Commitment.sync_last_cemented_commitment_hash_with_level
-        node_ctxt
-    in
     let*! old_head =
       State.last_processed_head_opt node_ctxt.Node_context.store
     in
@@ -284,6 +282,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
     let* () = notify_injector node_ctxt new_head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
+    let* () = Components.Refutation_game.process head node_ctxt in
     let* () = Components.Batcher.batch () in
     let* () = Components.Batcher.new_head head in
     let*! () = Injector.inject ~header () in

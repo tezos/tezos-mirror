@@ -33,5 +33,5 @@ module Make (PVM : Pvm.S) : sig
   val proof_of_output :
     Node_context.rw ->
     Sc_rollup.output ->
-    (Store.Last_cemented_commitment_hash.value * string) tzresult Lwt.t
+    (Sc_rollup.Commitment.Hash.t * string) tzresult Lwt.t
 end

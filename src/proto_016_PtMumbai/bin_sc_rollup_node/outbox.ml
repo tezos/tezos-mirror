@@ -29,11 +29,10 @@ open Protocol.Alpha_context
 module Make (PVM : Pvm.S) = struct
   let get_state_of_lcc node_ctxt =
     let open Lwt_result_syntax in
-    let*! lcc_level =
-      Store.Last_cemented_commitment_level.get node_ctxt.store
-    in
     let*! block_hash =
-      State.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
+      State.hash_of_level
+        node_ctxt.store
+        (Raw_level.to_int32 node_ctxt.lcc.level)
     in
     let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     let*! state = PVM.State.find ctxt in
@@ -41,9 +40,6 @@ module Make (PVM : Pvm.S) = struct
 
   let proof_of_output node_ctxt output =
     let open Lwt_result_syntax in
-    let*! commitment_hash =
-      Store.Last_cemented_commitment_hash.get node_ctxt.store
-    in
     let* state = get_state_of_lcc node_ctxt in
     match state with
     | None ->
@@ -59,7 +55,7 @@ module Make (PVM : Pvm.S) = struct
             let serialized_proof =
               Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
             in
-            return @@ (commitment_hash, serialized_proof)
+            return @@ (node_ctxt.lcc.commitment, serialized_proof)
         | Error err ->
             failwith
               "Error producing outbox proof (%a)"

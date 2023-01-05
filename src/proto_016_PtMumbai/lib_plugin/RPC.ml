@@ -2023,10 +2023,15 @@ module Sc_rollup = struct
     let staked_on_commitment =
       RPC_service.get_service
         ~description:
-          "The hash of the commitment on which the operator has staked on for \
-           a smart rollup"
+          "The newest commitment on which the operator has staked on for a \
+           smart rollup. Note that is can return a commitment that is before \
+           the last cemented one."
         ~query:RPC_query.empty
-        ~output:(obj1 (req "hash" Sc_rollup.Commitment.Hash.encoding))
+        ~output:
+          (option
+             (merge_objs
+                (obj1 (req "hash" Sc_rollup.Commitment.Hash.encoding))
+                Sc_rollup.Commitment.encoding))
         RPC_path.(
           path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg
           / "staked_on_commitment")
@@ -2191,10 +2196,16 @@ module Sc_rollup = struct
     Registration.register2 ~chunked:false S.staked_on_commitment
     @@ fun ctxt address staker () () ->
     let open Lwt_result_syntax in
-    let+ branch, _ctxt =
+    let* commitment_hash, ctxt =
       Alpha_context.Sc_rollup.Stake_storage.find_staker ctxt address staker
     in
-    branch
+    let* commitment, _ctxt =
+      Alpha_context.Sc_rollup.Commitment.get_commitment
+        ctxt
+        address
+        commitment_hash
+    in
+    return_some (commitment_hash, commitment)
 
   let register_commitment () =
     Registration.register2 ~chunked:false S.commitment
@@ -2312,6 +2323,16 @@ module Sc_rollup = struct
       ctxt
       block
       sc_rollup_address
+      ()
+      ()
+
+  let staked_on_commitment ctxt block sc_rollup_address staker =
+    RPC_context.make_call2
+      S.staked_on_commitment
+      ctxt
+      block
+      sc_rollup_address
+      staker
       ()
       ()
 

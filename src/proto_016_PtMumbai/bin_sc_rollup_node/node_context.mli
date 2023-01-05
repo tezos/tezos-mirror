@@ -28,6 +28,8 @@
 open Protocol
 open Alpha_context
 
+type lcc = {commitment : Sc_rollup.Commitment.Hash.t; level : Raw_level.t}
+
 type 'a t = {
   cctxt : Protocol_client_context.full;
       (** Client context used by the rollup node. *)
@@ -55,7 +57,12 @@ type 'a t = {
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
   store : 'a Store.t;  (** The store for the persistent storage. *)
-  context : 'a Context.index;  (** The persistent context for the rollup node. *)
+  context : 'a Context.index;
+      (** The persistent context for the rollup node. *)
+  mutable lcc : lcc;  (** Last cemented commitment and its level. *)
+  mutable lpc : Sc_rollup.Commitment.t option;
+      (** The last published commitment, i.e. commitment that the operator is
+          staked on. *)
 }
 
 (** Read/write node context {!t}. *)

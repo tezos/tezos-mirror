@@ -49,12 +49,6 @@ module type S = sig
       [PVM] to compute the hash of to be included in the commitment.  *)
   val process_head : Node_context.rw -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [sync_last_cemented_commitment_hash_with_level node_ctxt] fetches and
-      stores information about the last cemeneted commitment in the layer1
-      chain.  *)
-  val sync_last_cemented_commitment_hash_with_level :
-    Node_context.rw -> unit tzresult Lwt.t
-
   (** [publish_commitment node_ctxt] publishes the earliest commitment
       stored in [store] that has not been published yet, unless its inbox level
       is below or equal to the inbox level of the last cemented commitment in

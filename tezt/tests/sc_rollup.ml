@@ -354,7 +354,7 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
          ~sc_rollup
          staker
   in
-  match JSON.(json |> as_string_opt) with
+  match JSON.(json |-> "hash" |> as_string_opt) with
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
 
@@ -791,15 +791,8 @@ let basic_scenario sc_rollup_node _rollup_client _sc_rollup _node client =
   in
   unit
 
-(* Reactivate when the following TODO is fixed:
-
-   FIXME: https://gitlab.com/tezos/tezos/-/issues/3205
-
-   The rollup node should be able to restart properly after an
-   abnormal interruption at every point of its process.  Currently,
-   the state is not persistent enough and the processing is not
-   idempotent enough to achieve that property. *)
-let _sc_rollup_node_stops_scenario sc_rollup_node _node client =
+let sc_rollup_node_stops_scenario sc_rollup_node _rollup_client _sc_rollup _node
+    client =
   let num_messages = 2 in
   let expected_level =
     (* We start at level 2 and each message also bakes a block. With 2 messages being sent twice, we
@@ -2135,7 +2128,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
      `init_level + sc_rollup_commitment_period_in_blocks` is processed by
      the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
-  let* commitment_finalized_level =
+  let* _commitment_finalized_level =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
       sc_rollup_node
@@ -2153,8 +2146,9 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
        %R)" ;
   (* Bake an additional block for the commitment to be included. *)
   let* () = Client.bake_for_and_wait client in
-  let* commitment_publish_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (commitment_finalized_level + 1)
+  let commitment_publish_level = Node.get_level node in
+  let* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node commitment_publish_level
   in
   let*! rollup_node1_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
@@ -2179,16 +2173,25 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
   in
   let* () = Sc_rollup_node.run sc_rollup_node' [] in
 
-  let* rollup_node2_catchup_level =
+  let* _ =
     Sc_rollup_node.wait_for_level
       ~timeout:3.
       sc_rollup_node'
-      commitment_finalized_level
+      commitment_publish_level
   in
-  Check.(rollup_node2_catchup_level = commitment_finalized_level)
-    Check.int
-    ~error_msg:"Current level has moved past cementation inbox level (%L = %R)" ;
-  (* Check that no commitment was published. *)
+  let*! rollup_node2_published_commitment =
+    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
+  in
+  Check.(
+    Option.bind rollup_node2_published_commitment first_published_at_level
+    = None)
+    (Check.option Check.int)
+    ~error_msg:"Rollup node 2 cannot publish commitment without any new block." ;
+  let* () = Client.bake_for_and_wait client in
+  let commitment_publish_level2 = Node.get_level node in
+  let* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node' commitment_publish_level2
+  in
   let*! rollup_node2_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
@@ -3208,7 +3211,7 @@ let test_timeout =
     ~staker2:operator2.public_key_hash
     client
 
-(* Testing rollup node catch up mechanism
+(* Testing rollup node catch up mechanism I
    --------------------------------------
 
    The rollup node must be able to catch up from the genesis
@@ -3216,17 +3219,111 @@ let test_timeout =
 *)
 let test_late_rollup_node =
   test_full_scenario
+    ~commitment_period:3
     {
       tags = ["late"];
       variant = None;
       description = "a late rollup should catch up";
     }
-  @@ fun _protocol sc_rollup_node _rollup_client _sc_rollup_address _node client
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup_address node client
     ->
   let* () = bake_levels 65 client in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = bake_levels 30 client in
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
+  Log.info "First rollup node synchronized." ;
+  let sc_rollup_node2 =
+    Sc_rollup_node.create
+      Operator
+      node
+      client
+      ~default_operator:
+        Constant.bootstrap1.alias (* Same as other rollup_node *)
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup_address
+  in
+  Log.info "Start rollup node from scratch with same operator" ;
+  let* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Other rollup node synchronized." ;
+  let* () = Client.bake_for_and_wait client in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Other rollup node progresses." ;
+  unit
+
+(* Testing rollup node catch up mechanism II
+   --------------------------------------
+
+   An alternative rollup node must be able to catch up from the genesis
+   of the rollup when paired with a node in archive mode when there is
+   already an other rollup node with a different operator already operating
+   on the given rollup. This same alternative rollup node must be able to
+   catch up a second time when it is stopped midway.
+*)
+let test_late_rollup_node_2 =
+  test_full_scenario
+    ~commitment_period:3
+    {
+      tags = ["late"];
+      variant = None;
+      description = "a late alternative rollup should catch up";
+    }
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup_address node client
+    ->
+  let* () = bake_levels 65 client in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let* () = bake_levels 30 client in
+  let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
+  Log.info "First rollup node synchronized." ;
+  let sc_rollup_node2 =
+    Sc_rollup_node.create
+      Operator
+      node
+      client
+      ~default_operator:Constant.bootstrap2.alias
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node2 sc_rollup_address
+  in
+  Log.info
+    "Starting alternative rollup node from scratch with a different operator." ;
+  let* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Alternative rollup node is synchronized." ;
+  let* () = Client.bake_for_and_wait client in
+  let* _level =
+    Sc_rollup_node.wait_for_level
+      ~timeout:2.
+      sc_rollup_node2
+      (Node.get_level node)
+  in
+  Log.info "Both rollup nodes are progressing and are synchronized." ;
+  let* () = Sc_rollup_node.terminate sc_rollup_node2 in
+  Log.info "Alternative rollup node terminated." ;
+  let* () = bake_levels 30 client in
+  let* () = Sc_rollup_node.run sc_rollup_node2 [] in
+  Log.info "Alternative rollup node is re-running." ;
+  let* () = bake_levels 30 client in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node2 155 in
+  Log.info
+    "Alternative rollup node is synchronized once again after being terminated \
+     once." ;
   unit
 
 (* Test interruption of rollup node before the first inbox is processed. Upon
@@ -3924,14 +4021,11 @@ let register ~kind ~protocols =
     basic_scenario
     protocols ;
   test_rpcs ~kind protocols ;
-  (* See above at definition of sc_rollup_node_stops_scenario:
-
-     test_rollup_inbox_of_rollup_node
-      ~kind
-      "stops"
-      sc_rollup_node_stops_scenario
-      protocols ;
-  *)
+  test_rollup_inbox_of_rollup_node
+    ~kind
+    ~variant:"stops"
+    sc_rollup_node_stops_scenario
+    protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
     ~variant:"disconnects"
@@ -4031,6 +4125,7 @@ let register ~kind ~protocols =
      Uncomment this test as soon as the issue done.
      test_reinject_failed_commitment protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
+  test_late_rollup_node_2 protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message
     ~regression:true
