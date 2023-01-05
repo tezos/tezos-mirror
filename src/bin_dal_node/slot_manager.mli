@@ -31,26 +31,26 @@ include module type of Slot_manager_legacy
 
 type error += Invalid_slot_size of {provided : int; expected : int}
 
-(** [add_slots node_store slot cryptobox] computes the given [slot]'s commitment
-    and adds the association "commitment -> slot" in the DAL's [node_store] if
-    the commitment is not already bound to some data.
+(** [add_commitment node_store slot cryptobox] computes the given [slot]'s
+    commitment and adds the association "commitment -> slot" in the DAL's
+    [node_store] if the commitment is not already bound to some data.
 
     The function returns an error {!ref:Invalid_slot_size} if the [slot]'s size
     doesn't match the expected slots' size given in [cryptobox], or the [slot]'s
     commitment otherwise.
 *)
-val add_slots :
+val add_commitment :
   Store.node_store ->
   Cryptobox.slot ->
   Cryptobox.t ->
   Cryptobox.commitment tzresult Lwt.t
 
-(** [add_slot_id node_tore cryptobox commitment slot_id] associates a [slot_id] to a
-    [commitment] in [node_store]. The function returns [Error `Not_found] if
-    there is no entry for [commitment] in [node_store]. Otherwise, [Ok ()] is
-    returned.
+(** [associate_slot_id_with_commitment node_store cryptobox commitment slot_id]
+    associates a [slot_id] to a [commitment] in [node_store]. The function
+    returns [Error `Not_found] if there is no entry for [commitment] in
+    [node_store]. Otherwise, [Ok ()] is returned.
 *)
-val add_slot_id :
+val associate_slot_id_with_commitment :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->

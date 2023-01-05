@@ -150,7 +150,7 @@ module Types = struct
     |> seal
 end
 
-let post_slots :
+let post_commitment :
     < meth : [`POST]
     ; input : Cryptobox.slot
     ; output : Cryptobox.commitment
@@ -165,9 +165,9 @@ let post_slots :
     ~query:Tezos_rpc.Query.empty
     ~input:Types.slot_encoding
     ~output:Cryptobox.Commitment.encoding
-    Tezos_rpc.Path.(open_root / "slots")
+    Tezos_rpc.Path.(open_root / "commitments")
 
-let patch_slot :
+let patch_commitment :
     < meth : [`PATCH]
     ; input : Types.slot_id
     ; output : unit
@@ -180,7 +180,7 @@ let patch_slot :
     ~query:Tezos_rpc.Query.empty
     ~input:Types.slot_id_encoding
     ~output:Data_encoding.unit
-    Tezos_rpc.Path.(open_root / "slots" /: Cryptobox.Commitment.rpc_arg)
+    Tezos_rpc.Path.(open_root / "commitments" /: Cryptobox.Commitment.rpc_arg)
 
 let get_slot :
     < meth : [`GET]
