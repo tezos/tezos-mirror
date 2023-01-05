@@ -217,6 +217,26 @@ let build hash =
 
           let complete_b58prefix = Env.Context.complete
         end : T)
+  | Some (V9 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Tezos_crypto.Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.V9.Make (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
 
 module VersionTable = Tezos_crypto.Protocol_hash.Table
 
@@ -516,6 +536,35 @@ end
 
 module Register_embedded_V8
     (Env : Tezos_protocol_environment.V8.T)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V9
+    (Env : Tezos_protocol_environment.V9.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct

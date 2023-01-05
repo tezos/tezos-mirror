@@ -316,6 +316,7 @@ end
 module V6 = V5
 module V7 = V6
 module V8 = V7
+module V9 = V8
 
 module type S = V7.S
 
@@ -327,6 +328,7 @@ module type Sigs = sig
   module V6 = V6
   module V7 = V7
   module V8 = V8
+  module V9 = V9
 
   module type VIEW = VIEW
 

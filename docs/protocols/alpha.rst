@@ -13,7 +13,7 @@ New Environment Version (V9)
 ----------------------------
 
 This protocol requires a different protocol environment version than Mumbai.
-It requires protocol environment V9, compared to V8 for Mumbai.
+It requires protocol environment V9, compared to V8 for Mumbai. (MR :gl:`!7178`)
 
 Smart Contract Optimistic Rollups
 ---------------------------------

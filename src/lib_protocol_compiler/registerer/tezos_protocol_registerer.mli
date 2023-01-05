@@ -59,6 +59,10 @@ module type PROTOCOL_V8 = functor
   (Env : Tezos_protocol_environment_sigs.V8.T)
   -> Env.Updater.PROTOCOL
 
+module type PROTOCOL_V9 = functor
+  (Env : Tezos_protocol_environment_sigs.V9.T)
+  -> Env.Updater.PROTOCOL
+
 type proto_env =
   | V0 of (module PROTOCOL_V0)
   | V1 of (module PROTOCOL_V1)
@@ -69,6 +73,7 @@ type proto_env =
   | V6 of (module PROTOCOL_V6)
   | V7 of (module PROTOCOL_V7)
   | V8 of (module PROTOCOL_V8)
+  | V9 of (module PROTOCOL_V9)
 
 val register : string -> proto_env -> unit
 
