@@ -114,7 +114,7 @@ val patch_commitment :
   service
 
 (** Retrieve the content of the slot associated with the given commitment. *)
-val get_slot :
+val get_commitment_slot :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.slot
