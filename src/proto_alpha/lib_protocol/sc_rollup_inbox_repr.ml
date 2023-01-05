@@ -229,9 +229,15 @@ module V1 = struct
       pp_history_proof
       old_levels_messages
 
+  let hash inbox = hash_history_proof inbox.old_levels_messages
+
   let inbox_level inbox = inbox.level
 
   let old_levels_messages inbox = inbox.old_levels_messages
+
+  let current_witness inbox =
+    let {hash; _} = Skip_list.content inbox.old_levels_messages in
+    hash
 
   let encoding =
     Data_encoding.(

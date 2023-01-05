@@ -204,8 +204,10 @@ module History : sig
        confirmed slot headers. *)
   type t
 
+  module Pointer_hash : S.HASH
+
   (** Type of hashes of history. *)
-  type hash
+  type hash = Pointer_hash.t
 
   (** Encoding of the datatype. *)
   val encoding : t Data_encoding.t
