@@ -30,12 +30,13 @@ module Constants = struct
   let cost_decoding_contract_optimized = S.safe_int 70
 
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.key_hash_optimized *)
-  let cost_decoding_key_hash_optimized = S.safe_int 50
+  let cost_decoding_key_hash_optimized = S.safe_int 70
 
   (* Set to the cost of encoding a pkh defined in {!Michelson_v1_gas} divided
-     by the number of characters of a pkh, i.e. 70/35. To be updated when
-     benchmarking is completed. *)
-  let cost_encode_string_per_byte = S.safe_int 2
+     by the number of characters of a pkh, with the result rounded up, i.e.
+     70/20 + 1.
+     To be updated when benchmarking is completed. *)
+  let cost_encode_string_per_byte = S.safe_int 4
 
   (* Cost of serializing a state hash. *)
   let cost_serialize_state_hash =
