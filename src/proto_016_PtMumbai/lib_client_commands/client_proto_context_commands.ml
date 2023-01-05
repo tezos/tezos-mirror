@@ -3318,12 +3318,13 @@ let commands_rw () =
     command
       ~group
       ~desc:"Send one or more messages to a smart rollup."
-      (args7
+      (args8
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
          fee_parameter_args
+         gas_limit_arg
          storage_limit_arg
          counter_arg)
       (prefixes ["send"; "smart"; "rollup"; "message"]
@@ -3345,6 +3346,7 @@ let commands_rw () =
              verbose_signing,
              simulation,
              fee_parameter,
+             gas_limit,
              storage_limit,
              counter )
            messages
@@ -3384,6 +3386,7 @@ let commands_rw () =
             ?dry_run:(Some dry_run)
             ?verbose_signing:(Some verbose_signing)
             ?fee
+            ?gas_limit
             ?storage_limit
             ?counter
             ?confirmations:cctxt#confirmations
