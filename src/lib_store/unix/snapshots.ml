@@ -3049,7 +3049,10 @@ module Make_snapshot_loader (Loader : LOADER) : Snapshot_loader = struct
     let* loader = load snapshot_path in
     trace (Wrong_snapshot_file {filename = snapshot_path})
     @@ protect
-         (fun () -> Loader.load_snapshot_header loader)
+         (fun () ->
+           Lwt.finalize
+             (fun () -> Loader.load_snapshot_header loader)
+             (fun () -> close loader))
          ~on_error:(fun err ->
            let* () = close loader in
            Lwt.return_error err)
@@ -4151,6 +4154,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             pp_print_trace
             errs
     in
+    let*! () = Context.close context_index in
     let* () =
       check_context_hash_consistency
         ~expected_context_hash:resulting_context_hash
