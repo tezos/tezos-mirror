@@ -233,7 +233,7 @@ module Legacy = struct
     let* known_levels = mem store levels_path in
     let* known_header = mem store header_path in
     (* An invariant that should hold for the storage. *)
-    assert (known_header = known_header) ;
+    assert (known_levels = known_header) ;
     if known_levels then return_unit
     else
       (* The path allows to reconstruct the data. *)
