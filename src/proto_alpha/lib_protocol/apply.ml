@@ -721,11 +721,6 @@ let apply_internal_operation_contents :
         unparsed_parameters = payload;
       } ->
       assert_sc_rollup_feature_enabled ctxt >>?= fun () ->
-      (* TODO: #3242
-         We could rather change the type of [source] in
-         {!Script_type_ir.internal_operation}. Only originated accounts should
-         be allowed anyway for internal operations.
-      *)
       (match source with
       | Destination.Contract (Originated hash) -> ok hash
       | _ -> error Invalid_transfer_to_sc_rollup)
