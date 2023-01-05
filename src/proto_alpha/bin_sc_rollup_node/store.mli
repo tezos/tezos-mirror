@@ -63,11 +63,19 @@ module L2_blocks :
      and type 'a store := 'a store
 
 (** Storage for persisting messages downloaded from the L1 node. *)
-module Messages :
-  Store_sigs.Append_only_map
-    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-     and type value := Sc_rollup.Inbox_message.t list
-     and type 'a store := 'a store
+module Messages : sig
+  type info = {
+    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor_timestamp : Timestamp.t;
+    messages : Sc_rollup.Inbox_message.t list;
+  }
+
+  include
+    Store_sigs.Append_only_map
+      with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+       and type value := info
+       and type 'a store := 'a store
+end
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :

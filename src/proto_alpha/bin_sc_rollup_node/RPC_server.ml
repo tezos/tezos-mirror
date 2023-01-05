@@ -224,7 +224,7 @@ module Common = struct
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
     let* l2_block = get_l2_block_exn node_ctxt.store block in
-    let*! messages =
+    let*! {messages; _} =
       Store.Messages.get node_ctxt.store l2_block.header.inbox_witness
     in
     return @@ Z.of_int (List.length messages)

@@ -230,8 +230,13 @@ module Make (Interpreter : Interpreter.S) :
 
         let get_payloads_history witness =
           let open Lwt_syntax in
-          let+ messages = Store.Messages.get node_ctxt.store witness in
-          Inbox.payloads_history_of_messages messages
+          let+ {predecessor; predecessor_timestamp; messages} =
+            Store.Messages.get node_ctxt.store witness
+          in
+          Inbox.payloads_history_of_messages
+            ~predecessor
+            ~predecessor_timestamp
+            messages
           |> WithExceptions.Result.get_ok ~loc:__LOC__
       end
 

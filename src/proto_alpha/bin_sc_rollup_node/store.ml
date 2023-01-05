@@ -70,25 +70,46 @@ module L2_blocks =
     end)
 
 (** Unaggregated messages per block *)
-module Messages =
-  Make_append_only_map
-    (struct
-      let path = ["messages"]
-    end)
-    (struct
-      type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+module Messages = struct
+  type info = {
+    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor_timestamp : Timestamp.t;
+    messages : Sc_rollup.Inbox_message.t list;
+  }
 
-      let to_path_representation =
-        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.to_b58check
-    end)
-    (struct
-      type value = Sc_rollup.Inbox_message.t list
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {predecessor; predecessor_timestamp; messages} ->
+        (predecessor, predecessor_timestamp, messages))
+      (fun (predecessor, predecessor_timestamp, messages) ->
+        {predecessor; predecessor_timestamp; messages})
+    @@ obj3
+         (req "predecessor" Tezos_crypto.Block_hash.encoding)
+         (req "predecessor_timestamp" Timestamp.encoding)
+         (req
+            "messages"
+            (list @@ dynamic_size Sc_rollup.Inbox_message.encoding))
 
-      let name = "messages"
+  include
+    Make_append_only_map
+      (struct
+        let path = ["messages"]
+      end)
+      (struct
+        type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
 
-      let encoding =
-        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
-    end)
+        let to_path_representation =
+          Sc_rollup.Inbox_merkelized_payload_hashes.Hash.to_b58check
+      end)
+      (struct
+        type value = info
+
+        let name = "messages"
+
+        let encoding = encoding
+      end)
+end
 
 (** Inbox state for each block *)
 module Inboxes =

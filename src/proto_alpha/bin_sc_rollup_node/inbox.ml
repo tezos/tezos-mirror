@@ -212,7 +212,7 @@ let process_head (node_ctxt : _ Node_context.t)
         (List.length collected_messages)
     in
     let* ( _messages_history,
-           messages_hash,
+           witness_hash,
            inbox_hash,
            inbox,
            messages_with_protocol_internal_messages ) =
@@ -227,15 +227,19 @@ let process_head (node_ctxt : _ Node_context.t)
     let*! () =
       State.add_messages
         node_ctxt.store
-        messages_hash
-        messages_with_protocol_internal_messages
+        witness_hash
+        {
+          predecessor = predecessor_hash;
+          predecessor_timestamp;
+          messages = collected_messages;
+        }
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
     let*! () = State.add_inbox node_ctxt.store inbox_hash inbox in
     return
       ( inbox_hash,
         inbox,
-        messages_hash,
+        witness_hash,
         messages_with_protocol_internal_messages,
         ctxt ))
   else
@@ -256,35 +260,26 @@ let inbox_of_head = State.inbox_of_head
 
 let start () = Inbox_event.starting ()
 
-let payloads_history_of_messages messages =
+let payloads_history_of_messages ~predecessor ~predecessor_timestamp messages =
   let open Result_syntax in
   Environment.wrap_tzresult
-  @@
-  let messages, predecessor_timestamp, predecessor =
-    match messages with
-    | Sc_rollup.Inbox_message.Internal Start_of_level
-      :: Internal (Info_per_level {predecessor_timestamp; predecessor})
-      :: rest -> (
-        match List.rev rest with
-        | Internal End_of_level :: rmsgs ->
-            (List.rev rmsgs, predecessor_timestamp, predecessor)
-        | _ -> assert false)
-    | _ -> assert false
-  in
-  let* dummy_inbox =
-    (* The inbox is not necessary to compute the payloads *)
-    Sc_rollup.Inbox.genesis ~predecessor_timestamp ~predecessor Raw_level.root
-  in
-  let+ ( payloads_history,
-         _history,
-         _inbox,
-         _witness,
-         _messages_with_protocol_internal_messages ) =
-    Sc_rollup.Inbox.add_all_messages
-      ~predecessor_timestamp
-      ~predecessor
-      (Sc_rollup.Inbox.History.empty ~capacity:0L)
-      dummy_inbox
-      messages
-  in
-  payloads_history
+  @@ let* dummy_inbox =
+       (* The inbox is not necessary to compute the payloads *)
+       Sc_rollup.Inbox.genesis
+         ~predecessor_timestamp
+         ~predecessor
+         Raw_level.root
+     in
+     let+ ( payloads_history,
+            _history,
+            _inbox,
+            _witness,
+            _messages_with_protocol_internal_messages ) =
+       Sc_rollup.Inbox.add_all_messages
+         ~predecessor_timestamp
+         ~predecessor
+         (Sc_rollup.Inbox.History.empty ~capacity:0L)
+         dummy_inbox
+         messages
+     in
+     payloads_history

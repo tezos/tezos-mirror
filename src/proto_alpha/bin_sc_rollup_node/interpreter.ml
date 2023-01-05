@@ -205,8 +205,14 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         Layer1.{hash = block.header.predecessor; level = pred_level}
     in
     let*! inbox = Store.Inboxes.get node_ctxt.store block.header.inbox_hash in
-    let*! messages =
+    let*! {predecessor; predecessor_timestamp; messages} =
       Store.Messages.get node_ctxt.store block.header.inbox_witness
+    in
+    let messages =
+      Sc_rollup.Inbox_message.Internal Start_of_level
+      :: Internal (Info_per_level {predecessor; predecessor_timestamp})
+      :: messages
+      @ [Internal End_of_level]
     in
     let>* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox

@@ -64,7 +64,7 @@ val inbox_of_head : _ Node_context.t -> Layer1.head -> Inbox.t tzresult Lwt.t
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
 
-(** [add_messages ~timestamp ~predecessor inbox messages] adds
+(** [add_messages ~predecessor_timestamp ~predecessor inbox messages] adds
     [messages] to the [inbox] using {!Inbox.add_all_messages}. *)
 val add_messages :
   predecessor_timestamp:Timestamp.time ->
@@ -79,9 +79,12 @@ val add_messages :
   tzresult
   Lwt.t
 
-(** [payloads_history_of_messages messages] builds the payloads history for the
-    list of [messages]. This allows to not store payloads histories (which
-    contain merkelized skip lists) but simply messages. *)
+(** [payloads_history_of_messages ~predecessor ~predecessor_timestamp messages]
+    builds the payloads history for the list of [messages]. This allows to not
+    store payloads histories (which contain merkelized skip lists) but simply
+    messages. *)
 val payloads_history_of_messages :
+  predecessor:Tezos_crypto.Block_hash.t ->
+  predecessor_timestamp:Timestamp.time ->
   Sc_rollup.Inbox_message.t list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult

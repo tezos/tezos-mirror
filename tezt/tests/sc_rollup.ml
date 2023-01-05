@@ -3760,7 +3760,7 @@ let test_rpcs ~kind =
       ["global"; "block"; "head"; "num_messages"]
   in
   let l2_num_messages = JSON.as_int l2_num_messages in
-  Check.((l2_num_messages = batch_size + 3) int)
+  Check.((l2_num_messages = batch_size) int)
     ~error_msg:"Number of messages of head is %L but should be %R" ;
   let*! _status =
     Sc_rollup_client.rpc_get
