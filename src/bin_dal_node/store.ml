@@ -199,6 +199,19 @@ module Legacy = struct
   let decode encoding string =
     Data_encoding.Binary.of_string_opt encoding string
 
+  let encode_commitment = Cryptobox.Commitment.to_b58check
+
+  let decode_commitment = Cryptobox.Commitment.of_b58check_opt
+
+  let encode_header_status =
+    Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
+
+  let decode_header_status =
+    Data_encoding.Binary.of_string_opt Services.Types.header_status_encoding
+
+  let decode_slot_id =
+    Data_encoding.Binary.of_string_exn Services.Types.slot_id_encoding
+
   let add_slot_by_commitment node_store cryptobox slot commitment =
     let open Lwt_syntax in
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -249,19 +262,6 @@ module Legacy = struct
                implementing the new DAL API. *)
             Lwt.return_unit)
       slot_headers
-
-  let encode_commitment = Cryptobox.Commitment.to_b58check
-
-  let decode_commitment = Cryptobox.Commitment.of_b58check_opt
-
-  let encode_header_status =
-    Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
-
-  let decode_header_status =
-    Data_encoding.Binary.of_string_opt Services.Types.header_status_encoding
-
-  let decode_slot_id =
-    Data_encoding.Binary.of_string_exn Services.Types.slot_id_encoding
 
   let add_slot_headers ~block_level ~block_hash slot_headers node_store =
     let open Lwt_syntax in
