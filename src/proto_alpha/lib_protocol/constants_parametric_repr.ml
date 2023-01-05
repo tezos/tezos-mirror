@@ -289,20 +289,20 @@ let sc_rollup_encoding =
       })
     (merge_objs
        (obj9
-          (req "sc_rollup_enable" bool)
-          (req "sc_rollup_arith_pvm_enable" bool)
-          (req "sc_rollup_origination_size" int31)
-          (req "sc_rollup_challenge_window_in_blocks" int31)
-          (req "sc_rollup_stake_amount" Tez_repr.encoding)
-          (req "sc_rollup_commitment_period_in_blocks" int31)
-          (req "sc_rollup_max_lookahead_in_blocks" int32)
-          (req "sc_rollup_max_active_outbox_levels" int32)
-          (req "sc_rollup_max_outbox_messages_per_level" int31))
+          (req "smart_rollup_enable" bool)
+          (req "smart_rollup_arith_pvm_enable" bool)
+          (req "smart_rollup_origination_size" int31)
+          (req "smart_rollup_challenge_window_in_blocks" int31)
+          (req "smart_rollup_stake_amount" Tez_repr.encoding)
+          (req "smart_rollup_commitment_period_in_blocks" int31)
+          (req "smart_rollup_max_lookahead_in_blocks" int32)
+          (req "smart_rollup_max_active_outbox_levels" int32)
+          (req "smart_rollup_max_outbox_messages_per_level" int31))
        (obj4
-          (req "sc_rollup_number_of_sections_in_dissection" uint8)
-          (req "sc_rollup_timeout_period_in_blocks" int31)
-          (req "sc_rollup_max_number_of_cemented_commitments" int31)
-          (req "sc_rollup_max_number_of_parallel_games" int31)))
+          (req "smart_rollup_number_of_sections_in_dissection" uint8)
+          (req "smart_rollup_timeout_period_in_blocks" int31)
+          (req "smart_rollup_max_number_of_cemented_commitments" int31)
+          (req "smart_rollup_max_number_of_parallel_games" int31)))
 
 let zk_rollup_encoding =
   let open Data_encoding in

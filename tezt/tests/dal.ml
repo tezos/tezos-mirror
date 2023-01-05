@@ -114,18 +114,15 @@ let with_layer1 ?additional_bootstrap_accounts ?(attestation_lag = 1)
       ["dal_parametric"; "attestation_lag"]
       (Some attestation_lag)
     @ make_int_parameter
-        ["sc_rollup_commitment_period_in_blocks"]
+        ["smart_rollup_commitment_period_in_blocks"]
         commitment_period
     @ make_int_parameter
-        ["sc_rollup_challenge_window_in_blocks"]
+        ["smart_rollup_challenge_window_in_blocks"]
         challenge_window
     (* this will produce the empty list if dal_enable is not passed to the function invocation,
        hence the value from the protocol constants will be used. *)
     @ dal_enable_param dal_enable
-    @ [
-        (["sc_rollup_enable"], `Bool true);
-        (["sc_rollup_arith_pvm_enable"], `Bool true);
-      ]
+    @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
   in
   let* node, client, dal_parameters =
     setup_node
