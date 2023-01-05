@@ -49,7 +49,14 @@ module Table = struct
   include Stdlib.Hashtbl.MakeSeeded (struct
     include Tezos_crypto.Block_hash
 
+    (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+    [@@@ocaml.warning "-32"]
+
     let hash = Stdlib.Hashtbl.seeded_hash
+
+    let seeded_hash = Stdlib.Hashtbl.seeded_hash
+
+    [@@@ocaml.warning "+32"]
   end)
 
   let encoding arg_encoding =

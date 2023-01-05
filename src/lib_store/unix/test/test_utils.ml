@@ -751,7 +751,14 @@ module Example_tree = struct
   module Nametbl = Hashtbl.MakeSeeded (struct
     type t = string
 
+    (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+    [@@@ocaml.warning "-32"]
+
     let hash = Hashtbl.seeded_hash
+
+    let seeded_hash = Hashtbl.seeded_hash
+
+    [@@@ocaml.warning "+32"]
 
     let equal = String.equal
   end)

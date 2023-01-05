@@ -259,7 +259,14 @@ module Raw_block_header =
 module Operations_table = Hashtbl.MakeSeeded (struct
   type t = Tezos_crypto.Block_hash.t * int
 
+  (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+  [@@@ocaml.warning "-32"]
+
   let hash = Hashtbl.seeded_hash
+
+  let seeded_hash = Hashtbl.seeded_hash
+
+  [@@@ocaml.warning "+32"]
 
   let equal (b1, i1) (b2, i2) = Tezos_crypto.Block_hash.equal b1 b2 && i1 = i2
 end)

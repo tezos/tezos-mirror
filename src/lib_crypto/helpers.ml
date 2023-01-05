@@ -206,7 +206,14 @@ struct
     include Hashtbl.MakeSeeded (struct
       type t = H.t
 
+      (* See [src/lib_base/tzPervasives.ml] for an explanation *)
+      [@@@ocaml.warning "-32"]
+
       let hash = H.seeded_hash
+
+      let seeded_hash = H.seeded_hash
+
+      [@@@ocaml.warning "+32"]
 
       let equal = H.equal
     end)
