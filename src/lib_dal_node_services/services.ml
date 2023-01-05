@@ -198,7 +198,7 @@ let get_commitment_slot :
     Tezos_rpc.Path.(
       open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "slot")
 
-let get_slot_commitment_proof :
+let get_commitment_proof :
     < meth : [`GET]
     ; input : unit
     ; output : Cryptobox.commitment_proof
@@ -211,7 +211,7 @@ let get_slot_commitment_proof :
     ~query:Tezos_rpc.Query.empty
     ~output:Cryptobox.Commitment_proof.encoding
     Tezos_rpc.Path.(
-      open_root / "slots" /: Cryptobox.Commitment.rpc_arg / "proof")
+      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "proof")
 
 let get_commitment_by_published_level_and_index :
     < meth : [`GET]

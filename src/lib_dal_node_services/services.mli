@@ -124,7 +124,7 @@ val get_commitment_slot :
   service
 
 (** Compute the proof associated to a commitment. *)
-val get_slot_commitment_proof :
+val get_commitment_proof :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.commitment_proof
