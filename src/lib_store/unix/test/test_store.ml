@@ -86,7 +86,7 @@ let test_path chain_store tbl =
   let* () = check_path "A1" "A1" [] in
   let* () = check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] in
   let* () = check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] in
-  let* () = check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] in
+  let* () = check_path "A1" "B3" ["A2"; "B1"; "B2"; "B3"] in
   return_ok_unit
 
 (****************************************************************************)
@@ -117,12 +117,12 @@ let test_ancestor chain_store tbl =
   let* () = check_ancestor "A1" "A1" (vblock tbl "A1") in
   let* () = check_ancestor "A1" "A3" (vblock tbl "A1") in
   let* () = check_ancestor "A3" "A1" (vblock tbl "A1") in
-  let* () = check_ancestor "A6" "B6" (vblock tbl "A3") in
-  let* () = check_ancestor "B6" "A6" (vblock tbl "A3") in
-  let* () = check_ancestor "A4" "B1" (vblock tbl "A3") in
-  let* () = check_ancestor "B1" "A4" (vblock tbl "A3") in
-  let* () = check_ancestor "A3" "B1" (vblock tbl "A3") in
-  let* () = check_ancestor "B1" "A3" (vblock tbl "A3") in
+  let* () = check_ancestor "A6" "B6" (vblock tbl "A2") in
+  let* () = check_ancestor "B6" "A6" (vblock tbl "A2") in
+  let* () = check_ancestor "A4" "B1" (vblock tbl "A2") in
+  let* () = check_ancestor "B1" "A4" (vblock tbl "A2") in
+  let* () = check_ancestor "A2" "B1" (vblock tbl "A2") in
+  let* () = check_ancestor "B1" "A2" (vblock tbl "A2") in
   let* () = check_ancestor "A2" "B1" (vblock tbl "A2") in
   let* () = check_ancestor "B1" "A2" (vblock tbl "A2") in
   return_ok_unit
@@ -171,43 +171,12 @@ let test_locator chain_store tbl =
   in
   let* () = check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"] in
   let* () =
-    check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A3"]
+    check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A2"]
   in
   let* () = check_locator 4 "B8" ["B7"; "B6"; "B5"; "B4"] in
   let* () = check_locator 0 "A5" [] in
   let* () = check_locator 100 "A5" ["A4"; "A3"; "A2"; "A1"; "Genesis"] in
   return_ok_unit
-
-(****************************************************************************)
-
-(** Chain.known_heads *)
-
-let compare s name heads l =
-  List.iter (fun b -> Format.printf "%s@." (rev_lookup b s)) heads ;
-  if Compare.List_lengths.(heads <> l) then
-    Assert.fail_msg
-      "unexpected known_heads size (%s: %d %d)"
-      name
-      (List.length heads)
-      (List.length l) ;
-  List.iter
-    (fun bname ->
-      let hash = Store.Block.hash (vblock s bname) in
-      if not (List.exists (fun bh -> Block_hash.equal hash bh) heads) then
-        Assert.fail_msg "missing block in known_heads (%s: %s)" name bname)
-    l
-
-let test_known_heads chain_store tbl =
-  let open Lwt_result_syntax in
-  let*! heads = Store.Chain.known_heads chain_store in
-  let heads = List.map fst heads in
-  compare tbl "initial" heads ["Genesis"] ;
-  let* _ = Store.Chain.set_head chain_store (vblock tbl "A8") in
-  let* _ = Store.Chain.set_head chain_store (vblock tbl "B8") in
-  let*! heads = Store.Chain.known_heads chain_store in
-  let heads = List.map fst heads in
-  compare tbl "initial" heads ["A8"; "B8"] ;
-  return_unit
 
 (****************************************************************************)
 
@@ -219,26 +188,23 @@ let test_head chain_store tbl =
   let*! genesis_block = Store.Chain.genesis_block chain_store in
   if not (Store.Block.equal head genesis_block) then
     Assert.fail_msg "unexpected head" ;
-  let* o = Store.Chain.set_head chain_store (vblock tbl "A6") in
-  match o with
-  | None -> Assert.fail_msg "unexpected previous head"
-  | Some prev_head ->
-      if not (Store.Block.equal prev_head genesis_block) then
-        Assert.fail_msg "unexpected previous head" ;
-      let*! head = Store.Chain.current_head chain_store in
-      if not (Store.Block.equal head (vblock tbl "A6")) then
-        Assert.fail_msg "unexpected head" ;
-      return_unit
+  let* prev_head = Store.Chain.set_head chain_store (vblock tbl "A6") in
+  if not (Store.Block.equal prev_head genesis_block) then
+    Assert.fail_msg "unexpected previous head" ;
+  let*! head = Store.Chain.current_head chain_store in
+  if not (Store.Block.equal head (vblock tbl "A6")) then
+    Assert.fail_msg "unexpected head" ;
+  return_unit
 
 (****************************************************************************)
 
 (** Chain.mem *)
 
 (*
-  Genesis - A1 - A2 (cp) - A3 - A4 - A5
-                  \
-                   B1 - B2 - B3 - B4 - B5
-  *)
+    Genesis (H) - A1 - A2 - A3 - A4 - A5 - A6 - A7 - A8
+                         \
+                          B1 - B2 - B3 - B4 - B5 - B6 - B7 - B8
+*)
 
 let test_mem chain_store tbl =
   let open Lwt_result_syntax in
@@ -271,28 +237,38 @@ let test_mem chain_store tbl =
   let*! () = test_not_mem "B6" in
   let*! () = test_not_mem "B8" in
   let* () =
-    let* o = Store.Chain.set_head chain_store (vblock tbl "A6") in
-    match o with
-    | Some _prev_head -> Assert.fail_msg "unexpected head switch"
-    | None -> return_unit
+    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "A6") in
+    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A8") ;
+    return_unit
   in
-  (* A6 is a predecessor of A8. A8 remains the new head. *)
+  let*! () = test_mem "A2" in
   let*! () = test_mem "A3" in
   let*! () = test_mem "A6" in
-  let*! () = test_mem "A8" in
+  let*! () = test_not_mem "A7" in
+  let*! () = test_not_mem "A8" in
   let*! () = test_not_mem "B1" in
   let*! () = test_not_mem "B6" in
   let*! () = test_not_mem "B8" in
-  let* _ = Store.Chain.set_head chain_store (vblock tbl "B6") in
-  let*! () = test_mem "A3" in
+  let* () =
+    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "B6") in
+    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "A6") ;
+    return_unit
+  in
+  let*! () = test_mem "A2" in
+  let*! () = test_not_mem "A3" in
   let*! () = test_not_mem "A4" in
   let*! () = test_not_mem "A6" in
   let*! () = test_not_mem "A8" in
   let*! () = test_mem "B1" in
   let*! () = test_mem "B6" in
   let*! () = test_not_mem "B8" in
-  let* _ = Store.Chain.set_head chain_store (vblock tbl "B8") in
-  let*! () = test_mem "A3" in
+  let* () =
+    let* prev_head = Store.Chain.set_head chain_store (vblock tbl "B8") in
+    Assert.equal ~loc:__LOC__ prev_head (vblock tbl "B6") ;
+    return_unit
+  in
+  let*! () = test_mem "A2" in
+  let*! () = test_not_mem "A3" in
   let*! () = test_not_mem "A4" in
   let*! () = test_not_mem "A6" in
   let*! () = test_not_mem "A8" in
@@ -344,7 +320,7 @@ let test_new_blocks chain_store tbl =
   in
   let* () = test "A6" "A6" "A6" [] in
   let* () = test "A8" "A6" "A6" ["A7"; "A8"] in
-  let* () = test "A8" "B7" "A3" ["A4"; "A5"; "A6"; "A7"; "A8"] in
+  let* () = test "A8" "B7" "A2" ["A3"; "A4"; "A5"; "A6"; "A7"; "A8"] in
   return_ok_unit
 
 (** Store.Chain.checkpoint *)
@@ -432,24 +408,6 @@ let test_is_valid_target chain_store table =
   (* "b3" is valid because:
      a1 - a2 (checkpoint) - b1 - b2 - b3
   *)
-  return_unit
-
-(* return a block with the best fitness amongst the known blocks which
-    are compatible with the given checkpoint *)
-
-let test_best_know_head_for_checkpoint chain_store table =
-  let open Lwt_result_syntax in
-  let block = vblock table "A2" in
-  let block_hash = Store.Block.hash block in
-  let level = Store.Block.level block in
-  let checkpoint = (block_hash, level) in
-  let* _prev_head = Store.Chain.set_head chain_store block in
-  let* () = Store.Chain.set_target chain_store checkpoint in
-  let* _head = Store.Chain.set_head chain_store (vblock table "B3") in
-  let*! _block =
-    Store.Chain.best_known_head_for_checkpoint chain_store ~checkpoint
-  in
-  (* the block returns with the best fitness is B3 at level 5 *)
   return_unit
 
 (* Setting checkpoint in the future is possible
@@ -749,14 +707,12 @@ let tests =
         ("path between blocks", test_path);
         ("common ancestor", test_ancestor);
         ("block locators", test_locator);
-        ("known heads", test_known_heads);
         ("set head", test_head);
         ("blocks in chain", test_mem);
         ("new blocks", test_new_blocks);
         ("basic checkpoint", test_basic_checkpoint);
         ("is valid target", test_is_valid_target);
         ("acceptable block", test_acceptable_block);
-        ("best know head", test_best_know_head_for_checkpoint);
         ("future target", test_future_target);
         ("reach target", test_reach_target);
         ("update target in node", test_not_may_update_target);

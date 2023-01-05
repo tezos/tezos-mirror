@@ -101,10 +101,6 @@ val genesis_block_file :
 val current_head_file :
   [`Chain_dir] directory -> ([`Current_head], block_descriptor) encoded_file
 
-val alternate_heads_file :
-  [`Chain_dir] directory ->
-  ([`Alternate_heads], block_descriptor list) encoded_file
-
 val cementing_highwatermark_file :
   [`Chain_dir] directory ->
   ([`Cementing_highwatermark], int32 option) encoded_file

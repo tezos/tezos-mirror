@@ -29,13 +29,12 @@ open Store_errors
 (* A non-empty store is considered consistent if the following
    invariants hold:
 
-   - genesis, caboose, savepoint, checkpoint, current_head,
-   alternate_heads associated files exists, are decodable and the
-   blocks they point to may be read in the block store and are
-   consistent with their definition;
+   - genesis, caboose, savepoint, checkpoint, current_head associated
+   files exists, are decodable and the blocks they point to may be
+   read in the block store and are consistent with their definition;
 
    - genesis ≤ caboose ≤ savepoint ≤ [cementing_highwatermark] ≤
-   checkpoint ≤ all(alternate_heads ∪ current_head)
+   checkpoint ≤ current_head
 
    Hypothesis:
 
@@ -129,14 +128,11 @@ let check_protocol_levels block_store ~savepoint ~current_head protocol_levels =
   return_unit
 
 let check_invariant ~genesis ~caboose ~savepoint ~cementing_highwatermark
-    ~checkpoint ~current_head ~alternate_heads =
+    ~checkpoint ~current_head =
   let ( <= ) descr descr' = Compare.Int32.(snd descr <= snd descr') in
   let invariant_holds =
     genesis <= caboose && caboose <= savepoint && savepoint <= checkpoint
     && checkpoint <= current_head
-    && List.for_all
-         (fun alternate_head -> checkpoint <= alternate_head)
-         alternate_heads
     &&
     match cementing_highwatermark with
     | Some ch -> Compare.Int32.(ch <= snd checkpoint)
@@ -181,10 +177,6 @@ let check_consistency chain_dir genesis =
     Stored_data.load (Naming.current_head_file chain_dir)
   in
   let*! current_head = Stored_data.get current_head_data in
-  let* alternate_heads_data =
-    Stored_data.load (Naming.alternate_heads_file chain_dir)
-  in
-  let*! alternate_heads = Stored_data.get alternate_heads_data in
   let* protocol_levels_data =
     Stored_data.load (Naming.protocol_levels_file chain_dir)
   in
@@ -211,9 +203,6 @@ let check_consistency chain_dir genesis =
           (checkpoint, true, "checkpoint");
           (current_head, true, "current_head");
         ]
-        @ List.map
-            (fun descr -> (descr, true, "alternate_heads"))
-            alternate_heads
       in
       let* () =
         List.iter_es
@@ -245,7 +234,6 @@ let check_consistency chain_dir genesis =
           ~cementing_highwatermark
           ~checkpoint
           ~current_head
-          ~alternate_heads
       in
       return_unit)
     (fun () -> Block_store.close block_store)
@@ -1069,12 +1057,12 @@ let fix_protocol_levels chain_dir block_store context_index genesis
   return fixed_protocol_levels
 
 (* [fix_chain_state chain_dir ~head ~cementing_highwatermark
-   ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
+   ~checkpoint ~savepoint ~caboose ~forked_chains
    ~protocol_levels ~chain_config ~genesis ~genesis_context] writes, as
    [Stored_data.t], the given arguments. *)
 let fix_chain_state chain_dir block_store ~head ~cementing_highwatermark
-    ~checkpoint ~savepoint:tmp_savepoint ~caboose:tmp_caboose ~alternate_heads
-    ~forked_chains ~protocol_levels ~chain_config ~genesis ~genesis_context =
+    ~checkpoint ~savepoint:tmp_savepoint ~caboose:tmp_caboose ~forked_chains
+    ~protocol_levels ~chain_config ~genesis ~genesis_context =
   let open Lwt_result_syntax in
   (* By setting each stored data, we erase the previous content. *)
   let* () =
@@ -1092,11 +1080,6 @@ let fix_chain_state chain_dir block_store ~head ~cementing_highwatermark
     Stored_data.write_file (Naming.genesis_block_file chain_dir) genesis_block
   in
   let* () = Stored_data.write_file (Naming.current_head_file chain_dir) head in
-  let* () =
-    Stored_data.write_file
-      (Naming.alternate_heads_file chain_dir)
-      alternate_heads
-  in
   let* () =
     Stored_data.write_file (Naming.checkpoint_file chain_dir) checkpoint
   in
@@ -1242,7 +1225,6 @@ let fix_cementing_highwatermark chain_dir block_store =
       both the floating and cemented stores,
     - the caboose is set as the lowest block found in both the
       floating and cemented stores,
-    - alternated heads is set as empty,
     - forked chains is set as empty,
     - genesis is set based on the node's run args (network flag),
     - the chain_state is updated accordingly to the inferred values.
@@ -1300,7 +1282,6 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
       ~checkpoint
       ~savepoint
       ~caboose
-      ~alternate_heads:[]
       ~forked_chains:Chain_id.Map.empty
       ~protocol_levels
       ~chain_config

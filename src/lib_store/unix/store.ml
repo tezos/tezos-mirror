@@ -87,7 +87,6 @@ and chain_state = {
   (* Following fields are not safe to update concurrently and must be
      manipulated carefuly: *)
   current_head_data : block_descriptor Stored_data.t;
-  alternate_heads_data : block_descriptor list Stored_data.t;
   cementing_highwatermark_data : int32 option Stored_data.t;
   target_data : block_descriptor option Stored_data.t;
   checkpoint_data : block_descriptor Stored_data.t;
@@ -1272,72 +1271,6 @@ module Chain = struct
         in
         Lwt.return_some l
 
-  (* Hypothesis:
-     \forall x. x \in current_head \union alternate_heads | new_head
-     is not a predecessor of x *)
-  let locked_update_and_trim_alternate_heads chain_store chain_state
-      ~new_checkpoint ~new_head =
-    let open Lwt_syntax in
-    let* prev_head_descr = Stored_data.get chain_state.current_head_data in
-    let* prev_alternate_heads =
-      Stored_data.get chain_state.alternate_heads_data
-    in
-    let new_head_descr = Block.descriptor new_head in
-    let* b =
-      is_ancestor chain_store ~head:new_head_descr ~ancestor:prev_head_descr
-    in
-    match b with
-    | true ->
-        (* If the new head is a successor of prev_head, do nothing
-           particular, just trim alternate heads which are anchored
-           below the checkpoint. *)
-        List.filter_s
-          (fun alternate_head ->
-            is_ancestor
-              chain_store
-              ~head:alternate_head
-              ~ancestor:new_checkpoint)
-          prev_alternate_heads
-    | false ->
-        (* If the new head is not a successor of prev_head. *)
-        (* 2 cases:
-           - new_head is a new branch => not a successor of any alternate_heads;
-           - new_head is a successor of a previous alternate head. *)
-        let* filtered_alternate_heads =
-          List.filter_s
-            (fun alternate_head ->
-              let* b =
-                is_ancestor
-                  chain_store
-                  ~head:new_head_descr
-                  ~ancestor:alternate_head
-              in
-              match b with
-              | true ->
-                  (* If the new head is a successor of a former
-                     alternate_head, remove it from the alternate heads,
-                     it will be updated as the current head *)
-                  Lwt.return_false
-              | false ->
-                  (* Only retain alternate_heads that are successor of the
-                     new_checkpoint *)
-                  is_ancestor
-                    chain_store
-                    ~head:alternate_head
-                    ~ancestor:new_checkpoint)
-            prev_alternate_heads
-        in
-        (* Promote prev_head as an alternate head *)
-        Lwt.return (prev_head_descr :: filtered_alternate_heads)
-
-  let locked_is_heads_predecessor chain_store chain_state ~new_head =
-    let open Lwt_syntax in
-    let* current_head_descr = Stored_data.get chain_state.current_head_data in
-    let* alternate_heads = Stored_data.get chain_state.alternate_heads_data in
-    List.exists_p
-      (fun head -> is_ancestor chain_store ~head ~ancestor:new_head)
-      (current_head_descr :: alternate_heads)
-
   let merge_finalizer chain_store (new_highest_cemented_level : int32) =
     let open Lwt_syntax in
     (* Assumed invariant: two merges cannot occur concurrently *)
@@ -1431,16 +1364,6 @@ module Chain = struct
       (Int32.to_float (snd new_checkpoint)) ;
     return_unit
 
-  let write_alternate_heads chain_state new_alternate_heads =
-    let open Lwt_result_syntax in
-    let* () =
-      Stored_data.write chain_state.alternate_heads_data new_alternate_heads
-    in
-    Prometheus.Gauge.set
-      Store_metrics.metrics.alternate_heads_count
-      (Int.to_float (List.length new_alternate_heads)) ;
-    return_unit
-
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
@@ -1475,302 +1398,181 @@ module Chain = struct
             (Invalid_head_switch
                {checkpoint_level = snd checkpoint; given_head = new_head_descr})
         in
-        (* Check that the new_head is not a predecessor of existing heads *)
-        let*! is_heads_predecessor =
-          locked_is_heads_predecessor
+        (* Check that its predecessor exists and has metadata *)
+        let predecessor = Block.predecessor new_head in
+        let* new_head_metadata =
+          trace
+            Bad_head_invariant
+            (let* pred_block = Block.read_block chain_store predecessor in
+             (* check that prededecessor's block metadata are available *)
+             let* _pred_head_metadata =
+               Block.get_block_metadata chain_store pred_block
+             in
+             Block.get_block_metadata chain_store new_head)
+        in
+        let*! target = Stored_data.get chain_state.target_data in
+        let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
+        let*! cementing_highwatermark =
+          locked_determine_cementing_highwatermark
             chain_store
             chain_state
-            ~new_head:new_head_descr
+            new_head_lafl
         in
-        if is_heads_predecessor then
-          (* Do not raise an error: this might be caused by
-             intertwined [set_head] calls. *)
-          return (None, None)
-        else
-          (* Check that its predecessor exists and has metadata *)
-          let predecessor = Block.predecessor new_head in
-          let* new_head_metadata =
-            trace
-              Bad_head_invariant
-              (let* pred_block = Block.read_block chain_store predecessor in
-               (* check that prededecessor's block metadata are available *)
-               let* _pred_head_metadata =
-                 Block.get_block_metadata chain_store pred_block
-               in
-               Block.get_block_metadata chain_store new_head)
-          in
-          let*! target = Stored_data.get chain_state.target_data in
-          let new_head_lafl = Block.last_allowed_fork_level new_head_metadata in
-          let*! cementing_highwatermark =
-            locked_determine_cementing_highwatermark
-              chain_store
-              chain_state
-              new_head_lafl
-          in
-          (* This write call will initialize the cementing
-             highwatermark when it is not yet set or do nothing
-             otherwise. *)
-          let* () =
-            locked_may_update_cementing_highwatermark
-              chain_state
-              cementing_highwatermark
-          in
-          let*! lafl_block_opt =
-            Block.locked_read_block_by_level_opt
-              chain_store
-              new_head
-              new_head_lafl
-          in
-          let* new_checkpoint, new_target =
-            match lafl_block_opt with
-            | None ->
-                (* This case may occur when importing a rolling
-                   snapshot where the lafl block is not known.
-                   We may use the checkpoint instead. *)
-                return (checkpoint, target)
-            | Some lafl_block ->
-                may_update_checkpoint_and_target
-                  chain_store
-                  ~new_head:new_head_descr
-                  ~new_head_lafl:(Block.descriptor lafl_block)
-                  ~checkpoint
-                  ~target
-          in
-          let should_merge =
-            (* Make sure that the previous merge is completed before
-               starting a new merge. If the lock on the chain_state is
-               retained, the merge thread will never be able to
-               complete. *)
-            (not is_merge_ongoing)
-            &&
-            match cementing_highwatermark with
-            | None ->
-                (* Do not merge if the cementing highwatermark is not
-                   set. *)
-                false
-            | Some cementing_highwatermark ->
-                Compare.Int32.(new_head_lafl > cementing_highwatermark)
-          in
-          let* new_cementing_highwatermark =
-            if should_merge then
-              let*! b = try_lock_for_write chain_store.lockfile in
-              match b with
-              | false ->
-                  (* Delay the merge until the lock is available *)
-                  return cementing_highwatermark
-              | true ->
-                  (* Lock on lockfile is now taken *)
-                  let finalizer new_highest_cemented_level =
-                    let* () =
-                      merge_finalizer chain_store new_highest_cemented_level
-                    in
-                    let*! () = may_unlock chain_store.lockfile in
-                    return_unit
-                  in
-                  let on_error errs =
-                    (* Release the lockfile *)
-                    let*! () = may_unlock chain_store.lockfile in
-                    Lwt.return (Error errs)
-                  in
-                  (* Notes:
-                     - The lock will be released when the merge
-                       terminates. i.e. in [finalizer] or in
-                       [on_error].
-                     - The heavy-work of this function is asynchronously
-                       done so this call is expected to return quickly. *)
-                  let* () =
-                    Block_store.merge_stores
-                      chain_store.block_store
-                      ~on_error
-                      ~finalizer
-                      ~history_mode:(history_mode chain_store)
-                      ~new_head
-                      ~new_head_metadata
-                      ~cementing_highwatermark:
-                        (WithExceptions.Option.get
-                           ~loc:__LOC__
-                           cementing_highwatermark)
-                  in
-                  (* The new memory highwatermark is new_head_lafl, the disk
-                     value will be updated after the merge completion. *)
-                  return (Some new_head_lafl)
-            else return cementing_highwatermark
-          in
-          let*! new_checkpoint =
-            match new_cementing_highwatermark with
-            | None -> Lwt.return new_checkpoint
-            | Some new_cementing_highwatermark -> (
-                if
-                  Compare.Int32.(
-                    snd new_checkpoint >= new_cementing_highwatermark)
-                then Lwt.return new_checkpoint
-                else
-                  let*! o =
-                    read_ancestor_hash_by_level
-                      chain_store
-                      new_head
-                      new_cementing_highwatermark
-                  in
-                  match o with
-                  | None -> Lwt.return new_checkpoint
-                  | Some h -> Lwt.return (h, new_cementing_highwatermark))
-          in
-          let*! new_alternate_heads =
-            locked_update_and_trim_alternate_heads
-              chain_store
-              chain_state
-              ~new_checkpoint
-              ~new_head
-          in
-          let* () =
-            if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
-              (* Remove potentially outdated invalid blocks if the
-                 checkpoint changed *)
-              let* () =
-                Prometheus.Gauge.set Store_metrics.metrics.invalid_blocks 0. ;
-                Stored_data.update_with
-                  chain_state.invalid_blocks_data
-                  (fun invalid_blocks ->
-                    Lwt.return
-                      (Block_hash.Map.filter
-                         (fun _k {level; _} ->
-                           if level > snd new_checkpoint then (
-                             Prometheus.Gauge.inc_one
-                               Store_metrics.metrics.invalid_blocks ;
-                             true)
-                           else false)
-                         invalid_blocks))
-              in
-              write_checkpoint chain_state new_checkpoint
-            else return_unit
-          in
-          (* Update values on disk but not the cementing highwatermark
-             which will be updated by the merge finalizer. *)
-          let* () =
-            Stored_data.write chain_state.current_head_data new_head_descr
-          in
-          let* () = write_alternate_heads chain_state new_alternate_heads in
-          let* () = Stored_data.write chain_state.target_data new_target in
-          (* Update live_data *)
-          let*! live_blocks, live_operations =
-            locked_compute_live_blocks
-              ~update_cache:true
-              chain_store
-              chain_state
-              new_head
-              new_head_metadata
-          in
-          let new_chain_state =
-            {
-              chain_state with
-              live_blocks;
-              live_operations;
-              current_head = new_head;
-            }
-          in
-          let*! () = Store_events.(emit set_head) new_head_descr in
-          return (Some new_chain_state, Some previous_head))
-
-  let known_heads chain_store =
-    let open Lwt_syntax in
-    Shared.use
-      chain_store.chain_state
-      (fun {current_head_data; alternate_heads_data; _} ->
-        let* current_head_descr = Stored_data.get current_head_data in
-        let* alternate_heads = Stored_data.get alternate_heads_data in
-        Lwt.return (current_head_descr :: alternate_heads))
-
-  (* TODO (later) check if that's ok *)
-  let locked_is_valid_for_checkpoint chain_store chain_state
-      (given_checkpoint_hash, given_checkpoint_level) =
-    let open Lwt_result_syntax in
-    let current_head = chain_state.current_head in
-    let* current_head_metadata =
-      Block.get_block_metadata chain_store current_head
-    in
-    let head_lafl = Block.last_allowed_fork_level current_head_metadata in
-    if Compare.Int32.(given_checkpoint_level <= head_lafl) then
-      (* Cannot set a checkpoint before the current head's last
-         allowed fork level *)
-      return_false
-    else
-      let*! b = Block.is_known_valid chain_store given_checkpoint_hash in
-      match b with
-      | false ->
-          (* Given checkpoint is in the future: valid *)
-          return_true
-      | true -> (
-          let* o =
-            read_ancestor_hash
-              chain_store
-              ~distance:Int32.(to_int (sub given_checkpoint_level head_lafl))
-              given_checkpoint_hash
-          in
-          match o with
-          | None ->
-              (* The last allowed fork level is unknown, thus different from current head's lafl *)
-              return_false
-          | Some ancestor -> (
-              let* o =
-                read_ancestor_hash
-                  chain_store
-                  ~distance:
-                    Int32.(to_int (sub (Block.level current_head) head_lafl))
-                  (Block.hash current_head)
-              in
-              match o with
-              | None -> tzfail Missing_last_allowed_fork_level_block
-              | Some lafl_hash -> return (Block_hash.equal lafl_hash ancestor)))
-
-  let is_valid_for_checkpoint chain_store given_checkpoint =
-    let open Lwt_syntax in
-    Shared.use chain_store.chain_state (fun chain_state ->
-        let* b =
-          Block.locked_is_known_invalid chain_state (fst given_checkpoint)
+        (* This write call will initialize the cementing
+           highwatermark when it is not yet set or do nothing
+           otherwise. *)
+        let* () =
+          locked_may_update_cementing_highwatermark
+            chain_state
+            cementing_highwatermark
         in
-        match b with
-        | true -> return_ok_false
-        | false ->
-            locked_is_valid_for_checkpoint
-              chain_store
-              chain_state
-              given_checkpoint)
-
-  let best_known_head_for_checkpoint chain_store ~checkpoint =
-    let open Lwt_result_syntax in
-    let _, checkpoint_level = checkpoint in
-    let*! current_head = current_head chain_store in
-    let* valid =
-      is_valid_for_checkpoint
-        chain_store
-        (Block.hash current_head, Block.level current_head)
-    in
-    if valid then return current_head
-    else
-      let find_valid_predecessor hash =
-        let* block = Block.read_block chain_store hash in
-        if Compare.Int32.(Block_repr.level block < checkpoint_level) then
-          return block
-        else
-          (* Read the checkpoint's predecessor *)
-          Block.read_block
+        let*! lafl_block_opt =
+          Block.locked_read_block_by_level_opt
             chain_store
-            hash
-            ~distance:
-              (1
-              + (Int32.to_int
-                @@ Int32.sub (Block_repr.level block) checkpoint_level))
-      in
-      let*! heads = known_heads chain_store in
-      let*! genesis = genesis_block chain_store in
-      let best = genesis in
-      List.fold_left_es
-        (fun best (hash, _level) ->
-          let* pred = find_valid_predecessor hash in
-          if Fitness.(Block.fitness pred > Block.fitness best) then return pred
-          else return best)
-        best
-        heads
+            new_head
+            new_head_lafl
+        in
+        let* new_checkpoint, new_target =
+          match lafl_block_opt with
+          | None ->
+              (* This case may occur when importing a rolling
+                 snapshot where the lafl block is not known.
+                 We may use the checkpoint instead. *)
+              return (checkpoint, target)
+          | Some lafl_block ->
+              may_update_checkpoint_and_target
+                chain_store
+                ~new_head:new_head_descr
+                ~new_head_lafl:(Block.descriptor lafl_block)
+                ~checkpoint
+                ~target
+        in
+        let should_merge =
+          (* Make sure that the previous merge is completed before
+             starting a new merge. If the lock on the chain_state is
+             retained, the merge thread will never be able to
+             complete. *)
+          (not is_merge_ongoing)
+          &&
+          match cementing_highwatermark with
+          | None ->
+              (* Do not merge if the cementing highwatermark is not
+                 set. *)
+              false
+          | Some cementing_highwatermark ->
+              Compare.Int32.(new_head_lafl > cementing_highwatermark)
+        in
+        let* new_cementing_highwatermark =
+          if should_merge then
+            let*! b = try_lock_for_write chain_store.lockfile in
+            match b with
+            | false ->
+                (* Delay the merge until the lock is available *)
+                return cementing_highwatermark
+            | true ->
+                (* Lock on lockfile is now taken *)
+                let finalizer new_highest_cemented_level =
+                  let* () =
+                    merge_finalizer chain_store new_highest_cemented_level
+                  in
+                  let*! () = may_unlock chain_store.lockfile in
+                  return_unit
+                in
+                let on_error errs =
+                  (* Release the lockfile *)
+                  let*! () = may_unlock chain_store.lockfile in
+                  Lwt.return (Error errs)
+                in
+                (* Notes:
+                   - The lock will be released when the merge
+                     terminates. i.e. in [finalizer] or in
+                     [on_error].
+                   - The heavy-work of this function is asynchronously
+                     done so this call is expected to return quickly. *)
+                let* () =
+                  Block_store.merge_stores
+                    chain_store.block_store
+                    ~on_error
+                    ~finalizer
+                    ~history_mode:(history_mode chain_store)
+                    ~new_head
+                    ~new_head_metadata
+                    ~cementing_highwatermark:
+                      (WithExceptions.Option.get
+                         ~loc:__LOC__
+                         cementing_highwatermark)
+                in
+                (* The new memory highwatermark is new_head_lafl, the disk
+                   value will be updated after the merge completion. *)
+                return (Some new_head_lafl)
+          else return cementing_highwatermark
+        in
+        let*! new_checkpoint =
+          match new_cementing_highwatermark with
+          | None -> Lwt.return new_checkpoint
+          | Some new_cementing_highwatermark -> (
+              if
+                Compare.Int32.(
+                  snd new_checkpoint >= new_cementing_highwatermark)
+              then Lwt.return new_checkpoint
+              else
+                let*! o =
+                  read_ancestor_hash_by_level
+                    chain_store
+                    new_head
+                    new_cementing_highwatermark
+                in
+                match o with
+                | None -> Lwt.return new_checkpoint
+                | Some h -> Lwt.return (h, new_cementing_highwatermark))
+        in
+        let* () =
+          if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
+            (* Remove potentially outdated invalid blocks if the
+               checkpoint changed *)
+            let* () =
+              Prometheus.Gauge.set Store_metrics.metrics.invalid_blocks 0. ;
+              Stored_data.update_with
+                chain_state.invalid_blocks_data
+                (fun invalid_blocks ->
+                  Lwt.return
+                    (Block_hash.Map.filter
+                       (fun _k {level; _} ->
+                         if level > snd new_checkpoint then (
+                           Prometheus.Gauge.inc_one
+                             Store_metrics.metrics.invalid_blocks ;
+                           true)
+                         else false)
+                       invalid_blocks))
+            in
+            write_checkpoint chain_state new_checkpoint
+          else return_unit
+        in
+        (* Update values on disk but not the cementing highwatermark
+           which will be updated by the merge finalizer. *)
+        let* () =
+          Stored_data.write chain_state.current_head_data new_head_descr
+        in
+        let* () = Stored_data.write chain_state.target_data new_target in
+        (* Update live_data *)
+        let*! live_blocks, live_operations =
+          locked_compute_live_blocks
+            ~update_cache:true
+            chain_store
+            chain_state
+            new_head
+            new_head_metadata
+        in
+        let new_chain_state =
+          {
+            chain_state with
+            live_blocks;
+            live_operations;
+            current_head = new_head;
+          }
+        in
+        let*! () = Store_events.(emit set_head) new_head_descr in
+        return (Some new_chain_state, previous_head))
 
   let set_target chain_store new_target =
     let open Lwt_result_syntax in
@@ -1795,7 +1597,7 @@ module Chain = struct
               match b with
               | true -> tzfail (Cannot_set_target new_target)
               | false ->
-                  (* unknown block => new_target > all_heads *)
+                  (* unknown block => new_target > current_head *)
                   (* Write future-block as target, [set_head] will
                      update it correctly *)
                   let* () =
@@ -1808,96 +1610,31 @@ module Chain = struct
                 (Cannot_set_target new_target)
                 (* Do not store the target but update the chain data
                    according to the following cases:
-                   1. Target is below known heads: filter heads
-                      for which new_target is not an ancestor;
-                   2. Target is above all heads: filter heads
-                      that are not an ancestor of the new_target;
-                   3. Target has no head as ancestor:
-                      the new_target becomes the head.
-                      (Side-note: I think the last case is ok) *)
+                   1. Target is below current_head;
+                   2. Target has no head as ancestor:
+                      the new_target becomes the head. *)
                 (let*! current_head_descr =
                    Stored_data.get chain_state.current_head_data
                  in
-                 let*! alternate_heads =
-                   Stored_data.get chain_state.alternate_heads_data
+                 let*! is_target_an_ancestor_of_current_head =
+                   is_ancestor
+                     chain_store
+                     ~head:current_head_descr
+                     ~ancestor:new_target
                  in
-                 let all_heads = current_head_descr :: alternate_heads in
-                 let*! filtered_heads =
-                   List.filter_s
-                     (fun block ->
-                       is_ancestor chain_store ~head:block ~ancestor:new_target)
-                     all_heads
-                 in
-                 let find_best_head heads =
-                   assert (heads <> []) ;
-                   let first_alternate_head, alternate_heads =
-                     ( List.hd heads |> WithExceptions.Option.get ~loc:__LOC__,
-                       List.tl heads |> WithExceptions.Option.get ~loc:__LOC__
-                     )
-                   in
-                   let* first_block =
-                     Block.read_block chain_store (fst first_alternate_head)
-                   in
-                   let* best_head =
-                     List.fold_left_es
-                       (fun best alternate_head ->
-                         let* alternate_head =
-                           Block.read_block chain_store (fst alternate_head)
-                         in
-                         if
-                           Fitness.(
-                             Block.fitness best >= Block.fitness alternate_head)
-                         then return best
-                         else return alternate_head)
-                       first_block
-                       alternate_heads
-                   in
-                   return
-                     ( best_head,
-                       List.filter
-                         (fun (hash, _) ->
-                           not (Block_hash.equal (Block.hash best_head) hash))
-                         all_heads )
-                 in
-                 (* Case 1 *)
-                 let* new_current_head, new_alternate_heads, new_checkpoint =
-                   if filtered_heads <> [] then
-                     let* best_alternate_head, alternate_heads =
-                       find_best_head filtered_heads
-                     in
-                     return (best_alternate_head, alternate_heads, new_target)
+                 let* new_current_head, new_checkpoint =
+                   if is_target_an_ancestor_of_current_head then
+                     return (current_head_descr, new_target)
                    else
-                     (* Case 2 *)
-                     let*! filtered_heads =
-                       List.filter_s
-                         (fun block ->
-                           is_ancestor
-                             chain_store
-                             ~head:new_target
-                             ~ancestor:block)
-                         all_heads
+                     let* target_block =
+                       Block.read_block chain_store (fst new_target)
                      in
-                     if filtered_heads <> [] then
-                       let* best_alternate_head, alternate_heads =
-                         find_best_head filtered_heads
-                       in
-                       return (best_alternate_head, alternate_heads, new_target)
-                     else
-                       (* Case 3 *)
-                       let* target_block =
-                         Block.read_block chain_store (fst new_target)
-                       in
-                       return (target_block, [], new_target)
+                     return (Block.descriptor target_block, new_target)
                  in
                  let* () =
                    Stored_data.write
                      chain_state.current_head_data
-                     (Block_repr.descriptor new_current_head)
-                 in
-                 let* () =
-                   Stored_data.write
-                     chain_state.alternate_heads_data
-                     new_alternate_heads
+                     new_current_head
                  in
                  let* () =
                    Stored_data.write chain_state.checkpoint_data new_checkpoint
@@ -1969,9 +1706,6 @@ module Chain = struct
         (Naming.current_head_file chain_dir)
         ~initial_data:genesis_descr
     in
-    let* alternate_heads_data =
-      Stored_data.init (Naming.alternate_heads_file chain_dir) ~initial_data:[]
-    in
     let* cementing_highwatermark_data =
       Stored_data.init
         (Naming.cementing_highwatermark_file chain_dir)
@@ -2005,7 +1739,6 @@ module Chain = struct
     return
       {
         current_head_data;
-        alternate_heads_data;
         cementing_highwatermark_data;
         target_data;
         checkpoint_data;
@@ -2061,9 +1794,6 @@ module Chain = struct
     let* current_head_data =
       Stored_data.load (Naming.current_head_file chain_dir)
     in
-    let* alternate_heads_data =
-      Stored_data.load (Naming.alternate_heads_file chain_dir)
-    in
     let* cementing_highwatermark_data =
       Stored_data.load (Naming.cementing_highwatermark_file chain_dir)
     in
@@ -2105,7 +1835,6 @@ module Chain = struct
         return
           {
             current_head_data;
-            alternate_heads_data;
             cementing_highwatermark_data;
             target_data;
             checkpoint_data;
@@ -2942,7 +2671,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
     Data_encoding.Json.construct chain_config_encoding chain_config
   in
   let* ( current_head,
-         alternate_heads,
          cementing_highwatermark,
          target,
          checkpoint,
@@ -2961,7 +2689,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
       (fun
         {
           current_head;
-          alternate_heads_data;
           cementing_highwatermark_data;
           target_data;
           checkpoint_data;
@@ -2972,7 +2699,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
           _;
         }
       ->
-        let* alternate_heads = Stored_data.get alternate_heads_data in
         let* cementing_highwatermark =
           Stored_data.get cementing_highwatermark_data
         in
@@ -3026,7 +2752,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
         in
         Lwt.return
           ( current_head,
-            alternate_heads,
             cementing_highwatermark,
             target,
             checkpoint,
@@ -3063,12 +2788,11 @@ let rec make_pp_chain_store (chain_store : chain_store) =
       Format.fprintf
         fmt
         "@[<v 2>chain id: %a@ chain directory: %s@ chain config: %a@ current \
-         head: %a@ @[<v 2>alternate heads:@ %a@]@ checkpoint: %a@ cementing \
-         highwatermark: %a@ savepoint: %a@ caboose: %a@ first block in \
-         floating: %a@ interval of cemented blocks: [%a, %a]@ merge status: \
-         %a@ target: %a@ @[<v 2>protocol levels:@ %a@]@ @[<v 2>invalid \
-         blocks:@ %a@]@ @[<v 2>forked chains:@ %a@]@ @[<v 2>active testchain: \
-         %a@]@]"
+         head: %a@ checkpoint: %a@ cementing highwatermark: %a@ savepoint: %a@ \
+         caboose: %a@ first block in floating: %a@ interval of cemented \
+         blocks: [%a, %a]@ merge status: %a@ target: %a@ @[<v 2>protocol \
+         levels:@ %a@]@ @[<v 2>invalid blocks:@ %a@]@ @[<v 2>forked chains:@ \
+         %a@]@ @[<v 2>active testchain: %a@]@]"
         Chain_id.pp
         chain_id
         (Naming.dir_path chain_dir)
@@ -3086,8 +2810,6 @@ let rec make_pp_chain_store (chain_store : chain_store) =
             (Block.last_allowed_fork_level metadata)
             (Block.max_operations_ttl metadata))
         current_head
-        (Format.pp_print_list ~pp_sep:Format.pp_print_cut pp_block_descriptor)
-        alternate_heads
         pp_block_descriptor
         checkpoint
         (fun fmt opt ->
@@ -3317,9 +3039,6 @@ module Unsafe = struct
       Stored_data.write_file
         (Naming.current_head_file chain_dir)
         (Block.descriptor new_head_with_metadata)
-    in
-    let* () =
-      Stored_data.write_file (Naming.alternate_heads_file chain_dir) []
     in
     (* Checkpoint is the new head *)
     let* () =

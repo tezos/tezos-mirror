@@ -782,7 +782,7 @@ module Example_tree = struct
         (fun b -> Store.Block.read_block_opt chain_store (Store.Block.hash b))
         blocks
     in
-    let a2 = List.nth main_blocks 2 |> WithExceptions.Option.get ~loc:__LOC__ in
+    let a2 = List.nth main_blocks 1 |> WithExceptions.Option.get ~loc:__LOC__ in
     let main_blocks = combine_exn main_chain main_blocks in
     let branch_chain = List.map (fun i -> Format.sprintf "B%d" i) (1 -- 8) in
     let* branch, _head =
