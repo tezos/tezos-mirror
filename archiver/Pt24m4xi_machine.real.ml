@@ -121,7 +121,11 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
 
   let baker cctxt hash =
     let* metadata =
-      Block_services.metadata ~chain:cctxt#chain ~block:(`Hash (hash,0)) cctxt ()
+      Block_services.metadata
+        ~chain:cctxt#chain
+        ~block:(`Hash (hash, 0))
+        cctxt
+        ()
     in
     return metadata.protocol_data.baker
 

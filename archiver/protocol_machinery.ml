@@ -57,10 +57,7 @@ module type PROTOCOL_SERVICES = sig
     Lwt.t
 
   val baker :
-    wrap_full ->
-    Block_hash.t ->
-    Signature.public_key_hash
-      tzresult Lwt.t
+    wrap_full -> Block_hash.t -> Signature.public_key_hash tzresult Lwt.t
 
   val block_round : Block_header.t -> int tzresult
 
