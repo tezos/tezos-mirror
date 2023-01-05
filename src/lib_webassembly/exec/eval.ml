@@ -1607,7 +1607,9 @@ let reveal_step reveal module_reg payload =
       in
       let vs, es = inv.code in
       let vs = Vector.cons (Num (I32 bytes_count)) vs in
-      (* This value should be benchmarked *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+         Define a tick consumption model.
+      *)
       let ticks_to_consume = Z.zero in
       {
         config with
