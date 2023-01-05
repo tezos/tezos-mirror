@@ -613,6 +613,13 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
     let new_state = {state with round_state = new_round_state} in
     handle_proposal new_state >>= return
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4539
+   Avoid updating the state here.
+   (See also comment in {!State_transitions.step}.)
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/4538
+   Improve/clarify when the state is recorded.
+*)
 let rec perform_action ~state_recorder state (action : action) =
   match action with
   | Do_nothing -> state_recorder ~new_state:state >>=? fun () -> return state

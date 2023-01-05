@@ -697,6 +697,9 @@ let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
 
 (* Hypothesis:
    - The state is not to be modified outside this module
+     (NB: there are exceptions in Baking_actions: the corner cases
+     [update_to_level] and [synchronize_round] and
+     the hack used by [inject_block])
 
    - new_proposal's received blocks are expected to belong to our current
      round
