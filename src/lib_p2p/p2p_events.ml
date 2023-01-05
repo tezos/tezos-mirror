@@ -361,6 +361,14 @@ module P2p_conn = struct
       ~level:Debug
       ("bytes", Data_encoding.int31)
       ("peer", P2p_peer.Id.encoding)
+
+  let disconnect =
+    declare_1
+      ~section
+      ~name:"disconnect"
+      ~msg:"{peer} has been explicitly closed"
+      ~level:Debug
+      ("peer", P2p_peer.Id.encoding)
 end
 
 module P2p_fd = struct
