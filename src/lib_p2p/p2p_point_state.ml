@@ -108,7 +108,7 @@ module Info = struct
 
   let known_public s = s.known_public
 
-  let can_reconnect ~now {reconnection_info; _} =
+  let cannot_reconnect_yet ~now {reconnection_info; _} =
     Option.fold
       ~none:false
       ~some:(fun gr -> Time.System.compare now gr.end_time <= 0)
