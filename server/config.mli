@@ -28,7 +28,7 @@ type tls_conf = {crt : string; key : string}
 type connection = {source : string option; port : int; tls : tls_conf option}
 
 type t = {
-  db_file : string;
+  db_uri : string;
   network_interfaces : connection list;
   users : (string * string) list;
 }

@@ -28,7 +28,7 @@ type tls_conf = {crt : string; key : string}
 type connection = {source : string option; port : int; tls : tls_conf option}
 
 type t = {
-  db_file : string;
+  db_uri : string;
   network_interfaces : connection list;
   users : (string * string) list;
 }
@@ -63,11 +63,15 @@ let user_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {db_file; network_interfaces; users} ->
-      (db_file, network_interfaces, users))
-    (fun (db_file, network_interfaces, users) ->
-      {db_file; network_interfaces; users})
+    (fun {db_uri; network_interfaces; users} ->
+      (db_uri, network_interfaces, users))
+    (fun (db_uri, network_interfaces, users) ->
+      {db_uri; network_interfaces; users})
     (obj3
-       (req "db" string)
+       (req
+          ~description:
+            "Uri to reach the database: sqlite3:path or postgresql://host:port"
+          "db"
+          string)
        (dft "interfaces" (list connection_encoding) [])
        (req "users" (list user_encoding)))

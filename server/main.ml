@@ -556,7 +556,7 @@ let config =
           exit 1)
 
 let () =
-  let uri = Uri.make ~scheme:"sqlite3" ~path:config.Config.db_file () in
+  let uri = Uri.of_string config.Config.db_uri in
   Lwt_main.run
     (match Caqti_lwt.connect_pool uri with
     | Error e -> Lwt_io.eprintl (Caqti_error.show e)
