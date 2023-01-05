@@ -126,7 +126,7 @@ let encoding =
                 case
                   (Tag 3)
                   (Fixed.add_padding Sc_rollup_repr.Address.encoding 1)
-                  ~title:"Sc_rollup"
+                  ~title:"Smart_rollup"
                   (function Sc_rollup k -> Some k | _ -> None)
                   (fun k -> Sc_rollup k);
                 case
