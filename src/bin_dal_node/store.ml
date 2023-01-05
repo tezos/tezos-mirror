@@ -223,11 +223,38 @@ module Legacy = struct
     return_unit
 
   let associate_slot_id_with_commitment node_store commitment slot_id =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
+       Improve the implementation of this handler.
+    *)
     let open Lwt_syntax in
-    let path = Path.Commitment.header commitment slot_id in
-    (* The path allows to reconstruct the data. *)
-    let* () = set ~msg:"Slot id stored" node_store.store path "" in
-    return_unit
+    let store = node_store.store in
+    let header_path = Path.Commitment.header commitment slot_id in
+    let levels_path = Path.Level.other_header_status slot_id commitment in
+    let* known_levels = mem store levels_path in
+    let* known_header = mem store header_path in
+    (* An invariant that should hold for the storage. *)
+    assert (known_header = known_header) ;
+    if known_levels then return_unit
+    else
+      (* The path allows to reconstruct the data. *)
+      let* () =
+        set
+          ~msg:
+            (Path.to_string
+               ~prefix:"associate_slot_id_with_commitment:"
+               header_path)
+          store
+          header_path
+          ""
+      in
+      set
+        ~msg:
+          (Path.to_string
+             ~prefix:"associate_slot_id_with_commitment:"
+             levels_path)
+        store
+        levels_path
+        (encode_header_status `Unseen)
 
   let exists_slot_by_commitment node_store cryptobox commitment =
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -270,6 +297,7 @@ module Legacy = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
        Handle reorgs. *)
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4389
+             https://gitlab.com/tezos/tezos/-/issues/4528
        Handle statuses evolution. *)
     List.iter_s
       (fun (slot_header, status) ->
@@ -442,6 +470,9 @@ module Legacy = struct
       indices
 
   let get_commitment_headers commitment ?slot_level ?slot_index node_store =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
+       Improve the implementation of this handler.
+    *)
     let open Lwt_result_syntax in
     let store = node_store.store in
     (* Get the list of known slot identifiers for [commitment]. *)
