@@ -129,7 +129,6 @@ type action =
     }
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
-      updated_state : state;
     }
   | Update_to_level of level_update
   | Synchronize_round of round_update
@@ -489,11 +488,10 @@ let sign_endorsements state endorsements =
           return_some (delegate, operation))
     endorsements
 
-let inject_endorsements ~state_recorder state ~endorsements ~updated_state =
+let inject_endorsements state ~endorsements =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   sign_endorsements state endorsements >>=? fun signed_operations ->
-  state_recorder ~new_state:updated_state >>=? fun () ->
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
     (fun (delegate, signed_operation) ->
@@ -628,13 +626,12 @@ let rec perform_action ~state_recorder state (action : action) =
   | Inject_preendorsements {preendorsements} ->
       inject_preendorsements state ~preendorsements >>=? fun () ->
       perform_action ~state_recorder state Watch_proposal
-  | Inject_endorsements {endorsements; updated_state} ->
-      inject_endorsements ~state_recorder state ~endorsements ~updated_state
-      >>=? fun () ->
+  | Inject_endorsements {endorsements} ->
+      state_recorder ~new_state:state >>=? fun () ->
+      inject_endorsements state ~endorsements >>=? fun () ->
       (* We wait for endorsements to trigger the [Quorum_reached]
          event *)
-      start_waiting_for_endorsement_quorum updated_state >>= fun () ->
-      return updated_state
+      start_waiting_for_endorsement_quorum state >>= fun () -> return state
   | Update_to_level level_update ->
       update_to_level state level_update >>=? fun (new_state, new_action) ->
       perform_action ~state_recorder new_state new_action

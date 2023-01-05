@@ -586,16 +586,10 @@ let update_locked_round state round payload_hash =
   {state with level_state = new_level_state}
 
 let make_endorse_action state proposal =
-  let updated_state =
-    update_locked_round state proposal.block.round proposal.block.payload_hash
-  in
-  let updated_state =
-    update_current_phase updated_state Awaiting_endorsements
-  in
   let endorsements : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
-  Inject_endorsements {endorsements; updated_state}
+  Inject_endorsements {endorsements}
 
 let prequorum_reached_when_awaiting_preendorsements state candidate
     preendorsements =
@@ -638,6 +632,13 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
           else state.level_state
     in
     let new_state = {state with level_state = new_level_state} in
+    let new_state =
+      update_locked_round
+        new_state
+        latest_proposal.block.round
+        latest_proposal.block.payload_hash
+    in
+    let new_state = update_current_phase new_state Awaiting_endorsements in
     Lwt.return (new_state, make_endorse_action new_state latest_proposal)
 
 let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =

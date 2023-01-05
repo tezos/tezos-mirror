@@ -51,7 +51,6 @@ type action =
     }
   | Inject_endorsements of {
       endorsements : (consensus_key_and_delegate * consensus_content) list;
-      updated_state : state;
     }
   | Update_to_level of level_update
   | Synchronize_round of round_update
@@ -97,10 +96,8 @@ val sign_endorsements :
   (consensus_key_and_delegate * packed_operation) list tzresult Lwt.t
 
 val inject_endorsements :
-  state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
   state ->
   endorsements:(consensus_key_and_delegate * consensus_content) list ->
-  updated_state:state ->
   unit tzresult Lwt.t
 
 val prepare_waiting_for_quorum :

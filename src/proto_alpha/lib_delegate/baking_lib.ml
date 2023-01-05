@@ -116,14 +116,10 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
           Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
-  let state_recorder ~new_state =
-    Baking_state.may_record_new_state ~previous_state:state ~new_state
+  let* () =
+    Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_endorsements
-    ~state_recorder
-    state
-    ~endorsements:consensus_list
-    ~updated_state:state
+  Baking_actions.inject_endorsements state ~endorsements:consensus_list
 
 let bake_at_next_level state =
   let open Lwt_result_syntax in
