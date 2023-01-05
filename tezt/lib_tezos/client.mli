@@ -2387,3 +2387,19 @@ val spawn_config_init :
   ?protocol_constants:string ->
   t ->
   Process.t
+
+(** Run [tezos-client compute chain id from block hash]. *)
+val compute_chain_id_from_block_hash :
+  ?endpoint:endpoint -> t -> string -> string Lwt.t
+
+(** Same as [compute_chain_id_from_block_hash], but do not wait for the process to exit. *)
+val spawn_compute_chain_id_from_block_hash :
+  ?endpoint:endpoint -> t -> string -> Process.t
+
+(** Run [tezos-client compute chain id from seed]. *)
+val compute_chain_id_from_seed :
+  ?endpoint:endpoint -> t -> string -> string Lwt.t
+
+(** Same as [compute_chain_id_from_seed], but do not wait for the process to exit. *)
+val spawn_compute_chain_id_from_seed :
+  ?endpoint:endpoint -> t -> string -> Process.t
