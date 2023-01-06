@@ -135,8 +135,6 @@ end
 let add_service registerer service handler directory =
   registerer directory service handler
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4308
-   Add an RPC to the DAL node API to return the commitment proof of a commitment. *)
 let register_new :
     Node_context.t -> unit Tezos_rpc.Directory.t -> unit Tezos_rpc.Directory.t =
  fun ctxt directory ->
