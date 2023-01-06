@@ -1871,6 +1871,19 @@ let list_protocols mode client =
   in
   return (parse_list_protocols_output output)
 
+let spawn_list_understood_protocols ?config_file client =
+  spawn_command
+    ?config_file
+    client
+    (mode_arg client @ ["list"; "understood"; "protocols"])
+
+let list_understood_protocols ?config_file client =
+  let* output =
+    spawn_list_understood_protocols ?config_file client
+    |> Process.check_and_read_stdout
+  in
+  return (parse_list_protocols_output output)
+
 let spawn_migrate_mockup ~next_protocol client =
   spawn_command
     client

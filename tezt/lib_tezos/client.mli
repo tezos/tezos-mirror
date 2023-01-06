@@ -1536,6 +1536,13 @@ val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
     and do not process stdout. *)
 val spawn_list_protocols : [< `Light | `Mockup | `Proxy] -> t -> Process.t
 
+(** Run [octez-client list understood protocols]. *)
+val list_understood_protocols : ?config_file:string -> t -> string list Lwt.t
+
+(** Same as [list_understood_protocols], but do not wait for the process to exit
+    and do not process stdout. *)
+val spawn_list_understood_protocols : ?config_file:string -> t -> Process.t
+
 (** Run [octez-client migrate mockup to]. *)
 val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
