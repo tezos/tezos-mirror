@@ -39,7 +39,12 @@ module Query_arg = struct
 end
 
 let make ?data ?query_string =
-  make ?data ?query_string ~get_host:Node.rpc_host ~get_port:Node.rpc_port
+  make
+    ?data
+    ?query_string
+    ~get_host:Node.rpc_host
+    ~get_port:Node.rpc_port
+    ~get_scheme:Node.rpc_scheme
 
 module Decode = struct
   let mutez json = json |> JSON.as_int |> Tez.of_mutez_int

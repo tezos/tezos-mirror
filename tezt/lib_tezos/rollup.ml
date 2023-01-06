@@ -603,6 +603,7 @@ module Dal = struct
         ?query_string
         ~get_host:Dal_node.rpc_host
         ~get_port:Dal_node.rpc_port
+        ~get_scheme:(Fun.const "http")
 
     (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
     let encode_bytes_to_hex_string raw =

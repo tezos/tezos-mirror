@@ -1206,7 +1206,13 @@ let test_deprecated _test_mode_tag protocol ?endpoint client =
 
   let implicit_account = Account.Bootstrap.keys.(0).public_key_hash in
   let make path =
-    RPC.make ~get_host:Node.rpc_host ~get_port:Node.rpc_port GET path Fun.id
+    RPC.make
+      ~get_host:Node.rpc_host
+      ~get_port:Node.rpc_port
+      ~get_scheme:Node.rpc_scheme
+      GET
+      path
+      Fun.id
   in
   let* () =
     check_rpc_not_found

@@ -34,6 +34,8 @@ let string_of_media_type = function
   | Binary -> "binary"
   | Json -> "json"
 
+type tls_config = {certificate_path : string; key_path : string}
+
 type argument =
   | Network of string
   | History_mode of history_mode
@@ -130,6 +132,7 @@ module Parameters = struct
     advertised_net_port : int option;
     rpc_host : string;
     rpc_port : int;
+    rpc_tls : tls_config option;
     allow_all_rpc : bool;
     default_expected_pow : int;
     mutable default_arguments : argument list;
@@ -174,9 +177,15 @@ let net_port node = node.persistent_state.net_port
 
 let advertised_net_port node = node.persistent_state.advertised_net_port
 
+let rpc_scheme node =
+  match node.persistent_state.rpc_tls with Some _ -> "https" | None -> "http"
+
 let rpc_host node = node.persistent_state.rpc_host
 
 let rpc_port node = node.persistent_state.rpc_port
+
+let rpc_endpoint node =
+  sf "%s://%s:%d" (rpc_scheme node) (rpc_host node) (rpc_port node)
 
 let data_dir node = node.persistent_state.data_dir
 
@@ -592,7 +601,7 @@ let wait_for_request ~request node =
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
-    ?rpc_port ?(allow_all_rpc = true) arguments =
+    ?rpc_port ?rpc_tls ?(allow_all_rpc = true) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -621,6 +630,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         advertised_net_port;
         rpc_host;
         rpc_port;
+        rpc_tls;
         allow_all_rpc;
         default_arguments = arguments;
         arguments;
@@ -702,6 +712,12 @@ let runlike_command_arguments node command arguments =
       :: command_args
     else command_args
   in
+  let command_args =
+    match node.persistent_state.rpc_tls with
+    | None -> command_args
+    | Some {certificate_path; key_path} ->
+        "--rpc-tls" :: (certificate_path ^ "," ^ key_path) :: command_args
+  in
   command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
   :: "--rpc-addr"
@@ -759,8 +775,8 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
-    ?patch_config ?snapshot arguments =
+    ?advertised_net_port ?rpc_host ?rpc_port ?rpc_tls ?event_level
+    ?event_sections_levels ?patch_config ?snapshot arguments =
   let node =
     create
       ?runner
@@ -773,6 +789,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?advertised_net_port
       ?rpc_host
       ?rpc_port
+      ?rpc_tls
       arguments
   in
   let* () = identity_generate node in
