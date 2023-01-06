@@ -195,8 +195,7 @@ val level_of_hash : _ t -> Block_hash.t -> int32 tzresult Lwt.t
 
 (** [block_before store tick] returns the last layer 2 block whose initial tick
     is before [tick]. *)
-val block_before :
-  _ t -> Sc_rollup.Tick.t -> Sc_rollup_block.t option tzresult Lwt.t
+val block_before : _ t -> Sc_rollup.Tick.t -> Sc_rollup_block.t tzresult Lwt.t
 
 (** {3 Commitments} *)
 

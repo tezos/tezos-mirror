@@ -287,26 +287,6 @@ let mark_finalized_head {store; _} head_hash =
 let get_finalized_head_opt {store; _} =
   Store.Last_finalized_head.read store.last_finalized_head
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4532
-   Make this logarithmic, by storing pointers to muliple predecessor and
-   by dichotomy. *)
-let block_before {store; _} tick =
-  let open Lwt_result_syntax in
-  let* head = Store.L2_head.read store.l2_head in
-  match head with
-  | None -> return_none
-  | Some head ->
-      let rec search block_hash =
-        let* block = Store.L2_blocks.read store.l2_blocks block_hash in
-        match block with
-        | None -> failwith "Missing block %a" Block_hash.pp block_hash
-        | Some (info, header) ->
-            if Sc_rollup.Tick.(info.initial_tick <= tick) then
-              return_some {info with header}
-            else search header.predecessor
-      in
-      search head.header.block_hash
-
 let get_l2_block {store; _} block_hash =
   let open Lwt_result_syntax in
   let* block = Store.L2_blocks.read store.l2_blocks block_hash in
@@ -332,6 +312,76 @@ let find_l2_block_by_level node_ctxt level =
   match block_hash with
   | None -> return_none
   | Some block_hash -> find_l2_block node_ctxt block_hash
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4128
+   Unit test the function tick_search. *)
+
+(** Returns the block that is right before [tick]. [big_step_blocks] is used to
+    first look for a block before the [tick] *)
+let tick_search ~big_step_blocks node_ctxt head tick =
+  let open Lwt_result_syntax in
+  if Sc_rollup.Tick.(head.Sc_rollup_block.initial_tick <= tick) then
+    (* The starting block has already a tick before the one we want, we are done. *)
+    return head
+  else
+    let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+    let rec find_big_step (end_block : Sc_rollup_block.t) =
+      let start_level =
+        Int32.sub
+          (Raw_level.to_int32 end_block.header.level)
+          (Int32.of_int big_step_blocks)
+      in
+      let start_level =
+        if start_level < genesis_level then genesis_level else start_level
+      in
+      let* start_block = get_l2_block_by_level node_ctxt start_level in
+      if Sc_rollup.Tick.(start_block.initial_tick <= tick) then
+        return (start_block, end_block)
+      else find_big_step start_block
+    in
+    let block_level Sc_rollup_block.{header = {level; _}; _} =
+      Raw_level.to_int32 level |> Int32.to_int
+    in
+    let rec dicho start_block end_block =
+      (* Precondition:
+             [start_block <> end_block =>
+              end_block.initial_tick > tick >= start_block.initial_tick] *)
+      let start_level = block_level start_block in
+      let end_level = block_level end_block in
+      if end_level - start_level <= 1 then
+        (* We have found the interval where the tick happened *)
+        return start_block
+      else
+        let middle_level = start_level + ((end_level - start_level) / 2) in
+        let* block_middle =
+          get_l2_block_by_level node_ctxt (Int32.of_int middle_level)
+        in
+        if Sc_rollup.Tick.(block_middle.initial_tick <= tick) then
+          dicho block_middle end_block
+        else dicho start_block block_middle
+    in
+    (* First linear approximation *)
+    let* start_block, end_block = find_big_step head in
+    (* Then do dichotomy on interval [start_block; end_block] *)
+    dicho start_block end_block
+
+let block_before ({store; _} as node_ctxt) tick =
+  let open Lwt_result_syntax in
+  let* head = Store.L2_head.read store.l2_head in
+  match head with
+  | None -> failwith "No head to compute block before tick"
+  | Some head ->
+      (* We start by taking big steps of 4096 blocks for the first
+         approximation. This means we need at most 20 big steps to start a
+         dichotomy on a 4096 blocks interval (at most 12 steps). We could take
+         the refutation period as the big_step_blocks to do a dichotomy on the
+         full space but we anticipate refutation to happen most of the time
+         close to the head. *)
+      trace_lwt_result_with
+        "Could not retrieve block before tick %a"
+        Sc_rollup.Tick.pp
+        tick
+      @@ tick_search ~big_step_blocks:4096 node_ctxt head tick
 
 let get_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in
