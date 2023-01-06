@@ -305,6 +305,50 @@ let set_input_step message message_counter tree =
   in
   Wasm.set_input_step input_info message tree
 
+let pp_interpreter_error out
+    Wasm_pvm_errors.{raw_exception = Truncated raw_exception; explanation} =
+  Format.fprintf
+    out
+    "@[<hv 2>{ raw_exception: %s; explanation: %s }@]"
+    raw_exception
+    (match explanation with
+    | None -> "None"
+    | Some (Truncated s) -> "Some: " ^ s)
+
+let pp_fallback_cause out = function
+  | Wasm_pvm_errors.Decode_cause error ->
+      Format.fprintf out "@[<hv 2>Decode_cause %a@]" pp_interpreter_error error
+  | Wasm_pvm_errors.Link_cause (Truncated error) ->
+      Format.fprintf out "@[<hv 2>Link_cause %s@]" error
+  | Wasm_pvm_errors.Init_cause error ->
+      Format.fprintf out "@[<hv 2>Init_cause %a@]" pp_interpreter_error error
+
+let pp_error_state out = function
+  | Wasm_pvm_errors.Eval_error error ->
+      Format.fprintf out "@[<hv 2>Eval_error %a@]" pp_interpreter_error error
+  | Wasm_pvm_errors.Decode_error error ->
+      Format.fprintf out "@[<hv 2>Decode_error %a@]" pp_interpreter_error error
+  | Wasm_pvm_errors.Link_error (Truncated error) ->
+      Format.fprintf out "@[<hv 2>Link_error %s@]" error
+  | Wasm_pvm_errors.Init_error error ->
+      Format.fprintf out "@[<hv 2>Init_error %a@]" pp_interpreter_error error
+  | Wasm_pvm_errors.Invalid_state (Truncated err) ->
+      Format.fprintf out "@[<hv 2>Invalid_state (%s)@]" err
+  | Wasm_pvm_errors.Unknown_error (Truncated err) ->
+      Format.fprintf out "@[<hv 2>Unknown_error (%s)@]" err
+  | Wasm_pvm_errors.Too_many_ticks ->
+      Format.fprintf out "@[<hv 2>Too_many_ticks@]"
+  | Wasm_pvm_errors.Too_many_reboots ->
+      Format.fprintf out "@[<hv 2>Too_many_reboots@]"
+  | Wasm_pvm_errors.No_fallback_kernel cause ->
+      Format.fprintf
+        out
+        "@[<hv 2>No_fallback_kernel (%a)@]"
+        pp_fallback_cause
+        cause
+
+let print_error_state = Format.asprintf "%a" pp_error_state
+
 let pp_state fmt state =
   let pp_s s = Format.fprintf fmt "%s" s in
   match state with
@@ -325,8 +369,7 @@ let pp_state fmt state =
       } ->
       Format.fprintf fmt "Evaluation failed (%s)" msg.it
   | Eval _ -> Format.fprintf fmt "Eval"
-  | Stuck e ->
-      Format.fprintf fmt "Stuck (%a)" Test_wasm_pvm_encodings.pp_error_state e
+  | Stuck e -> Format.fprintf fmt "Stuck (%a)" pp_error_state e
   | Init _ -> pp_s "Init"
   | Collect -> pp_s "Collect"
   | Link _ -> pp_s "Link"
