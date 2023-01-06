@@ -225,6 +225,9 @@ val get_network_version : JSON.t t
 (** RPC: [GET /network/versions] *)
 val get_network_versions : JSON.t t
 
+(** RPC: [GET /versions] *)
+val get_version : JSON.t t
+
 (** RPC: [POST /private/injection/operations]
 
     Returns the hashes of the operations that were injected.
