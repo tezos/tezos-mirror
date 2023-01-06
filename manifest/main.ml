@@ -6012,7 +6012,7 @@ let _octez_scoru_wasm_debugger =
     ~path:"src/bin_wasm_debugger"
     ~opam:"octez-smart-rollup-wasm-debugger"
     ~synopsis:"Tezos: Debugger for the smart rollups’ WASM kernels"
-    ~release_status:Experimental
+    ~release_status:Released
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
