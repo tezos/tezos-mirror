@@ -214,31 +214,22 @@ let make ~reveal_builtins ~write_debug state =
     fn
       (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
       (fun hash_addr hash_size dst max_bytes ->
-        let mem = state.retrieve_mem () in
-        let hash_size = Int32.to_int hash_size in
-        let hash_addr = Int32.to_int hash_addr in
-        (* If hash_size is too large we fail and fallback to another execution
-           mode.*)
-        if hash_size > Host_funcs.Aux.input_output_max_size then
-          raise @@ Invalid_argument "Hash size too large"
-        else
-          let hash =
-            String.init hash_size (fun i ->
-                (* XXX: No bounds checks
-                   The "main" reveal function does not deal with out-of-bounds
-                   scenarios. That ultimate means we don't return error codes.
-                   Instead, we just fail with the exception being thrown.
-                   In most cases the Fast Exec mechanism will fall back to another
-                   execution mode to deal with this. *)
-                Memory.get mem (hash_addr + i)
-                |> Unsigned.UInt8.to_int |> Char.chr)
-          in
-          let* payload = reveal_builtins.Builtins.reveal_preimage hash in
+        Lwt.map (Result.fold ~ok:Fun.id ~error:Fun.id)
+        @@ with_mem
+        @@ fun memory ->
+        let open Lwt_result_syntax in
+        let* hash =
+          Host_funcs.Aux.load_bytes ~memory ~addr:hash_addr ~size:hash_size
+        in
+        let*! payload = reveal_builtins.Builtins.reveal_preimage hash in
+        let*! result =
           Host_funcs.Aux.reveal
-            ~memory:mem
+            ~memory
             ~dst
             ~max_bytes
-            ~payload:(Bytes.of_string payload))
+            ~payload:(Bytes.of_string payload)
+        in
+        return result)
   in
   let reveal_metadata =
     fn

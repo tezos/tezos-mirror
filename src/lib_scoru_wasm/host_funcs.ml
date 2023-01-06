@@ -134,6 +134,9 @@ module Aux = struct
     (** max size of intputs and outputs. *)
     val input_output_max_size : int
 
+    val load_bytes :
+      memory:memory -> addr:int32 -> size:int32 -> (string, int32) result Lwt.t
+
     (** [write_output ~output_buffer ~memory ~src ~num_bytes] reads
      num_bytes from the memory of module_inst starting at src and writes
      this to the output_buffer. It also checks that the input payload is
@@ -286,6 +289,14 @@ module Aux = struct
       let store_bytes mem addr data =
         guard @@ fun () -> M.store_bytes mem addr data
     end
+
+    let load_bytes ~memory ~addr ~size =
+      let open Lwt_result_syntax in
+      Lwt_result.map_error Error.code
+      @@
+      let size = Int32.to_int size in
+      if size > input_output_max_size then fail Error.Input_output_too_large
+      else M.load_bytes memory addr size
 
     let load_key_from_memory key_offset key_length memory =
       let open Lwt_result_syntax in
@@ -945,15 +956,9 @@ let reveal_preimage_parse_args memories args =
       ] ->
       let open Lwt_result_syntax in
       let*! memory = retrieve_memory memories in
-      let hash_size = Int32.to_int hash_size in
-      if hash_size > Aux.input_output_max_size then
-        fail (Error.code Input_output_too_large)
-      else
-        let*! hash =
-          Memory_access_interpreter.load_bytes memory hash_addr hash_size
-        in
-        Lwt_result.return
-          (Host_funcs.(Reveal_raw_data hash), Host_funcs.{base; max_bytes})
+      let* hash = Aux.load_bytes ~memory ~addr:hash_addr ~size:hash_size in
+      Lwt_result.return
+        (Host_funcs.(Reveal_raw_data hash), Host_funcs.{base; max_bytes})
   | _ -> raise Bad_input
 
 let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
