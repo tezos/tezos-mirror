@@ -106,12 +106,13 @@ let inbox_message_encoding =
 
 let reveal_data_encoding =
   let open Data_encoding in
+  let kind name = req "reveal_data_kind" (constant name) in
   let case_raw_data =
     case
       ~title:"raw data"
       (Tag 0)
       (obj2
-         (req "reveal_data_kind" (constant "raw_data"))
+         (kind "raw_data")
          (req
             "raw_data"
             (check_size
@@ -123,9 +124,7 @@ let reveal_data_encoding =
     case
       ~title:"metadata"
       (Tag 1)
-      (obj2
-         (req "reveal_data_kind" (constant "metadata"))
-         (req "metadata" Sc_rollup_metadata_repr.encoding))
+      (obj2 (kind "metadata") (req "metadata" Sc_rollup_metadata_repr.encoding))
       (function Metadata md -> Some ((), md) | _ -> None)
       (fun ((), md) -> Metadata md)
   in
@@ -133,9 +132,7 @@ let reveal_data_encoding =
     case
       ~title:"dal page"
       (Tag 2)
-      (obj2
-         (req "reveal_data_kind" (constant "dal_page"))
-         (req "dal_page_content" (option (bytes Hex))))
+      (obj2 (kind "dal_page") (req "dal_page_content" (option (bytes Hex))))
       (function Dal_page p -> Some ((), p) | _ -> None)
       (fun ((), p) -> Dal_page p)
   in
@@ -143,22 +140,19 @@ let reveal_data_encoding =
 
 let input_encoding =
   let open Data_encoding in
+  let kind name = req "input_kind" (constant name) in
   let case_inbox_message =
     case
       ~title:"inbox msg"
       (Tag 0)
-      (obj2
-         (req "input_kind" (constant "inbox_message"))
-         (req "inbox_message" inbox_message_encoding))
+      (obj2 (kind "inbox_message") (req "inbox_message" inbox_message_encoding))
       (function Inbox_message m -> Some ((), m) | _ -> None)
       (fun ((), m) -> Inbox_message m)
   and case_reveal_revelation =
     case
       ~title:"reveal"
       (Tag 1)
-      (obj2
-         (req "input_kind" (constant "reveal_revelation"))
-         (req "reveal_data" reveal_data_encoding))
+      (obj2 (kind "reveal_revelation") (req "reveal_data" reveal_data_encoding))
       (function Reveal d -> Some ((), d) | _ -> None)
       (fun ((), d) -> Reveal d)
   in
@@ -209,12 +203,13 @@ type reveal =
 
 let reveal_encoding =
   let open Data_encoding in
+  let kind name = req "reveal_kind" (constant name) in
   let case_raw_data =
     case
       ~title:"Reveal_raw_data"
       (Tag 0)
       (obj2
-         (req "reveal_kind" (constant "reveal_raw_data"))
+         (kind "reveal_raw_data")
          (req "input_hash" Sc_rollup_reveal_hash.encoding))
       (function Reveal_raw_data s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_raw_data s)
@@ -222,7 +217,7 @@ let reveal_encoding =
     case
       ~title:"Reveal_metadata"
       (Tag 1)
-      (obj1 (req "reveal_kind" (constant "reveal_metadata")))
+      (obj1 (kind "reveal_kind"))
       (function Reveal_metadata -> Some () | _ -> None)
       (fun () -> Reveal_metadata)
   in
@@ -230,9 +225,7 @@ let reveal_encoding =
     case
       ~title:"Request_dal_page"
       (Tag 2)
-      (obj2
-         (req "reveal_kind" (constant "request_dal_page"))
-         (req "page_id" Dal_slot_repr.Page.encoding))
+      (obj2 (kind "reveal_kind") (req "page_id" Dal_slot_repr.Page.encoding))
       (function Request_dal_page s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Request_dal_page s)
   in
@@ -259,26 +252,27 @@ type input_request =
 (** [input_request_encoding] encoding value for {!input_request}. *)
 let input_request_encoding =
   let open Data_encoding in
+  let kind name = req "input_request_kind" (constant name) in
   union
     ~tag_size:`Uint8
     [
       case
         ~title:"No_input_required"
         (Tag 0)
-        (obj1 (req "input_request_kind" (constant "no_input_required")))
+        (obj1 (kind "no_input_required"))
         (function No_input_required -> Some () | _ -> None)
         (fun () -> No_input_required);
       case
         ~title:"Initial"
         (Tag 1)
-        (obj1 (req "input_request_kind" (constant "initial")))
+        (obj1 (kind "initial"))
         (function Initial -> Some () | _ -> None)
         (fun () -> Initial);
       case
         ~title:"First_after"
         (Tag 2)
         (obj3
-           (req "input_request_kind" (constant "first_after"))
+           (kind "first_after")
            (req "level" Raw_level_repr.encoding)
            (req "counter" n))
         (function
@@ -288,9 +282,7 @@ let input_request_encoding =
       case
         ~title:"Needs_reveal"
         (Tag 3)
-        (obj2
-           (req "input_request_kind" (constant "needs_reveal"))
-           (req "reveal" reveal_encoding))
+        (obj2 (kind "needs_reveal") (req "reveal" reveal_encoding))
         (function Needs_reveal p -> Some ((), p) | _ -> None)
         (fun ((), p) -> Needs_reveal p);
     ]
