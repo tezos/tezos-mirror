@@ -77,14 +77,14 @@ let find_key_in_durable tree key =
    their value in their hexadecimal representation. *)
 let print_durable ?(depth = 10) tree =
   let open Lwt_syntax in
-  Test_encodings_util.Context.Tree.fold
+  Encodings_util.Context.Tree.fold
     ~depth:(`Le depth)
     tree
     ["durable"]
     ~order:`Sorted
     ~init:()
     ~f:(fun key tree () ->
-      let+ value = Test_encodings_util.Context.Tree.find tree [] in
+      let+ value = Encodings_util.Context.Tree.find tree [] in
       let value = Option.value ~default:(Bytes.create 0) value in
       Format.printf
         "/%s\n  %a\n%!"

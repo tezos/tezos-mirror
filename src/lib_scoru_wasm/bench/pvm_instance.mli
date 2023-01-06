@@ -23,10 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context = Tezos_context_memory.Context_binary
-
 (** PVM instance used in benchmark*)
-module Wasm : Tezos_scoru_wasm.Wasm_pvm_sig.S with type tree = Context.tree
+module Wasm :
+  Tezos_scoru_wasm.Wasm_pvm_sig.S
+    with type tree = Test_scoru_wasm_test_helpers.Encodings_util.Context.tree
 
 module Wasm_fast_vm : Tezos_scoru_wasm.Wasm_vm_sig.S
 

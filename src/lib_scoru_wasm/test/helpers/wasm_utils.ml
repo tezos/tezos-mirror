@@ -25,10 +25,16 @@
 
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
-open Test_encodings_util
+open Encodings_util
 open Tezos_lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
 module Wasm_fast = Tezos_scoru_wasm_fast.Pvm.Make (Tree)
+
+let empty_tree () =
+  let open Lwt_syntax in
+  let* index = Context.init "/tmp" in
+  let empty_store = Context.empty index in
+  return @@ Context.Tree.empty empty_store
 
 let parse_module code =
   let def = Parse.string_to_module code in
@@ -247,7 +253,7 @@ let eval_to_cond ?write_debug ?reveal_builtins should_compute tree =
   (* Since `compute_step_many_until` is not exported by the PVM but only the VM,
      we decode and re-encode by hand. *)
   let* pvm_state =
-    Test_encodings_util.Tree_encoding_runner.decode
+    Tree_encoding_runner.decode
       Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
       tree
   in
@@ -260,7 +266,7 @@ let eval_to_cond ?write_debug ?reveal_builtins should_compute tree =
       pvm_state
   in
   let+ tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Tree_encoding_runner.encode
       Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
       pvm_state
       tree

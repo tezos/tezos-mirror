@@ -25,9 +25,7 @@
 
 open Tezos_scoru_wasm
 open Test_scoru_wasm_test_helpers
-module Context = Test_encodings_util.Context
-module Tree = Test_encodings_util.Tree
-module Tree_encoding_runner = Test_encodings_util.Tree_encoding_runner
+open Encodings_util
 module Wasm = Wasm_utils.Wasm
 module Wasm_fast_vm = Tezos_scoru_wasm_fast.Vm
 
@@ -50,7 +48,7 @@ let get_tick_from_pvm_state
   Lwt.return pvm_state.current_tick
 
 module PP = struct
-  let pp_error_state e = Test_wasm_pvm_encodings.print_error_state e
+  let pp_error_state e = Wasm_utils.print_error_state e
 
   let tick_label = Format.asprintf "%a" Wasm_utils.pp_state
 end

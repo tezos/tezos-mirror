@@ -34,6 +34,7 @@
 open Tztest
 open Tezos_scoru_wasm
 open Tezos_webassembly_interpreter
+open Encodings_util
 open Test_encodings_util
 
 (** Test serialize/deserialize instructions. *)

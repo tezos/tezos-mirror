@@ -35,6 +35,7 @@
 open Tztest
 open Tezos_scoru_wasm
 open Wasm_utils
+open Encodings_util
 
 let should_boot_unreachable_kernel ~max_steps kernel =
   let open Lwt_syntax in
@@ -101,7 +102,6 @@ let should_run_debug_kernel () =
 
 let add_value ?(content = "a very long value") tree key_steps =
   let open Tezos_lazy_containers in
-  let open Test_encodings_util in
   let value = Chunked_byte_vector.of_string content in
   Tree_encoding_runner.encode
     Tezos_tree_encoding.(
@@ -180,9 +180,7 @@ let should_run_store_has_kernel () =
   (* We now delete the path ["hello"; "universe"] - this will cause gthe kernel
      assertion on this path to fail, and the PVM should become stuck on the
      third assert in the kernel. *)
-  let* tree =
-    Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "@"]
-  in
+  let* tree = Tree.remove tree ["durable"; "hello"; "universe"; "@"] in
   let* tree = eval_until_input_or_reveal_requested tree in
   (* The kernel is now expected to fail, the PVM should have stuck tag on. *)
   let* stuck_flag = has_stuck_flag tree in
@@ -277,7 +275,6 @@ let should_run_store_delete_kernel () =
 |}
   in
   let open Lwt_syntax in
-  let open Test_encodings_util in
   let* tree = initial_tree ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
@@ -544,14 +541,14 @@ let build_snapshot_wasm_state_from_set_input
   in
   (* Serves to encode the `Input_requested` status. *)
   let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.scope ["wasm"] state_encoding)
       Collect
       tree
   in
   (* Since we start directly after reading an inbox. *)
   let* previous_top_level_call =
-    Test_encodings_util.Tree_encoding_runner.decode
+    Encodings_util.Tree_encoding_runner.decode
       (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
       tree
   in
@@ -559,21 +556,21 @@ let build_snapshot_wasm_state_from_set_input
   let new_last_top_level_call = Z.(max_tick + previous_top_level_call) in
 
   let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n)
       new_last_top_level_call
       tree
   in
   let* tree = Wasm.Internal_for_tests.reset_reboot_counter tree in
   let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
       new_last_top_level_call
       tree
   in
   (* The kernel had read three inputs (SOL, Info_per_level and EOL). *)
   let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value
          ["wasm"; "input"]
          Wasm_pvm_sig.input_info_encoding)
@@ -587,10 +584,10 @@ let build_snapshot_wasm_state_from_set_input
 
   (* The input buffer is being cleared. *)
   let* tree =
-    Test_encodings_util.Tree.remove tree ["value"; "pvm"; "buffers"; "input"]
+    Encodings_util.Tree.remove tree ["value"; "pvm"; "buffers"; "input"]
   in
   let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value
          ["value"; "pvm"; "buffers"; "input"; "length"]
          Data_encoding.n)
@@ -598,7 +595,7 @@ let build_snapshot_wasm_state_from_set_input
       tree
   in
   let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
+    Encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value
          ["value"; "pvm"; "buffers"; "input"; "head"]
          Data_encoding.n)
@@ -608,7 +605,7 @@ let build_snapshot_wasm_state_from_set_input
 
   (* The kernel will have been set as the fallback kernel. *)
   let* durable =
-    Test_encodings_util.Tree_encoding_runner.decode
+    Encodings_util.Tree_encoding_runner.decode
       (Tezos_tree_encoding.scope ["durable"] Durable.encoding)
       tree
   in
@@ -641,7 +638,7 @@ let build_snapshot_wasm_state_from_set_input
           Data_encoding_utils.Little_endian.int32
           Int32.(succ (Z.to_int32 Constants.maximum_reboots_per_input)))
   in
-  Test_encodings_util.Tree_encoding_runner.encode
+  Encodings_util.Tree_encoding_runner.encode
     (Tezos_tree_encoding.scope ["durable"] Durable.encoding)
     durable
     tree
@@ -673,11 +670,9 @@ let test_snapshotable_state () =
   (* The "wasm"/"modules" key should not exist after the snapshot, since it
      contains the instance of the module after its evaluation. *)
   let*! wasm_tree_exists =
-    Test_encodings_util.Tree.mem_tree tree ["wasm"; "modules"]
+    Encodings_util.Tree.mem_tree tree ["wasm"; "modules"]
   in
-  let*! wasm_value_exists =
-    Test_encodings_util.Tree.mem tree ["wasm"; "modules"]
-  in
+  let*! wasm_value_exists = Encodings_util.Tree.mem tree ["wasm"; "modules"] in
   assert (not (wasm_tree_exists || wasm_value_exists)) ;
   (* Set a new input should go back to decoding *)
   let*! tree = set_empty_inbox_step 1l tree in
@@ -714,20 +709,20 @@ let test_rebuild_snapshotable_state () =
   (* Remove the "wasm" key from the tree after evaluation, and try to rebuild it
      as a snapshot. This would take into account any change in the input and
      output buffers and the durable storage. *)
-  let*! tree_without_wasm = Test_encodings_util.Tree.remove tree ["wasm"] in
+  let*! tree_without_wasm = Encodings_util.Tree.remove tree ["wasm"] in
   let*! rebuilded_tree_without_wasm =
     build_snapshot_wasm_state_from_set_input tree_without_wasm
   in
   (* Both hash should be exactly the same. *)
-  let hash_tree_after_eval = Test_encodings_util.Tree.hash tree_after_eval in
-  let hash_rebuilded_tree = Test_encodings_util.Tree.hash rebuilded_tree in
+  let hash_tree_after_eval = Encodings_util.Tree.hash tree_after_eval in
+  let hash_rebuilded_tree = Encodings_util.Tree.hash rebuilded_tree in
   assert (
     Tezos_crypto.Context_hash.equal hash_tree_after_eval hash_rebuilded_tree) ;
 
   (* The hash of the tree rebuilded from the evaluated one without the "wasm"
      part should also be exactly the same. *)
   let hash_rebuilded_tree_without_wasm =
-    Test_encodings_util.Tree.hash rebuilded_tree_without_wasm
+    Encodings_util.Tree.hash rebuilded_tree_without_wasm
   in
   assert (
     Tezos_crypto.Context_hash.equal
@@ -742,10 +737,10 @@ let test_rebuild_snapshotable_state () =
   (* Their hash should still be the same, but the first test should have caught
      that. *)
   let hash_input_tree_after_eval =
-    Test_encodings_util.Tree.hash input_step_from_eval
+    Encodings_util.Tree.hash input_step_from_eval
   in
   let hash_input_rebuilded_tree =
-    Test_encodings_util.Tree.hash input_step_from_snapshot
+    Encodings_util.Tree.hash input_step_from_snapshot
   in
 
   assert (
@@ -820,7 +815,7 @@ let test_bulk_noops () =
     let* tree_slow = Wasm.compute_step tree_slow in
     assert (
       Tezos_crypto.Context_hash.(
-        Test_encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
+        Encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
 
     let* stuck_flag = has_stuck_flag tree_fast in
     assert (not stuck_flag) ;

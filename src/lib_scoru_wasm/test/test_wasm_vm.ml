@@ -25,7 +25,7 @@ let test_padding_state () =
   let open Wasm_pvm_state.Internal_state in
   let* tree = init_tree_with_empty_input () in
   let*! pvm_state =
-    Test_encodings_util.Tree_encoding_runner.decode
+    Encodings_util.Tree_encoding_runner.decode
       Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
       tree
   in
