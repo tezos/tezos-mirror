@@ -421,9 +421,8 @@ module Legacy = struct
       |> List.filter (fun {Services.Types.slot_level = l; slot_index = i} ->
              keep_field l slot_level && keep_field i slot_index)
 
-  let get_accepted_headers_of_commitment commitment indices store accu =
+  let get_accepted_headers ~skip_commitment indices store accu =
     let open Lwt_result_syntax in
-    let encoded_commitment = encode_commitment commitment in
     List.fold_left_es
       (fun acc slot_id ->
         let commitment_path = Path.Level.accepted_header_commitment slot_id in
@@ -431,41 +430,52 @@ module Legacy = struct
         match commitment_opt with
         | None -> return acc
         | Some read_commitment -> (
-            if not @@ String.equal read_commitment encoded_commitment then
-              return acc
-            else
-              let status_path = Path.Level.accepted_header_status slot_id in
-              let*! status_opt = find store status_path in
-              match status_opt with
-              | None -> return acc
-              | Some status_str -> (
-                  match decode_header_status status_str with
-                  | None -> failwith "Attestation status decoding failed"
-                  | Some status ->
-                      return
-                      @@ {
-                           Services.Types.slot_id;
-                           commitment;
-                           status = (status :> Services.Types.header_status);
-                         }
-                         :: acc)))
+            match skip_commitment read_commitment with
+            | `Skip -> return acc
+            | `Keep commitment -> (
+                let status_path = Path.Level.accepted_header_status slot_id in
+                let*! status_opt = find store status_path in
+                match status_opt with
+                | None -> return acc
+                | Some status_str -> (
+                    match decode_header_status status_str with
+                    | None -> failwith "Attestation status decoding failed"
+                    | Some status ->
+                        return
+                        @@ {
+                             Services.Types.slot_id;
+                             commitment;
+                             status = (status :> Services.Types.header_status);
+                           }
+                           :: acc))))
       accu
       indices
 
-  let get_other_headers_of_commitment commitment indices store accu =
+  let get_accepted_headers_of_commitment commitment indices store accu =
+    let encoded_commitment = encode_commitment commitment in
+    let skip_commitment read_commitment =
+      if String.equal read_commitment encoded_commitment then `Keep commitment
+      else `Skip
+    in
+    get_accepted_headers ~skip_commitment indices store accu
+
+  let get_other_headers_of_identified_commitment commitment slot_id store acc =
     let open Lwt_result_syntax in
+    let*! status_opt =
+      find store @@ Path.Level.other_header_status slot_id commitment
+    in
+    match status_opt with
+    | None -> return acc
+    | Some status_str -> (
+        match decode_header_status status_str with
+        | None -> failwith "Attestation status decoding failed"
+        | Some status ->
+            return @@ ({Services.Types.slot_id; commitment; status} :: acc))
+
+  let get_other_headers_of_commitment commitment indices store accu =
     List.fold_left_es
       (fun acc slot_id ->
-        let*! status_opt =
-          find store @@ Path.Level.other_header_status slot_id commitment
-        in
-        match status_opt with
-        | None -> return acc
-        | Some status_str -> (
-            match decode_header_status status_str with
-            | None -> failwith "Attestation status decoding failed"
-            | Some status ->
-                return @@ ({Services.Types.slot_id; commitment; status} :: acc)))
+        get_other_headers_of_identified_commitment commitment slot_id store acc)
       accu
       indices
 
@@ -481,7 +491,7 @@ module Legacy = struct
     let indices = filter_indexes ?slot_level ?slot_index indexes in
     (* Retrieve the headers that haven't been "accepted" on L1. *)
     let* accu = get_other_headers_of_commitment commitment indices store [] in
-    (* Retrieve the headers that have "accepted" on L1 (i.e. with
+    (* Retrieve the headers that have been "accepted" on L1 (i.e. with
        [`Waiting_attestation], [`Attested] or [`Unattested] statuses). *)
     get_accepted_headers_of_commitment commitment indices store accu
 end
