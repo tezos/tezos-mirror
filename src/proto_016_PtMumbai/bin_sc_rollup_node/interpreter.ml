@@ -223,24 +223,19 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       [None].*)
   let state_of_tick node_ctxt tick level =
     let open Lwt_result_syntax in
-    let* closest_block = Node_context.block_before node_ctxt tick in
-    match closest_block with
-    | None -> return None
+    let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
+    match event with
+    | None -> return_none
     | Some event ->
-        if Raw_level.(event.header.level > level) then return None
-        else
-          let tick_distance =
-            Sc_rollup.Tick.distance tick event.initial_tick |> Z.to_int64
-          in
-          (* TODO: #3384
-             We assume that [StateHistory] correctly stores enough
-             events to compute the state of any tick using
-             [run_for_ticks]. In particular, this assumes that
-             [event.block_hash] is the block where the tick
-             happened. We should test that this is always true because
-             [state_of_tick] is a critical function. *)
-          let* state = run_for_ticks node_ctxt event tick_distance in
-          let state = Delayed_write_monad.ignore state in
-          let*! hash = PVM.state_hash state in
-          return (Some (state, hash))
+        assert (Raw_level.(event.header.level <= level)) ;
+        let tick_distance =
+          Sc_rollup.Tick.distance tick event.initial_tick |> Z.to_int64
+        in
+        (* TODO: #3384
+           We should test that we always have enough blocks to find the tick
+           because [state_of_tick] is a critical function. *)
+        let* state = run_for_ticks node_ctxt event tick_distance in
+        let state = Delayed_write_monad.ignore state in
+        let*! hash = PVM.state_hash state in
+        return (Some (state, hash))
 end
