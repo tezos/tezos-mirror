@@ -26,28 +26,25 @@
 open Filename.Infix
 open Store_types
 
-type 'kind directory = {dir_path : string}
+type 'dirname directory = {dir_path : string}
 
 type 'kind file = {file_path : string}
 
-type ('kind, 'data) encoded_file = {
-  encoding : 'data Data_encoding.t;
-  encoded_file_path : string;
-  json : bool;
-}
+type ('kind, 'data) encoded_file = 'data Stored_data.file
 
 let dir_path {dir_path} = dir_path
 
 let file_path {file_path} = file_path
 
-let is_json_file file = file.json
+let is_json_file file = file.Stored_data.json
 
 let make_encoded_file ?(json = false) dir ~filename encoding =
-  {encoding; encoded_file_path = dir.dir_path // filename; json}
+  let filepath = dir_path dir // filename in
+  Stored_data.make_file ~json ~filepath encoding
 
-let encoded_file_path {encoded_file_path; _} = encoded_file_path
+let encoded_file_path {Stored_data.path; _} = path
 
-let file_encoding {encoding; _} = encoding
+let file_encoding {Stored_data.encoding; _} = encoding
 
 (* Utility functions *)
 

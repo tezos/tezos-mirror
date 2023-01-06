@@ -50,7 +50,6 @@
   floating_block_index
   floating_block_store
   protocol_store
-  stored_data
   store_metrics
   store))
 

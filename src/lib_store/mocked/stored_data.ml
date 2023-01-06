@@ -23,8 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_errors
 open Naming
+module Filesystem = String.Hashtbl
+
+type error += Mocked_missing_stored_data of string
+
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"mocked-stored-data.missing_stored_data"
+    ~title:"Missing stored data"
+    ~description:"Failed to load stored data"
+    ~pp:(fun ppf path ->
+      Format.fprintf
+        ppf
+        "Failed to load on-disk data: no corresponding data found in file %s."
+        path)
+    Data_encoding.(obj1 (req "path" string))
+    (function Mocked_missing_stored_data path -> Some path | _ -> None)
+    (fun path -> Mocked_missing_stored_data path)
 
 type _ t =
   | Stored_data : {
@@ -33,8 +50,6 @@ type _ t =
       scheduler : Lwt_idle_waiter.t;
     }
       -> 'a t
-
-module Filesystem = String.Hashtbl
 
 let filesystem = Filesystem.create 11
 
@@ -104,7 +119,7 @@ let load file =
   | Some cache ->
       let scheduler = Lwt_idle_waiter.create () in
       return (Stored_data {cache; file; scheduler})
-  | None -> tzfail (Missing_stored_data (Naming.encoded_file_path file))
+  | None -> tzfail (Mocked_missing_stored_data (Naming.encoded_file_path file))
 
 let init file ~initial_data =
   let path = Naming.encoded_file_path file in

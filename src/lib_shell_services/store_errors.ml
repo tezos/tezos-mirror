@@ -384,7 +384,6 @@ type error +=
       Tezos_crypto.Block_hash.t * Tezos_crypto.Protocol_hash.t * History_mode.t
   | Inconsistent_protocol_commit_info of
       Tezos_crypto.Block_hash.t * Tezos_crypto.Protocol_hash.t
-  | Missing_stored_data of string
   | Failed_to_get_live_blocks of Tezos_crypto.Block_hash.t
   | Target_mismatch
   | Bad_head_invariant
@@ -951,19 +950,6 @@ let () =
     (function
       | Inconsistent_protocol_commit_info (bh, ph) -> Some (bh, ph) | _ -> None)
     (fun (bh, ph) -> Inconsistent_protocol_commit_info (bh, ph)) ;
-  Error_monad.register_error_kind
-    `Temporary
-    ~id:"store.missing_stored_data"
-    ~title:"Missing stored data"
-    ~description:"Failed to load stored data"
-    ~pp:(fun ppf path ->
-      Format.fprintf
-        ppf
-        "Failed to load on-disk data: no corresponding data found in file %s."
-        path)
-    Data_encoding.(obj1 (req "path" string))
-    (function Missing_stored_data path -> Some path | _ -> None)
-    (fun path -> Missing_stored_data path) ;
   Error_monad.register_error_kind
     `Permanent
     ~id:"store.failed_to_get_live_blocks"
