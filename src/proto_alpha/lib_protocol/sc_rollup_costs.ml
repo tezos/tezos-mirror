@@ -85,8 +85,9 @@ let cost_serialize_internal_inbox_message
 
 (* Derived from benchmark in
    [Sc_rollup_benchmarks.Sc_rollup_deserialize_output_proof_benchmark] and model
-   [model_Sc_rollup_deserialize_output_proof_benchmark] with estimated parameters:
-   [fun size -> (7148.78790875 + (5.53034040727 * size))] *)
+   [model_Sc_rollup_deserialize_output_proof_benchmark]. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4533
+   use the reference machine to infer the parameters of this model *)
 let cost_deserialize_output_proof ~bytes_len =
   let open S.Syntax in
   let size = S.safe_int bytes_len in
