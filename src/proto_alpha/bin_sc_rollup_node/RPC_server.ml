@@ -154,10 +154,10 @@ module Common = struct
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
     let* l2_block = Node_context.get_l2_block node_ctxt block in
-    let* {messages; _} =
-      Node_context.get_messages node_ctxt l2_block.header.inbox_witness
+    let+ num_messages =
+      Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
     in
-    return @@ Z.of_int (List.length messages)
+    Z.of_int num_messages
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address

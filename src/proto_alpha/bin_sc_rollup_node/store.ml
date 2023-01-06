@@ -104,15 +104,16 @@ module Messages =
         Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
 
       module Header = struct
-        type t = Block_hash.t * Timestamp.t
+        type t = Block_hash.t * Timestamp.t * int
 
         let name = "messages_inbox_info"
 
         let encoding =
           let open Data_encoding in
-          obj2
+          obj3
             (req "predecessor" Block_hash.encoding)
             (req "predecessor_timestamp" Timestamp.encoding)
+            (req "num_messages" int31)
 
         let fixed_size =
           WithExceptions.Option.get ~loc:__LOC__

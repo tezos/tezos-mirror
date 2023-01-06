@@ -457,23 +457,35 @@ let get_messages {store; _} messages_hash =
         "Could not retrieve messages with payloads merkelized hash %a"
         Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
         messages_hash
-  | Some (messages, (predecessor, predecessor_timestamp)) ->
+  | Some (messages, (predecessor, predecessor_timestamp, _num_messages)) ->
       return {predecessor; predecessor_timestamp; messages}
 
 let find_messages {store; _} hash =
   let open Lwt_result_syntax in
   let+ msgs = Store.Messages.read store.messages hash in
   Option.map
-    (fun (messages, (predecessor, predecessor_timestamp)) ->
+    (fun (messages, (predecessor, predecessor_timestamp, _num_messages)) ->
       {predecessor; predecessor_timestamp; messages})
     msgs
+
+let get_num_messages {store; _} hash =
+  let open Lwt_result_syntax in
+  let* header = Store.Messages.header store.messages hash in
+  match header with
+  | None ->
+      failwith
+        "Could not retrieve number of messages for inbox witness %a"
+        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+        hash
+  | Some (_predecessor, _predecessor_timestamp, num_messages) ->
+      return num_messages
 
 let save_messages {store; _} key {predecessor; predecessor_timestamp; messages}
     =
   Store.Messages.append
     store.messages
     ~key
-    ~header:(predecessor, predecessor_timestamp)
+    ~header:(predecessor, predecessor_timestamp, List.length messages)
     ~value:messages
 
 let get_full_l2_block node_ctxt block_hash =
