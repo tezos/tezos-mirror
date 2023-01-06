@@ -264,9 +264,9 @@ module Merkle_tree = struct
       let module Backend = Hashes_Map_backend () in
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 32 * 2 + 5 = 69 bytes to store two hashes in a page. We round
-         this value to 70. *)
-      let max_page_size = 70 in
+         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
+         this value to 80. *)
+      let max_page_size = 80 in
       let payload = Bytes.empty in
 
       assert_fails_with
@@ -282,9 +282,9 @@ module Merkle_tree = struct
       let module Backend = Hashes_Map_backend () in
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 32 * 2 + 5 = 69 bytes to store two hashes in a page. We round
-         this value to 70. *)
-      let max_page_size = 70 in
+         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
+         this value to 80. *)
+      let max_page_size = 80 in
       let payload = Bytes.of_string "Hello payload" in
       let* hash =
         lift
@@ -320,8 +320,8 @@ module Merkle_tree = struct
       let module Backend = Hashes_Map_backend () in
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 32 * 2 + 5 = 69 bytes to store two hashes in a page. We round
-         this value to 70. *)
+         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
+         this value to 80. *)
       let max_page_size = 80 in
       let payload =
         Bytes.of_string
@@ -363,8 +363,8 @@ module Merkle_tree = struct
       let open Lwt_result_syntax in
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 32 * 2 + 5 = 69 bytes to store two hashes in a page. We round
-         this value to 70. *)
+         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
+         this value to 80. *)
       let max_page_size = 80 in
       let payload =
         List.repeat 225 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
