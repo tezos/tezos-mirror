@@ -143,12 +143,28 @@ module Types = struct
 
   (* String parameters queries. *)
 
+  let header_status_arg =
+    let destruct s =
+      let s = `O [("status", `String s)] in
+      try Ok (Data_encoding.Json.destruct header_status_encoding s)
+      with _ -> Error "Cannot parse header status value"
+    in
+    let construct = Data_encoding.Binary.to_string_exn header_status_encoding in
+    Tezos_rpc.Arg.make ~name:"header_status" ~destruct ~construct ()
+
   let slot_id_query =
     let open Tezos_rpc in
     let open Query in
     query (fun slot_level slot_index -> (slot_level, slot_index))
     |+ opt_field "slot_level" Arg.int32 fst
     |+ opt_field "slot_index" Arg.int snd
+    |> seal
+
+  let opt_header_status_query =
+    let open Tezos_rpc in
+    let open Query in
+    query (fun header_status -> header_status)
+    |+ opt_field "status" header_status_arg (fun hs -> hs)
     |> seal
 end
 
@@ -243,11 +259,25 @@ let get_commitment_headers :
     service =
   Tezos_rpc.Service.get_service
     ~description:
-      "Return the known headers for the the slot whose commitment is given."
+      "Return the known headers for the slot whose commitment is given."
     ~query:Types.slot_id_query
     ~output:(Data_encoding.list Types.slot_header_encoding)
     Tezos_rpc.Path.(
       open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "headers")
+
+let get_published_level_headers :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.slot_header list
+    ; prefix : unit
+    ; params : unit * Types.level
+    ; query : Types.header_status option >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"Return the known headers for the given published level."
+    ~query:Types.opt_header_status_query
+    ~output:(Data_encoding.list Types.slot_header_encoding)
+    Tezos_rpc.Path.(open_root / "levels" /: Tezos_rpc.Arg.int32 / "headers")
 
 let patch_profile :
     < meth : [`PATCH]

@@ -157,6 +157,16 @@ val get_commitment_headers :
   ; query : Types.level option * Types.slot_index option >
   service
 
+(** Return the known slot headers for the given published level. *)
+val get_published_level_headers :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.slot_header list
+  ; prefix : unit
+  ; params : unit * Types.level
+  ; query : Types.header_status option >
+  service
+
 (** Update the list of profiles tracked by the DAL node *)
 val patch_profile :
   < meth : [`PATCH]
