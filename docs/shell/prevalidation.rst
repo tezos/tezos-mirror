@@ -57,7 +57,7 @@ the operation and already accepted operations, not taking into account
 the state of the ledger.
 
 Starting from Octez version 12.0, the ``precheck`` filter can be used
-instead of ``applying_operation`` to classify operations, as follows:
+instead of ``apply_operation`` to classify operations, as follows:
 If ``precheck`` cannot decide the classification
 of an operation, the prevalidator uses ``apply_operation`` instead.
 If an operation passes the ``precheck`` filter, or otherwise it has been successfully

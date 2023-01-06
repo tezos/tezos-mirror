@@ -20,12 +20,13 @@ The solutions provided to strengthen the security of the default key management 
   + sign user operations (e.g. transfers) interactively on the wallet
   + automatically sign baking operations, such as (pre-)endorsements, more securely.
 
-- If you don't have a hardware wallet:
+- If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
 
-  + The option ``--encrypted`` of the client offers a first protection for storing your keys.
-  + A separate signer daemon allows to decouple the client and baker from the signing process.
-    In particular, this allows executing a remote signer, placed on a different machine than the client and/or the baker, perhaps less exposed to attacks.
-    As the keys only need to be accessible to the signer, they can also benefit from the lesser exposure.
+- A separate signer daemon allows to decouple the client and baker from the signing process.
+
+  In particular, this allows executing the signer remotely (that is, on a different machine than the client and/or the baker), perhaps less exposed to attacks.
+
+  As the keys only need to be accessible to the signer, they can also benefit from the lesser exposure. Even better (and recommended), a remote signer can be combined with a hardware wallet connected to the same machine as the signer.
 
 These solutions are detailed in the rest of this page.
 
@@ -266,12 +267,12 @@ Consensus Key
 
 .. note::
 
-   Consensus key is available starting with the Tezos L protocol.
+   The "consensus key" feature is available starting with the Tezos :doc:`Lima<../protocols/015_lima>` protocol.
 
 By default, the baker's key, also called manager key, is used to sign in the consensus protocol, i.e. signing blocks while baking,
 and signing consensus operations (preendorsements and endorsements).
 
-A delegate may elect instead to choose a dedicated key: the consensus key. It can then be changed without redelegation.
+A delegate may elect instead to choose a dedicated key: the *consensus key*. It can then be changed without redelegation.
 
 It also allows establishment of baking operations in an environment where access is not ultimately guaranteed:
 for example, a cloud platform providing hosted Key Management Systems (KMS) where the private key is
@@ -298,7 +299,7 @@ The command to update the consensus key is::
 
    tezos-client set consensus key for <mgr> to consensus
 
-The update becomes active after `PRESERVED_CYCLES + 1` cycles. We therefore distinguish
+The update becomes active after ``PRESERVED_CYCLES + 1`` cycles. We therefore distinguish
 the active consensus key and the pending consensus keys.
 The active consensus key is by default the delegate’s manager key, which cannot change.
 
@@ -324,7 +325,7 @@ The delegate will seamlessly keep baking when the transition happens::
 Draining a Manager's Account With its Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This operation immediately transfers all the spendable balance of the `baker_pkh`’s implicit account into the `destination_pkh` implicit account::
+This operation immediately transfers all the spendable balance of the ``baker_pkh``’s implicit account into the ``destination_pkh`` implicit account::
 
    tezos-client drain delegate <baker_pkh> to <destination_pkh> with <consensus_pkh>
 
@@ -333,9 +334,9 @@ If the destination is the consensus key account, this can be simplified to::
    tezos-client drain delegate <baker_pkh> to <consensus_pkh>
 
 The active consensus key is the signer for this operation, therefore the private key associated to the consensus key must be available
-in the wallet of the client typing the command. The delegate's private key needs not be present.
+in the wallet of the client typing the command. The delegate's private key does not need to be present.
 
-`drain delegate` has no effect on the frozen balance.
+The drain operation has no effect on the frozen balance.
 
 A fixed fraction of the drained delegate’s spendable balance is transferred as fees to the baker that includes the operation,
 i.e. the maximum between 1 tez or 1% of the spendable balance.

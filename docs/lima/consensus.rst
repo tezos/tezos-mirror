@@ -154,7 +154,7 @@ balance*. Let us first (re)define these and related concepts.
 
 - The *(maximal) staking balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
   balances of all accounts that have delegated to it.
-  It must be at least ``TOKENS_PER_ROLL`` tez, otherwise the delegate cannot be selected as a validator.
+  It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.

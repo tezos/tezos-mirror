@@ -694,7 +694,7 @@ the next inbox are being loaded. The inputs that were not consumed by
 kernel from yielding by writing arbitrary data under the path
 ``/kernel/env/reboot`` in its durable storage. In such a case (known
 as reboot), ``kernel_run`` is called again, without dropping unread
-inputs. This value is removed between each call of ``kernel_run``,
+inputs. The value at ``/kernel/env/reboot`` is removed between each call of ``kernel_run``,
 and the ``kernel_run`` function can postpone yielding at most 1,000
 reboots for each Tezos level.
 
@@ -1271,7 +1271,7 @@ Glossary
 
 #. **Refutation period**: At the end of each commitment period, a
    period of two weeks starts to allow any commitment related to
-   this commitment period to be published.
+   this commitment period to be challenged.
 
 #. **Staker**: An implicit account that has made a deposit on a
    commitment.

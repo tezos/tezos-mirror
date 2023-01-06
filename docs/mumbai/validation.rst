@@ -50,11 +50,6 @@ state-passing machine where:
   on (i.e., it should call) *apply_operation* to validate and apply
   each operation in the block, and compute intermediate states.
 
-.. TODO #4155:
-
-   When creating a new environment, update references to V<N> in the
-   paragraph below.
-   
 However, the *concrete* API exported from the Tezos economic protocol
 does not implement this business logic *monolithically*, as described
 above, but it rather presents a more fine-grained API. The rationale
@@ -71,7 +66,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V8``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-alpha/Tezos_raw_protocol_alpha/Main/index.html>`
+:package-api:`Main<tezos-protocol-016-PtMumbai/Tezos_raw_protocol_016_PtMumbai/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe
