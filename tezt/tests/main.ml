@@ -45,6 +45,7 @@ let alpha_can_stitch_from_its_predecessor = false
 let register_protocol_independent_tests () =
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
+  Client_config.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
   Client_chain_id.register_protocol_independent () ;
   Config.register () ;
