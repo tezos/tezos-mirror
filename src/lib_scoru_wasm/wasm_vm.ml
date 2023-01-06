@@ -115,16 +115,11 @@ let save_fallback_kernel durable =
       Constants.kernel_fallback_key
   else Lwt.return durable
 
-let unsafe_next_tick_state ~write_debug
+let unsafe_next_tick_state host_function_registry
     ({buffers; durable; tick_state; _} as pvm_state) =
   let open Lwt_syntax in
   let return ?(status = Running) ?(durable = durable) state =
     Lwt.return (durable, state, status)
-  in
-  let host_function_registry =
-    match write_debug with
-    | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
-    | Noop -> Host_funcs.all
   in
   match tick_state with
   | Stuck ((Decode_error _ | Init_error _ | Link_error _) as e) ->
@@ -312,10 +307,10 @@ let exn_to_stuck pvm_state exn =
   in
   Lwt.return (Stuck wasm_error)
 
-let next_tick_state ~write_debug pvm_state =
+let next_tick_state host_function_registry pvm_state =
   let open Lwt_syntax in
   Lwt.catch
-    (fun () -> unsafe_next_tick_state ~write_debug pvm_state)
+    (fun () -> unsafe_next_tick_state host_function_registry pvm_state)
     (fun exn ->
       let+ tick_state = exn_to_stuck pvm_state exn in
       (pvm_state.durable, tick_state, Failing))
@@ -400,10 +395,10 @@ let clean_up_input_buffer buffers =
 (** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.
 *)
-let compute_step_with_debug ~write_debug pvm_state =
+let compute_step_with_host_functions registry pvm_state =
   let open Lwt_syntax in
   (* Calculate the next tick state. *)
-  let* durable, tick_state, status = next_tick_state ~write_debug pvm_state in
+  let* durable, tick_state, status = next_tick_state registry pvm_state in
   let current_tick = Z.succ pvm_state.current_tick in
   let last_top_level_call = next_last_top_level_call pvm_state status in
   let reboot_counter = next_reboot_counter pvm_state status in
@@ -423,7 +418,16 @@ let compute_step_with_debug ~write_debug pvm_state =
   in
   return pvm_state
 
-let compute_step pvm_state = compute_step_with_debug pvm_state ~write_debug:Noop
+let compute_step pvm_state =
+  compute_step_with_host_functions Host_funcs.all pvm_state
+
+let compute_step_with_debug ~write_debug pvm_state =
+  let registry =
+    match write_debug with
+    | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
+    | Noop -> Host_funcs.all
+  in
+  compute_step_with_host_functions registry pvm_state
 
 let input_request pvm_state =
   match pvm_state.tick_state with
@@ -457,6 +461,11 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_step:_
     ?(write_debug = Builtins.Noop) should_continue =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
+  let host_function_registry =
+    match write_debug with
+    | Builtins.Printer _ -> Host_funcs.all_debug ~write_debug
+    | Noop -> Host_funcs.all
+  in
   let rec go steps_left pvm_state =
     let* continue = should_continue pvm_state in
     if steps_left > 0L && continue then
@@ -476,14 +485,18 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_step:_
         in
         go (Int64.sub steps_left (Z.to_int64 bulk_ticks)) pvm_state
       else
-        let* pvm_state = compute_step_with_debug ~write_debug pvm_state in
+        let* pvm_state =
+          compute_step_with_host_functions host_function_registry pvm_state
+        in
         go (Int64.pred steps_left) pvm_state
     else Lwt.return pvm_state
   in
   let one_or_more_steps pvm_state =
     (* Make sure we perform at least 1 step. The assertion above ensures that
        we were asked to perform at least 1. *)
-    let* pvm_state = compute_step_with_debug ~write_debug pvm_state in
+    let* pvm_state =
+      compute_step_with_host_functions host_function_registry pvm_state
+    in
     go (Int64.pred max_steps) pvm_state
   in
   measure_executed_ticks one_or_more_steps
