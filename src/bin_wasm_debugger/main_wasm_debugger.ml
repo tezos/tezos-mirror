@@ -57,7 +57,7 @@ let link module_ =
    installation into a tree for the PVM interpreter. *)
 let handle_module binary name module_ =
   let open Lwt_result_syntax in
-  let open Protocol.Alpha_context.Sc_rollup in
+  let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
   let* ast =
     Repl_helpers.trap_exn (fun () ->
         if binary then parse_binary_module name module_
@@ -178,7 +178,7 @@ let () =
           fun ppf errs ->
             pp_cli_errors
               ppf
-              ~executable_name:"octez-wasm-repl"
+              ~executable_name:"octez-wasm-debugger"
               ~global_options:no_options
               ~default:pp
               errs)
