@@ -71,6 +71,9 @@ val make :
   (JSON.t -> 'result) ->
   ('endpoint, 'result) t
 
+(** [make_uri endpoint rpc] returns the URI of the RPC [rpc] at [endpoint]. *)
+val make_uri : 'endpoint -> ('endpoint, 'result) t -> Uri.t
+
 (** Parse and decode a response body using the decode function of an RPC description.
 
     [origin] is used in error messages.
