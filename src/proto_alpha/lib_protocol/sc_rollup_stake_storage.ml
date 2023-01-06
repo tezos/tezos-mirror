@@ -699,6 +699,8 @@ let assert_cement_commitment_met ctxt rollup ~old_lcc ~new_lcc =
                valid_candidate = candidate_commitment;
                invalid_candidate = new_lcc;
              })
+  | [] ->
+      tzfail (Sc_rollup_no_commitment_to_cement new_lcc_commitment.inbox_level)
   | _ -> tzfail Sc_rollup_disputed
 
 let deallocate_inbox_level ctxt rollup inbox_level new_lcc_hash
