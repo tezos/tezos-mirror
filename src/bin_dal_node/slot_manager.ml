@@ -121,3 +121,6 @@ let get_commitment_headers commitment ?slot_level ?slot_index node_store =
     ?slot_level
     ?slot_index
     node_store
+
+let get_published_level_headers ~published_level ?header_status store =
+  Store.Legacy.get_published_level_headers ~published_level ?header_status store

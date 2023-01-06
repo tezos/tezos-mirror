@@ -102,9 +102,13 @@ module Legacy = struct
     end
 
     module Level : sig
+      val slots_indices : Services.Types.level -> Path.t
+
       val accepted_header_commitment : Services.Types.slot_id -> Path.t
 
       val accepted_header_status : Services.Types.slot_id -> Path.t
+
+      val others : Services.Types.slot_id -> Path.t
 
       val other_header_status :
         Services.Types.slot_id -> Cryptobox.commitment -> Path.t
@@ -157,9 +161,11 @@ module Legacy = struct
     module Level = struct
       let root = ["levels"]
 
+      let slots_indices slot_level = root / Int32.to_string slot_level
+
       let headers index =
         let open Services.Types in
-        root / Int32.to_string index.slot_level / Int.to_string index.slot_index
+        slots_indices index.slot_level / Int.to_string index.slot_index
 
       let accepted_header index =
         let prefix = headers index in
@@ -173,10 +179,13 @@ module Legacy = struct
         let prefix = accepted_header index in
         prefix / "status"
 
+      let others index =
+        let prefix = headers index in
+        prefix / "others"
+
       let other_header_status index commitment =
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        let prefix = headers index in
-        prefix / "others" / commitment_repr / "status"
+        others index / commitment_repr / "status"
     end
 
     module Profile = struct
@@ -494,4 +503,66 @@ module Legacy = struct
     (* Retrieve the headers that have been "accepted" on L1 (i.e. with
        [`Waiting_attestation], [`Attested] or [`Unattested] statuses). *)
     get_accepted_headers_of_commitment commitment indices store accu
+
+  let get_other_headers indices store accu =
+    let open Lwt_result_syntax in
+    List.fold_left_es
+      (fun acc slot_id ->
+        let*! commitments_with_statuses =
+          list store @@ Path.Level.others slot_id
+        in
+        List.fold_left_es
+          (fun acc (encoded_commitment, _status_tree) ->
+            match decode_commitment encoded_commitment with
+            | None -> return acc
+            | Some commitment ->
+                get_other_headers_of_identified_commitment
+                  commitment
+                  slot_id
+                  store
+                  acc)
+          acc
+          commitments_with_statuses)
+      accu
+      indices
+
+  let get_published_level_headers ~published_level ?header_status node_store =
+    let open Lwt_result_syntax in
+    let store = node_store.store in
+    (* Get the list of slots indices from the given level. *)
+    let*! slots_indices =
+      list store @@ Path.Level.slots_indices published_level
+    in
+    (* Build the list of slot IDs. *)
+    let indices =
+      List.rev_map
+        (fun (index, _tree) ->
+          {
+            Services.Types.slot_level = published_level;
+            slot_index = int_of_string index;
+          })
+        slots_indices
+    in
+    (* Retrieve the list of non-accepted headers for [indices]. *)
+    let* accu = get_other_headers indices store [] in
+    (* Retrieve the headers that have been "accepted" on L1 (i.e. with
+       [`Waiting_attestation], [`Attested] or [`Unattested] statuses) whose IDs
+       are in [indices]. *)
+    let skip_commitment c =
+      decode_commitment c |> Option.fold ~none:`Skip ~some:(fun c -> `Keep c)
+    in
+    let* accu = get_accepted_headers ~skip_commitment indices store accu in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
+       Enable the same filtering for GET /commitments/<commitment>/headers
+       (function get_commitment_headers above). Push this filtering into the result
+       construction? *)
+    return
+    @@
+    match header_status with
+    | None -> accu
+    | Some hs ->
+        List.filter_map
+          (fun header ->
+            if header.Services.Types.status = hs then Some header else None)
+          accu
 end
