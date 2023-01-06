@@ -320,9 +320,11 @@ let pp_input_request fmt request =
 let reveal_equal p1 p2 =
   match (p1, p2) with
   | Reveal_raw_data h1, Reveal_raw_data h2 -> Sc_rollup_reveal_hash.equal h1 h2
+  | Reveal_raw_data _, _ -> false
   | Reveal_metadata, Reveal_metadata -> true
+  | Reveal_metadata, _ -> false
   | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
-  | (Reveal_raw_data _ | Reveal_metadata | Request_dal_page _), _ -> false
+  | Request_dal_page _, _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =
