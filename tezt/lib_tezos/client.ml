@@ -160,7 +160,7 @@ let mode_arg client =
 
 let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
-    client command =
+    ?config_file client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -168,7 +168,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
       (fun o -> Option.value ~default:"Y" o |> Option.some)
       env
   in
-  let protocol_arg = Cli_arg.optional_arg "protocol" Fun.id protocol_hash in
+  let protocol_arg = optional_arg "protocol" Fun.id protocol_hash in
+  let config_file_arg = optional_arg "config-file" Fun.id config_file in
   Process.spawn
     ~name:client.name
     ~color:client.color
@@ -180,7 +181,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ command
+  @ base_dir_arg client @ config_file_arg @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -2752,23 +2753,33 @@ let sign_bytes ~signer ~data client =
 
 let bootstrapped client = spawn_command client ["bootstrapped"] |> Process.check
 
-let spawn_config_show ?protocol client =
-  spawn_command client
+let spawn_config_show ?config_file ?protocol client =
+  spawn_command ?config_file client
   @@ Cli_arg.optional_arg "protocol" Protocol.hash protocol
   @ ["config"; "show"]
 
-let config_show ?protocol client =
-  spawn_config_show ?protocol client |> Process.check_and_read_stdout
+let config_show ?config_file ?protocol client =
+  spawn_config_show ?config_file ?protocol client
+  |> Process.check_and_read_stdout
 
-let spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
-  spawn_command client
+let spawn_config_init ?config_file ?protocol ?bootstrap_accounts
+    ?protocol_constants ?output client =
+  spawn_command ?config_file client
   @@ Cli_arg.optional_arg "protocol" Protocol.hash protocol
   @ ["config"; "init"]
   @ Cli_arg.optional_arg "bootstrap-accounts" Fun.id bootstrap_accounts
   @ Cli_arg.optional_arg "protocol-constants" Fun.id protocol_constants
+  @ Cli_arg.optional_arg "output" Fun.id output
 
-let config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
-  spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client
+let config_init ?config_file ?protocol ?bootstrap_accounts ?protocol_constants
+    ?output client =
+  spawn_config_init
+    ?config_file
+    ?protocol
+    ?bootstrap_accounts
+    ?protocol_constants
+    ?output
+    client
   |> Process.check
 
 let spawn_check_contract_implements_fa1_2 ~contract client =
