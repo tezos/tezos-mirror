@@ -163,7 +163,7 @@ Contract memorized as tickets_blackhole.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[PUBLIC_KEY_HASH]" 3'
 Node is bootstrapped.
-Estimated gas: 3588.163 units (will add 100 for safety)
+Estimated gas: 3588.513 units (will add 100 for safety)
 Estimated storage: 66 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -190,7 +190,7 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 158 bytes
       Paid storage size diff: 66 bytes
-      Consumed gas: 2588.410
+      Consumed gas: 2588.760
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0165
         storage fees ........................... +ꜩ0.0165
@@ -215,7 +215,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 2 tickets from bootstrap1 to bootstrap2 with entrypoint default and contents '"Ticket"' and type string and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 2124.710 units (will add 100 for safety)
+Estimated gas: 2124.750 units (will add 100 for safety)
 Estimated storage: 66 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -249,7 +249,7 @@ This sequence of operations was run:
         Account updates:
           [PUBLIC_KEY_HASH] ... -2
           [PUBLIC_KEY_HASH] ... +2
-      Consumed gas: 2124.710
+      Consumed gas: 2124.750
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0165
         storage fees ........................... +ꜩ0.0165
@@ -263,7 +263,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 tickets from bootstrap2 to '[CONTRACT_HASH]' with entrypoint save and contents '"Ticket"' and type string and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 4936.930 units (will add 100 for safety)
+Estimated gas: 4937.050 units (will add 100 for safety)
 Estimated storage: 110 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -276,7 +276,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000803
     Expected counter: 1
-    Gas limit: 5037
+    Gas limit: 5038
     Storage limit: 130 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000803
@@ -297,7 +297,7 @@ This sequence of operations was run:
         Content: "Ticket"
         Account updates:
           [PUBLIC_KEY_HASH] ... -1
-      Consumed gas: 2126.230
+      Consumed gas: 2126.280
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0165
         storage fees ........................... +ꜩ0.0165
@@ -313,7 +313,7 @@ This sequence of operations was run:
             { Pair 0x013c68b1807d42e2e2cb5a4dddb457b75dbf4a4dce00 (Pair "Ticket" 1) }
           Storage size: 238 bytes
           Paid storage size diff: 44 bytes
-          Consumed gas: 2811.345
+          Consumed gas: 2811.415
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.011
             storage fees ........................... +ꜩ0.011
@@ -333,7 +333,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 6446.754 units (will add 100 for safety)
+Estimated gas: 6447.214 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -346,7 +346,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000954
     Expected counter: 6
-    Gas limit: 6547
+    Gas limit: 6548
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000954
@@ -360,7 +360,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 194 bytes
-      Consumed gas: 3694.167
+      Consumed gas: 3694.587
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
@@ -377,7 +377,7 @@ This sequence of operations was run:
           This transaction was successfully applied
           Updated storage: Unit
           Storage size: 51 bytes
-          Consumed gas: 2753.748
+          Consumed gas: 2753.788
 
 
 ./octez-client --mode mockup get ticket balance for '[CONTRACT_HASH]' with ticketer '[CONTRACT_HASH]' and type string and content '"Ticket"'

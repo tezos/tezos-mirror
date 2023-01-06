@@ -1,7 +1,7 @@
 
 ./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_alpha/opcodes/view_op_nonexistent_addr.tz --details
 Well typed
-Gas remaining: 1039989.559 units remaining
+Gas remaining: 1039989.259 units remaining
 { parameter (pair nat address) ;
   storage bool ;
   code { DROP

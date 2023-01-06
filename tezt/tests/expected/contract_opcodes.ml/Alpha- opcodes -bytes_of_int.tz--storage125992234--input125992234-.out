@@ -13,7 +13,7 @@ trace
     [  ]
   - location: 8 (just consumed gas: 0.010)
     [ 0 ]
-  - location: 11 (just consumed gas: 0.070)
+  - location: 11 (just consumed gas: 0.090)
     [ 0x ]
   - location: 12 (just consumed gas: 0.010)
     [ 0x
@@ -28,7 +28,7 @@ trace
     [  ]
   - location: 25 (just consumed gas: 0.010)
     [ 1 ]
-  - location: 28 (just consumed gas: 0.072)
+  - location: 28 (just consumed gas: 0.093)
     [ 0x01 ]
   - location: 29 (just consumed gas: 0.010)
     [ 0x01
@@ -43,7 +43,7 @@ trace
     [  ]
   - location: 42 (just consumed gas: 0.010)
     [ 1193046 ]
-  - location: 45 (just consumed gas: 0.076)
+  - location: 45 (just consumed gas: 0.099)
     [ 0x123456 ]
   - location: 46 (just consumed gas: 0.010)
     [ 0x123456
@@ -58,7 +58,7 @@ trace
     [  ]
   - location: 59 (just consumed gas: 0.010)
     [ 0x123456 ]
-  - location: 62 (just consumed gas: 0.036)
+  - location: 62 (just consumed gas: 0.027)
     [ 1193046 ]
   - location: 63 (just consumed gas: 0.010)
     [ 1193046
@@ -73,7 +73,7 @@ trace
     [  ]
   - location: 76 (just consumed gas: 0.010)
     [ 0x0000123456 ]
-  - location: 79 (just consumed gas: 0.040)
+  - location: 79 (just consumed gas: 0.032)
     [ 1193046 ]
   - location: 80 (just consumed gas: 0.010)
     [ 1193046
@@ -88,7 +88,7 @@ trace
     [  ]
   - location: 93 (just consumed gas: 0.010)
     [ 0x ]
-  - location: 96 (just consumed gas: 0.030)
+  - location: 96 (just consumed gas: 0.020)
     [ 0 ]
   - location: 97 (just consumed gas: 0.010)
     [ 0
@@ -103,7 +103,7 @@ trace
     [  ]
   - location: 110 (just consumed gas: 0.010)
     [ 0x0000 ]
-  - location: 113 (just consumed gas: 0.034)
+  - location: 113 (just consumed gas: 0.025)
     [ 0 ]
   - location: 114 (just consumed gas: 0.010)
     [ 0
@@ -118,7 +118,7 @@ trace
     [  ]
   - location: 127 (just consumed gas: 0.010)
     [ -128 ]
-  - location: 130 (just consumed gas: 0.072)
+  - location: 130 (just consumed gas: 0.093)
     [ 0x80 ]
   - location: 131 (just consumed gas: 0.010)
     [ 0x80
@@ -133,7 +133,7 @@ trace
     [  ]
   - location: 144 (just consumed gas: 0.010)
     [ -129 ]
-  - location: 147 (just consumed gas: 0.072)
+  - location: 147 (just consumed gas: 0.093)
     [ 0xff7f ]
   - location: 148 (just consumed gas: 0.010)
     [ 0xff7f
@@ -148,7 +148,7 @@ trace
     [  ]
   - location: 161 (just consumed gas: 0.010)
     [ -33024 ]
-  - location: 164 (just consumed gas: 0.074)
+  - location: 164 (just consumed gas: 0.096)
     [ 0xff7f00 ]
   - location: 165 (just consumed gas: 0.010)
     [ 0xff7f00
@@ -163,7 +163,7 @@ trace
     [  ]
   - location: 178 (just consumed gas: 0.010)
     [ -4294967296 ]
-  - location: 181 (just consumed gas: 0.081)
+  - location: 181 (just consumed gas: 0.105)
     [ 0xff00000000 ]
   - location: 182 (just consumed gas: 0.010)
     [ 0xff00000000
@@ -178,7 +178,7 @@ trace
     [  ]
   - location: 195 (just consumed gas: 0.010)
     [ 0x80 ]
-  - location: 198 (just consumed gas: 0.032)
+  - location: 198 (just consumed gas: 0.022)
     [ -128 ]
   - location: 199 (just consumed gas: 0.010)
     [ -128
@@ -193,7 +193,7 @@ trace
     [  ]
   - location: 212 (just consumed gas: 0.010)
     [ 0xff7f ]
-  - location: 215 (just consumed gas: 0.034)
+  - location: 215 (just consumed gas: 0.025)
     [ -129 ]
   - location: 216 (just consumed gas: 0.010)
     [ -129
@@ -208,7 +208,7 @@ trace
     [  ]
   - location: 229 (just consumed gas: 0.010)
     [ 0xff7f00 ]
-  - location: 232 (just consumed gas: 0.036)
+  - location: 232 (just consumed gas: 0.027)
     [ -33024 ]
   - location: 233 (just consumed gas: 0.010)
     [ -33024
@@ -223,7 +223,7 @@ trace
     [  ]
   - location: 246 (just consumed gas: 0.010)
     [ 0xffffff7f00 ]
-  - location: 249 (just consumed gas: 0.040)
+  - location: 249 (just consumed gas: 0.032)
     [ -33024 ]
   - location: 250 (just consumed gas: 0.010)
     [ -33024
@@ -238,7 +238,7 @@ trace
     [  ]
   - location: 263 (just consumed gas: 0.010)
     [ 0xff00000000 ]
-  - location: 266 (just consumed gas: 0.040)
+  - location: 266 (just consumed gas: 0.032)
     [ -4294967296 ]
   - location: 267 (just consumed gas: 0.010)
     [ -4294967296
