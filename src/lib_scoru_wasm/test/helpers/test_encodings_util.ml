@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Encodings_util
+open Tezos_scoru_wasm_helpers.Encodings_util
 
 let test_encode_decode enc value f =
   let open Lwt_result_syntax in

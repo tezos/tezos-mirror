@@ -15,6 +15,7 @@ depends: [
   "tezos-tree-encoding" {with-test}
   "tezos-context" {with-test}
   "tezos-base-test-helpers" {with-test}
+  "tezos-scoru-wasm-helpers" {with-test}
   "tezos-scoru-wasm-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "tezos-scoru-wasm" {with-test}

@@ -18,9 +18,9 @@ depends: [
   "tezos-test-helpers"
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
+  "tezos-scoru-wasm-helpers"
   "qcheck-alcotest" { >= "0.18" }
   "alcotest-lwt" { >= "1.5.0" }
-  "tezt" { >= "3.0.0" }
   "tezos-webassembly-interpreter-extra"
 ]
 build: [
@@ -28,4 +28,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Helpers for testing for the scoru-wasm functionality"
+synopsis: "Helpers for test of the smart rollup wasm functionality"

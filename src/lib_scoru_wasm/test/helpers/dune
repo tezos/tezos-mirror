@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name test_scoru_wasm_test_helpers)
+ (name tezos_scoru_wasm_test_helpers)
  (package tezos-scoru-wasm-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -14,14 +14,13 @@
   tezos-test-helpers
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
+  tezos-scoru-wasm-helpers
   qcheck-alcotest
   alcotest-lwt
-  tezt
   tezos-webassembly-interpreter-extra)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
-  -open Tezos_test_helpers
   -open Tezos_webassembly_interpreter_extra))

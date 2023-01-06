@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_scoru_wasm
-open Test_scoru_wasm_test_helpers
+open Tezos_scoru_wasm_helpers
 open Encodings_util
 module Wasm = Wasm_utils.Wasm
 module Wasm_fast_vm = Tezos_scoru_wasm_fast.Vm

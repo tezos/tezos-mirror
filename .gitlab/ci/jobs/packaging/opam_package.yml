@@ -1395,6 +1395,8 @@ opam:tezos-scoru-wasm-fast:
 
 # Ignoring unreleased package tezos-scoru-wasm-fast-test.
 
+# Ignoring unreleased package tezos-scoru-wasm-helpers.
+
 # Ignoring unreleased package tezos-scoru-wasm-test.
 
 # Ignoring unreleased package tezos-scoru-wasm-test-helpers.

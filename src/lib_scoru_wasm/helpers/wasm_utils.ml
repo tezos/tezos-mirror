@@ -509,7 +509,7 @@ let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
   (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
      issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let kernel_file =
-    project_root // Filename.dirname __FILE__ // "../wasm_kernels"
+    project_root // Filename.dirname __FILE__ // "../test/wasm_kernels"
     // (kernel ^ ".wasm")
   in
   let* () =
@@ -524,7 +524,7 @@ let read_test_messages names =
   (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
      issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let locate_file name =
-    project_root // Filename.dirname __FILE__ // "../messages" // name
+    project_root // Filename.dirname __FILE__ // "../test/messages" // name
   in
   List.map_s
     (fun name ->

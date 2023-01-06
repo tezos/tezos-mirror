@@ -35,5 +35,5 @@ let mem_content =
     uint8
 
 let num : Tezos_webassembly_interpreter.Values.num t =
-  let open Test_scoru_wasm_test_helpers.Ast_generators in
+  let open Tezos_scoru_wasm_test_helpers.Ast_generators in
   value_op_gen int32 int64

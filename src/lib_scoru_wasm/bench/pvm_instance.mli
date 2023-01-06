@@ -26,7 +26,7 @@
 (** PVM instance used in benchmark*)
 module Wasm :
   Tezos_scoru_wasm.Wasm_pvm_sig.S
-    with type tree = Test_scoru_wasm_test_helpers.Encodings_util.Context.tree
+    with type tree = Tezos_scoru_wasm_helpers.Encodings_util.Context.tree
 
 module Wasm_fast_vm : Tezos_scoru_wasm.Wasm_vm_sig.S
 

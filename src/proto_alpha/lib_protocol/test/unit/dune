@@ -16,7 +16,7 @@
   tezos-test-helpers
   tezos-alpha-test-helpers
   alcotest-lwt
-  test_scoru_wasm_test_helpers
+  tezos-scoru-wasm-helpers
   tezos-stdlib
   tezos-crypto-dal
   tezos-scoru-wasm
@@ -32,7 +32,7 @@
   -open Tezos_protocol_alpha
   -open Tezos_test_helpers
   -open Tezos_alpha_test_helpers
-  -open Test_scoru_wasm_test_helpers
+  -open Tezos_scoru_wasm_helpers
   -open Tezos_stdlib
   -open Tezos_crypto_dal
   -open Tezos_webassembly_interpreter_extra))
