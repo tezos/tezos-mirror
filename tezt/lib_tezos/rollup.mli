@@ -325,15 +325,16 @@ module Dal : sig
       slot_index:int ->
       (Dal_node.t, unit) RPC_core.t
 
-    (** Call RPC "GET /slots/<commitment>" to retrieve the slot content associated with the
-        given commitment. *)
-    val get_slot : commitment -> (Dal_node.t, slot) RPC_core.t
+    (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
+        content associated with the given commitment. *)
+    val get_commitment_slot : commitment -> (Dal_node.t, slot) RPC_core.t
 
     type commitment_proof = string
 
-    (** Call RPC "GET /slots/<commitment>/proof" to get the proof
+    (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)
-    val get_slot_proof : commitment -> (Dal_node.t, commitment_proof) RPC_core.t
+    val get_commitment_proof :
+      commitment -> (Dal_node.t, commitment_proof) RPC_core.t
 
     (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get

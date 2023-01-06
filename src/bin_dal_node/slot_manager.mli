@@ -57,11 +57,11 @@ val associate_slot_id_with_commitment :
   Services.Types.slot_id ->
   (unit, [> `Not_found]) result Lwt.t
 
-(** [find_slot node_store cryptobox commitment] returns the slot
+(** [get_commitment_slot node_store cryptobox commitment] returns the slot
    content associated with the given [commitment] in [node_store]. The
    function returns [Error `Not_found] if there is no slot content for
    [commitment] in [node_store].  *)
-val find_slot :
+val get_commitment_slot :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->

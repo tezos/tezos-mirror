@@ -1228,20 +1228,24 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:1 in
   patch_slot_rpc ~slot_level:(-4) ~slot_index:3
 
-let test_dal_node_test_get_slots _protocol parameters cryptobox _node client
-    dal_node =
+let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
+    client dal_node =
   let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let* slot = Rollup.Dal.make_slot (generate_dummy_slot size) client in
   let commit =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
   let* () =
-    let* response = RPC.call_raw dal_node @@ Rollup.Dal.RPC.get_slot commit in
+    let* response =
+      RPC.call_raw dal_node @@ Rollup.Dal.RPC.get_commitment_slot commit
+    in
     return @@ RPC.check_string_response ~code:404 response
   in
   let* _commitment = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
-  (* commit = _commitment already test in /POST test. *)
-  let* got_slot = RPC.call dal_node (Rollup.Dal.RPC.get_slot commit) in
+  (* commit = _commitment already tested in /POST test. *)
+  let* got_slot =
+    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot commit)
+  in
   Check.(Rollup.Dal.content_of_slot slot = Rollup.Dal.content_of_slot got_slot)
     Check.string
     ~error_msg:
@@ -1249,12 +1253,14 @@ let test_dal_node_test_get_slots _protocol parameters cryptobox _node client
        %L, got = %R)" ;
   unit
 
-let test_dal_node_test_get_slot_proof _protocol parameters cryptobox _node
+let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
     client dal_node =
   let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let* slot = Rollup.Dal.make_slot (generate_dummy_slot size) client in
   let* commitment = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
-  let* proof = RPC.call dal_node (Rollup.Dal.RPC.get_slot_proof commitment) in
+  let* proof =
+    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_proof commitment)
+  in
   let _, expected_proof =
     Rollup.Dal.Commitment.dummy_commitment cryptobox (generate_dummy_slot size)
   in
@@ -1918,12 +1924,12 @@ let register ~protocols =
     test_dal_node_test_patch_commitments
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "dal node GET /slots"
-    test_dal_node_test_get_slots
+    "dal node GET /commitments/<commitment>/slot"
+    test_dal_node_test_get_commitment_slot
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "dal node GET /slot/<commitment>/proof"
-    test_dal_node_test_get_slot_proof
+    "dal node GET /commitments/<commitment>/proof"
+    test_dal_node_test_get_commitment_proof
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "dal node PATCH+GET /profiles"

@@ -88,7 +88,7 @@ let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
   in
   return_unit
 
-let find_slot node_store cryptobox commitment =
+let get_commitment_slot node_store cryptobox commitment =
   let open Lwt_result_syntax in
   let*! slot_opt =
     Store.Legacy.find_slot_by_commitment node_store cryptobox commitment

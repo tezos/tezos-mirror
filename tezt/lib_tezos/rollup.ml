@@ -727,13 +727,16 @@ module Dal = struct
       in
       make ~data PATCH ["commitments"; commitment] as_empty_object_or_fail
 
-    let get_slot commitment =
-      make GET ["slots"; commitment] get_bytes_from_json_string_node
+    let get_commitment_slot commitment =
+      make
+        GET
+        ["commitments"; commitment; "slot"]
+        get_bytes_from_json_string_node
 
     type commitment_proof = string
 
-    let get_slot_proof commitment =
-      make GET ["slots"; commitment; "proof"] JSON.as_string
+    let get_commitment_proof commitment =
+      make GET ["commitments"; commitment; "proof"] JSON.as_string
 
     let get_level_index_commitment ~slot_level ~slot_index =
       make

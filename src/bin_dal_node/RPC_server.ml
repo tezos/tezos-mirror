@@ -51,21 +51,23 @@ module Slots_handlers = struct
         match r with Ok () -> return_some () | Error `Not_found -> return_none)
       ctxt
 
-  let get_slot_content ctxt commitment () () =
+  let get_commitment_slot ctxt commitment () () =
     call_handler
       (fun store cryptobox ->
         let open Lwt_result_syntax in
-        let*! r = Slot_manager.find_slot store cryptobox commitment in
+        let*! r = Slot_manager.get_commitment_slot store cryptobox commitment in
         match r with Ok s -> return_some s | Error `Not_found -> return_none)
       ctxt
 
-  let get_slot_commitment_proof ctxt commitment () () =
+  let get_commitment_proof ctxt commitment () () =
     call_handler
       (fun store cryptobox ->
         let open Lwt_result_syntax in
         (* This handler may be costly: We need to recompute the
            polynomial and then compute the proof. *)
-        let*! slot = Slot_manager.find_slot store cryptobox commitment in
+        let*! slot =
+          Slot_manager.get_commitment_slot store cryptobox commitment
+        in
         match slot with
         | Error `Not_found -> return_none
         | Ok slot -> (
@@ -134,12 +136,12 @@ let register_new :
        (Slots_handlers.patch_commitment ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
-       Services.get_slot
-       (Slots_handlers.get_slot_content ctxt)
+       Services.get_commitment_slot
+       (Slots_handlers.get_commitment_slot ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
-       Services.get_slot_commitment_proof
-       (Slots_handlers.get_slot_commitment_proof ctxt)
+       Services.get_commitment_proof
+       (Slots_handlers.get_commitment_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
        Services.get_commitment_by_published_level_and_index
