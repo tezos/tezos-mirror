@@ -38,7 +38,13 @@ let get_compiler () =
   match compiler_choice with
   | Some "singlepass" -> Wasmer.Config.SINGLEPASS
   | Some "cranelift" -> Wasmer.Config.CRANELIFT
-  | _ -> Wasmer.Config.CRANELIFT
+  | Some compiler ->
+      Format.sprintf
+        "Unknown Wasmer compiler %S (selected via %s environment variable)"
+        compiler
+        compiler_env_variable
+      |> Stdlib.failwith
+  | None -> Wasmer.Config.CRANELIFT
 
 let store =
   Lazy.from_fun @@ fun () ->
