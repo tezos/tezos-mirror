@@ -365,12 +365,8 @@ end
 
 module Client = struct
   let raw_tx_node_rpc node ~url =
-    let* rpc = RPC.Curl.get () in
-    match rpc with
-    | None -> assert false
-    | Some curl ->
-        let url = Printf.sprintf "%s/%s" (rpc_addr node) url in
-        curl ~url
+    let url = Printf.sprintf "%s/%s" (rpc_addr node) url in
+    Runnable.run (RPC.Curl.get url)
 
   let get_inbox ~tx_node ~block =
     let parse_l2_context_hash json =
