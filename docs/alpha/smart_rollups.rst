@@ -527,6 +527,40 @@ this. For instance, one can classify pages into two categories: index
 pages that are hashes for other pages and leaf pages that contain
 actual payloads.
 
+.. _configure_fast_exec_alpha:
+
+Configure WebAssembly fast execution
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When the rollup node advances its internal rollup state under normal
+operation, it does so in a mode called "Fast Execution".
+
+This mode uses Wasmer when running WebAssembly code at the moment
+which allows you to configure the compiler it will use to deal with
+the WebAssembly code. It can be done using the
+``OCTEZ_WASMER_COMPILER`` environment variable which will be picked
+up by the smart rollup node.
+
+The choice of compiler primarily affects the performance of the
+WebAssembly execution. Some compilers offer additional security
+guarantees which might be attractive to you.
+
+There are these options:
+
+.. list-table:: Wasmer compiler options
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Compiler
+     - ``OCTEZ_WASMER_COMPILER`` value
+     - Description
+   * - Singlepass
+     - ``singlepass``
+     - `When to use Singlepass <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-singlepass#when-to-use-singlepass>`_
+   * - Cranelift
+     - ``cranelift``
+     - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-cranelift#when-to-use-cranelift>`_
+
 Developing WASM Kernels
 -----------------------
 
