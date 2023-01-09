@@ -244,6 +244,8 @@ let test_vdf : Protocol.t list -> unit =
   in
   let* vdf_baker = Vdf.init ~protocol node in
   init_vdf_event_listener vdf_baker injected ;
+  let* vdf_baker2 = Vdf.init ~protocol node in
+  init_vdf_event_listener vdf_baker2 injected ;
 
   (* Bake to the end of the cycle and check that the VDF was not injected. *)
   let* level =
@@ -262,6 +264,8 @@ let test_vdf : Protocol.t list -> unit =
       injected
   in
 
-  Vdf.terminate vdf_baker
+  let* () = Vdf.terminate vdf_baker in
+  let* () = Vdf.terminate vdf_baker2 in
+  Lwt.return_unit
 
 let register ~protocols = test_vdf protocols
