@@ -25,6 +25,7 @@
 
 module Plugin = struct
   module Proto = Registerer.Registered
+  module RPC = RPC
 end
 
 let () = Dac_plugin.register (module Plugin)

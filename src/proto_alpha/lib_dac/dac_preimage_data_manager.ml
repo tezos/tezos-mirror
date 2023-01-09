@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,29 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Unit_test : sig
-  (**
-   * Example: [spec "Dac_pages_encoding.ml" Test_dac_pages_encoding.tests]
-   * Unit tests needs tag in log (like "[UNIT] some test description here...")
-   * This function handles such meta data *)
-  val spec :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
+open Protocol
+open Environment.Error_monad
 
-  (** Tests with description string without [Unit] are skipped *)
-  val _skip :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
-end = struct
-  let spec unit_name test_cases = ("[Unit] " ^ unit_name, test_cases)
-
-  let _skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
-end
+type error += Cannot_write_dac_page_to_disk of string
 
 let () =
-  Alcotest_lwt.run
-    "protocol > unit"
-    [Unit_test.spec "Dac_pages_encoding.ml" Test_dac_pages_encoding.tests]
-  |> Lwt_main.run
+  register_error_kind
+    `Permanent
+    ~id:"cannot_write_dac_page_to_disk"
+    ~title:"Cannot write Dac page to disk"
+    ~description:"Cannot write Dac page to disk"
+    ~pp:(fun ppf b58_hash ->
+      Format.fprintf ppf "Could not write dac page for hash %s" b58_hash)
+    Data_encoding.(obj1 (req "hash" string))
+    (function
+      | Cannot_write_dac_page_to_disk b58_hash -> Some b58_hash | _ -> None)
+    (fun b58_hash -> Cannot_write_dac_page_to_disk b58_hash)
+
+module type REVEAL_HASH = module type of Sc_rollup_reveal_hash
+
+module Make (Hash : REVEAL_HASH) = struct
+  let path data_dir hash =
+    let hash = Hash.to_hex hash in
+    Filename.(concat data_dir hash)
+
+  let save_bytes data_dir hash page_contents =
+    let open Lwt_result_syntax in
+    let path = path data_dir hash in
+    let*! result =
+      Lwt_utils_unix.with_atomic_open_out path @@ fun chan ->
+      Lwt_utils_unix.write_bytes chan page_contents
+    in
+    match result with
+    | Ok () -> return ()
+    | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_hex hash)
+end
+
+module Reveal_hash = Make (Sc_rollup_reveal_hash)
