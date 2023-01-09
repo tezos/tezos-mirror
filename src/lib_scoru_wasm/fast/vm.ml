@@ -48,14 +48,27 @@ let compute_fast ~reveal_step ~write_debug pvm_state =
   let* durable =
     Exec.compute ~reveal_step ~write_debug pvm_state.durable pvm_state.buffers
   in
-  (* Compute the new tick counter. *)
+  (* The WASM PVM does several maintenance operations at the end of
+     each [kernel_run] call, using the very last [Padding]
+     tick. Instead of replicating the same logic in the Fast VM, we
+     reuse it by crafting the PVM state just before that critical
+     tick. *)
   let ticks = pvm_state.max_nb_ticks in
   let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
-  (* Revert the tick state to [Padding]. *)
-  let tick_state = Padding in
-  (* Assemble state *)
-  let pvm_state = {pvm_state with durable; current_tick; tick_state} in
-  let+ pvm_state = Wasm_vm.compute_step_with_debug ~write_debug pvm_state in
+  let pvm_state =
+    {pvm_state with durable; current_tick; tick_state = Padding}
+  in
+  (* Here, we don't reuse the [write_debug] argument, because we are
+     in the [Padding] stage of the WASM PVM execution, so there is no
+     WASM execution during this tick.
+
+     Calling [compute_step_with_debug ~write_debug] has a significant
+     performance cost, because the host functions registry is
+     reconstructed.
+
+     As a consequence of these two facts, we call [compute_step] to
+     avoid this penalty.*)
+  let+ pvm_state = Wasm_vm.compute_step pvm_state in
   (pvm_state, Z.to_int64 ticks)
 
 let rec compute_step_many accum_ticks ?reveal_step
