@@ -244,12 +244,8 @@ let assert_fails_with_missing_rollup ~loc op =
     (op ctxt Zero.rollup)
     (Sc_rollup_errors.Sc_rollup_does_not_exist Zero.rollup)
 
-(** Assert commitment hash equality.
-
-    By convention, context is passed linearly as [ctxt].  This takes a context
-    argument to allow this.
-    *)
-let assert_commitment_hash_equal ~loc _ctxt x y =
+(** Assert commitment hash equality. *)
+let assert_commitment_hash_equal ~loc x y =
   Assert.equal
     ~loc
     Commitment_repr.Hash.equal
@@ -579,7 +575,7 @@ module Stake_storage_tests = struct
            ctxt
            rollup
     in
-    let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt genesis_hash c1 in
+    let* () = assert_commitment_hash_equal ~loc:__LOC__ genesis_hash c1 in
     Assert.equal_int32
       ~loc:__LOC__
       (Raw_level_repr.to_int32 (Raw_context.current_level ctxt).level)
@@ -1464,7 +1460,7 @@ module Stake_storage_tests = struct
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
 
-    let* c2, _level, ctxt =
+    let* c2, _level, _ctxt =
       lift
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
@@ -1472,10 +1468,10 @@ module Stake_storage_tests = struct
            staker2
            commitment
     in
-    let* ctxt =
+    let* _ctxt =
       lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
+    assert_commitment_hash_equal ~loc:__LOC__ c1 c2
 
   let test_last_cemented_commitment_hash_with_level () =
     let* ctxt, rollup, genesis_hash, staker =
@@ -1501,13 +1497,13 @@ module Stake_storage_tests = struct
     let* ctxt, _ =
       lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
-    let* c1', inbox_level', ctxt =
+    let* c1', inbox_level', _ctxt =
       lift
       @@ Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
            ctxt
            rollup
     in
-    let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c1' in
+    let* () = assert_commitment_hash_equal ~loc:__LOC__ c1 c1' in
     Assert.equal_int32
       ~loc:__LOC__
       (Raw_level_repr.to_int32 inbox_level)
@@ -1784,7 +1780,7 @@ module Stake_storage_tests = struct
            staker2
            commitment2
     in
-    let* (left, _right), ctxt =
+    let* (left, _right), _ctxt =
       lift
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
@@ -1792,7 +1788,7 @@ module Stake_storage_tests = struct
            staker1
            staker2
     in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash c1
+    assert_commitment_hash_equal ~loc:__LOC__ left.hash c1
 
   let test_finds_conflict_point_beneath_lcc () =
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
@@ -1840,7 +1836,7 @@ module Stake_storage_tests = struct
            staker2
            commitment3
     in
-    let* (left, right), ctxt =
+    let* (left, right), _ctxt =
       lift
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
@@ -1848,8 +1844,8 @@ module Stake_storage_tests = struct
            staker1
            staker2
     in
-    let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash c2 in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt right.hash c3
+    let* () = assert_commitment_hash_equal ~loc:__LOC__ left.hash c2 in
+    assert_commitment_hash_equal ~loc:__LOC__ right.hash c3
 
   let test_conflict_point_is_first_point_of_disagreement () =
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
@@ -1909,7 +1905,7 @@ module Stake_storage_tests = struct
     let* _c4, _level, ctxt =
       lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment4
     in
-    let* (left, right), ctxt =
+    let* (left, right), _ctxt =
       lift
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
@@ -1917,8 +1913,8 @@ module Stake_storage_tests = struct
            staker1
            staker2
     in
-    let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left.hash c2 in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt right.hash c3
+    let* () = assert_commitment_hash_equal ~loc:__LOC__ left.hash c2 in
+    assert_commitment_hash_equal ~loc:__LOC__ right.hash c3
 
   let test_conflict_point_computation_fits_in_gas_limit () =
     (* Worst case of conflict point computation: two branches of maximum
@@ -2008,7 +2004,7 @@ module Stake_storage_tests = struct
         ctxt
         (Constants_storage.hard_gas_limit_per_operation ctxt)
     in
-    let* (left, right), ctxt =
+    let* (left, right), _ctxt =
       lift
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
@@ -2020,17 +2016,9 @@ module Stake_storage_tests = struct
       match List.hd branch with Some x -> snd x | None -> assert false
     in
     let* () =
-      assert_commitment_hash_equal
-        ~loc:__LOC__
-        ctxt
-        left.hash
-        (head_hash branch_1)
+      assert_commitment_hash_equal ~loc:__LOC__ left.hash (head_hash branch_1)
     in
-    assert_commitment_hash_equal
-      ~loc:__LOC__
-      ctxt
-      right.hash
-      (head_hash branch_2)
+    assert_commitment_hash_equal ~loc:__LOC__ right.hash (head_hash branch_2)
 
   let test_no_conflict_point_one_staker_at_lcc_preboot () =
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
@@ -2221,7 +2209,7 @@ module Stake_storage_tests = struct
            staker1
            staker2
     in
-    let* (c1', c2'), ctxt =
+    let* (c1', c2'), _ctxt =
       lift
       @@ let* _c2, _level, ctxt =
            advance_level_n_refine_stake before_ctxt rollup staker2 commitment2
@@ -2235,8 +2223,8 @@ module Stake_storage_tests = struct
            staker1
            staker2
     in
-    let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt c1.hash c1'.hash in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt c2.hash c2'.hash
+    let* () = assert_commitment_hash_equal ~loc:__LOC__ c1.hash c1'.hash in
+    assert_commitment_hash_equal ~loc:__LOC__ c2.hash c2'.hash
 
   let test_concurrent_refinement_cement () =
     let* before_ctxt, rollup, genesis_hash, staker1, staker2 =
@@ -2274,7 +2262,7 @@ module Stake_storage_tests = struct
          in
          Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
     in
-    let* c2, ctxt =
+    let* c2, _ctxt =
       lift
       @@ let* c2, _level, ctxt =
            advance_level_n_refine_stake before_ctxt rollup staker2 commitment
@@ -2297,7 +2285,7 @@ module Stake_storage_tests = struct
          in
          Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
     in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
+    assert_commitment_hash_equal ~loc:__LOC__ c1 c2
 
   let record ctxt rollup level message_index =
     Sc_rollup_outbox_storage.record_applied_message
@@ -2886,10 +2874,10 @@ module Rollup_storage_tests = struct
 
   let test_initial_state_is_pre_boot () =
     let* ctxt, rollup, genesis_hash = new_context_with_rollup () in
-    let* lcc, ctxt =
+    let* lcc, _ctxt =
       lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
     in
-    assert_commitment_hash_equal ~loc:__LOC__ ctxt lcc genesis_hash
+    assert_commitment_hash_equal ~loc:__LOC__ lcc genesis_hash
 
   let test_kind_of_missing_rollup () =
     assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
