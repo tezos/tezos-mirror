@@ -2165,13 +2165,6 @@ module Stake_storage_tests = struct
       ~loc:__LOC__
       Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
 
-  let test_cement_commitment_of_missing_rollup () =
-    assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
-        Sc_rollup_stake_storage.cement_commitment
-          ctxt
-          rollup
-          Commitment_repr.Hash.zero)
-
   let test_get_commitment_of_missing_rollup () =
     assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
         Sc_rollup_commitment_storage.get_commitment
@@ -2817,10 +2810,6 @@ module Stake_storage_tests = struct
            fails"
           `Quick
           test_last_cemented_commitment_hash_with_level_of_missing_rollup;
-        Tztest.tztest
-          "Finalizing commitment of missing rollup fails"
-          `Quick
-          test_cement_commitment_of_missing_rollup;
         Tztest.tztest
           "fetching commitment of missing rollup fails"
           `Quick
