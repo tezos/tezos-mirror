@@ -647,9 +647,6 @@ module Dal = struct
       make ~data POST ["slot"; "split"] @@ fun json ->
       JSON.(json |-> "commitment" |> as_string, json |-> "proof" |> as_string)
 
-    let slot_content slot_header =
-      make GET ["slot"; "content"; slot_header] get_bytes_from_json_string_node
-
     let slot_pages slot_header =
       make GET ["slot"; "pages"; slot_header] (fun pages ->
           pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)

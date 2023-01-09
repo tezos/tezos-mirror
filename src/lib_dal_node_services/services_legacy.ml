@@ -36,14 +36,6 @@ let split_slot =
           (req "proof" Cryptobox.Commitment_proof.encoding))
     Tezos_rpc.Path.(open_root / "slot" / "split")
 
-let slot =
-  Tezos_rpc.Service.get_service
-    ~description:"Show content of a slot"
-    ~query:Tezos_rpc.Query.empty
-    ~output:Data_encoding.bytes
-    Tezos_rpc.Path.(
-      open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
-
 let slot_pages =
   Tezos_rpc.Service.get_service
     ~description:"Fetch slot as list of pages"

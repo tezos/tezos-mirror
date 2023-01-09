@@ -857,16 +857,24 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   unit
 
-let split_slot node client content =
+let split_slot dal_node client content =
   let* slot = Rollup.Dal.make_slot content client in
-  RPC.call node (Rollup.Dal.RPC.split_slot slot)
+  let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
+  let* commitment2, proof =
+    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot)
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7294
+     This assert as well as split_slot above will be removed in MR 7294.
+  *)
+  assert (String.equal commitment2 commitment) ;
+  return (commitment, proof)
 
 let test_dal_node_slot_management _protocol _parameters _cryptobox _node client
     dal_node =
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
   let* slot_commitment, _proof = split_slot dal_node client slot_content in
   let* received_slot =
-    RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_commitment)
+    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot slot_commitment)
   in
   let received_slot_content = Rollup.Dal.content_of_slot received_slot in
   Check.(

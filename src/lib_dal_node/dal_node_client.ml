@@ -48,7 +48,8 @@ let make_unix_cctxt ~addr ~port =
 
 let call (cctxt : #cctxt) = cctxt#call_service
 
-let get_slot cctxt header = call cctxt Services.slot ((), header) () ()
+let get_slot cctxt header =
+  call cctxt Services.get_commitment_slot ((), header) () ()
 
 let get_shard cctxt header shard_index =
   call cctxt Services.shard (((), header), shard_index) () ()

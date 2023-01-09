@@ -255,9 +255,6 @@ module Dal : sig
         corresponding commitment and proof *)
     val split_slot : slot -> (Dal_node.t, string * string) RPC_core.t
 
-    (** [slot_content slot_header] gets slot/content of [slot_header] *)
-    val slot_content : string -> (Dal_node.t, slot) RPC_core.t
-
     (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
     val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
 

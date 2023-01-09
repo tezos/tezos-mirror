@@ -39,14 +39,6 @@ let handle_split_slot ctxt () slot =
   in
   (Cryptobox.Commitment.to_b58check commitment, proof)
 
-let handle_slot ctxt (_, commitment) () () =
-  let open Lwt_result_syntax in
-  let*? {cryptobox; _} = Node_context.get_ready ctxt in
-  Slot_manager.get_slot
-    cryptobox
-    (Node_context.get_store ctxt).shard_store
-    commitment
-
 let handle_slot_pages ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
@@ -81,9 +73,6 @@ let handle_monitor_slot_headers ctxt () () () =
 
 let register_split_slot ctxt dir =
   Tezos_rpc.Directory.register0 dir Services.split_slot (handle_split_slot ctxt)
-
-let register_show_slot ctxt dir =
-  Tezos_rpc.Directory.register dir Services.slot (handle_slot ctxt)
 
 let register_show_slot_pages ctxt dir =
   Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)

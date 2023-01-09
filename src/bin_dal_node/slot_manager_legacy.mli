@@ -66,12 +66,6 @@ val get_shards :
   int list ->
   Cryptobox.shard list tzresult Lwt.t
 
-(** [get_slot dal_constants store slot_header] fetches from
-    disk the shards associated to [slot_header], gathers them, rebuilds and
-    returns the [slot]. *)
-val get_slot :
-  Cryptobox.t -> Shard_store.t -> Cryptobox.commitment -> slot tzresult Lwt.t
-
 (** [get_slot_pages] behaves as [get_slot], except that it also
     splits the slot into pages before returning them.
 
