@@ -51,7 +51,6 @@ let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 type node_store = {
   store : t;
   shard_store : Shard_store.t;
-  slot_headers_store : Slot_headers_store.t;
   slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
@@ -64,7 +63,6 @@ let open_slots_stream {slots_watcher; _} =
 let init config =
   let open Lwt_result_syntax in
   let dir = Configuration.data_dir_path config path in
-  let*! slot_headers_store = Slot_headers_store.load dir in
   let slots_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config dir) in
   let*! store = main repo in
@@ -74,7 +72,7 @@ let init config =
       (Filename.concat dir shard_store_path)
   in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; slots_watcher; slot_headers_store}
+  return {shard_store; store; slots_watcher}
 
 module Legacy = struct
   module Path : sig
