@@ -267,6 +267,10 @@ let wait_for_stored_slot dal_node slot_header =
       if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
       else None)
 
+let wait_for_layer1_block_processing dal_node level =
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
+      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
+
 let test_feature_flag _protocol _parameters _cryptobox node client
     _bootstrap_key =
   (* This test ensures the feature flag works:
@@ -985,8 +989,10 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7049
      Retrieve successfull & failed slots with GET /slots/<commitment>/headers
      in MR !7049. *)
+  let level = Node.get_level node in
   let* () = Client.bake_for_and_wait client in
-  let* _level = Node.wait_for_level node 1 in
+  let* level = Node.wait_for_level node (level + 1) in
+  let* () = wait_for_layer1_block_processing dal_node level in
   let* block = RPC.call node (RPC.get_chain_block_hash ()) in
   let* slot_headers =
     RPC.call dal_node (Rollup.Dal.RPC.stored_slot_headers block)
