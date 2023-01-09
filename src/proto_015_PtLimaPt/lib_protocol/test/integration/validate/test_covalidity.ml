@@ -40,8 +40,6 @@ open Alpha_context
 
 (** Values of number of bootstraps to create.*)
 
-let default_batch_max_size = 49
-
 let default_nb_bootstrap = 7
 
 let nb_permutations = 30
@@ -98,7 +96,7 @@ let print_candidates candidates =
 let covalid_permutation_and_bake ks nb_bootstrap =
   let open Lwt_result_syntax in
   let* state, candidates =
-    covalid ks ~nb_bootstrap ~max_batch_size:default_batch_max_size
+    covalid ks ~nb_bootstrap ~max_batch_size:Operation_generator.max_batch_size
   in
   print_candidates candidates ;
   let* () = sequential_validate state.block candidates in

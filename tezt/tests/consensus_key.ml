@@ -66,6 +66,11 @@ let blocks_per_cycle = 4
 
 let preserved_cycles = 1
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4243
+   Instead of [~expect_failure:true], the helpers should take a
+   function that identifies which error should happen, to avoid the
+   tests succeeding for wrong reasons. *)
+
 let test_update_consensus_key =
   Protocol.register_test
     ~__FILE__
@@ -333,10 +338,7 @@ let test_update_consensus_key =
       client
   in
 
-  let* old_balance = Client.get_balance_for ~account:destination.alias client in
-  let* old_balance5 =
-    Client.get_balance_for ~account:Constant.bootstrap5.alias client
-  in
+  Log.info "Inject a valid drain..." ;
   let* () =
     Client.drain_delegate
       ~delegate:Constant.bootstrap4.alias
@@ -344,49 +346,34 @@ let test_update_consensus_key =
       ~destination:destination.alias
       client
   in
+  Log.info
+    "Check that after a drain, the mempool rejects a manager operation from \
+     the same manager..." ;
   let* () =
     Client.transfer
+      ~expect_failure:true
       ~burn_cap:Tez.one
       ~amount:(Tez.of_int 1)
       ~giver:Constant.bootstrap4.alias
       ~receiver:Constant.bootstrap5.alias
       client
   in
+  Log.info "Bake and check the effects of the valid drain..." ;
+  let* old_balance = Client.get_balance_for ~account:destination.alias client in
   let* () = Client.bake_for_and_wait ~keys:[Constant.bootstrap1.alias] client in
-  Log.info
-    "Check that other manager operations are not included after a drain..." ;
-  let* () =
-    let* json =
-      RPC.get_chain_mempool_pending_operations () |> RPC.Client.call client
-    in
-    let delayed_op_kind =
-      JSON.(
-        json |-> "branch_delayed" |> geti 0 |-> "contents" |> geti 0 |-> "kind"
-        |> encode)
-    in
-    Check.((delayed_op_kind = "\"transaction\"") string)
-      ~error_msg:
-        "The transaction is not in the branch_delayed pool (expected %R, got \
-         %L)" ;
-    Lwt.return_unit
+  let* new_balance4 =
+    Client.get_balance_for ~account:Constant.bootstrap4.alias client
   in
-  Log.info "The manager account has been drained..." ;
-  let* b = Client.get_balance_for ~account:Constant.bootstrap4.alias client in
-  Check.((b = Tez.zero) Tez.typ) ~error_msg:"Manager balance is not empty" ;
+  Check.(new_balance4 = Tez.zero)
+    Tez.typ
+    ~error_msg:"Drained account should be empty but its balance is %L." ;
   let* new_balance = Client.get_balance_for ~account:destination.alias client in
   Check.(old_balance < new_balance)
     Tez.typ
-    ~error_msg:"Destination account has not been credited" ;
-  let* new_balance5 =
-    Client.get_balance_for ~account:Constant.bootstrap5.alias client
-  in
-  Check.(new_balance5 = old_balance5)
-    Tez.typ
-    ~error_msg:"Manager operation was included" ;
+    ~error_msg:"Destination account of the drain has not been credited." ;
 
   Log.info
-    "Check that a drain conflicts with (ie is not included after) a manager \
-     operation of the same delegate..." ;
+    "Check that a drain replaces a manager operation from the same delegate..." ;
   let* () =
     Client.transfer
       ~burn_cap:Tez.one
@@ -397,37 +384,53 @@ let test_update_consensus_key =
   in
   let* () =
     Client.drain_delegate
-      ~expect_failure:true
       ~delegate:Constant.bootstrap3.alias
       ~consensus_key:key_a.alias
       ~destination:destination.alias
       client
   in
-  let* old_balance3 =
-    Client.get_balance_for ~account:Constant.bootstrap3.alias client
+  let* () =
+    let* json =
+      RPC.get_chain_mempool_pending_operations () |> RPC.Client.call client
+    in
+    let replaced_op = JSON.(json |-> "outdated" |> geti 0) in
+    let replaced_op_kind =
+      JSON.(replaced_op |-> "contents" |> geti 0 |-> "kind" |> as_string)
+    in
+    Check.((replaced_op_kind = "transaction") string)
+      ~error_msg:
+        "Expected the replaced transaction to be in the outdated pool, but \
+         instead found %L." ;
+    let replaced_op_err =
+      JSON.(replaced_op |-> "error" |> geti 0 |-> "id" |> as_string)
+    in
+    Check.((replaced_op_err = "prevalidation.operation_replacement") string)
+      ~error_msg:
+        "The replaced transaction has an unexpected error (expected %R, got \
+         %L)." ;
+    Lwt.return_unit
   in
+  let* old_balance = Client.get_balance_for ~account:destination.alias client in
   let* old_balance5 =
     Client.get_balance_for ~account:Constant.bootstrap5.alias client
   in
-  let* old_balance = Client.get_balance_for ~account:destination.alias client in
-
   let* () = Client.bake_for_and_wait ~keys:[Constant.bootstrap1.alias] client in
-
+  let* new_balance3 =
+    Client.get_balance_for ~account:Constant.bootstrap3.alias client
+  in
+  Check.(new_balance3 = Tez.zero)
+    Tez.typ
+    ~error_msg:"Drained account should be empty but its balance is %L." ;
+  let* new_balance = Client.get_balance_for ~account:destination.alias client in
+  Check.(old_balance < new_balance)
+    Tez.typ
+    ~error_msg:"Destination account of the drain has not been credited." ;
   let* new_balance5 =
     Client.get_balance_for ~account:Constant.bootstrap5.alias client
   in
-  let* new_balance = Client.get_balance_for ~account:destination.alias client in
-  Check.(old_balance = new_balance)
+  Check.(old_balance5 = new_balance5)
     Tez.typ
-    ~error_msg:"Drain operation was included (destination balance changed)" ;
-  Check.(old_balance3 > Tez.zero)
-    Tez.typ
-    ~error_msg:
-      "Drain operation was included (delegate balance changed: old %L versus \
-       new %R)" ;
-  Check.(old_balance5 < new_balance5)
-    Tez.typ
-    ~error_msg:"Destination account has not been credited" ;
+    ~error_msg:"Destination of the transaction has been credited." ;
 
   unit
 

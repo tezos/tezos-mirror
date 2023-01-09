@@ -39,24 +39,6 @@
     consistency. This module is stateless and creates and manipulates the
     prevalidation_state. *)
 
-type 'protocol_operation operation = private {
-  hash : Tezos_crypto.Operation_hash.t;  (** Hash of an operation. *)
-  raw : Operation.t;
-      (** Raw representation of an operation (from the point view of the
-          shell). *)
-  protocol : 'protocol_operation;
-      (** Economic protocol specific data of an operation. It is the
-          unserialized representation of [raw.protocol_data]. For
-          convenience, the type associated to this type may be [unit] if we
-          do not have deserialized the operation yet. *)
-  count_successful_prechecks : int;
-      (** This field provides an under-approximation for the number of times
-          the operation has been successfully prechecked. It is an
-          under-approximation because if the operation is e.g., parsed more than
-          once, or is prechecked in other modes, this flag is not globally
-          updated. *)
-}
-
 module type T = sig
   (** Similar to the same type in the protocol,
       see {!Tezos_protocol_environment.PROTOCOL.operation} *)
@@ -64,11 +46,13 @@ module type T = sig
 
   (** Similar to the same type in the protocol,
       see {!Tezos_protocol_environment.PROTOCOL} *)
-  type operation_receipt
-
-  (** Similar to the same type in the protocol,
-      see {!Tezos_protocol_environment.PROTOCOL} *)
   type validation_state
+
+  (** Type {!Shell_plugin.FILTER.Mempool.state}. *)
+  type filter_state
+
+  (** Type {!Shell_plugin.FILTER.Mempool.config}. *)
+  type filter_config
 
   (** The type implemented by {!Tezos_store.Store.chain_store} in
       production, and mocked in tests *)
@@ -78,98 +62,85 @@ module type T = sig
       then passed back and possibly updated by {!apply_operation}. *)
   type t
 
-  (** [parse hash op] reads a usual {!Operation.t} and lifts it to the
-      type {!protocol_operation} used by this module. This function is in the
-      {!tzresult} monad, because it can return the following errors:
-
-      - {!Validation_errors.Oversized_operation} if the size of the operation
-        data within [op] is too large (to protect against DoS attacks), and
-      - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
-  val parse :
-    Tezos_crypto.Operation_hash.t ->
-    Operation.t ->
-    protocol_operation operation tzresult
-
-  (** [increment_successful_precheck op] increments the field
-      [count_successful_prechecks] of the given operation [op]. It is supposed
-      to be called after each successful precheck of a given operation [op],
-      and nowhere else. Overflow is unlikely to occur in practice, as the
-      counter grows very slowly and the number of prechecks is bounded. *)
-  val increment_successful_precheck :
-    protocol_operation operation -> protocol_operation operation
-
   (** Creates a new prevalidation context w.r.t. the protocol associated with
-      the predecessor block. *)
+      the head block. *)
   val create :
     chain_store ->
-    predecessor:Store.Block.t ->
-    live_operations:Tezos_crypto.Operation_hash.Set.t ->
+    head:Store.Block.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
 
-  (** Values returned by {!create}. They are obtained from the result
-      of the protocol [apply_operation] function and the classification of
-      errors. *)
-  type result =
-    | Applied of t * operation_receipt
-    | Branch_delayed of tztrace
-    | Branch_refused of tztrace
-    | Refused of tztrace
-    | Outdated of tztrace
+  (** If an old operation has been replaced by a newly added
+      operation, then this type contains its hash and its new
+      classification. If there is no replaced operation, this is [None]. *)
+  type replacement =
+    (Tezos_crypto.Operation_hash.t
+    * Prevalidator_classification.error_classification)
+    option
 
-  (** [apply_operation t op] calls the protocol [apply_operation] function
-      and handles possible errors, hereby yielding a classification *)
-  val apply_operation : t -> protocol_operation operation -> result Lwt.t
+  (** Result of {!add_operation}.
+
+      Contain the updated (or unchanged) state {!t} and
+      {!filter_state}, the operation (in which
+      [count_successful_prechecks] has been incremented if
+      appropriate), its classification, and the potential
+      {!replacement}.
+
+      Invariant: [replacement] can only be [Some _] when the
+      classification is [`Prechecked]. *)
+  type add_result =
+    t
+    * filter_state
+    * protocol_operation Shell_operation.operation
+    * Prevalidator_classification.classification
+    * replacement
+
+  (** Call the protocol [Mempool.add_operation] function, providing it
+      with the [conflict_handler] from the plugin.
+
+      Then if the protocol accepts the operation, call the plugin
+      [add_operation_and_enforce_mempool_bound], which is responsible
+      for bounding the number of manager operations in the mempool.
+
+      See {!add_result} for a description of the output. *)
+  val add_operation :
+    t ->
+    filter_state ->
+    filter_config ->
+    protocol_operation Shell_operation.operation ->
+    add_result Lwt.t
 
   (** [validation_state t] returns the subset of [t] corresponding
       to the type {!validation_state} of the protocol. *)
   val validation_state : t -> validation_state
 
-  (** Updates the subset of [t] corresponding to the type
-      {!validation_state} of the protocol. *)
-  val set_validation_state : t -> validation_state -> t
-
-  val pp_result : Format.formatter -> result -> unit
-
   module Internal_for_tests : sig
-    (** Returns operations for which {!apply_operation} returned [Applied _]
-        so far. *)
-    val to_applied :
-      t -> (protocol_operation operation * operation_receipt) list
+    (** Return the map of operations currently present in the protocol
+        representation of the mempool. *)
+    val get_valid_operations :
+      t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+
+    (** Type {!Tezos_protocol_environment.PROTOCOL.Mempool.validation_info}. *)
+    type validation_info
+
+    (** Modify the [validation_info] field of the internal state [t]. *)
+    val set_validation_info : t -> validation_info -> t
   end
 end
 
 (** How-to obtain an instance of this module's main module type: {!T} *)
-module Make : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
+module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
-    with type protocol_operation = Proto.operation
-     and type operation_receipt = Proto.operation_receipt
-     and type validation_state = Proto.validation_state
+    with type protocol_operation = Filter.Proto.operation
+     and type validation_state = Filter.Proto.validation_state
+     and type filter_state = Filter.Mempool.state
+     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store
 
 (**/**)
 
 module Internal_for_tests : sig
-  (** Returns the {!Operation.t} underlying an {!operation} *)
-  val to_raw : _ operation -> Operation.t
-
-  (** The hash of an {!operation} *)
-  val hash_of : _ operation -> Tezos_crypto.Operation_hash.t
-
-  (** A constructor for the [operation] datatype. It by-passes the
-      checks done by the [parse] function. *)
-  val make_operation :
-    Operation.t -> Tezos_crypto.Operation_hash.t -> 'a -> 'a operation
-
-  (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
-      Any error happening during parsing becomes {!Parse_error}.
-
-      If one day the functor's signature is simplified, tests could use
-      [parse_unsafe] directly rather than relying on this function to
-      replace [Proto.operation_data_encoding]. *)
-  val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
-
   module type CHAIN_STORE = sig
     (** The [chain_store] type. Implemented by
         {!Tezos_store.Store.chain_store} in production and mocked in
@@ -191,11 +162,14 @@ module Internal_for_tests : sig
       for mocking purposes. *)
   module Make : functor
     (Chain_store : CHAIN_STORE)
-    (Proto : Tezos_protocol_environment.PROTOCOL)
+    (Filter : Shell_plugin.FILTER)
     ->
     T
-      with type protocol_operation = Proto.operation
-       and type operation_receipt = Proto.operation_receipt
-       and type validation_state = Proto.validation_state
+      with type protocol_operation = Filter.Proto.operation
+       and type validation_state = Filter.Proto.validation_state
+       and type filter_state = Filter.Mempool.state
+       and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
+       and type Internal_for_tests.validation_info =
+        Filter.Proto.Mempool.validation_info
 end

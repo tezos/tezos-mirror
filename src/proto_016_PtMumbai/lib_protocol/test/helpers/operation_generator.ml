@@ -828,6 +828,19 @@ let generate_manager_operation batch_size =
   let protocol_data = {contents = contents_list; signature} in
   return (Operation.pack {shell = first_op.shell; protocol_data})
 
+(** The default upper bound on the number of manager operations in a batch.
+
+    As of December 2022, there is no batch maximal size enforced
+    anywhere in the protocol. However, the Octez Shell only accepts
+    batches of at most [operations_batch_size] operations, which has a
+    default value of [50] in [src/lib_shell_services/shell_limits.ml].
+    The protocol tests do not necessarily have to align with this
+    value, but there is no reason either to choose a different
+    one. Therefore, they use the same bound, but decremented once to
+    account for some tests adding a reveal at the front of the batch as
+    needed. *)
+let max_batch_size = 49
+
 let generate_operation =
   let open QCheck2.Gen in
   let* pass = oneofl all_passes in
@@ -848,7 +861,7 @@ let generate_operation =
     | `KProposals -> generate_operation generate_proposals
     | `KBallot -> generate_operation generate_ballot
     | `KManager ->
-        let* batch_size = int_range 1 49 in
+        let* batch_size = int_range 1 max_batch_size in
         generate_manager_operation batch_size
   in
   (kind, (Operation.hash_packed packed_operation, packed_operation))

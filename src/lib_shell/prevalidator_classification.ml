@@ -33,6 +33,8 @@
    start with the "legacy" prefix and will be removed when Lima is
    activated on Mainnet. *)
 
+open Shell_operation
+
 module Event = struct
   let section = ["prevalidator_classification"]
 
@@ -67,7 +69,7 @@ module Sized_map = Tezos_base.Sized.MakeSizedMap (Map)
 *)
 type 'protocol_data bounded_map = {
   ring : Tezos_crypto.Operation_hash.t Ringo.Ring.t;
-  mutable map : ('protocol_data Prevalidation.operation * error list) Map.t;
+  mutable map : ('protocol_data operation * error list) Map.t;
 }
 
 let map bounded_map = bounded_map.map
@@ -95,11 +97,10 @@ type 'protocol_data t = {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev : 'protocol_data Prevalidation.operation list;
-  mutable prechecked : 'protocol_data Prevalidation.operation Sized_map.t;
+  mutable applied_rev : 'protocol_data operation list;
+  mutable prechecked : 'protocol_data operation Sized_map.t;
   mutable unparsable : Tezos_crypto.Operation_hash.Set.t;
-  mutable in_mempool :
-    ('protocol_data Prevalidation.operation * classification) Map.t;
+  mutable in_mempool : ('protocol_data operation * classification) Map.t;
 }
 
 let create parameters =
@@ -153,7 +154,7 @@ let flush (classes : 'protocol_data t) ~handle_branch_refused =
   let remove_list_from_in_mempool list =
     classes.in_mempool <-
       List.fold_left
-        (fun mempool op -> Map.remove op.Prevalidation.hash mempool)
+        (fun mempool op -> Map.remove op.hash mempool)
         classes.in_mempool
         list
   in
@@ -205,8 +206,7 @@ let remove oph classes =
        | `Applied ->
            classes.applied_rev <-
              List.filter
-               (fun op ->
-                 Tezos_crypto.Operation_hash.(op.Prevalidation.hash <> oph))
+               (fun op -> Tezos_crypto.Operation_hash.(op.hash <> oph))
                classes.applied_rev) ;
       Some (op, classification)
 
@@ -260,14 +260,14 @@ let add_unparsable oph classes =
 
 let add classification op classes =
   match classification with
-  | `Applied -> handle_applied op.Prevalidation.hash op classes
-  | `Prechecked -> handle_prechecked op.Prevalidation.hash op classes
+  | `Applied -> handle_applied op.hash op classes
+  | `Prechecked -> handle_prechecked op.hash op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
     classification ->
-      handle_error op.Prevalidation.hash op classification classes
+      handle_error op.hash op classification classes
 
 let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
-    ~outdated classes : 'protocol_data Prevalidation.operation Map.t =
+    ~outdated classes : 'protocol_data operation Map.t =
   let ( +> ) accum to_add =
     let merge_fun _k accum_v_opt to_add_v_opt =
       match (accum_v_opt, to_add_v_opt) with
@@ -290,7 +290,7 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
     (if prechecked then Sized_map.to_map classes.prechecked else Map.empty)
   @@ (if applied then
       List.to_seq classes.applied_rev
-      |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+      |> Seq.map (fun op -> (op.hash, op))
       |> Map.of_seq
      else Map.empty)
      +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
@@ -299,7 +299,7 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
      +> if outdated then classes.outdated.map else Map.empty
 
 type 'block block_tools = {
-  hash : 'block -> Tezos_crypto.Block_hash.t;
+  bhash : 'block -> Tezos_crypto.Block_hash.t;
   operations : 'block -> Operation.t list list;
   all_operation_hashes : 'block -> Tezos_crypto.Operation_hash.t list list;
 }
@@ -319,10 +319,10 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
     ~(parse :
        Tezos_crypto.Operation_hash.t ->
        Operation.t ->
-       'protocol_data Prevalidation.operation option) old_mempool =
+       'protocol_data operation option) old_mempool =
   let open Lwt_syntax in
   let rec pop_block ancestor (block : 'block) mempool =
-    let hash = block_store.hash block in
+    let hash = block_store.bhash block in
     if Tezos_crypto.Block_hash.equal hash ancestor then Lwt.return mempool
     else
       let operations = block_store.operations block in
@@ -386,13 +386,12 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
     chain.new_blocks ~from_block:from_branch ~to_block:to_branch
   in
   let+ mempool =
-    pop_block (block_store.hash ancestor) from_branch old_mempool
+    pop_block (block_store.bhash ancestor) from_branch old_mempool
   in
   let new_mempool = List.fold_left push_block mempool path in
   let new_mempool, outdated =
     Map.partition
-      (fun _oph op ->
-        is_branch_alive op.Prevalidation.raw.Operation.shell.branch)
+      (fun _oph op -> is_branch_alive op.raw.Operation.shell.branch)
       new_mempool
   in
   Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
@@ -479,7 +478,7 @@ module Internal_for_tests = struct
       } =
     let applied_pp ppf applied =
       applied
-      |> List.map (fun op -> op.Prevalidation.hash)
+      |> List.map (fun op -> op.hash)
       |> Format.fprintf
            ppf
            "%a"

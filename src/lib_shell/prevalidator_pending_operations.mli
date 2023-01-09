@@ -34,6 +34,8 @@
    start with the "legacy" prefix and will be removed when Lima is
    activated on Mainnet. *)
 
+open Shell_operation
+
 (** The priority of a pending operation.
 
     A priority is attached to each pending operation. *)
@@ -56,8 +58,7 @@ val hashes : 'protocol_data t -> Tezos_crypto.Operation_hash.Set.t
 
 (** [operations p] returns the Map of bindings [oph -> op] contained in [p] *)
 val operations :
-  'protocol_data t ->
-  'protocol_data Prevalidation.operation Tezos_crypto.Operation_hash.Map.t
+  'protocol_data t -> 'protocol_data operation Tezos_crypto.Operation_hash.Map.t
 
 (** [is_empty p] returns [true] if [p] has operations, [false] otherwise. *)
 val is_empty : 'protocol_data t -> bool
@@ -80,10 +81,7 @@ val mem : Tezos_crypto.Operation_hash.t -> 'protocol_data t -> bool
     as the caller of the function to ensure this.
 *)
 val add :
-  'protocol_data Prevalidation.operation ->
-  priority ->
-  'protocol_data t ->
-  'protocol_data t
+  'protocol_data operation -> priority -> 'protocol_data t -> 'protocol_data t
 
 (** [remove oph op p] removes the binding [oph] from [p].
 
@@ -112,7 +110,7 @@ val cardinal : 'protocol_data t -> int
 val fold :
   (priority ->
   Tezos_crypto.Operation_hash.t ->
-  'protocol_data Prevalidation.operation ->
+  'protocol_data operation ->
   'a ->
   'a) ->
   'protocol_data t ->
@@ -123,7 +121,7 @@ val fold :
 val iter :
   (priority ->
   Tezos_crypto.Operation_hash.t ->
-  'protocol_data Prevalidation.operation ->
+  'protocol_data operation ->
   unit) ->
   'protocol_data t ->
   unit
@@ -134,7 +132,7 @@ val iter :
 val fold_es :
   (priority ->
   Tezos_crypto.Operation_hash.t ->
-  'protocol_data Prevalidation.operation ->
+  'protocol_data operation ->
   'a ->
   ('a, 'b) result Lwt.t) ->
   'protocol_data t ->

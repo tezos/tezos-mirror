@@ -35,24 +35,24 @@
     These events are defined in [lib_workers/worker_events.ml], and
     the section name comes from the [Name] module given as argument to
     [Worker.MakeGroup] in either [lib_shell/prevalidator_internal.ml]
-    (for Lima and Alpha) or [lib_shell/legacy_prevalidator_internal.ml]
-    (for Kathmandu). They should not be confused with the
+    (for protocols Lima and up) or [lib_shell/legacy_prevalidator_internal.ml]
+    (for Kathmandu and older). They should not be confused with the
     prevalidator-specific events from
     [lib_shell/prevalidator_events.ml], which are always in the
     "prevalidator" section regardless of the protocol version. *)
-let prevalidator_worker_event_section = function
-  | Protocol.Kathmandu -> "legacy_prevalidator"
-  | Lima | Mumbai | Alpha -> "prevalidator"
+let prevalidator_worker_event_section protocol =
+  if Protocol.number protocol <= 014 (* Kathmandu *) then "legacy_prevalidator"
+  else "prevalidator"
 
 (** The [event_sections_levels] argument that should be provided to
     {!Node.init} in order to observe all debug-level prevalidator
     events, depending on the protocol version. See
     {!prevalidator_worker_event_section} regarding the section
     names. *)
-let prevalidator_debug = function
-  | Protocol.Kathmandu ->
-      [("prevalidator", `Debug); ("legacy_prevalidator", `Debug)]
-  | Lima | Mumbai | Alpha -> [("prevalidator", `Debug)]
+let prevalidator_debug protocol =
+  if Protocol.number protocol <= 014 (* Kathmandu *) then
+    [("prevalidator", `Debug); ("legacy_prevalidator", `Debug)]
+  else [("prevalidator", `Debug)]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1657
 
@@ -829,9 +829,11 @@ module Revamped = struct
        the [force] argument of [inject] defaults to [false] so the faulty \
        injected operation is discarded." ;
     let error =
-      rex
-        ~opts:[`Dotall]
-        "Only one manager operation per manager per block allowed"
+      if Protocol.number protocol <= 014 (* Kathmandu *) then
+        rex "Only one manager operation per manager per block allowed"
+      else
+        rex
+          {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
     in
     let* (`OpHash _) =
       Operation.Manager.(
@@ -1048,7 +1050,7 @@ module Revamped = struct
     Check.(
       (!to_reclassified = false)
         bool
-        ~error_msg:"a flush have been triggered after the ban") ;
+        ~error_msg:"A flush has been triggered after the ban.") ;
     unit
 
   (* This test checks that on a ban of an applied operation the flush respect

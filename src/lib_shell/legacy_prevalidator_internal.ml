@@ -264,7 +264,7 @@ end
     this functor doesn't assume a specific chain store implementation,
     which is the crux for having it easily unit-testable. *)
 module Make_s
-    (Filter : Shell_plugin.FILTER)
+    (Filter : Legacy_mempool_plugin.FILTER)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                            Filter.Proto.validation_state
@@ -1056,7 +1056,7 @@ module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
     Note that, because this functor [include]s {!Make_s}, it is a
     strict extension of [Make_s]. *)
 module Make
-    (Filter : Shell_plugin.FILTER)
+    (Filter : Legacy_mempool_plugin.FILTER)
     (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
@@ -1649,7 +1649,8 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
-let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) : t =
+let make limits chain_db chain_id (module Filter : Legacy_mempool_plugin.FILTER)
+    : t =
   let module Prevalidation_t = Prevalidation.Make (Filter.Proto) in
   let module Prevalidator =
     Make
@@ -1703,7 +1704,7 @@ module Internal_for_tests = struct
     }
 
   module Make
-      (Filter : Shell_plugin.FILTER)
+      (Filter : Legacy_mempool_plugin.FILTER)
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state

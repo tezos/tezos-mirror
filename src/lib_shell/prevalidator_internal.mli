@@ -57,8 +57,7 @@ module Internal_for_tests : sig
     advertise_current_head : mempool:Mempool.t -> Store.Block.t -> unit;
     chain_tools : Store.Block.t Prevalidator_classification.chain_tools;
     create :
-      predecessor:Store.Block.t ->
-      live_operations:Tezos_crypto.Operation_hash.Set.t ->
+      head:Store.Block.t ->
       timestamp:Time.Protocol.t ->
       unit ->
       'prevalidation_t tzresult Lwt.t;
@@ -97,9 +96,9 @@ module Internal_for_tests : sig
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state
-                            and type protocol_operation = Filter.Proto.operation
-                            and type operation_receipt =
-                             Filter.Proto.operation_receipt) : sig
+                            and type filter_state = Filter.Mempool.state
+                            and type filter_config = Filter.Mempool.config
+                            and type protocol_operation = Filter.Proto.operation) : sig
     (** The corresponding internal type of the mempool (see {!Prevalidator.S}),
         that depends on the protocol *)
     type types_state

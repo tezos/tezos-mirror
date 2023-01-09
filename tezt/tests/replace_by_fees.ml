@@ -191,7 +191,11 @@ let mk_batch client op_data size =
 *)
 let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
     ~incheck1 ~incheck2 ~postcheck2 ?op3 ?(size3 = 1) ?incheck3 ?postcheck3 () =
-  Protocol.register_test ~__FILE__ ~title ~tags:["replace"; "fee"; "manager"]
+  Protocol.register_test
+    ~__FILE__
+    ~title
+    ~tags:["replace"; "fee"; "manager"]
+    ~supports:(Protocol.From_protocol 015)
   @@ fun protocol ->
   let* nodes = Helpers.init ~protocol () in
   let client = nodes.main.client in
@@ -474,7 +478,10 @@ let sum_fees_overflow =
     ~op2:{default_op with fee = max_int}
     ~size2:10
     ~incheck1:check_applied
-    ~incheck2:check_refused
+      (* We notice that the source cannot afford the fees before finding
+         out that the fees overflow, hence the branch_delayed
+         classification instead of refused. *)
+    ~incheck2:check_branch_delayed
     ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
     ()
 

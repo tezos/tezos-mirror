@@ -77,13 +77,23 @@ let check_validate_1m_restriction_node =
     unit
   in
 
+  let new_mempool_conflict_rex =
+    rex
+      {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
+  in
+  let conflict_rex_with_precheck, conflict_rex_without_precheck =
+    if Protocol.number protocol <= 014 (* Kathmandu *) then
+      ( rex "Only one manager operation per manager per block allowed",
+        rex "Manager .* already has the operation .* in the current block." )
+    else (new_mempool_conflict_rex, new_mempool_conflict_rex)
+  in
   let* () =
     inject_two_manager_operations_and_check_error
       ~disable_operations_precheck:false
-      (rex "Only one manager operation per manager per block allowed")
+      conflict_rex_with_precheck
   in
   inject_two_manager_operations_and_check_error
     ~disable_operations_precheck:true
-    (rex "Manager.*already has the operation.*in the current block.")
+    conflict_rex_without_precheck
 
 let register ~protocols = check_validate_1m_restriction_node protocols

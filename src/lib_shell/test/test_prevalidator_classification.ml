@@ -41,6 +41,7 @@
 *)
 
 open Lib_test.Qcheck2_helpers
+open Shell_operation
 module Classification = Prevalidator_classification
 
 let is_in_mempool oph t = Classification.is_in_mempool oph t <> None
@@ -57,7 +58,7 @@ module Operation_map = struct
              Tezos_crypto.Operation_hash.pp
              oph
              Operation.pp
-             op.Prevalidation.raw))
+             op.raw))
       (Tezos_crypto.Operation_hash.Map.bindings map)
 
   let pp ppf map =
@@ -71,27 +72,23 @@ module Operation_map = struct
              Tezos_crypto.Operation_hash.pp
              oph
              Operation.pp
-             op.Prevalidation.raw))
+             op.raw))
       (Tezos_crypto.Operation_hash.Map.bindings map)
 
   (* Uses polymorphic equality on tztraces! *)
   let eq =
     Tezos_crypto.Operation_hash.Map.equal (fun (o1, t1) (o2, t2) ->
-        Tezos_crypto.Operation_hash.equal o1.Prevalidation.hash o2.hash
-        && t1 = t2)
+        Tezos_crypto.Operation_hash.equal o1.hash o2.hash && t1 = t2)
 end
 
 type classification_event =
-  | Add_if_not_present of
-      Classification.classification * unit Prevalidation.operation
+  | Add_if_not_present of Classification.classification * unit operation
   | Remove of Tezos_crypto.Operation_hash.t
   | Flush of bool
 
 let drop oph t =
   let open Classification in
-  let (_ : (unit Prevalidation.operation * classification) option) =
-    remove oph t
-  in
+  let (_ : (unit operation * classification) option) = remove oph t in
   ()
 
 let play_event event t =
@@ -123,7 +120,7 @@ module Extra_generators = struct
     in
     let remove_gen =
       let+ op = Generators.with_t_operation_gen t in
-      Remove op.Prevalidation.hash
+      Remove op.hash
     in
     let flush_gen =
       let+ b = bool in
@@ -192,7 +189,7 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   +> (Classification.Sized_map.to_seq t.prechecked
      |> Seq.map fst |> Tezos_crypto.Operation_hash.Set.of_seq)
   +> (Tezos_crypto.Operation_hash.Set.of_list
-     @@ List.rev_map (fun op -> op.Prevalidation.hash) t.applied_rev)
+     @@ List.rev_map (fun op -> op.hash) t.applied_rev)
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
@@ -274,7 +271,7 @@ let event_pp pp = function
         classification_pp
         classification
         Tezos_crypto.Operation_hash.pp
-        op.Prevalidation.hash
+        op.hash
   | Remove oph ->
       Format.fprintf pp "Remove %a" Tezos_crypto.Operation_hash.pp oph
   | Flush handle_branch_refused ->
@@ -354,7 +351,7 @@ let test_is_in_mempool_remove =
     Generators.(Gen.pair t_with_operation_gen unrefused_classification_gen)
   @@ fun ((t, op), unrefused_classification) ->
   Classification.add unrefused_classification op t ;
-  let oph = op.Prevalidation.hash in
+  let oph = op.hash in
   qcheck_eq_true ~actual:(is_in_mempool oph t) ;
   drop oph t ;
   qcheck_eq_false ~actual:(is_in_mempool oph t) ;
@@ -367,7 +364,7 @@ let test_is_applied =
     Generators.(Gen.pair t_gen (operation_with_hash_gen ()))
   @@ fun (t, op) ->
   Classification.add `Applied op t ;
-  let oph = op.Prevalidation.hash in
+  let oph = op.hash in
   qcheck_eq_true ~actual:(is_in_mempool oph t) ;
   match Classification.remove oph t with
   | None -> false
@@ -407,7 +404,7 @@ module Unparsable = struct
       ~name:"[is_known_unparsable oph (add_unparsable oph t)] holds"
       Generators.(t_with_operation_gen)
     @@ fun (t, op) ->
-    let oph = op.Prevalidation.hash in
+    let oph = op.hash in
     Classification.add_unparsable oph t ;
     qcheck_eq_true ~actual:(Classification.is_known_unparsable oph t) ;
     true
@@ -422,14 +419,14 @@ module Unparsable = struct
       ~name:"[is_known_unparsable _ (flush t)] does not hold"
       (Gen.pair Generators.t_with_operation_gen Gen.bool)
     @@ fun ((t, op), handle_branch_refused) ->
-    let oph = op.Prevalidation.hash in
+    let oph = op.hash in
     Classification.Internal_for_tests.flush ~handle_branch_refused t ;
     qcheck_eq_false ~actual:(Classification.is_known_unparsable oph t) ;
     true
 end
 
 module Bounded = struct
-  type binding = unit Prevalidation.operation
+  type binding = unit operation
 
   type custom =
     unit Classification.t
@@ -451,7 +448,7 @@ module Bounded = struct
     in
     let binding_pp ppf bindings =
       bindings
-      |> List.map (fun value -> value.Prevalidation.hash)
+      |> List.map (fun value -> value.hash)
       |> Format.pp_print_list Tezos_crypto.Operation_hash.pp ppf
     in
     Format.asprintf
@@ -498,7 +495,7 @@ module Bounded = struct
     List.iter (fun op -> Classification.add classification op t) ops
 
   let check_discarded_contains_ops ~discarded_hashes ~ops =
-    let excess_hashes = List.map (fun op -> op.Prevalidation.hash) ops in
+    let excess_hashes = List.map (fun op -> op.hash) ops in
     if
       not
         (List.for_all
@@ -546,9 +543,7 @@ module Bounded = struct
       (custom_gen discarded_operations_rev)
     @@ fun (t, error_classification, first_ops, other_ops) ->
     (* We must not have duplicate operation hashes otherwise we may not go over the bound *)
-    let hashes =
-      first_ops @ other_ops |> List.map (fun op -> op.Prevalidation.hash)
-    in
+    let hashes = first_ops @ other_ops |> List.map (fun op -> op.hash) in
     let unique_hashes = Tezos_crypto.Operation_hash.Set.of_list hashes in
     QCheck2.assume
       Compare.List_length_with.(
@@ -594,7 +589,7 @@ module To_map = struct
         fmt
         "%a:%a"
         Tezos_crypto.Operation_hash.pp
-        op.Prevalidation.hash
+        op.hash
         Operation.pp
         op.raw
     in
@@ -602,7 +597,7 @@ module To_map = struct
 
   let map_eq =
     Tezos_crypto.Operation_hash.Map.equal (fun op1 op2 ->
-        Operation.equal op1.Prevalidation.raw op2.raw)
+        Operation.equal op1.raw op2.raw)
 
   (** [remove_all m1 m2] returns the subset of [m1] thas is not within [m2].
       Said differently, [remove_all m1 m2] removes from [m1] all keys
@@ -628,7 +623,7 @@ module To_map = struct
     | [], _ -> true
     | [(kdiff, vdiff)], Some v
       when Tezos_crypto.Operation_hash.equal kdiff k
-           && Operation.equal v.Prevalidation.raw vdiff.Prevalidation.raw ->
+           && Operation.equal v.raw vdiff.raw ->
         true
     | [(kdiff, _)], None when Tezos_crypto.Operation_hash.equal kdiff k -> true
     | _ -> false
@@ -675,8 +670,7 @@ module To_map = struct
        if [oph] is in [initial] already, we have [initial = to_map_all t] *)
     qcheck_eq'
       ~expected:true
-      ~actual:
-        (eq_mod_op initial (op.Prevalidation.hash, Some op) (to_map_all t))
+      ~actual:(eq_mod_op initial (op.hash, Some op) (to_map_all t))
       ()
 
   (** Tests the relationship between [Classification.remove]
@@ -688,13 +682,13 @@ module To_map = struct
       Generators.t_with_operation_gen
     @@ fun (t, op) ->
     let initial = to_map_all t in
-    drop op.Prevalidation.hash t ;
+    drop op.hash t ;
     (* We need to use [eq_mod_binding] because it covers the two possible cases:
        if [oph] is not in [initial], we have [initial = to_map_all t]
        if [oph] is in [initial], we have [initial = to_map_all t @@ [(oph, op)] ] *)
     qcheck_eq'
       ~expected:true
-      ~actual:(eq_mod_op (to_map_all t) (op.Prevalidation.hash, None) initial)
+      ~actual:(eq_mod_op (to_map_all t) (op.hash, None) initial)
       ()
 
   let to_string ((t, op), _classification) =
@@ -703,7 +697,7 @@ module To_map = struct
       Operation_map.pp
       (to_map_all t)
       Tezos_crypto.Operation_hash.pp
-      op.Prevalidation.hash
+      op.hash
 
   let test_map_remove_add =
     (* Property checked:
@@ -725,11 +719,9 @@ module To_map = struct
          Generators.classification_gen)
     @@ fun ((t, op), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
-    drop op.Prevalidation.hash t ;
+    drop op.hash t ;
     let initial = to_map_all t in
-    let left =
-      Tezos_crypto.Operation_hash.Map.add op.Prevalidation.hash op initial
-    in
+    let left = Tezos_crypto.Operation_hash.Map.add op.hash op initial in
     Classification.add classification op t' ;
     let right = to_map_all t' in
     qcheck_eq'
@@ -737,7 +729,7 @@ module To_map = struct
       ~actual:right
       ~eq:
         (Tezos_crypto.Operation_hash.Map.equal (fun op1 op2 ->
-             Tezos_crypto.Operation_hash.equal op1.Prevalidation.hash op2.hash))
+             Tezos_crypto.Operation_hash.equal op1.hash op2.hash))
       ~pp:map_pp
       ()
 
@@ -762,18 +754,15 @@ module To_map = struct
     let t' = Classification.Internal_for_tests.copy t in
     Classification.add classification op t ;
     let initial = to_map_all t in
-    let oph = op.Prevalidation.hash in
-    let left = Tezos_crypto.Operation_hash.Map.remove oph initial in
-    drop oph t' ;
+    let left = Tezos_crypto.Operation_hash.Map.remove op.hash initial in
+    drop op.hash t' ;
     let right = to_map_all t' in
     qcheck_eq'
       ~expected:left
       ~actual:right
       ~eq:
         (Tezos_crypto.Operation_hash.Map.equal (fun op1 op2 ->
-             Tezos_crypto.Operation_hash.equal
-               op1.Prevalidation.hash
-               op2.Prevalidation.hash))
+             Tezos_crypto.Operation_hash.equal op1.hash op2.hash))
       ~pp:map_pp
       ()
 
@@ -807,7 +796,7 @@ module To_map = struct
       ~name:"[is_in_mempool] can be emulated by [to_map]"
       Generators.t_with_operation_gen
     @@ fun (t, op) ->
-    let oph = op.Prevalidation.hash in
+    let oph = op.hash in
     let is_in_mempool = is_in_mempool oph t in
     let map =
       to_map_all t

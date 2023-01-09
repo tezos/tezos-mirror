@@ -42,11 +42,14 @@
 *)
 
 open Lib_test.Qcheck2_helpers
+open Shell_operation
 module Op_map = Tezos_crypto.Operation_hash.Map
 module Classification = Prevalidator_classification
 module Tree = Generators_tree.Tree
 module List_extra = Generators_tree.List_extra
 module Block = Generators_tree.Block
+
+let make_operation = Shell_operation.Internal_for_tests.make_operation
 
 (** Function to unwrap an [option] when it MUST be a [Some] *)
 let force_opt ~loc = function
@@ -79,7 +82,7 @@ let op_map_pp fmt x =
       Tezos_crypto.Operation_hash.pp
       hash
       Operation.pp
-      op.Prevalidation.raw
+      op.raw
   in
   Format.fprintf
     fmt
@@ -113,20 +116,15 @@ let blocks_to_oph_set (blocks : Tezos_crypto.Operation_hash.t list list list) :
 
 (** [is_subset m1 m2] returns whether all bindings of [m1] are in [m2].
     In other words, it returns whether [m2] is a superset of [m1]. *)
-let is_subset (m1 : unit Prevalidation.operation Op_map.t)
-    (m2 : unit Prevalidation.operation Op_map.t) =
-  let rec go
-      (m1_seq :
-        (Tezos_crypto.Operation_hash.t * unit Prevalidation.operation) Seq.t) =
+let is_subset (m1 : unit operation Op_map.t) (m2 : unit operation Op_map.t) =
+  let rec go (m1_seq : (Tezos_crypto.Operation_hash.t * unit operation) Seq.t) =
     match m1_seq () with
     | Seq.Nil -> true
     | Seq.Cons ((m1_key, m1_value), m1_rest) -> (
         match Op_map.find m1_key m2 with
         | None -> (* A key in [m1] that is not in [m2] *) false
         | Some m2_value ->
-            Tezos_crypto.Operation_hash.equal
-              m1_value.Prevalidation.hash
-              m2_value.Prevalidation.hash
+            Tezos_crypto.Operation_hash.equal m1_value.hash m2_value.hash
             && go m1_rest)
   in
   go (Op_map.to_seq m1)
@@ -137,8 +135,7 @@ module Handle_operations = struct
     Classification.(
       create {map_size_limit = 1; on_discarded_operation = (fun _oph -> ())})
 
-  let parse raw hash =
-    Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
+  let parse raw hash = Some (make_operation hash raw ())
 
   (** Test that operations returned by [handle_live_operations]
       are all in the alive branch. *)
@@ -154,7 +151,7 @@ module Handle_operations = struct
       in
       let* live_blocks = sublist (Tree.values tree) in
       let live_blocks =
-        List.map (fun (blk : Block.t) -> blk.hash) live_blocks
+        List.map (fun (blk : Block.t) -> blk.bhash) live_blocks
       in
       return
         ( tree,
@@ -169,20 +166,20 @@ module Handle_operations = struct
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let expected_superset : unit Prevalidation.operation Op_map.t =
+    let expected_superset : unit operation Op_map.t =
       (* Take all blocks *)
       Tree.values tree
       (* Keep only the ones in live_blocks *)
       |> List.to_seq
       |> Seq.filter (fun (blk : Block.t) ->
-             Tezos_crypto.Block_hash.Set.mem blk.hash live_blocks)
+             Tezos_crypto.Block_hash.Set.mem blk.bhash live_blocks)
       (* Then extract (oph, op) pairs from them *)
       |> Seq.flat_map (fun (blk : Block.t) -> List.to_seq blk.operations)
       |> Seq.flat_map List.to_seq
-      |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+      |> Seq.map (fun op -> (op.hash, op))
       |> Op_map.of_seq
     in
-    let actual : unit Prevalidation.operation Op_map.t =
+    let actual : unit operation Op_map.t =
       Classification.Internal_for_tests.handle_live_operations
         ~classes:dummy_classes
         ~block_store:Block.tools
@@ -350,7 +347,7 @@ module Recyle_operations = struct
       given operations and hashes, spreading them among the different
       classes of {!Prevalidator_classification.t}. This generator is NOT
       a fully random generator like {!Prevalidator_generators.t_gen}. *)
-  let classification_of_ops_gen (ops : unit Prevalidation.operation Op_map.t) :
+  let classification_of_ops_gen (ops : unit operation Op_map.t) :
       unit Classification.t QCheck2.Gen.t =
     let open QCheck2.Gen in
     let ops = Tezos_crypto.Operation_hash.Map.bindings ops |> List.map snd in
@@ -395,7 +392,7 @@ module Recyle_operations = struct
     let oph_op_list_to_map l = List.to_seq l |> Op_map.of_seq in
     let blocks_ops =
       List.concat_map to_ops blocks
-      |> List.map (fun op -> (op.Prevalidation.hash, op))
+      |> List.map (fun op -> (op.hash, op))
       |> oph_op_list_to_map
     in
     let blocks_hashes = List.map Block.to_hash blocks in
@@ -446,10 +443,8 @@ module Recyle_operations = struct
     assume @@ Option.is_some pair_blocks_opt ;
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let parse raw hash =
-      Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
-    in
-    let actual : unit Prevalidation.operation Op_map.t =
+    let parse raw hash = Some (make_operation hash raw ()) in
+    let actual : unit operation Op_map.t =
       Classification.recycle_operations
         ~block_store:Block.tools
         ~chain
@@ -517,9 +512,7 @@ module Recyle_operations = struct
            expected_from_classification)
         expected_from_pending
     in
-    let parse raw hash =
-      Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
-    in
+    let parse raw hash = Some (make_operation hash raw ()) in
     let actual : Tezos_crypto.Operation_hash.Set.t =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -553,7 +546,7 @@ module Recyle_operations = struct
       Tree.values tree |> List.map Block.to_hash
       |> Tezos_crypto.Block_hash.Set.of_list
     in
-    let expected : unit Prevalidation.operation Op_map.t =
+    let expected : unit operation Op_map.t =
       Classification.Internal_for_tests.to_map
         ~applied:false
         ~prechecked:false
@@ -565,9 +558,7 @@ module Recyle_operations = struct
     in
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let parse raw hash =
-      Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
-    in
+    let parse raw hash = Some (make_operation hash raw ()) in
     let () =
       Classification.recycle_operations
         ~block_store:Block.tools

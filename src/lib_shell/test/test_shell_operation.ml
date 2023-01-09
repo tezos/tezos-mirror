@@ -35,9 +35,12 @@
 
 (** Testing
     -------
-    Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation.exe
-    Subject:      Unit tests for [Prevalidation]
+    Component:    Shell_operation and others
+    Invocation:   dune exec src/lib_shell/test/test_shell_operation.exe
+    Subject:      Unit tests for [Shell_operation], and for other
+                  components e.g. [Requester] when the tests rely on
+                  the operation representation provided by
+                  [Shell_operation].
 *)
 
 let test_safe_decode () =
@@ -49,7 +52,7 @@ let test_safe_decode () =
       Data_encoding.unit
   in
   let actual =
-    Prevalidation.Internal_for_tests.safe_binary_of_bytes
+    Shell_operation.Internal_for_tests.safe_binary_of_bytes
       broken_encoding
       Bytes.empty
   in
@@ -130,7 +133,7 @@ let test_db_leak f (nb_ops : int) (_ : unit) =
   let handle i =
     let op = mk_operation i in
     let oph = Operation.hash op in
-    let op = Prevalidation.Internal_for_tests.make_operation op oph () in
+    let op = Shell_operation.Internal_for_tests.make_operation op oph () in
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
     f [] op classes
@@ -167,7 +170,7 @@ let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
   let handle i =
     let op = mk_operation i in
     let oph = Operation.hash op in
-    let op = Prevalidation.Internal_for_tests.make_operation op oph () in
+    let op = Shell_operation.Internal_for_tests.make_operation op oph () in
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
     f [] op classes
@@ -205,7 +208,7 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
   let handle i =
     let op = mk_operation i in
     let oph = Operation.hash op in
-    let op = Prevalidation.Internal_for_tests.make_operation op oph () in
+    let op = Shell_operation.Internal_for_tests.make_operation op oph () in
     Format.printf "Injecting op: %a\n" Tezos_crypto.Operation_hash.pp oph ;
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
@@ -263,7 +266,7 @@ let () =
       handle_branch_pairs
   in
   Alcotest.run
-    "Prevalidation"
+    "Shell_operation"
     [
       ( "Corner cases",
         [
