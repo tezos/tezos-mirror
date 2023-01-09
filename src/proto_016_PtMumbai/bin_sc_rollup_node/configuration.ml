@@ -26,7 +26,7 @@
 
 open Protocol.Alpha_context
 
-type mode = Observer | Batcher | Maintenance | Operator | Custom
+type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
 
 type purpose = Publish | Add_messages | Cement | Timeout | Refute
 
@@ -392,6 +392,7 @@ let modes = [Observer; Batcher; Maintenance; Operator; Custom]
 
 let string_of_mode = function
   | Observer -> "observer"
+  | Accuser -> "accuser"
   | Batcher -> "batcher"
   | Maintenance -> "maintenance"
   | Operator -> "operator"
@@ -399,6 +400,7 @@ let string_of_mode = function
 
 let mode_of_string = function
   | "observer" -> Ok Observer
+  | "accuser" -> Ok Accuser
   | "batcher" -> Ok Batcher
   | "maintenance" -> Ok Maintenance
   | "operator" -> Ok Operator
@@ -407,6 +409,8 @@ let mode_of_string = function
 
 let description_of_mode = function
   | Observer -> "Only follows the chain, reconstructs and interprets inboxes"
+  | Accuser ->
+      "Only publishes commitments for conflicts and play refutation games"
   | Batcher ->
       "Accepts transactions in its queue and batches them on the L1 (TODO)"
   | Maintenance ->
@@ -420,6 +424,7 @@ let mode_encoding =
   Data_encoding.string_enum
     [
       ("observer", Observer);
+      ("accuser", Accuser);
       ("batcher", Batcher);
       ("maintenance", Maintenance);
       ("operator", Operator);
@@ -607,6 +612,7 @@ let check_mode config =
   match config.mode with
   | Observer -> narrow_purposes []
   | Batcher -> narrow_purposes [Add_messages]
+  | Accuser -> narrow_purposes [Publish; Refute]
   | Maintenance -> narrow_purposes [Publish; Cement; Refute]
   | Operator -> narrow_purposes [Publish; Cement; Add_messages; Refute]
   | Custom -> return config

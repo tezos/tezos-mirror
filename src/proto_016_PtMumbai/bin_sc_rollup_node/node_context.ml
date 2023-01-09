@@ -36,6 +36,7 @@ type 'a t = {
   data_dir : string;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
+  mode : Configuration.mode;
   operators : Configuration.operators;
   genesis_info : Sc_rollup.Commitment.genesis_info;
   injector_retention_period : int;
@@ -61,6 +62,8 @@ let is_operator node_ctxt pkh =
   Configuration.Operator_purpose_map.exists
     (fun _ operator -> Tezos_crypto.Signature.Public_key_hash.(operator = pkh))
     node_ctxt.operators
+
+let is_accuser {mode; _} = mode = Accuser
 
 let get_fee_parameter node_ctxt purpose =
   Configuration.Operator_purpose_map.find purpose node_ctxt.fee_parameters
@@ -116,6 +119,7 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
       {
         sc_rollup_address = rollup_address;
         sc_rollup_node_operators = operators;
+        mode = operating_mode;
         fee_parameters;
         loser_mode;
         _;
@@ -141,6 +145,7 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
       data_dir;
       l1_ctxt;
       rollup_address;
+      mode = operating_mode;
       operators;
       genesis_info = l1_ctxt.Layer1.genesis_info;
       lcc;
