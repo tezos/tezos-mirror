@@ -1622,6 +1622,38 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let* () = patch_profile_rpc profile2 in
   check_profiles ~__LOC__ ~expected:[profile1; profile2]
 
+(* Check that result of the DAL node's
+   GET /profile/<public_key_hash>/<level>/assigned-shard-indices
+   is consistent with the result of the L1 node GET dal/shards . *)
+let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
+    node _client dal_node =
+  let pkh = Constant.bootstrap1.public_key_hash in
+  let* level =
+    RPC.(call node @@ get_chain_block_helper_current_level ())
+    |> Lwt.map (fun level -> level.RPC.level)
+  in
+  let* committee_from_l1 = Rollup.Dal.Committee.at_level node ~level in
+  let* shards_from_dal =
+    RPC.call dal_node Rollup.Dal.RPC.(get_assigned_shard_indices ~level ~pkh)
+  in
+  match
+    committee_from_l1
+    |> List.find_opt (fun member ->
+           String.equal member.Rollup.Dal.Committee.attestor pkh)
+  with
+  | None -> Test.fail ~__LOC__ "pkh %S not found in committee from L1." pkh
+  | Some member ->
+      let shards_from_l1 =
+        List.init member.power (fun i -> member.first_shard_index + i)
+      in
+      Check.(
+        (shards_from_dal = shards_from_l1)
+          (list int)
+          ~error_msg:
+            "Shard indexes does not match between DAL and L1  (From DAL: %L <> \
+             From L1: %R)") ;
+      unit
+
 (* DAC tests *)
 let check_valid_root_hash expected_rh actual_rh =
   Check.(
@@ -1934,6 +1966,10 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node PATCH+GET /profiles"
     test_dal_node_test_patch_profile
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node GET /profile/<public_key_hash>/<level>/assigned-shard-indices"
+    test_dal_node_get_assigned_shard_indices
     protocols ;
 
   (* Tests with all nodes *)
