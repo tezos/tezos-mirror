@@ -5020,6 +5020,7 @@ module Protocol = Protocol
             octez_stdlib_unix |> open_;
             octez_dal_node_lib |> open_;
             client |> if_some |> open_;
+            plugin |> if_some |> open_;
             embedded |> open_;
             layer2_utils |> if_some |> open_;
             main |> open_;
