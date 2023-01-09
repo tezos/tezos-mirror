@@ -110,3 +110,22 @@ module Storage = struct
             else tzfail @@ Cannot_create_reveal_data_dir reveal_data_dir
         | _ -> tzfail @@ Cannot_create_reveal_data_dir reveal_data_dir)
 end
+
+let resolve_plugin
+    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) =
+  let open Lwt_syntax in
+  let plugin_opt =
+    Option.either
+      (Dac_plugin.get protocols.current_protocol)
+      (Dac_plugin.get protocols.next_protocol)
+  in
+  Option.map_s
+    (fun dac_plugin ->
+      let (module Dac_plugin : Dac_plugin.T) = dac_plugin in
+      let* () =
+        Event.emit_protocol_plugin_resolved
+          ~plugin_name:"dac"
+          Dac_plugin.Proto.hash
+      in
+      return dac_plugin)
+    plugin_opt
