@@ -45,7 +45,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["1 6 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.239 units (will add 100 for safety)
+Estimated gas: 1002.447 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -58,14 +58,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000354
     Expected counter: 1
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000354
       payload fees(the block proposer) ....... +ꜩ0.000354
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.273
+      Consumed gas: 1002.447
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -82,7 +82,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["2 8 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.239 units (will add 100 for safety)
+Estimated gas: 1002.447 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -95,14 +95,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000354
     Expected counter: 2
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000354
       payload fees(the block proposer) ....... +ꜩ0.000354
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.273
+      Consumed gas: 1002.447
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -119,7 +119,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["3 10 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -132,14 +132,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 3
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -156,7 +156,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["4 12 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -169,14 +169,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 4
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -193,7 +193,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["5 14 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -206,14 +206,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 5
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -230,7 +230,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["6 16 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -243,14 +243,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 6
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -267,7 +267,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["7 18 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -280,14 +280,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 7
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -304,7 +304,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["8 20 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -317,14 +317,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 8
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -341,7 +341,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["9 22 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.242 units (will add 100 for safety)
+Estimated gas: 1002.450 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -354,14 +354,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000355
     Expected counter: 9
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000355
       payload fees(the block proposer) ....... +ꜩ0.000355
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.276
+      Consumed gas: 1002.450
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash
@@ -378,7 +378,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message '["10 24 + value"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.245 units (will add 100 for safety)
+Estimated gas: 1002.453 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -391,14 +391,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000356
     Expected counter: 10
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000356
       payload fees(the block proposer) ....... +ꜩ0.000356
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.279
+      Consumed gas: 1002.453
 
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/state_hash

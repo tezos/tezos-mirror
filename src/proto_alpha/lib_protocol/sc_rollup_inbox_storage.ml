@@ -40,16 +40,19 @@ let add_messages ctxt messages =
      design, i.e. the skip list.
   *)
   let current_messages = Sc_rollup_in_memory_inbox.current_messages ctxt in
-  let messages_witness_index =
-    Sc_rollup_inbox_merkelized_payload_hashes_repr.get_index current_messages
-  in
   let*? ctxt =
-    List.fold_left_i_e
-      (fun i ctxt (message : Sc_rollup_inbox_message_repr.serialized) ->
+    List.fold_left_e
+      (fun ctxt (message : Sc_rollup_inbox_message_repr.serialized) ->
         let msg_len = String.length (message :> string) in
+        (* The average cost of adding a message with a
+           [current_index] from [0] to [1_000_000] is reached after [100_000]
+           messages.
+           If we use the real index, the simulations of [Sc_rollup_add_messages]
+           are always performed on an empty skip list.
+        *)
         let cost =
           Sc_rollup_costs.cost_add_message
-            ~current_index:Z.(add messages_witness_index (of_int i))
+            ~current_index:Z.(of_int 100_000)
             ~msg_len
         in
         Raw_context.consume_gas ctxt cost)

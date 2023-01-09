@@ -39,7 +39,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none send smart rollup message 'text:["hash:0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428e7aa3"]' from bootstrap2
 Node is bootstrapped.
-Estimated gas: 1001.427 units (will add 100 for safety)
+Estimated gas: 1002.635 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -52,14 +52,14 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000414
     Expected counter: 1
-    Gas limit: 1102
+    Gas limit: 1103
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000414
       payload fees(the block proposer) ....... +ꜩ0.000414
     Smart rollup messages submission:
       This smart rollup messages submission was successfully applied
-      Consumed gas: 1001.461
+      Consumed gas: 1002.635
 
 
 ./octez-smart-rollup-client-alpha get state value for vars/value --block head
