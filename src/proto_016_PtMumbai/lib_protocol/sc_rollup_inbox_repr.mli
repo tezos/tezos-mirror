@@ -123,34 +123,18 @@ type error += Inbox_level_reached_messages_limit
 
 module Hash : S.HASH
 
+module Skip_list : Skip_list_repr.S
+
 module V1 : sig
-  (** The type of the inbox for a smart-contract rollup as stored
-    by the protocol in the context. Values that inhabit this type
-    only act as fingerprint for inboxes. *)
-  type t
-
-  val pp : Format.formatter -> t -> unit
-
-  val equal : t -> t -> bool
-
-  val encoding : t Data_encoding.t
-
-  (** [inbox_level inbox] returns the maximum level of message insertion in
-      [inbox] or its initial level. *)
-  val inbox_level : t -> Raw_level_repr.t
-
-  (** A [level_proof] contains the root hash of the level tree and its
-      corresponding level. *)
-  type level_proof = private {
+  type level_proof = {
     hash : Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t;
     level : Raw_level_repr.t;
   }
 
   (** A [history_proof] is a [Skip_list.cell] that stores multiple
-    hashes. [Skip_list.content history_proof] gives the hash of the
-    [level_proof] for this cell, while [Skip_list.back_pointers
-    history_proof] is an array of hashes of earlier [history_proof]s
-    in the inbox.
+    hashes. [Skip_list.content history_proof] gives the hash of this cell,
+    while [Skip_list.back_pointers history_proof] is an array of hashes of
+    earlier [history_proof]s in the inbox.
 
     On the one hand, we think of this type as representing the whole
     Merkle structure of an inbox at a given level---it is the part of
@@ -170,7 +154,27 @@ module V1 : sig
     number of non-empty levels between now and the origination level of
     the rollup.
   *)
-  type history_proof
+  type history_proof = (level_proof, Hash.t) Skip_list.cell
+
+  (** The type of the inbox for a smart-contract rollup as stored
+      by the protocol in the context. Values that inhabit this type
+      only act as fingerprint for inboxes and contain:
+      - [level] : the inbox level ;
+      - [old_levels_messages] : a witness of the inbox history.
+  *)
+  type t = {level : Raw_level_repr.t; old_levels_messages : history_proof}
+
+  val pp : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
+
+  val hash : t -> Hash.t
+
+  val encoding : t Data_encoding.t
+
+  (** [inbox_level inbox] returns the maximum level of message insertion in
+      [inbox] or its initial level. *)
+  val inbox_level : t -> Raw_level_repr.t
 
   (** A [History.t] is basically a lookup table of {!history_proof}s. We
       need this if we want to produce inbox proofs because it allows us
@@ -199,18 +203,21 @@ module V1 : sig
   (** [old_levels_messages inbox] returns the latest skip list cell of the inbox
       history that is not up to change (i.e. not the current level tree). *)
   val old_levels_messages : t -> history_proof
+
+  (** [current_witness inbox] returns the current witness of the inbox, i.e. the
+      merkelized payload hash. *)
+  val current_witness :
+    t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.Hash.t
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
 include Sc_rollup_data_version_sig.S with type t = V1.t
 
-include module type of V1 with type t = V1.t
-
-(** This extracts the current {!level_proof} from the inbox. Note: the
-    current level hash is stored lazily as [fun () -> ...], and this
-    function will call that function. So don't use this if you want to
-    preserve the laziness. *)
-val current_level_proof : t -> level_proof
+include
+  module type of V1
+    with type level_proof = V1.level_proof
+     and type history_proof = V1.history_proof
+     and type t = V1.t
 
 type serialized_proof
 

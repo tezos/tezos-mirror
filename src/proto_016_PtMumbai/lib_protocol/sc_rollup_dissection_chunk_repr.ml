@@ -164,7 +164,7 @@ let () =
   let description = "Mismatch in the number of sections in the dissection" in
   register_error_kind
     `Temporary
-    ~id:"Dissection_number_of_sections_mismatch"
+    ~id:"smart_rollup_dissection_number_of_sections_mismatch"
     ~title:description
     ~description
     ~pp:(fun ppf (expected, given) ->
@@ -185,7 +185,7 @@ let () =
   let description = "Invalid number of sections in the dissection" in
   register_error_kind
     `Permanent
-    ~id:"Dissection_invalid_number_of_sections"
+    ~id:"smart_rollup_dissection_invalid_number_of_sections"
     ~title:description
     ~description
     ~pp:(fun ppf n ->
@@ -200,7 +200,7 @@ let () =
   let description = "Mismatch in the start hash of the dissection" in
   register_error_kind
     `Temporary
-    ~id:"Dissection_start_hash_mismatch"
+    ~id:"smart_rollup_dissection_start_hash_mismatch"
     ~title:description
     ~description
     ~pp:(fun ppf (given, expected) ->
@@ -226,7 +226,7 @@ let () =
   let description = "Mismatch in the stop hash of the dissection" in
   register_error_kind
     `Temporary
-    ~id:"Dissection_stop_hash_mismatch"
+    ~id:"smart_rollup_dissection_stop_hash_mismatch"
     ~title:description
     ~description
     ~pp:(fun ppf h ->
@@ -238,7 +238,7 @@ let () =
   let description = "Mismatch in the edge ticks of the dissection" in
   register_error_kind
     `Temporary
-    ~id:"Dissection_edge_ticks_mismatch"
+    ~id:"smart_rollup_dissection_edge_ticks_mismatch"
     ~title:description
     ~description
     ~pp:
@@ -288,7 +288,7 @@ let () =
   let description = "Ticks should only increase in dissection" in
   register_error_kind
     `Permanent
-    ~id:"Dissection_ticks_not_increasing"
+    ~id:"smart_rollup_dissection_ticks_not_increasing"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.pp_print_string ppf description)
@@ -297,7 +297,7 @@ let () =
     (fun () -> Dissection_ticks_not_increasing) ;
   register_error_kind
     `Permanent
-    ~id:"Dissection_invalid_distribution"
+    ~id:"smart_rollup_dissection_invalid_distribution"
     ~title:description
     ~description
     ~pp:(fun ppf max ->
@@ -312,7 +312,7 @@ let () =
   let description = "Cannot recover from a blocked state in a dissection" in
   register_error_kind
     `Permanent
-    ~id:"Dissection_invalid_successive_states_shape"
+    ~id:"smart_rollup_dissection_invalid_successive_states_shape"
     ~title:description
     ~description
     ~pp:(fun ppf () -> Format.pp_print_string ppf description)

@@ -37,6 +37,7 @@ type error +=
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
+  | Non_empty_transaction_from of Destination.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
@@ -44,7 +45,8 @@ type error +=
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
   | Zero_frozen_deposits of Signature.Public_key_hash.t
-  | Invalid_transfer_to_sc_rollup_from_implicit_account
+  | Invalid_transfer_to_sc_rollup
+  | Invalid_source of Destination.t
 
 let () =
   register_error_kind
@@ -159,6 +161,20 @@ let () =
     Data_encoding.(obj1 (req "contract" Contract.encoding))
     (function Empty_transaction c -> Some c | _ -> None)
     (fun c -> Empty_transaction c) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.non_empty_transaction_from_source"
+    ~title:"Unexpected non-empty transaction"
+    ~description:"This address cannot initiate non-empty transactions"
+    ~pp:(fun ppf contract ->
+      Format.fprintf
+        ppf
+        "%a does not have a balance and cannot initiate non-empty transactions"
+        Destination.pp
+        contract)
+    Data_encoding.(obj1 (req "source" Destination.encoding))
+    (function Non_empty_transaction_from c -> Some c | _ -> None)
+    (fun c -> Non_empty_transaction_from c) ;
 
   register_error_kind
     `Permanent
@@ -166,10 +182,7 @@ let () =
     ~title:"Tx rollup is disabled"
     ~description:"Cannot originate a tx rollup as it is disabled."
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Cannot apply a tx rollup operation as it is disabled. This feature \
-         will be enabled in a future proposal")
+      Format.fprintf ppf "Cannot apply a tx rollup operation as it is disabled.")
     Data_encoding.unit
     (function Tx_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Tx_rollup_feature_disabled) ;
@@ -188,13 +201,11 @@ let () =
       | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
     (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
 
-  let description =
-    "Smart contract rollups will be enabled in a future proposal."
-  in
+  let description = "Smart rollups are disabled." in
   register_error_kind
     `Permanent
-    ~id:"operation.sc_rollup_disabled"
-    ~title:"Smart contract rollups are disabled"
+    ~id:"operation.smart_rollup_disabled"
+    ~title:"Smart rollups are disabled"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
@@ -244,19 +255,34 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate) ;
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_transfer_to_sc_rollup_from_implicit_account"
-    ~title:"Invalid transfer to sc rollup"
-    ~description:"Invalid transfer to sc rollup from implicit account"
+    ~id:"operations.invalid_transfer_to_smart_rollup_from_implicit_account"
+    ~title:"Invalid transfer to smart rollup"
+    ~description:"Invalid transfer to smart rollup from implicit account"
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "Invalid source for transfer operation to smart-contract rollup. Only \
-         originated accounts are allowed")
+        "Invalid source for transfer operation to smart rollup. Only \
+         originated accounts are allowed.")
     Data_encoding.empty
-    (function
-      | Invalid_transfer_to_sc_rollup_from_implicit_account -> Some ()
-      | _ -> None)
-    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
+    (function Invalid_transfer_to_sc_rollup -> Some () | _ -> None)
+    (fun () -> Invalid_transfer_to_sc_rollup) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.invalid_source"
+    ~title:"Invalid source for an internal operation"
+    ~description:
+      "Invalid source for an internal operation restricted to implicit and \
+       originated accounts."
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Invalid source (%a) for this internal operation. Only implicit and \
+         originated accounts are allowed"
+        Destination.pp
+        c)
+    Data_encoding.(obj1 (req "contract" Destination.encoding))
+    (function Invalid_source c -> Some c | _ -> None)
+    (fun c -> Invalid_source c)
 
 open Apply_results
 open Apply_operation_result
@@ -316,6 +342,16 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
   in
   return (ctxt, result, [])
 
+let transfer_from_any_address ctxt source destination amount =
+  match source with
+  | Destination.Contract source ->
+      Token.transfer ctxt (`Contract source) (`Contract destination) amount
+  | Destination.Sc_rollup _ | Destination.Tx_rollup _ | Destination.Zk_rollup _
+    ->
+      (* We do not allow transferring tez from rollups to other contracts. *)
+      error_unless Tez.(amount = zero) (Non_empty_transaction_from source)
+      >>?= fun () -> return (ctxt, [])
+
 let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
     ~amount ~before_operation ctxt =
   let destination = Contract.Implicit destination in
@@ -325,7 +361,7 @@ let apply_transaction_to_implicit_with_ticket ~source ~destination ~ty ~ticket
     @@ Ticket_scanner.Ex_ticket (ty, ticket)
   in
   Ticket_token_unparser.unparse ctxt ex_token >>=? fun (ticket_token, ctxt) ->
-  Token.transfer ctxt (`Contract source) (`Contract destination) amount
+  transfer_from_any_address ctxt source destination amount
   >>=? fun (ctxt, balance_updates) ->
   let ticket_receipt =
     Ticket_receipt.
@@ -367,7 +403,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
      does not exist, [Script_cache.find] will signal that by returning [None]
      and we'll fail.
   *)
-  Token.transfer ctxt (`Contract source) (`Contract contract) amount
+  transfer_from_any_address ctxt source contract amount
   >>=? fun (ctxt, balance_updates) ->
   Script_cache.find ctxt contract_hash >>=? fun (ctxt, cache_key, script) ->
   match script with
@@ -589,11 +625,15 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
+let assert_source_is_contract = function
+  | Destination.Contract source -> ok source
+  | source -> error (Invalid_source source)
+
 let apply_internal_operation_contents :
     type kind.
     context ->
     payer:public_key_hash ->
-    source:Contract.t ->
+    source:Destination.t ->
     chain_id:Chain_id.t ->
     kind Script_typed_ir.internal_operation_contents ->
     (context
@@ -602,15 +642,15 @@ let apply_internal_operation_contents :
     tzresult
     Lwt.t =
  fun ctxt_before_op ~payer ~source ~chain_id operation ->
-  Contract.must_exist ctxt_before_op source >>=? fun () ->
-  Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
-  >>?= fun ctxt ->
+  Destination.must_exist ctxt_before_op source >>=? fun ctxt ->
+  Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
   (* Note that [ctxt_before_op] will be used again later to compute
      gas consumption and originations for the operation result (by
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
   | Transaction_to_implicit {destination = pkh; amount} ->
+      assert_source_is_contract source >>?= fun source ->
       apply_transaction_to_implicit
         ~ctxt
         ~source
@@ -687,9 +727,8 @@ let apply_internal_operation_contents :
          be allowed anyway for internal operations.
       *)
       (match source with
-      | Contract.Implicit _ ->
-          error Invalid_transfer_to_sc_rollup_from_implicit_account
-      | Originated hash -> ok hash)
+      | Destination.Contract (Originated hash) -> ok hash
+      | _ -> error Invalid_transfer_to_sc_rollup)
       >>?= fun sender ->
       (* Adding the message to the inbox. Note that it is safe to ignore the
          size diff since only its hash and meta data are stored in the context.
@@ -759,6 +798,7 @@ let apply_internal_operation_contents :
         storage_type;
         storage;
       } ->
+      assert_source_is_contract source >>?= fun source ->
       apply_origination
         ~ctxt
         ~storage_type
@@ -772,6 +812,7 @@ let apply_internal_operation_contents :
       >|=? fun (ctxt, origination_result, ops) ->
       (ctxt, IOrigination_result origination_result, ops)
   | Delegation delegate ->
+      assert_source_is_contract source >>?= fun source ->
       apply_delegation ~ctxt ~source ~delegate ~before_operation:ctxt_before_op
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
@@ -862,7 +903,7 @@ let apply_manager_operation :
       >>?= fun (parameters, ctxt) ->
       apply_transaction_to_smart_contract
         ~ctxt
-        ~source:source_contract
+        ~source:(Destination.Contract source_contract)
         ~contract_hash
         ~amount
         ~entrypoint
@@ -1023,7 +1064,7 @@ let apply_manager_operation :
             ~ticketer
             ~contents
             ~ty
-            ~source:source_contract
+            ~source:(Destination.Contract source_contract)
             ~destination:destination_hash
             ~entrypoint
             ~amount
@@ -1482,10 +1523,15 @@ let apply_manager_operation :
       let open Sc_rollup.Refutation_storage in
       let player = source in
       (match refutation with
-      | None ->
-          start_game ctxt rollup ~player ~opponent >>=? fun ctxt ->
-          return (None, ctxt)
-      | Some refutation -> game_move ctxt rollup ~player ~opponent refutation)
+      | Start {player_commitment_hash; opponent_commitment_hash} ->
+          start_game
+            ctxt
+            rollup
+            ~player:(player, player_commitment_hash)
+            ~opponent:(opponent, opponent_commitment_hash)
+          >>=? fun ctxt -> return (None, ctxt)
+      | Move {step; choice} ->
+          game_move ctxt rollup ~player ~opponent ~step ~choice)
       >>=? fun (game_result, ctxt) ->
       (match game_result with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])
@@ -1522,7 +1568,6 @@ let apply_manager_operation :
         ctxt
         rollup
         ~cemented_commitment
-        ~source
         ~output_proof
       >|=? fun ( {
                    Sc_rollup_operations.paid_storage_size_diff;
@@ -2506,7 +2551,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 since they are not used within the CPMM default
                 entrypoint. *)
              {
-               source = liquidity_baking_cpmm_contract;
+               source = Destination.Contract liquidity_baking_cpmm_contract;
                payer = Signature.Public_key_hash.zero;
                self = liquidity_baking_cpmm_contract_hash;
                amount = liquidity_baking_subsidy;

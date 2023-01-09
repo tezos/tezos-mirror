@@ -1590,7 +1590,7 @@ module Sc_rollup = struct
   module Raw_context =
     Make_subcontext (Registered) (Raw_context)
       (struct
-        let name = ["sc_rollup"]
+        let name = ["smart_rollup"]
       end)
 
   module Indexed_context =
@@ -1695,7 +1695,7 @@ module Sc_rollup = struct
     include
       Make_single_data_storage (Registered) (Raw_context)
         (struct
-          let name = ["sc_rollup_inbox"]
+          let name = ["inbox"]
         end)
         (struct
           type t = Sc_rollup_inbox_repr.versioned
@@ -1743,33 +1743,30 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
 
+  module Staker_index_counter =
+    Make_single_data_storage (Registered) (Indexed_context.Raw_context)
+      (struct
+        let name = ["staker_index_counter"]
+      end)
+      (Sc_rollup_staker_index_repr)
+
+  module Staker_index =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["staker_index"]
+         end))
+         (Public_key_hash_index)
+      (Sc_rollup_staker_index_repr)
+
   module Stakers =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
            let name = ["stakers"]
          end))
-         (Public_key_hash_index)
-      (struct
-        type t = Sc_rollup_commitment_repr.Hash.t
-
-        let encoding = Sc_rollup_commitment_repr.Hash.encoding
-      end)
-
-  let stakers (ctxt : Raw_context.t) (rollup : Sc_rollup_repr.t) =
-    Stakers.list_key_values (ctxt, rollup)
-
-  module Staker_count =
-    Indexed_context.Make_carbonated_map
-      (Registered)
-      (struct
-        let name = ["staker_count"]
-      end)
-      (struct
-        type t = int32
-
-        let encoding = Data_encoding.int32
-      end)
+         (Make_index (Sc_rollup_staker_index_repr.Index))
+      (Raw_level_repr)
 
   module Commitments_versioned =
     Make_indexed_carbonated_data_storage
@@ -1789,30 +1786,39 @@ module Sc_rollup = struct
     include Make_versioned (Sc_rollup_commitment_repr) (Commitments_versioned)
   end
 
-  module Commitment_stake_count =
+  module Commitment_indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_index"]
+         end))
+         (Make_index (Sc_rollup_commitment_repr.Hash))
+
+  module Commitment_stakers =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
-           let name = ["commitment_stake_count"]
+           let name = ["commitments_stakers"]
          end))
          (Make_index (Sc_rollup_commitment_repr.Hash))
       (struct
-        type t = int32
+        type t = Sc_rollup_staker_index_repr.t list
 
-        let encoding = Data_encoding.int32
+        let encoding = Data_encoding.list Sc_rollup_staker_index_repr.encoding
       end)
 
-  module Commitment_count_per_inbox_level =
+  module Commitments_per_inbox_level =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
-           let name = ["commitment_count_per_inbox_level"]
+           let name = ["commitments_per_inbox_level"]
          end))
          (Make_index (Raw_level_repr.Index))
       (struct
-        type t = int32
+        type t = Sc_rollup_commitment_repr.Hash.t list
 
-        let encoding = Data_encoding.int32
+        let encoding =
+          Data_encoding.list Sc_rollup_commitment_repr.Hash.encoding
       end)
 
   module Commitment_first_publication_level =
@@ -1831,11 +1837,7 @@ module Sc_rollup = struct
            let name = ["commitment_added"]
          end))
          (Make_index (Sc_rollup_commitment_repr.Hash))
-      (struct
-        type t = Raw_level_repr.t
-
-        let encoding = Raw_level_repr.encoding
-      end)
+      (Raw_level_repr)
 
   module Game_info_versioned =
     Make_indexed_carbonated_data_storage

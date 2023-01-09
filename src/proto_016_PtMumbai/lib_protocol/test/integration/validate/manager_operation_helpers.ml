@@ -451,7 +451,13 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
       enable = flags.toru;
     }
   in
-  let sc_rollup = {params.constants.sc_rollup with enable = flags.scoru} in
+  let sc_rollup =
+    {
+      params.constants.sc_rollup with
+      enable = flags.scoru;
+      arith_pvm_enable = flags.scoru;
+    }
+  in
   let zk_rollup = {params.constants.zk_rollup with enable = flags.zkru} in
   let constants =
     {
@@ -1053,7 +1059,7 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let* sc_rollup = sc_rollup_of infos.ctxt.sc_rollup in
   let refutation : Sc_rollup.Game.refutation =
-    {choice = Sc_rollup.Tick.initial; step = Dissection []}
+    Move {choice = Sc_rollup.Tick.initial; step = Dissection []}
   in
   Op.sc_rollup_refute
     ?fee:oinfos.fee
@@ -1067,7 +1073,7 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
     (match infos.accounts.dest with
     | None -> (get_source infos).pkh
     | Some dest -> dest.pkh)
-    (Some refutation)
+    refutation
 
 let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
   Op.sc_rollup_add_messages
@@ -1643,12 +1649,13 @@ let revealed_subjects =
 let is_disabled flags = function
   | K_Transaction | K_Origination | K_Register_global_constant | K_Delegation
   | K_Undelegation | K_Self_delegation | K_Set_deposits_limit
-  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal ->
+  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal
+  | K_Transfer_ticket ->
       false
   | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_commit
   | K_Tx_rollup_return_bond | K_Tx_rollup_finalize
   | K_Tx_rollup_remove_commitment | K_Tx_rollup_dispatch_tickets
-  | K_Transfer_ticket | K_Tx_rollup_reject ->
+  | K_Tx_rollup_reject ->
       flags.toru = false
   | K_Sc_rollup_origination | K_Sc_rollup_publish | K_Sc_rollup_cement
   | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout

@@ -3238,7 +3238,7 @@ module Registration_section = struct
           let step_constants =
             {
               source =
-                Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero;
+                Contract (Implicit Tezos_crypto.Signature.Public_key_hash.zero);
               payer = Tezos_crypto.Signature.Public_key_hash.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;

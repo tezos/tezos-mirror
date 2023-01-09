@@ -34,7 +34,7 @@ let () =
   in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox_message_repr.error_encoding_inbox_message"
+    ~id:"smart_rollup_inbox_message_encoding"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
@@ -42,11 +42,11 @@ let () =
     (function Error_encode_inbox_message -> Some () | _ -> None)
     (fun () -> Error_encode_inbox_message) ;
   let msg =
-    "Failed to decode a rollup management protocol inbox message value"
+    "Failed to decode a smart rollup management protocol inbox message value"
   in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox_message_repr.error_decoding_inbox_message"
+    ~id:"smart_rollup_inbox_message_decoding"
     ~title:msg
     ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
     ~description:msg
@@ -158,10 +158,10 @@ let unsafe_of_string s = s
 let unsafe_to_string s = s
 
 (* 32 *)
-let hash_prefix = "\003\250\174\239\012" (* scib3(55) *)
+let hash_prefix = "\003\255\138\145\170" (* srib3(55) *)
 
 module Hash = struct
-  let prefix = "scib3"
+  let prefix = "srib3"
 
   let encoded_size = 55
 
@@ -169,10 +169,10 @@ module Hash = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "serialized_message_hash"
+        let name = "Smart_rollup_serialized_message_hash"
 
         let title =
-          "The hash of a serialized message of the smart contract rollup inbox."
+          "The hash of a serialized message of the smart rollup inbox."
 
         let b58check_prefix = hash_prefix
 

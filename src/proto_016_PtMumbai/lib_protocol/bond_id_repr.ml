@@ -53,8 +53,8 @@ let encoding =
            (fun id -> Tx_rollup_bond_id id);
          case
            (Tag 1)
-           ~title:"Sc_rollup_bond_id"
-           (obj1 (req "sc_rollup" Sc_rollup_repr.encoding))
+           ~title:"Smart_rollup_bond_id"
+           (obj1 (req "smart_rollup" Sc_rollup_repr.encoding))
            (function Sc_rollup_bond_id id -> Some id | _ -> None)
            (fun id -> Sc_rollup_bond_id id);
        ]
@@ -83,7 +83,7 @@ let destruct id =
   else if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
     match Sc_rollup_repr.Address.of_b58check_opt id with
     | Some id -> Result.ok (Sc_rollup_bond_id id)
-    | None -> Result.error "Cannot parse smart contract rollup id"
+    | None -> Result.error "Cannot parse smart rollup id"
   else Result.error "Cannot parse rollup id"
 
 let construct = function

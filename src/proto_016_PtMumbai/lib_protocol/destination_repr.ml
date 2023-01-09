@@ -108,7 +108,7 @@ let encoding =
       "A destination notation compatible with the contract notation as given \
        to an RPC or inside scripts. Can be a base58 implicit contract hash, a \
        base58 originated contract hash, a base58 originated transaction \
-       rollup, or a base58 originated smart-contract rollup."
+       rollup, or a base58 originated smart rollup."
   @@ splitted
        ~binary:
          (union
@@ -126,7 +126,7 @@ let encoding =
                 case
                   (Tag 3)
                   (Fixed.add_padding Sc_rollup_repr.Address.encoding 1)
-                  ~title:"Sc_rollup"
+                  ~title:"Smart_rollup"
                   (function Sc_rollup k -> Some k | _ -> None)
                   (fun k -> Sc_rollup k);
                 case

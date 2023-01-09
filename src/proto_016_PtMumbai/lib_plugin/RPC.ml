@@ -1071,6 +1071,7 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
+          let source = Destination.Contract source in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
         Script_interpreter.execute
@@ -1142,6 +1143,7 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
+          let source = Destination.Contract source in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
         let module Unparsing_mode = struct
@@ -1225,6 +1227,7 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
+          let source = Destination.Contract source in
           {
             source;
             payer;
@@ -1323,6 +1326,7 @@ module Scripts = struct
              |> Script_int.of_int32 |> Script_int.abs)
         in
         let step_constants =
+          let source = Destination.Contract source in
           {
             Script_interpreter.source;
             payer;
@@ -2078,12 +2082,14 @@ module Sc_rollup = struct
             list
               (obj2
                  (req "staker" Staker.encoding)
-                 (req "commitment" Commitment.Hash.encoding))))
+                 (opt "commitment" Commitment.Hash.encoding))))
       in
       RPC_service.get_service
         ~description:
-          "List of stakers for a given rollup, associated to the commitments \
-           they are staked on"
+          "List of stakers for a given rollup, associated to the commitment \
+           hash they are staked on. The hash can be absent if the staked \
+           commitment is before the last cemented commitment, and therefore \
+           the hash no longer exists in the context."
         ~query:RPC_query.empty
         ~output
         RPC_path.(path_sc_rollup / "stakers_commitments")
@@ -2196,16 +2202,19 @@ module Sc_rollup = struct
     Registration.register2 ~chunked:false S.staked_on_commitment
     @@ fun ctxt address staker () () ->
     let open Lwt_result_syntax in
-    let* commitment_hash, ctxt =
+    let* ctxt, commitment_hash =
       Alpha_context.Sc_rollup.Stake_storage.find_staker ctxt address staker
     in
-    let* commitment, _ctxt =
-      Alpha_context.Sc_rollup.Commitment.get_commitment
-        ctxt
-        address
-        commitment_hash
-    in
-    return_some (commitment_hash, commitment)
+    match commitment_hash with
+    | None -> return_none
+    | Some commitment_hash ->
+        let* commitment, _ctxt =
+          Alpha_context.Sc_rollup.Commitment.get_commitment
+            ctxt
+            address
+            commitment_hash
+        in
+        return_some (commitment_hash, commitment)
 
   let register_commitment () =
     Registration.register2 ~chunked:false S.commitment
@@ -2242,7 +2251,7 @@ module Sc_rollup = struct
       ~chunked:false
       S.stakers_commitments
       (fun context rollup () () ->
-        Sc_rollup.Storage.stakers_commitments_uncarbonated context rollup)
+        Sc_rollup.Stake_storage.stakers_commitments_uncarbonated context rollup)
 
   let register_conflicts () =
     Registration.register2

@@ -124,7 +124,7 @@ let get_messages Node_context.{l1_ctxt; _} head =
     match (operation, result) with
     | ( {
           operation = Transaction {destination = Sc_rollup rollup; parameters; _};
-          source = Originated sender;
+          source = Contract (Originated sender);
           _;
         },
         ITransaction_result (Transaction_to_sc_rollup_result _) ) ->
@@ -168,7 +168,7 @@ let add_messages ~predecessor_timestamp ~predecessor inbox history messages =
   @@ let*? ( messages_history,
              history,
              inbox,
-             _witness,
+             witness,
              messages_with_protocol_internal_messages ) =
        Sc_rollup.Inbox.add_all_messages
          ~predecessor_timestamp
@@ -177,8 +177,8 @@ let add_messages ~predecessor_timestamp ~predecessor inbox history messages =
          inbox
          messages
      in
-     let Sc_rollup.Inbox.{hash = witness_hash; _} =
-       Sc_rollup.Inbox.current_level_proof inbox
+     let witness_hash =
+       Sc_rollup.Inbox_merkelized_payload_hashes.hash witness
      in
      return
        ( messages_history,

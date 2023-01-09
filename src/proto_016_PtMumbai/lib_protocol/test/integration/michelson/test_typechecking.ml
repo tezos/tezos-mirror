@@ -44,7 +44,12 @@ let context_init_with_sc_rollup_enabled tup =
     {
       Context.default_test_constants with
       consensus_threshold = 0;
-      sc_rollup = {Context.default_test_constants.sc_rollup with enable = true};
+      sc_rollup =
+        {
+          Context.default_test_constants.sc_rollup with
+          enable = true;
+          arith_pvm_enable = true;
+        };
     }
 
 let sc_originate block contract parameters_ty =
