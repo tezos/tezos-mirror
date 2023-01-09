@@ -673,9 +673,9 @@ enforces a bound on the number of ticks used in a call to
 execution of ``kernel_run`` is trapped (*i.e.*, interrupted with an
 error).
 
-The current bound is set to 11,000,000,000 ticks. ``octez-wasm-repl``
-is probably the best tool available to verify the ``kernel_run``
-function does not take more ticks than authorized.
+The current bound is set to 11,000,000,000 ticks.
+``octez-smart-rollup-wasm-debugger`` is probably the best tool available to
+verify the ``kernel_run`` function does not take more ticks than authorized.
 
 The direct consequence of this setup is that it might be necessary for
 a WASM kernel to span a long computation across several calls to
@@ -1022,28 +1022,28 @@ Testing your Kernel
 
 .. warning::
 
-   The ``octez-wasm-repl`` tool that is described in this section is
-   still under active development. A preliminary version can be found
+   The ``octez-smart-rollup-wasm-debugger`` tool that is described in this
+   section is still under active development. A preliminary version can be found
    in `the Octez repository <https://gitlab.com/tezos/tezos>`_.
 
-   To get ``octez-wasm-repl``, the easiest way is to build Octez from
-   source. See the `usual instructions
+   To get ``octez-smart-rollup-wasm-debugger``, the easiest way is to build
+   Octez from source. See the `usual instructions
    <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_.
 
-   For now, ``octez-wasm-repl`` is **not** part of Octez, and is only
-   provided for developers interested in testing Tezos smart rollup
+   For now, ``octez-smart-rollup-wasm-debugger`` is **not** part of Octez, and
+   is only provided for developers interested in testing Tezos smart rollup
    infrastructure before its release on mainnet.
 
-Testing kernels can be useful during its development, without relying
-on starting a rollup on a test network. We provide a
-*read-eval-print-loop* (REPL) as a mean to evaluate the WASM PVM
-without relying on any node and network: ``octez-wasm-repl``.
+Testing kernels can be useful during its development, without relying on
+starting a rollup on a test network. We provide a debugger as a mean to evaluate
+the WASM PVM without relying on any node and network:
+``octez-smart-rollup-wasm-debugger``.
 
 .. code:: sh
 
-  octez-wasm-repl ${WASM_FILE} --inputs ${JSON_INPUTS} --rollup ${ROLLUP_ADDRESS}
+  octez-smart-rollup-wasm-debugger ${WASM_FILE} --inputs ${JSON_INPUTS} --rollup ${ROLLUP_ADDRESS}
 
-``octez-wasm-repl`` can take either a `.wasm` file (the binary
+``octez-smart-rollup-wasm-debugger`` can take either a `.wasm` file (the binary
 representation of WebAssembly modules) or a `.wast` file (its textual
 representation), and actually parses and typechecks the kernel before
 giving it to the PVM. It can take a file containing inboxes and a
@@ -1093,15 +1093,15 @@ two messages:
   ]
 
 Note that the `sender`, `source` and `destination` fields are optional
-and will be given default values by the REPL (which are the *zero*
+and will be given default values by the debugger (which are the *zero*
 adresses). If no input file is given it will be assumed empty. If no
 rollup address is given, it will use a default address which is the
 *zero* address: ``scr1AFyXAWFS3c6S2D617o8NGRvazoMJPEw6s``.
 
-``octez-wasm-repl`` is a REPL, as such it waits for user inputs to
-continue its execution. Its initial state is exactly the same as right
-after its origination. Its current state can be inspected with the
-command ``show status``:
+``octez-smart-rollup-wasm-debugger`` is a debugger, as such it waits for user
+inputs to continue its execution. Its initial state is exactly the same as right
+after its origination. Its current state can be inspected with the command
+``show status``:
 
 .. code::
 
@@ -1164,9 +1164,9 @@ wrote data at key `/store/key`:
   > show key /store/key
   `<hexadecimal value of the key>`
 
-Since the representation of values is decided by the kernel, the REPL can only
-return its raw value. It is possible however to inspect the memory by stopping
-the PVM before its snapshot internal state, with ``step result``, and
+Since the representation of values is decided by the kernel, the debugger can
+only return its raw value. It is possible however to inspect the memory by
+stopping the PVM before its snapshot internal state, with ``step result``, and
 inspect the memory at pointer `n` and length `l`, and finaly evaluate until the
 next `kernel_run`:
 

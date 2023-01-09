@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_alpha
 open Protocol
 open Alpha_context
 
@@ -32,8 +33,10 @@ let parsed_string_encoding =
   Data_encoding.conv
     (fun _ -> Stdlib.failwith "This value is not supposed to be encoded")
     (fun s ->
-      let parsed, _ = Michelson_v1_parser.parse_expression s in
-      parsed.Michelson_v1_parser.expanded)
+      let parsed, _ =
+        Tezos_client_alpha.Michelson_v1_parser.parse_expression s
+      in
+      parsed.Tezos_client_alpha.Michelson_v1_parser.expanded)
     Data_encoding.string
 
 (* [input_encoding default_sender default_source default_destination] is an

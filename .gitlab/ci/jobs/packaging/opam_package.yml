@@ -314,6 +314,8 @@ opam:octez-smart-rollup-node-PtMumbai:
 
 # Ignoring unreleased package octez-smart-rollup-node-alpha.
 
+# Ignoring unreleased package octez-smart-rollup-wasm-debugger.
+
 # Ignoring unreleased package octez-snoop.
 
 opam:octez-tx-rollup-client-PtKathma:
@@ -343,8 +345,6 @@ opam:octez-tx-rollup-node-PtLimaPt:
     - .rules_template__trigger_opam_batch_1
   variables:
     package: octez-tx-rollup-node-PtLimaPt
-
-# Ignoring unreleased package octez-wasm-repl.
 
 # Ignoring unreleased package tezos-014-PtKathma-test-helpers.
 

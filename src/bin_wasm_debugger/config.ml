@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_alpha
+
 let default_sender = Protocol.Contract_hash.zero
 
 let default_source = Tezos_crypto.Signature.Public_key_hash.zero
