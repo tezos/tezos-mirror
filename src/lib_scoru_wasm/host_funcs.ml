@@ -618,6 +618,8 @@ module Tick_model = struct
   let tree_write = Z.one
 
   let tree_read = Z.one
+
+  let with_error result ticks = if result < 0l then nop else ticks
 end
 
 let value i = Values.(Num (I32 i))
@@ -631,7 +633,8 @@ let read_input_type =
 
 let read_input_name = "tezos_read_input"
 
-let read_input_ticks input_size = Tick_model.value_written_in_memory input_size
+let read_input_ticks input_size =
+  Tick_model.(with_error input_size (value_written_in_memory input_size))
 
 let read_input =
   Host_funcs.Host_func
@@ -661,7 +664,7 @@ let write_output_type =
   Types.FuncType (input_types, output_types)
 
 let write_output_ticks output_size =
-  Tick_model.value_read_from_memory output_size
+  Tick_model.(with_error output_size (value_read_from_memory output_size))
 
 let write_output =
   Host_funcs.Host_func
@@ -713,8 +716,8 @@ let store_has_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let store_has_ticks key_size =
-  Tick_model.(read_key_in_memory key_size + tree_access)
+let store_has_ticks key_size result =
+  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
 
 let store_has =
   Host_funcs.Host_func
@@ -730,7 +733,7 @@ let store_has =
               ~key_offset
               ~key_length
           in
-          (durable, [value r], store_has_ticks key_length)
+          (durable, [value r], store_has_ticks key_length r)
       | _ -> raise Bad_input)
 
 let store_delete_name = "tezos_store_delete"
@@ -742,8 +745,8 @@ let store_delete_type =
   let output_types = Vector.of_list [Types.NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_delete_ticks key_size =
-  Tick_model.(read_key_in_memory key_size + tree_deletion)
+let store_delete_ticks key_size result =
+  Tick_model.(with_error result (read_key_in_memory key_size + tree_deletion))
 
 let store_delete =
   Host_funcs.Host_func
@@ -761,7 +764,7 @@ let store_delete =
           in
           ( Durable.to_storage durable,
             [value code],
-            store_delete_ticks key_length )
+            store_delete_ticks key_length code )
       | _ -> raise Bad_input)
 
 let store_value_size_name = "tezos_store_value_size"
@@ -774,8 +777,8 @@ let store_value_size_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_value_size_ticks key_size =
-  Tick_model.(read_key_in_memory key_size + tree_access)
+let store_value_size_ticks key_size result =
+  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
 
 let store_value_size =
   let open Lwt_syntax in
@@ -792,7 +795,7 @@ let store_value_size =
               ~key_offset
               ~key_length
           in
-          (durable, [value res], store_value_size_ticks key_length)
+          (durable, [value res], store_value_size_ticks key_length res)
       | _ -> raise Bad_input)
 
 let store_list_size_name = "tezos_store_list_size"
@@ -805,8 +808,8 @@ let store_list_size_type =
   let output_types = Types.[NumType I64Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let store_list_size_ticks key_size =
-  Tick_model.(read_key_in_memory key_size + tree_access)
+let store_list_size_ticks key_size result =
+  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
 
 let store_list_size =
   Host_funcs.Host_func
@@ -824,7 +827,7 @@ let store_list_size =
           in
           ( Durable.to_storage durable,
             [Values.(Num (I64 result))],
-            store_list_size_ticks key_length )
+            store_list_size_ticks key_length (Int64.to_int32 result) )
       | _ -> raise Bad_input)
 
 let store_get_nth_key_name = "tezos_store_get_nth_key_list"
@@ -844,8 +847,8 @@ let store_get_nth_key_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let store_get_nth_key_ticks key_size =
-  Tick_model.(read_key_in_memory key_size + tree_access)
+let store_get_nth_key_ticks key_size result =
+  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
 
 let store_get_nth_key =
   Host_funcs.Host_func
@@ -871,7 +874,7 @@ let store_get_nth_key =
               ~dst
               ~max_size
           in
-          (durable, [value result], store_get_nth_key_ticks key_length)
+          (durable, [value result], store_get_nth_key_ticks key_length result)
       | _ -> raise Bad_input)
 
 let store_copy_name = "tezos_store_copy"
@@ -885,11 +888,13 @@ let store_copy_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_copy_ticks from_key_size to_key_size =
+let store_copy_ticks from_key_size to_key_size result =
   Tick_model.(
-    read_key_in_memory from_key_size
-    + read_key_in_memory to_key_size
-    + tree_copy)
+    with_error
+      result
+      (read_key_in_memory from_key_size
+      + read_key_in_memory to_key_size
+      + tree_copy))
 
 let store_copy =
   Host_funcs.Host_func
@@ -915,7 +920,7 @@ let store_copy =
           in
           ( Durable.to_storage durable,
             [value code],
-            store_copy_ticks from_key_length to_key_length )
+            store_copy_ticks from_key_length to_key_length code )
       | _ -> raise Bad_input)
 
 let store_move_name = "tezos_store_move"
@@ -929,11 +934,13 @@ let store_move_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_move_ticks from_key_size to_key_size =
+let store_move_ticks from_key_size to_key_size result =
   Tick_model.(
-    read_key_in_memory from_key_size
-    + read_key_in_memory to_key_size
-    + tree_move)
+    with_error
+      result
+      (read_key_in_memory from_key_size
+      + read_key_in_memory to_key_size
+      + tree_move))
 
 let store_move =
   Host_funcs.Host_func
@@ -959,7 +966,7 @@ let store_move =
           in
           ( Durable.to_storage durable,
             [value code],
-            store_move_ticks to_key_length from_key_length )
+            store_move_ticks to_key_length from_key_length code )
       | _ -> raise Bad_input)
 
 let store_read_name = "tezos_store_read"
@@ -981,9 +988,11 @@ let store_read_type =
 
 let store_read_ticks key_size value_size =
   Tick_model.(
-    read_key_in_memory key_size
-    + tree_access
-    + value_written_in_memory value_size)
+    with_error
+      value_size
+      (read_key_in_memory key_size
+      + tree_access
+      + value_written_in_memory value_size))
 
 let store_read =
   Host_funcs.Host_func
@@ -1077,11 +1086,13 @@ let store_write_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_write_ticks key_size value_size =
+let store_write_ticks key_size value_size result =
   Tick_model.(
-    read_key_in_memory key_size
-    + tree_access
-    + value_read_from_memory value_size)
+    with_error
+      result
+      (read_key_in_memory key_size
+      + tree_access
+      + value_read_from_memory value_size))
 
 let store_write =
   Host_funcs.Host_func
@@ -1109,7 +1120,7 @@ let store_write =
           in
           ( Durable.to_storage durable,
             [value code],
-            store_write_ticks key_length num_bytes )
+            store_write_ticks key_length num_bytes code )
       | _ -> raise Bad_input)
 
 let lookup_opt name =
