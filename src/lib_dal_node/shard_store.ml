@@ -193,6 +193,22 @@ let read_shards_subset ~share_size store commitment shards =
       return Cryptobox.{index; share})
     shards
 
+let are_shards_available ~share_size store commitment shard_indexes =
+  let open Lwt_result_syntax in
+  let dir = commitment_dir store commitment in
+  List.for_all_es
+    (fun index ->
+      let name = string_of_int index in
+      let filepath = Filename.concat dir name in
+      let*! share =
+        read_share_from_disk store ~commitment ~name ~share_size filepath
+      in
+      match share with
+      | Ok _ -> return true
+      | Error [Resource_not_found _] -> return false
+      | Error e -> fail e)
+    shard_indexes
+
 let read_shard ~share_size store commitment shard_index =
   let open Lwt_result_syntax in
   let dir = commitment_dir store commitment in
