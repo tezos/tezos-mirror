@@ -273,16 +273,16 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Bool -> Atom.bool state value
   | Int8 -> Atom.int8 state value
   | Uint8 -> Atom.uint8 state value
-  | Int16 Big -> Atom.int16 state value
-  | Uint16 Big -> Atom.uint16 state value
-  | Int31 Big -> Atom.int31 state value
-  | Int32 Big -> Atom.int32 state value
-  | Int64 Big -> Atom.int64 state value
-  | Int16 Little -> Atom.int16_le state value
-  | Uint16 Little -> Atom.uint16_le state value
-  | Int31 Little -> Atom.int31_le state value
-  | Int32 Little -> Atom.int32_le state value
-  | Int64 Little -> Atom.int64_le state value
+  | Int16 Big_endian -> Atom.int16 state value
+  | Uint16 Big_endian -> Atom.uint16 state value
+  | Int31 Big_endian -> Atom.int31 state value
+  | Int32 Big_endian -> Atom.int32 state value
+  | Int64 Big_endian -> Atom.int64 state value
+  | Int16 Little_endian -> Atom.int16_le state value
+  | Uint16 Little_endian -> Atom.uint16_le state value
+  | Int31 Little_endian -> Atom.int31_le state value
+  | Int32 Little_endian -> Atom.int32_le state value
+  | Int64 Little_endian -> Atom.int64_le state value
   | N -> Atom.n state value
   | Z -> Atom.z state value
   | Float -> Atom.float state value
@@ -297,9 +297,9 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Padded (e, n) ->
       write_rec e state value ;
       Atom.fixed_kind_string n state (String.make n '\000')
-  | RangedInt {minimum; endianness = Big; maximum} ->
+  | RangedInt {minimum; endianness = Big_endian; maximum} ->
       Atom.ranged_int ~minimum ~maximum state value
-  | RangedInt {minimum; endianness = Little; maximum} ->
+  | RangedInt {minimum; endianness = Little_endian; maximum} ->
       Atom.ranged_int_le ~minimum ~maximum state value
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum state value

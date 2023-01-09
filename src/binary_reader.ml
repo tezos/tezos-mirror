@@ -260,16 +260,16 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Bool -> Atom.bool state
   | Int8 -> Atom.int8 state
   | Uint8 -> Atom.uint8 state
-  | Int16 Big -> Atom.int16 state
-  | Uint16 Big -> Atom.uint16 state
-  | Int31 Big -> Atom.int31 state
-  | Int32 Big -> Atom.int32 state
-  | Int64 Big -> Atom.int64 state
-  | Int16 Little -> Atom.int16_le state
-  | Uint16 Little -> Atom.uint16_le state
-  | Int31 Little -> Atom.int31_le state
-  | Int32 Little -> Atom.int32_le state
-  | Int64 Little -> Atom.int64_le state
+  | Int16 Big_endian -> Atom.int16 state
+  | Uint16 Big_endian -> Atom.uint16 state
+  | Int31 Big_endian -> Atom.int31 state
+  | Int32 Big_endian -> Atom.int32 state
+  | Int64 Big_endian -> Atom.int64 state
+  | Int16 Little_endian -> Atom.int16_le state
+  | Uint16 Little_endian -> Atom.uint16_le state
+  | Int31 Little_endian -> Atom.int31_le state
+  | Int32 Little_endian -> Atom.int32_le state
+  | Int64 Little_endian -> Atom.int64_le state
   | N -> Atom.n state
   | Z -> Atom.z state
   | Float -> Atom.float state
@@ -282,9 +282,9 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let v = read_rec e state in
       ignore (Atom.fixed_length_string n state : string) ;
       v
-  | RangedInt {minimum; endianness = Big; maximum} ->
+  | RangedInt {minimum; endianness = Big_endian; maximum} ->
       Atom.ranged_int ~minimum ~maximum state
-  | RangedInt {minimum; endianness = Little; maximum} ->
+  | RangedInt {minimum; endianness = Little_endian; maximum} ->
       Atom.ranged_int_le ~minimum ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
   | String_enum (_, arr) -> Atom.string_enum arr state

@@ -65,7 +65,7 @@ type case_tag_internal = Uint_option.t
 
 type string_json_repr = Hex | Plain
 
-type endianness = Big | Little [@@deriving hash]
+type endianness = Big_endian | Little_endian [@@deriving hash]
 
 val default_endianness : endianness
 

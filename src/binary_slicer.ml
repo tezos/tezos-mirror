@@ -316,16 +316,16 @@ let rec read_rec :
   | Bool -> Atom.bool !!"bool" state
   | Int8 -> Atom.int8 !!"int8" state
   | Uint8 -> Atom.uint8 !!"uint8" state
-  | Int16 Big -> Atom.int16 !!"int16" state
-  | Uint16 Big -> Atom.uint16 !!"uint16" state
-  | Int31 Big -> Atom.int31 !!"int31" state
-  | Int32 Big -> Atom.int32 !!"int32" state
-  | Int64 Big -> Atom.int64 !!"int64" state
-  | Int16 Little -> Atom.int16_le !!"int16" state
-  | Uint16 Little -> Atom.uint16_le !!"uint16" state
-  | Int31 Little -> Atom.int31_le !!"int31" state
-  | Int32 Little -> Atom.int32_le !!"int32" state
-  | Int64 Little -> Atom.int64_le !!"int64" state
+  | Int16 Big_endian -> Atom.int16 !!"int16" state
+  | Uint16 Big_endian -> Atom.uint16 !!"uint16" state
+  | Int31 Big_endian -> Atom.int31 !!"int31" state
+  | Int32 Big_endian -> Atom.int32 !!"int32" state
+  | Int64 Big_endian -> Atom.int64 !!"int64" state
+  | Int16 Little_endian -> Atom.int16_le !!"int16" state
+  | Uint16 Little_endian -> Atom.uint16_le !!"uint16" state
+  | Int31 Little_endian -> Atom.int31_le !!"int31" state
+  | Int32 Little_endian -> Atom.int32_le !!"int32" state
+  | Int64 Little_endian -> Atom.int64_le !!"int64" state
   | N -> Atom.n !!"N" state
   | Z -> Atom.z !!"Z" state
   | Float -> Atom.float !!"float" state
@@ -339,9 +339,9 @@ let rec read_rec :
       let v = read_rec e ?name state in
       ignore (Atom.fixed_length_string n "padding" state : string) ;
       v
-  | RangedInt {minimum; endianness = Big; maximum} ->
+  | RangedInt {minimum; endianness = Big_endian; maximum} ->
       Atom.ranged_int ~minimum ~maximum !!"ranged int" state
-  | RangedInt {minimum; endianness = Little; maximum} ->
+  | RangedInt {minimum; endianness = Little_endian; maximum} ->
       Atom.ranged_int_le ~minimum ~maximum !!"ranged int" state
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum !!"ranged float" state

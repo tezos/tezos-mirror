@@ -90,7 +90,7 @@ module Encoding : sig
 
   type string_json_repr = Hex | Plain
 
-  type endianness = Big | Little
+  type endianness = Big_endian | Little_endian
 
   (** {3 Ground descriptors} *)
 

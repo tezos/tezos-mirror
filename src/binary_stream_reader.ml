@@ -339,16 +339,16 @@ let rec read_rec :
   | Bool -> Atom.bool resume state k
   | Int8 -> Atom.int8 resume state k
   | Uint8 -> Atom.uint8 resume state k
-  | Int16 Big -> Atom.int16 resume state k
-  | Uint16 Big -> Atom.uint16 resume state k
-  | Int31 Big -> Atom.int31 resume state k
-  | Int32 Big -> Atom.int32 resume state k
-  | Int64 Big -> Atom.int64 resume state k
-  | Int16 Little -> Atom.int16_le resume state k
-  | Uint16 Little -> Atom.uint16_le resume state k
-  | Int31 Little -> Atom.int31_le resume state k
-  | Int32 Little -> Atom.int32_le resume state k
-  | Int64 Little -> Atom.int64_le resume state k
+  | Int16 Big_endian -> Atom.int16 resume state k
+  | Uint16 Big_endian -> Atom.uint16 resume state k
+  | Int31 Big_endian -> Atom.int31 resume state k
+  | Int32 Big_endian -> Atom.int32 resume state k
+  | Int64 Big_endian -> Atom.int64 resume state k
+  | Int16 Little_endian -> Atom.int16_le resume state k
+  | Uint16 Little_endian -> Atom.uint16_le resume state k
+  | Int31 Little_endian -> Atom.int31_le resume state k
+  | Int32 Little_endian -> Atom.int32_le resume state k
+  | Int64 Little_endian -> Atom.int64_le resume state k
   | N -> Atom.n resume state k
   | Z -> Atom.z resume state k
   | Float -> Atom.float resume state k
@@ -363,9 +363,9 @@ let rec read_rec :
   | Padded (e, n) ->
       read_rec false e state @@ fun (v, state) ->
       skip n state @@ fun state -> k (v, state)
-  | RangedInt {minimum; endianness = Big; maximum} ->
+  | RangedInt {minimum; endianness = Big_endian; maximum} ->
       Atom.ranged_int ~minimum ~maximum resume state k
-  | RangedInt {minimum; endianness = Little; maximum} ->
+  | RangedInt {minimum; endianness = Little_endian; maximum} ->
       Atom.ranged_int_le ~minimum ~maximum resume state k
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum resume state k

@@ -91,9 +91,7 @@ let get_tag = Uint_option.get
 
 type string_json_repr = Hex | Plain
 
-type endianness = Big | Little [@@deriving hash]
-
-let default_endianness = Big
+type endianness = Big_endian | Little_endian [@@deriving hash]
 
 type 'a desc =
   | Null : unit desc
@@ -549,13 +547,13 @@ let int8 = make @@ Int8
 let uint8 = make @@ Uint8
 
 module Big_endian = struct
-  let int16 = make @@ Int16 default_endianness
+  let int16 = make @@ Int16 Big_endian
 
-  let uint16 = make @@ Uint16 default_endianness
+  let uint16 = make @@ Uint16 Big_endian
 
-  let int31 = make @@ Int31 default_endianness
+  let int31 = make @@ Int31 Big_endian
 
-  let int32 = make @@ Int32 default_endianness
+  let int32 = make @@ Int32 Big_endian
 
   let ranged_int minimum maximum =
     let minimum = min minimum maximum and maximum = max minimum maximum in
@@ -563,10 +561,12 @@ module Big_endian = struct
       minimum < Binary_size.min_int `Int31
       || Binary_size.max_int `Int31 < maximum
     then invalid_arg "Data_encoding.ranged_int" ;
-    make @@ RangedInt {minimum; endianness = default_endianness; maximum}
+    make @@ RangedInt {minimum; endianness = Big_endian; maximum}
 
-  let int64 = make @@ Int64 default_endianness
+  let int64 = make @@ Int64 Big_endian
 end
+
+let default_endianness = Big_endian
 
 include Big_endian
 
@@ -575,13 +575,13 @@ let ranged_float minimum maximum =
   make @@ RangedFloat {minimum; maximum}
 
 module Little_endian = struct
-  let int16 = make @@ Int16 Little
+  let int16 = make @@ Int16 Little_endian
 
-  let uint16 = make @@ Uint16 Little
+  let uint16 = make @@ Uint16 Little_endian
 
-  let int31 = make @@ Int31 Little
+  let int31 = make @@ Int31 Little_endian
 
-  let int32 = make @@ Int32 Little
+  let int32 = make @@ Int32 Little_endian
 
   let ranged_int minimum maximum =
     let minimum = min minimum maximum and maximum = max minimum maximum in
@@ -589,9 +589,9 @@ module Little_endian = struct
       minimum < Binary_size.min_int `Int31
       || Binary_size.max_int `Int31 < maximum
     then invalid_arg "Data_encoding.ranged_int" ;
-    make @@ RangedInt {minimum; endianness = Little; maximum}
+    make @@ RangedInt {minimum; endianness = Little_endian; maximum}
 
-  let int64 = make @@ Int64 Little
+  let int64 = make @@ Int64 Little_endian
 end
 
 let n = make @@ N

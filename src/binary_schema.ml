@@ -108,8 +108,8 @@ module Printer_ast = struct
       | `Uint8 -> "unsigned 8-bit")
       (match endianness with
       | _ when is_single_byte -> ""
-      | Big -> " big-endian"
-      | Little -> " little-endian")
+      | Big_endian -> " big-endian"
+      | Little_endian -> " little-endian")
 
   let rec pp_layout ppf = function
     | Zero_width -> ()
@@ -442,7 +442,8 @@ module Encoding = struct
     string_enum (("Int64", `Int64) :: ("Int32", `Int32) :: integer_cases)
 
   let endianness_encoding =
-    string_enum [("Big", Encoding.Big); ("Little", Encoding.Little)]
+    string_enum
+      [("Big", Encoding.Big_endian); ("Little", Encoding.Little_endian)]
 
   let limit_enc =
     union
