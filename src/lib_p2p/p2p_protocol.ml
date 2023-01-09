@@ -42,15 +42,19 @@ let message conn _request size msg =
 
 module Private_answerer = struct
   let advertise conn _request _points =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_received ;
     Events.(emit private_node_new_peers) conn.peer_id
 
   let bootstrap conn _request =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_received ;
     Lwt_result.ok @@ Events.(emit private_node_peers_request) conn.peer_id
 
   let swap_request conn _request _new_point _peer =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
     Events.(emit private_node_swap_request) conn.peer_id
 
   let swap_ack conn _request _point _peer_id =
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
     Events.(emit private_node_swap_ack) conn.peer_id
 
   let create conn =
@@ -71,6 +75,7 @@ module Default_answerer = struct
     let log = config.log in
     let source_peer_id = conn.peer_id in
     log (Advertise_received {source = source_peer_id}) ;
+    Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_received ;
     P2p_pool.register_list_of_new_points
       ~medium:"advertise"
       ~source:conn.peer_id
@@ -82,6 +87,7 @@ module Default_answerer = struct
     let log = config.log in
     let source_peer_id = conn.peer_id in
     log (Bootstrap_received {source = source_peer_id}) ;
+    Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_received ;
     if conn.is_private then
       let*! () = Events.(emit private_node_request) conn.peer_id in
       return_unit
@@ -95,6 +101,7 @@ module Default_answerer = struct
           match conn.write_advertise points with
           | Ok true ->
               log (Advertise_sent {source = source_peer_id}) ;
+              Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_sent ;
               return_unit
           | Ok false ->
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/4594
@@ -114,6 +121,7 @@ module Default_answerer = struct
     | Ok _new_conn -> (
         t.latest_successful_swap <- Time.System.now () ;
         t.log (Swap_success {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Swap.success ;
         let* () = Events.(emit swap_succeeded) new_point in
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
         | None -> Lwt.return_unit
@@ -121,6 +129,7 @@ module Default_answerer = struct
     | Error err -> (
         t.latest_accepted_swap <- t.latest_successful_swap ;
         t.log (Swap_failure {source = source_peer_id}) ;
+        Prometheus.Counter.inc_one P2p_metrics.Swap.fail ;
         match err with
         | [Timeout] -> Events.(emit swap_interrupted) (new_point, err)
         | _ -> Events.(emit swap_failed) (new_point, err))
@@ -132,6 +141,7 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
     let* () = Events.(emit swap_ack_received) source_peer_id in
     match request.last_sent_swap_request with
     | None -> Lwt.return_unit (* ignore *)
@@ -149,6 +159,7 @@ module Default_answerer = struct
     let connect = config.connect in
     let log = config.log in
     log (Swap_request_received {source = source_peer_id}) ;
+    Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
     let* () = Events.(emit swap_request_received) source_peer_id in
     (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
@@ -164,6 +175,7 @@ module Default_answerer = struct
       || not (P2p_point_state.is_disconnected new_point_info)
     then (
       log (Swap_request_ignored {source = source_peer_id}) ;
+      Prometheus.Counter.inc_one P2p_metrics.Swap.ignored ;
       Events.(emit swap_request_ignored) source_peer_id)
     else
       match P2p_pool.Connection.random_addr pool ~no_private:true with
@@ -172,6 +184,7 @@ module Default_answerer = struct
           match conn.write_swap_ack proposed_point proposed_peer_id with
           | Ok true ->
               log (Swap_ack_sent {source = source_peer_id}) ;
+              Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
               swap
                 config
                 pool

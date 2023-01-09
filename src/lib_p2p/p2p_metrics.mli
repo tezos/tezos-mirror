@@ -23,5 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Prometheus
+
+(** All metrics related to the p2p protocol. *)
+module Messages : sig
+  (** bootstrap messages counter *)
+  val bootstrap_received : Counter.t
+
+  (** bootstrap messages counter *)
+  val bootstrap_sent : Counter.t
+
+  (** advertise messages counter *)
+  val advertise_received : Counter.t
+
+  (** advertise messages counter *)
+  val advertise_sent : Counter.t
+
+  (**  user messages sent counter *)
+  val user_message_sent : Counter.t
+
+  (**  user messages sent by broadcasting counter *)
+  val broadcast_message_sent : Counter.t
+
+  (**  user messages received counter *)
+  val user_message_received : Counter.t
+
+  (**  user messages received with errors counter *)
+  val user_message_received_error : Counter.t
+
+  (** swap requests messages counter *)
+  val swap_request_received : Counter.t
+
+  (** swap requests messages counter *)
+  val swap_request_sent : Counter.t
+
+  (** swap acks messages counter *)
+  val swap_ack_received : Counter.t
+
+  (** swap acks messages counter *)
+  val swap_ack_sent : Counter.t
+end
+
+(** Metrics related to the status of swap messages *)
+module Swap : sig
+  (** ignored swaps counter *)
+  val ignored : Counter.t
+
+  (** successful swaps counter *)
+  val success : Counter.t
+
+  (** failed swaps counter *)
+  val fail : Counter.t
+end
+
 (** [collect pool] registers metrics collections of [pool] *)
 val collect : ('msg, 'peer, 'conn) P2p_pool.t -> unit
