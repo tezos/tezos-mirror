@@ -35,7 +35,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300026bce65bde33033eb7c782906b98edafc2b8072aad985db5cbf1ab05cf173e48a6bce65bde33033eb7c782906b98edafc2b8072aad985db5cbf1ab05cf173e48a00100007d0030170000382066f7574707574810130c8bf1dd363ea01e68dcc907aa6b151279d7df8452a7da2bb7cf1c23c9458b696ff0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293dc0fa513fc9657217226bee9cf2242f01b8939ef07b7363a2c7ba435a57c2cbed83c07bdef93456b7a2f460e71a4482f214a38ed7f93a697dc7d2d0be9d9fefc54c65c06cebd770767d6e9e746e42e5b2c772092c7874983cd57a5a7d57128ad2a26eb76bce65bde33033eb7c782906b98edafc2b8072aad985db5cbf1ab05cf173e48a0000000500000000001f00250197df2be9ed7a1cc34521d82be23fe949a0f016900000000003617578 --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 6403.809 units (will add 100 for safety)
+Estimated gas: 6403.929 units (will add 100 for safety)
 Estimated storage: 5 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -58,7 +58,7 @@ This sequence of operations was run:
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart output message execution was successfully applied
       Paid storage size diff: 5 bytes
-      Consumed gas: 4750.396
+      Consumed gas: 4750.516
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00125
         storage fees ........................... +ꜩ0.00125
