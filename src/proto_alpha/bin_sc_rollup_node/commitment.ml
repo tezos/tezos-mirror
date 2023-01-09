@@ -235,13 +235,31 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let publish_commitments (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Publish in
+    if Node_context.is_accuser node_ctxt then
+      (* Accuser does not publish all commitments *)
+      return_unit
+    else
+      match operator with
+      | None ->
+          (* Configured to not publish commitments *)
+          return_unit
+      | Some source ->
+          let*! commitments = missing_commitments node_ctxt in
+          List.iter_es (publish_commitment node_ctxt ~source) commitments
+
+  let publish_single_commitment node_ctxt commitment_hash =
+    let open Lwt_result_syntax in
+    let operator = Node_context.get_operator node_ctxt Publish in
     match operator with
     | None ->
         (* Configured to not publish commitments *)
         return_unit
     | Some source ->
-        let*! commitments = missing_commitments node_ctxt in
-        List.iter_es (publish_commitment node_ctxt ~source) commitments
+        let* commitment =
+          Node_context.get_commitment node_ctxt commitment_hash
+        in
+        when_ (commitment.inbox_level > node_ctxt.lcc.level) @@ fun () ->
+        publish_commitment node_ctxt ~source commitment
 
   (* Commitments can only be cemented after [sc_rollup_challenge_window] has
      passed since they were first published. *)
