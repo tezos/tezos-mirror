@@ -324,11 +324,20 @@ module Legacy = struct
             header_path
             ""
         in
+        let others_path = Path.Level.other_header_status index commitment in
         match status with
         | Dal_plugin.Succeeded ->
             let commitment_path = Path.Level.accepted_header_commitment index in
             let status_path = Path.Level.accepted_header_status index in
             let data = encode_commitment commitment in
+            (* Before adding the item in accepted path, we should remove it from
+               others path, as it may appear there with an Unseen status. *)
+            let* () =
+              remove
+                ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
+                slots_store
+                others_path
+            in
             let* () =
               set
                 ~msg:
@@ -343,11 +352,10 @@ module Legacy = struct
               status_path
               (encode_header_status `Waiting_attestation)
         | Dal_plugin.Failed ->
-            let path = Path.Level.other_header_status index commitment in
             set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" path)
+              ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
               slots_store
-              path
+              others_path
               (encode_header_status `Not_selected))
       slot_headers
 
