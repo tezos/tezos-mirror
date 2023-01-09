@@ -280,6 +280,12 @@ module Atom = struct
   let fixed_length_string length r =
     read_atom r length @@ fun buf ofs -> Bytes.sub_string buf ofs length
 
+  let fixed_length_bigstring length r =
+    read_atom r length @@ fun buf ofs ->
+    let b = Bigstringaf.create length in
+    Bigstringaf.blit_from_bytes buf ~src_off:ofs b ~dst_off:0 ~len:length ;
+    b
+
   let tag = function
     | `Uint8 -> uint8
     | `Uint16 -> uint16 TzEndian.default_endianness
@@ -333,6 +339,10 @@ let rec read_rec :
   | String (`Variable, _) ->
       let size = remaining_bytes_for_variable_encoding state in
       Atom.fixed_length_string size resume state k
+  | Bigstring (`Fixed n, _) -> Atom.fixed_length_bigstring n resume state k
+  | Bigstring (`Variable, _) ->
+      let size = remaining_bytes_for_variable_encoding state in
+      Atom.fixed_length_bigstring size resume state k
   | Padded (e, n) ->
       read_rec false e state @@ fun (v, state) ->
       skip n state @@ fun state -> k (v, state)

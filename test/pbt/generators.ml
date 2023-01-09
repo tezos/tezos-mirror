@@ -112,6 +112,8 @@ type _ ty =
   | FixedStringHex : int -> string ty
   | BytesHex : bytes ty
   | FixedBytesHex : int -> bytes ty
+  | BigstringHex : Bigstringaf.t ty
+  | FixedBigstringHex : int -> Bigstringaf.t ty
   | Option : 'a ty -> 'a option ty
   | Result : 'a ty * 'b ty -> ('a, 'b) result ty
   | List : 'a ty -> 'a list ty
@@ -210,6 +212,8 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | BytesHex -> Crowbar.pp ppf "byteshex"
   | FixedStringHex n -> Crowbar.pp ppf "fixedstringhex(%d)" n
   | FixedBytesHex n -> Crowbar.pp ppf "fixedbyteshex(%d)" n
+  | BigstringHex -> Crowbar.pp ppf "bigstringhex"
+  | FixedBigstringHex n -> Crowbar.pp ppf "fixedbigstringhex(%d)" n
   | Option ty -> Crowbar.pp ppf "option(%a)" pp_ty ty
   | Result (tya, tyb) -> Crowbar.pp ppf "result(%a,%a)" pp_ty tya pp_ty tyb
   | List ty -> Crowbar.pp ppf "list(%a)" pp_ty ty
@@ -776,6 +780,46 @@ let full_fixed_bytes_plain n : bytes full =
     (FixedBytesPlain n)
     Crowbar.(map [bytes_fixed n] Bytes.unsafe_of_string)
     (Data_encoding.Fixed.bytes' Plain n)
+
+let full_bigstring : Bigstringaf.t full =
+  (module struct
+    type t = Bigstringaf.t
+
+    let ty = BigstringHex
+
+    let eq a b =
+      Bigstringaf.length a = Bigstringaf.length b
+      && Bigstringaf.memcmp a 0 b 0 (Bigstringaf.length a) = 0
+
+    let pp ppf v = Crowbar.pp ppf "%S" (Bigstringaf.to_string v)
+
+    let gen =
+      Crowbar.map [string] (fun s ->
+          Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
+
+    let encoding = Data_encoding.bigstring Hex
+  end)
+
+let full_fixed_bigstring n : Bigstringaf.t full =
+  (module struct
+    type t = Bigstringaf.t
+
+    let ty = FixedBigstringHex n
+
+    let eq a b =
+      Bigstringaf.length a = n
+      && Bigstringaf.length b = n
+      && Bigstringaf.memcmp a 0 b 0 n = 0
+
+    let pp ppf v = Crowbar.pp ppf "%S" (Bigstringaf.to_string v)
+
+    let gen =
+      Crowbar.map
+        [Crowbar.bytes_fixed n]
+        (fun s -> Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
+
+    let encoding = Data_encoding.Fixed.bigstring Hex n
+  end)
 
 let full_option : type a. a full -> a option full =
  fun full ->
@@ -2138,6 +2182,8 @@ let rec full_of_ty : type a. a ty -> a full = function
   | BytesHex -> full_bytes_hex
   | FixedStringHex n -> full_fixed_string_hex n
   | FixedBytesHex n -> full_fixed_bytes_hex n
+  | BigstringHex -> full_bigstring
+  | FixedBigstringHex n -> full_fixed_bigstring n
   | Option ty -> full_option (full_of_ty ty)
   | Result (tya, tyb) -> full_result (full_of_ty tya) (full_of_ty tyb)
   | List ty -> full_list (full_of_ty ty)

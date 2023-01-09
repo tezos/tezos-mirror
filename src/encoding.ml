@@ -116,6 +116,7 @@ type 'a desc =
   | Float : float desc
   | Bytes : Kind.length * string_json_repr -> Bytes.t desc
   | String : Kind.length * string_json_repr -> string desc
+  | Bigstring : Kind.length * string_json_repr -> Bigstringaf.t desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : {
@@ -250,6 +251,7 @@ and classify_desc : type a. a desc -> Kind.t =
   (* Tagged *)
   | Bytes (kind, _repr) -> (kind :> Kind.t)
   | String (kind, _repr) -> (kind :> Kind.t)
+  | Bigstring (kind, _repr) -> (kind :> Kind.t)
   | Padded ({encoding; _}, n) -> (
       match classify_desc encoding with
       | `Fixed m -> `Fixed (n + m)
@@ -371,6 +373,7 @@ let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
+  | Bigstring _ -> false
   | Padded _ -> false
   | String_enum _ -> false
   (* true in some cases, but in practice always protected by Dynamic *)
@@ -453,6 +456,12 @@ module Fixed = struct
 
   let bytes n = bytes' Hex n
 
+  let bigstring json_repr n =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create a bigstring encoding of negative or null fixed length." ;
+    make @@ Bigstring (`Fixed n, json_repr)
+
   let add_padding e n =
     if n <= 0 then
       invalid_arg "Cannot create a padding of negative or null fixed length." ;
@@ -485,6 +494,8 @@ module Variable = struct
   let bytes' json_repr = make @@ Bytes (`Variable, json_repr)
 
   let bytes = bytes' Hex
+
+  let bigstring json_repr = make @@ Bigstring (`Variable, json_repr)
 
   let array ?max_length e =
     check_not_variable "an array" e ;
@@ -607,6 +618,9 @@ let bytes' ?length_kind json_repr =
   dynamic_size ?kind:length_kind (Variable.bytes' json_repr)
 
 let bytes = bytes' Hex
+
+let bigstring ?length_kind json_repr =
+  dynamic_size ?kind:length_kind (Variable.bigstring json_repr)
 
 let array ?max_length e = dynamic_size (Variable.array ?max_length e)
 
@@ -757,6 +771,7 @@ let rec is_obj : type a. Mu_visited.t -> a t -> bool =
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
+  | Bigstring _ -> false
 
 let is_obj e = is_obj Mu_visited.empty e
 
@@ -805,6 +820,7 @@ let rec is_tup : type a. Mu_visited.t -> a t -> bool =
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
+  | Bigstring _ -> false
 
 let is_tup e = is_tup Mu_visited.empty e
 
@@ -1072,6 +1088,7 @@ let rec is_nullable : type t. Mu_visited.t -> t encoding -> bool =
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
+  | Bigstring _ -> false
   | Padded (e, _) -> is_nullable visited e
   | String_enum _ -> false
   | Array _ -> false

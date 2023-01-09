@@ -218,6 +218,14 @@ module Atom = struct
     may_resize state length ;
     Bytes.blit_string s 0 state.buffer ofs length
 
+  let fixed_kind_bigstring length state s =
+    if Bigstringaf.length s <> length then
+      raise
+        (Invalid_string_length {expected = length; found = Bigstringaf.length s}) ;
+    let ofs = state.offset in
+    may_resize state length ;
+    Bigstringaf.blit_to_bytes s ~src_off:0 state.buffer ~dst_off:ofs ~len:length
+
   let tag = function
     | `Uint8 -> uint8
     | `Uint16 -> uint16 TzEndian.default_endianness
@@ -251,6 +259,10 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | String (`Variable, _) ->
       let length = String.length value in
       Atom.fixed_kind_string length state value
+  | Bigstring (`Fixed n, _) -> Atom.fixed_kind_bigstring n state value
+  | Bigstring (`Variable, _) ->
+      let length = Bigstringaf.length value in
+      Atom.fixed_kind_bigstring length state value
   | Padded (e, n) ->
       write_rec e state value ;
       Atom.fixed_kind_string n state (String.make n '\000')

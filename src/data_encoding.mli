@@ -302,6 +302,11 @@ module Encoding : sig
   (** same as [bytes' Hex] *)
   val bytes : Bytes.t encoding
 
+  val bigstring :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    Bigstringaf.t encoding
+
   (** {3 Descriptor combinators} *)
 
   (** Combinator to make an optional value
@@ -1020,6 +1025,9 @@ let encoding_t =
     val bytes : int -> Bytes.t encoding
 
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
+    val bigstring : string_json_repr -> int -> Bigstringaf.t encoding
+
+    (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val bytes' : string_json_repr -> int -> Bytes.t encoding
 
     (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
@@ -1108,6 +1116,8 @@ let expr_encoding =
 
     val bytes' : string_json_repr -> Bytes.t encoding
 
+    val bigstring : string_json_repr -> Bigstringaf.t encoding
+
     (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
     val array : ?max_length:int -> 'a encoding -> 'a array encoding
@@ -1153,6 +1163,12 @@ let expr_encoding =
 
     (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding
+
+    val bigstring :
+      ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+      string_json_repr ->
+      int ->
+      Bigstringaf.t encoding
   end
 
   (** Mark an encoding as being of dynamic size.

@@ -4,7 +4,7 @@
    json_roundtrip_in_binary)
  (modes native js)
  (js_of_ocaml)
- (libraries data_encoding zarith zarith_stubs_js crowbar))
+ (libraries data_encoding zarith zarith_stubs_js crowbar bigstringaf))
 
 ; We need to increase the stack size
 

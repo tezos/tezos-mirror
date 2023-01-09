@@ -193,7 +193,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
         right
   | Null | Empty | Ignore | Constant _ | Bool | Int8 | Uint8 | Int16 _
   | Uint16 _ | Int31 _ | Int32 _ | Int64 _ | N | Z | RangedInt _ | RangedFloat _
-  | Float | Bytes _ | String _
+  | Float | Bytes _ | String _ | Bigstring _
   | Padded (_, _)
   | String_enum (_, _)
   | Array _ | List _ | Obj _ | Tup _ | Union _ | Mu _ | Describe _ | Splitted _
@@ -302,6 +302,36 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
       | `Fixed expected ->
           let check s =
             let found = String.length s in
+            if found <> expected then
+              raise
+                (Cannot_destruct
+                   ( [],
+                     Unexpected
+                       ( Format.asprintf "string (len %d)" found,
+                         Format.asprintf "string (len %d)" expected ) )) ;
+            s
+          in
+
+          conv check check f
+      | _ -> f)
+  | Bigstring (kind, json_repr) -> (
+      let f =
+        match json_repr with
+        | Plain ->
+            conv
+              Bigstringaf.to_string
+              (fun s -> Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
+              raw_string_encoding
+        | Hex ->
+            conv
+              Bigstringaf.to_string
+              (fun s -> Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
+              string_as_hex_jsont
+      in
+      match kind with
+      | `Fixed expected ->
+          let check s =
+            let found = Bigstringaf.length s in
             if found <> expected then
               raise
                 (Cannot_destruct

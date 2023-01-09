@@ -301,6 +301,12 @@ module Atom = struct
     read_atom ~pp:(Format.sprintf "%S") length @@ fun buf ofs ->
     String.sub buf ofs length
 
+  let fixed_length_bigstring length =
+    read_atom
+      ~pp:(fun b -> Format.sprintf "%S" (Bigstringaf.to_string b))
+      length
+    @@ fun buf ofs -> Bigstringaf.of_string ~off:ofs ~len:length buf
+
   let tag = function
     | `Uint8 -> uint8
     | `Uint16 -> uint16 TzEndian.default_endianness
@@ -336,6 +342,9 @@ let rec read_rec :
   | String (`Fixed n, _) -> Atom.fixed_length_string n !!"string" state
   | String (`Variable, _) ->
       Atom.fixed_length_string state.remaining_bytes !!"string" state
+  | Bigstring (`Fixed n, _) -> Atom.fixed_length_bigstring n !!"string" state
+  | Bigstring (`Variable, _) ->
+      Atom.fixed_length_bigstring state.remaining_bytes !!"string" state
   | Padded (e, n) ->
       let v = read_rec e ?name state in
       ignore (Atom.fixed_length_string n "padding" state : string) ;

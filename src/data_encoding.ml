@@ -141,6 +141,41 @@ module Encoding = struct
             (Json.bytes json_repr))
 
     let bytes length = bytes' Hex length
+
+    let bigstring ?length_kind json_repr length =
+      let max_length =
+        match length_kind with
+        | None -> Binary_size.max_int `Uint30 (* biggest that's allowed *)
+        | Some kind -> Binary_size.max_int kind
+      in
+      if length > max_length then
+        raise
+          (Invalid_argument
+             "Data_encoding.Encoding.Bounded.bigstring': length bound is \
+              greater than maximum length allowed in size header.") ;
+      raw_splitted
+        ~binary:
+          (let kind =
+             match length_kind with
+             | None ->
+                 (Binary_size.unsigned_range_to_size length
+                   :> Binary_size.length)
+             | Some kind -> kind
+           in
+           dynamic_size ~kind (check_size length (Variable.bigstring Hex)))
+        ~json:
+          (let open Json_encoding in
+          conv
+            (fun s ->
+              if Bigstringaf.length s > length then
+                invalid_arg "oversized string" ;
+              Bigstringaf.to_string s)
+            (fun s ->
+              if String.length s > length then
+                raise
+                  (Cannot_destruct ([], Invalid_argument "oversized string")) ;
+              Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
+            (Json.string json_repr))
   end
 
   type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a

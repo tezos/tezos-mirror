@@ -92,6 +92,7 @@ type 'a desc =
       (** A mutable string *)
   | String : Kind.length * string_json_repr -> string desc
       (** An immutable string *)
+  | Bigstring : Kind.length * string_json_repr -> Bigstringaf.t desc
   | Padded : 'a t * int -> 'a desc
       (** The [int] indicates how many null bytes should be added on the right
           of the value. *)
@@ -282,6 +283,9 @@ val bytes : Bytes.t encoding
 val bytes' :
   ?length_kind:Binary_size.length -> string_json_repr -> Bytes.t encoding
 
+val bigstring :
+  ?length_kind:Binary_size.length -> string_json_repr -> Bigstringaf.t encoding
+
 val float : float encoding
 
 val option : 'a encoding -> 'a option encoding
@@ -303,6 +307,8 @@ module Fixed : sig
 
   val bytes' : string_json_repr -> int -> Bytes.t encoding
 
+  val bigstring : string_json_repr -> int -> Bigstringaf.t encoding
+
   val add_padding : 'a encoding -> int -> 'a encoding
 
   val list : int -> 'a encoding -> 'a list encoding
@@ -318,6 +324,8 @@ module Variable : sig
   val bytes : Bytes.t encoding
 
   val bytes' : string_json_repr -> Bytes.t encoding
+
+  val bigstring : string_json_repr -> Bigstringaf.t encoding
 
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
