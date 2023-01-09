@@ -13,19 +13,19 @@
 ## This script is also sourced in the Makefile, as such it should be compatible
 ## with both the make and sh syntax
 
-export ocaml_version=4.14.0
+export ocaml_version=4.14.1
 export opam_version=2
 export recommended_rust_version=1.60.0
 export recommended_node_version=16.18.1
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=789990a742984743e12a872912ab71b023b031e7
+export full_opam_repository_tag=c64e9a29cb319826b5d509912dd2f98bd21223f4
 
 ## opam_repository is an additional, tezos-specific opam repository.
 ## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.yml
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-f2589aed25a72ec2aa699891e5982cba2524fa45}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-a6706ca22431db7401e99c8c8cc64911ed935ae3}"
 export opam_repository_git="$opam_repository_url.git"
 export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 
