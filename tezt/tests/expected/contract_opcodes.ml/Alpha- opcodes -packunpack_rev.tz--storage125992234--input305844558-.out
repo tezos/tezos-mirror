@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 16 (just consumed gas: 148.183)
+  - location: 16 (just consumed gas: 148.783)
     [ (Pair (Pair -1
                   1
                   "foobar"
@@ -699,11 +699,11 @@ trace
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 172 (just consumed gas: 0.496)
+  - location: 172 (just consumed gas: 0.506)
     [ 0x050a0000001500bdfe3885e846fdea23c9acbe3bb1cfcca9c03e4a
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 173 (just consumed gas: 0.963)
+  - location: 173 (just consumed gas: 0.973)
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
@@ -769,10 +769,10 @@ trace
   - location: 217 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 218 (just consumed gas: 0.506)
+  - location: 218 (just consumed gas: 0.516)
     [ 0x050a000000160000bdfe3885e846fdea23c9acbe3bb1cfcca9c03e4a
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 219 (just consumed gas: 0.984)
+  - location: 219 (just consumed gas: 0.994)
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
       "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
   - location: 222 (just consumed gas: 0)

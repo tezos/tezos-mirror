@@ -26,28 +26,17 @@
 module S = Saturation_repr
 
 module Constants = struct
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2648
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_add_message_base = S.safe_int 430
-
-  let cost_add_message_per_byte = S.safe_int 15
-
-  let cost_add_inbox_per_level = S.safe_int 15
-
-  let cost_update_num_and_size_of_messages = S.safe_int 15
-
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.contract_optimized *)
   let cost_decoding_contract_optimized = S.safe_int 70
 
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.key_hash_optimized *)
-  let cost_decoding_key_hash_optimized = S.safe_int 50
+  let cost_decoding_key_hash_optimized = S.safe_int 70
 
   (* Set to the cost of encoding a pkh defined in {!Michelson_v1_gas} divided
-     by the number of characters of a pkh, i.e. 70/35. To be updated when
-     benchmarking is completed. *)
-  let cost_encode_string_per_byte = S.safe_int 2
+     by the number of characters of a pkh, with the result rounded up, i.e.
+     70/20 + 1.
+     To be updated when benchmarking is completed. *)
+  let cost_encode_string_per_byte = S.safe_int 4
 
   (* Cost of serializing a state hash. *)
   let cost_serialize_state_hash =
@@ -96,8 +85,9 @@ let cost_serialize_internal_inbox_message
 
 (* Derived from benchmark in
    [Sc_rollup_benchmarks.Sc_rollup_deserialize_output_proof_benchmark] and model
-   [model_Sc_rollup_deserialize_output_proof_benchmark] with estimated parameters:
-   [fun size -> (7148.78790875 + (5.53034040727 * size))] *)
+   [model_Sc_rollup_deserialize_output_proof_benchmark]. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4533
+   use the reference machine to infer the parameters of this model *)
 let cost_deserialize_output_proof ~bytes_len =
   let open S.Syntax in
   let size = S.safe_int bytes_len in
@@ -144,9 +134,9 @@ let cost_add_message ~current_index ~msg_len =
 (* Derived from benchmark in
    [Sc_rollup_benchmarks.Sc_rollup_verify_output_proof_benchmark] and model
    [model_Sc_rollup_verify_output_proof_benchmark] with estimated parameters:
-   [fun size -> (98707.0824163 + (11.6809615751 * size))] *)
+   [fun size -> (103413.141163 + (6.85566158429 * size))] *)
 let cost_verify_output_proof ~bytes_len =
   let open S.Syntax in
   let size = S.safe_int bytes_len in
   let v0 = size in
-  S.safe_int 98750 + ((v0 lsl 3) + (v0 lsl 1) + v0 + (v0 lsr 1))
+  S.safe_int 103450 + (v0 lsl 2) + (v0 lsl 1) + v0

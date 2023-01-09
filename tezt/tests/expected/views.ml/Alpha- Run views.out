@@ -145,7 +145,7 @@ Contract memorized as check_caller.
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4413.514 units (will add 100 for safety)
+Estimated gas: 4413.814 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -171,7 +171,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
-      Consumed gas: 4414.159
+      Consumed gas: 4414.459
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [CONTRACT_HASH] ... +ꜩ1
@@ -179,7 +179,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 2117.241 units (will add 100 for safety)
+Estimated gas: 2117.251 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -205,7 +205,7 @@ This sequence of operations was run:
       Updated storage: { 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 }
       Storage size: 179 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 2117.929
+      Consumed gas: 2117.939
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
@@ -215,7 +215,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4417.116 units (will add 100 for safety)
+Estimated gas: 4417.446 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -242,7 +242,7 @@ This sequence of operations was run:
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 4417.761
+      Consumed gas: 4418.091
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675

@@ -21,12 +21,12 @@ trace
     [  ]
   - location: 18 (just consumed gas: 0.010)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
-  - location: 19 (just consumed gas: 0.506)
+  - location: 19 (just consumed gas: 0.516)
     [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
   - location: 20 (just consumed gas: 0.010)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
-  - location: 21 (just consumed gas: 0.506)
+  - location: 21 (just consumed gas: 0.516)
     [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
   - location: 24 (just consumed gas: 0.035)
