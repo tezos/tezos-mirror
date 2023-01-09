@@ -193,7 +193,7 @@ module type S = sig
     shell : (protocol_operation, prevalidation_t) types_state_shell;
     mutable filter_state : filter_state;
         (** Internal state of the filter in the plugin *)
-    mutable validation_state : prevalidation_t tzresult;
+    mutable validation_state : prevalidation_t;
     mutable operation_stream :
       (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
@@ -284,7 +284,7 @@ module Make_s
   type types_state = {
     shell : (protocol_operation, prevalidation_t) types_state_shell;
     mutable filter_state : filter_state;
-    mutable validation_state : prevalidation_t tzresult;
+    mutable validation_state : prevalidation_t;
     mutable operation_stream :
       (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
@@ -347,14 +347,12 @@ module Make_s
       [Pending_ops.priority | `Drop] Lwt.t =
     let open Lwt_syntax in
     let validation_state_before =
-      Option.map
-        Prevalidation_t.validation_state
-        (Option.of_result validation_state)
+      Prevalidation_t.validation_state validation_state
     in
     let+ v =
       Filter.Mempool.pre_filter
         ~filter_state
-        ?validation_state_before
+        ~validation_state_before
         filter_config
         parsed_op.protocol
     in
@@ -541,31 +539,20 @@ module Make_s
   let handle_unprocessed pv =
     let open Lwt_syntax in
     let notifier = mk_notifier pv.operation_stream in
-    match pv.validation_state with
-    | Error err ->
-        (* At the time this comment was written (26/05/21), this is dead
-           code since [Proto.begin_construction] cannot fail. *)
-        Pending_ops.iter
-          (fun _prio _oph op ->
-            handle_classification ~notifier pv.shell (op, `Branch_delayed err))
-          pv.shell.pending ;
-        pv.shell.pending <- Pending_ops.empty ;
-        Lwt.return_unit
-    | Ok state ->
-        if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
-        else
-          let* () = Events.(emit processing_operations) () in
-          let* filter_state, validation_state, delta_mempool =
-            classify_pending_operations
-              ~notifier
-              pv.shell
-              pv.filter_config
-              pv.filter_state
-              state
-          in
-          pv.filter_state <- filter_state ;
-          pv.validation_state <- Ok validation_state ;
-          update_advertised_mempool_fields pv.shell delta_mempool
+    if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
+    else
+      let* () = Events.(emit processing_operations) () in
+      let* filter_state, validation_state, delta_mempool =
+        classify_pending_operations
+          ~notifier
+          pv.shell
+          pv.filter_config
+          pv.filter_state
+          pv.validation_state
+      in
+      pv.filter_state <- filter_state ;
+      pv.validation_state <- validation_state ;
+      update_advertised_mempool_fields pv.shell delta_mempool
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
@@ -715,23 +702,13 @@ module Make_s
                 Tezos_crypto.Block_hash.pp
                 op.Operation.shell.branch
             else
-              let*? validation_state =
-                Result.bind_error pv.validation_state (fun err ->
-                    error_with
-                      "%s, in function [on_inject], the [validation_state] \
-                       contains the following error:@\n\
-                       %a"
-                      __LOC__
-                      Error_monad.pp_print_top_error_of_trace
-                      err)
-              in
               let notifier = mk_notifier pv.operation_stream in
               let*! filter_state, validation_state, delta_mempool, to_handle =
                 classify_operation
                   pv.shell
                   ~filter_config:pv.filter_config
                   ~filter_state:pv.filter_state
-                  ~validation_state
+                  ~validation_state:pv.validation_state
                   Mempool.empty
                   parsed_op
               in
@@ -760,7 +737,7 @@ module Make_s
                   (* Call handle & update_advertised_mempool only if op is accepted *)
                   List.iter (handle_classification ~notifier pv.shell) to_handle ;
                   pv.filter_state <- filter_state ;
-                  pv.validation_state <- Ok validation_state ;
+                  pv.validation_state <- validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
                   let*! v =
@@ -809,7 +786,7 @@ module Make_s
       let timestamp_system = Tezos_base.Time.System.now () in
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
-      let*! validation_state =
+      let* validation_state =
         pv.shell.parameters.tools.create ~head:new_predecessor ~timestamp ()
       in
       pv.validation_state <- validation_state ;
@@ -817,10 +794,7 @@ module Make_s
         Filter.Mempool.on_flush
           pv.filter_config
           pv.filter_state
-          ?validation_state:
-            (Option.map
-               Prevalidation_t.validation_state
-               (Option.of_result validation_state))
+          ~validation_state:(Prevalidation_t.validation_state validation_state)
           ~predecessor:(Store.Block.header new_predecessor)
           ()
       in
@@ -1401,7 +1375,7 @@ module Make
       in
       let timestamp_system = Tezos_base.Time.System.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
-      let*! validation_state =
+      let* validation_state =
         Prevalidation_t.create chain_store ~head ~timestamp ()
       in
       let fetching =
@@ -1462,10 +1436,7 @@ module Make
       let* filter_state =
         Filter.Mempool.init
           Filter.Mempool.default_config
-          ?validation_state:
-            (Option.map
-               Prevalidation_t.validation_state
-               (Option.of_result validation_state))
+          ~validation_state:(Prevalidation_t.validation_state validation_state)
           ~predecessor:(Store.Block.header head)
           ()
       in
