@@ -269,8 +269,9 @@ let wait_for_conflict_detected sc_node =
 
    A rollup node has a configuration file that must be initialized.
 *)
-let setup_rollup ~protocol ~kind ?boot_sector ?(parameters_ty = "string")
-    ?(operator = Constant.bootstrap1.alias) tezos_node tezos_client =
+let setup_rollup ~protocol ~kind ?(mode = Sc_rollup_node.Operator) ?boot_sector
+    ?(parameters_ty = "string") ?(operator = Constant.bootstrap1.alias)
+    tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup
       ~kind
@@ -282,7 +283,7 @@ let setup_rollup ~protocol ~kind ?boot_sector ?(parameters_ty = "string")
   let sc_rollup_node =
     Sc_rollup_node.create
       ~protocol
-      Operator
+      mode
       tezos_node
       tezos_client
       ~default_operator:operator
@@ -314,7 +315,7 @@ let test_l1_scenario ?regression ~kind ?boot_sector ?commitment_period
   let* sc_rollup = originate_sc_rollup ~kind ?boot_sector ~src tezos_client in
   scenario sc_rollup tezos_node tezos_client
 
-let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
+let test_full_scenario ?regression ~kind ?mode ?boot_sector ?commitment_period
     ?(parameters_ty = "string") ?challenge_window ?timeout
     {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
@@ -339,6 +340,7 @@ let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
       ~protocol
       ~parameters_ty
       ~kind
+      ?mode
       ?boot_sector
       tezos_node
       tezos_client
@@ -2645,16 +2647,17 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
    its deposit while the honest one has not.
 
 *)
-let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
-    (loser_modes, inputs, final_level, empty_levels, stop_loser_at) =
+let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
+    ~kind (loser_modes, inputs, final_level, empty_levels, stop_loser_at) =
   test_full_scenario
     ?commitment_period
     ~kind
+    ~mode
     ~timeout:60
     ?challenge_window
     {
-      tags = ["refutation"];
-      variant = Some variant;
+      tags = (["refutation"] @ if mode = Accuser then ["accuser"] else []);
+      variant = Some (variant ^ if mode = Accuser then "+accuser" else "");
       description = "refutation games winning strategies";
     }
   @@ fun protocol sc_rollup_node sc_client1 sc_rollup_address node client ->
@@ -2840,12 +2843,24 @@ let test_refutation protocols ~kind =
     (fun (variant, inputs) ->
       test_refutation_scenario
         ~kind
+        ~mode:Operator
         ~challenge_window
         ~commitment_period
         ~variant
         inputs
         protocols)
     tests
+
+(** Run one of the refutation tests with an accuser instead of a full operator. *)
+let test_accuser protocols =
+  test_refutation_scenario
+    ~kind:"wasm_2_0_0"
+    ~mode:Accuser
+    ~challenge_window:10
+    ~commitment_period:10
+    ~variant:"pvm_proof_2"
+    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [])
+    protocols
 
 (** Helper to check that the operation whose hash is given is successfully
     included (applied) in the current head block. *)
@@ -4202,6 +4217,7 @@ let register ~protocols =
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
+  test_accuser protocols ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols
