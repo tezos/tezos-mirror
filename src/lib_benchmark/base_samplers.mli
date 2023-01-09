@@ -38,6 +38,12 @@ val range_encoding : range Data_encoding.t
  *)
 val sample_in_interval : range:range -> int sampler
 
+(** [sample_float_in_interval ~min ~max] creates a sampler in the
+    specified interval.
+    @raise Invalid_argument if [max <= min].
+*)
+val sample_float_in_interval : min:float -> max:float -> float sampler
+
 (** Samples a boolean uniformly at random *)
 val uniform_bool : bool sampler
 
