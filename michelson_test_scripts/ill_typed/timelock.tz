@@ -1,6 +1,7 @@
-/* Script extracted from
-   `src/proto_alpha/lib_protocol/test/integration/michelson/contracts/timelock.tz`
-*/
+# This contract takes a chest and chest key as parameter.
+# It tries to open it and stores the resulting bytes if successful.
+# Otherwise it stores some hardcoded bytes to test that we are in
+# the expected branch
 storage (bytes);
 parameter (pair (chest_key) (chest));
 code {

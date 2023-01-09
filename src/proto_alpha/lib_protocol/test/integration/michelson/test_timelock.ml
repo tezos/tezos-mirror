@@ -64,11 +64,14 @@ let simple_test () =
   assert (result = expected_result) ;
   return_unit
 
+let timelock_path =
+  "../../../../../../michelson_test_scripts/ill_typed/timelock.tz"
+
 let deprecated_chest_open () =
   (* Verify contract fails origination as OPEN_CHEST is marked as legacy (deprecated )*)
   let* block, baker, source_contract, _src2 = Contract_helpers.init () in
   let storage = "0xdeadbeef" in
-  let script = Contract_helpers.read_file "./contracts/timelock.tz" in
+  let script = Contract_helpers.read_file timelock_path in
   Contract_helpers.originate_contract_from_string_hash
     ~script
     ~storage
@@ -93,7 +96,7 @@ let deprecated_chest_open () =
 let contract_test () =
   let* block, baker, source_contract, _src2 = Contract_helpers.init () in
   let storage = "0xdeadbeef" in
-  let script = Contract_helpers.read_file "./contracts/timelock.tz" in
+  let script = Contract_helpers.read_file timelock_path in
   let* dst, _script, block =
     Contract_helpers.originate_contract_from_string_hash
       ~script
