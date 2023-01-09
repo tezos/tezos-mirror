@@ -902,12 +902,11 @@ module Instructions = struct
 
   let sub_tez_legacy _tez1 _tez2 = ir_sized_step N_ISub_tez_legacy nullary
 
-  let mul_teznat _tez nat = ir_sized_step N_IMul_teznat (unary "nat" nat)
+  let mul_teznat _tez _nat = ir_sized_step N_IMul_teznat nullary
 
-  let mul_nattez nat _tez = ir_sized_step N_IMul_nattez (unary "nat" nat)
+  let mul_nattez _nat _tez = ir_sized_step N_IMul_nattez nullary
 
-  let ediv_teznat tez nat =
-    ir_sized_step N_IEdiv_teznat (binary "tez" tez "nat" nat)
+  let ediv_teznat _tez _nat = ir_sized_step N_IEdiv_teznat nullary
 
   let ediv_tez _tez1 _tez2 = ir_sized_step N_IEdiv_tez nullary
 
