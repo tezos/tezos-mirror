@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/transfer_amount.tz --details
+./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/transfer_amount.tz --details
 Well typed
 Gas remaining: 1039997.443 units remaining
 { parameter unit ;

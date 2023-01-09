@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/shifts.tz on storage None and input '(Right (Pair 1 2))' --level 1 --trace-stack
+./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/shifts.tz on storage None and input '(Right (Pair 1 2))' --level 1 --trace-stack
 storage
   (Some 0)
 emitted operations
