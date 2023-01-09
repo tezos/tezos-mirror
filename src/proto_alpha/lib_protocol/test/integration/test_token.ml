@@ -36,8 +36,6 @@ open Protocol
 open Alpha_context
 open Test_tez
 
-let wrap e = e >|= Environment.wrap_tzresult
-
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)
 let create_context () =
@@ -57,6 +55,7 @@ let mk_rollup () = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
 
 (** Check balances for a simple transfer from [bootstrap] to new [Implicit]. *)
 let test_simple_balances () =
+  let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let src = `Contract (Contract.Implicit pkh) in
@@ -76,6 +75,7 @@ let test_simple_balances () =
 (** Check balance updates for a simple transfer from [bootstrap] to new
     [Implicit]. *)
 let test_simple_balance_updates () =
+  let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let src = Contract.Implicit pkh in
@@ -105,6 +105,7 @@ let test_simple_balance_updates () =
   return_unit
 
 let test_allocated_and_deallocated ctxt dest initial_status status_when_empty =
+  let open Lwt_result_wrap_syntax in
   wrap (Token.allocated ctxt dest) >>=? fun (ctxt, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated initial_status >>=? fun () ->
   let amount = Tez.one in
@@ -144,6 +145,7 @@ let test_allocated () =
   test_allocated_and_deallocated_when_empty ctxt dest
 
 let check_sink_balances ctxt ctxt' dest amount =
+  let open Lwt_result_wrap_syntax in
   wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
   wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
@@ -153,6 +155,7 @@ let check_sink_balances ctxt ctxt' dest amount =
    receive funds for the first time. To force allocation, we transfer to
    (`Contract pkh) instead. *)
 let force_allocation_if_need_be ctxt account =
+  let open Lwt_result_wrap_syntax in
   match account with
   | `Delegate_balance pkh ->
       let account = `Contract (Contract.Implicit pkh) in
@@ -160,6 +163,7 @@ let force_allocation_if_need_be ctxt account =
   | _ -> return ctxt
 
 let test_transferring_to_sink ctxt sink amount expected_bupds =
+  let open Lwt_result_wrap_syntax in
   (* Transferring zero must be a noop, and must not return balance updates. *)
   wrap (Token.transfer ctxt `Minted sink Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
@@ -227,6 +231,7 @@ let test_transferring_to_collected_fees ctxt =
     [(Block_fees, Credited amount, Block_application)]
 
 let test_transferring_to_burned ctxt =
+  let open Lwt_result_wrap_syntax in
   let amount = random_amount () in
   let minted_bupd = Receipt.(Minted, Debited amount, Block_application) in
   wrap (Token.transfer ctxt `Minted `Burned amount) >>=? fun (_, bupds) ->
@@ -301,12 +306,14 @@ let test_transferring_to_sink () =
   test_transferring_to_frozen_bonds ctxt
 
 let check_src_balances ctxt ctxt' src amount =
+  let open Lwt_result_wrap_syntax in
   wrap (Token.balance ctxt src) >>=? fun (_, bal_src) ->
   wrap (Token.balance ctxt' src) >>=? fun (_, bal_src') ->
   bal_src' +? amount >>?= fun add_bal_src'_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount
 
 let test_transferring_from_unbounded_source ctxt src expected_bupds =
+  let open Lwt_result_wrap_syntax in
   (* Transferring zero must not return balance updates. *)
   wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (_, bupds) ->
   Assert.equal_bool ~loc:__LOC__ (bupds = []) true >>=? fun () ->
@@ -323,11 +330,13 @@ let test_transferring_from_unbounded_source ctxt src expected_bupds =
 (* Returns the balance of [account] if [account] is allocated, and returns
    [Tez.zero] otherwise. *)
 let balance_no_fail ctxt account =
+  let open Lwt_result_wrap_syntax in
   wrap (Token.allocated ctxt account) >>=? fun (ctxt, allocated) ->
   if allocated then wrap (Token.balance ctxt account)
   else return (ctxt, Tez.zero)
 
 let test_transferring_from_bounded_source ctxt src amount expected_bupds =
+  let open Lwt_result_wrap_syntax in
   balance_no_fail ctxt src >>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
   (* Test transferring from an empty account. *)
@@ -493,6 +502,7 @@ let cast_to_container_type x =
 
 (** Generates all combinations of constructors. *)
 let build_test_cases () =
+  let open Lwt_result_wrap_syntax in
   create_context () >>=? fun (ctxt, pkh) ->
   let origin = `Contract (Contract.Implicit pkh) in
   let user1, _, _ = Tezos_crypto.Signature.generate_key () in
@@ -576,6 +586,7 @@ let check_sink_balances ctxt ctxt' dest amount =
   | Some dest -> check_sink_balances ctxt ctxt' dest amount
 
 let rec check_balances ctxt ctxt' src dest amount =
+  let open Lwt_result_wrap_syntax in
   match (cast_to_container_type src, cast_to_container_type dest) with
   | None, None -> return_unit
   | ( Some (`Delegate_balance d),
@@ -597,6 +608,7 @@ let rec check_balances ctxt ctxt' src dest amount =
       check_sink_balances ctxt ctxt' dest amount
 
 let test_all_combinations_of_sources_and_sinks () =
+  let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   build_test_cases () >>=? fun (ctxt, cases) ->
   List.iter_es
@@ -694,6 +706,7 @@ let test_transfer_n ctxt src dest =
   >>=? fun () -> check_balances_are_consistent ctxt1 ctxt2 dest
 
 let test_transfer_n_with_empty_source () =
+  let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   wrap (test_transfer_n ctxt [] `Block_fees) >>=? fun () ->
@@ -701,6 +714,7 @@ let test_transfer_n_with_empty_source () =
   wrap (test_transfer_n ctxt [] dest)
 
 let test_transfer_n_with_non_empty_source () =
+  let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let origin = `Contract (Contract.Implicit pkh) in

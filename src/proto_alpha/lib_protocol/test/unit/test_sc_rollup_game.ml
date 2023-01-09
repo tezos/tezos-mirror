@@ -85,6 +85,7 @@ let init_refutation ~size ?init_tick start_hash =
   (choice, step)
 
 let two_stakers_in_conflict () =
+  let open Lwt_result_wrap_syntax in
   let* ctxt, rollup, genesis_hash, refuter, defender, staker3 =
     T.originate_rollup_and_deposit_with_three_stakers ()
   in
@@ -102,7 +103,7 @@ let two_stakers_in_conflict () =
   in
   let level l = T.valid_inbox_level ctxt l in
   let* parent, _, ctxt =
-    T.lift @@ T.advance_level_n_refine_stake ctxt rollup defender parent_commit
+    wrap @@ T.advance_level_n_refine_stake ctxt rollup defender parent_commit
   in
   let child1 =
     Commitment_repr.
@@ -124,11 +125,11 @@ let two_stakers_in_conflict () =
   in
   let ctxt = T.advance_level_for_commitment ctxt child1 in
   let* _, _, ctxt, _ =
-    T.lift
+    wrap
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup defender child1
   in
   let* _, _, ctxt, _ =
-    T.lift
+    wrap
     @@ Sc_rollup_stake_storage.publish_commitment ctxt rollup refuter child2
   in
   let defender_commitment_hash =
@@ -151,6 +152,7 @@ very evenly spread through the total tick-duration. Formally, the
 maximum tick-distance between two consecutive states in a dissection
 may not be more than half of the total tick-duration. *)
 let test_poorly_distributed_dissection () =
+  let open Lwt_result_wrap_syntax in
   let* ( ctxt,
          rollup,
          refuter,
@@ -171,7 +173,7 @@ let test_poorly_distributed_dissection () =
   let player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
   let* ctxt =
-    T.lift
+    wrap
     @@ R.start_game
          ctxt
          rollup
@@ -184,12 +186,13 @@ let test_poorly_distributed_dissection () =
   let choice, step = init_refutation ~size ~init_tick start_hash in
   assert_fails_with_f
     ~__LOC__
-    (T.lift
+    (wrap
     @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender ~step ~choice
     )
     (function D.Dissection_invalid_distribution _ -> true | _ -> false)
 
 let test_single_valid_game_move () =
+  let open Lwt_result_wrap_syntax in
   let* ( ctxt,
          rollup,
          refuter,
@@ -217,7 +220,7 @@ let test_single_valid_game_move () =
   and opponent_commitment_hash = defender_commitment_hash in
 
   let* ctxt =
-    T.lift
+    wrap
     @@ R.start_game
          ctxt
          rollup
@@ -226,7 +229,7 @@ let test_single_valid_game_move () =
   in
   let choice, step = (Sc_rollup_tick_repr.initial, G.Dissection dissection) in
   let* game_result, _ctxt =
-    T.lift
+    wrap
     @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender ~choice ~step
   in
   Assert.is_none ~loc:__LOC__ ~pp:Sc_rollup_game_repr.pp_game_result game_result
@@ -236,7 +239,7 @@ module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 (** Test that sending a invalid serialized inbox proof to
     {Sc_rollup_proof_repr.valid} is rejected. *)
 let test_invalid_serialized_inbox_proof () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Alpha_context in
   let rollup = Sc_rollup.Address.zero in
   let level = Raw_level.(succ root) in
@@ -268,7 +271,7 @@ let test_invalid_serialized_inbox_proof () =
     Sc_rollup.Metadata.{address = rollup; origination_level = level}
   in
   let*! res =
-    T.lift
+    wrap
     @@ Sc_rollup.Proof.valid
          ~pvm:(module Arith_pvm)
          ~metadata
@@ -285,6 +288,7 @@ let test_invalid_serialized_inbox_proof () =
     (( = ) Sc_rollup_proof_repr.Sc_rollup_invalid_serialized_inbox_proof)
 
 let test_first_move_with_swapped_commitment () =
+  let open Lwt_result_wrap_syntax in
   let* ( ctxt,
          rollup,
          refuter,
@@ -299,7 +303,7 @@ let test_first_move_with_swapped_commitment () =
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
   let*! res =
-    T.lift
+    wrap
     @@ R.start_game
          ctxt
          rollup
@@ -314,6 +318,7 @@ let test_first_move_with_swapped_commitment () =
           (player, opponent_commitment_hash)))
 
 let test_first_move_from_invalid_player () =
+  let open Lwt_result_wrap_syntax in
   let* ( ctxt,
          rollup,
          _refuter,
@@ -327,7 +332,7 @@ let test_first_move_from_invalid_player () =
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
   let*! res =
-    T.lift
+    wrap
     @@ R.start_game
          ctxt
          rollup
@@ -342,6 +347,7 @@ let test_first_move_from_invalid_player () =
           (staker3, player_commitment_hash)))
 
 let test_first_move_with_invalid_opponent () =
+  let open Lwt_result_wrap_syntax in
   let* ( ctxt,
          rollup,
          refuter,
@@ -355,7 +361,7 @@ let test_first_move_with_invalid_opponent () =
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
   let*! res =
-    T.lift
+    wrap
     @@ R.start_game
          ctxt
          rollup
@@ -370,6 +376,7 @@ let test_first_move_with_invalid_opponent () =
           (staker3, opponent_commitment_hash)))
 
 let test_first_move_with_invalid_ancestor () =
+  let open Lwt_result_wrap_syntax in
   let* ( ctxt,
          rollup,
          refuter,
@@ -379,7 +386,7 @@ let test_first_move_with_invalid_ancestor () =
          defender_commitment_hash ) =
     two_stakers_in_conflict ()
   in
-  let* inbox_level = T.lift @@ T.proper_valid_inbox_level (ctxt, rollup) 3 in
+  let* inbox_level = wrap @@ T.proper_valid_inbox_level (ctxt, rollup) 3 in
   let refuter_commitment =
     let context_hash11 = hash_string "child11" in
     Commitment_repr.
@@ -402,7 +409,7 @@ let test_first_move_with_invalid_ancestor () =
   in
   let ctxt = T.advance_level_for_commitment ctxt refuter_commitment in
   let* _, _, ctxt, _ =
-    T.lift
+    wrap
     @@ Sc_rollup_stake_storage.publish_commitment
          ctxt
          rollup
@@ -410,7 +417,7 @@ let test_first_move_with_invalid_ancestor () =
          refuter_commitment
   in
   let* _, _, ctxt, _ =
-    T.lift
+    wrap
     @@ Sc_rollup_stake_storage.publish_commitment
          ctxt
          rollup
@@ -428,7 +435,7 @@ let test_first_move_with_invalid_ancestor () =
   and player_commitment_hash = refuter_commitment_hash
   and opponent_commitment_hash = defender_commitment_hash in
   let*! res =
-    T.lift
+    wrap
     @@ R.start_game
          ctxt
          rollup

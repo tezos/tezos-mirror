@@ -33,10 +33,6 @@
 *)
 open Protocol
 
-let lift k = Environment.wrap_tzresult k
-
-let lift_lwt k = Lwt.map Environment.wrap_tzresult k
-
 let opt_get ~__LOC__ = WithExceptions.Option.get ~loc:__LOC__
 
 module Merkelized_payload_hashes =
@@ -173,9 +169,10 @@ let fill_merkelized_payload history payloads =
     | [] -> failwith "empty payloads"
   in
   let*? history, merkelized_payload =
-    lift @@ Merkelized_payload_hashes.genesis history first
+    Environment.wrap_tzresult @@ Merkelized_payload_hashes.genesis history first
   in
-  Lwt.return @@ lift
+
+  Lwt.return @@ Environment.wrap_tzresult
   @@ List.fold_left_e
        (fun (history, payloads) payload ->
          Merkelized_payload_hashes.add_payload history payloads payload)
@@ -316,7 +313,7 @@ let test_merkelized_payload_hashes_proof (payloads, index) =
       target_merkelized_payload
   in
   let*? proof_ancestor_merkelized, proof_current_merkelized =
-    lift @@ Merkelized_payload_hashes.verify_proof proof
+    Environment.wrap_tzresult @@ Merkelized_payload_hashes.verify_proof proof
   in
   let* () =
     assert_equal_merkelized_payload
@@ -410,7 +407,9 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
     make_proof @@ prefix @ suffix
   in
   let assert_fails ~__LOC__ proof =
-    let res = lift @@ Merkelized_payload_hashes.verify_proof proof in
+    let res =
+      Environment.wrap_tzresult @@ Merkelized_payload_hashes.verify_proof proof
+    in
     assert_merkelized_payload_proof_error ~__LOC__ "invalid inclusion proof" res
   in
   let* () = assert_fails ~__LOC__ proof_with_missing_cell in
@@ -422,14 +421,14 @@ let test_invalid_merkelized_payload_hashes_proof_fails (payloads, index) =
   return_unit
 
 let test_inclusion_proof_production (payloads_per_levels, level) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   let*? node_inbox =
     Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, node_old_level_messages =
-    lift_lwt
+    wrap
     @@ Inbox.Internal_for_tests.produce_inclusion_proof
          (Sc_rollup_helpers.get_history node_inbox.history)
          node_inbox_snapshot
@@ -440,7 +439,8 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
   in
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let*? found_old_levels_messages =
-    lift @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+    Environment.wrap_tzresult
+    @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
   in
   Assert.equal
     ~loc:__LOC__
@@ -451,14 +451,14 @@ let test_inclusion_proof_production (payloads_per_levels, level) =
     found_old_levels_messages
 
 let test_inclusion_proof_verification (payloads_per_levels, level) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   let*? node_inbox =
     Node_inbox.construct_inbox ~inbox_creation_level payloads_per_levels
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, _node_old_level_messages =
-    lift_lwt
+    wrap
     @@ Inbox.Internal_for_tests.produce_inclusion_proof
          (Sc_rollup_helpers.get_history node_inbox.history)
          node_inbox_snapshot
@@ -472,12 +472,13 @@ let test_inclusion_proof_verification (payloads_per_levels, level) =
      added an empty level. *)
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let result =
-    lift @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
+    Environment.wrap_tzresult
+    @@ Inbox.verify_inclusion_proof proof proto_inbox_snapshot
   in
   assert_inbox_proof_error "invalid inclusion proof" result
 
 let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   (* We begin with a Node inbox so we can produce a proof. *)
   let exp_message =
@@ -488,7 +489,7 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
   in
   let node_inbox_snapshot = Inbox.take_snapshot node_inbox.inbox in
   let* proof, input =
-    lift_lwt
+    wrap
     @@ Inbox.produce_proof
          ~get_payloads_history:
            (Sc_rollup_helpers.get_payloads_history
@@ -513,7 +514,7 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
       proto_inbox_snapshot
   in
   let*? v_input =
-    lift
+    Environment.wrap_tzresult
     @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
   in
   let* () =
@@ -535,7 +536,7 @@ let test_inbox_proof_production (payloads_per_levels, level, message_counter) =
 
 let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
     =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let inbox_creation_level = Raw_level.root in
   (* We begin with a Node inbox so we can produce a proof. *)
   let*? node_inbox =
@@ -546,7 +547,7 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   in
   let node_inbox_snapshot = Inbox.old_levels_messages node_inbox.inbox in
   let* proof, _input =
-    lift_lwt
+    wrap
     @@ Inbox.produce_proof
          ~get_payloads_history
          ~get_history:(Sc_rollup_helpers.get_history node_inbox.history)
@@ -567,7 +568,7 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   in
   let* () =
     let result =
-      lift
+      Environment.wrap_tzresult
       @@ Inbox.verify_proof
            (level, invalid_message_counter)
            proto_inbox_snapshot
@@ -584,7 +585,7 @@ let test_inbox_proof_verification (payloads_per_levels, level, message_counter)
   let proto_inbox_snapshot = Inbox.take_snapshot proto_inbox in
   let* () =
     let result =
-      lift
+      Environment.wrap_tzresult
       @@ Inbox.verify_proof (level, message_counter) proto_inbox_snapshot proof
     in
     assert_inbox_proof_error ~loc:__LOC__ "invalid inclusion proof" result
@@ -598,7 +599,7 @@ let test_messages_are_correctly_added_in_history
   let inbox = Sc_rollup_helpers.dumb_init Raw_level.root in
   let messages = List.map (fun message -> Message.External message) messages in
   let*? payloads_history, _history, _inbox, witness, messages =
-    lift
+    Environment.wrap_tzresult
     @@ Inbox.add_all_messages
          ~predecessor_timestamp
          ~predecessor
@@ -609,7 +610,9 @@ let test_messages_are_correctly_added_in_history
   List.iteri_es
     (fun i message ->
       let index = Z.of_int i in
-      let*? expected_payload = lift @@ Message.serialize message in
+      let*? expected_payload =
+        Environment.wrap_tzresult @@ Message.serialize message
+      in
       let expected_hash = Message.hash_serialized_message expected_payload in
       let found_merkelized_opt =
         Sc_rollup.Inbox_merkelized_payload_hashes.Internal_for_tests

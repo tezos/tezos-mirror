@@ -35,11 +35,6 @@ open Qcheck2_helpers
 open QCheck2
 open Protocol
 
-let wrap m =
-  let open Lwt_syntax in
-  let+ v = m in
-  Environment.wrap_tzresult v
-
 let new_ctxt () =
   let open Lwt_result_syntax in
   let* block, _contract = Context.init1 () in
@@ -78,6 +73,7 @@ let int_map_gen =
          | Error _ -> Stdlib.failwith "Failed to construct map")
 
 let pp_int_map fmt map =
+  let open Lwt_result_wrap_syntax in
   let pp =
     Assert.pp_print_list (fun fmt (k, v) -> Format.fprintf fmt "(%d, %d)" k v)
   in

@@ -34,9 +34,6 @@
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
-
-let wrap m = m >|= Environment.wrap_tzresult
 
 type init_env = {
   block : Block.t;
@@ -45,10 +42,12 @@ type init_env = {
 }
 
 let init_env () =
+  let open Lwt_result_wrap_syntax in
   let* block, baker, contract, _src2 = Contract_helpers.init () in
   return {block; baker; contract}
 
 let transaction block ~baker ~sender ~entrypoint ~recipient ~parameters =
+  let open Lwt_result_wrap_syntax in
   let parameters = Script.lazy_expr @@ Expr.from_string parameters in
   let* operation =
     Op.transaction
@@ -70,29 +69,34 @@ let transaction block ~baker ~sender ~entrypoint ~recipient ~parameters =
 let originate = Contract_helpers.originate_contract_from_string
 
 let get_balance ctxt ~token ~owner =
+  let open Lwt_result_wrap_syntax in
   let* key_hash, ctxt =
     wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
   in
   wrap (Ticket_balance.get_balance ctxt key_hash)
 
 let get_used_ticket_storage block =
+  let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   wrap
   @@ Ticket_balance.Internal_for_tests.used_storage_space
        (Incremental.alpha_ctxt incr)
 
 let get_paid_ticket_storage block =
+  let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   wrap
   @@ Ticket_balance.Internal_for_tests.paid_storage_space
        (Incremental.alpha_ctxt incr)
 
 let get_used_contract_storage block contract =
+  let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   let alpha_ctxt = Incremental.alpha_ctxt incr in
   wrap @@ Alpha_context.Contract.used_storage_space alpha_ctxt contract
 
 let get_paid_contract_storage block contract =
+  let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   let alpha_ctxt = Incremental.alpha_ctxt incr in
   wrap
@@ -101,6 +105,7 @@ let get_paid_contract_storage block contract =
        contract
 
 let assert_paid_contract_storage ~loc block contract expected =
+  let open Lwt_result_wrap_syntax in
   let* storage = get_paid_contract_storage block contract in
   Assert.equal
     ~loc
@@ -111,6 +116,7 @@ let assert_paid_contract_storage ~loc block contract expected =
     storage
 
 let assert_used_contract_storage ~loc block contract expected =
+  let open Lwt_result_wrap_syntax in
   let* storage = get_used_contract_storage block contract in
   Assert.equal
     ~loc
@@ -121,6 +127,7 @@ let assert_used_contract_storage ~loc block contract expected =
     storage
 
 let assert_paid_ticket_storage ~loc block expected =
+  let open Lwt_result_wrap_syntax in
   let* storage = get_paid_ticket_storage block in
   Assert.equal
     ~loc
@@ -131,6 +138,7 @@ let assert_paid_ticket_storage ~loc block expected =
     storage
 
 let assert_used_ticket_storage ~loc block expected =
+  let open Lwt_result_wrap_syntax in
   let* storage = get_used_ticket_storage block in
   Assert.equal
     ~loc
@@ -141,6 +149,7 @@ let assert_used_ticket_storage ~loc block expected =
     storage
 
 let assert_token_balance ~loc block token owner expected =
+  let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
   let* balance, _ =
@@ -165,6 +174,7 @@ let unit_ticket ~ticketer =
     {ticketer; contents_type = Script_typed_ir.unit_t; contents = ()}
 
 let new_contracts ~before ~after =
+  let open Lwt_result_wrap_syntax in
   let all_contracts current_block =
     let* ctxt =
       Incremental.begin_construction current_block >|=? Incremental.alpha_ctxt
@@ -181,6 +191,7 @@ let new_contracts ~before ~after =
   return (List.filter not_in_cs1 cs2)
 
 let get_new_contract before f =
+  let open Lwt_result_wrap_syntax in
   let* after = f before in
   let* contracts = new_contracts ~before ~after in
   match contracts with
@@ -189,6 +200,7 @@ let get_new_contract before f =
 
 (** Test adding a ticket to a strict storage. *)
 let test_add_strict () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* Originate *)
   let* contract, _script, block =
@@ -243,6 +255,7 @@ let test_add_strict () =
 
 (** Test adding and removing tickets from a list in the storage. *)
 let test_add_remove () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* Originate *)
   let* contract, _script, block =
@@ -301,6 +314,7 @@ let test_add_remove () =
 
 (** Test adding multiple tickets to a big-map. *)
 let test_add_to_big_map () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   let* contract, _script, block =
     originate
@@ -365,6 +379,7 @@ let test_add_to_big_map () =
      3) Clear map1
  *)
 let test_swap_big_map () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   let* contract, _script, block =
     originate
@@ -452,6 +467,7 @@ let test_swap_big_map () =
 
 (* Test sending a ticket to an address *)
 let test_send_tickets () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a ticket and store it in a list. *)
   let* ticket_receiver, _script, block =
@@ -515,6 +531,7 @@ let test_send_tickets () =
 
 (** Test sending and storing tickets with amount zero. *)
 let test_send_and_store_zero_amount_tickets () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that, given an address to a contract that receives tickets,
      mints a ticket and sends it over. *)
@@ -720,6 +737,7 @@ let test_send_and_store_zero_amount_tickets () =
 
 (** Test sending tickets to an implicit account. *)
 let test_send_tickets_to_implicit_account () =
+  let open Lwt_result_wrap_syntax in
   let* block, baker, contract, contract2 = Contract_helpers.init () in
   let () =
     match (contract, contract2) with
@@ -769,6 +787,7 @@ let test_send_tickets_to_implicit_account () =
 
 (** Test sending tickets in a big-map. *)
 let test_send_tickets_in_big_map () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a big-map with tickets. *)
   let* ticket_receiver, _script, block =
@@ -892,6 +911,7 @@ let test_send_tickets_in_big_map () =
 
 (* Test sending tickets in a big-map. *)
 let test_modify_big_map () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract with two actions:
        - [Add ((int, string))] for adding a ticket to the big-map.
@@ -984,6 +1004,7 @@ let test_modify_big_map () =
 
 (* Test sending tickets in a big-map to a receiver that drops it. *)
 let test_send_tickets_in_big_map_and_drop () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a big-map with tickets but drops it. *)
   let* ticket_receiver, _script, block =
@@ -1059,6 +1080,7 @@ let test_send_tickets_in_big_map_and_drop () =
 
 (* Test create contract with tickets *)
 let test_create_contract_with_ticket () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   let* ticket_creator, _script, block =
     originate
@@ -1112,6 +1134,7 @@ let test_create_contract_with_ticket () =
   assert_token_balance ~loc:__LOC__ block token_red ticket_creator None
 
 let test_join_tickets () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   let* ticket_joiner, _script, block =
     originate
@@ -1319,6 +1342,7 @@ let ticket_wallet =
 
 (** Test ticket wallet implementation including sending tickets to self. *)
 let test_ticket_wallet () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   let* ticket_builder, _script, block =
     originate
@@ -1406,6 +1430,7 @@ let test_ticket_wallet () =
 
 (* Test used ticket storage and paid storage. *)
 let test_ticket_storage () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract that can receive a ticket and store it. Each new ticket it
      receives is added to a list. *)
@@ -1588,6 +1613,7 @@ let test_ticket_storage () =
 
 (* Test used ticket storage and paid storage. *)
 let test_storage_for_create_and_remove_tickets () =
+  let open Lwt_result_wrap_syntax in
   let* {block; baker; contract = source_contract} = init_env () in
   (* A contract with two endpoints:
       - Create n tickets and add to its storage

@@ -35,8 +35,6 @@ open Protocol
 open QCheck2
 open Qcheck2_helpers
 
-let lift k = Environment.wrap_tzresult k
-
 (** {2 Generators} *)
 
 let gen_state_hash =
@@ -94,7 +92,7 @@ let gen_inbox level =
   let witness_and_inbox =
     let open Result_syntax in
     let inbox = Sc_rollup_helpers.dumb_init_repr level in
-    lift
+    Environment.wrap_tzresult
     @@
     let witness = Sc_rollup_inbox_repr.init_witness_no_history in
     let* witness =

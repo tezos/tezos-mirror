@@ -26,10 +26,8 @@
 open Protocol
 open Alpha_context
 
-let wrap m = m >|= Environment.wrap_tzresult
-
 let make_big_map block ~source ~key_type ~value_type key_values =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let key_type = Expr.from_string key_type in
   let value_type = Expr.from_string value_type in
   let* operation, originated =

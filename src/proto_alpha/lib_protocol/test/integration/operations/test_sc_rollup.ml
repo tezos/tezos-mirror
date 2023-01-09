@@ -41,8 +41,6 @@ exception Sc_rollup_test_error of string
 
 let err x = Exn (Sc_rollup_test_error x)
 
-let wrap k = Lwt.map Environment.wrap_tzresult k
-
 let assert_fails ~loc ?error m =
   let open Lwt_result_syntax in
   let*! res = m in
@@ -323,6 +321,7 @@ let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
 
 (* Verify that parameters and unparsed parameters match. *)
 let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
+  let open Lwt_result_wrap_syntax in
   let show exp = Expr.to_string @@ exp in
   let unparse ctxt parameters =
     wrap
@@ -359,6 +358,7 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
    Also checks each transaction operation for type mismatches etc. *)
 let verify_execute_outbox_message_operations incr rollup ~loc ~operations
     ~expected_transactions =
+  let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
   let validate_and_extract_operation_params ctxt op =
     match op with
@@ -512,6 +512,7 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
   return (contract, incr)
 
 let hash_commitment incr commitment =
+  let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
   let+ ctxt, hash =
     wrap @@ Lwt.return (Sc_rollup.Commitment.hash ctxt commitment)
@@ -632,6 +633,7 @@ let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
 (** A version of execute outbox message that output ignores proof validation. *)
 let execute_outbox_message_without_proof_validation incr rollup
     ~cemented_commitment outbox_message =
+  let open Lwt_result_wrap_syntax in
   let* res, ctxt =
     wrap
       (Sc_rollup_operations.Internal_for_tests.execute_outbox_message
@@ -660,6 +662,7 @@ let execute_outbox_message incr ~originator rollup ~output_proof
   Incremental.begin_construction block
 
 let assert_ticket_token_balance ~loc incr token owner expected =
+  let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
   let* balance, _ =
     let* key_hash, ctxt =
@@ -687,7 +690,7 @@ let balances ctxt contract =
   return {liquid; frozen}
 
 let check_balances_evolution bal_before {liquid; frozen} ~action =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let wret x = wrap @@ Lwt.return x in
   let* {liquid = expected_liquid; frozen = expected_frozen} =
     match action with
@@ -1056,6 +1059,7 @@ let assert_equal_expr ~loc e1 e2 =
   Assert.equal_string ~loc s1 s2
 
 let test_originating_with_valid_type () =
+  let open Lwt_result_wrap_syntax in
   let* block, contract = context_init Context.T1 in
   let assert_parameters_ty parameters_ty =
     let* block, rollup = sc_originate block contract parameters_ty in

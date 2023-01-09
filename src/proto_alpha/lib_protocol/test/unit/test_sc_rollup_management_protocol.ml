@@ -34,10 +34,8 @@
 open Protocol
 open Alpha_context
 
-let wrap m = m >|= Environment.wrap_tzresult
-
 let check_encode_decode_inbox_message message =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult @@ Sc_rollup.Inbox_message.serialize message
@@ -55,7 +53,7 @@ let check_encode_decode_inbox_message message =
     (Sc_rollup.Inbox_message.unsafe_to_string bytes')
 
 let check_encode_decode_outbox_message ctxt message =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
@@ -101,8 +99,8 @@ let assert_encoding_failure ~loc res =
     "Failed to encode a rollup management protocol inbox message value"
 
 let test_encode_decode_internal_inbox_message_transfer () =
+  let open Lwt_result_wrap_syntax in
   let open WithExceptions in
-  let open Lwt_result_syntax in
   let* ctxt = init_ctxt () in
   let destination = Sc_rollup.Address.zero in
   let sender =
@@ -162,7 +160,7 @@ let test_encode_decode_internal_inbox_message_eol () =
   check_encode_decode_inbox_message eol
 
 let test_encode_decode_external_inbox_message () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let assert_prefix message =
     let inbox_message = Sc_rollup.Inbox_message.External message in
     let*? real_encoding =
@@ -235,7 +233,7 @@ let add_or_clear =
   |}
 
 let test_encode_decode_outbox_message () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block, baker, source_contract = init_env () in
   let* ticket_receiver, _, block =
     Contract_helpers.originate_contract_from_string

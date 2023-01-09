@@ -39,8 +39,6 @@ open Sc_rollup_inbox_repr
 
 exception Sc_rollup_inbox_test_error of string
 
-let lift res = Environment.wrap_tzresult res
-
 let err x = Exn (Sc_rollup_inbox_test_error x)
 
 let rollup = Sc_rollup_repr.Address.hash_string [""]
