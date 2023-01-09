@@ -1021,6 +1021,15 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
     return (6, commit)
   in
+  (* Just after injecting slots and before baking, all slots have status
+     "Unseen". *)
+  let* () =
+    check_get_commitment_headers
+      dal_node
+      ~slot_level:level
+      (get_headers_succeeds "unseen")
+      [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
+  in
   let* () = check_published_levels_headers ~__LOC__ dal_node [(pub_level, 5)] in
   (* slot2_a and slot3 will not be included as successfull, slot2_b has better
      fees for slot 4. While slot3's fee is too low. slot4 is not injected
