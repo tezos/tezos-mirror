@@ -2117,6 +2117,96 @@ module Revamped = struct
         ~error_msg:"The [applied] batch has a wrong number of manager payloads.") ;
     Log.info "The [applied] batch as the correct number of manager payloads." ;
     unit
+
+  (** Runs a network of three nodes, one of which has a disabled mempool.
+      Check that operations do not propagate to the node with disable mempool and
+      that this node does not run a prevalidator nor accepts operation injections. *)
+  let mempool_disabled =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Mempool disabled"
+      ~tags:["mempool"; "disabled"; "injection"]
+    @@ fun protocol ->
+    log_step
+      1
+      "Initialize three nodes and connect them. The mempool of the third node \
+       is disabled." ;
+    let* node1, client1 =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+    let* node2, client2 =
+      Client.init_with_node ~nodes_args:[Synchronisation_threshold 0] `Client ()
+    in
+    let* node3, client3 =
+      Client.init_with_node
+        ~nodes_args:[Synchronisation_threshold 0; Disable_mempool]
+        `Client
+        ()
+    in
+    (* Connect nodes and wait for them to synchronize on node1's level. *)
+    let* () = Client.Admin.connect_address ~peer:node2 client1 in
+    let* () = Client.Admin.connect_address ~peer:node3 client1 in
+    let* () = Client.Admin.connect_address ~peer:node3 client2 in
+    let lvl1 = Node.get_level node1 in
+    let* (_ : int) = Node.wait_for_level node2 lvl1
+    and* (_ : int) = Node.wait_for_level node3 lvl1 in
+    log_step
+      2
+      "Verify that prevalidators are running on node1 and node2, but not on \
+       node3." ;
+    let get_prevalidators client =
+      let* prevalidators =
+        RPC.Client.call client @@ RPC.get_workers_prevalidators
+      in
+      return JSON.(as_list prevalidators)
+    in
+    let* prevalidators1 = get_prevalidators client1 in
+    Check.(
+      (prevalidators1 <> [])
+        (list json)
+        ~__LOC__
+        ~error_msg:"Expected node1 to have running prevalidators") ;
+    let* prevalidators2 = get_prevalidators client2 in
+    Check.(
+      (prevalidators2 <> [])
+        (list json)
+        ~__LOC__
+        ~error_msg:"Expected node2 to have running prevalidators") ;
+    let* prevalidators3 = get_prevalidators client3 in
+    Check.(
+      (prevalidators3 = [])
+        (list json)
+        ~__LOC__
+        ~error_msg:"Did not expected node3 to have running prevalidators") ;
+    log_step 3 "Forge and inject an operation on node1." ;
+    let* (`OpHash oph1) =
+      Operation.Manager.(inject [make (transfer ())]) client1
+    in
+    log_step
+      4
+      "Ensure that the operation is applied on first two nodes, but not on the \
+       third." ;
+    let* () = check_mempool ~applied:[oph1] client1 in
+    let* () = check_mempool ~applied:[oph1] client2 in
+    let* () = check_mempool ~applied:[] client3 in
+    log_step
+      5
+      "Check that injecting an operation into the node with disabled mempool \
+       fails." ;
+    let* (`OpHash _oph2) =
+      let error =
+        rex "Prevalidator is not running, cannot inject the operation."
+      in
+      let source = Constant.bootstrap2 in
+      let dest = Constant.bootstrap3 in
+      Operation.Manager.(inject ~error [make ~source (transfer ~dest ())])
+        client3
+    in
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -4145,6 +4235,7 @@ let register ~protocols =
   Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
+  Revamped.mempool_disabled protocols ;
   propagation_future_endorsement protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;

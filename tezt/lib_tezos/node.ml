@@ -51,6 +51,7 @@ type argument =
   | Metadata_size_limit of int option
   | Metrics_addr of string
   | Cors_origin of string
+  | Disable_mempool
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -77,6 +78,7 @@ let make_argument = function
   | Metadata_size_limit (Some i) -> ["--metadata-size-limit"; string_of_int i]
   | Metrics_addr metrics_addr -> ["--metrics-addr"; metrics_addr]
   | Cors_origin cors_origin -> ["--cors-origin"; cors_origin]
+  | Disable_mempool -> ["--disable-mempool"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -115,7 +117,8 @@ let is_redundant = function
   | Metadata_size_limit _, _
   | Peer _, _
   | Metrics_addr _, _
-  | Cors_origin _, _ ->
+  | Cors_origin _, _
+  | Disable_mempool, _ ->
       false
 
 type 'a known = Unknown | Known of 'a

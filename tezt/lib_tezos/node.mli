@@ -81,6 +81,7 @@ type argument =
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
   | Metrics_addr of string  (** [--metrics-addr] *)
   | Cors_origin of string  (** [--cors-origin] *)
+  | Disable_mempool  (** [--disable-mempool] *)
 
 (** Tezos node states. *)
 type t
