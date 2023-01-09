@@ -993,9 +993,19 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = Client.bake_for_and_wait client in
   let* level = Node.wait_for_level node (level + 1) in
   let* () = wait_for_layer1_block_processing dal_node level in
-  let* block = RPC.call node (RPC.get_chain_block_hash ()) in
   let* slot_headers =
-    RPC.call dal_node (Rollup.Dal.RPC.stored_slot_headers block)
+    let slot_level = Node.get_level node in
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.get_published_level_headers
+         ~status:"waiting_attestation"
+         slot_level)
+  in
+  let slot_headers =
+    List.map
+      (fun sh -> (sh.Rollup.Dal.RPC.slot_index, sh.commitment))
+      slot_headers
+    |> List.fast_sort (fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
   in
   Check.(slot_headers = [slot0; slot1; slot2_b])
     Check.(list (tuple2 int string))
