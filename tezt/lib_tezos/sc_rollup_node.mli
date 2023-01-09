@@ -31,7 +31,7 @@
 (** Smart contract rollup node states. *)
 type t
 
-type mode = Batcher | Custom | Maintenance | Observer | Operator
+type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 
 (** Create a smart contract rollup node.
 
