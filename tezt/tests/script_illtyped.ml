@@ -30,19 +30,6 @@
    Subject:      Test Michelson script typechecking failures
 *)
 
-(*
-def test_deprecated_typecheck_breaks(self, client, contract):
-    if contract in [
-        "legacy/create_contract.tz",
-        "legacy/create_contract_flags.tz",
-        "legacy/create_contract_rootname.tz",
-    ]:
-        with utils.assert_run_failure(r'ill-typed script'):
-            client.typecheck(os.path.join(CONTRACT_PATH, contract))
-    else:
-        with utils.assert_run_failure(r'Use of deprecated instruction'):
-            client.typecheck(os.path.join(CONTRACT_PATH, contract))
-*)
 let test_deprecated_typecheck script ~legacy =
   Protocol.register_test
     ~__FILE__
@@ -70,11 +57,6 @@ let test_deprecated_typecheck script ~legacy =
   Client.spawn_typecheck_script ~script:script_path ~legacy client
   |> Process.check_error ~msg:(rex expected_error)
 
-(*
-def test_ill_typecheck(self, client: Client, contract, error_pattern):
-    with utils.assert_run_failure(error_pattern):
-        client.typecheck(os.path.join(ILLTYPED_CONTRACT_PATH, contract))
-*)
 let test_ill_typecheck script error_pattern =
   Protocol.register_test
     ~__FILE__
