@@ -61,15 +61,12 @@ mkdir "$SNOOP_RESULT_DIR"
 echo $$ > "$SNOOP_RESULT_DIR"/STARTED
 
 # Build dependencies.
-# opam's solver can timeout sometimes, which does not mean that the remaining
-# processes can't proceed, so we just pass the potential failures.
-# However, this can lead to zcash_params not being properly installed; in this
-# case, we copy the files directly.
 cd tezos
 dated_log "Compiling dependencies"
 . "/home/mclaren/.cargo/env"
-make BLST_PORTABLE=y build-dev-deps || true
-if [ -d _opam/share/zcash-params ]; then dated_log "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
+# BLST_PORTABLE=y is needed to benchmark BLS instructions
+# OPAMSOLVERTIMEOUT=0 means that the opam solver won't timeout
+make BLST_PORTABLE=y OPAMSOLVERTIMEOUT=0 build-dev-deps
 eval "$(opam env)"
 
 # Build Tezos
