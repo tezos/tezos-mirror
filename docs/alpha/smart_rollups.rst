@@ -490,6 +490,11 @@ In addition, a rollup node can run under different modes:
 #. ``maintenance`` is the same as the operator mode except that it does not
    include the message batching service.
 
+#. ``accuser`` follows the layer1-chain and computes commitments but does not
+   publish them. Only when a conflicting commitment (published by another
+   staker) is detected will the "accuser node" publish a commitment and
+   participate in the subsequent refutation game.
+
 The following table summarizes the operation modes, focusing on the L1
 operations which are injected by the rollup node in each mode.
 
@@ -504,6 +509,11 @@ operations which are injected by the rollup node in each mode.
 +-------------+--------------+----------+--------+--------+
 | Maintenance | No           | Yes      | Yes    | Yes    |
 +-------------+--------------+----------+--------+--------+
+| Accuser     | No           | Yes [*]_ | No     | Yes    |
++-------------+--------------+----------+--------+--------+
+
+.. [*] An accuser node will publish commitments only when it detects
+       conflicts; for such cases it must make a deposit of 10,000 tez.
 
 Second, the configured rollup node can be run:
 
