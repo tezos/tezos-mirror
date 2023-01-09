@@ -188,16 +188,19 @@ module Slot_market : sig
   val candidates : t -> Header.t list
 end
 
-(** This module provides an abstract data structure (type {!t}) that represents a
-    skip list used to store successive DAL slots confirmed on L1. There is one
-    slot per cell in the skip list. The slots are sorted in increasing order by
-    level, and by slot index, for the slots of the same level.
+(** This module provides an abstract data structure (type {!t}) that represents
+    a skip list used to store successive DAL slots confirmed/attested on
+    L1. There is one slot per cell in the skip list. The slots are sorted in
+    increasing order by level, and by slot index, for the slots of the same
+    level.
 
     This module also defines a bounded history cache (type {History_cache.t})
     that allows to remember recent values of a skip list of type {!t}
     (indexed by the skip lists' hashes). This structure is meant to be
     maintained and used by the rollup node to produce refutation proofs
     involving DAL slot inputs.
+
+    Note on terminology: "confirmed slot" is another name for "attested slot".
 *)
 module History : sig
   (** Abstract representation of a skip list specialized for

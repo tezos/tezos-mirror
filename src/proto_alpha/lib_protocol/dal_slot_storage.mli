@@ -29,19 +29,19 @@
 
     This module is an interface for the slot storage for the layer 1.
 
-    Depending on the current level of the context and the [lag] (a
-   constant given by the context), the status of the slot may differ:
+    Depending on the current level of the context and the [attestation_lag] (a
+    constant given by the context), the status of the slot may differ:
 
     - For every level in the interval [current_level; current_level +
-   lag -1] the slot is [Pending]. This means a slot header was
-   proposed but was not declared available yet.
+    attestation_lag - 1] the slot is [Pending]. This means a slot header was
+    proposed but was not declared available yet.
 
-    - For every level above [current_level + lag], the slot may be
-   [confirmed]. For any slot confirmed by the protocol (i.e. indices
-   returned by [finalize_pending_slots]), subscribers of the DAL
-   should take into account the corresponding slots.
+    - For every level above [current_level + attestation_lag], the slot may be
+    [attested]. For any slot attested by the protocol (i.e. indices returned by
+    [finalize_pending_slots]), subscribers of the DAL should take into account
+    the corresponding slots.
 
-    - For every level below [current_level - lag], there should not be
+    - For every level below [current_level - attestation_lag], there should not be
    any slot in the storage.  *)
 
 (** [find_slot_headers ctxt level] returns [Some slot_headers] where [slot_headers]
@@ -58,11 +58,11 @@ val find_slot_headers :
    context.  *)
 val finalize_current_slot_headers : Raw_context.t -> Raw_context.t Lwt.t
 
-(** [finalize_pending_slot_headers ctxt] finalizes pending slot
-   headers which are old enough (i.e. registered at level
-   [current_level - lag]). All slots marked as available are
-   returned. All the pending slots at [current_level - lag] level are
-   removed from the context. *)
+(** [finalize_pending_slot_headers ctxt] finalizes pending slot headers which
+    are old enough (i.e. registered at level [current_level -
+    attestation_lag]). All slots marked as available are returned. All the
+    pending slots at [current_level - attestation_lag] level are removed from
+    the context. *)
 val finalize_pending_slot_headers :
   Raw_context.t -> (Raw_context.t * Dal_attestation_repr.t) tzresult Lwt.t
 
