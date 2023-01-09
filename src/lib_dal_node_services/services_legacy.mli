@@ -50,15 +50,6 @@ val slot_pages :
     Tezos_crypto_dal.Cryptobox.page list )
   Tezos_rpc.Service.service
 
-val stored_slot_headers :
-  ( [`GET],
-    unit,
-    unit * Tezos_crypto.Block_hash.t,
-    unit,
-    unit,
-    (int * Tezos_crypto_dal.Cryptobox.commitment) list )
-  Tezos_rpc.Service.service
-
 val shard :
   ( [`GET],
     unit,

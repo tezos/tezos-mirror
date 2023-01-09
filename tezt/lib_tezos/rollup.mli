@@ -257,11 +257,6 @@ module Dal : sig
     (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
     val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
 
-    (** [stored_slot_headers slot_header] gets slot_headers stored for a given
-        block hash *)
-    val stored_slot_headers :
-      string -> (Dal_node.t, (int * string) list) RPC_core.t
-
     (** [shard ~slot_header ~shard_id] gets a shard from
         a given slot header and shard id *)
     val shard :

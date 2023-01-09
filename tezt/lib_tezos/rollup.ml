@@ -630,15 +630,6 @@ module Dal = struct
       make GET ["slot"; "pages"; slot_header] (fun pages ->
           pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
 
-    let stored_slot_headers block_hash =
-      make GET ["stored_slot_headers"; block_hash] @@ fun json ->
-      let open JSON in
-      let l = as_list json in
-      List.map
-        (fun json ->
-          (json |-> "index" |> as_int, json |-> "slot_header" |> as_string))
-        l
-
     let shard ~slot_header ~shard_id =
       make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
       json |> JSON.encode

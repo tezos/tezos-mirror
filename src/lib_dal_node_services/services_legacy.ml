@@ -52,19 +52,6 @@ let slot_pages =
     Tezos_rpc.Path.(
       open_root / "slot" / "pages" /: Cryptobox.Commitment.rpc_arg)
 
-let stored_slot_headers =
-  Tezos_rpc.Service.get_service
-    ~description:"List slot headers for a given block hash"
-    ~query:Tezos_rpc.Query.empty
-    ~output:
-      Data_encoding.(
-        list
-          (obj2
-             (req "index" int31)
-             (req "slot_header" Cryptobox.Commitment.encoding)))
-    Tezos_rpc.Path.(
-      open_root / "stored_slot_headers" /: Tezos_crypto.Block_hash.rpc_arg)
-
 let shard =
   let shard_arg = Tezos_rpc.Arg.int in
   Tezos_rpc.Service.get_service

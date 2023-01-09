@@ -903,9 +903,26 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?(fee = 1_200) node client dal_node source index
-    content =
+let publish_and_store_slot ?level ?(fee = 1_200) node client dal_node source
+    index content =
+  let slot_level =
+    match level with Some level -> level | None -> 1 + Node.get_level node
+  in
+  let* slot_commitment0 =
+    let* slot = Rollup.Dal.make_slot content client in
+    let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+    let* () =
+      RPC.call
+        dal_node
+        (Rollup.Dal.RPC.patch_commitment commit ~slot_level ~slot_index:index)
+    in
+    return commit
+  in
   let* slot_commitment, proof = split_slot dal_node client content in
+  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7294
+     This assert as well as split_slot above will be removed in MR 7294.
+  *)
+  assert (String.equal slot_commitment0 slot_commitment) ;
   let commitment =
     Cryptobox.Commitment.of_b58check_opt slot_commitment
     |> mandatory "The b58check-encoded slot commitment is not valid"
@@ -980,8 +997,14 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot2_a = publish Constant.bootstrap3 4 ~fee:1_200 "test4_a" in
   let* slot2_b = publish Constant.bootstrap4 4 ~fee:1_350 "test4_b" in
   let* slot3 = publish Constant.bootstrap5 5 ~fee:1 "test5" in
+  let* slot4 =
+    let* slot = Rollup.Dal.make_slot "never associated to a slot_id" client in
+    let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+    return (6, commit)
+  in
   (* slot2_a and slot3 will not be included as successfull, slot2_b has better
-     fees for slot 4. While slot3's fee is too low.
+     fees for slot 4. While slot3's fee is too low. slot4 is not injected
+     into L1 or Dal nodes.
 
      We decide to have two failed slots instead of just one to better test some
      internal aspects of failed slots headers recoding (i.e. having a collection
@@ -994,12 +1017,11 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* level = Node.wait_for_level node (level + 1) in
   let* () = wait_for_layer1_block_processing dal_node level in
   let* slot_headers =
-    let slot_level = Node.get_level node in
     RPC.call
       dal_node
       (Rollup.Dal.RPC.get_published_level_headers
          ~status:"waiting_attestation"
-         slot_level)
+         level)
   in
   let slot_headers =
     List.map
@@ -1057,16 +1079,21 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () =
     check_get_commitment_headers (get_headers_succeeds "not_selected") [slot2_a]
   in
-  (* slot_3 never finished in an L1 block, so the DAL node never tracked it
-     (except when its content has been injected). *)
+  (* slot_3 never finished in an L1 block, so the DAL node only saw it as
+     Unseen. *)
+  let* () =
+    check_get_commitment_headers (get_headers_succeeds "unseen") [slot3]
+  in
+  (* slot_4 is never injected in any of the nodes. So, it's not
+     known by the Dal node. *)
   let* () =
     check_get_commitment_headers
       (fun response ->
         Check.(
           (String.trim response.RPC_core.body = "[]")
             string
-            ~error_msg:"Slot3 is not expected to be indexed by DAL node"))
-      [slot3]
+            ~error_msg:"slot4 is not expected to have a header"))
+      [slot4]
   in
   unit
 

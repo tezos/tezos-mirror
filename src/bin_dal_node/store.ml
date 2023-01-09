@@ -278,30 +278,8 @@ module Legacy = struct
     Option.bind res_opt (decode (Data_encoding.Fixed.bytes slot_size))
     |> Lwt.return
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4383
-     Remove legacy code once migration to new API is done. *)
-  let legacy_add_slot_headers ~block_hash slot_headers node_store =
-    let slot_headers_store = node_store.slot_headers_store in
-    List.iter_s
-      (fun (slot_header, status) ->
-        match status with
-        | Dal_plugin.Succeeded ->
-            let Dal_plugin.{slot_index; commitment; _} = slot_header in
-            Slot_headers_store.add
-              slot_headers_store
-              ~primary_key:block_hash
-              ~secondary_key:slot_index
-              commitment
-        | Dal_plugin.Failed ->
-            (* This function is only supposed to add successfully applied slot
-               headers. Anyway, this piece of code will be removed once fully
-               implementing the new DAL API. *)
-            Lwt.return_unit)
-      slot_headers
-
-  let add_slot_headers ~block_level ~block_hash slot_headers node_store =
+  let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
     let open Lwt_syntax in
-    let* () = legacy_add_slot_headers ~block_hash slot_headers node_store in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
        Handle reorgs. *)
