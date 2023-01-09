@@ -139,6 +139,7 @@ module Handler = struct
       match Node_context.get_status ctxt with
       | Starting -> return_unit
       | Ready {plugin = (module Plugin); proto_parameters; _} ->
+          let block_level = header.shell.level in
           let* block_info =
             Plugin.block_info
               cctxt
@@ -148,7 +149,7 @@ module Handler = struct
           let* slot_headers = Plugin.get_published_slot_headers block_info in
           let*! () =
             Slot_manager.store_slot_headers
-              ~block_level:header.shell.level
+              ~block_level
               ~block_hash
               slot_headers
               (Node_context.get_store ctxt)
@@ -161,11 +162,14 @@ module Handler = struct
           in
           let*! () =
             Slot_manager.update_selected_slot_headers_statuses
-              ~block_level:header.shell.level
+              ~block_level
               ~attestation_lag:proto_parameters.attestation_lag
               ~number_of_slots:proto_parameters.number_of_slots
               attested_slots
               (Node_context.get_store ctxt)
+          in
+          let*! () =
+            Event.(emit layer1_node_new_head (block_hash, block_level))
           in
           return_unit
     in
