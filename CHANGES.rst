@@ -82,10 +82,11 @@ Node
 
 - **Breaking change**: bumped the snapshot version to ``5``. This
   version changes internal snapshot file representation to include
-  more information required by the new protocol's semantics. Snapshots
-  of version ``4`` exported with previous versions of Octez can still
-  be imported. Snapshots of version ``5`` are not backward compatible.
-  (MR :gl: `!6835`)
+  more information required by the new protocol's semantics and to
+  improve both import and export speed. Snapshots of version ``4``
+  exported with previous versions of Octez can still be
+  imported. Snapshots of version ``5`` are not backward compatible.
+  (MR :gl: `!6835` and :gl: `!6961`)
 
 - Upon receiving a new non-manager operation that conflicts with a
   previously validated operation, the mempool may now replace the old
