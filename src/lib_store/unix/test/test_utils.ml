@@ -185,8 +185,14 @@ let dummy_patch_context ctxt =
 let register_gc store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  let gc ch =
-    let*! () = Context_ops.gc (Store.context_index store) ch in
+  let gc bh =
+    let* block = Store.Block.read_block chain_store bh in
+    let* resulting_context_hash =
+      Store.Block.resulting_context_hash chain_store block
+    in
+    let*! () =
+      Context_ops.gc (Store.context_index store) resulting_context_hash
+    in
     return_unit
   in
   Store.Chain.register_gc_callback chain_store gc

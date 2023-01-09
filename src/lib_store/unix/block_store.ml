@@ -44,7 +44,7 @@ type block_store = {
   savepoint : block_descriptor Stored_data.t;
   status_data : status Stored_data.t;
   block_cache : Block_repr.t Block_lru_cache.t;
-  mutable gc_callback : (Context_hash.t -> unit tzresult Lwt.t) option;
+  mutable gc_callback : (Block_hash.t -> unit tzresult Lwt.t) option;
   merge_mutex : Lwt_mutex.t;
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
@@ -1297,19 +1297,7 @@ let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
     | None -> return_unit
     | Some gc ->
         let*! () = Store_events.(emit start_context_gc new_savepoint) in
-        let* savepoint =
-          let* block =
-            read_block
-              ~read_metadata:false
-              block_store
-              (Block (savepoint_hash, 0))
-          in
-          match block with
-          | None ->
-              tzfail @@ Block_not_found {hash = savepoint_hash; distance = 0}
-          | Some block -> return block
-        in
-        gc savepoint.contents.header.shell.context
+        gc savepoint_hash
 
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
     ~finalizer ~history_mode ~new_head ~new_head_metadata

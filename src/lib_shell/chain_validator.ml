@@ -437,14 +437,19 @@ let may_flush_or_update_prevalidator parameters event prevalidator chain_db
           live_operations
 
 let register_garbage_collect_callback w =
+  let open Lwt_result_syntax in
   let nv = Worker.state w in
   let chain_store = nv.parameters.chain_store in
   let index = Store.(context_index (Chain.global_store chain_store)) in
-  let gc context_hash =
+  let gc block_hash =
+    let* block = Store.Block.read_block chain_store block_hash in
+    let* resulting_context_hash =
+      Store.Block.resulting_context_hash chain_store block
+    in
     Block_validator.context_garbage_collection
       nv.parameters.block_validator
       index
-      context_hash
+      resulting_context_hash
   in
   Store.Chain.register_gc_callback nv.parameters.chain_store gc
 

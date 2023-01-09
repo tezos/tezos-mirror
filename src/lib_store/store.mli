@@ -937,7 +937,7 @@ module Chain : sig
       [callback] that may be triggered during a block store merge in
       order to garbage-collect old contexts. *)
   val register_gc_callback :
-    chain_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
+    chain_store -> (Block_hash.t -> unit tzresult Lwt.t) -> unit
 end
 
 (** [global_block_watcher global_store] instantiates a new block
