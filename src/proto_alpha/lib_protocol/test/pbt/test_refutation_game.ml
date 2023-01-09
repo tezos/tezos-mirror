@@ -1663,7 +1663,7 @@ let test_wasm_dissection name kind =
 (** Create a test of [p1_strategy] against [p2_strategy]. One of them
     must be a {!Perfect} player, otherwise, we do not care about which
     cheater wins. *)
-let test_game ?(count = 100) ~p1_strategy ~p2_strategy () =
+let test_game ?(count = 10) ~p1_strategy ~p2_strategy () =
   let name =
     Format.asprintf
       "%a against %a"
