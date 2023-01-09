@@ -1199,10 +1199,10 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
 
 let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
     client dal_node =
-  let failing_patch_slot_rpc slot ~slot_level ~slot_index =
+  let failing_patch_slot_rpc commit ~slot_level ~slot_index =
     let* response =
       RPC.call_raw dal_node
-      @@ Rollup.Dal.RPC.patch_commitment slot ~slot_level ~slot_index
+      @@ Rollup.Dal.RPC.patch_commitment commit ~slot_level ~slot_index
     in
     return @@ RPC.check_string_response ~code:404 response
   in
