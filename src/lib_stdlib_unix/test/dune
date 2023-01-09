@@ -1,0 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_key_value_store_fuzzy)
+ (libraries
+  tezos-error-monad
+  tezos-stdlib-unix
+  qcheck-alcotest
+  alcotest-lwt)
+ (flags
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_stdlib_unix))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib-unix)
+ (action (run %{dep:./test_key_value_store_fuzzy.exe})))

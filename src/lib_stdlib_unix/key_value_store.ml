@@ -141,6 +141,7 @@ let write_value (type value) ?(override = false)
           return store
         in
         LRU.put write_lru file.path new_store_promise ;
+        let* _store = new_store_promise in
         return_unit)
       else (
         LRU.put write_lru file.path store_promise ;

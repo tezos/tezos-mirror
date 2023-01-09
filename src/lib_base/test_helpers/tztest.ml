@@ -55,10 +55,10 @@ let tztest_qcheck ?count ~name generator f =
   in
   Alcotest_lwt.test_case name speed (fun _sw () -> Lwt.return @@ run ())
 
-let tztest_qcheck2 ?count ~name generator f =
+let tztest_qcheck2 ?print ?count ~name generator f =
   let name, speed, run =
     QCheck_alcotest.to_alcotest
-      ( QCheck2.Test.make ?count ~name generator @@ fun x ->
+      ( QCheck2.Test.make ?print ?count ~name generator @@ fun x ->
         match Lwt_main.run (f x) with
         | Ok _ -> true
         | Error err -> QCheck2.Test.fail_reportf "@\n%a@." pp_print_trace err )

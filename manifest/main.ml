@@ -463,7 +463,7 @@ let _octez_stdlib_tests =
       ]
     ~js_compatible:true
 
-let _octez_stdlib_unix_tests =
+let _octez_stdlib_test_unix =
   tests
     [
       "test_lwt_pipe";
@@ -953,6 +953,19 @@ let octez_stdlib_unix =
         lwt_log;
         conf_libev;
         uri;
+      ]
+
+let _octez_stdlib_unix_test =
+  test
+    "test_key_value_store_fuzzy"
+    ~path:"src/lib_stdlib_unix/test/"
+    ~opam:"tezos-stdlib-unix"
+    ~deps:
+      [
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_stdlib_unix |> open_;
+        qcheck_alcotest;
+        alcotest_lwt;
       ]
 
 let octez_clic =
