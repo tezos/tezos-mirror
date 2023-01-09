@@ -237,21 +237,3 @@ module Operation_encountered = struct
       Tezos_crypto.Operation_hash.pp
       oph
 end
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
-
-   This module should be removed once backlogs will be removed from
-   the RPC /worker/prevalidators *)
-module Event = struct
-  type t = unit
-
-  type view = t
-
-  let view t = t
-
-  let level _req = Internal_event.Debug
-
-  let encoding = Data_encoding.unit
-
-  let pp = Format.pp_print_newline
-end

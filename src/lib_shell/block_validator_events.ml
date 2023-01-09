@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Request = Block_validator_worker_state.Request
 include Internal_event.Simple
 
 let section = ["validator"; "block"]

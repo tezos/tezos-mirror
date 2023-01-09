@@ -80,21 +80,3 @@ module Operation_encountered : sig
 
   val pp : Format.formatter -> t -> unit
 end
-
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
-
-   This module should be removed once backlogs will be removed from
-   the RPC /worker/prevalidators. *)
-module Event : sig
-  type t = unit
-
-  type view = t
-
-  val view : t -> view
-
-  val level : t -> Internal_event.level
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
