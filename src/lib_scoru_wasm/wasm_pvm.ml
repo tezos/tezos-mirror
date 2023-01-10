@@ -272,13 +272,13 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     in
     encode pvm tree
 
-  let compute_step_many ?reveal_step ?write_debug ?stop_at_snapshot ~max_steps
-      tree =
+  let compute_step_many ?reveal_builtins ?write_debug ?stop_at_snapshot
+      ~max_steps tree =
     let open Lwt.Syntax in
     let* pvm_state = decode tree in
     let* pvm_state, executed_ticks =
       Wasm_vm.compute_step_many
-        ?reveal_step
+        ?reveal_builtins
         ?write_debug
         ?stop_at_snapshot
         ~max_steps
@@ -398,13 +398,13 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
       pvm.buffers.input
 
-    let compute_step_many_with_hooks ?reveal_step ?write_debug ?after_fast_exec
-        ?stop_at_snapshot ~max_steps tree =
+    let compute_step_many_with_hooks ?reveal_builtins ?write_debug
+        ?after_fast_exec ?stop_at_snapshot ~max_steps tree =
       let open Lwt.Syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* pvm_state, ticks =
         Wasm_vm.Internal_for_tests.compute_step_many_with_hooks
-          ?reveal_step
+          ?reveal_builtins
           ?write_debug
           ?after_fast_exec
           ?stop_at_snapshot
