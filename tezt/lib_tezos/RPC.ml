@@ -838,23 +838,6 @@ let get_chain_block_context_smart_rollups_smart_rollup_genesis_info
     ]
     Fun.id
 
-let get_chain_block_context_smart_rollups_smart_rollup_stakers_commitments
-    ?(chain = "main") ?(block = "head") sc_rollup =
-  make
-    GET
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "smart_rollups";
-      "smart_rollup";
-      sc_rollup;
-      "stakers_commitments";
-    ]
-    Fun.id
-
 let get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level
     ?(chain = "main") ?(block = "head") sc_rollup =
   make

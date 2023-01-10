@@ -155,16 +155,27 @@ let find_staker ctxt rollup staker =
       in
       (ctxt, Some commitment_hash)
 
-let stakers_commitments_uncarbonated ctxt rollup =
+let commitments_uncarbonated ctxt ~rollup ~inbox_level =
   let open Lwt_result_syntax in
-  let*! stakers =
-    Sc_rollup_staker_index_storage.list_stakers_uncarbonated ctxt rollup
+  let* _, commitments =
+    Commitments_per_inbox_level.find ctxt rollup inbox_level
   in
-  List.map_es
-    (fun staker ->
-      let* _ctxt, commitment_opt = find_staker ctxt rollup staker in
-      return (staker, commitment_opt))
-    stakers
+  return commitments
+
+let stakers_ids_uncarbonated ctxt ~rollup ~commitment =
+  let open Lwt_result_syntax in
+  let* _, stakers_ids =
+    Store.Commitment_stakers.get (ctxt, rollup) commitment
+  in
+  return stakers_ids
+
+let staker_id_uncarbonated ctxt ~rollup ~pkh =
+  let open Lwt_result_syntax in
+  let* _, staker_index = Store.Staker_index.get (ctxt, rollup) pkh in
+  return staker_index
+
+let stakers_pkhs_uncarbonated ctxt ~rollup =
+  Sc_rollup_staker_index_storage.list_stakers_uncarbonated ctxt rollup
 
 let get_contract_and_stake ctxt staker =
   let staker_contract = Contract_repr.Implicit staker in
