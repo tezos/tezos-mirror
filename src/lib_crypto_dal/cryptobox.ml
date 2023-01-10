@@ -626,7 +626,10 @@ module Inner = struct
 
       (* 6. Computing Lagrange interpolation polynomial P(x). *)
       let p = fft_mul t.domain_2k [a_poly; b] in
-      let p = Polynomials.copy ~len:t.k p in
+      let len =
+        if Polynomials.is_zero p then 1 else min t.k (Polynomials.degree p + 1)
+      in
+      let p = Polynomials.copy ~len p in
       Polynomials.opposite_inplace p ;
       Ok p
 
