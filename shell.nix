@@ -4,12 +4,18 @@
 
 let
   opam-nix-integration = import (
-    fetchTarball "https://github.com/vapourismo/opam-nix-integration/archive/2917c0d3a54fe7b376e2e974aa077b272f95190b.tar.gz"
+    fetchTarball {
+      url = "https://github.com/vapourismo/opam-nix-integration/archive/a1a4c9815d1286efe1299e1f66369bb1c3605ace.tar.gz";
+      sha256 = "159nrv8fn6zmg2hifgray5azxd8p9vbb28zda8svrdh2h60x962r";
+    }
   );
 
   pkgs =
     import
-      (fetchTarball "https://github.com/NixOS/nixpkgs/archive/ed8347c8841fcfbe2002638eae5305ac8fcd2316.tar.gz")
+      (fetchTarball {
+        url = "https://github.com/NixOS/nixpkgs/archive/6025d713d198ec296eaf27a1f2f78983eccce4d8.tar.gz";
+        sha256 = "0fa6nd1m5lr4fnliw21ppc4qdd4s85x448967333dvmslnvj35xi";
+      })
       { overlays = [ opam-nix-integration.overlay ]; };
 
   mkFrameworkFlags = frameworks:
