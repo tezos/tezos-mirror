@@ -43,7 +43,7 @@ let pp_micheline_from_lazy_expr ppf expr =
   in
   pp_micheline_expr ppf expr
 
-let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
+let pp_internal_operation ppf (Internal_operation {operation; sender; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
   Format.fprintf ppf "@[<v 2>Internal " ;
   (match operation with
@@ -55,7 +55,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         Tez.pp
         amount
         Destination.pp
-        source
+        sender
         Destination.pp
         destination ;
       if not (Entrypoint.is_default entrypoint) then
@@ -71,7 +71,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         ppf
         "Origination:@,From: %a@,Credit: %s%a"
         Destination.pp
-        source
+        sender
         tez_sym
         Tez.pp
         credit ;
@@ -99,7 +99,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
             Signature.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
-      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp source ;
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp sender ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
@@ -108,7 +108,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         ppf
         "Event:@,From: %a@,Type: %a"
         Destination.pp
-        source
+        sender
         pp_micheline_expr
         ty ;
       if not (Entrypoint.is_default tag) then

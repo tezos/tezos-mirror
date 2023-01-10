@@ -60,7 +60,7 @@ type 'kind internal_operation_contents =
       -> Kind.event internal_operation_contents
 
 type 'kind internal_operation = {
-  source : Destination.t;
+  sender : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }

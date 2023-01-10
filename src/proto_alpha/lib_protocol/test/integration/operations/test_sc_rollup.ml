@@ -303,8 +303,8 @@ let bake_blocks_until_next_inbox_level ?predecessor block rollup =
 let bake_blocks_until_inbox_level block commitment =
   Block.bake_until_level commitment.Sc_rollup.Commitment.inbox_level block
 
-let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
-    block =
+let publish_op_and_dummy_commitment ~sender ?compressed_state ?predecessor
+    rollup block =
   let open Lwt_result_syntax in
   let compressed_state =
     Option.map
@@ -316,7 +316,7 @@ let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
   let* commitment =
     dummy_commitment ?compressed_state ?predecessor (B block) rollup
   in
-  let* publish = Op.sc_rollup_publish (B block) src rollup commitment in
+  let* publish = Op.sc_rollup_publish (B block) sender rollup commitment in
   return (publish, commitment)
 
 (* Verify that parameters and unparsed parameters match. *)
@@ -362,7 +362,7 @@ let verify_execute_outbox_message_operations incr rollup ~loc ~operations
     match op with
     | Script_typed_ir.Internal_operation
         {
-          source = op_source;
+          sender = op_sender;
           operation =
             Transaction_to_smart_contract
               {
@@ -381,11 +381,11 @@ let verify_execute_outbox_message_operations incr rollup ~loc ~operations
           verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters
         in
         let* () =
-          (* Check that the sources match. *)
+          (* Check that the senders match. *)
           Assert.equal_string
             ~loc
             (Destination.to_b58check (Sc_rollup rollup))
-            (Destination.to_b58check op_source)
+            (Destination.to_b58check op_sender)
         in
         (* Assert that the amount is 0. *)
         let* () = Assert.equal_tez ~loc amount Tez.zero in
@@ -2876,14 +2876,14 @@ let test_curfew () =
   in
   let* publish1, commitment1 =
     publish_op_and_dummy_commitment
-      ~src:account1
+      ~sender:account1
       ~compressed_state:"first"
       rollup
       block
   in
   let* publish2, commitment2 =
     publish_op_and_dummy_commitment
-      ~src:account2
+      ~sender:account2
       ~compressed_state:"second"
       rollup
       block
@@ -2894,21 +2894,21 @@ let test_curfew () =
 
   let* publish11, commitment11 =
     publish_op_and_dummy_commitment
-      ~src:account1
+      ~sender:account1
       ~predecessor:commitment1
       rollup
       block
   in
   let* publish21, commitment21 =
     publish_op_and_dummy_commitment
-      ~src:account2
+      ~sender:account2
       ~predecessor:commitment2
       rollup
       block
   in
   let* publish3, _commitment3 =
     publish_op_and_dummy_commitment
-      ~src:account3
+      ~sender:account3
       ~compressed_state:"third"
       rollup
       block
@@ -2917,21 +2917,21 @@ let test_curfew () =
   let* block = Block.bake ~operations:[publish11; publish21; publish3] block in
   let* publish111, commitment111 =
     publish_op_and_dummy_commitment
-      ~src:account1
+      ~sender:account1
       ~predecessor:commitment11
       rollup
       block
   in
   let* publish211, _commitment211 =
     publish_op_and_dummy_commitment
-      ~src:account2
+      ~sender:account2
       ~predecessor:commitment21
       rollup
       block
   in
   let* publish4, _commitment4 =
     publish_op_and_dummy_commitment
-      ~src:account3
+      ~sender:account3
       ~compressed_state:"fourth"
       rollup
       block

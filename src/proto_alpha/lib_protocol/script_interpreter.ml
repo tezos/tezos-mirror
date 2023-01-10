@@ -1257,7 +1257,7 @@ module Raw = struct
             let piop =
               Internal_operation
                 {
-                  source = Destination.Contract (Contract.Originated sc.self);
+                  sender = Destination.Contract (Contract.Originated sc.self);
                   operation;
                   nonce;
                 }

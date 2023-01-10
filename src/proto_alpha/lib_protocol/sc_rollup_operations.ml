@@ -302,7 +302,7 @@ let to_transaction_operation ctxt rollup
   in
   return
     ( Script_typed_ir.Internal_operation
-        {source = Destination.Sc_rollup rollup; operation; nonce},
+        {sender = Destination.Sc_rollup rollup; operation; nonce},
       ctxt )
 
 let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff

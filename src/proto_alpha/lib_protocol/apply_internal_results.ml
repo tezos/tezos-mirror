@@ -57,7 +57,7 @@ type packed_internal_operation_contents =
       -> packed_internal_operation_contents
 
 type 'kind internal_operation = {
-  source : Destination.t;
+  sender : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }
@@ -66,7 +66,7 @@ type packed_internal_operation =
   | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 let internal_operation (type kind)
-    ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
+    ({sender; operation; nonce} : kind Script_typed_ir.internal_operation) :
     kind internal_operation =
   let operation : kind internal_operation_contents =
     match operation with
@@ -124,7 +124,7 @@ let internal_operation (type kind)
         Origination {delegate; script; credit}
     | Delegation delegate -> Delegation delegate
   in
-  {source; operation; nonce}
+  {sender; operation; nonce}
 
 let packed_internal_operation (Script_typed_ir.Internal_operation op) =
   Internal_operation (internal_operation op)
@@ -472,11 +472,13 @@ end
 let internal_operation_encoding : packed_internal_operation Data_encoding.t =
   def "apply_internal_results.alpha.operation_result"
   @@ conv
-       (fun (Internal_operation {source; operation; nonce}) ->
-         ((source, nonce), Internal_operation_contents operation))
-       (fun ((source, nonce), Internal_operation_contents operation) ->
-         Internal_operation {source; operation; nonce})
+       (fun (Internal_operation {sender; operation; nonce}) ->
+         ((sender, nonce), Internal_operation_contents operation))
+       (fun ((sender, nonce), Internal_operation_contents operation) ->
+         Internal_operation {sender; operation; nonce})
        (merge_objs
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+             Rename the "source" field into "sender" *)
           (obj2 (req "source" Destination.encoding) (req "nonce" uint16))
           Internal_operation.encoding)
 
@@ -653,6 +655,8 @@ let internal_operation_result_encoding :
     case
       (Tag op_case.tag)
       ~title:op_case.name
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+         Rename the "source" field into "sender" *)
       (merge_objs
          (obj3
             (req "kind" (constant op_case.name))
@@ -662,10 +666,10 @@ let internal_operation_result_encoding :
       (fun op ->
         match ires_case.iselect op with
         | Some (op, res) ->
-            Some (((), op.source, op.nonce), (ires_case.proj op.operation, res))
+            Some (((), op.sender, op.nonce), (ires_case.proj op.operation, res))
         | None -> None)
-      (fun (((), source, nonce), (op, res)) ->
-        let op = {source; operation = ires_case.inj op; nonce} in
+      (fun (((), sender, nonce), (op, res)) ->
+        let op = {sender; operation = ires_case.inj op; nonce} in
         Internal_operation_result (op, res))
   in
   def "apply_internal_results.alpha.operation_result"

@@ -56,7 +56,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   let op =
     Script_typed_ir.Internal_operation
       {
-        source = sender;
+        sender;
         nonce;
         operation =
           Transaction_to_smart_contract

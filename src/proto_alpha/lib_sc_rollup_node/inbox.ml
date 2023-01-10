@@ -57,7 +57,7 @@ let get_messages Node_context.{cctxt; _} head =
     match (operation, result) with
     | ( {
           operation = Transaction {destination = Sc_rollup rollup; parameters; _};
-          source = Contract (Originated sender);
+          sender = Contract (Originated sender);
           _;
         },
         ITransaction_result (Transaction_to_sc_rollup_result _) ) ->

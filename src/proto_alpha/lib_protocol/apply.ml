@@ -1144,7 +1144,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
   let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
-    | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
+    | Script_typed_ir.Internal_operation ({sender; operation; nonce} as op)
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
          let op_res = Apply_internal_results.internal_operation op in
@@ -1153,7 +1153,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_operation_contents
             ctxt
-            ~sender:source
+            ~sender
             ~payer
             ~chain_id
             operation)

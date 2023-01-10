@@ -163,7 +163,7 @@ let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   (Some {tickets; destination}, ctxt)
 
 let tickets_of_operation ctxt
-    (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
+    (Script_typed_ir.Internal_operation {sender = _; operation; nonce = _}) =
   match operation with
   | Transaction_to_implicit _ -> return (None, ctxt)
   | Transaction_to_implicit_with_ticket
