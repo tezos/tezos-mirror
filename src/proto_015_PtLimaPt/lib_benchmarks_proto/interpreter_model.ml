@@ -129,9 +129,8 @@ let division_cost name =
       let model =
         lam ~name:"size1" @@ fun size1 ->
         lam ~name:"size2" @@ fun size2 ->
-        let_ ~name:"q" (size1 - size2) @@ fun q ->
-        (free ~name:coeff * if_ (lt size2 size1) (q * size2) (int 0))
-        + free ~name:const
+        let_ ~name:"q" (sat_sub size1 size2) @@ fun q ->
+        (free ~name:coeff * q * size2) + free ~name:const
     end
   end in
   (module M : Model.Model_impl with type arg_type = int * (int * unit))

@@ -70,7 +70,7 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let ( + ) x y = call ["+"] [x; y]
 
-  let ( - ) x y = call ["-"] [x; y]
+  let sat_sub x y = call (saturated "sub") [x; y]
 
   let ( * ) x y = call ["*"] [x; y]
 

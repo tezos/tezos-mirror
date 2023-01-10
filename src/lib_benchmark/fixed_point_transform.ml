@@ -390,7 +390,7 @@ end = struct
 
   let ( + ) = lift_binop X.( + )
 
-  let ( - ) = lift_binop X.( - )
+  let sat_sub = lift_binop X.sat_sub
 
   let ( * ) x y =
     match (x, y) with
