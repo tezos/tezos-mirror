@@ -4139,6 +4139,9 @@ module Sc_rollup : sig
       rollup:t ->
       pkh:public_key_hash ->
       Staker.Index.t tzresult Lwt.t
+
+    val stakers_pkhs_uncarbonated :
+      context -> rollup:t -> public_key_hash list Lwt.t
   end
 
   module Refutation_storage : sig
