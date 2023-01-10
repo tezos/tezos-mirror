@@ -4113,6 +4113,12 @@ module Sc_rollup : sig
 
     val stakers_commitments_uncarbonated :
       context -> t -> (Staker.t * Commitment.Hash.t option) list tzresult Lwt.t
+
+    val commitments_uncarbonated :
+      context ->
+      rollup:t ->
+      inbox_level:Raw_level.t ->
+      Commitment.Hash.t list option tzresult Lwt.t
   end
 
   module Refutation_storage : sig
