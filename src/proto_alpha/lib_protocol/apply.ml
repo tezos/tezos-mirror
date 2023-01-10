@@ -480,7 +480,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 (**
 
-   Retrieving the source code of a contract from its address is costly
+   Retrieving the script of a contract from its address is costly
    because it requires I/Os. For this reason, we put the corresponding
    Micheline expression in the cache.
 

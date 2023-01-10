@@ -104,7 +104,7 @@ type ('arg, 'storage) code =
       entrypoints : 'arg Script_typed_ir.entrypoints;
       code_size : Cache_memory_helpers.sint;
           (** This is an over-approximation of the value size in memory, in
-         bytes, of the contract's static part, that is its source
+         bytes, of the contract's static part, that is its
          code. This includes the code of the contract as well as the code
          of the views. The storage size is not taken into account by this
          field as it has a dynamic size. *)
