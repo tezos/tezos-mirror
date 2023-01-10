@@ -132,6 +132,15 @@ val commitments_uncarbonated :
   inbox_level:Raw_level_repr.t ->
   Sc_rollup_commitment_repr.Hash.t list option tzresult Lwt.t
 
+(** [stakers_ids_uncarbonated ctxt ~rollup ~commitment] returns the
+    list of stakers' indexes associated to [rollup] for a specific
+    [commitment] *)
+val stakers_ids_uncarbonated :
+  Raw_context.t ->
+  rollup:Sc_rollup_repr.t ->
+  commitment:Sc_rollup_commitment_repr.Hash.t ->
+  Sc_rollup_staker_index_repr.t list tzresult Lwt.t
+
 (** [withdraw_stake context rollup staker] removes [staker] and cleans
     its metadata. [staker] is allowed to withdraw if it latest staked
     commitment is older than the last cemented commitment.
