@@ -135,6 +135,8 @@ module type T = sig
     protocol_operation operation ->
     add_result Lwt.t
 
+  val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
+
   val validation_state : t -> validation_state
 
   module Internal_for_tests : sig
@@ -339,6 +341,10 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     | Ok add_result -> return add_result
     | Error trace ->
         return (state, filter_state, op, classification_of_trace trace, None)
+
+  let remove_operation state oph =
+    let mempool = Proto.Mempool.remove_operation state.mempool oph in
+    {state with mempool}
 
   let validation_state {validation_state; _} = validation_state
 

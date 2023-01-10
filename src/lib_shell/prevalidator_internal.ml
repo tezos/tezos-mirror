@@ -893,6 +893,8 @@ module Make_s
           | `Refused _, _
           | `Outdated _, _
           | `Prechecked, false ->
+              pv.validation_state <-
+                Prevalidation_t.remove_operation pv.validation_state oph ;
               pv.filter_state <-
                 Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
               return_unit)

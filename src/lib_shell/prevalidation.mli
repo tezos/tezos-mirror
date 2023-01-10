@@ -111,6 +111,12 @@ module type T = sig
     protocol_operation Shell_operation.operation ->
     add_result Lwt.t
 
+  (** Remove an operation from the state.
+
+      The state remains unchanged when the operation was not
+      present. *)
+  val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
+
   (** [validation_state t] returns the subset of [t] corresponding
       to the type {!validation_state} of the protocol. *)
   val validation_state : t -> validation_state
