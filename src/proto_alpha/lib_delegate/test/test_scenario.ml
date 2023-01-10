@@ -401,6 +401,14 @@ let test_scenario_f1 () =
   let d_proposed_l1_r1 = ref false in
   let a_proposed_l2_r0 = ref false in
   let stop_on_event0 _ = !a_proposed_l2_r0 in
+  let pass =
+    (* This is to be sure that the proposal for round r arrives while
+       the baker is in round r, and not in round r-1. (See related
+       issue:
+       https://gitlab.com/tezos/tezos/-/issues/4143). Otherwise, the
+       test does not perform as expected. *)
+    Delay 0.5
+  in
   let module Node_a_hooks : Hooks = struct
     include Default_hooks
 
@@ -416,7 +424,7 @@ let test_scenario_f1 () =
           (a_proposed_l2_r0 := true ;
            return_unit)
           >>=? fun () ->
-          return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
+          return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
             "unexpected injection on the node A, level = %ld / round = %ld"
@@ -455,7 +463,7 @@ let test_scenario_f1 () =
           (c_proposed_l1_r0 := true ;
            return_unit)
           >>=? fun () ->
-          return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
+          return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
             "unexpected injection on the node C, level = %ld / round = %ld"
@@ -484,7 +492,7 @@ let test_scenario_f1 () =
           (d_proposed_l1_r1 := true ;
            return_unit)
           >>=? fun () ->
-          return (block_hash, block_header, operations, [Pass; Pass; Pass; Pass])
+          return (block_hash, block_header, operations, [pass; pass; pass; pass])
       | _ ->
           failwith
             "unexpected injection on the node D, level = %ld / round = %ld"
@@ -1465,8 +1473,7 @@ let tests =
     tztest "scenario t1" `Quick test_scenario_t1;
     tztest "scenario t2" `Quick test_scenario_t2;
     tztest "scenario t3" `Quick test_scenario_t3;
-    (* See issue https://gitlab.com/nomadic-labs/tezos/-/issues/518 *)
-    (* tztest "scenario f1" `Quick test_scenario_f1; *)
+    tztest "scenario f1" `Quick test_scenario_f1;
     tztest "scenario f2" `Quick test_scenario_f2;
     tztest "scenario m1" `Quick test_scenario_m1;
     tztest "scenario m2" `Quick test_scenario_m2;

@@ -147,6 +147,8 @@ type state = {
 
 type t = state
 
+val update_current_phase : t -> phase -> t
+
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_bake_next_level of {at_round : Round.t}

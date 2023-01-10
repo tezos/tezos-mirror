@@ -91,16 +91,10 @@ let make_consensus_list state proposal =
 (* If we do not have any slots, we won't inject any operation but we
    will still participate to determine an elected block *)
 let make_preendorse_action state proposal =
-  let updated_state =
-    let round_state =
-      {state.round_state with current_phase = Awaiting_preendorsements}
-    in
-    {state with round_state}
-  in
   let preendorsements : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
-  Inject_preendorsements {preendorsements; updated_state}
+  Inject_preendorsements {preendorsements}
 
 let update_proposal state proposal =
   Events.(emit updating_latest_proposal proposal.block.hash) >>= fun () ->
@@ -123,12 +117,13 @@ let preendorse state proposal =
       proposal.block.protocol <> proposal.block.next_protocol)
   then
     (* We do not preendorse the first transition block *)
-    let new_round_state = {state.round_state with current_phase = Idle} in
-    let new_state = {state with round_state = new_round_state} in
+    let new_state = update_current_phase state Idle in
     Lwt.return (new_state, Do_nothing)
   else
     Events.(emit attempting_preendorse_proposal proposal.block.hash)
-    >>= fun () -> Lwt.return (state, make_preendorse_action state proposal)
+    >>= fun () ->
+    let new_state = update_current_phase state Awaiting_preendorsements in
+    Lwt.return (new_state, make_preendorse_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
@@ -250,7 +245,13 @@ let rec handle_new_proposal state (new_proposal : proposal) =
                 | Some {round; _} when Round.(locked_round.round < round) ->
                     (* This PQC is above our locked_round, we can preendorse it *)
                     preendorse new_state new_proposal
-                | _ -> Lwt.return (new_state, Do_nothing))
+                | _ ->
+                    (* We shouldn't preendorse this proposal, but we should at
+                       least watch (pre)quorums events on it *)
+                    let new_state =
+                      update_current_phase new_state Awaiting_preendorsements
+                    in
+                    Lwt.return (new_state, Watch_proposal))
           | None ->
               (* Otherwise, we did not lock on any payload, thus we can
                  preendorse it *)
@@ -416,10 +417,7 @@ let propose_fresh_block_action ~endorsements ?last_proposal
   let kind = Fresh operation_pool in
   Events.(emit proposing_fresh_block (delegate, round)) >>= fun () ->
   let block_to_bake = {predecessor; round; delegate; kind} in
-  let updated_state =
-    let new_round_state = {state.round_state with current_phase = Idle} in
-    {state with round_state = new_round_state}
-  in
+  let updated_state = update_current_phase state Idle in
   Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
 let propose_block_action state delegate round (proposal : proposal) =
@@ -506,10 +504,7 @@ let propose_block_action state delegate round (proposal : proposal) =
       let block_to_bake =
         {predecessor = proposal.predecessor; round; delegate; kind}
       in
-      let updated_state =
-        let new_round_state = {state.round_state with current_phase = Idle} in
-        {state with round_state = new_round_state}
-      in
+      let updated_state = update_current_phase state Idle in
       Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
 let end_of_round state current_round =
@@ -532,8 +527,7 @@ let end_of_round state current_round =
       (* We don't have any delegate that may propose a new block for
          this round -- We will wait for preendorsements when the next
          level block arrive. Meanwhile, we are idle *)
-      let new_round_state = {new_state.round_state with current_phase = Idle} in
-      let new_state = {state with round_state = new_round_state} in
+      let new_state = update_current_phase new_state Idle in
       do_nothing new_state
   | Some (delegate, _) ->
       let last_proposal = state.level_state.latest_proposal.block in
@@ -592,20 +586,10 @@ let update_locked_round state round payload_hash =
   {state with level_state = new_level_state}
 
 let make_endorse_action state proposal =
-  let updated_state =
-    let new_round_state =
-      {state.round_state with current_phase = Awaiting_endorsements}
-    in
-    let new_state = {state with round_state = new_round_state} in
-    update_locked_round
-      new_state
-      proposal.block.round
-      proposal.block.payload_hash
-  in
   let endorsements : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
-  Inject_endorsements {endorsements; updated_state}
+  Inject_endorsements {endorsements}
 
 let prequorum_reached_when_awaiting_preendorsements state candidate
     preendorsements =
@@ -648,6 +632,13 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
           else state.level_state
     in
     let new_state = {state with level_state = new_level_state} in
+    let new_state =
+      update_locked_round
+        new_state
+        latest_proposal.block.round
+        latest_proposal.block.payload_hash
+    in
+    let new_state = update_current_phase new_state Awaiting_endorsements in
     Lwt.return (new_state, make_endorse_action new_state latest_proposal)
 
 let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
@@ -682,6 +673,9 @@ let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
 
 (* Hypothesis:
    - The state is not to be modified outside this module
+     (NB: there are exceptions in Baking_actions: the corner cases
+     [update_to_level] and [synchronize_round] and
+     the hack used by [inject_block])
 
    - new_proposal's received blocks are expected to belong to our current
      round
