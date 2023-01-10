@@ -141,6 +141,14 @@ val stakers_ids_uncarbonated :
   commitment:Sc_rollup_commitment_repr.Hash.t ->
   Sc_rollup_staker_index_repr.t list tzresult Lwt.t
 
+(** [staker_id_uncarbonated ctxt ~rollup ~pkh] returns the staker's
+    index associated to the public key hash [pkh] *)
+val staker_id_uncarbonated :
+  Raw_context.t ->
+  rollup:Sc_rollup_repr.t ->
+  pkh:Signature.public_key_hash ->
+  Sc_rollup_staker_index_repr.t tzresult Lwt.t
+
 (** [withdraw_stake context rollup staker] removes [staker] and cleans
     its metadata. [staker] is allowed to withdraw if it latest staked
     commitment is older than the last cemented commitment.
