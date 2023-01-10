@@ -48,6 +48,8 @@ module Types = struct
   type header_status =
     [`Waiting_attestation | `Attested | `Unattested | `Not_selected | `Unseen]
 
+  type shard_index = int
+
   type slot_header = {
     slot_id : slot_id;
     commitment : Cryptobox.Commitment.t;
@@ -275,3 +277,21 @@ let get_profiles :
     ~query:Tezos_rpc.Query.empty
     ~output:(Data_encoding.list Types.profile_encoding)
     Tezos_rpc.Path.(open_root / "profiles")
+
+let get_assigned_shard_indices :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.shard_index list
+    ; prefix : unit
+    ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Return the shard indexes assigned to the given public key hash at the \
+       given level."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.(list int16)
+    Tezos_rpc.Path.(
+      open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
+      /: Tezos_rpc.Arg.int32 / "assigned-shard-indices")

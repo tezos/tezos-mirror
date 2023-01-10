@@ -782,6 +782,12 @@ module Dal = struct
         GET
         ["commitments"; commitment; "headers"]
         slot_headers_of_json
+
+    let get_assigned_shard_indices ~level ~pkh =
+      make
+        GET
+        ["profiles"; pkh; string_of_int level; "assigned-shard-indices"]
+        (fun json -> JSON.(json |> as_list |> List.map as_int))
   end
 
   let make

@@ -2448,6 +2448,9 @@ module Dal = struct
   let dal_confirmed_slots_history ctxt block =
     RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
 
+  let dal_shards ctxt block ?level () =
+    RPC_context.make_call0 S.shards ctxt block level ()
+
   let register_shards () =
     Registration.register0 ~chunked:true S.shards @@ fun ctxt level () ->
     let level = Option.value level ~default:(Level.current ctxt).level in

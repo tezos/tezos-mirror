@@ -115,6 +115,21 @@ module Profile_handlers = struct
   let get_profiles ctxt () () =
     let store = Node_context.get_store ctxt in
     Profile_manager.get_profiles store
+
+  let get_assigned_shard_indices ctxt pkh level () () =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4496
+       Cache DAL comittee in DAL context. *)
+    let open Lwt_result_syntax in
+    let*? {plugin = (module Plugin); _} = Node_context.get_ready ctxt in
+    let cctxt = Node_context.get_tezos_node_cctxt ctxt in
+    let+ committee = Plugin.get_committee cctxt ~level in
+    match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
+    | None -> []
+    | Some (s, n) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4540
+           Consider returning some abstract representation of [(s, n)]
+           instead of [int list] *)
+        Stdlib.List.init n (fun i -> s + i)
 end
 
 let add_service registerer service handler directory =
@@ -158,6 +173,10 @@ let register_new :
        Tezos_rpc.Directory.register1
        Services.get_commitment_headers
        (Slots_handlers.get_commitment_headers ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register2
+       Services.get_assigned_shard_indices
+       (Profile_handlers.get_assigned_shard_indices ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in

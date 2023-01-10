@@ -11,6 +11,7 @@
   tezos-stdlib-unix
   tezos_dal_node_lib
   tezos-client-016-PtMumbai
+  tezos-protocol-plugin-016-PtMumbai
   tezos-embedded-protocol-016-PtMumbai
   tezos-layer2-utils-016-PtMumbai
   tezos-protocol-016-PtMumbai)
@@ -25,6 +26,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_dal_node_lib
   -open Tezos_client_016_PtMumbai
+  -open Tezos_protocol_plugin_016_PtMumbai
   -open Tezos_embedded_protocol_016_PtMumbai
   -open Tezos_layer2_utils_016_PtMumbai
   -open Tezos_protocol_016_PtMumbai))

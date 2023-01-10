@@ -52,6 +52,9 @@ module Types : sig
   (** An ID associated to a slot or to its commitment. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
+  (** An index of a DAL shard *)
+  type shard_index = int
+
   (** The status of a header a DAL node is aware of: *)
   type header_status =
     [ `Waiting_attestation
@@ -171,5 +174,15 @@ val get_profiles :
   ; output : Types.profile list
   ; prefix : unit
   ; params : unit
+  ; query : unit >
+  service
+
+(** Return the shard indexes assigned to the given public key hash at the given level. *)
+val get_assigned_shard_indices :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.shard_index list
+  ; prefix : unit
+  ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
   ; query : unit >
   service

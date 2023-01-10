@@ -113,6 +113,9 @@ module Plugin = struct
     let* () = check_is_in_range upper in
     return Misc.(lower --> upper)
 
+  let get_committee _ctxt ~level:_ =
+    Stdlib.failwith "get_committee not supported for this protocol version."
+
   let attested_slot_headers _hash (_block : block_info) ~number_of_slots:_ =
     let open Result_syntax in
     (* DAL Will not be activated in Mumbai. *)

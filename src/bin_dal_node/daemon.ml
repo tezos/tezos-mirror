@@ -249,7 +249,7 @@ let run ~data_dir cctxt =
     |> List.split
   in
   let* store = Store.init config in
-  let ctxt = Node_context.init config store in
+  let ctxt = Node_context.init config store cctxt in
 
   let* rpc_server =
     RPC_server.(start config cctxt ctxt dac_pks_opt dac_sk_uris)
