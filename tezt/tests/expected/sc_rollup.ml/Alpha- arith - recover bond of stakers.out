@@ -156,7 +156,7 @@ This sequence of operations was run:
     Smart rollup bond retrieval:
       Address: [SMART_ROLLUP_HASH]
       Staker: [PUBLIC_KEY_HASH]
-      This smart bond retrieval was successfully applied
+      This smart rollup bond retrieval was successfully applied
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... -ꜩ10000
         [PUBLIC_KEY_HASH] ...................................................... +ꜩ10000
@@ -186,7 +186,7 @@ This sequence of operations was run:
     Smart rollup bond retrieval:
       Address: [SMART_ROLLUP_HASH]
       Staker: [PUBLIC_KEY_HASH]
-      This smart bond retrieval was successfully applied
+      This smart rollup bond retrieval was successfully applied
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... -ꜩ10000
         [PUBLIC_KEY_HASH] ...................................................... +ꜩ10000
