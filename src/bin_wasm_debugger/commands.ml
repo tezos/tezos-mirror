@@ -90,6 +90,31 @@ let build_metadata config =
     }
     |> Data_encoding.Binary.to_string_exn encoding)
 
+let reveal_preimage_manually hash =
+  let open Lwt_syntax in
+  let* () = Lwt_io.printf "Preimage for hash %s not found.\n%!" hash in
+  let rec input_preimage retries : string Lwt.t =
+    if retries <= 0 then Stdlib.failwith "Too much retry, aborting"
+    else
+      let* () = Lwt_io.printf "> " in
+      let* input =
+        Lwt.catch
+          (fun () ->
+            let* i = Lwt_io.read_line Lwt_io.stdin in
+            return_some i)
+          (fun _ -> return_none)
+      in
+      match Option.bind input (fun bytes -> Hex.to_string (`Hex bytes)) with
+      | Some preimage -> Lwt.return preimage
+      | None ->
+          let* () =
+            Lwt_io.printf
+              "Error: the preimage is not a valid hexadecimal value.\n%!"
+          in
+          input_preimage (pred retries)
+  in
+  input_preimage 3
+
 let reveal_builtins config =
   Tezos_scoru_wasm.Builtins.
     {
@@ -98,11 +123,14 @@ let reveal_builtins config =
           let (`Hex hex) = Hex.of_string hash in
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
              Let the user override this hardcoded value. *)
-          let path = "preimages/" ^ hex in
-          let ch = open_in path in
-          let s = really_input_string ch (in_channel_length ch) in
-          close_in ch ;
-          Lwt.return s);
+          Lwt.catch
+            (fun () ->
+              let path = "preimages/" ^ hex in
+              let ch = open_in path in
+              let s = really_input_string ch (in_channel_length ch) in
+              close_in ch ;
+              Lwt.return s)
+            (fun _ -> reveal_preimage_manually hex));
       reveal_metadata = (fun () -> Lwt.return (build_metadata config));
     }
 
