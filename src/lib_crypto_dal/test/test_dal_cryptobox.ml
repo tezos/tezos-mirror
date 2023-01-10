@@ -35,132 +35,174 @@ module Test = struct
     Bytes.blit msg 0 slot 0 padding_threshold ;
     (slot, msg)
 
-  type params = {number_of_shards : int; slot_size : int; page_size : int}
+  type params = {
+    redundancy_factor : int;
+    number_of_shards : int;
+    slot_size : int;
+    page_size : int;
+  }
 
-  (* We divide mainnet parameters by [32] to speed up the tests. *)
-  let test_params =
-    {
-      number_of_shards = 2048 / 32;
-      slot_size = (1 lsl 20) / 32;
-      page_size = 4096 / 32;
-    }
+  let params_gen =
+    let open QCheck2.Gen in
+    let* redundancy_factor_log2 = int_range 1 4 in
+    let* slot_size_log2 = int_range 5 10 in
+    let* page_size_log2 = int_range 5 slot_size_log2 in
+    let* number_of_shards_log2 = int_range 0 11 in
+    map
+      (fun (redundancy_factor, number_of_shards, slot_size, page_size) ->
+        {redundancy_factor; number_of_shards; slot_size; page_size})
+      (tup4
+         (return (1 lsl redundancy_factor_log2))
+         (return (1 lsl number_of_shards_log2))
+         (return (1 lsl slot_size_log2))
+         (return (1 lsl page_size_log2)))
+
+  let print =
+    QCheck2.Print.(
+      contramap
+        (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+          (redundancy_factor, number_of_shards, slot_size, page_size))
+        (tup4 int int int int))
+
+  let acceptable_errors =
+    [
+      "Too few shards";
+      "Too many shards";
+      "Slot size too small";
+      "Wrong page size";
+    ]
 
   (* Tests that with a fraction 1/redundancy_factor of the shards
      the decoding succeeds. *)
-  let test_erasure_code () =
-    let {number_of_shards; slot_size; page_size} = test_params in
-    let msg_size = slot_size / 16 in
-    let slot, msg = make_slot ~size:slot_size ~padding_threshold:msg_size in
-    init slot_size ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_e
-      (fun redundancy_factor ->
-        let* t =
-          Cryptobox.make
-            {redundancy_factor; slot_size; page_size; number_of_shards}
-        in
-        let* p = Cryptobox.polynomial_from_slot t slot in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let c_indices =
-          random_indices
-            (number_of_shards - 1)
-            (number_of_shards / redundancy_factor)
-        in
-        let c =
-          Seq.filter
-            (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
-            enc_shards
-        in
-        let* decoded_slot = Cryptobox.polynomial_from_shards t c in
-        let decoded_msg =
-          Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
-        in
-        assert (Bytes.equal msg decoded_msg) ;
-        Ok ())
-      [2; 4; 16]
-    |> function
-    | Ok _ -> assert true
-    | _ -> assert false
+  let test_erasure_code =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test erasure code"
+      ~print
+      params_gen
+      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+        let msg_size = slot_size / 16 in
+        let slot, msg = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        init slot_size ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t =
+           Cryptobox.make
+             {redundancy_factor; slot_size; page_size; number_of_shards}
+         in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let enc_shards = Cryptobox.shards_from_polynomial t p in
+         let c_indices =
+           random_indices
+             (number_of_shards - 1)
+             (number_of_shards / redundancy_factor)
+         in
+         let c =
+           Seq.filter
+             (fun ({index; _} : Cryptobox.shard) -> Array.mem index c_indices)
+             enc_shards
+         in
+         let* decoded_slot = Cryptobox.polynomial_from_shards t c in
+         let decoded_msg =
+           Bytes.sub (Cryptobox.polynomial_to_bytes t decoded_slot) 0 msg_size
+         in
+         return decoded_msg)
+        |> function
+        | Ok decoded_msg -> Bytes.equal msg decoded_msg
+        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error
+            ( `Fail _ | `Invert_zero _ | `Not_enough_shards _
+            | `Slot_wrong_size _ ) ->
+            false)
 
   (* Tests that a page is included in a slot. *)
-  let test_page_proofs () =
-    let {number_of_shards; slot_size; page_size} = test_params in
-    let msg_size = slot_size / 16 in
-    let number_of_pages = slot_size / page_size in
-    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-    init slot_size ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (let* t =
-       Cryptobox.make
-         {redundancy_factor = 2; slot_size; page_size; number_of_shards}
-     in
-     let* p = Cryptobox.polynomial_from_slot t slot in
-     let cm = Cryptobox.commit t p in
-     let page_index = Random.int number_of_pages in
-     let* pi = Cryptobox.prove_page t p page_index in
-     let page = Bytes.sub slot (page_index * page_size) page_size in
-     let* check = Cryptobox.verify_page t cm ~page_index page pi in
-     Ok check)
-    |> function
-    | Ok check -> assert check
-    | _ -> assert false
+  let test_page_proofs =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test page proofs"
+      ~print
+      params_gen
+      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+        let msg_size = slot_size / 16 in
+        let number_of_pages = slot_size / page_size in
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        init slot_size ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t =
+           Cryptobox.make
+             {redundancy_factor; slot_size; page_size; number_of_shards}
+         in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let cm = Cryptobox.commit t p in
+         let page_index = Random.int number_of_pages in
+         let* pi = Cryptobox.prove_page t p page_index in
+         let page = Bytes.sub slot (page_index * page_size) page_size in
+         Cryptobox.verify_page t cm ~page_index page pi)
+        |> function
+        | Ok check -> check
+        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error
+            ( `Fail _ | `Slot_wrong_size _ | `Page_length_mismatch
+            | `Segment_index_out_of_range ) ->
+            false)
 
   (* Tests that a shard comes from the erasure-encoded slot. *)
-  let test_shard_proofs () =
-    let {number_of_shards; slot_size; page_size} = test_params in
-    let msg_size = slot_size / 16 in
-    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-    init slot_size ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_e
-      (fun redundancy_factor ->
-        let* t =
-          Cryptobox.make
-            {redundancy_factor; slot_size; page_size; number_of_shards}
-        in
-        let* p = Cryptobox.polynomial_from_slot t slot in
-        let cm = Cryptobox.commit t p in
-        let enc_shards = Cryptobox.shards_from_polynomial t p in
-        let shard_proofs = Cryptobox.prove_shards t p in
-        let shard_index = Random.int number_of_shards in
-        match
-          Seq.find
-            (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
-            enc_shards
-        with
-        | None -> Ok ()
-        | Some shard ->
-            let check =
-              Cryptobox.verify_shard t cm shard shard_proofs.(shard_index)
-            in
-            assert check ;
-            Ok ())
-      [2; 16]
-    |> function
-    | Ok _ -> assert true
-    | _ -> assert false
+  let test_shard_proofs =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test shard proofs"
+      ~print
+      params_gen
+      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+        let msg_size = slot_size / 16 in
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        init slot_size ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t =
+           Cryptobox.make
+             {redundancy_factor; slot_size; page_size; number_of_shards}
+         in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         let cm = Cryptobox.commit t p in
+         let enc_shards = Cryptobox.shards_from_polynomial t p in
+         let shard_proofs = Cryptobox.prove_shards t p in
+         let shard_index = Random.int number_of_shards in
+         match
+           Seq.find
+             (fun ({index; _} : Cryptobox.shard) -> index = shard_index)
+             enc_shards
+         with
+         | None -> return true
+         | Some shard ->
+             return
+               (Cryptobox.verify_shard t cm shard shard_proofs.(shard_index)))
+        |> function
+        | Ok check -> check
+        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error (`Fail _ | `Slot_wrong_size _) -> false)
 
   (* Tests that the slot behind the commitment has its size bounded
      by [t.slot_size]. *)
-  let test_commitment_proof () =
-    let {number_of_shards; slot_size; page_size} = test_params in
-    let msg_size = slot_size / 16 in
-    let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-    init slot_size ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (let* t =
-       Cryptobox.make
-         {redundancy_factor = 2; slot_size; page_size; number_of_shards}
-     in
-     let* p = Cryptobox.polynomial_from_slot t slot in
-     Ok (t, p))
-    |> function
-    | Ok (t, p) ->
-        let cm = Cryptobox.commit t p in
-        let pi = Cryptobox.prove_commitment t p in
-        let check = Cryptobox.verify_commitment t cm pi in
-        assert check
-    | _ -> assert false
+  let test_commitment_proof =
+    QCheck2.Test.make
+      ~name:"DAL cryptobox: test commitment proof"
+      ~print
+      params_gen
+      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+        let msg_size = slot_size / 16 in
+        let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
+        init slot_size ;
+        let open Tezos_error_monad.Error_monad.Result_syntax in
+        (let* t =
+           Cryptobox.make
+             {redundancy_factor; slot_size; page_size; number_of_shards}
+         in
+         let* p = Cryptobox.polynomial_from_slot t slot in
+         Ok (t, p))
+        |> function
+        | Ok (t, p) ->
+            let cm = Cryptobox.commit t p in
+            let pi = Cryptobox.prove_commitment t p in
+            let check = Cryptobox.verify_commitment t cm pi in
+            check
+        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | _ -> false)
 
   (* We can craft two slots whose commitments are equal for two different
      page sizes.*)
@@ -210,13 +252,7 @@ let test =
   List.map
     (fun (test_name, test_func) ->
       Alcotest.test_case test_name `Quick test_func)
-    [
-      ("test_erasure_code", Test.test_erasure_code);
-      ("test_page_proofs", Test.test_page_proofs);
-      ("test_shard_proofs", Test.test_shard_proofs);
-      ("test_commitment_proof", Test.test_commitment_proof);
-      ("test_collision_page_size", Test.test_collision_page_size);
-    ]
+    [("test_collision_page_size", Test.test_collision_page_size)]
 
 let () =
   (* Seed for deterministic pseudo-randomness:
@@ -233,4 +269,16 @@ let () =
   in
 
   Random.init seed ;
-  Alcotest.run "DAL cryptobox" [("DAL cryptobox", test)]
+  Alcotest.run
+    "DAL cryptobox"
+    [
+      ("DAL cryptobox", test);
+      ( "PBT",
+        Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
+          [
+            Test.test_erasure_code;
+            Test.test_page_proofs;
+            Test.test_shard_proofs;
+            Test.test_commitment_proof;
+          ] );
+    ]
