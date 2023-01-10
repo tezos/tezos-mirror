@@ -185,6 +185,9 @@ let staker_id_uncarbonated ctxt ~rollup ~pkh =
   let* _, staker_index = Store.Staker_index.get (ctxt, rollup) pkh in
   return staker_index
 
+let stakers_pkhs_uncarbonated ctxt ~rollup =
+  Sc_rollup_staker_index_storage.list_stakers_uncarbonated ctxt rollup
+
 let get_contract_and_stake ctxt staker =
   let staker_contract = Contract_repr.Implicit staker in
   let stake = Constants_storage.sc_rollup_stake_amount ctxt in
