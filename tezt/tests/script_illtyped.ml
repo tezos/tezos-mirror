@@ -80,6 +80,29 @@ let test_ill_typecheck script error_pattern =
   Client.spawn_typecheck_script ~script:script_path client
   |> Process.check_error ~msg:error_pattern
 
+let test_legacy_typecheck protocols =
+  [("timelock", Protocol.From_protocol 015)]
+  |> List.iter @@ fun (script, supports) ->
+     ( Protocol.register_test
+         ~__FILE__
+         ~supports
+         ~title:
+           (sf
+              "Test deprecated instructions typecheck conditionally - %s"
+              script)
+         ~tags:["client"; "script"; "michelson"; "typechecking"]
+     @@ fun protocol ->
+       let* client = Client.init_mockup ~protocol () in
+       let script_path =
+         Michelson_script.(find ["ill_typed"; script] protocol |> path)
+       in
+       let* () =
+         Client.spawn_typecheck_script ~script:script_path ~legacy:false client
+         |> Process.check_error ~msg:(rex "Use of deprecated instruction")
+       in
+       Client.typecheck_script ~script:script_path ~legacy:true client )
+       protocols
+
 let register ~protocols =
   protocols
   |> List.iter (fun protocol ->
@@ -183,4 +206,5 @@ let register ~protocols =
       rex "The proper type of the return list cannot be inferred." );
   ]
   |> List.iter (fun (script, error_pattern) ->
-         test_ill_typecheck script error_pattern protocols)
+         test_ill_typecheck script error_pattern protocols) ;
+  test_legacy_typecheck protocols
