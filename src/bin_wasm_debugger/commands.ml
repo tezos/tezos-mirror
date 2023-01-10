@@ -81,7 +81,16 @@ let parse_commands s =
   in
   go command
 
-let reveal_builtins =
+let build_metadata config =
+  Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Metadata.(
+    {
+      address = config.Config.destination;
+      origination_level =
+        Tezos_protocol_alpha.Protocol.Alpha_context.Raw_level.of_int32_exn 0l;
+    }
+    |> Data_encoding.Binary.to_string_exn encoding)
+
+let reveal_builtins config =
   Tezos_scoru_wasm.Builtins.
     {
       reveal_preimage =
@@ -94,7 +103,7 @@ let reveal_builtins =
           let s = really_input_string ch (in_channel_length ch) in
           close_in ch ;
           Lwt.return s);
-      reveal_metadata = (fun () -> Lwt.return "not implemented yet");
+      reveal_metadata = (fun () -> Lwt.return (build_metadata config));
     }
 
 let write_debug =
@@ -111,17 +120,19 @@ let compute_step tree =
 (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
-let eval_to_result tree = trap_exn (fun () -> eval_to_result tree)
+let eval_to_result config tree =
+  trap_exn (fun () ->
+      eval_to_result ~write_debug ~reveal_builtins:(reveal_builtins config) tree)
 
 (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
    starts a new one if already at snapshot point). *)
-let eval_kernel_run tree =
+let eval_kernel_run config tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
       let* tree, _ =
         Wasm_fast.compute_step_many
-          ~reveal_builtins
+          ~reveal_builtins:(reveal_builtins config)
           ~write_debug
           ~stop_at_snapshot:true
           ~max_steps:Int64.max_int
@@ -132,14 +143,14 @@ let eval_kernel_run tree =
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
 (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-let eval_until_input_requested tree =
+let eval_until_input_requested config tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
       let* tree =
         eval_until_input_requested
           ~fast_exec:true
-          ~reveal_builtins:(Some reveal_builtins)
+          ~reveal_builtins:(Some (reveal_builtins config))
           ~write_debug
           ~max_steps:Int64.max_int
           tree
@@ -149,11 +160,11 @@ let eval_until_input_requested tree =
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
 (* Eval dispatcher. *)
-let eval = function
+let eval config = function
   | Tick -> compute_step
-  | Result -> eval_to_result
-  | Kernel_run -> eval_kernel_run
-  | Inbox -> eval_until_input_requested
+  | Result -> eval_to_result config
+  | Kernel_run -> eval_kernel_run config
+  | Inbox -> eval_until_input_requested config
 
 let set_raw_message_input_step level counter encoded_message tree =
   Wasm.set_input_step (input_info level counter) encoded_message tree
@@ -228,9 +239,9 @@ let show_status tree =
 
 (* [step kind tree] evals according to the step kind and prints the number of
    ticks elapsed and the new status. *)
-let step kind tree =
+let step config kind tree =
   let open Lwt_result_syntax in
-  let* tree, ticks = eval kind tree in
+  let* tree, ticks = eval config kind tree in
   let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
   let*! () = show_status tree in
   return tree
@@ -382,7 +393,7 @@ let show_memory tree address length =
 
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
-let handle_command c tree inboxes level =
+let handle_command c config tree inboxes level =
   let open Lwt_result_syntax in
   let command = parse_commands c in
   let return ?(tree = tree) () = return (tree, inboxes, level) in
@@ -402,7 +413,7 @@ let handle_command c tree inboxes level =
         let*! () = show_status tree in
         return ()
     | Step kind ->
-        let* tree = step kind tree in
+        let* tree = step config kind tree in
         return ~tree ()
     | Show_inbox ->
         let*! () = show_inbox tree in

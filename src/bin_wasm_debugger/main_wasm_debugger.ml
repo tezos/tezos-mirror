@@ -84,7 +84,7 @@ let start binary file =
   handle_module binary module_name buffer
 
 (* REPL main loop: reads an input, does something out of it, then loops. *)
-let repl tree inboxes level =
+let repl tree inboxes level config =
   let open Lwt_result_syntax in
   let rec loop tree inboxes level =
     let*! () = Lwt_io.printf "> " in
@@ -98,7 +98,7 @@ let repl tree inboxes level =
     match input with
     | Some command ->
         let* tree, inboxes, level =
-          Commands.handle_command command tree inboxes level
+          Commands.handle_command command config tree inboxes level
         in
         loop tree inboxes level
     | None -> return tree
@@ -141,7 +141,7 @@ let main_command =
         | Some inputs -> Messages.parse_inboxes inputs config
         | None -> return []
       in
-      let+ _tree = repl tree inboxes 0l in
+      let+ _tree = repl tree inboxes 0l config in
       ())
 
 (* List of program commands *)
