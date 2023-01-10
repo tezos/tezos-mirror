@@ -1611,7 +1611,7 @@ module Dal = struct
   let candidates ctxt =
     Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
 
-  let is_slot_index_available ctxt =
+  let is_slot_index_attested ctxt =
     let threshold =
       ctxt.back.constants.Constants_parametric_repr.dal.attestation_threshold
     in
