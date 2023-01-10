@@ -124,6 +124,14 @@ val stakers_commitments_uncarbonated :
   tzresult
   Lwt.t
 
+(** [commitments_uncarbonated ctxt ~rollup ~inbox_level] returns the
+    list of commitments associated to [rollup] at [inbox_level] *)
+val commitments_uncarbonated :
+  Raw_context.t ->
+  rollup:Sc_rollup_repr.t ->
+  inbox_level:Raw_level_repr.t ->
+  Sc_rollup_commitment_repr.Hash.t list option tzresult Lwt.t
+
 (** [withdraw_stake context rollup staker] removes [staker] and cleans
     its metadata. [staker] is allowed to withdraw if it latest staked
     commitment is older than the last cemented commitment.

@@ -166,6 +166,13 @@ let stakers_commitments_uncarbonated ctxt rollup =
       return (staker, commitment_opt))
     stakers
 
+let commitments_uncarbonated ctxt ~rollup ~inbox_level =
+  let open Lwt_result_syntax in
+  let* _, commitments =
+    Commitments_per_inbox_level.find ctxt rollup inbox_level
+  in
+  return commitments
+
 let get_contract_and_stake ctxt staker =
   let staker_contract = Contract_repr.Implicit staker in
   let stake = Constants_storage.sc_rollup_stake_amount ctxt in
