@@ -142,7 +142,7 @@ let test_create ctxt =
   let module P = MakePrevalidation (Chain_store) (Filter) in
   let timestamp : Time.Protocol.t = now () in
   let head = Init.genesis_block ~timestamp ctxt in
-  let* _ = P.create chain_store ~head ~timestamp () in
+  let* _ = P.create chain_store ~head ~timestamp in
   return_unit
 
 module Parser = Shell_operation.MakeParser (Mock_protocol)
@@ -486,9 +486,9 @@ let test_add_operation ctxt =
   let open Lwt_result_syntax in
   let (module Chain_store) = make_chain_store ctxt in
   let module P = MakePrevalidation (Chain_store) (Toy_filter) in
-  let add_op (state, filter_state_before) (op, (proto_outcome, filter_outcome))
-      =
+  let add_op state (op, (proto_outcome, filter_outcome)) =
     let valid_ops_before = P.Internal_for_tests.get_valid_operations state in
+    let filter_state_before = P.Internal_for_tests.get_filter_state state in
     assert (
       not (Operation_hash.Map.mem op.Shell_operation.hash valid_ops_before)) ;
     assert (not (Operation_hash.Set.mem op.hash filter_state_before)) ;
@@ -498,11 +498,10 @@ let test_add_operation ctxt =
     in
     let state = P.Internal_for_tests.set_validation_info state proto_outcome in
     let*! ( state,
-            filter_state,
             (_op : Mock_protocol.operation Shell_operation.operation),
             classification,
             replacement ) =
-      P.add_operation state filter_state_before filter_outcome op
+      P.add_operation state filter_outcome op
     in
     (* Check the classification. *)
     (match (proto_outcome, filter_outcome) with
@@ -521,6 +520,7 @@ let test_add_operation ctxt =
     (* Check whether the new operation has been added, whether there
        is a replacement, and when there is one, whether it has been removed. *)
     let valid_ops = P.Internal_for_tests.get_valid_operations state in
+    let filter_state = P.Internal_for_tests.get_filter_state state in
     (match (proto_outcome, filter_outcome) with
     | Proto_added, F_no_replace ->
         assert (Operation_hash.Map.mem op.hash valid_ops) ;
@@ -542,14 +542,11 @@ let test_add_operation ctxt =
         assert (not (Operation_hash.Map.mem op.hash valid_ops)) ;
         assert (not (Operation_hash.Set.mem op.hash filter_state)) ;
         assert (Option.is_none replacement)) ;
-    Lwt.return (state, filter_state)
+    Lwt.return state
   in
   let timestamp : Time.Protocol.t = now () in
   let head = Init.genesis_block ~timestamp ctxt in
-  let* prevalidation_state = P.create chain_store ~head ~timestamp () in
-  let* filter_state =
-    Toy_filter.Mempool.(init default_config ~predecessor:head ())
-  in
+  let* prevalidation_state = P.create chain_store ~head ~timestamp in
   let ops = mk_ops () in
   let outcomes =
     QCheck2.Gen.(
@@ -557,11 +554,14 @@ let test_add_operation ctxt =
   in
   let ops_and_outcomes, leftovers = List.combine_with_leftovers ops outcomes in
   assert (Option.is_none leftovers) ;
-  let*! final_prevalidation_state, final_filter_state =
-    List.fold_left_s add_op (prevalidation_state, filter_state) ops_and_outcomes
+  let*! final_prevalidation_state =
+    List.fold_left_s add_op prevalidation_state ops_and_outcomes
   in
   let final_valid_ops =
     P.Internal_for_tests.get_valid_operations final_prevalidation_state
+  in
+  let final_filter_state =
+    P.Internal_for_tests.get_filter_state final_prevalidation_state
   in
   assert (
     Operation_hash.Map.cardinal final_valid_ops

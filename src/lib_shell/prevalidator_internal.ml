@@ -75,13 +75,13 @@ module Tools = struct
             active peers for the chain being considered. *)
     chain_tools : Store.Block.t Classification.chain_tools;
         (** Lower-level tools provided by {!Prevalidator_classification} *)
-    create :
+    flush :
       head:Store.Block.t ->
       timestamp:Time.Protocol.t ->
-      unit ->
+      'prevalidation_t ->
       'prevalidation_t tzresult Lwt.t;
-        (** Creates a new prevalidation context w.r.t. the protocol associated to the
-            predecessor block. *)
+        (** Create a new empty prevalidation state, recycling some elements
+            of the provided previous prevalidation state. *)
     fetch :
       ?peer:P2p_peer.Id.t ->
       ?timeout:Time.System.Span.t ->
@@ -191,9 +191,10 @@ module type S = sig
 
   type types_state = {
     shell : (protocol_operation, prevalidation_t) types_state_shell;
-    mutable filter_state : filter_state;
-        (** Internal state of the filter in the plugin *)
     mutable validation_state : prevalidation_t;
+        (** Internal prevalidation state. Among others, this contains the
+            internal states of the protocol mempool and of the plugin
+            filter. *)
     mutable operation_stream :
       (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
@@ -283,7 +284,6 @@ module Make_s
 
   type types_state = {
     shell : (protocol_operation, prevalidation_t) types_state_shell;
-    mutable filter_state : filter_state;
     mutable validation_state : prevalidation_t;
     mutable operation_stream :
       (Classification.classification * protocol_operation operation)
@@ -342,24 +342,15 @@ module Make_s
        on an "harmless" field of [types_state_shell]: [operation_stream] *)
     Lwt_watcher.notify operation_stream (classification, op)
 
-  let pre_filter shell ~filter_config ~filter_state ~validation_state ~notifier
-      (parsed_op : protocol_operation operation) :
-      [Pending_ops.priority | `Drop] Lwt.t =
+  let pre_filter pv ~notifier parsed_op : [Pending_ops.priority | `Drop] Lwt.t =
     let open Lwt_syntax in
-    let validation_state_before =
-      Prevalidation_t.validation_state validation_state
-    in
     let+ v =
-      Filter.Mempool.pre_filter
-        ~filter_state
-        ~validation_state_before
-        filter_config
-        parsed_op.protocol
+      Prevalidation_t.pre_filter pv.validation_state pv.filter_config parsed_op
     in
     match v with
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
-        handle_classification ~notifier shell (parsed_op, errs) ;
+        handle_classification ~notifier pv.shell (parsed_op, errs) ;
         `Drop
     | `Passed_prefilter priority -> (priority :> [Pending_ops.priority | `Drop])
 
@@ -408,20 +399,14 @@ module Make_s
        operations whose classes are changed/impacted by this classification
        (eg. in case of operation replacement).
   *)
-  let classify_operation shell ~filter_config ~filter_state ~validation_state
-      mempool op :
-      (filter_state
-      * prevalidation_t
+  let classify_operation shell ~filter_config ~validation_state mempool op :
+      (prevalidation_t
       * Mempool.t
       * (protocol_operation operation * Classification.classification) trace)
       Lwt.t =
     let open Lwt_syntax in
-    let* v_state, f_state, op, classification, replacement =
-      Prevalidation_t.add_operation
-        validation_state
-        filter_state
-        filter_config
-        op
+    let* v_state, op, classification, replacement =
+      Prevalidation_t.add_operation validation_state filter_config op
     in
     let to_replace =
       match replacement with
@@ -439,7 +424,7 @@ module Make_s
       | `Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _ ->
           mempool
     in
-    return (f_state, v_state, mempool, to_handle)
+    return (v_state, mempool, to_handle)
 
   (* Classify pending operations into either: [Refused |
      Branch_delayed | Branch_refused | Applied | Outdated].
@@ -460,49 +445,38 @@ module Make_s
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier shell filter_config filter_state
-      state =
+  let classify_pending_operations ~notifier shell filter_config state =
     let open Lwt_syntax in
     let* r =
       Pending_ops.fold_es
-        (fun _prio
-             oph
-             op
-             (acc_filter_state, acc_validation_state, acc_mempool, limit) ->
+        (fun _prio oph op (acc_validation_state, acc_mempool, limit) ->
           if limit <= 0 then
             (* Using Error as an early-return mechanism *)
-            Lwt.return_error
-              (acc_filter_state, acc_validation_state, acc_mempool)
+            Lwt.return_error (acc_validation_state, acc_mempool)
           else (
             shell.pending <- Pending_ops.remove oph shell.pending ;
-            let* new_filter_state, new_validation_state, new_mempool, to_handle
-                =
+            let* new_validation_state, new_mempool, to_handle =
               classify_operation
                 shell
                 ~filter_config
-                ~filter_state:acc_filter_state
                 ~validation_state:acc_validation_state
                 acc_mempool
                 op
             in
             let+ () = Events.(emit operation_reclassified) oph in
             List.iter (handle_classification ~notifier shell) to_handle ;
-            Ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
+            Ok (new_validation_state, new_mempool, limit - 1)))
         shell.pending
-        ( filter_state,
-          state,
-          Mempool.empty,
-          shell.parameters.limits.operations_batch_size )
+        (state, Mempool.empty, shell.parameters.limits.operations_batch_size)
     in
     match r with
-    | Error (filter_state, state, advertised_mempool) ->
+    | Error (state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
         let* (_was_pushed : bool) =
           shell.worker.push_request Request.Leftover
         in
-        Lwt.return (filter_state, state, advertised_mempool)
-    | Ok (filter_state, state, advertised_mempool, _) ->
-        Lwt.return (filter_state, state, advertised_mempool)
+        Lwt.return (state, advertised_mempool)
+    | Ok (state, advertised_mempool, _) -> Lwt.return (state, advertised_mempool)
 
   let update_advertised_mempool_fields pv_shell delta_mempool =
     let open Lwt_syntax in
@@ -542,15 +516,13 @@ module Make_s
     if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
     else
       let* () = Events.(emit processing_operations) () in
-      let* filter_state, validation_state, delta_mempool =
+      let* validation_state, delta_mempool =
         classify_pending_operations
           ~notifier
           pv.shell
           pv.filter_config
-          pv.filter_state
           pv.validation_state
       in
-      pv.filter_state <- filter_state ;
       pv.validation_state <- validation_state ;
       update_advertised_mempool_fields pv.shell delta_mempool
 
@@ -631,10 +603,7 @@ module Make_s
         | Ok parsed_op -> (
             let* v =
               pre_filter
-                pv.shell
-                ~filter_config:pv.filter_config
-                ~filter_state:pv.filter_state
-                ~validation_state:pv.validation_state
+                pv
                 ~notifier:(mk_notifier pv.operation_stream)
                 parsed_op
             in
@@ -703,11 +672,10 @@ module Make_s
                 op.Operation.shell.branch
             else
               let notifier = mk_notifier pv.operation_stream in
-              let*! filter_state, validation_state, delta_mempool, to_handle =
+              let*! validation_state, delta_mempool, to_handle =
                 classify_operation
                   pv.shell
                   ~filter_config:pv.filter_config
-                  ~filter_state:pv.filter_state
                   ~validation_state:pv.validation_state
                   Mempool.empty
                   parsed_op
@@ -736,7 +704,6 @@ module Make_s
                   in
                   (* Call handle & update_advertised_mempool only if op is accepted *)
                   List.iter (handle_classification ~notifier pv.shell) to_handle ;
-                  pv.filter_state <- filter_state ;
                   pv.validation_state <- validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
@@ -787,18 +754,12 @@ module Make_s
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
       let* validation_state =
-        pv.shell.parameters.tools.create ~head:new_predecessor ~timestamp ()
+        pv.shell.parameters.tools.flush
+          ~head:new_predecessor
+          ~timestamp
+          pv.validation_state
       in
       pv.validation_state <- validation_state ;
-      let* filter_state =
-        Filter.Mempool.on_flush
-          pv.filter_config
-          pv.filter_state
-          ~validation_state:(Prevalidation_t.validation_state validation_state)
-          ~predecessor:(Store.Block.header new_predecessor)
-          ()
-      in
-      pv.filter_state <- filter_state ;
       let*! new_pending_operations =
         Classification.recycle_operations
           ~from_branch:old_predecessor
@@ -817,13 +778,7 @@ module Make_s
         Tezos_crypto.Operation_hash.Map.fold_s
           (fun _oph op (pending, nb_pending) ->
             let*! v =
-              pre_filter
-                pv.shell
-                ~filter_config:pv.filter_config
-                ~filter_state:pv.filter_state
-                ~validation_state:pv.validation_state
-                ~notifier:(mk_notifier pv.operation_stream)
-                op
+              pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
             in
             match v with
             | `Drop -> Lwt.return (pending, nb_pending)
@@ -895,8 +850,6 @@ module Make_s
           | `Prechecked, false ->
               pv.validation_state <-
                 Prevalidation_t.remove_operation pv.validation_state oph ;
-              pv.filter_state <-
-                Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
               return_unit)
 
     let on_ban pv oph_to_ban =
@@ -1323,16 +1276,12 @@ module Make
         pv.shell.fetching ;
       Lwt.return_unit
 
-    let mk_tools (chain_db : Distributed_db.chain_db) :
-        prevalidation_t Tools.tools =
+    let mk_tools (chain_db : Distributed_db.chain_db) : _ Tools.tools =
       let advertise_current_head ~mempool bh =
         Distributed_db.Advertise.current_head chain_db ~mempool bh
       in
       let chain_tools = mk_chain_tools chain_db in
-      let create ~head ~timestamp =
-        let chain_store = Distributed_db.chain_store chain_db in
-        Prevalidation_t.create chain_store ~head ~timestamp
-      in
+      let flush = Prevalidation_t.flush (Distributed_db.chain_store chain_db) in
       let fetch ?peer ?timeout oph =
         Distributed_db.Operation.fetch chain_db ?timeout ?peer oph ()
       in
@@ -1353,7 +1302,7 @@ module Make
       {
         advertise_current_head;
         chain_tools;
-        create;
+        flush;
         fetch;
         read_block;
         send_get_current_head;
@@ -1378,7 +1327,7 @@ module Make
       let timestamp_system = Tezos_base.Time.System.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
       let* validation_state =
-        Prevalidation_t.create chain_store ~head ~timestamp ()
+        Prevalidation_t.create chain_store ~head ~timestamp
       in
       let fetching =
         List.fold_left
@@ -1435,18 +1384,10 @@ module Make
       Shell_metrics.Mempool.set_unprocessed_collector (fun () ->
           Prevalidator_pending_operations.cardinal shell.pending |> float_of_int) ;
 
-      let* filter_state =
-        Filter.Mempool.init
-          Filter.Mempool.default_config
-          ~validation_state:(Prevalidation_t.validation_state validation_state)
-          ~predecessor:(Store.Block.header head)
-          ()
-      in
       let pv =
         {
           shell;
           validation_state;
-          filter_state;
           operation_stream = Lwt_watcher.create_input ();
           rpc_directory = build_rpc_directory w;
           filter_config =

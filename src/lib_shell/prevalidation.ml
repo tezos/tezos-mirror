@@ -113,8 +113,22 @@ module type T = sig
     chain_store ->
     head:Store.Block.t ->
     timestamp:Time.Protocol.t ->
-    unit ->
     t tzresult Lwt.t
+
+  val flush :
+    chain_store ->
+    head:Store.Block.t ->
+    timestamp:Time.Protocol.t ->
+    t ->
+    t tzresult Lwt.t
+
+  val pre_filter :
+    t ->
+    filter_config ->
+    protocol_operation Shell_operation.operation ->
+    [ `Passed_prefilter of Prevalidator_pending_operations.priority
+    | Prevalidator_classification.error_classification ]
+    Lwt.t
 
   type replacement =
     (Tezos_crypto.Operation_hash.t
@@ -123,25 +137,20 @@ module type T = sig
 
   type add_result =
     t
-    * filter_state
     * protocol_operation operation
     * Prevalidator_classification.classification
     * replacement
 
   val add_operation :
-    t ->
-    filter_state ->
-    filter_config ->
-    protocol_operation operation ->
-    add_result Lwt.t
+    t -> filter_config -> protocol_operation operation -> add_result Lwt.t
 
   val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
-
-  val validation_state : t -> validation_state
 
   module Internal_for_tests : sig
     val get_valid_operations :
       t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+
+    val get_filter_state : t -> filter_state
 
     type validation_info
 
@@ -172,15 +181,14 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
 
   type operation = protocol_operation Shell_operation.operation
 
-  type t = {
+  type create_aux_t = {
     validation_info : Proto.Mempool.validation_info;
     mempool : Proto.Mempool.t;
-    validation_state : validation_state; (* initial protocol validation_state *)
+    validation_state : validation_state;
+    head_header : Block_header.t;
   }
 
-  let create chain_store ~head ~timestamp () =
-    (* The prevalidation module receives input from the system byt handles
-       protocol values. It translates timestamps here. *)
+  let create_aux chain_store head timestamp =
     let open Lwt_result_syntax in
     let* head_context = Chain_store.context chain_store head in
     let head_hash = Store.Block.hash head in
@@ -191,7 +199,8 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
         timestamp
     in
     let chain_id = Chain_store.chain_id chain_store in
-    let head = (Store.Block.header head).shell in
+    let head_header = Store.Block.header head in
+    let head = head_header.shell in
     let* validation_info, mempool =
       Proto.Mempool.init head_context chain_id ~head_hash ~head ~cache:`Lazy
     in
@@ -203,7 +212,52 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
         ~predecessor:head
         ~cache:`Lazy
     in
-    return {validation_info; mempool; validation_state}
+    return {validation_info; mempool; validation_state; head_header}
+
+  type t = {
+    validation_info : Proto.Mempool.validation_info;
+    mempool : Proto.Mempool.t;
+    validation_state : validation_state; (* initial protocol validation_state *)
+    filter_state : Filter.Mempool.state;
+  }
+
+  let create chain_store ~head ~timestamp =
+    let open Lwt_result_syntax in
+    let* {validation_info; mempool; validation_state; head_header} =
+      create_aux chain_store head timestamp
+    in
+    let* filter_state =
+      Filter.Mempool.init
+        Filter.Mempool.default_config
+        ~validation_state
+        ~predecessor:head_header
+        ()
+    in
+    return {validation_info; mempool; validation_state; filter_state}
+
+  let flush chain_store ~head ~timestamp old_state =
+    let open Lwt_result_syntax in
+    let* {validation_info; mempool; validation_state; head_header} =
+      create_aux chain_store head timestamp
+    in
+    let* filter_state =
+      Filter.Mempool.on_flush
+        (* The config is ignored in [Filter.Mempool.on_flush] anyway,
+           and will no longer be an argument in the next commit. *)
+        Filter.Mempool.default_config
+        old_state.filter_state
+        ~validation_state
+        ~predecessor:head_header
+        ()
+    in
+    return {validation_info; mempool; validation_state; filter_state}
+
+  let pre_filter state filter_config op =
+    Filter.Mempool.pre_filter
+      ~filter_state:state.filter_state
+      ~validation_state_before:state.validation_state
+      filter_config
+      op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 
@@ -212,7 +266,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
   type replacement =
     (Tezos_crypto.Operation_hash.t * error_classification) option
 
-  type add_result = t * filter_state * operation * classification * replacement
+  type add_result = t * operation * classification * replacement
 
   let classification_of_trace trace =
     match classify_trace trace with
@@ -272,9 +326,9 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
       (but not both: if the protocol already causes a replacement, then
       the mempool is no longer full so there cannot be a
       [full_mempool_replacement]. *)
-  let enforce_mempool_bound_and_update_states state filter_state filter_config
+  let enforce_mempool_bound_and_update_states state filter_config
       (mempool, proto_add_result) op :
-      (t * filter_state * replacement, error_classification) result Lwt.t =
+      (t * replacement, error_classification) result Lwt.t =
     let open Lwt_result_syntax in
     let*? proto_replacement = translate_proto_add_result proto_add_result op in
     let* filter_state, full_mempool_replacement =
@@ -282,7 +336,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
         ?replace:(Option.map fst proto_replacement)
         state.validation_state
         filter_config
-        filter_state
+        state.filter_state
         (op.hash, op.protocol)
     in
     let mempool =
@@ -300,11 +354,10 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
              mempool before adding [op] so the mempool cannot be full. *)
           assert false
     in
-    return ({state with mempool}, filter_state, replacement)
+    return ({state with mempool; filter_state}, replacement)
 
-  let add_operation_result state filter_state filter_config op :
-      (t * filter_state * operation * classification * replacement) tzresult
-      Lwt.t =
+  let add_operation_result state filter_config op :
+      (t * operation * classification * replacement) tzresult Lwt.t =
     let open Lwt_result_syntax in
     let conflict_handler = Filter.Mempool.conflict_handler filter_config in
     let* proto_output = proto_add_operation ~conflict_handler state op in
@@ -320,36 +373,34 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     let*! res =
       enforce_mempool_bound_and_update_states
         state
-        filter_state
         filter_config
         proto_output
         op
     in
     match res with
-    | Ok (state, filter_state, replacement) ->
-        return (state, filter_state, op, `Prechecked, replacement)
-    | Error err_class ->
-        return (state, filter_state, op, (err_class :> classification), None)
+    | Ok (state, replacement) -> return (state, op, `Prechecked, replacement)
+    | Error err_class -> return (state, op, (err_class :> classification), None)
 
-  let add_operation state filter_state filter_config op : add_result Lwt.t =
+  let add_operation state filter_config op : add_result Lwt.t =
     let open Lwt_syntax in
     let* res =
-      protect (fun () ->
-          add_operation_result state filter_state filter_config op)
+      protect (fun () -> add_operation_result state filter_config op)
     in
     match res with
     | Ok add_result -> return add_result
-    | Error trace ->
-        return (state, filter_state, op, classification_of_trace trace, None)
+    | Error trace -> return (state, op, classification_of_trace trace, None)
 
   let remove_operation state oph =
     let mempool = Proto.Mempool.remove_operation state.mempool oph in
-    {state with mempool}
-
-  let validation_state {validation_state; _} = validation_state
+    let filter_state =
+      Filter.Mempool.remove ~filter_state:state.filter_state oph
+    in
+    {state with mempool; filter_state}
 
   module Internal_for_tests = struct
     let get_valid_operations {mempool; _} = Proto.Mempool.operations mempool
+
+    let get_filter_state {filter_state; _} = filter_state
 
     type validation_info = Proto.Mempool.validation_info
 
