@@ -37,19 +37,12 @@ module type FILTER = sig
     type state
 
     val init :
-      config ->
-      ?validation_state:Proto.validation_state ->
-      predecessor:Tezos_base.Block_header.t ->
-      unit ->
+      Tezos_protocol_environment.Context.t ->
+      head:Tezos_base.Block_header.shell_header ->
       state tzresult Lwt.t
 
-    val on_flush :
-      config ->
-      state ->
-      ?validation_state:Proto.validation_state ->
-      predecessor:Tezos_base.Block_header.t ->
-      unit ->
-      state tzresult Lwt.t
+    val flush :
+      state -> head:Tezos_base.Block_header.shell_header -> state tzresult Lwt.t
 
     val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
 
@@ -101,13 +94,11 @@ module No_filter (Proto : Registered_protocol.T) :
 
     type state = unit
 
-    let init _ ?validation_state:_ ~predecessor:_ () =
-      Lwt_result_syntax.return_unit
+    let init _ ~head:_ = Lwt_result_syntax.return_unit
 
     let remove ~filter_state _ = filter_state
 
-    let on_flush _ _ ?validation_state:_ ~predecessor:_ () =
-      Lwt_result_syntax.return_unit
+    let flush _ ~head:_ = Lwt_result_syntax.return_unit
 
     let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =
       Lwt.return @@ `Passed_prefilter (`Low [])

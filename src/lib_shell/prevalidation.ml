@@ -185,34 +185,34 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     validation_info : Proto.Mempool.validation_info;
     mempool : Proto.Mempool.t;
     validation_state : validation_state;
-    head_header : Block_header.t;
+    head : Block_header.shell_header;
+    context : Tezos_protocol_environment.Context.t;
   }
 
   let create_aux chain_store head timestamp =
     let open Lwt_result_syntax in
-    let* head_context = Chain_store.context chain_store head in
+    let* context = Chain_store.context chain_store head in
     let head_hash = Store.Block.hash head in
-    let*! head_context =
+    let*! context =
       Block_validation.update_testchain_status
-        head_context
+        context
         ~predecessor_hash:head_hash
         timestamp
     in
     let chain_id = Chain_store.chain_id chain_store in
-    let head_header = Store.Block.header head in
-    let head = head_header.shell in
+    let head = (Store.Block.header head).shell in
     let* validation_info, mempool =
-      Proto.Mempool.init head_context chain_id ~head_hash ~head ~cache:`Lazy
+      Proto.Mempool.init context chain_id ~head_hash ~head ~cache:`Lazy
     in
     let* validation_state =
       Proto.begin_validation
-        head_context
+        context
         chain_id
         (Partial_construction {predecessor_hash = head_hash; timestamp})
         ~predecessor:head
         ~cache:`Lazy
     in
-    return {validation_info; mempool; validation_state; head_header}
+    return {validation_info; mempool; validation_state; head; context}
 
   type t = {
     validation_info : Proto.Mempool.validation_info;
@@ -223,33 +223,18 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
 
   let create chain_store ~head ~timestamp =
     let open Lwt_result_syntax in
-    let* {validation_info; mempool; validation_state; head_header} =
+    let* {validation_info; mempool; validation_state; head; context} =
       create_aux chain_store head timestamp
     in
-    let* filter_state =
-      Filter.Mempool.init
-        Filter.Mempool.default_config
-        ~validation_state
-        ~predecessor:head_header
-        ()
-    in
+    let* filter_state = Filter.Mempool.init context ~head in
     return {validation_info; mempool; validation_state; filter_state}
 
   let flush chain_store ~head ~timestamp old_state =
     let open Lwt_result_syntax in
-    let* {validation_info; mempool; validation_state; head_header} =
+    let* {validation_info; mempool; validation_state; head; context = _} =
       create_aux chain_store head timestamp
     in
-    let* filter_state =
-      Filter.Mempool.on_flush
-        (* The config is ignored in [Filter.Mempool.on_flush] anyway,
-           and will no longer be an argument in the next commit. *)
-        Filter.Mempool.default_config
-        old_state.filter_state
-        ~validation_state
-        ~predecessor:head_header
-        ()
-    in
+    let* filter_state = Filter.Mempool.flush old_state.filter_state ~head in
     return {validation_info; mempool; validation_state; filter_state}
 
   let pre_filter state filter_config op =

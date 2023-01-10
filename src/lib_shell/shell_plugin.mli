@@ -41,25 +41,21 @@ module type FILTER = sig
     (** Internal state of the prevalidator filter *)
     type state
 
-    (** [init config ?validation_state ~predecessor] is called once when
-        a prevalidator starts. *)
+    (** Create an empty [state].
+
+        Called only once when a prevalidator starts. *)
     val init :
-      config ->
-      ?validation_state:Proto.validation_state ->
-      predecessor:Tezos_base.Block_header.t ->
-      unit ->
+      Tezos_protocol_environment.Context.t ->
+      head:Tezos_base.Block_header.shell_header ->
       state tzresult Lwt.t
 
-    (** [on_flush config state ?validation_state ~predecessor] is called when
-        a flush in the prevalidator is triggered. It resets part of the
-        [state]. *)
-    val on_flush :
-      config ->
-      state ->
-      ?validation_state:Proto.validation_state ->
-      predecessor:Tezos_base.Block_header.t ->
-      unit ->
-      state tzresult Lwt.t
+    (** Create a new empty [state] based on [head].
+
+        Parts of the old [state] are recycled, so that this function
+        is more efficient than [init] and does not need a
+        [Tezos_protocol_environment.Context.t] argument. *)
+    val flush :
+      state -> head:Tezos_base.Block_header.shell_header -> state tzresult Lwt.t
 
     (** [remove ~filter_state oph] removes the operation manager linked to
         [oph] from the state of the filter *)

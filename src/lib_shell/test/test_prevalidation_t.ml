@@ -401,10 +401,9 @@ module Toy_filter = struct
 
     type state = Operation_hash.Set.t
 
-    let init _ ?validation_state:_ ~predecessor:_ () =
-      Lwt_result.return Operation_hash.Set.empty
+    let init _ ~head:_ = Lwt_result.return Operation_hash.Set.empty
 
-    let on_flush _ _ ?validation_state:_ ~predecessor:_ () = assert false
+    let flush _ ~head:_ = assert false
 
     let remove ~filter_state:_ _ = assert false
 

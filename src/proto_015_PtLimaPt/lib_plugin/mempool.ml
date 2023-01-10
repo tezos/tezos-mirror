@@ -210,16 +210,15 @@ end)
 
 (** Static information to store in the filter state. *)
 type state_info = {
-  grandparent_level_start : Timestamp.t;
+  head : Block_header.shell_header;
+  round_durations : Round.round_durations;
+  head_round : Round.t;
   round_zero_duration : Period.t;
-  proposal_round : Round.t;
-  alpha_ctxt : Alpha_context.t;
-      (** Protocol context at the initialization of the mempool filter.
-          Note that it never gets updated. *)
+  grandparent_level_start : Timestamp.t;
 }
 
-type state = {
-  state_info : state_info option;
+(** State that tracks validated manager operations. *)
+type ops_state = {
   prechecked_manager_op_count : int;
       (** Number of prechecked manager operations.
           Invariants:
@@ -238,66 +237,82 @@ type state = {
             - [min_prechecked_op_weight = min { x | x \in prechecked_op_weights }] *)
 }
 
-let empty : state =
+type state = {state_info : state_info; ops_state : ops_state}
+
+let empty_ops_state =
   {
-    state_info = None;
     prechecked_manager_op_count = 0;
     prechecked_manager_ops = Tezos_crypto.Operation_hash.Map.empty;
     prechecked_op_weights = ManagerOpWeightSet.empty;
     min_prechecked_op_weight = None;
   }
 
-let init config ?(validation_state : validation_state option) ~predecessor () =
-  ignore config ;
-  (match validation_state with
-  | None -> return empty
-  | Some validation_state ->
-      let ctxt = Validate.get_initial_ctxt validation_state in
-      let {
-        Tezos_base.Block_header.fitness = predecessor_fitness;
-        timestamp = predecessor_timestamp;
-        _;
-      } =
-        predecessor.Tezos_base.Block_header.shell
-      in
-      Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
-      >>?= fun grandparent_round ->
-      Alpha_context.Fitness.round_from_raw predecessor_fitness
-      >>?= fun predecessor_round ->
-      let round_durations = Constants.round_durations ctxt in
-      let round_zero_duration =
-        Round.round_duration round_durations Round.zero
-      in
-      Round.level_offset_of_round
-        round_durations
-        ~round:Round.(succ grandparent_round)
-      >>?= fun proposal_level_offset ->
-      Round.level_offset_of_round round_durations ~round:predecessor_round
-      >>?= fun proposal_round_offset ->
-      Period.(add proposal_level_offset proposal_round_offset)
-      >>?= fun proposal_offset ->
-      let state_info =
-        {
-          grandparent_level_start =
-            Timestamp.(predecessor_timestamp - proposal_offset);
-          round_zero_duration;
-          proposal_round = predecessor_round;
-          alpha_ctxt = ctxt;
-        }
-      in
-      return {empty with state_info = Some state_info})
-  >|= Environment.wrap_tzresult
+let init_state_prototzresult ~head round_durations =
+  let open Lwt_result_syntax in
+  let*? head_round =
+    Alpha_context.Fitness.round_from_raw head.Tezos_base.Block_header.fitness
+  in
+  let round_zero_duration = Round.round_duration round_durations Round.zero in
+  let*? grandparent_round =
+    Alpha_context.Fitness.predecessor_round_from_raw head.fitness
+  in
+  let*? proposal_level_offset =
+    Round.level_offset_of_round
+      round_durations
+      ~round:Round.(succ grandparent_round)
+  in
+  let*? proposal_round_offset =
+    Round.level_offset_of_round round_durations ~round:head_round
+  in
+  let*? proposal_offset =
+    Period.(add proposal_level_offset proposal_round_offset)
+  in
+  let grandparent_level_start = Timestamp.(head.timestamp - proposal_offset) in
+  let state_info =
+    {
+      head;
+      round_durations;
+      head_round;
+      round_zero_duration;
+      grandparent_level_start;
+    }
+  in
+  return {state_info; ops_state = empty_ops_state}
+
+let init_state ~head round_durations =
+  Lwt.map
+    Environment.wrap_tzresult
+    (init_state_prototzresult ~head round_durations)
+
+let init context ~(head : Tezos_base.Block_header.shell_header) =
+  let open Lwt_result_syntax in
+  let* ( ctxt,
+         (_ : Receipt.balance_updates),
+         (_ : Migration.origination_result list) ) =
+    prepare
+      context
+      ~level:(Int32.succ head.level)
+      ~predecessor_timestamp:head.timestamp
+      ~timestamp:head.timestamp
+    |> Lwt.map Environment.wrap_tzresult
+  in
+  let round_durations = Constants.round_durations ctxt in
+  init_state ~head round_durations
+
+let flush old_state ~head =
+  (* To avoid the need to prepare a context as in [init], we retrieve
+     the [round_durations] from the previous state. Indeed, they are
+     only determined by the [minimal_block_delay] and
+     [delay_increment_per_round] constants (see
+     {!Raw_context.prepare}), and all the constants remain unchanged
+     during the lifetime of a protocol. *)
+  init_state ~head old_state.state_info.round_durations
 
 let manager_prio p = `Low p
 
 let consensus_prio = `High
 
 let other_prio = `Medium
-
-let on_flush config filter_state ?(validation_state : validation_state option)
-    ~predecessor () =
-  ignore (filter_state : state) ;
-  init config ?validation_state ~predecessor ()
 
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
@@ -485,8 +500,7 @@ let required_fee_manager_operation_weight ~op_resources ~min_weight =
       be prechecked and return said weight. In the case where the prechecked
       mempool is full, return an error if the weight is too small, or return the
       operation to be replaced otherwise. *)
-let check_minimal_weight ?validation_state config filter_state ~fee ~gas_limit
-    op =
+let check_minimal_weight ?validation_state config ops_state ~fee ~gas_limit op =
   match validation_state with
   | None -> `Weight_ok (`No_replace, [])
   | Some validation_state -> (
@@ -498,13 +512,13 @@ let check_minimal_weight ?validation_state config filter_state ~fee ~gas_limit
           op
       in
       if
-        filter_state.prechecked_manager_op_count
+        ops_state.prechecked_manager_op_count
         < config.max_prechecked_manager_operations
       then
         (* The precheck mempool is not full yet *)
         `Weight_ok (`No_replace, [weight])
       else
-        match filter_state.min_prechecked_op_weight with
+        match ops_state.min_prechecked_op_weight with
         | None ->
             (* The precheck mempool is empty *)
             `Weight_ok (`No_replace, [weight])
@@ -577,7 +591,7 @@ let pre_filter_manager :
             check_minimal_weight
               ?validation_state:validation_state_before
               config
-              filter_state
+              filter_state.ops_state
               ~fee
               ~gas_limit
               packed_op
@@ -751,35 +765,26 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
 
 let pre_filter_far_future_consensus_ops config ~filter_state
     ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t =
-  match filter_state.state_info with
-  | None -> Lwt.return_true
-  | Some state_info -> (
-      (let proposal_timestamp = Timestamp.predecessor state_info.alpha_ctxt in
-       let now_timestamp = Time.System.now () |> Time.System.to_protocol in
-       let Level.{level; _} = Level.current state_info.alpha_ctxt in
-       let proposal_level =
-         match Raw_level.pred level with
-         | None ->
-             (* mempool level is set to the successor of the current head *)
-             assert false
-         | Some proposal_level -> proposal_level
-       in
-       let round_durations = Constants.round_durations state_info.alpha_ctxt in
-       Lwt.return
-       @@ acceptable_op
-            ~config
-            ~round_durations
-            ~round_zero_duration:state_info.round_zero_duration
-            ~proposal_level
-            ~proposal_round:state_info.proposal_round
-            ~proposal_timestamp
-            ~proposal_predecessor_level_start:state_info.grandparent_level_start
-            ~op_level
-            ~op_round
-            ~now_timestamp)
-      >>= function
-      | Ok b -> Lwt.return b
-      | _ -> Lwt.return_false)
+  let res =
+    let open Result_syntax in
+    let now_timestamp = Time.System.now () |> Time.System.to_protocol in
+    let* proposal_level =
+      Raw_level.of_int32 filter_state.state_info.head.level
+    in
+    acceptable_op
+      ~config
+      ~round_durations:filter_state.state_info.round_durations
+      ~round_zero_duration:filter_state.state_info.round_zero_duration
+      ~proposal_level
+      ~proposal_round:filter_state.state_info.head_round
+      ~proposal_timestamp:filter_state.state_info.head.timestamp
+      ~proposal_predecessor_level_start:
+        filter_state.state_info.grandparent_level_start
+      ~op_level
+      ~op_round
+      ~now_timestamp
+  in
+  match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
 
 (** A quasi infinite amount of "valid" (pre)endorsements could be
       sent by a committee member, one for each possible round number.
@@ -835,31 +840,31 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
-(** Remove a manager operation hash from the filter state.
+(** Remove a manager operation hash from the ops_state.
     Do nothing if the operation was not in the state. *)
-let remove ~filter_state oph =
+let remove_operation ops_state oph =
   match
-    Tezos_crypto.Operation_hash.Map.find oph filter_state.prechecked_manager_ops
+    Tezos_crypto.Operation_hash.Map.find oph ops_state.prechecked_manager_ops
   with
   | None ->
-      (* Not present in the filter_state: nothing to do. *)
-      filter_state
+      (* Not present in the ops_state: nothing to do. *)
+      ops_state
   | Some info ->
       let prechecked_manager_ops =
         Tezos_crypto.Operation_hash.Map.remove
           oph
-          filter_state.prechecked_manager_ops
+          ops_state.prechecked_manager_ops
       in
       let prechecked_manager_op_count =
-        filter_state.prechecked_manager_op_count - 1
+        ops_state.prechecked_manager_op_count - 1
       in
       let prechecked_op_weights =
         ManagerOpWeightSet.remove
           (mk_op_weight oph info)
-          filter_state.prechecked_op_weights
+          ops_state.prechecked_op_weights
       in
       let min_prechecked_op_weight =
-        match filter_state.min_prechecked_op_weight with
+        match ops_state.min_prechecked_op_weight with
         | None -> None
         | Some min_op_weight ->
             if
@@ -868,46 +873,49 @@ let remove ~filter_state oph =
             else Some min_op_weight
       in
       {
-        filter_state with
         prechecked_manager_op_count;
         prechecked_manager_ops;
         prechecked_op_weights;
         min_prechecked_op_weight;
       }
 
+(** Remove a manager operation hash from the ops_state.
+    Do nothing if the operation was not in the state. *)
+let remove ~filter_state oph =
+  {filter_state with ops_state = remove_operation filter_state.ops_state oph}
+
 (** Add a manager operation hash and information to the filter state.
     Do nothing if the operation is already present in the state. *)
-let add_manager_op filter_state oph info replacement =
-  let filter_state =
+let add_manager_op ops_state oph info replacement =
+  let ops_state =
     match replacement with
-    | `No_replace -> filter_state
-    | `Replace (oph, _classification) -> remove ~filter_state oph
+    | `No_replace -> ops_state
+    | `Replace (oph, _classification) -> remove_operation ops_state oph
   in
-  if Tezos_crypto.Operation_hash.Map.mem oph filter_state.prechecked_manager_ops
-  then (* Already present in the filter_state: nothing to do. *)
-    filter_state
+  if Tezos_crypto.Operation_hash.Map.mem oph ops_state.prechecked_manager_ops
+  then (* Already present in the ops_state: nothing to do. *)
+    ops_state
   else
     let prechecked_manager_op_count =
-      filter_state.prechecked_manager_op_count + 1
+      ops_state.prechecked_manager_op_count + 1
     in
     let prechecked_manager_ops =
       Tezos_crypto.Operation_hash.Map.add
         oph
         info
-        filter_state.prechecked_manager_ops
+        ops_state.prechecked_manager_ops
     in
     let op_weight = mk_op_weight oph info in
     let prechecked_op_weights =
-      ManagerOpWeightSet.add op_weight filter_state.prechecked_op_weights
+      ManagerOpWeightSet.add op_weight ops_state.prechecked_op_weights
     in
     let min_prechecked_op_weight =
-      match filter_state.min_prechecked_op_weight with
+      match ops_state.min_prechecked_op_weight with
       | Some old_min when compare_manager_op_weight old_min op_weight <= 0 ->
           Some old_min
       | _ -> Some op_weight
     in
     {
-      filter_state with
       prechecked_manager_op_count;
       prechecked_manager_ops;
       prechecked_op_weights;
@@ -927,7 +935,7 @@ let add_manager_op_and_enforce_mempool_bound validation_state config
       check_minimal_weight
         ~validation_state
         config
-        filter_state
+        filter_state.ops_state
         ~fee
         ~gas_limit
         (Operation_data op.protocol_data)
@@ -956,8 +964,8 @@ let add_manager_op_and_enforce_mempool_bound validation_state config
   in
   let weight = match weight with [x] -> x | _ -> assert false in
   let info = {manager_op = Manager_op op; gas_limit; fee; weight} in
-  let filter_state = add_manager_op filter_state oph info replacement in
-  return (filter_state, replacement)
+  let ops_state = add_manager_op filter_state.ops_state oph info replacement in
+  return ({filter_state with ops_state}, replacement)
 
 (** If the provided operation is a manager operation, add it to the
     filter_state. If the mempool is full, either return an error if the
