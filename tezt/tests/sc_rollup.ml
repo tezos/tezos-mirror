@@ -3735,14 +3735,14 @@ let test_rpcs ~kind =
   let l2_block_hash = JSON.as_string l2_block_hash in
   Check.((l1_block_hash = l2_block_hash) string)
     ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
-  let* l1_block_hash =
+  let* l1_block_hash_5 =
     RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
-  let*! l2_block_hash =
+  let*! l2_block_hash_5 =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "5"; "hash"]
   in
-  let l2_block_hash = JSON.as_string l2_block_hash in
-  Check.((l1_block_hash = l2_block_hash) string)
+  let l2_block_hash_5 = JSON.as_string l2_block_hash_5 in
+  Check.((l1_block_hash_5 = l2_block_hash_5) string)
     ~error_msg:"Block 5 on L1 is %L where as on L2 it is %R" ;
   let*! l2_finalied_block_level =
     Sc_rollup_client.rpc_get
@@ -3793,6 +3793,12 @@ let test_rpcs ~kind =
   let*! _level =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_level"]
   in
+  let*! l2_block =
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "head"]
+  in
+  let l2_block_hash' = JSON.(l2_block |-> "block_hash" |> as_string) in
+  Check.((l2_block_hash' = l2_block_hash) string)
+    ~error_msg:"L2 head is from full block is %L but should be %R" ;
   unit
 
 let test_messages_processed_by_commitment ~kind =

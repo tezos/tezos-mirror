@@ -35,6 +35,7 @@ let replace_variables string =
          Remove this regexp as soon as the WASM PVM stabilizes. *)
       ("srs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
       ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
+      ("SRCo\\w{50}\\b", "[SC_ROLLUP_CONTEXT_HASH]");
       ("Co\\w{50}\\b", "[CONTEXT_HASH]");
       ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
       ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
