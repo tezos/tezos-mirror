@@ -271,7 +271,7 @@ let commands () =
       (fun ( trace_exec,
              amount,
              balance,
-             source,
+             sender,
              payer,
              self,
              no_print_source,
@@ -299,7 +299,7 @@ let commands () =
                 program;
                 storage;
                 shared_params =
-                  {input; unparsing_mode; now; level; source; payer; gas};
+                  {input; unparsing_mode; now; level; sender; payer; gas};
                 entrypoint;
                 self;
               }
@@ -317,7 +317,7 @@ let commands () =
                 program;
                 storage;
                 shared_params =
-                  {input; unparsing_mode; now; level; source; payer; gas};
+                  {input; unparsing_mode; now; level; sender; payer; gas};
                 entrypoint;
                 self;
               }
@@ -1095,7 +1095,7 @@ let commands () =
       @@ prefixes ["with"; "input"]
       @@ param ~name:"input" ~desc:"the input data" data_parameter
       @@ stop)
-      (fun (source, payer, gas, unparsing_mode, now, level)
+      (fun (sender, payer, gas, unparsing_mode, now, level)
            entrypoint
            contract
            input
@@ -1108,7 +1108,7 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
+                {input; unparsing_mode; now; level; sender; payer; gas};
               contract;
               entrypoint;
             }
@@ -1132,7 +1132,7 @@ let commands () =
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ stop)
-      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+      (fun (sender, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            contract
            cctxt ->
@@ -1148,7 +1148,7 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
+                {input; unparsing_mode; now; level; sender; payer; gas};
               contract;
               view;
               unlimited_gas;
@@ -1178,7 +1178,7 @@ let commands () =
            ~desc:"the argument provided to the view"
            data_parameter
       @@ stop)
-      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+      (fun (sender, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            contract
            input
@@ -1191,7 +1191,7 @@ let commands () =
             ~block:cctxt#block
             {
               shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
+                {input; unparsing_mode; now; level; sender; payer; gas};
               contract;
               view;
               unlimited_gas;

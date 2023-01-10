@@ -347,7 +347,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
       let step_constants =
         let open Script_interpreter in
         {
-          source = sender;
+          sender;
           payer;
           self = contract_hash;
           amount;
@@ -2092,7 +2092,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 since they are not used within the CPMM default
                 entrypoint. *)
              {
-               source = Destination.Contract liquidity_baking_cpmm_contract;
+               sender = Destination.Contract liquidity_baking_cpmm_contract;
                payer = Signature.Public_key_hash.zero;
                self = liquidity_baking_cpmm_contract_hash;
                amount = liquidity_baking_subsidy;

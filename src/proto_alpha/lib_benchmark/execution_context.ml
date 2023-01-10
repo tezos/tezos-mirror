@@ -59,12 +59,12 @@ let make ~rng_state =
   let open Script_interpreter in
   (match context with
   | `Mem_block (block, (bs1, _, _, _, _)) ->
-      let source = Alpha_context.Destination.Contract bs1 in
+      let sender = Alpha_context.Destination.Contract bs1 in
       let payer = Contract_helpers.default_payer in
       let self = Contract_helpers.default_self in
       let step_constants =
         {
-          source;
+          sender;
           payer;
           self;
           amount;

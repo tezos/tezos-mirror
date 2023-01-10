@@ -181,6 +181,8 @@ module Scripts = struct
            (req "amount" Tez.encoding)
            (opt "balance" Tez.encoding)
            (req "chain_id" Chain_id.encoding)
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+              Rename the "source" field into "sender" *)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
@@ -240,6 +242,8 @@ module Scripts = struct
         (req "entrypoint" Entrypoint.simple_encoding)
         (req "input" Script.expr_encoding)
         (req "chain_id" Chain_id.encoding)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+           Rename the "source" field into "sender" *)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.implicit_encoding)
         (opt "gas" Gas.Arith.z_integral_encoding)
@@ -256,6 +260,8 @@ module Scripts = struct
            (req "input" Script.expr_encoding)
            (dft "unlimited_gas" bool false)
            (req "chain_id" Chain_id.encoding)
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+              Rename the "source" field into "sender" *)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.implicit_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
@@ -1004,7 +1010,7 @@ module Scripts = struct
     balance : Tez.t;
     self : Contract_hash.t;
     payer : Signature.public_key_hash;
-    source : Contract.t;
+    sender : Contract.t;
   }
 
   (* 4_000_000 ꜩ *)
@@ -1030,15 +1036,16 @@ module Scripts = struct
         balance
       >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
     in
-    let source_and_payer ~src_opt ~pay_opt ~default_src =
-      match (src_opt, pay_opt) with
+    let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
+      match (sender_opt, payer_opt) with
       | None, None ->
-          (Contract.Originated default_src, Signature.Public_key_hash.zero)
+          (Contract.Originated default_sender, Signature.Public_key_hash.zero)
       | Some c, None -> (c, Signature.Public_key_hash.zero)
       | None, Some c -> (Contract.Implicit c, c)
-      | Some src, Some pay -> (src, pay)
+      | Some sender, Some payer -> (sender, payer)
     in
-    let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
+    let configure_contracts ctxt script balance ~sender_opt ~payer_opt ~self_opt
+        =
       (match self_opt with
       | None ->
           let balance = Option.value ~default:default_balance balance in
@@ -1051,10 +1058,10 @@ module Scripts = struct
             balance
           >>=? fun bal -> return (ctxt, addr, bal))
       >>=? fun (ctxt, self, balance) ->
-      let source, payer =
-        source_and_payer ~src_opt ~pay_opt ~default_src:self
+      let sender, payer =
+        sender_and_payer ~sender_opt ~payer_opt ~default_sender:self
       in
-      return (ctxt, {balance; self; source; payer})
+      return (ctxt, {balance; self; sender; payer})
     in
     let script_entrypoint_type ctxt expr entrypoint =
       let ctxt = Gas.set_unlimited ctxt in
@@ -1098,8 +1105,8 @@ module Scripts = struct
             amount,
             balance,
             chain_id,
-            src_opt,
-            pay_opt,
+            sender_opt,
+            payer_opt,
             self_opt,
             entrypoint ),
           (unparsing_mode, gas, now, level) )
@@ -1111,10 +1118,10 @@ module Scripts = struct
           ctxt
           {storage; code}
           balance
-          ~src_opt
-          ~pay_opt
+          ~sender_opt
+          ~payer_opt
           ~self_opt
-        >>=? fun (ctxt, {self; source; payer; balance}) ->
+        >>=? fun (ctxt, {self; sender; payer; balance}) ->
         let gas =
           match gas with
           | Some gas -> gas
@@ -1133,8 +1140,8 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
-          let source = Destination.Contract source in
-          {source; payer; self; amount; balance; chain_id; now; level}
+          let sender = Destination.Contract sender in
+          {sender; payer; self; amount; balance; chain_id; now; level}
         in
         Script_interpreter.execute
           ctxt
@@ -1170,8 +1177,8 @@ module Scripts = struct
             amount,
             balance,
             chain_id,
-            src_opt,
-            pay_opt,
+            sender_opt,
+            payer_opt,
             self_opt,
             entrypoint ),
           (unparsing_mode, gas, now, level) )
@@ -1183,10 +1190,10 @@ module Scripts = struct
           ctxt
           {storage; code}
           balance
-          ~src_opt
-          ~pay_opt
+          ~sender_opt
+          ~payer_opt
           ~self_opt
-        >>=? fun (ctxt, {self; source; payer; balance}) ->
+        >>=? fun (ctxt, {self; sender; payer; balance}) ->
         let gas =
           match gas with
           | Some gas -> gas
@@ -1205,8 +1212,8 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
-          let source = Destination.Contract source in
-          {source; payer; self; amount; balance; chain_id; now; level}
+          let sender = Destination.Contract sender in
+          {sender; payer; self; amount; balance; chain_id; now; level}
         in
         let module Unparsing_mode = struct
           let unparsing_mode = unparsing_mode
@@ -1243,8 +1250,8 @@ module Scripts = struct
           entrypoint,
           input,
           chain_id,
-          src_opt,
-          pay_opt,
+          sender_opt,
+          payer_opt,
           gas,
           unparsing_mode,
           now,
@@ -1268,8 +1275,8 @@ module Scripts = struct
              (View_helpers.make_tzip4_viewer_script ty)
              Tez.zero
         >>=? fun (ctxt, viewer_contract) ->
-        let source, payer =
-          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
+        let sender, payer =
+          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
         in
         let gas =
           Option.value
@@ -1289,9 +1296,9 @@ module Scripts = struct
         in
         let step_constants =
           let open Script_interpreter in
-          let source = Destination.Contract source in
+          let sender = Destination.Contract sender in
           {
-            source;
+            sender;
             payer;
             self = contract_hash;
             amount = Tez.zero;
@@ -1341,8 +1348,8 @@ module Scripts = struct
             input,
             unlimited_gas,
             chain_id,
-            src_opt,
-            pay_opt,
+            sender_opt,
+            payer_opt,
             gas,
             unparsing_mode,
             now ),
@@ -1359,8 +1366,8 @@ module Scripts = struct
         script_view_type ctxt contract_hash decoded_script view
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
-        let source, payer =
-          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
+        let sender, payer =
+          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
         in
         let now =
           match now with None -> Script_timestamp.now ctxt | Some t -> t
@@ -1388,9 +1395,9 @@ module Scripts = struct
              |> Script_int.of_int32 |> Script_int.abs)
         in
         let step_constants =
-          let source = Destination.Contract source in
+          let sender = Destination.Contract sender in
           {
-            Script_interpreter.source;
+            Script_interpreter.sender;
             payer;
             self = contract_hash;
             amount = Tez.zero;
@@ -1620,7 +1627,7 @@ module Scripts = struct
                 [] ) ))
 
   let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ?balance
-      ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self ~now ~level
+      ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self ~now ~level
       ctxt block =
     RPC_context.make_call0
       S.run_code
@@ -1633,14 +1640,14 @@ module Scripts = struct
           amount,
           balance,
           chain_id,
-          source,
+          sender,
           payer,
           self,
           entrypoint ),
         (unparsing_mode, gas, now, level) )
 
   let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
-      ?balance ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self
+      ?balance ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self
       ~now ~level ctxt block =
     RPC_context.make_call0
       S.trace_code
@@ -1653,14 +1660,14 @@ module Scripts = struct
           amount,
           balance,
           chain_id,
-          source,
+          sender,
           payer,
           self,
           entrypoint ),
         (unparsing_mode, gas, now, level) )
 
   let run_tzip4_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level
-      ?source ?payer ~unparsing_mode ctxt block =
+      ?sender ?payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_tzip4_view
       ctxt
@@ -1670,7 +1677,7 @@ module Scripts = struct
         entrypoint,
         input,
         chain_id,
-        source,
+        sender,
         payer,
         gas,
         unparsing_mode,
@@ -1680,7 +1687,7 @@ module Scripts = struct
   (** [run_script_view] is an helper function to call the corresponding
         RPC. [unlimited_gas] is set to [false] by default. *)
   let run_script_view ?gas ~contract ~view ~input ?(unlimited_gas = false)
-      ~chain_id ~now ~level ?source ?payer ~unparsing_mode ctxt block =
+      ~chain_id ~now ~level ?sender ?payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_script_view
       ctxt
@@ -1691,7 +1698,7 @@ module Scripts = struct
           input,
           unlimited_gas,
           chain_id,
-          source,
+          sender,
           payer,
           gas,
           unparsing_mode,

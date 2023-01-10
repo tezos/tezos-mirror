@@ -3304,7 +3304,7 @@ module Registration_section = struct
           let open Alpha_context in
           let step_constants =
             {
-              source = Contract (Implicit Signature.Public_key_hash.zero);
+              sender = Contract (Implicit Signature.Public_key_hash.zero);
               payer = Signature.Public_key_hash.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;
