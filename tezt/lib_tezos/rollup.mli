@@ -350,8 +350,8 @@ module Dal : sig
          the DAL node. *)
     val get_profiles : unit -> (Dal_node.t, profile list) RPC_core.t
 
-    (** Call RPC "GET /commitments/<commitment>/headers" to get the header and
-        status know about the given commitment. The resulting list can be filtered by a
+    (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
+        statuses know about the given commitment. The resulting list can be filtered by a
         given header publication level and slot index. *)
     val get_commitment_headers :
       ?slot_level:int ->
@@ -363,6 +363,11 @@ module Dal : sig
         get shard ids assigned to the given public key hash at the given level. *)
     val get_assigned_shard_indices :
       level:int -> pkh:string -> (Dal_node.t, int list) RPC_core.t
+
+    (** Call RPC "GET /levels/<published_level>/headers?status" to get the known
+        headers with the given published level. *)
+    val get_published_level_headers :
+      ?status:string -> int -> (Dal_node.t, slot_header list) RPC_core.t
   end
 
   val make :
