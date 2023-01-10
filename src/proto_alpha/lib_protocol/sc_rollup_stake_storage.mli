@@ -113,17 +113,6 @@ val is_staked_on :
   Sc_rollup_commitment_repr.Hash.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** [stakers_commitments_uncarbonated ctxt rollup] returns the list of
-    active stakers and the hash of the commitment they stake with the
-    maximum inbox level. The commitment associated to a staker can
-    absent if it is no longer in the storage, i.e. cemented. *)
-val stakers_commitments_uncarbonated :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_repr.Staker.t * Sc_rollup_commitment_repr.Hash.t option) list
-  tzresult
-  Lwt.t
-
 (** [commitments_uncarbonated ctxt ~rollup ~inbox_level] returns the
     list of commitments associated to [rollup] at [inbox_level] *)
 val commitments_uncarbonated :

@@ -155,17 +155,6 @@ let find_staker ctxt rollup staker =
       in
       (ctxt, Some commitment_hash)
 
-let stakers_commitments_uncarbonated ctxt rollup =
-  let open Lwt_result_syntax in
-  let*! stakers =
-    Sc_rollup_staker_index_storage.list_stakers_uncarbonated ctxt rollup
-  in
-  List.map_es
-    (fun staker ->
-      let* _ctxt, commitment_opt = find_staker ctxt rollup staker in
-      return (staker, commitment_opt))
-    stakers
-
 let commitments_uncarbonated ctxt ~rollup ~inbox_level =
   let open Lwt_result_syntax in
   let* _, commitments =

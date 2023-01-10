@@ -4119,9 +4119,6 @@ module Sc_rollup : sig
       Staker.t ->
       (context * Receipt.balance_updates) tzresult Lwt.t
 
-    val stakers_commitments_uncarbonated :
-      context -> t -> (Staker.t * Commitment.Hash.t option) list tzresult Lwt.t
-
     val commitments_uncarbonated :
       context ->
       rollup:t ->

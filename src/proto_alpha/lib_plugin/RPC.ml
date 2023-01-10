@@ -2075,25 +2075,6 @@ module Sc_rollup = struct
         RPC_path.(
           path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "games")
 
-    let stakers_commitments =
-      let output =
-        Sc_rollup.(
-          Data_encoding.(
-            list
-              (obj2
-                 (req "staker" Staker.encoding)
-                 (opt "commitment" Commitment.Hash.encoding))))
-      in
-      RPC_service.get_service
-        ~description:
-          "List of stakers for a given rollup, associated to the commitment \
-           hash they are staked on. The hash can be absent if the staked \
-           commitment is before the last cemented commitment, and therefore \
-           the hash no longer exists in the context."
-        ~query:RPC_query.empty
-        ~output
-        RPC_path.(path_sc_rollup / "stakers_commitments")
-
     let commitments =
       let output =
         Data_encoding.(option (list Sc_rollup.Commitment.Hash.encoding))
@@ -2286,13 +2267,6 @@ module Sc_rollup = struct
         in
         return game)
 
-  let register_stakers_commitments () =
-    Registration.register1
-      ~chunked:false
-      S.stakers_commitments
-      (fun context rollup () () ->
-        Sc_rollup.Stake_storage.stakers_commitments_uncarbonated context rollup)
-
   let register_commitments () =
     Registration.register2
       ~chunked:false
@@ -2387,7 +2361,6 @@ module Sc_rollup = struct
     register_commitment () ;
     register_root () ;
     register_ongoing_refutation_games () ;
-    register_stakers_commitments () ;
     register_commitments () ;
     register_stakers_ids () ;
     register_staker_id () ;
@@ -2443,9 +2416,6 @@ module Sc_rollup = struct
       staker
       ()
       ()
-
-  let stakers_commitments ctxt rollup =
-    RPC_context.make_call1 S.stakers_commitments ctxt rollup
 
   let commitments ctxt rollup inbox_level =
     RPC_context.make_call2 S.commitments ctxt rollup inbox_level

@@ -781,10 +781,6 @@ val get_chain_block_context_smart_rollups_all_inbox :
 val get_chain_block_context_smart_rollups_smart_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/stakers_commitments] *)
-val get_chain_block_context_smart_rollups_smart_rollup_stakers_commitments :
-  ?chain:string -> ?block:string -> string -> JSON.t t
-
 (** RPC: [GET chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
 val get_chain_block_context_smart_rollups_smart_rollup_last_cemented_commitment_hash_with_level :
   ?chain:string -> ?block:string -> string -> JSON.t t
