@@ -28,7 +28,8 @@
 /src/lib_event_logging       @romain.nl
 /src/lib_lwt_result_stdlib   @raphael-proust
 /src/lib_mockup_proxy        @igarnier
-/src/lib_openapi             @romain.nl
+/src/lib_node_config         @Killian-Delarue
+/src/lib_openapi             @romain.nl @Killian-Delarue
 /src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment   @raphael-proust
 /src/lib_shell_benchmarks    @lrand
@@ -71,7 +72,9 @@
 # @iguerNL = Mohamed Iguernlala
 # @jobjo = Joel Bjornson
 # @julien.t = Julien Tesson
+# @Killian-Delarue = Killian Delarue
 # @klakplok = Benjamin Canou
+# @linoscope = Lin Oshitani
 # @lthms = Thomas Letan
 # @mbouaziz = Mehdi Bouaziz
 # @mebsout = Alain Mebsout
@@ -94,7 +97,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
+* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hhugo1 @igarnier @iguerNL @jobjo @julien.t @Killian-Delarue @klakplok @linoscope @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #
