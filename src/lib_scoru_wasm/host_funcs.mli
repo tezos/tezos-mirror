@@ -119,6 +119,11 @@ module Aux : sig
     (** max size of intputs and outputs. *)
     val input_output_max_size : int
 
+    (** [load_bytes ~memory ~addr ~size] extracts the bytes from the given
+        adress. *)
+    val load_bytes :
+      memory:memory -> addr:int32 -> size:int32 -> (string, int32) result Lwt.t
+
     (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
      ~num_bytes] reads num_bytes from the memory of module_inst starting at
      src and writes this to the output_buffer. It also checks that
