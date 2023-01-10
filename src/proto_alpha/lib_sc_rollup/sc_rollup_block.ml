@@ -52,6 +52,8 @@ type ('header, 'content) block = {
 
 type t = (header, unit) block
 
+type full = (header, content) block
+
 let commitment_hash_opt_encoding =
   let open Data_encoding in
   let binary =
@@ -190,6 +192,8 @@ let block_encoding header_encoding content_encoding =
              this block.")
 
 let encoding = block_encoding header_encoding Data_encoding.unit
+
+let full_encoding = block_encoding header_encoding content_encoding
 
 let most_recent_commitment (header : header) =
   Option.value header.commitment_hash ~default:header.previous_commitment_hash

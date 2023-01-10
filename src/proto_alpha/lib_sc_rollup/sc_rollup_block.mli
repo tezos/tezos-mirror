@@ -75,8 +75,13 @@ type ('header, 'content) block = {
           block. *)
 }
 
-(** The type of layer 2 blocks. *)
+(** The type of layer 2 blocks. This type corresponds to what is stored on disk
+    for L2 blocks. The contents is stored in separate tables because it can be
+    large to read is is not always necessary. *)
 type t = (header, unit) block
+
+(** The type of layer 2 blocks including their content (inbox, messages, commitment). *)
+type full = (header, content) block
 
 (** {2 Encodings} *)
 
@@ -92,6 +97,8 @@ val block_encoding :
   ('header, 'content) block Data_encoding.t
 
 val encoding : t Data_encoding.t
+
+val full_encoding : full Data_encoding.t
 
 (** {2 Helper functions} *)
 

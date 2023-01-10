@@ -174,3 +174,13 @@ let readonly (node_ctxt : _ t) =
   }
 
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
+
+let get_full_l2_block {store; _} block_hash =
+  let open Lwt_syntax in
+  let* block = Store.L2_blocks.get store block_hash in
+  let* inbox = Store.Inboxes.get store block.header.inbox_hash
+  and* {messages; _} = Store.Messages.get store block.header.inbox_witness
+  and* commitment =
+    Option.map_s (Store.Commitments.get store) block.header.commitment_hash
+  in
+  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}

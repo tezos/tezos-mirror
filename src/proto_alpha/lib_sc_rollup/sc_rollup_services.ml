@@ -402,6 +402,15 @@ module Global = struct
       let prefix = prefix / "block" /: Arg.block_id
     end)
 
+    let block =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Layer-2 block of the layer-2 chain with respect to a Layer 1 block \
+           identifier"
+        ~query:Tezos_rpc.Query.empty
+        ~output:Sc_rollup_block.full_encoding
+        path
+
     let hash =
       Tezos_rpc.Service.get_service
         ~description:"Tezos block hash of block known to the smart rollup node"

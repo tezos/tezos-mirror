@@ -220,6 +220,13 @@ end)
 
 module Common = struct
   let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.block
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let*! b = Node_context.get_full_l2_block node_ctxt block in
+    return b
+
+  let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
