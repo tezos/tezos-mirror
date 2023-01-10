@@ -872,12 +872,16 @@ val private_exes : string list maker
     - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
       in the [dune] file.
 
+    - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
+      in the [dune] file.
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
 val test :
   ?alias:string ->
   ?dep_files:string list ->
   ?dep_globs:string list ->
+  ?dep_globs_rec:string list ->
   string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
@@ -885,6 +889,7 @@ val tests :
   ?alias:string ->
   ?dep_files:string list ->
   ?dep_globs:string list ->
+  ?dep_globs_rec:string list ->
   string list maker
 
 (** Register a Tezt test.
