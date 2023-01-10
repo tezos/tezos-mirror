@@ -57,7 +57,7 @@ let
 
   tezos-opam-repository-rev = builtins.readFile (
     pkgs.runCommand
-      "opam-repo-rev"
+      "tezos-opam-repo-rev"
       {
         src = ./scripts/version.sh;
       }
@@ -152,13 +152,20 @@ let
         cp ${tezos-opam-repository}/zcash-params/sapling-spend.params $out/share/zcash-params
       '';
 
+  opam-repository-rev = builtins.readFile (
+    pkgs.runCommand
+      "opam-repo-rev"
+      {
+        src = ./scripts/version.sh;
+      }
+      ''
+        . $src
+        echo -n $full_opam_repository_tag > $out
+      ''
+  );
+
   devPackageSet = pkgs.opam-nix-integration.makePackageSet {
-    repository = pkgs.fetchFromGitHub {
-      owner = "ocaml";
-      repo = "opam-repository";
-      rev = "fd912d3a713abbbca6378ff061b292eb7904d9c6";
-      sha256 = "sha256-/5UxMeCB26N7tD0hi42y3460BVALnX7AeY//7tNcLbA=";
-    };
+    repository = fetchTarball "https://github.com/ocaml/opam-repository/archive/${opam-repository-rev}.tar.gz";
 
     packageSelection = {
       packageConstraints = [
