@@ -6,6 +6,8 @@ from tools import constants, utils
 HASH = constants.KATHMANDU
 DAEMON = constants.KATHMANDU_DAEMON
 PARAMETERS = constants.KATHMANDU_PARAMETERS
+NUMBER = constants.KATHMANDU_NUMBER
+
 
 TENDERBAKE_PARAMETERS = deepcopy(PARAMETERS)
 TENDERBAKE_PARAMETERS['consensus_threshold'] = 45

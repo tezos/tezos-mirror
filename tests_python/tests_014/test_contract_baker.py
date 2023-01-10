@@ -1,8 +1,7 @@
-import os
 import pytest
 from tools import constants, utils
 from client.client import Client
-from . import contract_paths
+from .contract_paths import find_script
 
 
 @pytest.mark.contract
@@ -13,9 +12,7 @@ class TestOriginationCall:
 
     def test_originate(self, client: Client, session: dict):
         initial_storage = 'Unit'
-        contract = os.path.join(
-            contract_paths.OPCODES_CONTRACT_PATH, 'transfer_tokens.tz'
-        )
+        contract = find_script(['opcodes', 'transfer_tokens'])
         args = ['--init', initial_storage, '--burn-cap', '0.400']
         origination = client.originate(
             'foobar', 1000, 'bootstrap1', contract, args

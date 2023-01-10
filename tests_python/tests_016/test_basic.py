@@ -1,11 +1,10 @@
-from os import path
 from typing import List
 import pytest
 from client.client import Client
 from tools import constants, utils
 from tools.paths import ACCOUNT_PATH
 from tools.utils import assert_run_failure
-from .contract_paths import CONTRACT_PATH
+from .contract_paths import find_script
 
 
 BAKE_ARGS: List[str] = []
@@ -214,7 +213,7 @@ class TestRawContext:
             client.transfer(999.95, session['keys'][0], session['keys'][1])
 
     def test_originate_contract_noop(self, client: Client):
-        contract = path.join(CONTRACT_PATH, 'opcodes', 'noop.tz')
+        contract = find_script(['opcodes', 'noop'])
         client.remember('noop', contract)
         client.typecheck(contract)
         client.originate(
@@ -227,7 +226,7 @@ class TestRawContext:
         utils.bake(client)
 
     def test_contract_hardlimit(self, client: Client):
-        contract = path.join(CONTRACT_PATH, 'mini_scenarios', 'hardlimit.tz')
+        contract = find_script(['mini_scenarios', 'hardlimit'])
         client.originate(
             'hardlimit',
             1000,
@@ -347,7 +346,7 @@ class TestRememberContract:
 
     # Test operation size.
     def test_operation_size_originate_byte_contract(self, client: Client):
-        contract = path.join(CONTRACT_PATH, 'opcodes', 'bytes.tz')
+        contract = find_script(['opcodes', 'bytes'])
         client.remember('bytes', contract)
         client.typecheck(contract)
         client.originate(
@@ -379,7 +378,7 @@ class TestRememberContract:
 
     # Test operation size with various data types.
     def test_operation_size_originate_munch_contract(self, client: Client):
-        contract = path.join(CONTRACT_PATH, 'opcodes', 'munch.tz')
+        contract = find_script(['opcodes', 'munch'])
         client.remember('munch', contract)
         client.typecheck(contract)
         client.originate(

@@ -88,21 +88,25 @@ ALPHA = "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 ALPHA_DAEMON = "alpha"  # tezos-baker-alpha
 ALPHA_FOLDER = "proto_alpha"
 ALPHA_PARAMETERS = get_parameters(ALPHA_FOLDER)
+ALPHA_NUMBER = 17
 
 KATHMANDU = "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
 KATHMANDU_DAEMON = "PtKathma"
 KATHMANDU_FOLDER = "proto_014_PtKathma"
 KATHMANDU_PARAMETERS = get_parameters(KATHMANDU_FOLDER)
+KATHMANDU_NUMBER = 14
 
 LIMA = "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
 LIMA_DAEMON = "PtLimaPt"
 LIMA_FOLDER = "proto_015_PtLimaPt"
 LIMA_PARAMETERS = get_parameters(LIMA_FOLDER)
+LIMA_NUMBER = 15
 
 MUMBAI = "PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD"
 MUMBAI_DAEMON = "PtMumbai"
 MUMBAI_FOLDER = "proto_016_PtMumbai"
 MUMBAI_PARAMETERS = get_parameters(MUMBAI_FOLDER)
+MUMBAI_NUMBER = 16
 
 TEZOS_CRT = """
 Certificate:

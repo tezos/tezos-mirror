@@ -1,18 +1,17 @@
 """Test the multiple transfer feature of octez-client"""
-import os
 import json
 import pytest
 
 from client.client import Client
 from tools import utils
 from tools.constants import IDENTITIES
-from .contract_paths import CONTRACT_PATH
+from .contract_paths import find_script
 
 
 def manager(client: Client) -> str:
     """Originate and return the alias of a manager contract"""
     alias = 'manager'
-    path = os.path.join(CONTRACT_PATH, 'entrypoints', alias + '.tz')
+    path = find_script(['entrypoints', alias])
     pubkey = IDENTITIES['bootstrap2']['identity']
     utils.init_with_transfer(
         client, path, f'"{pubkey}"', 1000, sender='bootstrap1'
@@ -24,7 +23,7 @@ def manager(client: Client) -> str:
 def big_map_entrypoints(client: Client) -> str:
     """Originate and return the alias of a big_map_entrypoints contract"""
     alias = 'big_map_entrypoints'
-    path = os.path.join(CONTRACT_PATH, 'entrypoints', alias + '.tz')
+    path = find_script(['entrypoints', alias])
     utils.init_with_transfer(
         client, path, 'Pair {} {Elt "Hello" 42}', 1000, sender='bootstrap1'
     )

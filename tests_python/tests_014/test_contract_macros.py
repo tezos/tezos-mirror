@@ -1,15 +1,18 @@
-from os import path
 import pytest
 from tools.utils import (
     assert_run_script_failwith,
     assert_transfer_failwith,
-    init_with_transfer,
     bake,
     assert_storage_contains,
 )
 from tools.client_regression import ClientRegression
 from client.client import Client
-from .contract_paths import MACROS_CONTRACT_PATH, CONTRACT_PATH, all_contracts
+from .contract_paths import (
+    find_script,
+    find_script_by_name,
+    all_contracts,
+    init_with_transfer,
+)
 
 
 @pytest.mark.contract
@@ -20,110 +23,110 @@ class TestContractMacros:
         "contract,param,storage,expected",
         [  # FORMAT: assert_output contract_file storage input expected_result
             # Build list
-            ('build_list.tz', '{}', '0', '{ 0 }'),
-            ('build_list.tz', '{}', '3', '{ 0 ; 1 ; 2 ; 3 }'),
+            ('build_list', '{}', '0', '{ 0 }'),
+            ('build_list', '{}', '3', '{ 0 ; 1 ; 2 ; 3 }'),
             (
-                'build_list.tz',
+                'build_list',
                 '{}',
                 '10',
                 '{ 0 ; 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 ; 10 }',
             ),
             # Find maximum int in list -- returns None if not found
-            ('max_in_list.tz', 'None', '{}', 'None'),
-            ('max_in_list.tz', 'None', '{ 1 }', '(Some 1)'),
-            ('max_in_list.tz', 'None', '{ -1 }', '(Some -1)'),
+            ('max_in_list', 'None', '{}', 'None'),
+            ('max_in_list', 'None', '{ 1 }', '(Some 1)'),
+            ('max_in_list', 'None', '{ -1 }', '(Some -1)'),
             (
-                'max_in_list.tz',
+                'max_in_list',
                 'None',
                 '{ 10 ; -1 ; -20 ; 100 ; 0 }',
                 '(Some 100)',
             ),
             (
-                'max_in_list.tz',
+                'max_in_list',
                 'None',
                 '{ 10 ; -1 ; -20 ; 100 ; 0 }',
                 '(Some 100)',
             ),
             (
-                'max_in_list.tz',
+                'max_in_list',
                 'None',
                 '{ -10 ; -1 ; -20 ; -100 }',
                 '(Some -1)',
             ),
             # Test comparisons on tez { EQ ; GT ; LT ; GE ; LE }
             (
-                'compare.tz',
+                'compare',
                 '{}',
                 '(Pair 1000000 2000000)',
                 '{ False ; False ; True ; False ; True }',
             ),
             (
-                'compare.tz',
+                'compare',
                 '{}',
                 '(Pair 2000000 1000000)',
                 '{ False ; True ; False ; True ; False }',
             ),
             (
-                'compare.tz',
+                'compare',
                 '{}',
                 '(Pair 2370000 2370000)',
                 '{ True ; False ; False ; True ; True }',
             ),
             # Test ASSERT
-            ('assert.tz', 'Unit', 'True', 'Unit'),
+            ('assert', 'Unit', 'True', 'Unit'),
             # ASSERT_{OP}
-            ('assert_eq.tz', 'Unit', '(Pair -1 -1)', 'Unit'),
-            ('assert_eq.tz', 'Unit', '(Pair -1 -1)', 'Unit'),
-            ('assert_neq.tz', 'Unit', '(Pair 0 -1)', 'Unit'),
-            ('assert_lt.tz', 'Unit', '(Pair -1 0)', 'Unit'),
-            ('assert_le.tz', 'Unit', '(Pair 0 0)', 'Unit'),
-            ('assert_le.tz', 'Unit', '(Pair -1 0)', 'Unit'),
-            ('assert_gt.tz', 'Unit', '(Pair 0 -1)', 'Unit'),
-            ('assert_ge.tz', 'Unit', '(Pair 0 0)', 'Unit'),
-            ('assert_ge.tz', 'Unit', '(Pair 0 -1)', 'Unit'),
+            ('assert_eq', 'Unit', '(Pair -1 -1)', 'Unit'),
+            ('assert_eq', 'Unit', '(Pair -1 -1)', 'Unit'),
+            ('assert_neq', 'Unit', '(Pair 0 -1)', 'Unit'),
+            ('assert_lt', 'Unit', '(Pair -1 0)', 'Unit'),
+            ('assert_le', 'Unit', '(Pair 0 0)', 'Unit'),
+            ('assert_le', 'Unit', '(Pair -1 0)', 'Unit'),
+            ('assert_gt', 'Unit', '(Pair 0 -1)', 'Unit'),
+            ('assert_ge', 'Unit', '(Pair 0 0)', 'Unit'),
+            ('assert_ge', 'Unit', '(Pair 0 -1)', 'Unit'),
             # ASSERT_CMP{OP}
-            ('assert_cmpeq.tz', 'Unit', '(Pair -1 -1)', 'Unit'),
-            ('assert_cmpneq.tz', 'Unit', '(Pair 0 -1)', 'Unit'),
-            ('assert_cmplt.tz', 'Unit', '(Pair -1 0)', 'Unit'),
-            ('assert_cmple.tz', 'Unit', '(Pair -1 0)', 'Unit'),
-            ('assert_cmple.tz', 'Unit', '(Pair 0 0)', 'Unit'),
-            ('assert_cmpgt.tz', 'Unit', '(Pair 0 -1)', 'Unit'),
-            ('assert_cmpge.tz', 'Unit', '(Pair 0 -1)', 'Unit'),
-            ('assert_cmpge.tz', 'Unit', '(Pair 0 0)', 'Unit'),
+            ('assert_cmpeq', 'Unit', '(Pair -1 -1)', 'Unit'),
+            ('assert_cmpneq', 'Unit', '(Pair 0 -1)', 'Unit'),
+            ('assert_cmplt', 'Unit', '(Pair -1 0)', 'Unit'),
+            ('assert_cmple', 'Unit', '(Pair -1 0)', 'Unit'),
+            ('assert_cmple', 'Unit', '(Pair 0 0)', 'Unit'),
+            ('assert_cmpgt', 'Unit', '(Pair 0 -1)', 'Unit'),
+            ('assert_cmpge', 'Unit', '(Pair 0 -1)', 'Unit'),
+            ('assert_cmpge', 'Unit', '(Pair 0 0)', 'Unit'),
             # Tests the SET_CAR and SET_CDR instructions
             (
-                'set_caddaadr.tz',
+                'set_caddaadr',
                 '(Pair (Pair 1 2 (Pair (Pair 3 0) 4) 5) 6)',
                 '3000000',
                 '(Pair (Pair 1 2 (Pair (Pair 3 3000000) 4) 5) 6)',
             ),
             (
-                'map_caddaadr.tz',
+                'map_caddaadr',
                 '(Pair (Pair 1 2 (Pair (Pair 3 0) 4) 5) 6)',
                 'Unit',
                 '(Pair (Pair 1 2 (Pair (Pair 3 1000000) 4) 5) 6)',
             ),
             # Test comparisons on bytes { EQ ; GT ; LT ; GE ; LE }
             (
-                'compare_bytes.tz',
+                'compare_bytes',
                 '{}',
                 '(Pair 0x33 0x34)',
                 '{ False ; False ; True ; False ; True }',
             ),
             (
-                'compare_bytes.tz',
+                'compare_bytes',
                 '{}',
                 '(Pair 0x33 0x33aa)',
                 '{ False ; False ; True ; False ; True }',
             ),
             (
-                'compare_bytes.tz',
+                'compare_bytes',
                 '{}',
                 '(Pair 0x33 0x33)',
                 '{ True ; False ; False ; True ; True }',
             ),
             (
-                'compare_bytes.tz',
+                'compare_bytes',
                 '{}',
                 '(Pair 0x34 0x33)',
                 '{ False ; True ; False ; True ; False }',
@@ -138,38 +141,35 @@ class TestContractMacros:
         storage: str,
         expected: str,
     ):
-        assert contract.endswith(
-            '.tz'
-        ), "test contract should have .tz extension"
-        contract = path.join(MACROS_CONTRACT_PATH, contract)
+        contract = find_script(['macros', contract])
         run_script_res = client.run_script(contract, param, storage)
         assert run_script_res.storage == expected
 
     @pytest.mark.parametrize(
         "contract,param,storage",
         [  # FORMAT: assert_output contract_file storage input expected_result
-            ('assert.tz', 'Unit', 'False'),
-            ('assert_eq.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_eq.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_neq.tz', 'Unit', '(Pair -1 -1)'),
-            ('assert_lt.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_lt.tz', 'Unit', '(Pair 0 0)'),
-            ('assert_le.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_gt.tz', 'Unit', '(Pair -1 0)'),
-            ('assert_gt.tz', 'Unit', '(Pair 0 0)'),
-            ('assert_ge.tz', 'Unit', '(Pair -1 0)'),
-            ('assert_cmpeq.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_cmpneq.tz', 'Unit', '(Pair -1 -1)'),
-            ('assert_cmplt.tz', 'Unit', '(Pair 0 0)'),
-            ('assert_cmplt.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_cmple.tz', 'Unit', '(Pair 0 -1)'),
-            ('assert_cmpgt.tz', 'Unit', '(Pair 0 0)'),
-            ('assert_cmpgt.tz', 'Unit', '(Pair -1 0)'),
-            ('assert_cmpge.tz', 'Unit', '(Pair -1 0)'),
+            ('assert', 'Unit', 'False'),
+            ('assert_eq', 'Unit', '(Pair 0 -1)'),
+            ('assert_eq', 'Unit', '(Pair 0 -1)'),
+            ('assert_neq', 'Unit', '(Pair -1 -1)'),
+            ('assert_lt', 'Unit', '(Pair 0 -1)'),
+            ('assert_lt', 'Unit', '(Pair 0 0)'),
+            ('assert_le', 'Unit', '(Pair 0 -1)'),
+            ('assert_gt', 'Unit', '(Pair -1 0)'),
+            ('assert_gt', 'Unit', '(Pair 0 0)'),
+            ('assert_ge', 'Unit', '(Pair -1 0)'),
+            ('assert_cmpeq', 'Unit', '(Pair 0 -1)'),
+            ('assert_cmpneq', 'Unit', '(Pair -1 -1)'),
+            ('assert_cmplt', 'Unit', '(Pair 0 0)'),
+            ('assert_cmplt', 'Unit', '(Pair 0 -1)'),
+            ('assert_cmple', 'Unit', '(Pair 0 -1)'),
+            ('assert_cmpgt', 'Unit', '(Pair 0 0)'),
+            ('assert_cmpgt', 'Unit', '(Pair -1 0)'),
+            ('assert_cmpge', 'Unit', '(Pair -1 0)'),
         ],
     )
     def test_contract_failures(self, client: Client, contract, param, storage):
-        contract = path.join(MACROS_CONTRACT_PATH, contract)
+        contract = find_script(['macros', contract])
         assert_run_script_failwith(client, contract, param, storage)
 
 
@@ -179,7 +179,7 @@ class TestGuestBook:
     """Test on the guestbook contract."""
 
     def test_guestbook(self, client: Client):
-        contract = path.join(MACROS_CONTRACT_PATH, 'guestbook.tz')
+        contract = ['macros', 'guestbook']
 
         init_with_transfer(
             client,
@@ -232,7 +232,7 @@ class TestBigmap:
     """Tests on the big_map_mem contract."""
 
     def test_bigmap(self, client: Client):
-        contract = path.join(MACROS_CONTRACT_PATH, 'big_map_mem.tz')
+        contract = ['macros', 'big_map_mem']
 
         init_with_transfer(
             client,
@@ -336,7 +336,7 @@ class TestBigmapGetAdd:
     """Tests on the big_map_get_add contract."""
 
     def test_bigmap(self, client: Client):
-        contract = path.join(MACROS_CONTRACT_PATH, 'big_map_get_add.tz')
+        contract = ['macros', 'big_map_get_add']
 
         init_with_transfer(
             client,
@@ -444,4 +444,4 @@ class TestMacroExpansion:
         regression detection enabled. This test should fail if the definition
         of any macros change.
         """
-        client_regtest.expand_macros(path.join(CONTRACT_PATH, contract))
+        client_regtest.expand_macros(find_script_by_name(contract))

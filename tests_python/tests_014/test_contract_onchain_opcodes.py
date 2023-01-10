@@ -1,5 +1,3 @@
-from os import path
-
 import pytest
 from tools.client_regression import ClientRegression
 from tools import paths
@@ -7,11 +5,10 @@ from tools.utils import (
     assert_run_failure,
     assert_storage_contains,
     bake,
-    init_with_transfer,
     assert_balance,
 )
 from tools.constants import IDENTITIES
-from .contract_paths import OPCODES_CONTRACT_PATH, MINI_SCENARIOS_CONTRACT_PATH
+from .contract_paths import find_script, find_script_by_name, init_with_transfer
 from . import protocol
 
 KEY1 = 'foo'
@@ -45,7 +42,7 @@ class TestContractOnchainOpcodes:
         # Create a contract and transfer 100 ꜩ to it
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'store_input.tz'),
+            ['opcodes', 'store_input'],
             '""',
             100,
             'bootstrap1',
@@ -77,7 +74,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'transfer_amount.tz'),
+            ['opcodes', 'transfer_amount'],
             '0',
             100,
             'bootstrap1',
@@ -103,7 +100,7 @@ class TestContractOnchainOpcodes:
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'store_now.tz'),
+            ['opcodes', 'store_now'],
             '"2017-07-13T09:19:01Z"',
             100,
             'bootstrap1',
@@ -125,7 +122,7 @@ class TestContractOnchainOpcodes:
             'test_transfer_account1',
             100,
             'bootstrap1',
-            path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
+            find_script(['opcodes', 'noop']),
             ['--burn-cap', '10'],
         )
         bake(client)
@@ -134,14 +131,14 @@ class TestContractOnchainOpcodes:
             'test_transfer_account2',
             20,
             'bootstrap1',
-            path.join(OPCODES_CONTRACT_PATH, 'noop.tz'),
+            find_script(['opcodes', 'noop']),
             ['--burn-cap', '10'],
         )
         bake(client)
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'transfer_tokens.tz'),
+            ['opcodes', 'transfer_tokens'],
             'Unit',
             1000,
             'bootstrap1',
@@ -181,7 +178,7 @@ class TestContractOnchainOpcodes:
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'self.tz'),
+            ['opcodes', 'self'],
             '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"',
             1000,
             'bootstrap1',
@@ -199,7 +196,7 @@ class TestContractOnchainOpcodes:
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'contract.tz'),
+            ['opcodes', 'contract'],
             'Unit',
             1000,
             'bootstrap1',
@@ -221,7 +218,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'proxy.tz'),
+            ['opcodes', 'proxy'],
             'Unit',
             1000,
             'bootstrap1',
@@ -232,7 +229,7 @@ class TestContractOnchainOpcodes:
         init_store = IDENTITIES['bootstrap4']['identity']
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'source.tz'),
+            ['opcodes', 'source'],
             f'"{init_store}"',
             1000,
             'bootstrap1',
@@ -263,7 +260,7 @@ class TestContractOnchainOpcodes:
         init_store = IDENTITIES['bootstrap4']['identity']
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'sender.tz'),
+            ['opcodes', 'sender'],
             f'"{init_store}"',
             1000,
             'bootstrap1',
@@ -292,7 +289,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'slices.tz'),
+            ['opcodes', 'slices'],
             '"sppk7dBPqMPjDjXgKbb5f7V3PuKUrA4Zuwc3c3H7XqQerqPUWbK7Hna"',
             1000,
             'bootstrap1',
@@ -350,7 +347,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'split_string.tz'),
+            ['opcodes', 'split_string'],
             '{}',
             1000,
             'bootstrap1',
@@ -380,7 +377,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'split_bytes.tz'),
+            ['opcodes', 'split_bytes'],
             '{}',
             1000,
             'bootstrap1',
@@ -410,7 +407,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'set_delegate.tz'),
+            ['opcodes', 'set_delegate'],
             'Unit',
             1000,
             'bootstrap1',
@@ -443,7 +440,7 @@ class TestContractOnchainOpcodes:
         client = client_regtest_scrubbed
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, contract),
+            find_script_by_name('opcodes/' + contract),
             'Unit',
             1000,
             'bootstrap1',
@@ -459,7 +456,7 @@ class TestTickets:
         bake(client)
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticket_store-2.tz'),
+            ['opcodes', 'ticket_store-2'],
             'None',
             100,
             'bootstrap1',
@@ -484,7 +481,7 @@ class TestTickets:
             # Create storage by hand with a ticket in it
             init_with_transfer(
                 client,
-                path.join(OPCODES_CONTRACT_PATH, 'ticket_bad.tz'),
+                ['opcodes', 'ticket_bad'],
                 '1',
                 100,
                 'bootstrap1',
@@ -496,7 +493,7 @@ class TestTickets:
         contract_name = 'big_storer'
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticket_big_store.tz'),
+            ['opcodes', 'ticket_big_store'],
             '{}',
             100,
             'bootstrap1',
@@ -513,7 +510,7 @@ class TestTickets:
             # Create a storage with the ID of a big map that has tickets in it
             init_with_transfer(
                 client,
-                path.join(OPCODES_CONTRACT_PATH, 'ticket_big_store.tz'),
+                ['opcodes', 'ticket_big_store'],
                 storage,
                 100,
                 'bootstrap1',
@@ -524,7 +521,7 @@ class TestTickets:
             # Create a storage with the ID of a big map that has tickets in it
             init_with_transfer(
                 client,
-                path.join(OPCODES_CONTRACT_PATH, 'ticket_big_store.tz'),
+                ['opcodes', 'ticket_big_store'],
                 '(Pair ' + storage + ' {})',
                 100,
                 'bootstrap1',
@@ -535,7 +532,7 @@ class TestTickets:
         """Test TICKETS"""
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticketer.tz'),
+            ['opcodes', 'ticketer'],
             '42',
             100,
             'bootstrap1',
@@ -545,7 +542,7 @@ class TestTickets:
         ticketer_addr = client.get_contract_address('ticketer_read')
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticket_read.tz'),
+            ['opcodes', 'ticket_read'],
             '"' + ticketer_addr + '"',
             100,
             'bootstrap1',
@@ -565,7 +562,7 @@ class TestTickets:
     def test_bad_ticket(self, client):
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticketer.tz'),
+            ['opcodes', 'ticketer'],
             '42',
             100,
             'bootstrap1',
@@ -575,7 +572,7 @@ class TestTickets:
         ticketer_addr = client.get_contract_address('ticketer_bad')
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticket_read.tz'),
+            ['opcodes', 'ticket_read'],
             '"' + ticketer_addr + '"',
             100,
             'bootstrap1',
@@ -595,7 +592,7 @@ class TestTickets:
         """Test UTXOs"""
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'utxor.tz'),
+            ['opcodes', 'utxor'],
             '42',
             100,
             'bootstrap1',
@@ -604,7 +601,7 @@ class TestTickets:
         utxor_addr = client.get_contract_address('utxor')
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'utxo_read.tz'),
+            ['opcodes', 'utxo_read'],
             '"' + utxor_addr + '"',
             100,
             'bootstrap1',
@@ -615,7 +612,7 @@ class TestTickets:
         utxor_addr = client.get_contract_address('utxor')
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'utxo_read.tz'),
+            ['opcodes', 'utxo_read'],
             '"' + utxor_addr + '"',
             100,
             'bootstrap1',
@@ -656,7 +653,7 @@ class TestTickets:
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticketer-2.tz'),
+            ['opcodes', 'ticketer-2'],
             'Unit',
             100,
             'bootstrap1',
@@ -664,7 +661,7 @@ class TestTickets:
         )
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticket_split.tz'),
+            ['opcodes', 'ticket_split'],
             'Unit',
             100,
             'bootstrap1',
@@ -694,7 +691,7 @@ class TestTickets:
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticketer-2.tz'),
+            ['opcodes', 'ticketer-2'],
             'Unit',
             100,
             'bootstrap1',
@@ -702,7 +699,7 @@ class TestTickets:
         )
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticketer-2.tz'),
+            ['opcodes', 'ticketer-2'],
             'Unit',
             100,
             'bootstrap1',
@@ -710,7 +707,7 @@ class TestTickets:
         )
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'ticket_join.tz'),
+            ['opcodes', 'ticket_join'],
             'None',
             100,
             'bootstrap1',
@@ -753,13 +750,11 @@ class TestTickets:
         """Test the origination of builder and wallet contracts for fungible
         tokens implemented using tickets."""
 
-        builder_path = path.join(
-            MINI_SCENARIOS_CONTRACT_PATH, 'ticket_builder_fungible.tz'
+        builder_path = find_script(
+            ['mini_scenarios', 'ticket_builder_fungible']
         )
 
-        wallet_path = path.join(
-            MINI_SCENARIOS_CONTRACT_PATH, 'ticket_wallet_fungible.tz'
-        )
+        wallet_path = find_script(['mini_scenarios', 'ticket_wallet_fungible'])
 
         manager_address = IDENTITIES['bootstrap1']['identity']
 
@@ -979,12 +974,12 @@ class TestTickets:
         """Test the origination of builder and wallet contracts for
         non-fungible tokens implemented using tickets."""
 
-        builder_path = path.join(
-            MINI_SCENARIOS_CONTRACT_PATH, 'ticket_builder_non_fungible.tz'
+        builder_path = find_script(
+            ['mini_scenarios', 'ticket_builder_non_fungible']
         )
 
-        wallet_path = path.join(
-            MINI_SCENARIOS_CONTRACT_PATH, 'ticket_wallet_non_fungible.tz'
+        wallet_path = find_script(
+            ['mini_scenarios', 'ticket_wallet_non_fungible']
         )
 
         manager_address = IDENTITIES['bootstrap1']['identity']
@@ -1202,9 +1197,7 @@ class TestTickets:
         burn(builder="B", wallet="Alice", token_id=0)
 
 
-ORIGINATE_BIG_MAP_FILE = path.join(
-    OPCODES_CONTRACT_PATH, 'originate_big_map.tz'
-)
+ORIGINATE_BIG_MAP_FILE = find_script(['opcodes', 'originate_big_map'])
 
 
 @pytest.mark.incremental
@@ -1287,7 +1280,7 @@ class TestContractOnchainLevel:
 
         init_with_transfer(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'level.tz'),
+            ['opcodes', 'level'],
             '9999999',
             100,
             'bootstrap1',
