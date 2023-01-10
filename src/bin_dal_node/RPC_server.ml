@@ -105,6 +105,15 @@ module Slots_handlers = struct
           ?slot_index
           store)
       ctxt
+
+  let get_published_level_headers ctxt published_level header_status () =
+    call_handler
+      (fun store _cryptobox ->
+        Slot_manager.get_published_level_headers
+          ~published_level
+          ?header_status
+          store)
+      ctxt
 end
 
 module Profile_handlers = struct
@@ -175,6 +184,10 @@ let register_new :
        Tezos_rpc.Directory.register2
        Services.get_assigned_shard_indices
        (Profile_handlers.get_assigned_shard_indices ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.get_published_level_headers
+       (Slots_handlers.get_published_level_headers ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
