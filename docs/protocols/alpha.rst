@@ -15,8 +15,8 @@ New Environment Version (V9)
 This protocol requires a different protocol environment version than Mumbai.
 It requires protocol environment V9, compared to V8 for Mumbai. (MR :gl:`!7178`)
 
-Smart Contract Optimistic Rollups
----------------------------------
+Smart Rollups
+-------------
 
 - Remove redundant ``level_proof`` field. (MR :gl:`!7109`)
 
@@ -43,6 +43,19 @@ Smart Contract Optimistic Rollups
 - Improve readability of ``assert_commitment_is_not_past_curfew``.
   (MR :gl:`!7230`)
 
+- Remove dead code: legacy Internal for Tests signatures (MR :gl:`!7234`)
+
+- Prefer hex over b58check to encode filenames. (MR :gl:`!7181`)
+
+- Use basis 4 for skip lists. (MR :gl:`!7213`)
+
+- Enable Smart Rollups on mainnet and adjust related constants. (MR :gl:`!7233`)
+
+- Rename SCORU to Smart Rollups. (MRs :gl:`!7247`, :gl:`!7248`, :gl:`!7253`,
+  :gl:`!7254`, :gl:`!7271`)
+
+- Expose hash functions and structure for node. (MR :gl:`!7161`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
@@ -50,7 +63,7 @@ Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
-:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`)
+:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`, :gl:`!7242`)
 
 Breaking Changes
 ----------------
