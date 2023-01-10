@@ -3710,6 +3710,12 @@ end = struct
                  ("contracts/*", true);
                  ("patched_contracts/*", N.(number >= 013));
                ])
+          ~dep_globs_rec:
+            (conditional_list
+               [
+                 ( "../../../../../../michelson_test_scripts/*",
+                   N.(number >= 014) );
+               ])
           ~deps:
             [
               alcotest_lwt;
