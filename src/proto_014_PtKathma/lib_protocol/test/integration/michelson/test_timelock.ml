@@ -63,6 +63,9 @@ let simple_test () =
   assert (result = expected_result) ;
   return_unit
 
+let timelock_path =
+  "../../../../../../michelson_test_scripts/ill_typed/timelock.tz"
+
 let contract_test () =
   (* Parse a Michelson contract from string. *)
   let originate_contract file storage src b =
@@ -85,7 +88,7 @@ let contract_test () =
     Incremental.finalize_block incr >|=? fun b -> (dst, b)
   in
   Context.init3 ~consensus_threshold:0 () >>=? fun (b, (src, _c2, _c3)) ->
-  originate_contract "contracts/timelock.tz" "0xaa" src b >>=? fun (dst, b) ->
+  originate_contract timelock_path "0xaa" src b >>=? fun (dst, b) ->
   let public, secret = Tezos_crypto.Timelock.gen_rsa_keys () in
   let locked_value = Tezos_crypto.Timelock.gen_locked_value public in
   let time = 1000 in

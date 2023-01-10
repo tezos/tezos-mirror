@@ -1,0 +1,3 @@
+parameter bytes;
+storage unit;
+code {CDR; NIL operation; PAIR}

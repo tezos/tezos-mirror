@@ -974,7 +974,9 @@ val drain_delegate :
    [src] should be named [from] and probably have type [Account.t] *)
 
 (** Run [octez-client originate contract alias transferring amount from src
-    running prg]. Returns the originated contract hash. *)
+    running prg]. Returns the originated contract hash.
+
+    Avoid this function when using [originate_contract_at] is possible. *)
 val originate_contract :
   ?hooks:Process.hooks ->
   ?log_output:bool ->
@@ -1181,7 +1183,9 @@ val stresstest_fund_accounts_from_source :
 
     Returns the new storage as a string.
 
-    Fails if the new storage cannot be extracted from the output. *)
+    Fails if the new storage cannot be extracted from the output.
+
+    Avoid this function when using [run_script_at] is possible. *)
 val run_script :
   ?hooks:Process.hooks ->
   ?protocol_hash:string ->

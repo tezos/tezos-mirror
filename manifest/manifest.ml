@@ -333,11 +333,17 @@ module Dune = struct
 
   let glob_files expr = [S "glob_files"; S expr]
 
-  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs name =
+  let glob_files_rec expr = [S "glob_files_rec"; S expr]
+
+  let runtest ?(alias = "runtest") ?package ~dep_files ~dep_globs ~dep_globs_rec
+      name =
     let deps_dune =
       let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
-      match files @ globs with [] -> None | deps -> Some (of_list deps)
+      let globs_rec = List.map glob_files_rec dep_globs_rec in
+      match files @ globs @ globs_rec with
+      | [] -> None
+      | deps -> Some (of_list deps)
     in
     alias_rule
       alias
@@ -1253,15 +1259,16 @@ module Target = struct
     snd (collect deps)
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
-      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
-      ?(dune = Dune.[]) ?flags ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
-      ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
-      ?(opam_with_test = Always) ?(optional = false) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?profile
-      ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static ?synopsis
-      ?description ?(time_measurement_ppx = false) ?(virtual_modules = [])
+      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
+      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags ?foreign_stubs
+      ?ctypes ?implements ?inline_tests ?js_compatible ?js_of_ocaml
+      ?documentation ?(linkall = false) ?modes ?modules
+      ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml ?opam
+      ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
+      ?(optional = false) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(private_modules = []) ?profile ?(opam_only_deps = [])
+      ?(release_status = Auto_opam) ?static ?synopsis ?description
+      ?(time_measurement_ppx = false) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
@@ -1511,7 +1518,13 @@ module Target = struct
             if run_native then
               List.map
                 (fun name ->
-                  Dune.runtest ~alias ~dep_files ~dep_globs ?package name)
+                  Dune.runtest
+                    ~alias
+                    ~dep_files
+                    ~dep_globs
+                    ~dep_globs_rec
+                    ?package
+                    name)
                 (Ne_list.to_list names)
             else []
           in
@@ -1576,24 +1589,28 @@ module Target = struct
       }
 
   let public_lib ?internal_name =
-    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_library {internal_name; public_name}
 
   let private_lib =
-    internal ?dep_files:None ?dep_globs:None @@ fun name -> Private_library name
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None @@ fun name ->
+    Private_library name
 
   let public_exe ?internal_name =
-    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_executable ({internal_name; public_name}, [])
 
   let public_exes ?internal_names =
-    internal ?dep_files:None ?dep_globs:None @@ fun public_names ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun public_names ->
     let names =
       match internal_names with
       | None ->
@@ -1617,23 +1634,24 @@ module Target = struct
     | head :: tail -> Public_executable (head, tail)
 
   let private_exe =
-    internal ?dep_files:None ?dep_globs:None @@ fun internal_name ->
-    Private_executable (internal_name, [])
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun internal_name -> Private_executable (internal_name, [])
 
   let private_exes =
-    internal ?dep_files:None ?dep_globs:None @@ fun internal_names ->
+    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
+    @@ fun internal_names ->
     match internal_names with
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(alias = "runtest") ?dep_files ?dep_globs =
+  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
     let runtest_alias = if alias = "" then None else Some alias in
-    internal ?dep_files ?dep_globs @@ fun test_name ->
+    internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
     Test_executable {names = (test_name, []); runtest_alias}
 
-  let tests ?(alias = "runtest") ?dep_files ?dep_globs =
+  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec =
     let runtest_alias = if alias = "" then None else Some alias in
-    internal ?dep_files ?dep_globs @@ fun test_names ->
+    internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail -> Test_executable {names = (head, tail); runtest_alias}

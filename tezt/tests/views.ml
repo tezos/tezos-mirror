@@ -30,9 +30,6 @@
    Subject:      Call smart contract views to catch performance regressions.
 *)
 
-(* This contract registers all SOURCE addresses that ever call it. It has views
-   that return registered callers count and the last caller address respectively. *)
-
 let contract_path protocol kind contract =
   sf
     "file:tests_python/contracts_%s/%s/%s"
@@ -41,53 +38,6 @@ let contract_path protocol kind contract =
     | _ -> sf "%03d" @@ Protocol.number protocol)
     kind
     contract
-
-let register_callers_src =
-  {|
-parameter unit;
-storage (list address);
-code {
-       CDR ;
-       SOURCE ;
-       CONS ;
-       NIL operation ;
-       PAIR ;
-     };
-view "calls_count" unit nat { CDR ; SIZE };
-view "last_caller" unit (option address) { CDR ; IF_CONS { DIP { DROP } ; SOME } { NONE address } };
-|}
-
-(* This script calls views on register_callers contract and verifies whether
-   its responses are consistent, i.e. if the view calls_count returned 0, then
-   last caller is None, otherwise – it's Some address. *)
-let check_caller_src =
-  {|
-parameter address ;
-storage (option address) ;
-code {
-       CAR ;
-       DUP ;
-       UNIT ;
-       VIEW "calls_count" nat ;
-       IF_NONE { UNIT ; FAILWITH } {} ;
-       DIP {
-              UNIT ;
-              VIEW "last_caller" (option address) ;
-           } ;
-       PUSH nat 0 ;
-       /* Check if the caller address is consistent with given calls count. */
-       IFCMPEQ {
-                 IF_NONE { UNIT ; FAILWITH } { IF_NONE {} { UNIT ; FAILWITH }} ;
-                 NONE address ;
-               }
-               {
-                 IF_NONE { UNIT ; FAILWITH } { IF_NONE { UNIT ; FAILWITH } {}} ;
-                 SOME ;
-               } ;
-       NIL operation ;
-       PAIR ;
-     }
-   |}
 
 let hooks = Tezos_regression.hooks
 
@@ -98,28 +48,28 @@ let test_regression =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* register_callers =
-    Client.originate_contract
+  let* _alias, register_callers =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
-      ~alias:"register_calls"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:register_callers_src
       ~init:"{}"
       client
+      ["mini_scenarios"; "view_registers_callers"]
+      protocol
   in
-  let arg = sf "%S" register_callers in
-  let* check_caller =
-    Client.originate_contract
+  let arg = Format.sprintf "\"%s\"" register_callers in
+  let* _alias, check_caller =
+    Client.originate_contract_at
       ~hooks
       ~burn_cap:Tez.one
-      ~alias:"check_caller"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:check_caller_src
       ~init:"None"
       client
+      ["mini_scenarios"; "view_check_caller"]
+      protocol
   in
   let* () =
     Client.transfer

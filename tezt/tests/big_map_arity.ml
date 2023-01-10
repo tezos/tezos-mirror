@@ -31,14 +31,6 @@
    Subject: Tests the error message in case the EMPTY_BIG_MAP instruction has bad arity.
 *)
 
-(* The EMPTY_BIG_MAP instruction has bad arity (1 argument instead of 2). *)
-let ill_typed_big_map_arity_script =
-  {|
-parameter unit;
-storage unit;
-code { DROP;  EMPTY_BIG_MAP nat;  DROP; UNIT;  NIL operation; PAIR; }
-|}
-
 let expected_msg =
   rex "primitive EMPTY_BIG_MAP expects 2 arguments but is given 1."
 
@@ -49,9 +41,10 @@ let test_big_map_arity =
     ~tags:["client"; "michelson"; "typechecking"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let process =
-    Client.spawn_typecheck_script ~script:ill_typed_big_map_arity_script client
+  let script =
+    Michelson_script.(find ["ill_typed"; "big_map_arity"] protocol |> path)
   in
+  let process = Client.spawn_typecheck_script ~script client in
   Process.check_error ~exit_code:1 ~msg:expected_msg process
 
 let register ~protocols = test_big_map_arity protocols

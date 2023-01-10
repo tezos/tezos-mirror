@@ -31,19 +31,17 @@
 *)
 
 module Helpers = struct
-  let originate_fail_on_false client =
-    let* contract =
-      Client.originate_contract
+  let originate_fail_on_false protocol client =
+    let* _alias, contract =
+      Client.originate_contract_at
         ~wait:"none"
         ~init:"Unit"
-        ~alias:"deserialization_gas"
         ~amount:Tez.zero
         ~burn_cap:Tez.one
         ~src:Constant.bootstrap1.alias
-        ~prg:
-          "parameter bool; storage unit; code { UNPAIR; IF { NIL operation; \
-           PAIR } { DROP; PUSH string \"bang\"; FAILWITH } }"
         client
+        ["mini_scenarios"; "fail_on_false"]
+        protocol
     in
     let* () = Client.bake_for_and_wait client in
     return contract
@@ -102,7 +100,7 @@ end
 module Simulation = struct
   let transfer ~arg ?simulation ?force k protocol =
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
-    let* contract = Helpers.originate_fail_on_false client in
+    let* contract = Helpers.originate_fail_on_false protocol client in
     Client.spawn_transfer
       ~amount:(Tez.of_int 2)
       ~giver:Constant.bootstrap1.public_key_hash
@@ -115,7 +113,7 @@ module Simulation = struct
 
   let multiple_transfers ~args ?simulation ?force k protocol =
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
-    let* contract = Helpers.originate_fail_on_false client in
+    let* contract = Helpers.originate_fail_on_false protocol client in
     let batches =
       Ezjsonm.list
         (fun arg ->

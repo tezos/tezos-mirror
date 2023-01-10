@@ -32,5 +32,8 @@
 (rule
  (alias runtest)
  (package tezos-protocol-015-PtLimaPt-tests)
- (deps (glob_files contracts/*) (glob_files patched_contracts/*))
+ (deps
+  (glob_files contracts/*)
+  (glob_files patched_contracts/*)
+  (glob_files_rec ../../../../../../michelson_test_scripts/*))
  (action (run %{dep:./main.exe})))

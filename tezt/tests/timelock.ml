@@ -30,51 +30,17 @@
    Subject:      Tests checking contracts with timelock cannot be originated
 *)
 
-(* Script extracted from
-   `src/proto_alpha/lib_protocol/test/integration/michelson/contracts/timelock.tz`
-*)
-let script =
-  {|
-storage (bytes);
-parameter (pair (chest_key) (chest));
-code {
-       UNPAIR;
-       DIP {DROP};
-       UNPAIR;
-       DIIP {PUSH nat 1000};
-       OPEN_CHEST;
-       IF_LEFT
-         { # successful case
-           NIL operation;
-           PAIR ;
-         }
-         {
-           IF
-             { # first type of failure
-               PUSH bytes 0x01;
-               NIL operation;
-               PAIR;
-             }
-             { # second type of failure
-               PUSH bytes 0x00;
-               NIL operation;
-               PAIR;
-             }
-         }
-     }
-    |}
-
 let test_contract_not_originable ~protocol () =
   let* client = Client.init_mockup ~protocol () in
-  let result =
-    Client.spawn_originate_contract
-      ~alias:Constant.bootstrap1.Account.alias
+  let _alias, result =
+    Client.spawn_originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:script
-      ~init:"0xaa"
       ~burn_cap:(Tez.of_int 1)
+      ~init:"0xaa"
       client
+      ["ill_typed"; "timelock"]
+      protocol
   in
   let msg =
     rex
