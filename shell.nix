@@ -69,12 +69,13 @@ let
 
   tezos-opam-repository = fetchTarball "https://gitlab.com/tezos/opam-repository/-/archive/${tezos-opam-repository-rev}/opam-repository-${tezos-opam-repository-rev}.tar.gz";
 
-  common-overlay = final: prev: {
-    ocaml-base-compiler = prev.ocaml-base-compiler.override {
-      # Compile faster!
-      jobs = "$NIX_BUILD_CORES";
+  common-overlay = final: prev:
+    pkgs.lib.optionalAttrs (pkgs.lib.hasAttr "ocaml-base-compiler" prev) {
+      ocaml-base-compiler = prev.ocaml-base-compiler.override {
+        # Compile faster!
+        jobs = "$NIX_BUILD_CORES";
+      };
     };
-  };
 
   darwin-overlay = final: prev: {
     hacl-star-raw = prev.hacl-star-raw.overrideAttrs (old: {
