@@ -40,13 +40,17 @@ let compute_until_snapshot ~max_steps ?write_debug pvm_state =
       | _ -> Wasm_vm.should_compute pvm_state)
     pvm_state
 
-let compute_fast ~reveal_step ~write_debug pvm_state =
+let compute_fast ~reveal_builtins ~write_debug pvm_state =
   let open Lwt.Syntax in
   (* Execute! *)
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4123
      Support performing multiple calls to [Eval.compute]. *)
   let* durable =
-    Exec.compute ~reveal_step ~write_debug pvm_state.durable pvm_state.buffers
+    Exec.compute
+      ~reveal_builtins
+      ~write_debug
+      pvm_state.durable
+      pvm_state.buffers
   in
   (* The WASM PVM does several maintenance operations at the end of
      each [kernel_run] call, using the very last [Padding]
@@ -71,7 +75,7 @@ let compute_fast ~reveal_step ~write_debug pvm_state =
   let+ pvm_state = Wasm_vm.compute_step pvm_state in
   (pvm_state, Z.to_int64 ticks)
 
-let rec compute_step_many accum_ticks ?reveal_step
+let rec compute_step_many accum_ticks ?reveal_builtins
     ?(write_debug = Builtins.Noop) ?(after_fast_exec = fun () -> ())
     ?(stop_at_snapshot = false) ~max_steps pvm_state =
   let open Lwt.Syntax in
@@ -82,7 +86,7 @@ let rec compute_step_many accum_ticks ?reveal_step
   let backup pvm_state =
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
-        ?reveal_step
+        ?reveal_builtins
         ~write_debug
         ~stop_at_snapshot
         ~max_steps
@@ -90,8 +94,8 @@ let rec compute_step_many accum_ticks ?reveal_step
     in
     (pvm_state, Int64.add accum_ticks ticks)
   in
-  match reveal_step with
-  | Some reveal_step when eligible_for_fast_exec -> (
+  match reveal_builtins with
+  | Some reveal_builtins when eligible_for_fast_exec -> (
       let goto_snapshot_and_retry () =
         let* pvm_state, ticks =
           compute_until_snapshot ~write_debug ~max_steps pvm_state
@@ -104,7 +108,7 @@ let rec compute_step_many accum_ticks ?reveal_step
             if may_compute_more && max_steps > 0L then
               (compute_step_many [@tailcall])
                 accum_ticks
-                ~reveal_step
+                ~reveal_builtins
                 ~write_debug
                 ~stop_at_snapshot
                 ~after_fast_exec
@@ -115,7 +119,7 @@ let rec compute_step_many accum_ticks ?reveal_step
       in
       let go_like_the_wind () =
         let+ pvm_state, ticks =
-          compute_fast ~write_debug ~reveal_step pvm_state
+          compute_fast ~write_debug ~reveal_builtins pvm_state
         in
         after_fast_exec () ;
         (pvm_state, Int64.(add ticks accum_ticks))

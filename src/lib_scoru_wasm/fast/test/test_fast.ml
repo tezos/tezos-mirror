@@ -30,21 +30,22 @@ open Wasm_utils
 let apply_fast ?(images = Preimage_map.empty) counter tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
-  let reveal_step =
-    Tezos_scoru_wasm.Builtins.
-      {
-        reveal_preimage =
-          (fun hash ->
-            match Preimage_map.find hash images with
-            | None -> Stdlib.failwith "Failed to find preimage"
-            | Some preimage -> Lwt.return preimage);
-        reveal_metadata =
-          (fun () -> Stdlib.failwith "reveal_preimage is not available");
-      }
+  let reveal_builtins =
+    Some
+      Tezos_scoru_wasm.Builtins.
+        {
+          reveal_preimage =
+            (fun hash ->
+              match Preimage_map.find hash images with
+              | None -> Stdlib.failwith "Failed to find preimage"
+              | Some preimage -> Lwt.return preimage);
+          reveal_metadata =
+            (fun () -> Stdlib.failwith "reveal_preimage is not available");
+        }
   in
   let+ tree =
     Wasm_utils.eval_until_input_requested
-      ~reveal_step
+      ~reveal_builtins
         (* We override the builtins to provide our own [reveal_preimage]
            implementation. This allows us to run Fast Exec with kernels that
            want to reveal stuff. *)
@@ -63,7 +64,7 @@ let apply_fast ?(images = Preimage_map.empty) counter tree =
 let rec apply_slow ?images tree =
   let open Lwt.Syntax in
   let* tree =
-    Wasm_utils.eval_until_input_requested
+    Wasm_utils.eval_until_input_or_reveal_requested
       ~fast_exec:false
       ~max_steps:Int64.max_int
       tree
@@ -392,7 +393,7 @@ let test_tx =
 let test_compute_step_many_pauses_at_snapshot_when_flag_set =
   Wasm_utils.test_with_kernel "computation" (fun kernel ->
       let open Lwt_result_syntax in
-      let reveal_step =
+      let reveal_builtins =
         Tezos_scoru_wasm.Builtins.
           {
             reveal_preimage =
@@ -414,7 +415,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set =
       assert (tick_state == Padding) ;
       let*! fast_tree, _ =
         Wasm_utils.Wasm_fast.compute_step_many
-          ~reveal_step
+          ~reveal_builtins
           ~write_debug:Noop
           ~stop_at_snapshot:true
           ~max_steps:Int64.max_int
@@ -422,7 +423,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set =
       in
       let*! slow_tree, _ =
         Wasm_utils.Wasm.compute_step_many
-          ~reveal_step
+          ~reveal_builtins
           ~stop_at_snapshot:true
           ~max_steps:Int64.max_int
           tree

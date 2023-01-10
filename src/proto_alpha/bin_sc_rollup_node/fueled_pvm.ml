@@ -113,7 +113,7 @@ module Make (PVM : Pvm.S) = struct
       let dal_attestation_lag =
         node_ctxt.protocol_constants.parametric.dal.attestation_lag
       in
-      let reveal_step =
+      let reveal_builtins =
         Tezos_scoru_wasm.Builtins.
           {
             reveal_preimage =
@@ -149,7 +149,7 @@ module Make (PVM : Pvm.S) = struct
             (fun () ->
               let*! state, executed_ticks =
                 PVM.eval_many
-                  ~reveal_step
+                  ~reveal_builtins
                   ~write_debug:(Printer Event.kernel_debug)
                   ~max_steps
                   state

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type reveal_step = {
+type reveals = {
   reveal_preimage : string -> string Lwt.t;
   reveal_metadata : unit -> string Lwt.t;
 }

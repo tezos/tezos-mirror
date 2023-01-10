@@ -38,7 +38,7 @@ type host_state = {
   mutable durable : Durable.t;
 }
 
-let make ~reveal_step ~write_debug state =
+let make ~reveal_builtins ~write_debug state =
   let open Wasmer in
   let open Lwt.Syntax in
   let with_mem f =
@@ -233,7 +233,7 @@ let make ~reveal_step ~write_debug state =
                 Memory.get mem (hash_addr + i)
                 |> Unsigned.UInt8.to_int |> Char.chr)
           in
-          let* payload = reveal_step.Builtins.reveal_preimage hash in
+          let* payload = reveal_builtins.Builtins.reveal_preimage hash in
           Host_funcs.Aux.reveal
             ~memory:mem
             ~dst
@@ -245,7 +245,7 @@ let make ~reveal_step ~write_debug state =
       (i32 @-> i32 @-> returning1 i32)
       (fun dst max_bytes ->
         let mem = state.retrieve_mem () in
-        let* payload = reveal_step.Builtins.reveal_metadata () in
+        let* payload = reveal_builtins.reveal_metadata () in
         Host_funcs.Aux.reveal
           ~memory:mem
           ~dst

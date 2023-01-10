@@ -41,7 +41,7 @@ include Wasm_vm_sig.S
   *)
 val compute_step_many_until :
   ?max_steps:int64 ->
-  ?reveal_step:Builtins.reveal_step ->
+  ?reveal_builtins:Builtins.reveals ->
   ?write_debug:Builtins.write_debug ->
   (pvm_state -> bool Lwt.t) ->
   pvm_state ->
@@ -58,7 +58,7 @@ val patch_flags_on_eval_successful : Durable.t -> Durable.t Lwt.t
 
 (** [should_compute pvm_state] probes whether it is possible to continue with
     more computational steps. *)
-val should_compute : pvm_state -> bool
+val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool
 
 (** [has_reboot_flag durable] checks if the reboot flag is set in the durable storage. *)
 val has_reboot_flag : Durable.t -> bool Lwt.t

@@ -30,7 +30,7 @@ module type Internal_for_tests = sig
   type state
 
   val compute_step_many_with_hooks :
-    ?reveal_step:Builtins.reveal_step ->
+    ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     ?after_fast_exec:(unit -> unit) ->
     ?stop_at_snapshot:bool ->
@@ -51,7 +51,7 @@ module type Generic = sig
       Returns a tuple containing the number of executed ticks and the new
       pvm_state. *)
   val compute_step_many :
-    ?reveal_step:Builtins.reveal_step ->
+    ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     ?stop_at_snapshot:bool ->
     max_steps:int64 ->

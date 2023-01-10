@@ -88,8 +88,8 @@ module Impl : Pvm.S = struct
 
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
 
-  let eval_many ~reveal_step ~write_debug =
-    Backend.compute_step_many ~reveal_step ~write_debug
+  let eval_many ~reveal_builtins ~write_debug =
+    Backend.compute_step_many ~reveal_builtins ~write_debug
 end
 
 include Impl
