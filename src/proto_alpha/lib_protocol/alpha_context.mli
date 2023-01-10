@@ -4133,6 +4133,12 @@ module Sc_rollup : sig
       rollup:t ->
       commitment:Commitment.Hash.t ->
       Staker.Index.t list tzresult Lwt.t
+
+    val staker_id_uncarbonated :
+      context ->
+      rollup:t ->
+      pkh:public_key_hash ->
+      Staker.Index.t tzresult Lwt.t
   end
 
   module Refutation_storage : sig
