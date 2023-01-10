@@ -28,7 +28,8 @@
 /src/lib_event_logging       @romain.nl
 /src/lib_lwt_result_stdlib   @raphael-proust
 /src/lib_mockup_proxy        @igarnier
-/src/lib_openapi             @romain.nl
+/src/lib_node_config         @Killian-Delarue
+/src/lib_openapi             @romain.nl @Killian-Delarue
 /src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment   @raphael-proust
 /src/lib_shell_benchmarks    @lrand
