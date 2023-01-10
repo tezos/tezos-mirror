@@ -413,7 +413,7 @@ let perform_exits ctxt exits =
             let* ctxt, diff =
               Ticket_transfer.transfer_ticket_with_hashes
                 ctxt
-                ~src_hash:op.price.id
+                ~sender_hash:op.price.id
                 ~dst_hash:receiver_ticket_hash
                 amount
             in

@@ -792,7 +792,7 @@ let apply_manager_operation :
           >>=? fun (ctxt, ticket) ->
           Ticket_transfer.transfer_ticket
             ctxt
-            ~src:(Contract source_contract)
+            ~sender:(Contract source_contract)
             ~dst:(Contract destination)
             ticket
             amount
@@ -829,7 +829,7 @@ let apply_manager_operation :
             ~ticketer
             ~contents
             ~ty
-            ~source:(Destination.Contract source_contract)
+            ~sender:(Destination.Contract source_contract)
             ~destination:destination_hash
             ~entrypoint
             ~amount
@@ -837,7 +837,7 @@ let apply_manager_operation :
           >>=? fun (ctxt, token, op) ->
           Ticket_transfer.transfer_ticket
             ctxt
-            ~src:(Contract source_contract)
+            ~sender:(Contract source_contract)
             ~dst:(Contract destination)
             token
             amount

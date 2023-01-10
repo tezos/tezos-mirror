@@ -38,14 +38,14 @@ val parse_ticket :
   (context * Ticket_token.ex_token, error trace) result Lwt.t
 
 (** Same as [parse_ticket], but in addition, build a transaction to
-     let [source] transfers [amount] units of said ticket to
+     let [sender] transfers [amount] units of said ticket to
      [destination]. *)
 val parse_ticket_and_operation :
   consume_deserialization_gas:Script.consume_deserialization_gas ->
   ticketer:Contract.t ->
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
-  source:Destination.t ->
+  sender:Destination.t ->
   destination:Contract_hash.t ->
   entrypoint:Entrypoint.t ->
   amount:Script_typed_ir.ticket_amount ->
@@ -54,11 +54,11 @@ val parse_ticket_and_operation :
   tzresult
   Lwt.t
 
-(** [transfer_ticket_with_hashes ctxt ~src_hash ~dst_hash qty] updates
+(** [transfer_ticket_with_hashes ctxt ~sender_hash ~dst_hash qty] updates
     the table of tickets moves [qty] units of a given ticket from a
-    source to a destination, as encoded by [src_hash] and [dst_hash].
+    sender to a destination, as encoded by [sender_hash] and [dst_hash].
 
-    Consistency between [src_hash] and [dst_hash] is the
+    Consistency between [sender_hash] and [dst_hash] is the
     responsibility of the caller. Whenever possible, [transfer_ticket]
     should be preferred, but [transfer_ticket_with_hashes] could be
     preferred to reduce gas comsumption (e.g., to reuse hashes already
@@ -69,21 +69,21 @@ val parse_ticket_and_operation :
     tickets. *)
 val transfer_ticket_with_hashes :
   context ->
-  src_hash:Ticket_hash.t ->
+  sender_hash:Ticket_hash.t ->
   dst_hash:Ticket_hash.t ->
   Ticket_amount.t ->
   (context * Z.t) tzresult Lwt.t
 
-(** [transfer_ticket ctxt ~src ~dst ex_token qty] updates the table of
-    tickets moves [qty] units of [ex_token] from [src] to [dst], as
-    encoded by [src_hash] and [dst_hash].
+(** [transfer_ticket ctxt ~sender ~dst ex_token qty] updates the table of
+    tickets moves [qty] units of [ex_token] from [sender] to [dst], as
+    encoded by [sender_hash] and [dst_hash].
 
     In addition to an updated context, this function returns the
     number of bytes that were newly allocated for the table of
     tickets. *)
 val transfer_ticket :
   context ->
-  src:Destination.t ->
+  sender:Destination.t ->
   dst:Destination.t ->
   Ticket_token.ex_token ->
   Ticket_amount.t ->

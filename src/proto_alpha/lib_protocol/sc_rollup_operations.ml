@@ -314,7 +314,7 @@ let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
       let* ctxt, storage_diff =
         Ticket_transfer.transfer_ticket
           ctxt
-          ~src:source_destination
+          ~sender:source_destination
           ~dst:target_destination
           ticket_token
           Ticket_amount.((amount :> t))
