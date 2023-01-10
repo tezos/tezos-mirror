@@ -61,12 +61,13 @@ module Make (PVM : Pvm.S) = struct
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
-        if Raw_level.(inbox_level > node_ctxt.lcc.level) then
-          node_ctxt.lcc <- {commitment; level = inbox_level} ;
         let*! () =
-          Commitment_event.last_cemented_commitment_updated
-            commitment
-            inbox_level
+          if Raw_level.(inbox_level > node_ctxt.lcc.level) then (
+            node_ctxt.lcc <- {commitment; level = inbox_level} ;
+            Commitment_event.last_cemented_commitment_updated
+              commitment
+              inbox_level)
+          else Lwt.return_unit
         in
         return_unit
     | ( Sc_rollup_refute _,
