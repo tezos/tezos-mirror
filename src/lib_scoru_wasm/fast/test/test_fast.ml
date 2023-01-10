@@ -242,7 +242,7 @@ let test_store_read_write =
 let test_read_input =
   let kernel =
     {|
-  (module       
+  (module
     (import
       "smart_rollup_core"
       "read_input"
@@ -264,17 +264,17 @@ let test_read_input =
 
     (memory 1)
     (export "memory" (memory 0))
-  
+
     (data (i32.const 1000) "kernel_run called")
-  
+
     (func (export "kernel_run")
       (call $write_debug
         (i32.const 1000) ;; Memory address
         (i32.const 17) ;; length of the string to log
-      ) ;; Should print "kernel_run called" 
+      ) ;; Should print "kernel_run called"
 
       (call $read_input
-        (i32.const 100) ;; address to write the level (4b) 
+        (i32.const 100) ;; address to write the level (4b)
         (i32.const 104) ;; address to write the message counter (8b)
         (i32.const 112) ;; address to write the read input
         (i32.const 4) ;; length of the input
@@ -284,11 +284,11 @@ let test_read_input =
 
       (call $write_output
         (i32.const 100) ;; source address
-        (i32.const 16) ;; number of bytes 
+        (i32.const 16) ;; number of bytes
       ) ;; writes the read level, msg counter and the data "abcd"
 
-      (drop) ;; we don't care about the result of write_output 
-      (drop) ;; we don't care about the result of write_output 
+      (drop) ;; we don't care about the result of write_output
+      (drop) ;; we don't care about the result of write_output
     )
   )
     |}
@@ -312,7 +312,7 @@ let test_big_address =
           (import "smart_rollup_core" "read_input" (func $read_input (type $read_t)))
           (memory 65536)
           (export "mem" (memory 0))
-          
+
           (func (export "kernel_run")
             (call $read_input
                   (i32.const 4_294_967_100) ;; addr_info
