@@ -3214,7 +3214,15 @@ module Sc_rollup : sig
 
   val must_exist : context -> t -> context tzresult Lwt.t
 
-  module Staker : S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
+  module Staker : sig
+    include S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
+
+    module Index : sig
+      type t = private Z.t
+
+      val encoding : t Data_encoding.t
+    end
+  end
 
   module State_hash : sig
     include S.HASH
@@ -4119,6 +4127,12 @@ module Sc_rollup : sig
       rollup:t ->
       inbox_level:Raw_level.t ->
       Commitment.Hash.t list option tzresult Lwt.t
+
+    val stakers_ids_uncarbonated :
+      context ->
+      rollup:t ->
+      commitment:Commitment.Hash.t ->
+      Staker.Index.t list tzresult Lwt.t
   end
 
   module Refutation_storage : sig

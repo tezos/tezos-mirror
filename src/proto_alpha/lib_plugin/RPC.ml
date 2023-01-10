@@ -2106,6 +2106,16 @@ module Sc_rollup = struct
         RPC_path.(
           path_sc_rollup / "inbox_level" /: Raw_level.rpc_arg / "commitments")
 
+    let stakers_ids =
+      let output = Data_encoding.list Sc_rollup.Staker.Index.encoding in
+      RPC_service.get_service
+        ~description:"List of stakers indexes staking on a given commitment"
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(
+          path_sc_rollup / "commitment" /: Sc_rollup.Commitment.Hash.rpc_arg
+          / "stakers_indexes")
+
     let conflicts =
       let output =
         Sc_rollup.(Data_encoding.list Refutation_storage.conflict_encoding)
@@ -2275,6 +2285,16 @@ module Sc_rollup = struct
           ~rollup
           ~inbox_level)
 
+  let register_stakers_ids () =
+    Registration.register2
+      ~chunked:false
+      S.stakers_ids
+      (fun context rollup commitment () () ->
+        Sc_rollup.Stake_storage.stakers_ids_uncarbonated
+          context
+          ~rollup
+          ~commitment)
+
   let register_conflicts () =
     Registration.register2
       ~chunked:false
@@ -2336,6 +2356,7 @@ module Sc_rollup = struct
     register_ongoing_refutation_games () ;
     register_stakers_commitments () ;
     register_commitments () ;
+    register_stakers_ids () ;
     register_conflicts () ;
     register_timeout () ;
     register_timeout_reached () ;
@@ -2393,6 +2414,9 @@ module Sc_rollup = struct
 
   let commitments ctxt rollup inbox_level =
     RPC_context.make_call2 S.commitments ctxt rollup inbox_level
+
+  let stakers_ids ctxt rollup commitment =
+    RPC_context.make_call2 S.stakers_ids ctxt rollup commitment
 
   let conflicts ctxt block sc_rollup_address staker =
     RPC_context.make_call2 S.conflicts ctxt block sc_rollup_address staker () ()
