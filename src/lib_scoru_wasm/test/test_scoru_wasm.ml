@@ -49,5 +49,6 @@ let () =
       ("Hash correspondence", Test_hash_consistency.tests);
       ("Reveal", Test_reveal.tests);
       ("Debug", Test_debug.tests);
+      ("Host functions ticks", Test_host_functions_ticks.tests);
     ]
   |> Lwt_main.run

@@ -6,6 +6,8 @@ type reveal = Reveal_raw_data of string | Reveal_metadata
 
 type reveal_destination = {base : int32; max_bytes : int32}
 
+type ticks = Z.t
+
 type reveal_func =
   available_memories ->
   Values.value list ->
@@ -18,7 +20,7 @@ type host_func =
       Durable_storage.t ->
       available_memories ->
       Values.value list ->
-      (Durable_storage.t * Values.value list) Lwt.t)
+      (Durable_storage.t * Values.value list * ticks) Lwt.t)
   | Reveal_func of reveal_func
 
 module Registry = Map.Make (String)

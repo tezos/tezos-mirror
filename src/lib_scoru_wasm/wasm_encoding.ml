@@ -1091,16 +1091,18 @@ let invoke_step_kont_encoding =
           Inv_reveal_tick {reveal; base_destination; max_bytes; code = (vs, es)});
       case
         "Inv_stop"
-        (tup3
+        (tup4
            ~flatten:true
            (scope ["values"] values_encoding)
            (lazy_vector_encoding "instructions" admin_instr_encoding)
-           (scope ["fresh_frame"] (option ongoing_frame_stack_encoding)))
+           (scope ["fresh_frame"] (option ongoing_frame_stack_encoding))
+           (value ["remaining_ticks"] Data_encoding.z))
         (function
-          | Eval.Inv_stop {code = vs, es; fresh_frame} ->
-              Some (vs, es, fresh_frame)
+          | Eval.Inv_stop {code = vs, es; fresh_frame; remaining_ticks} ->
+              Some (vs, es, fresh_frame, remaining_ticks)
           | _ -> None)
-        (fun (vs, es, fresh_frame) -> Inv_stop {code = (vs, es); fresh_frame});
+        (fun (vs, es, fresh_frame, remaining_ticks) ->
+          Inv_stop {code = (vs, es); fresh_frame; remaining_ticks});
     ]
 
 let label_step_kont_encoding =

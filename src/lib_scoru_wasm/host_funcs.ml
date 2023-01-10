@@ -595,6 +595,8 @@ module Aux = struct
   include Make (Memory_access_interpreter)
 end
 
+let default_ticks = Z.zero
+
 let value i = Values.(Num (I32 i))
 
 let read_input_type =
@@ -605,6 +607,11 @@ let read_input_type =
   Types.FuncType (input_types, output_types)
 
 let read_input_name = "tezos_read_input"
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let read_input_ticks _size = default_ticks
 
 let read_input =
   Host_funcs.Host_func
@@ -617,10 +624,10 @@ let read_input =
        Values.(Num (I32 max_bytes));
       ] ->
           let* memory = retrieve_memory memories in
-          let* x =
+          let* read_bytes =
             Aux.read_input ~input_buffer ~memory ~info_addr ~dst ~max_bytes
           in
-          Lwt.return (durable, [value x])
+          Lwt.return (durable, [value read_bytes], read_input_ticks read_bytes)
       | _ -> raise Bad_input)
 
 let write_output_name = "tezos_write_output"
@@ -632,6 +639,11 @@ let write_output_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let write_output_ticks _size = default_ticks
+
 let write_output =
   Host_funcs.Host_func
     (fun _input_buffer output_buffer durable memories inputs ->
@@ -639,8 +651,10 @@ let write_output =
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
           let* memory = retrieve_memory memories in
-          let* x = Aux.write_output ~output_buffer ~memory ~src ~num_bytes in
-          Lwt.return (durable, [value x])
+          let* read_bytes =
+            Aux.write_output ~output_buffer ~memory ~src ~num_bytes
+          in
+          Lwt.return (durable, [value read_bytes], write_output_ticks read_bytes)
       | _ -> raise Bad_input)
 
 let write_debug_name = "tezos_write_debug"
@@ -666,7 +680,9 @@ let write_debug ~implem =
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
           let+ () = run ~memory ~src ~num_bytes in
-          (durable, [])
+          (* Write_debug is considered a no-op, it shouldn't take more than the
+             default ticks. *)
+          (durable, [], default_ticks)
       | _ -> raise Bad_input)
 
 let store_has_name = "tezos_store_has"
@@ -677,6 +693,11 @@ let store_has_type =
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_has_ticks _size = default_ticks
 
 let store_has =
   Host_funcs.Host_func
@@ -692,7 +713,7 @@ let store_has =
               ~key_offset
               ~key_length
           in
-          (durable, [value r])
+          (durable, [value r], store_has_ticks 0l)
       | _ -> raise Bad_input)
 
 let store_delete_name = "tezos_store_delete"
@@ -703,6 +724,11 @@ let store_delete_type =
   in
   let output_types = Vector.of_list [Types.NumType I32Type] in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_delete_ticks _size = default_ticks
 
 let store_delete =
   Host_funcs.Host_func
@@ -718,7 +744,7 @@ let store_delete =
               ~key_offset
               ~key_length
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], store_delete_ticks 0l)
       | _ -> raise Bad_input)
 
 let store_value_size_name = "tezos_store_value_size"
@@ -730,6 +756,11 @@ let store_value_size_type =
   in
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_value_size_ticks _size = default_ticks
 
 let store_value_size =
   let open Lwt_syntax in
@@ -746,7 +777,7 @@ let store_value_size =
               ~key_offset
               ~key_length
           in
-          (durable, [value res])
+          (durable, [value res], store_value_size_ticks 0l)
       | _ -> raise Bad_input)
 
 let store_list_size_name = "tezos_store_list_size"
@@ -758,6 +789,11 @@ let store_list_size_type =
   in
   let output_types = Types.[NumType I64Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_list_size_ticks _size = default_ticks
 
 let store_list_size =
   Host_funcs.Host_func
@@ -773,7 +809,9 @@ let store_list_size =
               ~key_offset
               ~key_length
           in
-          (Durable.to_storage durable, [Values.(Num (I64 result))])
+          ( Durable.to_storage durable,
+            [Values.(Num (I64 result))],
+            store_list_size_ticks 0l )
       | _ -> raise Bad_input)
 
 let store_get_nth_key_name = "tezos_store_get_nth_key_list"
@@ -792,6 +830,11 @@ let store_get_nth_key_type =
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_get_nth_key_ticks _size = default_ticks
 
 let store_get_nth_key =
   Host_funcs.Host_func
@@ -817,7 +860,7 @@ let store_get_nth_key =
               ~dst
               ~max_size
           in
-          (durable, [value result])
+          (durable, [value result], store_get_nth_key_ticks 0l)
       | _ -> raise Bad_input)
 
 let store_copy_name = "tezos_store_copy"
@@ -830,6 +873,11 @@ let store_copy_type =
   in
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_copy_ticks _size = default_ticks
 
 let store_copy =
   Host_funcs.Host_func
@@ -853,7 +901,7 @@ let store_copy =
               ~to_key_offset
               ~to_key_length
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], store_copy_ticks 0l)
       | _ -> raise Bad_input)
 
 let store_move_name = "tezos_store_move"
@@ -866,6 +914,11 @@ let store_move_type =
   in
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_move_ticks _size = default_ticks
 
 let store_move =
   Host_funcs.Host_func
@@ -889,7 +942,7 @@ let store_move =
               ~to_key_offset
               ~to_key_length
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], store_move_ticks 0l)
       | _ -> raise Bad_input)
 
 let store_read_name = "tezos_store_read"
@@ -908,6 +961,11 @@ let store_read_type =
   in
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_read_ticks _size = default_ticks
 
 let store_read =
   Host_funcs.Host_func
@@ -932,7 +990,7 @@ let store_read =
               ~dest
               ~max_bytes
           in
-          (durable, [value len])
+          (durable, [value len], store_read_ticks 0l)
       | _ -> raise Bad_input)
 
 let reveal_preimage_name = "tezos_reveal_preimage"
@@ -1001,6 +1059,11 @@ let store_write_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4531
+   Define a tick consumption model.
+*)
+let store_write_ticks _size = default_ticks
+
 let store_write =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
@@ -1025,7 +1088,7 @@ let store_write =
               ~src
               ~num_bytes
           in
-          (Durable.to_storage durable, [value code])
+          (Durable.to_storage durable, [value code], store_write_ticks 0l)
       | _ -> raise Bad_input)
 
 let lookup_opt name =
