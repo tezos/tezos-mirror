@@ -974,18 +974,16 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
   let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
   Lwt_list.iter_s (test check_result ~query_string:false) slots_info
 
-let check_published_levels_headers ~__LOC__ dal_node =
-  let check_published_level_headers (level, expected_number_of_headers) =
-    let* slot_headers =
-      RPC.call dal_node (Rollup.Dal.RPC.get_published_level_headers level)
-    in
-    Check.(List.length slot_headers = expected_number_of_headers)
-      ~__LOC__
-      Check.int
-      ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
-    unit
+let check_published_levels_headers ~__LOC__ dal_node ~pub_level
+    ~number_of_headers =
+  let* slot_headers =
+    RPC.call dal_node (Rollup.Dal.RPC.get_published_level_headers pub_level)
   in
-  Lwt_list.iter_s check_published_level_headers
+  Check.(List.length slot_headers = number_of_headers)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
+  unit
 
 let get_headers_succeeds expected_status response =
   let headers =
@@ -1004,15 +1002,23 @@ let get_headers_succeeds expected_status response =
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
+  let check_published_levels_headers =
+    check_published_levels_headers dal_node
+  in
+
   let level = Node.get_level node in
   let pub_level = level + 1 in
   let publish ?fee =
     publish_and_store_slot ~level:pub_level ?fee node client dal_node
   in
-  let* () = check_published_levels_headers ~__LOC__ dal_node [(pub_level, 0)] in
+  let* () =
+    check_published_levels_headers ~__LOC__ ~pub_level ~number_of_headers:0
+  in
   let* slot0 = publish Constant.bootstrap1 0 "test0" in
   let* slot1 = publish Constant.bootstrap2 1 "test1" in
-  let* () = check_published_levels_headers ~__LOC__ dal_node [(pub_level, 2)] in
+  let* () =
+    check_published_levels_headers ~__LOC__ ~pub_level ~number_of_headers:2
+  in
   let* slot2_a = publish Constant.bootstrap3 4 ~fee:1_200 "test4_a" in
   let* slot2_b = publish Constant.bootstrap4 4 ~fee:1_350 "test4_b" in
   let* slot3 = publish Constant.bootstrap5 5 ~fee:1 "test5" in
@@ -1030,7 +1036,9 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       (get_headers_succeeds "unseen")
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
-  let* () = check_published_levels_headers ~__LOC__ dal_node [(pub_level, 5)] in
+  let* () =
+    check_published_levels_headers ~__LOC__ ~pub_level ~number_of_headers:5
+  in
   (* slot2_a and slot3 will not be included as successfull, slot2_b has better
      fees for slot 4. While slot3's fee is too low. slot4 is not injected
      into L1 or Dal nodes.
@@ -1048,7 +1056,9 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* _pub_level = Node.wait_for_level node pub_level in
   let* () = wait_block_processing in
 
-  let* () = check_published_levels_headers ~__LOC__ dal_node [(pub_level, 5)] in
+  let* () =
+    check_published_levels_headers ~__LOC__ ~pub_level ~number_of_headers:5
+  in
   let* slot_headers =
     RPC.call
       dal_node
@@ -1097,7 +1107,9 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = Client.bake_for_and_wait client in
   let* () = Lwt_unix.sleep 2.0 in
 
-  let* () = check_published_levels_headers ~__LOC__ dal_node [(pub_level, 5)] in
+  let* () =
+    check_published_levels_headers ~__LOC__ ~pub_level ~number_of_headers:5
+  in
 
   (* Slot confirmed. *)
   let* () = check_get_commitment get_commitment_succeeds ok in
@@ -1131,7 +1143,19 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
             ~error_msg:"slot4 is not expected to have a header"))
       [slot4]
   in
-  check_published_levels_headers ~__LOC__ dal_node [(pub_level, 5)]
+  let* () =
+    check_published_levels_headers
+      ~__LOC__
+      ~pub_level:(pub_level - 1)
+      ~number_of_headers:0
+  in
+  let* () =
+    check_published_levels_headers ~__LOC__ ~pub_level ~number_of_headers:5
+  in
+  check_published_levels_headers
+    ~__LOC__
+    ~pub_level:(pub_level + 1)
+    ~number_of_headers:0
 
 let generate_dummy_slot slot_size =
   String.init slot_size (fun i ->
