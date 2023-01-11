@@ -58,9 +58,9 @@ type manager_operation_content
       a '.json' extension.
 *)
 type micheline =
-  [ `Json of Ezjsonm.value  (** EzJsonm value *)
+  [ `Json of JSON.u  (** JSON value *)
   | `Michelson of string  (** Michelson string *)
-  | `File of string  (** file with ext .tz or .json for Ezjsonm *) ]
+  | `File of string  (** file with ext .tz or .json for JSON *) ]
 
 (** {2 Smart constructors} *)
 
