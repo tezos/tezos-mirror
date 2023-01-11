@@ -183,23 +183,6 @@ endif
 		@copy-parameters
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
-	@ln -s $(OCTEZ_BIN_DIR)/octez-node tezos-node
-	@ln -s $(OCTEZ_BIN_DIR)/octez-client tezos-client
-	@ln -s $(OCTEZ_BIN_DIR)/octez-admin-client tezos-admin-client
-	@ln -s $(OCTEZ_BIN_DIR)/octez-signer tezos-signer
-	@ln -s $(OCTEZ_BIN_DIR)/octez-codec tezos-codec
-	@ln -s $(OCTEZ_BIN_DIR)/octez-protocol-compiler tezos-protocol-compiler
-	@ln -s $(OCTEZ_BIN_DIR)/octez-proxy-server tezos-proxy-server
-	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-PtKathma tezos-baker-014-PtKathma
-	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-PtKathma tezos-accuser-014-PtKathma
-	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-node-PtKathma tezos-tx-rollup-node-014-PtKathma
-	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-PtKathma tezos-tx-rollup-client-014-PtKathma
-	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-PtLimaPt tezos-baker-015-PtLimaPt
-	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-PtLimaPt tezos-accuser-015-PtLimaPt
-	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-node-PtLimaPt tezos-tx-rollup-node-015-PtLimaPt
-	@ln -s $(OCTEZ_BIN_DIR)/octez-tx-rollup-client-PtLimaPt tezos-tx-rollup-client-015-PtLimaPt
-	@ln -s $(OCTEZ_BIN_DIR)/octez-baker-alpha tezos-baker-alpha
-	@ln -s $(OCTEZ_BIN_DIR)/octez-accuser-alpha tezos-accuser-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
