@@ -1524,6 +1524,21 @@ val sign_block : t -> string -> delegate:string -> string Lwt.t
 (** Same as [sign_block], but do not wait for the process to exit. *)
 val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
+(** Run [octez-client sign message <message> for <src>]. *)
+val sign_message : ?branch:string -> t -> string -> src:string -> string Lwt.t
+
+(** Same as [sign_message], but do not wait for the process to exit. *)
+val spawn_sign_message :
+  ?branch:string -> t -> string -> src:string -> Process.t
+
+(** Run [octez-client check that message <message> was signed by <src> to produce <signature>]. *)
+val check_message :
+  ?branch:string -> t -> src:string -> signature:string -> string -> unit Lwt.t
+
+(** Same as [check_message], but do not wait for the process to exit. *)
+val spawn_check_message :
+  ?branch:string -> t -> src:string -> signature:string -> string -> Process.t
+
 module Tx_rollup : sig
   (** Run [octez-client originate tx rollup from <src>]. *)
   val originate :

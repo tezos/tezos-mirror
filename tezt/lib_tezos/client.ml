@@ -1862,6 +1862,42 @@ let spawn_sign_block client block_hex ~delegate =
 let sign_block client block_hex ~delegate =
   spawn_sign_block client block_hex ~delegate |> Process.check_and_read_stdout
 
+let spawn_sign_message ?branch client message ~src =
+  spawn_command
+    client
+    (["sign"; "message"; message; "for"; src]
+    @ optional_arg "branch" Fun.id branch)
+
+let sign_message ?branch client message ~src =
+  let* output =
+    spawn_sign_message ?branch client message ~src
+    |> Process.check_and_read_stdout
+  in
+  match output =~* rex "Signature: ([a-zA-Z0-9]+)" with
+  | Some signature -> Lwt.return signature
+  | None -> Test.fail "Couldn't sign message '%s' for %s." message src
+
+let spawn_check_message ?branch client ~src ~signature message =
+  spawn_command
+    client
+    ([
+       "check";
+       "that";
+       "message";
+       message;
+       "was";
+       "signed";
+       "by";
+       src;
+       "to";
+       "produce";
+       signature;
+     ]
+    @ optional_arg "branch" Fun.id branch)
+
+let check_message ?branch client ~src ~signature message =
+  spawn_check_message ?branch client ~src ~signature message |> Process.check
+
 module Tx_rollup = struct
   let originate ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
       ?(storage_limit = 60_000) ?fee ?hooks ?(alias = "tx_rollup") ~src client =
