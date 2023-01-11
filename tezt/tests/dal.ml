@@ -1754,6 +1754,63 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
              From L1: %R)") ;
       unit
 
+let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
+    client dal_node =
+  let number_of_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  Log.info "Inject the shards of slots 1 and 3." ;
+  let slot1_content = "slot 1" in
+  let slot2_content = "slot 2" in
+  let slot3_content = "slot 3" in
+  let* _commitment, _proof = split_slot dal_node client slot1_content in
+  let* _commitment, _proof = split_slot dal_node client slot3_content in
+  Log.info "Publish slots 1 and 2 (inject and bake)." ;
+  let level = Node.get_level node + 1 in
+  let publish source ~index message =
+    let* _op_hash =
+      publish_dummy_slot
+        ~source
+        ~fee:3_000
+        ~level
+        ~index
+        ~message
+        cryptobox
+        node
+        client
+    in
+    unit
+  in
+  let* () = publish Constant.bootstrap1 ~index:0 slot1_content in
+  let* () = publish Constant.bootstrap2 ~index:2 slot2_content in
+  let wait_block_processing = wait_for_layer1_block_processing dal_node level in
+  let* () = Client.bake_for_and_wait client in
+  let* () = wait_block_processing in
+  Log.info "Check attestability of slots." ;
+  let attested_level = level + parameters.attestation_lag in
+  let rec iter i =
+    if i < 0 then unit
+    else
+      let attestor = Account.Bootstrap.keys.(i) in
+      (* Note: we assume that the key has at least an assigned shard index. *)
+      let* slots =
+        RPC.call
+          dal_node
+          (Rollup.Dal.RPC.get_attestable_slots ~attestor ~attested_level)
+      in
+      Check.(
+        (number_of_slots = List.length slots)
+          int
+          ~error_msg:"Expected %L slots (got %R)") ;
+      (match slots with
+      | true :: rest when List.for_all (fun b -> not b) rest ->
+          (* 1st slot is attestable; the rest are not: the 2nd is not because
+             the shards are not available; the rest are not because they are not
+             published *)
+          ()
+      | _ -> Test.fail "Unexpected result") ;
+      iter (i - 1)
+  in
+  iter (Array.length Account.Bootstrap.keys - 1)
+
 (* DAC tests *)
 let check_valid_root_hash expected_rh actual_rh =
   Check.(
@@ -2070,6 +2127,11 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node GET /profile/<public_key_hash>/<level>/assigned-shard-indices"
     test_dal_node_get_assigned_shard_indices
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    "dal node GET \
+     /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+    test_dal_node_get_attestable_slots
     protocols ;
 
   (* Tests with all nodes *)
