@@ -1069,6 +1069,12 @@ val remember_contract :
 val spawn_remember_contract :
   ?force:bool -> alias:string -> address:string -> t -> Process.t
 
+(** Run [octez-client remember script <alias> <src>]. *)
+val remember_script : alias:string -> src:string -> t -> unit Lwt.t
+
+(** Same as [remember_script], but do not wait for the process to exit. *)
+val spawn_remember_script : alias:string -> src:string -> t -> Process.t
+
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)
 type stresstest_contract_parameters = {

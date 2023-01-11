@@ -1366,6 +1366,12 @@ let spawn_remember_contract ?(force = false) ~alias ~address client =
 let remember_contract ?force ~alias ~address client =
   spawn_remember_contract ?force ~alias ~address client |> Process.check
 
+let spawn_remember_script ~alias ~src client =
+  spawn_command client ["remember"; "script"; alias; src]
+
+let remember_script ~alias ~src client =
+  spawn_remember_script ~alias ~src client |> Process.check
+
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
