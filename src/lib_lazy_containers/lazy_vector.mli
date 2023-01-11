@@ -180,7 +180,7 @@ module type S = sig
 
   (** [concat lhs rhs] concatenates two lazy vectors.
 
-      {b Note: This function maybe dangerous to use in a tick because
+      {b Note:} This function maybe dangerous to use in a tick because
       {i every} entries of both [lhs] and [rhs] will be loaded in
       memory. *)
   val concat : 'a t -> 'a t -> 'a t Lwt.t
