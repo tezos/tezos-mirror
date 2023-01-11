@@ -2361,11 +2361,11 @@ val convert_data :
 
 (** Convert the given smart contract from Michelson to JSON string. *)
 val convert_script_to_json :
-  ?endpoint:endpoint -> script:string -> t -> Ezjsonm.value Lwt.t
+  ?endpoint:endpoint -> script:string -> t -> JSON.u Lwt.t
 
 (** Convert the given Michelson constant to JSON string. *)
 val convert_data_to_json :
-  ?endpoint:endpoint -> data:string -> t -> Ezjsonm.value Lwt.t
+  ?endpoint:endpoint -> data:string -> t -> JSON.u Lwt.t
 
 (** Run [octez-client bootstrapped]. *)
 val bootstrapped : t -> unit Lwt.t
