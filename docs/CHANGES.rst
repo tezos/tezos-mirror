@@ -3,6 +3,169 @@
 Changelog
 '''''''''
 
+Version 16.0~rc1
+================
+
+General
+-------
+
+- **Breaking change**: Symbolic links from old-names ``tezos-*`` to new-names ``octez-*``
+  have been removed.
+  Old names are not supported anymore.
+
+Node
+----
+
+- Fixed a bug that caused snapshot import to ignore the data directory
+  of the configuration file when the configuration file was specified
+  from the command-line using ``--config-file``. Note that ``--data-dir``
+  can still be used to override the data directory location from the
+  configuration file, whether it is specified from the command-line or not.
+
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number of
+  additional cycles.
+
+- Fixed an issue that could left a temporary directory if a snapshot
+  export was cancelled. Additionally, a cleanup now ensures the
+  absence of leftovers temporary directories when exporting a
+  snapshot.
+
+- Fixed an issue that could left a lock file if a snapshot import was
+  cancelled.
+
+- **Breaking change**: the default ``?version`` of the ``pending_operations``
+  RPC is now 1 instead of 0. Version 1 is more consistent as
+  ``branch_delayed``/``branch_refused``/``outdated``/``refused`` operations are
+  encoded like ``applied`` operations: the ``"hash"`` field is included in the
+  object instead of being separate in an array. The same change applies to
+  ``unprocessed`` operations, except that those do not contain the ``error``
+  field. More details can be found by calling the
+  ``describe/chains/main/mempool/pending_operations`` RPC. You can get back the
+  previous encoding with ``?version=0`` but note that version 0 is now
+  deprecated and may be removed starting from the next major release of Octez.
+  (MR :gl:`!6783`)
+
+- The ``pending_operations`` RPC can now be run in ``binary`` format when using
+  version ``1``. (MR :gl:`!6783`)
+
+- Removed the ``node_`` prefix in identifiers of the
+  ``config_validation`` and ``config_file`` events and errors.
+
+- Introduced a ``--json`` command line argument to the ``snapshot
+  info`` allowing to print snapshot information as JSON.
+
+- Removed the ``octez-validator`` executable, which was already part
+  of ``octez-node`` and that was already used internally (and that was
+  not usable on its own).
+
+- **Breaking change**: bumped the node's storage version to
+  ``3.0``. This new version changes the store's representation
+  required by the new protocol's semantics and the context's format to
+  improve the disk usage footprint while running a context
+  pruning. Upgrading to this new version is automatic and
+  irreversible. (MR :gl: `!6835` and :gl: `!6959`)
+
+- **Breaking change**: bumped the snapshot version to ``5``. This
+  version changes internal snapshot file representation to include
+  more information required by the new protocol's semantics and to
+  improve both import and export speed. Snapshots of version ``4``
+  exported with previous versions of Octez can still be
+  imported. Snapshots of version ``5`` are not backward compatible.
+  (MR :gl: `!6835` and :gl: `!6961`)
+
+- Upon receiving a new non-manager operation that conflicts with a
+  previously validated operation, the mempool may now replace the old
+  operation with the new one, depending on both operations' content
+  and hash. This behavior was already in place for manager operations,
+  and has simply be extended to non-manager operations. It should help
+  all mempools converge toward the same set of accepted operations,
+  regardless of the order in which the operations were
+  received. (MR :gl: `!6749`)
+
+- Changed the id and message of the error when the mempool rejects a
+  new operation because it already contains a preferred conflicting
+  operation. Changed the id and message of the error associated with
+  an operation that is removed from the mempool to make room for a
+  better conflicting operation. (MR :gl: `!6749`)
+
+- Fixed a minor bug that caused the mempool to accept a manager
+  operation that conflicts with an already present ``drain_delegate``
+  operation. (MR :gl: `!6749`)
+
+- Removed the compatibility with storage snapshots of version ``2``
+  and ``3``. These snapshot versions from Octez 12 cannot be imported
+  anymore.
+
+- Added optional query parameter ``validation_pass`` to RPCs ``GET
+  /chains/main/mempool/pending_operations`` and ``GET
+  /chains/<chain_id>/mempool/monitor_operation``. This new parameter causes the
+  RPC to only return operations for the given validation pass (``0`` for
+  consensus operations, ``1`` for voting operations, ``2`` for anonymous
+  operations, ``3`` for manager operations). If ``validation_pass`` is
+  unspecified, operations for all validation passes are returned, making this
+  extension backward-compatible. (MR :gl:`!6724`)
+
+- Fixed an issue where the node's RPC server would silently fail when
+  either the path to the certificate or to the key passed in the
+  node's ``--rpc-tls`` argument does not point to an existing
+  file. The node's ``run`` now fails immediately in this case. (MR
+  :gl:`!7323`)
+
+- Improved the disk usage footprint when running a context pruning.
+
+- **Breaking Changes:** Removed ``kathmandunet`` from the list of
+  known networks (for ``--network`` command-line argument).
+
+- Allowed symbolic links in the datadir (to split data over several places).
+
+Client
+------
+
+- Added command to get contract's balance of ticket with specified ticketer, content type, and content. Can be used for both implicit and originated contracts.
+  ``octez-client get ticket balance for <contract> with ticketer '<ticketer>' and type <type> and content <content>``. (MR :gl:`!6491`)
+
+- Added command to get the complete list of tickets owned by a given contract by scanning the contract's storage. Can only be used for originated contracts.
+  ``octez-client get all ticket balances for <contract>``. (MR :gl:`!6804`)
+
+Baker
+-----
+
+- **Breaking change**: modified the baker's persistent state. Once the
+  protocol "M" activates, the new baker will automatically overwrite
+  the existing persistent state to the new format. This implies that
+  previous bakers will fail to load this new state from disk unless
+  the user directly removes the file
+  ``<client-dir>/<chain_id>_baker_state``. On mainnet, this will have
+  no effect as when the new protocol activates, previous bakers will
+  be permanently idle. (MR :gl: `!6835`)
+
+- Fixed an issue where the baker would keep files opened longer than
+  necessary causing unexpected out of space errors making the baker
+  crash.
+
+
+Proxy Server
+------------
+
+- The proxy server can now serve endpoints about blocks of all known economic
+  protocols instead of only one chosen at boot time.
+
+Codec
+-----
+
+- Added the ``dump encoding <id>`` command to dump the description of a single
+  registered encoding.
+
+
+Miscellaneous
+-------------
+
+- Versioning of signature module for protocol specific support and future
+  extensibility.
+
+- Removed binaries of Kathmandu.
+
 Version 15.1
 ============
 
