@@ -749,6 +749,13 @@ let gen_keys ?alias ?sig_alg client =
   let* () = Process.check p in
   return alias
 
+let spawn_activate_account ?(wait = "none") client ~alias ~activation_key =
+  spawn_command client
+  @@ ["--wait"; wait; "activate"; "account"; alias; "with"; activation_key]
+
+let activate_account ?wait client ~alias ~activation_key =
+  spawn_activate_account ?wait client ~alias ~activation_key |> Process.check
+
 let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
 

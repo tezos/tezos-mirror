@@ -622,6 +622,14 @@ val spawn_add_address :
 val bls_gen_keys :
   ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
 
+(** Run [octez-client activate accoung <alias> with <activation_key>]. *)
+val activate_account :
+  ?wait:string -> t -> alias:string -> activation_key:string -> unit Lwt.t
+
+(** Same as [activate_account] but do not wait for the process to exit. *)
+val spawn_activate_account :
+  ?wait:string -> t -> alias:string -> activation_key:string -> Process.t
+
 (** Run [octez-client bls list keys].
 
     Returns the known BLS aliases associated to their public key hash.
