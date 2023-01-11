@@ -158,6 +158,15 @@ Codec
   registered encoding.
 
 
+Rollups
+-------
+
+- Added Smart Rollups executables.
+  This includes ``octez-smart-rollup-node-PtMumbai``, ``octez-smart-rollup-client-PtMumbai``.
+
+- Released ``octez-smart-rollup-wasm-debugger`` as part of the Octez distribution (MR :gl:`!7295`).
+  See the smart rollups documentation for its functionalities and how to use it to test and debug kernels.
+
 Miscellaneous
 -------------
 
