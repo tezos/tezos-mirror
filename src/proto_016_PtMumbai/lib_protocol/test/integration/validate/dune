@@ -9,6 +9,7 @@
   tezos-protocol-016-PtMumbai
   qcheck-alcotest
   tezos-client-016-PtMumbai
+  tezos-test-helpers
   tezos-016-PtMumbai-test-helpers
   tezos-base-test-helpers
   tezos-protocol-plugin-016-PtMumbai)
@@ -18,6 +19,7 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_016_PtMumbai
   -open Tezos_client_016_PtMumbai
+  -open Lib_test
   -open Tezos_016_PtMumbai_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_plugin_016_PtMumbai))

@@ -21,9 +21,9 @@ depends: [
   "tezos-benchmark-alpha" {with-test}
   "tezos-benchmark-type-inference-alpha" {with-test}
   "qcheck-alcotest" { with-test & >= "0.18" }
+  "tezos-test-helpers" {with-test}
   "tezt" { with-test & >= "3.0.0" }
   "tezos-context" {with-test}
-  "tezos-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
   "tezos-smart-rollup-alpha" {with-test}
   "tezos-crypto-dal" {with-test}

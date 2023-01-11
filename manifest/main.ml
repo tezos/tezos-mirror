@@ -3734,6 +3734,7 @@ end = struct
               main |> open_;
               qcheck_alcotest;
               client |> if_some |> open_;
+              octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
               plugin |> if_some |> open_;
@@ -3849,6 +3850,7 @@ end = struct
               octez_protocol_environment;
               octez_stdlib_unix;
               main |> open_;
+              octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotest_lwt;
               octez_scoru_wasm_tests_helpers |> if_ N.(number >= 016) |> open_;
