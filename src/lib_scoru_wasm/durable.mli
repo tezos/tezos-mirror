@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -102,6 +102,9 @@ val copy_tree_exn : t -> ?edit_readonly:bool -> key -> key -> t Lwt.t
     @raise Readonly_value
 *)
 val move_tree_exn : t -> key -> key -> t Lwt.t
+
+(** [list durable key] returns the subkeys under [key]. *)
+val list : t -> key -> string list Lwt.t
 
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t

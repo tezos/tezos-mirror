@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -237,9 +238,53 @@ let rpc_get_rich ?hooks sc_client path parameters =
       @@ List.map (fun (k, v) -> Format.asprintf "%s=%s" k v) parameters
   in
   let uri = Client.string_of_path path ^ parameters in
-  let runnable = spawn_command ?hooks sc_client ["rpc"; "get"; uri] in
-  let* output = Process.check_and_read_stdout runnable.value in
-  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
+  spawn_command ?hooks sc_client ["rpc"; "get"; uri]
+  |> Runnable.map @@ fun output ->
+     JSON.parse ~origin:(Client.string_of_path path ^ " response") output
+
+type 'output_type durable_state_operation =
+  | Value : string option durable_state_operation
+  | Length : int64 option durable_state_operation
+  | Subkeys : string list durable_state_operation
+
+let string_of_durable_state_operation (type a) (x : a durable_state_operation) =
+  match x with Value -> "value" | Length -> "length" | Subkeys -> "subkeys"
+
+let inspect_durable_state_value :
+    type a.
+    ?hooks:Process.hooks ->
+    ?block:string ->
+    t ->
+    pvm_kind:string ->
+    operation:a durable_state_operation ->
+    key:string ->
+    a Runnable.process =
+ fun ?hooks ?(block = "head") sc_client ~pvm_kind ~operation ~key ->
+  let op = string_of_durable_state_operation operation in
+  let rpc_req () =
+    rpc_get_rich
+      ?hooks
+      sc_client
+      ["global"; "block"; block; "durable"; pvm_kind; op]
+      [("key", key)]
+  in
+  match operation with
+  | Value -> rpc_req () |> Runnable.map (fun json -> JSON.as_string_opt json)
+  | Length -> rpc_req () |> Runnable.map (fun json -> JSON.as_int64_opt json)
+  | Subkeys ->
+      rpc_req ()
+      |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
+
+(* match expected with
+   | Expected_success -> (
+       let*! json = rpc_req () in
+       match operation with
+       | Value -> return (JSON.as_string json : a)
+       | Length -> return (JSON.as_int64 json : a)
+       | Subkeys -> return (List.map JSON.as_string (JSON.as_list json)))
+   | Expected_error msg ->
+       let*? process = rpc_req () in
+       Process.check_error ~msg process *)
 
 let ticks ?hooks ?(block = "head") sc_client =
   let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in

@@ -243,6 +243,16 @@ This sequence of operations was run:
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/num_messages
 "5"
 
+./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/wasm_2_0_0/value?key=/readonly/wasm_version'
+Error
+  No service found at this URL
+  
+
+./octez-smart-rollup-client-alpha rpc get '/global/block/head/durable/arith/value?key=/readonly/wasm_version'
+Error
+  No service found at this URL
+  
+
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/status
 "Waiting for input message"
 

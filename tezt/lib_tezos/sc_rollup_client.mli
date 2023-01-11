@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,7 +83,7 @@ val rpc_get_rich :
   t ->
   Client.path ->
   (string * string) list ->
-  JSON.t Lwt.t
+  JSON.t Runnable.process
 
 (** [total_ticks ?block client] gets the total number of ticks for the PVM. *)
 val total_ticks :
@@ -110,6 +111,22 @@ val state_value :
   t ->
   key:string ->
   bytes Runnable.process
+
+type 'output_type durable_state_operation =
+  | Value : string option durable_state_operation
+  | Length : int64 option durable_state_operation
+  | Subkeys : string list durable_state_operation
+
+(** [inspect_durable_state_value ?block client key] gets the corresponding durable PVM state value
+    mapped to [key] for the [block] (default ["head"]). *)
+val inspect_durable_state_value :
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  t ->
+  pvm_kind:string ->
+  operation:'a durable_state_operation ->
+  key:string ->
+  'a Runnable.process
 
 (** [status ?block client] gets the corresponding PVM status for the [block]
     (default ["head"]). *)
