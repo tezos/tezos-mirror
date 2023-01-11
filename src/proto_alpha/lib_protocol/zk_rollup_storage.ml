@@ -32,7 +32,7 @@ type error +=
 let () =
   register_error_kind
     `Temporary
-    ~id:"Zk_rollup_does_not_exist"
+    ~id:"zk_rollup_does_not_exist"
     ~title:"ZK Rollup does not exist"
     ~description:"Attempted to use a ZK rollup that has not been originated."
     ~pp:(fun ppf x ->
@@ -42,7 +42,7 @@ let () =
     (fun x -> Zk_rollup_does_not_exist x) ;
   register_error_kind
     `Permanent
-    ~id:"Zk_rollup_invalid_op code"
+    ~id:"zk_rollup_invalid_op code"
     ~title:"Invalid op code in append"
     ~description:"Invalid op code in append"
     ~pp:(fun ppf oc ->
@@ -52,7 +52,7 @@ let () =
     (fun oc -> Zk_rollup_invalid_op_code oc) ;
   register_error_kind
     `Temporary
-    ~id:"Zk_rollup_pending_list_too_short"
+    ~id:"zk_rollup_pending_list_too_short"
     ~title:"Pending list is too short"
     ~description:"Pending list is too short"
     Data_encoding.unit
@@ -60,7 +60,7 @@ let () =
     (fun () -> Zk_rollup_pending_list_too_short) ;
   register_error_kind
     `Permanent
-    ~id:"Zk_rollup_negative_length"
+    ~id:"zk_rollup_negative_length"
     ~title:"Negative length for pending list prefix"
     ~description:"Negative length for pending list prefix"
     Data_encoding.unit
