@@ -249,6 +249,34 @@ module Merkle_tree = struct
       in
       assert_fails_with ~loc serialize_payload error
 
+    let test_serialization_roundtrip ?expect_num_of_pages ~loc ~max_page_size
+        payload =
+      let open Lwt_result_syntax in
+      let module Backend = Hashes_Map_backend () in
+      let* hash =
+        lift
+        @@ serialize_payload
+             ~max_page_size
+             payload
+             ~for_each_page:Backend.save_page
+      in
+      let* retrieved_payload =
+        lift
+        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
+      in
+      let* () =
+        match expect_num_of_pages with
+        | Some expected ->
+            let actual = Backend.number_of_pages () in
+            Assert.equal_int ~loc actual expected
+        | None -> return_unit
+      in
+      assert_equal_bytes
+        ~loc
+        "Deserialized payload do not match with original"
+        payload
+        retrieved_payload
+
     (* We use 50 bytes as the size of a page. Of these, 5 bytes are used for
        the preamble, which leaves 45 bytes of space for storing hashes in a
        page. The size of a hash is 32 bytes, therefore only floor(45/2) = 1
@@ -273,37 +301,22 @@ module Merkle_tree = struct
          this value to 80. *)
       test_serialization_fails_with
         ~loc:__LOC__
-        ~max_page_size: 80
-        ~payload: Bytes.empty
+        ~max_page_size:80
+        ~payload:Bytes.empty
         ~error:Dac_pages_encoding.Payload_cannot_be_empty
 
     let one_page_roundtrip () =
-      let open Lwt_result_syntax in
-      let module Backend = Hashes_Map_backend () in
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
          we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
          this value to 80. *)
       let max_page_size = 80 in
       let payload = Bytes.of_string "Hello payload" in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      let map_size = Backend.number_of_pages () in
-      let* () = Assert.equal_int ~loc:__LOC__ map_size 1 in
-      assert_equal_bytes
+      test_serialization_roundtrip
+        ~expect_num_of_pages:1
         ~loc:__LOC__
-        "Deserialized payload do not match with original"
+        ~max_page_size
         payload
-        retrieved_payload
 
     let multiple_pages_roundtrip_heterogeneous_payload () =
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
@@ -316,8 +329,7 @@ module Merkle_tree = struct
          are used for storing the 3 hashes of the 3 payload pages, and
          ceil(2/2) = 1 page is used for storing the 2 hashes of the previous
          pages. *)
-      let open Lwt_result_syntax in
-      let module Backend = Hashes_Map_backend () in
+
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
          we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
@@ -329,24 +341,11 @@ module Merkle_tree = struct
            eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim \
            ad minim veniam, quis nostrud exercitation ullamco"
       in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      let map_size = Backend.number_of_pages () in
-      let* () = Assert.equal_int ~loc:__LOC__ map_size 6 in
-      assert_equal_bytes
+      test_serialization_roundtrip
+        ~expect_num_of_pages:6
         ~loc:__LOC__
-        "Deserialized payload do not match with original"
+        ~max_page_size
         payload
-        retrieved_payload
 
     let multiple_pages_roundtrip_homogeneous_payload () =
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
@@ -359,8 +358,7 @@ module Merkle_tree = struct
          tree. Finally, another page will be used for storing the Merkle tree
          root page, which contains the two hashes of the Merkle tree nodes
          above. In total, the serialization should be spread among 4 pages. *)
-      let module Backend = Hashes_Map_backend () in
-      let open Lwt_result_syntax in
+
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
          we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
@@ -369,24 +367,11 @@ module Merkle_tree = struct
       let payload =
         List.repeat 225 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
       in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      let map_size = Backend.number_of_pages () in
-      let* () = Assert.equal_int ~loc:__LOC__ map_size 4 in
-      assert_equal_bytes
+      test_serialization_roundtrip
+        ~expect_num_of_pages:4
         ~loc:__LOC__
-        "Deserialized payload do not match with original"
+        ~max_page_size
         payload
-        retrieved_payload
 
     let multiple_pages_roundtrip_do_not_exceed_page_size () =
       (* Check that a bug related to the size of hashes has been fixed.
@@ -405,8 +390,6 @@ module Merkle_tree = struct
          3 hashes of 32 bytes each, resulting in a page of `101 bytes` and
          causing the serialization to fail.
       *)
-      let open Lwt_result_syntax in
-      let module Backend = Hashes_Map_backend () in
       let max_page_size = 98 in
       (* 279 bytes of payload *)
       let payload =
@@ -417,51 +400,20 @@ module Merkle_tree = struct
            aliquip ex ea commodo consequat. Duis aute irure dolor in \
            reprehenderit in volup"
       in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      assert_equal_bytes
-        ~loc:__LOC__
-        "Deserialized payload do not match with original"
-        payload
-        retrieved_payload
+      test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
 
     let long_content_roundtrip () =
       (* To ensure that the serialization and deserialization process work as
          expected, we test a roundtrip for a reasonably long text. We also
          increase the page size to allow for more than two hashes in a page. *)
       let module Backend = Hashes_Map_backend () in
-      let open Lwt_result_syntax in
       (* The page size is set to 150. Of these, 5 bytes are used for the page
          preamble, and the reset will contain hashes which are 32 bytes long
          each. The number of hashes that can fit into a page is
          floor((150 - 5)/32) = 4. *)
       let max_page_size = 150 in
       let payload = Bytes.of_string long_payload in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      assert_equal_bytes
-        ~loc:__LOC__
-        "Deserialized payload do not match with original"
-        payload
-        retrieved_payload
+      test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
   end
 end
 
