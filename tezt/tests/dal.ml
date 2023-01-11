@@ -1046,9 +1046,6 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
      We decide to have two failed slots instead of just one to better test some
      internal aspects of failed slots headers recoding (i.e. having a collection
      of data instead of just one). *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7049
-     Retrieve successfull & failed slots with GET /slots/<commitment>/headers
-     in MR !7049. *)
   let wait_block_processing =
     wait_for_layer1_block_processing dal_node pub_level
   in
