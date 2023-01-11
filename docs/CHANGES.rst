@@ -173,7 +173,7 @@ Miscellaneous
 - Versioning of signature module for protocol specific support and future
   extensibility.
 
-- Removed binaries of Kathmandu.
+- Removed binaries and mempool RPCs of Kathmandu.
 
 Version 15.1
 ============
