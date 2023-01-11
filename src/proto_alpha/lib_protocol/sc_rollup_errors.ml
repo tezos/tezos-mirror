@@ -99,6 +99,8 @@ type error +=
       last_cemented_inbox_level : Raw_level_repr.t;
       commitment_inbox_level : Raw_level_repr.t;
     }
+  | (* `Temporary *)
+      Sc_rollup_no_commitment_to_cement of Raw_level_repr.t
 
 let () =
   register_error_kind
@@ -675,4 +677,21 @@ let () =
       | _ -> None)
     (fun (last_cemented_inbox_level, commitment_inbox_level) ->
       Sc_rollup_commitment_too_old
-        {last_cemented_inbox_level; commitment_inbox_level})
+        {last_cemented_inbox_level; commitment_inbox_level}) ;
+  let description = "No commitment to cement" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_no_commitment_to_cement"
+    ~title:description
+    ~pp:(fun ppf inbox_level ->
+      Format.fprintf
+        ppf
+        "There is no commitment to cement at inbox level %a."
+        Raw_level_repr.pp
+        inbox_level)
+    ~description
+    Data_encoding.(obj1 (req "inbox_level" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_no_commitment_to_cement inbox_level -> Some inbox_level
+      | _ -> None)
+    (fun inbox_level -> Sc_rollup_no_commitment_to_cement inbox_level)
