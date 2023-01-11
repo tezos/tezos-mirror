@@ -493,6 +493,15 @@ Second, the configured rollup node can be run:
 The log should show that the rollup node follows the layer-1 chain and
 processes the inbox of each level.
 
+Rollup node in a sandbox
+""""""""""""""""""""""""
+
+The node can also be tested locally with a sandbox environment. (See :doc:`sandbox documentation <../user/sandbox>`.)
+
+Once you initialized the "sandboxed" client data with ``./src/bin_client/octez-init-sandboxed-client.sh``, you can run a sandboxed rollup node with ``octez-smart-rollup'node-alpha run``.
+
+A temporary directory ``/tmp/tezos-smart-rollup-node.xxxxxxxx`` will be used. However, a specific data directory can be set with the environment variable ``SCORU_DATA_DIR``.
+
 .. _sending_external_inbox_message_mumbai:
 
 Sending an external inbox message
