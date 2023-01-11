@@ -31,7 +31,7 @@
 *)
 
 include Shared
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 
 (** Completely random key generator. Mitigated by also picking keys

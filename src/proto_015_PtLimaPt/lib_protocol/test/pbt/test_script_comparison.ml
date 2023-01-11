@@ -34,7 +34,7 @@
 open Protocol
 open Alpha_context
 open Script_typed_ir
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* Reference implementation *)
 

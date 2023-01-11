@@ -31,7 +31,7 @@
     Subject:      Operations in Carbonated_map
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 open Protocol
 

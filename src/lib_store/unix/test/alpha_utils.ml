@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 open Tezos_protocol_alpha
 open Protocol
 open Alpha_context

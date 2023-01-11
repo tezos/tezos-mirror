@@ -30,7 +30,7 @@
     Subject:      Unit tests for [Peer_validator]
 *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 (** [wrap f] create a mocked [chain_store], [Chain_db] and a
     [Peer_validator] that can be used by [f]. *)

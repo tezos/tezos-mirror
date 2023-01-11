@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Plugin.Mempool
 open Alpha_context
 open Test_utils

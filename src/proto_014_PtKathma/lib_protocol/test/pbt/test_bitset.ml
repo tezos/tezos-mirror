@@ -30,7 +30,7 @@
     Subject:      Bitset structure
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Protocol.Bitset
 
 let gen_ofs = QCheck2.Gen.int_bound (64 * 10)

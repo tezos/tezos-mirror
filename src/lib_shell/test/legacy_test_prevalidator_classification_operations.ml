@@ -42,7 +42,7 @@
                   and [Prevalidator_classification.recyle_operations]
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 module Op_map = Tezos_crypto.Operation_hash.Map
 module Prevalidation = Legacy_prevalidation
 module Classification = Legacy_prevalidator_classification

@@ -31,12 +31,12 @@
     Subject:      Tests [P2p_buffer_reader]
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Lwt.Syntax
 
 let test_mk_buffer_negative_len =
   Alcotest.test_case "Negative length is rejected" `Quick @@ fun () ->
-  Lib_test.Assert.assert_true
+  Assert.assert_true
     "[mk_buffer ?length_to_copy:-1] fails"
     (Result.is_error
     @@ P2p_buffer_reader.mk_buffer ~length_to_copy:(-1)
@@ -44,13 +44,13 @@ let test_mk_buffer_negative_len =
 
 let test_mk_buffer_negative_pos =
   Alcotest.test_case "Negative position is rejected" `Quick @@ fun () ->
-  Lib_test.Assert.assert_true
+  Assert.assert_true
     "[mk_buffer ?pos:-1] fails"
     (Result.is_error @@ P2p_buffer_reader.mk_buffer ~pos:(-1) @@ Bytes.create 8)
 
 let test_mk_buffer_out_of_bound =
   Alcotest.test_case "Invalid length+position is rejected" `Quick @@ fun () ->
-  Lib_test.Assert.assert_true
+  Assert.assert_true
     "[mk_buffer ?length_to_copy ?pos buf] with (length_to_copy + pos > \
      (Bytes.length buf)) fails"
     (Result.is_error
@@ -59,14 +59,14 @@ let test_mk_buffer_out_of_bound =
 
 let test_mk_buffer_default =
   Alcotest.test_case "Default values are accepted" `Quick @@ fun () ->
-  Lib_test.Assert.assert_true
+  Assert.assert_true
     "[mk_buffer Bytes.empty] succeeds"
     (Result.is_ok @@ P2p_buffer_reader.mk_buffer Bytes.empty)
 
 let test_mk_buffer_regular =
   Alcotest.test_case "Extreme valid values are accepted" `Quick @@ fun () ->
   let length_to_copy = 16 in
-  Lib_test.Assert.assert_true
+  Assert.assert_true
     "[mk_buffer ?length_to_copy=max ?pos:0] succeeds"
     (Result.is_ok
     @@ P2p_buffer_reader.mk_buffer ~length_to_copy ~pos:0
@@ -91,7 +91,7 @@ let test_mk_buffer_safe =
       Alcotest.(check int "length_to_copy is always the buffer length")
         buf_len
         length_to_copy ;
-      Lib_test.Assert.assert_true
+      Assert.assert_true
         "A destructed mk_buffer_safe buffer correctly reconstructs"
         (P2p_buffer_reader.mk_buffer ~pos ~length_to_copy buf |> Result.is_ok))
     lengths

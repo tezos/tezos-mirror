@@ -295,7 +295,7 @@ let economic_tests =
   ]
 
 let _ =
-  let open Lib_test.Qcheck2_helpers in
+  let open Qcheck2_helpers in
   Alcotest.run
     "protocol > pbt > liquidity baking"
     [

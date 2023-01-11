@@ -41,7 +41,7 @@
     Subject:      Unit tests the Prevalidator pending operations APIs
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 module Prevalidation = Legacy_prevalidation
 module Pending_ops = Legacy_prevalidator_pending_operations
 module Generators = Legacy_generators

@@ -35,7 +35,7 @@ open Protocol
 
 open Alpha_context
 open Sc_rollup
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Sc_rollup_helpers
 
 (** {2 Utils} *)

@@ -31,7 +31,7 @@
 *)
 
 module Assert_lib = Lib_test_extra.Assert_lib
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 let equal_context_hash ?loc ?msg l1 l2 =
   Assert.equal

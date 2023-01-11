@@ -217,10 +217,10 @@ let assert_has_events msg ?filter ?(strict = true) (pats : Pattern.t list) =
   else
     List.iter
       (fun pattern ->
-        Lib_test.Assert.check_any ~msg (Pattern.match_event pattern) events)
+        Assert.check_any ~msg (Pattern.match_event pattern) events)
       pats
 
 let assert_has_event msg ?filter ?(strict = true) (pattern : Pattern.t) =
   let log = get_events ?filter () in
   if strict then assert_has_events msg ?filter ~strict [pattern]
-  else Lib_test.Assert.check_any ~msg (Pattern.match_event pattern) log
+  else Assert.check_any ~msg (Pattern.match_event pattern) log

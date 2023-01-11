@@ -39,7 +39,7 @@
                    \-- block3b
 *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 let create_block2 ctxt =
   let open Lwt_syntax in

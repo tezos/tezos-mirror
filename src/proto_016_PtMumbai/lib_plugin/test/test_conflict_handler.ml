@@ -36,8 +36,7 @@ let pp_answer fmt = function
 
 let check_answer ?__LOC__ expected actual =
   assert
-    (Lib_test.Qcheck2_helpers.qcheck_eq ~pp:pp_answer ?__LOC__ expected actual
-      : bool)
+    (Qcheck2_helpers.qcheck_eq ~pp:pp_answer ?__LOC__ expected actual : bool)
 
 let is_manager_op ((_ : Tezos_crypto.Operation_hash.t), op) =
   (* This is implemented differently from

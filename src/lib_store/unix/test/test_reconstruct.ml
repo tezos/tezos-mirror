@@ -30,7 +30,7 @@ open Test_utils
 let equal_history_mode ?loc ?msg hm1 hm2 =
   let eq = ( = ) in
   let pp = Tezos_shell_services.History_mode.pp in
-  Lib_test.Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
+  Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
 
 let check_flags descr store expected_head =
   let open Lwt_result_syntax in

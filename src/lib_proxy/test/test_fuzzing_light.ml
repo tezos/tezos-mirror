@@ -36,7 +36,7 @@
 
 module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 

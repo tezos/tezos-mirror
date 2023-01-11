@@ -32,7 +32,7 @@
 *)
 
 open Protocol
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (** Extract a Tezos result for compatibility with QCheck2. *)
 let extract_qcheck_result = function

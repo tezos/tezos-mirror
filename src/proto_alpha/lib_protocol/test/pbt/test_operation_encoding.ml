@@ -33,7 +33,7 @@
 
 open Protocol
 open QCheck2
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (** {2 Generators}  *)
 let generate_operation =

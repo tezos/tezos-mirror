@@ -32,7 +32,7 @@
 
 (** Basic blocks *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 (** Basic blocks *)
 

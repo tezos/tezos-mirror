@@ -33,7 +33,7 @@
 *)
 
 open Protocol
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 let pp ppf expr =
   expr

@@ -85,4 +85,4 @@ let test_split_key =
 let () =
   Alcotest.run
     "tezos-lib-client-proxy"
-    [("proxy", Lib_test.Qcheck_helpers.qcheck_wrap [test_split_key])]
+    [("proxy", Qcheck_helpers.qcheck_wrap [test_split_key])]

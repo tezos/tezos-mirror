@@ -30,7 +30,7 @@
     Subject:      Unit tests for [Worker]
 *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 open Mocked_worker
 module Event = Internal_event.Simple
 
@@ -155,7 +155,7 @@ let assert_status w expected_status =
     (Format.asprintf "Worker should be of status %s" expected_status)
     (status_str = expected_status)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 module Generators = struct
   open QCheck2

@@ -46,7 +46,7 @@ let z_in_mutez_bounds (z : Z.t) : bool =
 let compare (c' : Z.t) (c : Tez.t tzresult) : bool =
   match (z_in_mutez_bounds @@ c', c) with
   | true, Ok c ->
-      Lib_test.Qcheck2_helpers.qcheck_eq'
+      Qcheck2_helpers.qcheck_eq'
         ~pp:Z.pp_print
         ~expected:c'
         ~actual:(tez_to_z c)
@@ -133,4 +133,4 @@ let tests =
 let () =
   Alcotest.run
     "protocol > pbt > tez_repr"
-    [("Tez_repr", Lib_test.Qcheck2_helpers.qcheck_wrap tests)]
+    [("Tez_repr", Qcheck2_helpers.qcheck_wrap tests)]

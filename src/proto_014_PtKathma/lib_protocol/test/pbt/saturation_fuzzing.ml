@@ -32,7 +32,7 @@
 *)
 
 open Protocol.Saturation_repr
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (** A generator that returns a [t] that cannot be [saturated] *)
 let unsatured_gen = of_option_gen @@ QCheck2.Gen.(map of_int_opt int)

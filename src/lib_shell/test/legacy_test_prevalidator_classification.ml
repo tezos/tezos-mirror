@@ -41,7 +41,7 @@
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 module Prevalidation = Legacy_prevalidation
 module Classification = Legacy_prevalidator_classification
 module Generators = Legacy_generators

@@ -37,7 +37,7 @@ open Alpha_context
 open Tztest
 open Micheline
 open QCheck2
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Michelson_v1_primitives
 open Michelson_v1_printer
 open Test_global_constants

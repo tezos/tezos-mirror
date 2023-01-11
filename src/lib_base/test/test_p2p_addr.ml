@@ -30,7 +30,7 @@
    Subject:      Check the parsing of addresses with domain names
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* Note, this is a duplicate of some functions from
    Tezos_base_test_helpers.Tz_gen. Unfortunately it's impossible to

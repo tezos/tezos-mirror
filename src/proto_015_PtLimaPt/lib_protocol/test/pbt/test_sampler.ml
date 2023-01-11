@@ -31,7 +31,7 @@
     Subject:      Operations in Saturation_repr
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Protocol.Sampler
 
 (* ------------------------------------------------------------------------- *)

@@ -40,9 +40,9 @@
                   and considers only a unique, statically defined, active peer.
 *)
 
-open Lib_test.Testable
-open Lib_test.Assert
-open Lib_test.Lwt_assert
+open Testable
+open Assert
+open Lwt_assert
 open Tztestable
 include Shared
 

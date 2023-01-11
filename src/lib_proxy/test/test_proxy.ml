@@ -103,8 +103,8 @@ let mock_input : Tezos_proxy.Proxy.proxy_getter_input =
     block = mock_block;
   }
 
-open Lib_test.Assert
-open Lib_test.Lwt_assert
+open Assert
+open Lwt_assert
 
 let test_tree _ () =
   let open Tezos_proxy.Proxy_getter.RequestsTree in

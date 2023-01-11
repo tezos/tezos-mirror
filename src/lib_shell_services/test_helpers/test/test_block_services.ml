@@ -30,7 +30,7 @@
     Subject:      Fuzzing tests of equalities
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 

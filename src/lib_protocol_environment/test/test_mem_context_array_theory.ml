@@ -47,7 +47,7 @@
     use automatically generated values; thanks to [QCheck2].
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 module Test = QCheck2.Test
 
