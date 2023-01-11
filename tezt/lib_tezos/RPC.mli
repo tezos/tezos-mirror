@@ -533,6 +533,7 @@ val get_chain_block_context_raw :
   ?chain:string ->
   ?block:string ->
   ?ctxt_type:ctxt_type ->
+  ?depth:int ->
   value_path:string list ->
   unit ->
   JSON.t t

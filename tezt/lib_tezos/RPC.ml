@@ -515,8 +515,9 @@ type ctxt_type = Bytes | Json
 let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
 
 let get_chain_block_context_raw ?(chain = "main") ?(block = "head")
-    ?(ctxt_type = Json) ~value_path () =
+    ?(ctxt_type = Json) ?depth ~value_path () =
   make
+    ~query_string:(Query_arg.opt "depth" string_of_int depth)
     GET
     ([
        "chains";
