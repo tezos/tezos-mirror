@@ -27,13 +27,9 @@ let ns = Namespace.make Registration_helpers.ns "sc_rollup"
 
 let fv s = Free_variable.of_namespace (ns s)
 
-(** This benchmark estimates the cost of verifying an output proof for the
-    Wasm PVM.
-    The inferred cost model is [c1 + c2*proof_length]. *)
-module Sc_rollup_verify_output_proof_benchmark = struct
-  (* This section contains preliminary definitions for building a pvm state
-     from scratch. *)
-
+(** This section contains preliminary definitions for building a pvm state
+    from scratch. *)
+module Pvm_state_generator = struct
   module Context = Tezos_context_memory.Context_binary
 
   module Wasm_context = struct
@@ -243,7 +239,13 @@ module Sc_rollup_verify_output_proof_benchmark = struct
         tree
     in
     Lwt.return (dummy_context, output, tree)
+end
 
+(** This benchmark estimates the cost of verifying an output proof for the
+    Wasm PVM.
+    The inferred cost model is [c1 + c2*proof_length]. *)
+module Sc_rollup_verify_output_proof_benchmark = struct
+  open Pvm_state_generator
   module Full_Wasm =
     Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
 
