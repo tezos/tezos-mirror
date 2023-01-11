@@ -100,6 +100,16 @@ module Legacy = struct
     end
 
     module Level : sig
+      (**
+         Part of the storage for slots' headers where paths are indexed by slots
+         indices.
+
+         "Accepted" path(s) are used to store information about slots headers
+         that are either [`Waiting_attesattion], [`Attested], or [`Unattested].
+
+         "Others" path(s) are used to store information of slots headers when
+         their statuses are [`Not_selected] or [`Unseen]. *)
+
       val slots_indices : Services.Types.level -> Path.t
 
       val accepted_header_commitment : Services.Types.slot_id -> Path.t
@@ -414,6 +424,8 @@ module Legacy = struct
       |> List.filter (fun {Services.Types.slot_level = l; slot_index = i} ->
              keep_field l slot_level && keep_field i slot_index)
 
+  (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
+     header. *)
   let get_accepted_headers ~skip_commitment indices store accu =
     let open Lwt_result_syntax in
     List.fold_left_es
@@ -444,6 +456,8 @@ module Legacy = struct
       accu
       indices
 
+  (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
+     header. *)
   let get_accepted_headers_of_commitment commitment indices store accu =
     let encoded_commitment = encode_commitment commitment in
     let skip_commitment read_commitment =
@@ -452,6 +466,8 @@ module Legacy = struct
     in
     get_accepted_headers ~skip_commitment indices store accu
 
+  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
+     header. *)
   let get_other_headers_of_identified_commitment commitment slot_id store acc =
     let open Lwt_result_syntax in
     let*! status_opt =
@@ -465,6 +481,8 @@ module Legacy = struct
         | Some status ->
             return @@ ({Services.Types.slot_id; commitment; status} :: acc))
 
+  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
+     header. *)
   let get_other_headers_of_commitment commitment indices store accu =
     List.fold_left_es
       (fun acc slot_id ->
@@ -482,12 +500,11 @@ module Legacy = struct
     let*! indexes = list store @@ Path.Commitment.headers commitment in
     (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
     let indices = filter_indexes ?slot_level ?slot_index indexes in
-    (* Retrieve the headers that haven't been "accepted" on L1. *)
     let* accu = get_other_headers_of_commitment commitment indices store [] in
-    (* Retrieve the headers that have been "accepted" on L1 (i.e. with
-       [`Waiting_attestation], [`Attested] or [`Unattested] statuses). *)
     get_accepted_headers_of_commitment commitment indices store accu
 
+  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
+     header. *)
   let get_other_headers indices store accu =
     let open Lwt_result_syntax in
     List.fold_left_es
@@ -527,15 +544,13 @@ module Legacy = struct
           })
         slots_indices
     in
-    (* Retrieve the list of non-accepted headers for [indices]. *)
     let* accu = get_other_headers indices store [] in
-    (* Retrieve the headers that have been "accepted" on L1 (i.e. with
-       [`Waiting_attestation], [`Attested] or [`Unattested] statuses) whose IDs
-       are in [indices]. *)
-    let skip_commitment c =
-      decode_commitment c |> Option.fold ~none:`Skip ~some:(fun c -> `Keep c)
+    let* accu =
+      let skip_commitment c =
+        decode_commitment c |> Option.fold ~none:`Skip ~some:(fun c -> `Keep c)
+      in
+      get_accepted_headers ~skip_commitment indices store accu
     in
-    let* accu = get_accepted_headers ~skip_commitment indices store accu in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
        Enable the same filtering for GET /commitments/<commitment>/headers
        (function get_commitment_headers above). Push this filtering into the result
