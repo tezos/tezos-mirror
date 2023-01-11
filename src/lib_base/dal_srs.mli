@@ -25,7 +25,7 @@
 
 (** [find_trusted_setup_files] returns the path of the two files
    necessary to initialize cryptographic primitives used by the
-   DAL. See {!module:Tezos-crypto_dal.Cryptobox}. *)
+   DAL. See {!module:Tezos_crypto_dal.Cryptobox}. *)
 val find_trusted_setup_files :
   ?getenv_opt:(string -> string option) ->
   ?getcwd:(unit -> string) ->
