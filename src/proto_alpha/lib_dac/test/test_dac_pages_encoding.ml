@@ -239,6 +239,16 @@ module Merkle_tree = struct
   module V0 = struct
     open Dac_pages_encoding.Merkle_tree.V0
 
+    let test_serialization_fails_with ~loc ~max_page_size ~payload ~error =
+      let module Backend = Hashes_Map_backend () in
+      let serialize_payload =
+        serialize_payload
+          ~max_page_size
+          payload
+          ~for_each_page:Backend.save_page
+      in
+      assert_fails_with ~loc serialize_payload error
+
     (* We use 50 bytes as the size of a page. Of these, 5 bytes are used for
        the preamble, which leaves 45 bytes of space for storing hashes in a
        page. The size of a hash is 32 bytes, therefore only floor(45/2) = 1
@@ -246,36 +256,26 @@ module Merkle_tree = struct
        requires a page size that can contain at least two hashes, the
        serialization of any content will fail in this case.
     *)
-
     let serialize_one_hash_per_page_fails () =
-      let module Backend = Hashes_Map_backend () in
       let payload =
         List.repeat 195 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
       in
-      assert_fails_with
+      test_serialization_fails_with
         ~loc:__LOC__
-        (serialize_payload
-           ~max_page_size:50
-           payload
-           ~for_each_page:Backend.save_page)
-        Dac_pages_encoding.Merkle_tree_branching_factor_not_high_enough
+        ~max_page_size:50
+        ~payload
+        ~error:Dac_pages_encoding.Merkle_tree_branching_factor_not_high_enough
 
     let serialize_empty_payload_fails () =
-      let module Backend = Hashes_Map_backend () in
       (* Limit the number of hashes stored per page to 2. Because hashes
          have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
          we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
          this value to 80. *)
-      let max_page_size = 80 in
-      let payload = Bytes.empty in
-
-      assert_fails_with
+      test_serialization_fails_with
         ~loc:__LOC__
-        (serialize_payload
-           ~max_page_size
-           payload
-           ~for_each_page:Backend.save_page)
-        Dac_pages_encoding.Payload_cannot_be_empty
+        ~max_page_size: 80
+        ~payload: Bytes.empty
+        ~error:Dac_pages_encoding.Payload_cannot_be_empty
 
     let one_page_roundtrip () =
       let open Lwt_result_syntax in
