@@ -5,8 +5,8 @@ Documenting
 The documentation is available online at `tezos.gitlab.io <http://tezos.gitlab.io/>`_,
 and always up to date with branch ``master`` on `GitLab <https://gitlab.com/tezos/tezos>`_.
 
-Building instructions
-=====================
+Building the documentation
+==========================
 
 You can build the documentation locally or in the CI.
 

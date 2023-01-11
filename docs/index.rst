@@ -6,7 +6,7 @@
 .. TODO https://gitlab.com/tezos/tezos/-/issues/2170:
    search shifted protocol name/number & adapt
 
-Welcome to the Tezos Developer Documentation!
+Welcome to the Tezos Technical Documentation!
 =============================================
 
 To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
@@ -91,7 +91,7 @@ If you want to know more about the Tezos *technology*, there are several section
 
 - Section ``Shell`` introduces the common :ref:`architectural principles of any Tezos implementation <the_big_picture>`, mainly consisting of a "shell" and a "protocol". It also presents in particular the :ref:`architectural principles of the Octez implementation <packages>`. A group of pages in this section detail some major subsystems of :doc:`shell/shell`.
 
-- Sections named ``<name> Protocol`` explain the design principles and the salient features of several Tezos protocols, current or upcoming, such as: the :doc:`the active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
+- Sections named ``<name> Protocol`` explain the design principles and the salient features of several Tezos protocols, current or upcoming, such as: the :doc:`active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
 
 
 .. raw:: html

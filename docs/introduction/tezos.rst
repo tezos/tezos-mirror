@@ -73,6 +73,6 @@ See the list of test networks in :ref:`test network <test-networks>`.
 This website
 ~~~~~~~~~~~~
 
-This website (https://tezos.gitlab.io/) provides online developer documentation. This documentation is about :ref:`octez`, although it also documents Tezos in general.
+This website (https://tezos.gitlab.io/) provides online technical documentation. This documentation is about :ref:`octez`, although it also documents Tezos in general.
 
-The developer documentation is automatically generated from the master branch of the :ref:`Octez <octez>` repository.
+The technical documentation is automatically generated from the master branch of the :ref:`Octez <octez>` repository.
