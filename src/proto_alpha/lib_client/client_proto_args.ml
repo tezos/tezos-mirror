@@ -189,6 +189,15 @@ let data_parameter =
   in
   file_or_text_parameter ~from_text ()
 
+let binary_encoded_parameter ~name encoding =
+  let open Lwt_result_syntax in
+  let from_text (cctxt : #Client_context.full) s =
+    match Data_encoding.Binary.of_bytes_opt encoding (Bytes.of_string s) with
+    | None -> cctxt#error "Invalid %s parameter" name
+    | Some x -> return x
+  in
+  file_or_text_parameter ~from_text ()
+
 let entrypoint_parameter =
   Tezos_clic.parameter (fun _ str ->
       Lwt.return @@ Environment.wrap_tzresult @@ Entrypoint.of_string_lax str)
@@ -745,84 +754,27 @@ module Zk_rollup_params = struct
         | None -> cctxt#error "Parameter '%s' is an invalid Epoxy address" s)
 
   let plonk_public_parameters_parameter =
-    let open Lwt_result_syntax in
-    Tezos_clic.parameter @@ fun cctx s ->
-    file_or_text
-      ~read_file:cctx#read_file
-      ~from_text:(fun s ->
-        match
-          Data_encoding.(
-            Binary.of_bytes_opt
-              Plonk.Main_protocol.verifier_public_parameters_encoding)
-            (Bytes.of_string s)
-        with
-        | None -> failwith "Invalid PlonK public parameter"
-        | Some x -> return x)
-      s
+    binary_encoded_parameter
+      ~name:"PlonK public"
+      Plonk.Main_protocol.verifier_public_parameters_encoding
 
   let update_parameter =
-    let open Lwt_result_syntax in
-    Tezos_clic.parameter @@ fun cctx s ->
-    file_or_text
-      ~read_file:cctx#read_file
-      ~from_text:(fun s ->
-        match
-          Data_encoding.Binary.of_bytes_opt
-            Zk_rollup.Update.encoding
-            (Bytes.of_string s)
-        with
-        | None -> failwith "Invalid Epoxy Update parameter"
-        | Some u -> return u)
-      s
+    binary_encoded_parameter ~name:"Epoxy Update" Zk_rollup.Update.encoding
 
   let operations_parameter =
-    let open Lwt_result_syntax in
-    Tezos_clic.parameter @@ fun cctx s ->
-    file_or_text
-      ~read_file:cctx#read_file
-      ~from_text:(fun s ->
-        match
-          Data_encoding.(
-            Binary.of_bytes_opt
-              (list
-              @@ tup2
-                   Zk_rollup.Operation.encoding
-                   (option Zk_rollup.Ticket.encoding)))
-            (Bytes.of_string s)
-        with
-        | None -> failwith "Invalid Epoxy Operations parameter"
-        | Some ops -> return ops)
-      s
+    binary_encoded_parameter
+      ~name:"Epoxy Operations"
+      Data_encoding.(
+        list
+        @@ tup2 Zk_rollup.Operation.encoding (option Zk_rollup.Ticket.encoding))
 
   let state_parameter =
-    let open Lwt_result_syntax in
-    Tezos_clic.parameter @@ fun cctx s ->
-    file_or_text
-      ~read_file:cctx#read_file
-      ~from_text:(fun s ->
-        match
-          Data_encoding.Binary.of_bytes_opt
-            Zk_rollup.State.encoding
-            (Bytes.of_string s)
-        with
-        | None -> failwith "Invalid Epoxy State parameter"
-        | Some s -> return s)
-      s
+    binary_encoded_parameter ~name:"Epoxy State" Zk_rollup.State.encoding
 
   let circuits_info_parameter =
-    let open Lwt_result_syntax in
-    Tezos_clic.parameter @@ fun cctx s ->
-    file_or_text
-      ~read_file:cctx#read_file
-      ~from_text:(fun s ->
-        match
-          Data_encoding.Binary.of_bytes_opt
-            Zk_rollup.Account.circuits_info_encoding
-            (Bytes.of_string s)
-        with
-        | None -> failwith "Invalid Epoxy Circuits_info map parameter"
-        | Some c -> return c)
-      s
+    binary_encoded_parameter
+      ~name:"Epoxy Circuits_info map"
+      Zk_rollup.Account.circuits_info_encoding
 end
 
 let fee_parameter_args =
