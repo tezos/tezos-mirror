@@ -212,6 +212,7 @@ end)
 type state_info = {
   head : Block_header.shell_header;
   round_durations : Round.round_durations;
+  hard_gas_limit_per_block : Gas.Arith.integral;
   head_round : Round.t;
   round_zero_duration : Period.t;
   grandparent_level_start : Timestamp.t;
@@ -247,7 +248,7 @@ let empty_ops_state =
     min_prechecked_op_weight = None;
   }
 
-let init_state_prototzresult ~head round_durations =
+let init_state_prototzresult ~head round_durations hard_gas_limit_per_block =
   let open Lwt_result_syntax in
   let*? head_round =
     Alpha_context.Fitness.round_from_raw head.Tezos_base.Block_header.fitness
@@ -272,6 +273,7 @@ let init_state_prototzresult ~head round_durations =
     {
       head;
       round_durations;
+      hard_gas_limit_per_block;
       head_round;
       round_zero_duration;
       grandparent_level_start;
@@ -279,10 +281,10 @@ let init_state_prototzresult ~head round_durations =
   in
   return {state_info; ops_state = empty_ops_state}
 
-let init_state ~head round_durations =
+let init_state ~head round_durations hard_gas_limit_per_block =
   Lwt.map
     Environment.wrap_tzresult
-    (init_state_prototzresult ~head round_durations)
+    (init_state_prototzresult ~head round_durations hard_gas_limit_per_block)
 
 let init context ~(head : Tezos_base.Block_header.shell_header) =
   let open Lwt_result_syntax in
@@ -297,7 +299,8 @@ let init context ~(head : Tezos_base.Block_header.shell_header) =
     |> Lwt.map Environment.wrap_tzresult
   in
   let round_durations = Constants.round_durations ctxt in
-  init_state ~head round_durations
+  let hard_gas_limit_per_block = Constants.hard_gas_limit_per_block ctxt in
+  init_state ~head round_durations hard_gas_limit_per_block
 
 let flush old_state ~head =
   (* To avoid the need to prepare a context as in [init], we retrieve
@@ -305,8 +308,13 @@ let flush old_state ~head =
      only determined by the [minimal_block_delay] and
      [delay_increment_per_round] constants (see
      {!Raw_context.prepare}), and all the constants remain unchanged
-     during the lifetime of a protocol. *)
-  init_state ~head old_state.state_info.round_durations
+     during the lifetime of a protocol. As to
+     [hard_gas_limit_per_block], it is directly a protocol
+     constant. *)
+  init_state
+    ~head
+    old_state.state_info.round_durations
+    old_state.state_info.hard_gas_limit_per_block
 
 let manager_prio p = `Low p
 
@@ -472,12 +480,8 @@ let size_of_operation op =
       corresponds to the one implemented by the baker, to decide which operations
       to put in a block first (the code is largely duplicated).
       See {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
-let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas op
-    =
-  let hard_gas_limit_per_block =
-    Constants.hard_gas_limit_per_block
-      (Validate.get_initial_ctxt validation_state)
-  in
+let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
+    ~gas op =
   let max_size = managers_quota.max_size in
   let size = match size with None -> size_of_operation op | Some s -> s in
   let size_f = Q.of_int size in
@@ -500,51 +504,44 @@ let required_fee_manager_operation_weight ~op_resources ~min_weight =
       be prechecked and return said weight. In the case where the prechecked
       mempool is full, return an error if the weight is too small, or return the
       operation to be replaced otherwise. *)
-let check_minimal_weight ?validation_state config ops_state ~fee ~gas_limit op =
-  match validation_state with
-  | None -> `Weight_ok (`No_replace, [])
-  | Some validation_state -> (
-      let weight, op_resources =
-        weight_and_resources_manager_operation
-          ~validation_state
-          ~fee
-          ~gas:gas_limit
-          op
-      in
-      if
-        ops_state.prechecked_manager_op_count
-        < config.max_prechecked_manager_operations
-      then
-        (* The precheck mempool is not full yet *)
+let check_minimal_weight config state ~fee ~gas_limit op =
+  let weight, op_resources =
+    weight_and_resources_manager_operation
+      ~hard_gas_limit_per_block:state.state_info.hard_gas_limit_per_block
+      ~fee
+      ~gas:gas_limit
+      op
+  in
+  if
+    state.ops_state.prechecked_manager_op_count
+    < config.max_prechecked_manager_operations
+  then
+    (* The precheck mempool is not full yet *)
+    `Weight_ok (`No_replace, [weight])
+  else
+    match state.ops_state.min_prechecked_op_weight with
+    | None ->
+        (* The precheck mempool is empty *)
         `Weight_ok (`No_replace, [weight])
-      else
-        match ops_state.min_prechecked_op_weight with
-        | None ->
-            (* The precheck mempool is empty *)
-            `Weight_ok (`No_replace, [weight])
-        | Some {weight = min_weight; operation_hash = min_oph} ->
-            if Q.(weight > min_weight) then
-              (* The operation has a weight greater than the minimal
-                 prechecked operation, replace the latest with the new one *)
-              `Weight_ok (`Replace min_oph, [weight])
-            else
-              (* Otherwise fail and give indication as to what to fee should
-                 be for the operation to be prechecked *)
-              let required_fee =
-                required_fee_manager_operation_weight ~op_resources ~min_weight
-              in
-              `Fail
-                (`Branch_delayed
-                  [
-                    Environment.wrap_tzerror
-                      (Fees_too_low_for_mempool required_fee);
-                  ]))
+    | Some {weight = min_weight; operation_hash = min_oph} ->
+        if Q.(weight > min_weight) then
+          (* The operation has a weight greater than the minimal
+             prechecked operation, replace the latest with the new one *)
+          `Weight_ok (`Replace min_oph, [weight])
+        else
+          (* Otherwise fail and give indication as to what to fee should
+             be for the operation to be prechecked *)
+          let required_fee =
+            required_fee_manager_operation_weight ~op_resources ~min_weight
+          in
+          `Fail
+            (`Branch_delayed
+              [Environment.wrap_tzerror (Fees_too_low_for_mempool required_fee)])
 
 let pre_filter_manager :
     type t.
     config ->
     state ->
-    validation_state_before:validation_state option ->
     Operation.packed_protocol_data ->
     t Kind.manager contents_list ->
     [ `Passed_prefilter of Q.t list
@@ -552,7 +549,7 @@ let pre_filter_manager :
     | `Branch_delayed of tztrace
     | `Refused of tztrace
     | `Outdated of tztrace ] =
- fun config filter_state ~validation_state_before packed_op op ->
+ fun config filter_state packed_op op ->
   let size = size_of_operation packed_op in
   let check_gas_and_fee fee gas_limit =
     let fees_in_nanotez =
@@ -588,13 +585,7 @@ let pre_filter_manager :
       | `Refused _ as err -> err
       | `Fees_ok -> (
           match
-            check_minimal_weight
-              ?validation_state:validation_state_before
-              config
-              filter_state.ops_state
-              ~fee
-              ~gas_limit
-              packed_op
+            check_minimal_weight config filter_state ~fee ~gas_limit packed_op
           with
           | `Fail errs -> errs
           | `Weight_ok (_, weight) -> `Passed_prefilter weight))
@@ -795,20 +786,13 @@ let pre_filter_far_future_consensus_ops config ~filter_state
 
       We add [config.clock_drift] time as a safety margin.
   *)
-let pre_filter config ~(filter_state : state) ?validation_state_before
+let pre_filter config ~filter_state
     ({shell = _; protocol_data = Operation_data {contents; _} as op} :
       Main.operation) =
   let prefilter_manager_op manager_op =
     Lwt.return
     @@
-    match
-      pre_filter_manager
-        config
-        filter_state
-        ~validation_state_before
-        op
-        manager_op
-    with
+    match pre_filter_manager config filter_state op manager_op with
     | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
     | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as err
       ->
@@ -922,8 +906,8 @@ let add_manager_op ops_state oph info replacement =
       min_prechecked_op_weight;
     }
 
-let add_manager_op_and_enforce_mempool_bound validation_state config
-    filter_state oph (op : 'manager_kind Kind.manager operation) =
+let add_manager_op_and_enforce_mempool_bound config filter_state oph
+    (op : 'manager_kind Kind.manager operation) =
   let open Lwt_result_syntax in
   let*? fee, gas_limit =
     Result.map_error
@@ -933,9 +917,8 @@ let add_manager_op_and_enforce_mempool_bound validation_state config
   let* replacement, weight =
     match
       check_minimal_weight
-        ~validation_state
         config
-        filter_state.ops_state
+        filter_state
         ~fee
         ~gas_limit
         (Operation_data op.protocol_data)
@@ -985,8 +968,8 @@ let add_manager_op_and_enforce_mempool_bound validation_state config
     new operation has been validated by the protocol. It will be
     removed in the future once the shell is able to bound the number of
     operations in the mempool by itself. *)
-let add_operation_and_enforce_mempool_bound ?replace validation_state config
-    filter_state (oph, op) =
+let add_operation_and_enforce_mempool_bound ?replace config filter_state
+    (oph, op) =
   let filter_state =
     match replace with
     | Some replace_oph ->
@@ -999,7 +982,6 @@ let add_operation_and_enforce_mempool_bound ?replace validation_state config
   let {protocol_data = Operation_data protocol_data; _} = op in
   let call_manager protocol_data =
     add_manager_op_and_enforce_mempool_bound
-      validation_state
       config
       filter_state
       oph

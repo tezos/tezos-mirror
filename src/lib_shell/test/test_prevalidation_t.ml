@@ -407,9 +407,9 @@ module Toy_filter = struct
 
     let remove ~filter_state:_ _ = assert false
 
-    let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ = assert false
+    let pre_filter _ ~filter_state:_ _ = assert false
 
-    let add_operation_and_enforce_mempool_bound ?replace _ config filter_state
+    let add_operation_and_enforce_mempool_bound ?replace config filter_state
         (oph, _op) =
       let filter_state =
         match replace with

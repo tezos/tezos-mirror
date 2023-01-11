@@ -51,7 +51,12 @@ let test_flush () =
       let ctxt = Incremental.alpha_ctxt incremental in
       let head = block.header.shell in
       let round_durations = Alpha_context.Constants.round_durations ctxt in
-      let* filter_state = init_state ~head round_durations in
+      let hard_gas_limit_per_block =
+        Alpha_context.Constants.hard_gas_limit_per_block ctxt
+      in
+      let* filter_state =
+        init_state ~head round_durations hard_gas_limit_per_block
+      in
       let filter_state = {filter_state with ops_state} in
       let* flushed_state = flush filter_state ~head in
       if eq_state flushed_state.ops_state empty_ops_state then return_unit

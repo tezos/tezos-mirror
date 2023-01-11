@@ -61,7 +61,7 @@ module type FILTER = sig
         [oph] from the state of the filter *)
     val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
 
-    (** [pre_filter config ~filter_state ?validation_state_before operation_data]
+    (** [pre_filter config ~filter_state operation_data]
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
         plugin and returns [`Passed_prefilter priority] if no error occurs during
@@ -75,7 +75,6 @@ module type FILTER = sig
     val pre_filter :
       config ->
       filter_state:state ->
-      ?validation_state_before:Proto.validation_state ->
       Proto.operation ->
       [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
@@ -102,7 +101,6 @@ module type FILTER = sig
         [`No_replace]). *)
     val add_operation_and_enforce_mempool_bound :
       ?replace:Tezos_crypto.Operation_hash.t ->
-      Proto.validation_state ->
       config ->
       state ->
       Tezos_crypto.Operation_hash.t * Proto.operation ->
