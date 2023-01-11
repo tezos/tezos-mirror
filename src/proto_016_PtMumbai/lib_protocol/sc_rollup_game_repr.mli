@@ -191,6 +191,12 @@ module V1 : sig
 
   (** A game is characterized by:
 
+    - [refuter_commitment_hash], the hash of the commitment of the player that
+      has initiated the game.
+
+    - [defender_commitment_hash], the hash of the commitment of the player that
+      is tentatively refuted.
+
     - [turn], the player that must provide the next move.
 
     - [inbox_snapshot], a snapshot of the inbox state at the moment the
@@ -284,20 +290,20 @@ end
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
 
-    [initial inbox dal_slots_history ~start_level ~parent ~child
-    ~refuter ~defender ~default_number_of_sections] will construct an
-    initial game where [refuter] is next to play. The game has
+    [initial inbox dal_slots_history ~start_level ~parent_commitment
+    ~defender_commitment ~refuter ~defender ~default_number_of_sections] will
+    construct an initial game where [refuter] is next to play. The game has
     [dissection] with three states:
 
-      - firstly, the state (with tick zero) of [parent], the commitment
-      that both stakers agree on.
+      - firstly, the state (with tick zero) of [parent_commitment], the
+      commitment that both stakers agree on.
 
-      - secondly, the state and tick count of [child], the commitment
-      that [defender] has staked on.
+      - secondly, the state and tick count of [defender_commitment], the
+      commitment that [defender] has staked on.
 
-      - thirdly, a [None] state which is a single tick after the [child]
-      commitment. This represents the claim, implicit in the commitment,
-      that the state given is blocked.
+      - thirdly, a [None] state which is a single tick after the
+      [defender_commitment] commitment. This represents the claim, implicit in
+      the commitment, that the state given is blocked.
 
     This gives [refuter] a binary choice: she can refute the commit
     itself by providing a new dissection between the two committed
@@ -308,10 +314,10 @@ val initial :
   Sc_rollup_inbox_repr.history_proof ->
   Dal_slot_repr.History.t ->
   start_level:Raw_level_repr.t ->
-  parent:Sc_rollup_commitment_repr.t ->
-  child:Sc_rollup_commitment_repr.t ->
-  refuter:Staker.t ->
-  defender:Staker.t ->
+  parent_commitment:Sc_rollup_commitment_repr.t ->
+  defender_commitment:Sc_rollup_commitment_repr.t ->
+  refuter:Signature.public_key_hash ->
+  defender:Signature.public_key_hash ->
   default_number_of_sections:int ->
   t
 
@@ -321,9 +327,15 @@ type step =
   | Dissection of dissection_chunk list
   | Proof of Sc_rollup_proof_repr.serialized Sc_rollup_proof_repr.t
 
-(** A [refutation] is a move in the game. [choice] is the final tick
-    in the current dissection at which the two players agree. *)
-type refutation = {choice : Sc_rollup_tick_repr.t; step : step}
+(** A [refutation] is a move in the game. *)
+type refutation =
+  | Start of {
+      player_commitment_hash : Sc_rollup_commitment_repr.Hash.t;
+      opponent_commitment_hash : Sc_rollup_commitment_repr.Hash.t;
+    }
+  | Move of {choice : Sc_rollup_tick_repr.t; step : step}
+      (** [choice] is the final tick in the current dissection at which
+          the two players agree. *)
 
 val pp_refutation : Format.formatter -> refutation -> unit
 
@@ -385,12 +397,13 @@ val play :
   stakers:Index.t ->
   Sc_rollup_metadata_repr.t ->
   t ->
-  refutation ->
+  step:step ->
+  choice:Sc_rollup_tick_repr.t ->
   (game_result, t) Either.t tzresult Lwt.t
 
-(** [cost_play game refutation] returns the gas cost of [play] applied with [game]
-    and [refutation]. *)
-val cost_play : t -> refutation -> Gas_limit_repr.cost
+(** [cost_play ~step ~choice] returns the gas cost of [play] applied with[step],
+    and [choice]. *)
+val cost_play : step:step -> choice:Sc_rollup_tick_repr.t -> Gas_limit_repr.cost
 
 (** A type that represents the number of blocks left for players to play. Each
     player has her timeout value. `timeout` is expressed in the number of

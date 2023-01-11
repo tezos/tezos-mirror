@@ -143,9 +143,9 @@ let fixed_encoding =
           (req "cache_layout_size" uint8)
           (req "michelson_maximum_type_size" uint16))
        (obj3
-          (req "sc_max_wrapped_proof_binary_size" int31)
-          (req "sc_rollup_message_size_limit" int31)
-          (req "sc_rollup_max_number_of_messages_per_level" n)))
+          (req "smart_rollup_max_wrapped_proof_binary_size" int31)
+          (req "smart_rollup_message_size_limit" int31)
+          (req "smart_rollup_max_number_of_messages_per_level" n)))
 
 let fixed = ()
 
@@ -283,24 +283,23 @@ let check_constants constants =
   error_unless
     Compare.Int.(constants.sc_rollup.origination_size >= 0)
     (Invalid_protocol_constants
-       "The smart contract rollup origination size must be non-negative.")
+       "The smart rollup origination size must be non-negative.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.sc_rollup.challenge_window_in_blocks >= 0)
     (Invalid_protocol_constants
-       "The smart contract rollup challenge window in blocks must be \
-        non-negative.")
+       "The smart rollup challenge window in blocks must be non-negative.")
   >>? fun () ->
   error_unless
     Tez_repr.(constants.sc_rollup.stake_amount >= zero)
     (Invalid_protocol_constants
-       "The smart contract rollup max stake amount must be non-negative.")
+       "The smart rollup max stake amount must be non-negative.")
   >>? fun () ->
   error_unless
     Compare.Int.(constants.sc_rollup.commitment_period_in_blocks > 0)
     (Invalid_protocol_constants
-       "The smart contract rollup commitment period in blocks must be strictly \
-        greater than 0.")
+       "The smart rollup commitment period in blocks must be strictly greater \
+        than 0.")
   >>? fun () ->
   error_unless
     (let sc_rollup_max_lookahead_in_blocks =
@@ -309,16 +308,16 @@ let check_constants constants =
      Compare.Int32.(
        sc_rollup_max_lookahead_in_blocks
        > Int32.of_int constants.sc_rollup.commitment_period_in_blocks
-       && (* Check that [sc_rollup_challenge_window_in_blocks <
-             sc_rollup_max_lookahead_in_blocks]. Otherwise committers would be
+       && (* Check that [smart_rollup_challenge_window_in_blocks <
+             smart_rollup_max_lookahead_in_blocks]. Otherwise committers would be
              forced to commit at an artificially slow rate, affecting the
              throughput of the rollup. *)
        sc_rollup_max_lookahead_in_blocks
        > Int32.of_int constants.sc_rollup.challenge_window_in_blocks))
     (Invalid_protocol_constants
-       "The smart contract rollup max lookahead in blocks must be greater than \
-        [sc_rollup_commitment_period_in_blocks] and \
-        [sc_rollup_challenge_window_in_blocks].")
+       "The smart rollup max lookahead in blocks must be greater than \
+        [smart_rollup_commitment_period_in_blocks] and \
+        [smart_rollup_challenge_window_in_blocks].")
   >>? fun () ->
   error_unless
     Compare.Int.(

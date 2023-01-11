@@ -31,9 +31,9 @@ module Blake2B = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "Sc_rollup_reveal_data_blake2b_hash"
+        let name = "Smart_rollup_reveal_data_blake2b_hash"
 
-        let title = "A smart contract rollup reveal hash"
+        let title = "A smart rollup reveal hash"
 
         let b58check_prefix =
           "\230\206\128\200\196" (* "scrrh1(56)" decoded from Base58. *)

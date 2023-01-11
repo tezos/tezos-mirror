@@ -101,7 +101,7 @@ val get_index : t -> Z.t
 (** Given two t [(a, b)] and a {!Sc_rollup_inbox_message_repr.serialized}
     [payload], a [proof] guarantees that [payload] hash is equal to [a] and that
     [a] is an ancestor of [b]; i.e. [get_index a < get_index b]. *)
-type proof
+type proof = private t list
 
 val pp_proof : Format.formatter -> proof -> unit
 
@@ -122,4 +122,6 @@ module Internal_for_tests : sig
   (** [find_predecessor_payload history ~index latest_merkelized] looks for the
       {!t} with [index] that is an ancestor of [latest_merkelized]. *)
   val find_predecessor_payload : History.t -> index:Z.t -> t -> t option
+
+  val make_proof : t list -> proof
 end

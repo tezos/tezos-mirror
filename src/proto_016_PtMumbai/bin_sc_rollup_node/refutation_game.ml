@@ -73,14 +73,14 @@ module Make (Interpreter : Interpreter.S) :
     | Alice, Bob -> Their_turn
     | Bob, Alice -> Their_turn
 
-  (** [inject_next_move node_ctxt source ~refutation ~opponent] submits an L1
-      operation (signed by [source]) to issue the next move in the refutation
-      game. *)
-  let inject_next_move (node_ctxt : _ Node_context.t) source ~refutation
-      ~opponent =
+  (** [inject_next_move node_ctxt source ~refutation ~opponent ~commitment
+      ~opponent_commitment] submits an L1 operation (signed by [source]) to
+      issue the next move in the refutation game. *)
+  let inject_next_move node_ctxt source ~refutation ~opponent =
     let open Lwt_result_syntax in
     let refute_operation =
-      Sc_rollup_refute {rollup = node_ctxt.rollup_address; refutation; opponent}
+      Sc_rollup_refute
+        {rollup = node_ctxt.Node_context.rollup_address; refutation; opponent}
     in
     let* _hash = Injector.add_pending_operation ~source refute_operation in
     return_unit
@@ -372,9 +372,9 @@ module Make (Interpreter : Interpreter.S) :
             Sc_rollup.Proof.serialize_pvm_step ~pvm:(module PVM) proof.pvm_step
             |> Environment.wrap_tzresult
           in
-          let proof = {proof with pvm_step} in
+          let step = Proof {proof with pvm_step} in
           let choice = start_tick in
-          return {choice; step = Proof proof}
+          return (Move {choice; step})
     in
 
     match game.game_state with
@@ -387,7 +387,7 @@ module Make (Interpreter : Interpreter.S) :
             dissection
         in
         if Z.(equal chosen_section_len one) then final_move choice
-        else return {choice; step = Dissection dissection}
+        else return (Move {choice; step = Dissection dissection})
     | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
         let choice = agreed_start_chunk.tick in
         final_move choice
@@ -395,7 +395,7 @@ module Make (Interpreter : Interpreter.S) :
   let play_next_move node_ctxt game self opponent =
     let open Lwt_result_syntax in
     let* refutation = next_move node_ctxt game in
-    inject_next_move node_ctxt self ~refutation:(Some refutation) ~opponent
+    inject_next_move node_ctxt self ~refutation ~opponent
 
   let play_timeout (node_ctxt : _ Node_context.t) self stakers =
     let open Lwt_result_syntax in
@@ -450,7 +450,14 @@ module Make (Interpreter : Interpreter.S) :
     let open Lwt_syntax in
     let open Sc_rollup.Refutation_storage in
     let* () = Refutation_game_event.conflict_detected conflict in
-    inject_next_move node_ctxt self ~refutation:None ~opponent:conflict.other
+    let player_commitment_hash =
+      Sc_rollup.Commitment.hash_uncarbonated conflict.our_commitment
+    in
+    let opponent_commitment_hash =
+      Sc_rollup.Commitment.hash_uncarbonated conflict.their_commitment
+    in
+    let refutation = Start {player_commitment_hash; opponent_commitment_hash} in
+    inject_next_move node_ctxt self ~refutation ~opponent:conflict.other
 
   let start_game_if_conflict head_block node_ctxt self =
     let open Lwt_result_syntax in

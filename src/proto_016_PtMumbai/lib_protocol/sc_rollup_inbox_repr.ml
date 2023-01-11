@@ -61,7 +61,7 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox.inbox_proof_error"
+    ~id:"internal.smart_rollup_inbox_proof_error"
     ~title:
       "Internal error: error occurred during proof production or validation"
     ~description:"An inbox proof error."
@@ -72,7 +72,7 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox.add_zero_messages"
+    ~id:"internal.smart_rollup_add_zero_messages"
     ~title:"Internal error: trying to add zero messages"
     ~description:
       "Message adding functions must be called with a positive number of \
@@ -90,7 +90,7 @@ let () =
   in
   register_error_kind
     `Permanent
-    ~id:"sc_rollup_inbox.inbox_level_reached_message_limit"
+    ~id:"smart_rollup_inbox_level_reached_message_limit"
     ~title:"Inbox level reached messages limit"
     ~description
     ~pp:(fun ppf _ -> Format.pp_print_string ppf description)
@@ -101,10 +101,10 @@ let () =
 module Int64_map = Map.Make (Int64)
 
 (* 32 *)
-let hash_prefix = "\003\250\174\238\208" (* scib1(55) *)
+let hash_prefix = "\003\255\138\145\110" (* srib1(55) *)
 
 module Hash = struct
-  let prefix = "scib1"
+  let prefix = "srib1"
 
   let encoded_size = 55
 
@@ -112,9 +112,9 @@ module Hash = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "inbox_hash"
+        let name = "Smart_rollup_inbox_hash"
 
-        let title = "The hash of an inbox of a smart contract rollup"
+        let title = "The hash of an inbox of a smart rollup"
 
         let b58check_prefix = hash_prefix
 
@@ -130,7 +130,7 @@ module Hash = struct
 end
 
 module Skip_list_parameters = struct
-  let basis = 2
+  let basis = 4
 end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
@@ -191,7 +191,7 @@ module V1 = struct
   module History =
     Bounded_history_repr.Make
       (struct
-        let name = "inbox_history"
+        let name = "Smart_rollup_inbox_history"
       end)
       (Hash)
       (struct
@@ -204,70 +204,48 @@ module V1 = struct
         let encoding = history_proof_encoding
       end)
 
-  (*
+  (* An inbox is composed of a metadata of type {!t}, and a [level witness]
+     representing the messages of the current level (held by the
+     [Raw_context.t] in the protocol).
 
-   At a given level, an inbox is composed of metadata of type [t] and
-   [current_level], a [tree] representing the messages of the current level
-   (held by the [Raw_context.t] in the protocol).
-
-   The metadata contains :
-   - [level] : the inbox level ;
-   - [current_level_proof] : the [current_level] and its root hash ;
-   - [old_levels_messages] : a witness of the inbox history.
-
-   When new messages are appended to the current level inbox, the
-   metadata stored in the context may be related to an older level.
-   In that situation, an archival process is applied to the metadata.
-   This process saves the [current_level_proof] in the
-   [old_levels_messages] and empties [current_level]. It then
-   initializes a new level tree for the new messages---note that any
-   intermediate levels are simply skipped. See
-   {!Make_hashing_scheme.archive_if_needed} for details.
-
+     The metadata contains :
+     - [level] : the inbox level ;
+     - [old_levels_messages] : a witness of the inbox history.
   *)
-  type t = {
-    level : Raw_level_repr.t;
-    current_level_proof : level_proof;
-    old_levels_messages : history_proof;
-  }
+  type t = {level : Raw_level_repr.t; old_levels_messages : history_proof}
 
   let equal inbox1 inbox2 =
     (* To be robust to addition of fields in [t]. *)
-    let {level; current_level_proof; old_levels_messages} = inbox1 in
+    let {level; old_levels_messages} = inbox1 in
     Raw_level_repr.equal level inbox2.level
-    && equal_level_proof current_level_proof inbox2.current_level_proof
     && equal_history_proof old_levels_messages inbox2.old_levels_messages
 
-  let pp fmt {level; current_level_proof; old_levels_messages} =
+  let pp fmt {level; old_levels_messages} =
     Format.fprintf
       fmt
-      "@[<hov 2>{ level = %a@;\
-       current messages hash  = %a@;\
-       old_levels_messages = %a@;\
-       }@]"
+      "@[<hov 2>{ level = %a@;old_levels_messages = %a@;}@]"
       Raw_level_repr.pp
       level
-      pp_level_proof
-      current_level_proof
       pp_history_proof
       old_levels_messages
+
+  let hash inbox = hash_history_proof inbox.old_levels_messages
 
   let inbox_level inbox = inbox.level
 
   let old_levels_messages inbox = inbox.old_levels_messages
 
-  let current_level_proof inbox = inbox.current_level_proof
+  let current_witness inbox =
+    let {hash; _} = Skip_list.content inbox.old_levels_messages in
+    hash
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {level; current_level_proof; old_levels_messages} ->
-          (level, current_level_proof, old_levels_messages))
-        (fun (level, current_level_proof, old_levels_messages) ->
-          {level; current_level_proof; old_levels_messages})
-        (obj3
+        (fun {level; old_levels_messages} -> (level, old_levels_messages))
+        (fun (level, old_levels_messages) -> {level; old_levels_messages})
+        (obj2
            (req "level" Raw_level_repr.encoding)
-           (req "current_level_proof" level_proof_encoding)
            (req "old_levels_messages" history_proof_encoding)))
 end
 
@@ -360,15 +338,13 @@ let archive history inbox witness =
     let prev_cell = inbox.old_levels_messages in
     let prev_cell_ptr = hash_history_proof prev_cell in
     let* history = History.remember prev_cell_ptr prev_cell history in
-    let level_proof = current_level_proof inbox in
-    let cell = Skip_list.next ~prev_cell ~prev_cell_ptr level_proof in
+    let current_level_proof =
+      let hash = Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness in
+      {hash; level = inbox.level}
+    in
+    let cell = Skip_list.next ~prev_cell ~prev_cell_ptr current_level_proof in
     return (history, cell)
   in
-  let current_level_proof =
-    let hash = Sc_rollup_inbox_merkelized_payload_hashes_repr.hash witness in
-    {hash; level = inbox.level}
-  in
-  let inbox = {inbox with current_level_proof} in
   let* history, old_levels_messages = form_history_proof history inbox in
   let inbox = {inbox with old_levels_messages} in
   return (history, inbox)
@@ -843,12 +819,7 @@ let genesis ~predecessor_timestamp ~predecessor level =
     {hash; level}
   in
 
-  return
-    {
-      level;
-      current_level_proof = level_proof;
-      old_levels_messages = Skip_list.genesis level_proof;
-    }
+  return {level; old_levels_messages = Skip_list.genesis level_proof}
 
 module Internal_for_tests = struct
   let produce_inclusion_proof = produce_inclusion_proof

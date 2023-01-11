@@ -70,13 +70,17 @@ val conflicting_stakers_uncarbonated :
   Sc_rollup_repr.Staker.t ->
   conflict list tzresult Lwt.t
 
-(** [start_game ctxt rollup ~player ~opponent] initiates a refutation
-    game between [player] and [opponent] in the given [rollup]. *)
+(** [start_game ctxt rollup ~player:(player, player_commitment_hash)
+    ~opponent:(opponent, opponent_commitment_hash)] initiates a refutation game
+    between [player] and [opponent] in the given [rollup] as they are in
+    conflict with [commitment] and [opponent_commitment]. Where [commitment] is
+    the commitment in the storage with hash [player_commitment_hash]
+    (resp. [opponent_commitment] with [opponent_commitment_hash]). *)
 val start_game :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  player:Signature.public_key_hash ->
-  opponent:Signature.public_key_hash ->
+  player:Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t ->
+  opponent:Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [game_move ctxt rollup player opponent refutation]
@@ -117,7 +121,8 @@ val game_move :
   Sc_rollup_repr.t ->
   player:Sc_rollup_repr.Staker.t ->
   opponent:Sc_rollup_repr.Staker.t ->
-  Sc_rollup_game_repr.refutation ->
+  step:Sc_rollup_game_repr.step ->
+  choice:Sc_rollup_tick_repr.t ->
   (Sc_rollup_game_repr.game_result option * Raw_context.t) tzresult Lwt.t
 
 (** [timeout ctxt rollup stakers] checks that the timeout has
@@ -180,9 +185,11 @@ val apply_game_result :
 (**/**)
 
 module Internal_for_tests : sig
-  (** [get_conflict_point context rollup staker1 staker2] returns the first point
-      of disagreement between the given stakers. The returned commitments are
-      distinct, and have the same [parent] commitment.
+  (** [get_conflict_point context rollup staker1 staker2] returns the
+      first point of disagreement between the [staker1] and the
+      [staker2]
+      The returned commitments are distinct, and have the same [parent]
+      commitment; hence the same inbox level.
 
       May fail with:
       {ul

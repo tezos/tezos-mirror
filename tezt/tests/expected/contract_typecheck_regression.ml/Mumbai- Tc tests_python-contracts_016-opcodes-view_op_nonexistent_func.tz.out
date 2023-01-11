@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/view_op_nonexistent_func.tz --details
+./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/view_op_nonexistent_func.tz --details
 Well typed
 Gas remaining: 1039993.859 units remaining
 { parameter (pair nat address) ;

@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/attic/big_map_union.tz --details
+./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/attic/big_map_union.tz --details
 Well typed
 Gas remaining: 1039987.459 units remaining
 { parameter (list (pair string int)) ;

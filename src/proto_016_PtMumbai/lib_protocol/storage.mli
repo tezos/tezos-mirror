@@ -722,7 +722,7 @@ module Sc_rollup : sig
       - a parameters type specifying the types of parameters the rollup accepts
       - the L1 block level at which the rollup was created
       - a merkelized inbox, of which only the root hash is stored
-      - a tree of commitments, rooted at the last cemented commitment
+      - a map from stakers to their newest staked commitments
       - a map from stakers to commitments
       - a map from commitments to the time (level) of their first insertion
 
@@ -730,6 +730,7 @@ module Sc_rollup : sig
 
       - the total number of active stakers;
       - the number of stakers per commitment.
+      - the commitments per inbox level.
 
       See module {!Sc_rollup_repr.Commitment} for details.
   *)
@@ -751,8 +752,6 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3920
-     Use carbonated storage. *)
   module Inbox :
     Single_data_storage
       with type value = Sc_rollup_inbox_repr.t
@@ -764,33 +763,25 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.Hash.t
        and type t := Raw_context.t
 
-  module Stakers :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Sc_rollup_commitment_repr.Hash.t
+  (** Contains the current latest attributed index for stakers. *)
+  module Staker_index_counter :
+    Single_data_storage
+      with type value = Sc_rollup_staker_index_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** [stakers ctxt rollup] returns all the stakers over [rollup] with
-      their related commitment. *)
-  val stakers :
-    Raw_context.t ->
-    Sc_rollup_repr.t ->
-    (Raw_context.t
-    * (Signature.Public_key_hash.t * Sc_rollup_commitment_repr.Hash.t) list)
-    tzresult
-    Lwt.t
-
-  (** Cache: This should always be the number of entries in [Stakers].
-
-      Combined with {!Commitment_stake_count} (see below), this ensures we can
-      check that all stakers agree on a commitment prior to cementing it in
-      O(1) - rather than O(n) reads.
-    *)
-  module Staker_count :
+  (** Contains the index of any staker that currently have stake. *)
+  module Staker_index :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.t
-       and type value = int32
-       and type t := Raw_context.t
+      with type key = Signature.Public_key_hash.t
+       and type value = Sc_rollup_staker_index_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Contains the most recent inbox level staked by an active staker. *)
+  module Stakers :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_staker_index_repr.t
+       and type value = Raw_level_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
 
   module Commitments :
     Non_iterable_indexed_carbonated_data_storage
@@ -798,30 +789,12 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** Cache: This should always be the number of stakers that are directly or
-      indirectly staked on this commitment.
-
-      Let Stakers[S] mean "looking up the key S in [Stakers]".
-
-      A staker [S] is directly staked on [C] if [Stakers[S] = C]. A staker
-      [S] is indirectly staked on [C] if [C] is an ancestor of [Stakers[S]].
-
-      This ensures we remove unreachable commitments at the end of a
-      dispute in O(n) reads, where n is the length of the rejected branch.
-
-      We maintain the invariant that each branch has at least one staker.  On
-      rejection, we decrease stake count from the removed staker to the root,
-      and reclaim commitments whose stake count (refcount) thus reaches zero.
-
-      In the worst case all commitments are dishonest and on the same branch.
-      In practice we expect the honest branch, to be the longest, and dishonest
-      branches to be of similar lengths, making removal require a small number
-      of steps with respect to the total number of commitments.
-   *)
-  module Commitment_stake_count :
+  (** Contains for all commitment not yet cemented the list of stakers that have
+      staked on it. *)
+  module Commitment_stakers :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_commitment_repr.Hash.t
-       and type value = int32
+       and type value = Sc_rollup_staker_index_repr.t list
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   (** This storage contains for each rollup and inbox level not yet cemented the
@@ -841,11 +814,11 @@ module Sc_rollup : sig
        and type value = Raw_level_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** This storage contains number of commitments with a particular inbox level *)
-  module Commitment_count_per_inbox_level :
+  (** Stores the commitments published for an inbox level. *)
+  module Commitments_per_inbox_level :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Raw_level_repr.t
-       and type value = int32
+       and type value = Sc_rollup_commitment_repr.Hash.t list
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   module Commitment_added :

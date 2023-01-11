@@ -87,12 +87,6 @@ module Sc_rollup = struct
     include Sc_rollup_stake_storage
   end
 
-  module Storage = struct
-    let stakers_commitments_uncarbonated context rollup =
-      Storage.Sc_rollup.stakers context rollup
-      >>=? fun (_ctxt, stakers_commitments) -> return stakers_commitments
-  end
-
   module Refutation_storage = Sc_rollup_refutation_storage
   include Sc_rollup_storage
   include Sc_rollups
@@ -318,7 +312,10 @@ module Origination_nonce = struct
   module Internal_for_tests = Origination_nonce
 end
 
-module Destination = Destination_repr
+module Destination = struct
+  include Destination_repr
+  include Destination_storage
+end
 
 module Contract = struct
   include Contract_repr

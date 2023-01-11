@@ -73,6 +73,9 @@ let test_sc_rollup_challenge_window_lt_max_lookahead () =
   in
   Assert.lt_int32 ~loc:__LOC__ challenge_window max_lookahead
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4481
+   Improve this to catch more regressions in term of storage consumption *)
+
 (* Check that
     [commitment_storage_cost * max_lookahead / commitment_period < stake_amount]
 
@@ -86,7 +89,9 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
     Alpha_context.Tez.to_mutez constants.cost_per_byte
   in
   let commitment_storage_size =
-    Int64.of_int Sc_rollup_stake_storage.commitment_storage_size_in_bytes
+    Int64.of_int
+      Sc_rollup_stake_storage.Internal_for_tests
+      .max_commitment_storage_size_in_bytes
   in
   let commitment_storage_cost =
     Int64.mul cost_per_byte_mutez commitment_storage_size
@@ -116,14 +121,14 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
    correctly scaled with respect to each other - see
    {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
-let test_sc_rollup_commitment_storage_size () =
+let test_sc_rollup_max_commitment_storage_size () =
   let open Protocol in
   Assert.get_some
     ~loc:__LOC__
     (Sc_rollup_repr.Number_of_ticks.of_value 1232909L)
   >>=? fun number_of_ticks ->
   let commitment =
-    Sc_rollup_commitment_repr.to_versioned
+    Sc_rollup_commitment_repr.
       {
         predecessor = Sc_rollup_commitment_repr.Hash.zero;
         inbox_level = Raw_level_repr.of_int32_exn 21l;
@@ -131,33 +136,44 @@ let test_sc_rollup_commitment_storage_size () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let commitment_bytes =
-    Data_encoding.Binary.to_bytes_exn
+  let versioned_commitment =
+    Sc_rollup_commitment_repr.to_versioned commitment
+  in
+  let commitment_length =
+    Data_encoding.Binary.length
       Sc_rollup_commitment_repr.versioned_encoding
-      commitment
+      versioned_commitment
+  in
+  let commitment_hash =
+    Sc_rollup_commitment_repr.hash_uncarbonated commitment
   in
   let level = Alpha_context.Raw_level.of_int32_exn 5l in
-  let level_bytes =
-    Data_encoding.Binary.to_bytes_exn Alpha_context.Raw_level.encoding level
+  (* One for the first publication level, and one for the published level. *)
+  let levels_length =
+    Data_encoding.Binary.length Alpha_context.Raw_level.encoding level * 2
   in
-  (* commitment stake count is encoded in Int32, but is not exposed here *)
-  let commitment_stake_count = 300l in
-  let commitment_count_per_level = 3l in
-  let commitment_stake_count_bytes =
-    Data_encoding.Binary.to_bytes_exn Data_encoding.int32 commitment_stake_count
+  let staker_index =
+    Sc_rollup_staker_index_repr.Internal_for_tests.of_z (Z.of_int 94323442)
   in
-  let commitment_count_per_level_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Data_encoding.int32
-      commitment_count_per_level
+  let stakers_index_length =
+    Data_encoding.(
+      Binary.length (list Sc_rollup_staker_index_repr.encoding) [staker_index])
   in
-  Assert.equal_int
-    ~loc:__LOC__
-    Sc_rollup_stake_storage.commitment_storage_size_in_bytes
-    (Bytes.length commitment_bytes
-    + Bytes.length level_bytes
-    + Bytes.length commitment_stake_count_bytes
-    + Bytes.length commitment_count_per_level_bytes)
+  let commitment_hashes_length =
+    Data_encoding.(
+      Binary.length
+        (list Sc_rollup_commitment_repr.Hash.encoding)
+        [commitment_hash])
+  in
+  let max_expected =
+    Sc_rollup_stake_storage.Internal_for_tests
+    .max_commitment_storage_size_in_bytes
+  in
+  let total_computed =
+    commitment_length + levels_length + stakers_index_length
+    + commitment_hashes_length
+  in
+  Assert.leq_int ~loc:__LOC__ total_computed max_expected
 
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
@@ -192,7 +208,7 @@ let tests =
     Tztest.tztest
       "sc rollup commitment storage size correct"
       `Quick
-      test_sc_rollup_commitment_storage_size;
+      test_sc_rollup_max_commitment_storage_size;
     Tztest.tztest
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"

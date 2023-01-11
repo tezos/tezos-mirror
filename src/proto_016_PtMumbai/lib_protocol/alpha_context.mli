@@ -819,6 +819,7 @@ module Constants : sig
 
     type sc_rollup = {
       enable : bool;
+      arith_pvm_enable : bool;
       origination_size : int;
       challenge_window_in_blocks : int;
       stake_amount : Tez.t;
@@ -1002,6 +1003,8 @@ module Constants : sig
   val tx_rollup_sunset_level : context -> int32
 
   val sc_rollup_enable : context -> bool
+
+  val sc_rollup_arith_pvm_enable : context -> bool
 
   val dal_enable : context -> bool
 
@@ -3057,7 +3060,9 @@ module Dal : sig
   module Slots_history : sig
     type t
 
-    type hash
+    module Pointer_hash : S.HASH
+
+    type hash = Pointer_hash.t
 
     (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3766
        Do we need to export this? *)
@@ -3170,6 +3175,8 @@ module Sc_rollup : sig
 
   val in_memory_size : t -> Cache_memory_helpers.sint
 
+  val must_exist : context -> t -> context tzresult Lwt.t
+
   module Staker : S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
 
   module State_hash : sig
@@ -3265,7 +3272,7 @@ module Sc_rollup : sig
     val add_payload :
       History.t -> t -> Inbox_message.serialized -> (History.t * t) tzresult
 
-    type proof
+    type proof = private t list
 
     val proof_encoding : proof Data_encoding.t
 
@@ -3276,6 +3283,8 @@ module Sc_rollup : sig
 
     module Internal_for_tests : sig
       val find_predecessor_payload : History.t -> index:Z.t -> t -> t option
+
+      val make_proof : t list -> proof
     end
   end
 
@@ -3324,7 +3333,18 @@ module Sc_rollup : sig
   val pp_input_request : Format.formatter -> input_request -> unit
 
   module Inbox : sig
-    type t
+    module Skip_list : Skip_list_repr.S
+
+    module Hash : S.HASH
+
+    type level_proof = {
+      hash : Inbox_merkelized_payload_hashes.Hash.t;
+      level : Raw_level.t;
+    }
+
+    type history_proof = (level_proof, Hash.t) Skip_list.cell
+
+    type t = {level : Raw_level.t; old_levels_messages : history_proof}
 
     val pp : Format.formatter -> t -> unit
 
@@ -3334,27 +3354,20 @@ module Sc_rollup : sig
 
     val inbox_level : t -> Raw_level.t
 
-    type history_proof
-
     val old_levels_messages : t -> history_proof
 
     val equal_history_proof : history_proof -> history_proof -> bool
 
     val pp_history_proof : Format.formatter -> history_proof -> unit
 
-    module Hash : S.HASH
+    val hash : t -> Hash.t
+
+    val current_witness : t -> Inbox_merkelized_payload_hashes.Hash.t
 
     module History :
       Bounded_history_repr.S
         with type key = Hash.t
          and type value = history_proof
-
-    type level_proof = private {
-      hash : Inbox_merkelized_payload_hashes.Hash.t;
-      level : Raw_level.t;
-    }
-
-    val current_level_proof : t -> level_proof
 
     type serialized_proof
 
@@ -3626,6 +3639,8 @@ module Sc_rollup : sig
     val of_string : string -> t option
 
     val to_string : t -> string
+
+    val equal : t -> t -> bool
   end
 
   module ArithPVM : sig
@@ -3799,11 +3814,6 @@ module Sc_rollup : sig
       (bool * context) tzresult Lwt.t
   end
 
-  module Storage : sig
-    val stakers_commitments_uncarbonated :
-      context -> t -> (Staker.t * Commitment.Hash.t) list tzresult Lwt.t
-  end
-
   val originate :
     context ->
     kind:Kind.t ->
@@ -3963,7 +3973,12 @@ module Sc_rollup : sig
       | Dissection of dissection_chunk list
       | Proof of Proof.serialized Proof.t
 
-    type refutation = {choice : Tick.t; step : step}
+    type refutation =
+      | Start of {
+          player_commitment_hash : Commitment.Hash.t;
+          opponent_commitment_hash : Commitment.Hash.t;
+        }
+      | Move of {choice : Tick.t; step : step}
 
     val refutation_encoding : refutation Data_encoding.t
 
@@ -3993,8 +4008,8 @@ module Sc_rollup : sig
       Inbox.history_proof ->
       Dal.Slots_history.t ->
       start_level:Raw_level.t ->
-      parent:Commitment.t ->
-      child:Commitment.t ->
+      parent_commitment:Commitment.t ->
+      defender_commitment:Commitment.t ->
       refuter:Staker.t ->
       defender:Staker.t ->
       default_number_of_sections:int ->
@@ -4007,7 +4022,8 @@ module Sc_rollup : sig
       stakers:Index.t ->
       Metadata.t ->
       t ->
-      refutation ->
+      step:step ->
+      choice:Tick.t ->
       (game_result, t) Either.t tzresult Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level.t}
@@ -4043,7 +4059,10 @@ module Sc_rollup : sig
 
   module Stake_storage : sig
     val find_staker :
-      context -> t -> Staker.t -> (Commitment.Hash.t * context) tzresult Lwt.t
+      context ->
+      t ->
+      Staker.t ->
+      (context * Commitment.Hash.t option) tzresult Lwt.t
 
     val publish_commitment :
       context ->
@@ -4065,6 +4084,9 @@ module Sc_rollup : sig
       t ->
       Staker.t ->
       (context * Receipt.balance_updates) tzresult Lwt.t
+
+    val stakers_commitments_uncarbonated :
+      context -> t -> (Staker.t * Commitment.Hash.t option) list tzresult Lwt.t
   end
 
   module Refutation_storage : sig
@@ -4093,8 +4115,8 @@ module Sc_rollup : sig
     val start_game :
       context ->
       t ->
-      player:public_key_hash ->
-      opponent:public_key_hash ->
+      player:public_key_hash * Commitment.Hash.t ->
+      opponent:public_key_hash * Commitment.Hash.t ->
       context tzresult Lwt.t
 
     val game_move :
@@ -4102,7 +4124,8 @@ module Sc_rollup : sig
       t ->
       player:Staker.t ->
       opponent:Staker.t ->
-      Game.refutation ->
+      step:Game.step ->
+      choice:Tick.t ->
       (Game.game_result option * context) tzresult Lwt.t
 
     val get_timeout :
@@ -4120,6 +4143,15 @@ module Sc_rollup : sig
       Game.Index.t ->
       Game.game_result ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
+
+    module Internal_for_tests : sig
+      val get_conflict_point :
+        context ->
+        t ->
+        Staker.t ->
+        Staker.t ->
+        (conflict_point * context) tzresult Lwt.t
+    end
   end
 
   val rpc_arg : t RPC_arg.t
@@ -4157,6 +4189,8 @@ module Destination : sig
   val of_b58check : string -> t tzresult
 
   val in_memory_size : t -> Cache_memory_helpers.sint
+
+  val must_exist : context -> t -> context tzresult Lwt.t
 
   type error += Invalid_destination_b58check of string
 end
@@ -4700,7 +4734,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup.t;
       opponent : Sc_rollup.Staker.t;
-      refutation : Sc_rollup.Game.refutation option;
+      refutation : Sc_rollup.Game.refutation;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {

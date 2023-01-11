@@ -57,7 +57,7 @@ type packed_internal_operation_contents =
       -> packed_internal_operation_contents
 
 type 'kind internal_operation = {
-  source : Contract.t;
+  source : Destination.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }
@@ -333,7 +333,7 @@ module Internal_operation = struct
                 paid_storage_size_diff;
               });
         case
-          ~title:"To_sc_rollup"
+          ~title:"To_smart_rollup"
           (Tag 2)
           (obj2
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
@@ -516,7 +516,7 @@ let internal_operation_encoding : packed_internal_operation Data_encoding.t =
        (fun ((source, nonce), Internal_operation_contents operation) ->
          Internal_operation {source; operation; nonce})
        (merge_objs
-          (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
+          (obj2 (req "source" Destination.encoding) (req "nonce" uint16))
           Internal_operation.encoding)
 
 module Internal_operation_result = struct
@@ -695,7 +695,7 @@ let internal_operation_result_encoding :
       (merge_objs
          (obj3
             (req "kind" (constant op_case.name))
-            (req "source" Contract.encoding)
+            (req "source" Destination.encoding)
             (req "nonce" uint16))
          (merge_objs ires_case.encoding (obj1 (req "result" res_case.t))))
       (fun op ->

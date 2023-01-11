@@ -226,6 +226,10 @@ let sc_rollup_enable c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.enable
 
+let sc_rollup_arith_pvm_enable c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.arith_pvm_enable
+
 let sc_rollup_origination_size c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.origination_size

@@ -231,6 +231,7 @@ let create_ctxt () =
   let* block, (account1, account2, account3) =
     Context.init3
       ~sc_rollup_enable:true
+      ~sc_rollup_arith_pvm_enable:true
       ~consensus_threshold:0
       ~bootstrap_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
       ()
@@ -1284,7 +1285,10 @@ let operation_publish_commitment ctxt rollup predecessor inbox_level
   let*! commitment =
     create_commitment ~predecessor ~inbox_level ~our_states:player_client.states
   in
-  Op.sc_rollup_publish ctxt player_client.player.contract rollup commitment
+  let* op =
+    Op.sc_rollup_publish ctxt player_client.player.contract rollup commitment
+  in
+  return (op, commitment)
 
 (** [build_proof ~player_client start_tick game] builds a valid proof
     regarding the vision [player_client] has. The proof refutes the
@@ -1369,7 +1373,7 @@ let next_move ~player_client (game : Game.t) =
       | (start_chunk, _stop_chunk) :: _ ->
           let tick = start_chunk.tick in
           let+ proof = build_proof ~player_client tick game in
-          Game.{choice = tick; step = Proof proof}
+          Game.(Move {choice = tick; step = Proof proof})
       | [] ->
           (* If we reach this case, there is necessarily a disputed section. *)
           let start_chunk, stop_chunk = Stdlib.List.hd disputed_sections in
@@ -1380,11 +1384,13 @@ let next_move ~player_client (game : Game.t) =
               ~stop_chunk
               ~our_states:player_client.states
           in
-          return Game.{choice = start_chunk.tick; step = Dissection dissection})
+          return
+            Game.(
+              Move {choice = start_chunk.tick; step = Dissection dissection}))
   | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
       let tick = agreed_start_chunk.tick in
       let+ proof = build_proof ~player_client tick game in
-      Game.{choice = tick; step = Proof proof}
+      Game.(Move {choice = tick; step = Proof proof})
 
 type game_result_for_tests = Defender_wins | Refuter_wins
 
@@ -1415,7 +1421,7 @@ let play_until_game_result ~refuter_client ~defender_client ~rollup block =
         player_turn.player.contract
         rollup
         opponent.player.pkh
-        (Some refutation)
+        refutation
     in
     let* incr = Incremental.add_operation incr operation_refutation in
     match game_status_of_refute_op_result (Incremental.rev_tickets incr) with
@@ -1539,44 +1545,57 @@ let gen_game ~p1_strategy ~p2_strategy =
 let prepare_game ~p1_start block rollup lcc commitment_level p1_client p2_client
     =
   let open Lwt_result_syntax in
-  let* p1_commitment =
+  let* p1_op, p1_commitment =
     operation_publish_commitment (B block) rollup lcc commitment_level p1_client
   in
-  let* p2_commitment =
+  let* p2_op, p2_commitment =
     operation_publish_commitment (B block) rollup lcc commitment_level p2_client
   in
-  let commit_then_commit_and_refute ~defender_commitment ~refuter_commitment
-      (refuter, defender) =
+  let commit_then_commit_and_refute ~defender_op ~refuter_op refuter
+      refuter_commitment defender defender_commitment =
+    let refutation =
+      Sc_rollup.Game.Start
+        {
+          player_commitment_hash =
+            Sc_rollup.Commitment.hash_uncarbonated refuter_commitment;
+          opponent_commitment_hash =
+            Sc_rollup.Commitment.hash_uncarbonated defender_commitment;
+        }
+    in
     let* start_game =
       Op.sc_rollup_refute
         (B block)
         refuter.player.contract
         rollup
         defender.player.pkh
-        None
+        refutation
     in
     let* refuter_batch =
       Op.batch_operations
         ~recompute_counters:true
         ~source:refuter.player.contract
         (B block)
-        [refuter_commitment; start_game]
+        [refuter_op; start_game]
     in
-    let* block =
-      Block.bake ~operations:[defender_commitment; refuter_batch] block
-    in
+    let* block = Block.bake ~operations:[defender_op; refuter_batch] block in
     return (block, refuter, defender)
   in
   if p1_start then
     commit_then_commit_and_refute
-      ~defender_commitment:p2_commitment
-      ~refuter_commitment:p1_commitment
-      (p1_client, p2_client)
+      ~defender_op:p2_op
+      ~refuter_op:p1_op
+      p1_client
+      p1_commitment
+      p2_client
+      p2_commitment
   else
     commit_then_commit_and_refute
-      ~defender_commitment:p1_commitment
-      ~refuter_commitment:p2_commitment
-      (p2_client, p1_client)
+      ~defender_op:p1_op
+      ~refuter_op:p2_op
+      p2_client
+      p2_commitment
+      p1_client
+      p1_commitment
 
 let check_distribution = function
   | fst :: snd :: rst ->

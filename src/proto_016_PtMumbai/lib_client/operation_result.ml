@@ -54,7 +54,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
         tez_sym
         Tez.pp
         amount
-        Contract.pp
+        Destination.pp
         source
         Destination.pp
         destination ;
@@ -70,7 +70,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
       Format.fprintf
         ppf
         "Origination:@,From: %a@,Credit: %s%a"
-        Contract.pp
+        Destination.pp
         source
         tez_sym
         Tez.pp
@@ -99,7 +99,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
             Tezos_crypto.Signature.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
-      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
+      Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Destination.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Tezos_crypto.Signature.Public_key_hash.pp ppf delegate)
@@ -107,7 +107,7 @@ let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
       Format.fprintf
         ppf
         "Event:@,From: %a@,Type: %a"
-        Contract.pp
+        Destination.pp
         source
         pp_micheline_expr
         ty ;
@@ -318,7 +318,7 @@ let pp_manager_operation_content (type kind) source ppf
       {kind; boot_sector; origination_proof = _; parameters_ty} ->
       Format.fprintf
         ppf
-        "Smart contract rollup origination:@,\
+        "Smart rollup origination:@,\
          Kind: %a@,\
          Parameter type: %a@,\
          Kernel Blake2B hash: '%a'"
@@ -329,13 +329,11 @@ let pp_manager_operation_content (type kind) source ppf
         Tezos_crypto.Blake2B.pp
         (Tezos_crypto.Blake2B.hash_string [boot_sector])
   | Sc_rollup_add_messages {messages = _} ->
-      Format.pp_print_string ppf "Smart contract rollup messages submission"
+      Format.pp_print_string ppf "Smart rollup messages submission:"
   | Sc_rollup_cement {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Smart contract rollup commitment cementing:@,\
-         Address: %a@,\
-         Commitment: %a"
+        "Smart rollup commitment cementing:@,Address: %a@,Commitment: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Commitment.Hash.pp
@@ -343,7 +341,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Smart contract rollup commitment publishing:@,\
+        "Smart rollup commitment publishing:@,\
          Address: %a@,\
          @[<v 2>Commitment:@,\
          %a@]"
@@ -354,22 +352,17 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
-        "Smart contract rollup refutation move:@,\
-         Address: %a@,\
-         Staker: %a@,\
-         Move: %a"
+        "Smart rollup refutation move:@,Address: %a@,Staker: %a@,Refutation: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Staker.pp
         opponent
-        (fun fmt -> function
-          | None -> Format.pp_print_string fmt "opening of the game"
-          | Some refutation -> Sc_rollup.Game.pp_refutation fmt refutation)
+        Sc_rollup.Game.pp_refutation
         refutation
   | Sc_rollup_timeout {rollup; stakers = {alice; bob}} ->
       Format.fprintf
         ppf
-        "Smart contract rollup refutation timeout:@,\
+        "Smart rollup refutation timeout:@,\
          Address: %a@,\
          First staker (Alice): %a@,\
          Second staker (Bob): %a"
@@ -383,7 +376,7 @@ let pp_manager_operation_content (type kind) source ppf
       {rollup; cemented_commitment; output_proof = _} ->
       Format.fprintf
         ppf
-        "Smart contract output message execution:@,\
+        "Smart rollup output message execution:@,\
          Address: %a@,\
          Cemented commitment: %a"
         Sc_rollup.Address.pp
@@ -393,7 +386,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_recover_bond {sc_rollup; staker} ->
       Format.fprintf
         ppf
-        "Smart contract bond retrieval:@,Address: %a@,Staker: %a"
+        "Smart rollup bond retrieval:@,Address: %a@,Staker: %a"
         Sc_rollup.Address.pp
         sc_rollup
         Tezos_crypto.Signature.Public_key_hash.pp
@@ -466,8 +459,8 @@ let pp_balance_updates ppf balance_updates =
           | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
           | Tx_rollup_rejection_punishments -> "tx rollup rejection punishments"
           | Sc_rollup_refutation_punishments ->
-              "sc rollup refutation punishments"
-          | Sc_rollup_refutation_rewards -> "sc rollup refutation rewards"
+              "smart rollup refutation punishments"
+          | Sc_rollup_refutation_rewards -> "smart rollup refutation rewards"
         in
         let balance =
           match origin with
@@ -871,17 +864,15 @@ let pp_manager_operation_contents_result ppf op_result =
     | Tx_rollup_dispatch_tickets_result _ ->
         "transaction rollup tickets dispatch"
     | Transfer_ticket_result _ -> "tickets transfer"
-    | Sc_rollup_originate_result _ -> "smart contract rollup origination"
-    | Sc_rollup_add_messages_result _ ->
-        "smart contract rollup messages submission"
-    | Sc_rollup_cement_result _ -> "smart contract rollup commitment cementing"
-    | Sc_rollup_publish_result _ ->
-        "smart contract rollup commitment publishing"
-    | Sc_rollup_refute_result _ -> "smart contract rollup refutation move"
-    | Sc_rollup_timeout_result _ -> "smart contract rollup refutation timeout"
+    | Sc_rollup_originate_result _ -> "smart rollup origination"
+    | Sc_rollup_add_messages_result _ -> "smart rollup messages submission"
+    | Sc_rollup_cement_result _ -> "smart rollup commitment cementing"
+    | Sc_rollup_publish_result _ -> "smart rollup commitment publishing"
+    | Sc_rollup_refute_result _ -> "smart rollup refutation move"
+    | Sc_rollup_timeout_result _ -> "smart rollup refutation timeout"
     | Sc_rollup_execute_outbox_message_result _ ->
-        "smart contract output message execution"
-    | Sc_rollup_recover_bond_result _ -> "smart contract bond retrieval"
+        "smart output message execution"
+    | Sc_rollup_recover_bond_result _ -> "smart bond retrieval"
     | Dal_publish_slot_header_result _ ->
         "data availability slot header publishing"
     | Zk_rollup_origination_result _ -> "epoxy originate"

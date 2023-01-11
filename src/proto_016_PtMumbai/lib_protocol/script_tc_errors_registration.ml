@@ -277,8 +277,7 @@ let () =
     `Permanent
     ~id:"michelson_v1.sc_rollup_disabled"
     ~title:"Sc rollup are disabled"
-    ~description:
-      "Cannot use smart-contract rollup features as they are disabled."
+    ~description:"Cannot use smart rollup features as they are disabled."
     (obj1 (req "location" Script.location_encoding))
     (function Sc_rollup_disabled loc -> Some loc | _ -> None)
     (fun loc -> Sc_rollup_disabled loc) ;

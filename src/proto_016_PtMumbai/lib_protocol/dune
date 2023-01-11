@@ -93,6 +93,7 @@
   Sc_rollups
   Sc_rollup_data_version_sig
   Sc_rollup_inbox_repr
+  Sc_rollup_staker_index_repr
   Sc_rollup_commitment_repr
   Sc_rollup_proof_repr
   Skip_list_costs
@@ -193,6 +194,7 @@
   Tx_rollup_inbox_storage
   Tx_rollup_commitment_storage
   Tx_rollup_storage
+  Sc_rollup_staker_index_storage
   Sc_rollup_commitment_storage
   Sc_rollup_outbox_storage
   Sc_rollup_stake_storage
@@ -200,6 +202,7 @@
   Dal_slot_storage
   Sc_rollup_refutation_storage
   Zk_rollup_errors
+  Destination_storage
   Alpha_context
   Script_string
   Script_timestamp
@@ -296,7 +299,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtMumbaiaByZhjUPaSHEdbLZ6LUzw2YdzbGE2VX2oHSKAS4K2MD\"\nlet name = Tezos_protocol_environment_016_PtMumbai.Name.name\ninclude Tezos_raw_protocol_016_PtMumbai\ninclude Tezos_raw_protocol_016_PtMumbai.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj\"\nlet name = Tezos_protocol_environment_016_PtMumbai.Name.name\ninclude Tezos_raw_protocol_016_PtMumbai\ninclude Tezos_raw_protocol_016_PtMumbai.Main\n")))
 
 (rule
  (targets tezos_protocol_016_PtMumbai.ml)
@@ -371,6 +374,7 @@
   sc_rollups.ml sc_rollups.mli
   sc_rollup_data_version_sig.ml
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
+  sc_rollup_staker_index_repr.ml sc_rollup_staker_index_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   skip_list_costs.ml skip_list_costs.mli
@@ -474,6 +478,7 @@
   tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
+  sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
@@ -481,6 +486,7 @@
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  destination_storage.ml destination_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
@@ -632,6 +638,7 @@
   sc_rollups.ml sc_rollups.mli
   sc_rollup_data_version_sig.ml
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
+  sc_rollup_staker_index_repr.ml sc_rollup_staker_index_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   skip_list_costs.ml skip_list_costs.mli
@@ -735,6 +742,7 @@
   tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
+  sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
@@ -742,6 +750,7 @@
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  destination_storage.ml destination_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
@@ -898,6 +907,7 @@
   sc_rollups.ml sc_rollups.mli
   sc_rollup_data_version_sig.ml
   sc_rollup_inbox_repr.ml sc_rollup_inbox_repr.mli
+  sc_rollup_staker_index_repr.ml sc_rollup_staker_index_repr.mli
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   skip_list_costs.ml skip_list_costs.mli
@@ -1001,6 +1011,7 @@
   tx_rollup_inbox_storage.ml tx_rollup_inbox_storage.mli
   tx_rollup_commitment_storage.ml tx_rollup_commitment_storage.mli
   tx_rollup_storage.ml tx_rollup_storage.mli
+  sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
@@ -1008,6 +1019,7 @@
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  destination_storage.ml destination_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli

@@ -274,7 +274,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
   let operation =
     Script_typed_ir.Internal_operation
       {
-        source = src;
+        source = Contract src;
         operation =
           Origination
             {
@@ -421,7 +421,7 @@ let transfer_tickets_operation ~incr ~src ~destination tickets =
 let test_non_ticket_operations () =
   let* _baker, src, block = init () in
   let* incr = Incremental.begin_construction block in
-  let operations = [delegation_operation ~src] in
+  let operations = [delegation_operation ~src:(Contract src)] in
   let* ticket_diffs, ctxt = ticket_diffs_of_operations incr operations in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 
@@ -440,7 +440,7 @@ let test_transfer_to_non_ticket_contract () =
   let* operation, incr =
     transfer_operation
       ~incr
-      ~src
+      ~src:(Contract src)
       ~destination:orig_contract
       ~parameters_ty:unit_t
       ~parameters:()
@@ -461,7 +461,11 @@ let test_transfer_empty_ticket_list () =
       ~forges_tickets:false
   in
   let* operation, incr =
-    transfer_tickets_operation ~incr ~src ~destination:orig_contract []
+    transfer_tickets_operation
+      ~incr
+      ~src:(Contract src)
+      ~destination:orig_contract
+      []
   in
   let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
@@ -490,7 +494,7 @@ let test_transfer_one_ticket () =
   let* operation, incr =
     transfer_tickets_operation
       ~incr
-      ~src
+      ~src:(Contract src)
       ~destination:orig_contract
       [(ticketer, "white", 1)]
   in
@@ -527,7 +531,7 @@ let test_transfer_multiple_tickets () =
   let* operation, incr =
     transfer_tickets_operation
       ~incr
-      ~src
+      ~src:(Contract src)
       ~destination:orig_contract
       [
         (ticketer, "red", 1);
@@ -577,7 +581,7 @@ let test_transfer_different_tickets () =
   let* operation, incr =
     transfer_tickets_operation
       ~incr
-      ~src
+      ~src:(Contract src)
       ~destination
       [
         (ticketer1, "red", 1);
@@ -648,7 +652,11 @@ let test_transfer_to_two_contracts_with_different_tickets () =
       ~forges_tickets:false
   in
   let* operation1, incr =
-    transfer_tickets_operation ~incr ~src ~destination:destination1 parameters
+    transfer_tickets_operation
+      ~incr
+      ~src:(Contract src)
+      ~destination:destination1
+      parameters
   in
   let* block = Incremental.finalize_block incr in
   let* destination2, incr =
@@ -661,7 +669,11 @@ let test_transfer_to_two_contracts_with_different_tickets () =
       ~forges_tickets:false
   in
   let* operation2, incr =
-    transfer_tickets_operation ~incr ~src ~destination:destination2 parameters
+    transfer_tickets_operation
+      ~incr
+      ~src:(Contract src)
+      ~destination:destination2
+      parameters
   in
   let* ticket_diffs, ctxt =
     ticket_diffs_of_operations incr [operation1; operation2]
@@ -994,7 +1006,7 @@ let test_originate_and_transfer () =
   let* operation2, incr =
     transfer_tickets_operation
       ~incr
-      ~src
+      ~src:(Contract src)
       ~destination:destination2
       [(ticketer, "red", 1); (ticketer, "green", 1); (ticketer, "blue", 1)]
   in
@@ -1148,7 +1160,7 @@ let test_transfer_big_map_with_tickets () =
   let* operation, incr =
     transfer_operation
       ~incr
-      ~src:ticketer_contract
+      ~src:(Contract ticketer_contract)
       ~destination:orig_contract
       ~parameters_ty
       ~parameters
@@ -1214,7 +1226,7 @@ let test_tx_rollup_deposit_one_ticket () =
   let* operation, incr =
     transfer_operation_to_tx_rollup
       ~incr
-      ~src
+      ~src:(Contract src)
       ~tx_rollup
       ~parameters_ty
       ~parameters
@@ -1253,7 +1265,7 @@ let test_transfer_fails_on_multiple_zero_tickets () =
   @@ (* let* operation, incr = *)
   transfer_tickets_operation
     ~incr
-    ~src
+    ~src:(Contract src)
     ~destination:orig_contract
     [
       (ticketer, "red", 1);

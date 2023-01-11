@@ -451,7 +451,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
-      refutation : Sc_rollup_game_repr.refutation option;
+      refutation : Sc_rollup_game_repr.refutation;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {
@@ -1136,7 +1136,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_origination_tag;
-          name = "sc_rollup_originate";
+          name = "smart_rollup_originate";
           encoding =
             obj4
               (req "pvm_kind" Sc_rollups.Kind.encoding)
@@ -1175,7 +1175,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_add_message_tag;
-          name = "sc_rollup_add_messages";
+          name = "smart_rollup_add_messages";
           encoding = obj1 (req "message" (list (string Hex)));
           select =
             (function
@@ -1188,7 +1188,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_cement_tag;
-          name = "sc_rollup_cement";
+          name = "smart_rollup_cement";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1207,7 +1207,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_publish_tag;
-          name = "sc_rollup_publish";
+          name = "smart_rollup_publish";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1226,12 +1226,12 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_refute_tag;
-          name = "sc_rollup_refute";
+          name = "smart_rollup_refute";
           encoding =
             obj3
               (req "rollup" Sc_rollup_repr.encoding)
               (req "opponent" Sc_rollup_repr.Staker.encoding)
-              (opt "refutation" Sc_rollup_game_repr.refutation_encoding);
+              (req "refutation" Sc_rollup_game_repr.refutation_encoding);
           select =
             (function
             | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
@@ -1248,7 +1248,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_timeout_tag;
-          name = "sc_rollup_timeout";
+          name = "smart_rollup_timeout";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1266,7 +1266,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_execute_outbox_message_tag;
-          name = "sc_rollup_execute_outbox_message";
+          name = "smart_rollup_execute_outbox_message";
           encoding =
             obj3
               (req "rollup" Sc_rollup_repr.encoding)
@@ -1293,7 +1293,7 @@ module Encoding = struct
       MCase
         {
           tag = sc_rollup_operation_recover_bond_tag;
-          name = "sc_rollup_recover_bond";
+          name = "smart_rollup_recover_bond";
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.Address.encoding)
