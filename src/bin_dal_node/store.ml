@@ -426,7 +426,7 @@ module Legacy = struct
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
      header. *)
-  let get_accepted_headers ~skip_commitment indices store accu =
+  let get_accepted_headers ~skip_commitment slot_ids store accu =
     let open Lwt_result_syntax in
     List.fold_left_es
       (fun acc slot_id ->
@@ -454,17 +454,17 @@ module Legacy = struct
                            }
                            :: acc))))
       accu
-      indices
+      slot_ids
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
      header. *)
-  let get_accepted_headers_of_commitment commitment indices store accu =
+  let get_accepted_headers_of_commitment commitment slot_ids store accu =
     let encoded_commitment = encode_commitment commitment in
     let skip_commitment read_commitment =
       if String.equal read_commitment encoded_commitment then `Keep commitment
       else `Skip
     in
-    get_accepted_headers ~skip_commitment indices store accu
+    get_accepted_headers ~skip_commitment slot_ids store accu
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
      header. *)
@@ -483,12 +483,12 @@ module Legacy = struct
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
      header. *)
-  let get_other_headers_of_commitment commitment indices store accu =
+  let get_other_headers_of_commitment commitment slot_ids store accu =
     List.fold_left_es
       (fun acc slot_id ->
         get_other_headers_of_identified_commitment commitment slot_id store acc)
       accu
-      indices
+      slot_ids
 
   let get_commitment_headers commitment ?slot_level ?slot_index node_store =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
@@ -499,13 +499,13 @@ module Legacy = struct
     (* Get the list of known slot identifiers for [commitment]. *)
     let*! indexes = list store @@ Path.Commitment.headers commitment in
     (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
-    let indices = filter_indexes ?slot_level ?slot_index indexes in
-    let* accu = get_other_headers_of_commitment commitment indices store [] in
-    get_accepted_headers_of_commitment commitment indices store accu
+    let slot_ids = filter_indexes ?slot_level ?slot_index indexes in
+    let* accu = get_other_headers_of_commitment commitment slot_ids store [] in
+    get_accepted_headers_of_commitment commitment slot_ids store accu
 
   (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
      header. *)
-  let get_other_headers indices store accu =
+  let get_other_headers slot_ids store accu =
     let open Lwt_result_syntax in
     List.fold_left_es
       (fun acc slot_id ->
@@ -525,7 +525,7 @@ module Legacy = struct
           acc
           commitments_with_statuses)
       accu
-      indices
+      slot_ids
 
   let get_published_level_headers ~published_level ?header_status node_store =
     let open Lwt_result_syntax in
@@ -535,7 +535,7 @@ module Legacy = struct
       list store @@ Path.Level.slots_indices published_level
     in
     (* Build the list of slot IDs. *)
-    let indices =
+    let slot_ids =
       List.rev_map
         (fun (index, _tree) ->
           {
@@ -544,12 +544,12 @@ module Legacy = struct
           })
         slots_indices
     in
-    let* accu = get_other_headers indices store [] in
+    let* accu = get_other_headers slot_ids store [] in
     let* accu =
       let skip_commitment c =
         decode_commitment c |> Option.fold ~none:`Skip ~some:(fun c -> `Keep c)
       in
-      get_accepted_headers ~skip_commitment indices store accu
+      get_accepted_headers ~skip_commitment slot_ids store accu
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
        Enable the same filtering for GET /commitments/<commitment>/headers
