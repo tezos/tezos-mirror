@@ -141,6 +141,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Multinode_snapshot.register ~protocols ;
   Node_cors.register ~protocols ;
   Node_event_level.register ~protocols ;
+  Nonce_seed_revelation.register ~protocols ;
   Normalize.register ~protocols ;
   Operation_validation.register ~protocols ;
   Operation_size.register ~protocols ;
