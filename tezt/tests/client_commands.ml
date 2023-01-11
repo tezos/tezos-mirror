@@ -640,7 +640,44 @@ module Signatures = struct
       ~error_msg:"Block contains %L operations but should have %R" ;
     unit
 
-  let register protocols = test_check_signature protocols
+  let test_check_message_signature =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test client message signatures"
+      ~tags:["client"; "signature"; "message"; "check"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol ~protocol `Client () in
+    [
+      ( "bootstrap1",
+        "msg1",
+        "edsigtz68o4FdbpvycnAMDLaa7hpmmhjDxhx4Zu3QWHLYJtcY1mVhW9m6CCvsciFXwf1zLmah8fJP51cqaeaciBPGy5osH11AnR"
+      );
+      ( "bootstrap2",
+        "msg2",
+        "edsigtZqhR5SW6vbRSmqwzfS1KiJZLYLeFhLcCEw7WxjBDxotVx83M2rLe4Baq52SUTjxfXhQ5J3TabCwqt78kNpoU8j42GDEk4"
+      );
+      ( "bootstrap3",
+        "msg3",
+        "edsigu2PvAWxVYY3jQFVfBRW2Dg61xZMNesHiNbwCTmpJSyfcJMW8Ch9WABHqsgHQRBaSs6zZNHVGXfHSBnGCxT9x2b49L2zpMW"
+      );
+      ( "bootstrap4",
+        "msg4",
+        "edsigu5jieost8eeD3JwVrpPuSnKzLLvR3aqezLPDTvxC3p41qwBEpxuViKriipxig52NQmJ7AFXTzhM3xgKM2ZaADcSMYWztuJ"
+      );
+    ]
+    |> Lwt_list.iter_s @@ fun (src, message, expected_signature) ->
+       let* signature = Client.sign_message client ~src message in
+       Check.(
+         (signature = expected_signature)
+           string
+           ~__LOC__
+           ~error_msg:"Expected signature %R, got %L") ;
+       let* () = Client.check_message client ~src ~signature message in
+       unit
+
+  let register protocols =
+    test_check_signature protocols ;
+    test_check_message_signature protocols
 end
 
 let register ~protocols =
