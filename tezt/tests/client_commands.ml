@@ -95,6 +95,15 @@ module Helpers = struct
         accounts
     in
     Client.bake_for_and_wait client
+
+  let gen_accounts protocol client index =
+    Lwt_list.map_s
+      (fun sig_alg ->
+        Client.gen_and_show_keys
+          ~alias:(sf "account_%s_%d" sig_alg index)
+          ~sig_alg
+          client)
+      (supported_signature_schemes protocol)
 end
 
 module Simulation = struct
@@ -322,17 +331,8 @@ module Transfer = struct
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     Log.info "Generating new accounts" ;
-    let gen_accounts i =
-      Lwt_list.map_s
-        (fun sig_alg ->
-          Client.gen_and_show_keys
-            ~alias:(sf "account_%s_%d" sig_alg i)
-            ~sig_alg
-            client)
-        (supported_signature_schemes protocol)
-    in
-    let* accounts1 = gen_accounts 1 in
-    let* accounts2 = gen_accounts 2 in
+    let* accounts1 = gen_accounts protocol client 1 in
+    let* accounts2 = gen_accounts protocol client 2 in
     let accounts = accounts1 @ accounts2 in
     let* () = airdrop_and_reveal client accounts in
     let test_transfer (from : Account.key) (dest : Account.key) =
@@ -377,17 +377,8 @@ module Transfer = struct
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     Log.info "Generating new accounts" ;
-    let gen_accounts i =
-      Lwt_list.map_s
-        (fun sig_alg ->
-          Client.gen_and_show_keys
-            ~alias:(sf "account_%s_%d" sig_alg i)
-            ~sig_alg
-            client)
-        (supported_signature_schemes protocol)
-    in
-    let* accounts = gen_accounts 1 in
-    let* dests = gen_accounts 2 in
+    let* accounts = gen_accounts protocol client 1 in
+    let* dests = gen_accounts protocol client 2 in
     let* () = airdrop_and_reveal client (accounts @ dests) in
     let test_batch_transfer (from : Account.key) =
       Log.info "Test batch transfer from %s" from.alias ;
@@ -481,12 +472,119 @@ module Transfer = struct
     in
     Process.check_error set_delegate_process ~exit_code:1 ~msg
 
+  let balance_too_low =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test transfer with too low balance"
+      ~tags:["client"; "transfer"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    Log.info "Generating new accounts" ;
+    let* accounts = gen_accounts protocol client 1 in
+    let* () = airdrop_and_reveal client accounts in
+    let test_uncovered_transfer (from : Account.key) =
+      Log.info "Test uncovered transfer from %s to bootstrap1" from.alias ;
+      let* balance_from = get_balance from.public_key_hash client in
+      let amount = Tez.(balance_from + one) in
+      let fee = Tez.of_int 1 in
+      Client.spawn_transfer
+        ~amount
+        ~giver:from.public_key_hash
+        ~receiver:Constant.bootstrap1.public_key_hash
+        ~fee
+        client
+      |> Process.check_error ~msg:(rex "Balance of contract ([^ ]+) too low")
+    in
+    Lwt_list.iter_s test_uncovered_transfer accounts
+
+  let transfers_bootstraps5_bootstrap1 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simple transfer from bootstrap5 to bootstrap1"
+      ~tags:["client"; "transfer"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let check_balance_and_deposits ~__LOC__ (account : Account.key)
+        expected_amount =
+      let* all_deposits =
+        RPC.Client.call client
+        @@ RPC.get_chain_block_context_delegate_frozen_deposits
+             account.public_key_hash
+      in
+      let* balance = get_balance account.public_key_hash client in
+      Check.(
+        (Tez.(balance + all_deposits) = expected_amount)
+          Tez.typ
+          ~__LOC__
+          ~error_msg:
+            ("Expected balance and deposits of " ^ account.alias
+           ^ " to be %R, but got %L")) ;
+      unit
+    in
+    let bake () =
+      Client.bake_for_and_wait
+        ~minimal_fees:0
+        ~minimal_nanotez_per_gas_unit:0
+        ~minimal_nanotez_per_byte:0
+        ~keys:["bootstrap2"; "bootstrap3"; "bootstrap4"]
+        client
+    in
+    let (Account.{public_key_hash = bootstrap1_pkh; _} as bootstrap1) =
+      Constant.bootstrap1
+    in
+    let (Account.{public_key_hash = bootstrap5_pkh; _} as bootstrap5) =
+      Constant.bootstrap5
+    in
+    let fee = Tez.zero in
+    let initial_balance = Tez.of_int 4_000_000 in
+    let* () = bake () in
+    let* () = check_balance_and_deposits ~__LOC__ bootstrap1 initial_balance in
+    let* () = check_balance_and_deposits ~__LOC__ bootstrap5 initial_balance in
+    let amount = Tez.of_int 400_000 in
+    let* () =
+      Client.transfer
+        client
+        ~amount
+        ~fee
+        ~giver:bootstrap5_pkh
+        ~receiver:bootstrap1_pkh
+    in
+    let* () = bake () in
+    let* _ = Client.get_balance_for ~account:"bootstrap5" client in
+    let* () =
+      check_balance_and_deposits
+        ~__LOC__
+        bootstrap5
+        Tez.(initial_balance - amount)
+    in
+    let* () =
+      check_balance_and_deposits
+        ~__LOC__
+        bootstrap1
+        Tez.(initial_balance + amount)
+    in
+    let* () =
+      Client.transfer
+        client
+        ~amount
+        ~fee
+        ~giver:bootstrap1_pkh
+        ~receiver:bootstrap5_pkh
+    in
+    let* () = bake () in
+    let* () =
+      check_balance_and_deposits ~__LOC__ Constant.bootstrap5 initial_balance
+    in
+    unit
+
   let register protocols =
     alias_pkh_destination protocols ;
     alias_pkh_source protocols ;
     transfer_tz4 protocols ;
     batch_transfers_tz4 protocols ;
-    forbidden_set_delegate_tz4 protocols
+    forbidden_set_delegate_tz4 protocols ;
+    balance_too_low protocols ;
+    transfers_bootstraps5_bootstrap1 protocols
 end
 
 module Dry_run = struct
