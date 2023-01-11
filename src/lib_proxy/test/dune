@@ -18,7 +18,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
-  -open Lib_test))
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

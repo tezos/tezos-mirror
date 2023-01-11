@@ -385,7 +385,7 @@ let octez_test_helpers =
   public_lib
     "tezos-test-helpers"
     ~path:"src/lib_test"
-    ~internal_name:"lib_test"
+    ~internal_name:"tezos_test_helpers"
     ~synopsis:"Tezos-agnostic test helpers"
     ~deps:
       [uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix; data_encoding]

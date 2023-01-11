@@ -34,7 +34,7 @@
   -open Tezos_micheline
   -open Tezos_client_014_PtKathma
   -open Tezos_protocol_014_PtKathma
-  -open Lib_test
+  -open Tezos_test_helpers
   -open Tezos_014_PtKathma_test_helpers
   -open Tezos_benchmark_014_PtKathma
   -open Tezos_benchmark_type_inference_014_PtKathma))

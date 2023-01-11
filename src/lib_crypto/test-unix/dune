@@ -22,7 +22,7 @@
   -open Tezos_crypto
   -open Tezos_error_monad.TzLwtreslib
   -open Data_encoding
-  -open Lib_test))
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

@@ -15,7 +15,7 @@
   -open Tezos_base
   -open Tezos_base_unix
   -open Tezos_error_monad
-  -open Lib_test))
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

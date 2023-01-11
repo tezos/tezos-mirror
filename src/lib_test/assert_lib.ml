@@ -25,7 +25,7 @@
 
 (** [assert_lib] contains Alcotest convenience assertions depending on Tezos_base. *)
 
-module Assert = Assert
+module Assert = Tezos_test_helpers.Assert
 
 module Crypto = struct
   let equal_operation ?loc ?msg op1 op2 =

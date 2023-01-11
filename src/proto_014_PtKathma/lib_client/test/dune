@@ -24,7 +24,7 @@
   -open Tezos_client_014_PtKathma
   -open Tezos_protocol_014_PtKathma
   -open Tezos_base_test_helpers
-  -open Lib_test))
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

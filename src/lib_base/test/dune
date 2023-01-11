@@ -17,7 +17,7 @@
   (:standard)
   -open Tezos_base
   -open Tezos_error_monad
-  -open Lib_test)
+  -open Tezos_test_helpers)
  (modules test_bounded test_time test_protocol))
 
 (rule
@@ -64,7 +64,7 @@
   (:standard)
   -open Tezos_base
   -open Tezos_error_monad
-  -open Lib_test)
+  -open Tezos_test_helpers)
  (modules test_p2p_addr))
 
 (rule
@@ -93,7 +93,7 @@
   (:standard)
   -open Tezos_base
   -open Tezos_error_monad
-  -open Lib_test)
+  -open Tezos_test_helpers)
  (modules test_sized))
 
 (rule

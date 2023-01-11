@@ -19,7 +19,7 @@
  (flags
   (:standard)
   -open Tezos_stdlib
-  -open Lib_test))
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

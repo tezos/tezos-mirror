@@ -53,7 +53,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_validation
   -open Tezos_event_logging_test_helpers
-  -open Lib_test))
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)
