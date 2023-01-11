@@ -612,7 +612,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt (some (pair string string)) None
+      & opt (some (pair file file)) None
       & info ~docs ~doc ~docv:"crt,key" ["rpc-tls"])
 
   let cors_origins =

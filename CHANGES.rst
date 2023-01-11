@@ -112,6 +112,12 @@ Node
   unspecified, operations for all validation passes are returned, making this
   extension backward-compatible. (MR :gl:`!6724`)
 
+- Fixed an issue where the node's RPC server would silently fail when
+  either the path to the certificate or to the key passed in the
+  node's ``--rpc-tls`` argument does not point to an existing
+  file. The node's ``run`` now fails immediately in this case. (MR
+  :gl:`!7323`)
+
 Client
 ------
 
