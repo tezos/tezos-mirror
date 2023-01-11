@@ -778,8 +778,59 @@ module Signatures = struct
     test_check_message_signature protocols
 end
 
+module Account_activation = struct
+  let test_activate_accounts =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test account activation"
+      ~tags:["client"; "account"; "activation"]
+    @@ fun protocol ->
+    let parameter_file =
+      Protocol.parameter_file ~constants:Constants_test protocol
+    in
+    let* _node, client =
+      Client.init_with_protocol ~parameter_file `Client ~protocol ()
+    in
+    let* () =
+      Client.activate_account
+        client
+        ~alias:"king"
+        ~activation_key:"tezt/tests/account/king_commitment.json"
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* () =
+      Client.activate_account
+        client
+        ~alias:"queen"
+        ~activation_key:"tezt/tests/account/queen_commitment.json"
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* king_balance = Client.get_balance_for ~account:"king" client in
+    let* queen_balance = Client.get_balance_for ~account:"queen" client in
+    Check.(
+      (king_balance = Tez.of_mutez_int 23_932_454_669_343)
+        Tez.typ
+        ~__LOC__
+        ~error_msg:"Expected king's balance to be %R, got %L" ;
+      (queen_balance = Tez.of_mutez_int 72_954_577_464_032)
+        Tez.typ
+        ~__LOC__
+        ~error_msg:"Expected queen's balance to be %R, got %L") ;
+    let* () =
+      Client.transfer
+        client
+        ~amount:Tez.(of_int 10)
+        ~giver:"king"
+        ~receiver:"queen"
+    in
+    Client.bake_for_and_wait client
+
+  let register protocols = test_activate_accounts protocols
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
   Dry_run.register protocols ;
-  Signatures.register protocols
+  Signatures.register protocols ;
+  Account_activation.register protocols
