@@ -302,6 +302,7 @@ module Encoding : sig
   (** same as [bytes' Hex] *)
   val bytes : Bytes.t encoding
 
+  (** same as [string'] but for bigstring. *)
   val bigstring :
     ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
     string_json_repr ->

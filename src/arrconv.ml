@@ -1,3 +1,6 @@
+(* This function is meant to be called with accurrate size information. If it is
+   called with arguments such that [List.length l <> size] then bad things
+   happen. *)
 let array_of_list_size l size =
   match l with
   | [] ->
