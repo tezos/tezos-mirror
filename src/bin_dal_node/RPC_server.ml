@@ -105,6 +105,15 @@ module Slots_handlers = struct
           ?slot_index
           store)
       ctxt
+
+  let get_published_level_headers ctxt published_level header_status () =
+    call_handler
+      (fun store _cryptobox ->
+        Slot_manager.get_published_level_headers
+          ~published_level
+          ?header_status
+          store)
+      ctxt
 end
 
 module Profile_handlers = struct
@@ -135,8 +144,6 @@ end
 let add_service registerer service handler directory =
   registerer directory service handler
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4308
-   Add an RPC to the DAL node API to return the commitment proof of a commitment. *)
 let register_new :
     Node_context.t -> unit Tezos_rpc.Directory.t -> unit Tezos_rpc.Directory.t =
  fun ctxt directory ->
@@ -177,13 +184,15 @@ let register_new :
        Tezos_rpc.Directory.register2
        Services.get_assigned_shard_indices
        (Profile_handlers.get_assigned_shard_indices ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.get_published_level_headers
+       (Slots_handlers.get_published_level_headers ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
-  Tezos_rpc.Directory.empty
-  |> register_stored_slot_headers ctxt
-  |> register_split_slot ctxt |> register_show_slot ctxt |> register_shard ctxt
-  |> register_shards ctxt
+  Tezos_rpc.Directory.empty |> register_split_slot ctxt
+  |> register_show_slot ctxt |> register_shard ctxt |> register_shards ctxt
   |> register_show_slot_pages ctxt
   |> register_monitor_slot_headers ctxt
 

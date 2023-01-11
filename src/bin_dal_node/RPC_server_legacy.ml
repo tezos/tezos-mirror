@@ -47,15 +47,6 @@ let handle_slot ctxt (_, commitment) () () =
     (Node_context.get_store ctxt).shard_store
     commitment
 
-let handle_stored_slot_headers ctxt (_, block_hash) () () =
-  let open Lwt_result_syntax in
-  let*! shs =
-    Slot_headers_store.list_secondary_keys_with_values
-      (Node_context.get_store ctxt).slot_headers_store
-      ~primary_key:block_hash
-  in
-  return @@ shs
-
 let handle_slot_pages ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
@@ -87,12 +78,6 @@ let handle_monitor_slot_headers ctxt () () () =
   let shutdown () = Lwt_watcher.shutdown stopper in
   let next () = Lwt_stream.get stream in
   Tezos_rpc.Answer.return_stream {next; shutdown}
-
-let register_stored_slot_headers ctxt dir =
-  Tezos_rpc.Directory.register
-    dir
-    Services.stored_slot_headers
-    (handle_stored_slot_headers ctxt)
 
 let register_split_slot ctxt dir =
   Tezos_rpc.Directory.register0 dir Services.split_slot (handle_split_slot ctxt)
