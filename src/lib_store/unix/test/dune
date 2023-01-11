@@ -45,7 +45,8 @@
   -open Tezos_validation
   -open Tezos_protocol_updater
   -open Tezos_protocol_alpha_parameters
-  -open Tezos_protocol_plugin_alpha))
+  -open Tezos_protocol_plugin_alpha
+  -open Lib_test))
 
 (rule
  (alias runtest)

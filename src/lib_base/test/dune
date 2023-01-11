@@ -16,7 +16,8 @@
  (flags
   (:standard)
   -open Tezos_base
-  -open Tezos_error_monad)
+  -open Tezos_error_monad
+  -open Lib_test)
  (modules test_bounded test_time test_protocol))
 
 (rule
@@ -62,7 +63,8 @@
  (flags
   (:standard)
   -open Tezos_base
-  -open Tezos_error_monad)
+  -open Tezos_error_monad
+  -open Lib_test)
  (modules test_p2p_addr))
 
 (rule
@@ -90,7 +92,8 @@
  (flags
   (:standard)
   -open Tezos_base
-  -open Tezos_error_monad)
+  -open Tezos_error_monad
+  -open Lib_test)
  (modules test_sized))
 
 (rule

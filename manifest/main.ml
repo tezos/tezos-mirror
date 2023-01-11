@@ -458,7 +458,7 @@ let _octez_stdlib_tests =
         octez_stdlib |> open_;
         alcotest;
         bigstring;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         qcheck_alcotest;
       ]
     ~js_compatible:true
@@ -481,7 +481,7 @@ let _octez_stdlib_unix_tests =
         lwt_log;
         bigstring;
         lwt_unix;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         qcheck_alcotest;
       ]
 
@@ -604,7 +604,7 @@ let _octez_lwt_result_stdlib_tests =
         lwt_unix;
         alcotest_lwt;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
     ~opam_with_test:Only_on_64_arch
 
@@ -740,7 +740,7 @@ let _octez_hacl_tests =
         data_encoding |> open_;
         octez_hacl |> open_;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
     ~all_modules_except:["test"]
     ~modes:[Native; JS]
@@ -760,7 +760,7 @@ let _octez_hacl_tests_1 =
         data_encoding;
         octez_hacl;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
     ~modules:["test"]
     ~modes:[Native; JS]
@@ -832,7 +832,7 @@ let _octez_crypto_tests =
         data_encoding |> open_;
         alcotest;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
     ~modes:[Native; JS]
     ~js_compatible:true
@@ -855,7 +855,7 @@ let _octez_crypto_tests_unix =
         alcotest_lwt;
         lwt_unix;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
 
 let octez_crypto_dal =
@@ -919,7 +919,7 @@ let octez_event_logging_test_helpers =
         data_encoding;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_event_logging |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         alcotest;
       ]
     ~js_compatible:true
@@ -1099,7 +1099,7 @@ let lib_base_tests ?dep_files names =
         octez_error_monad |> open_;
         data_encoding;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
     ?dep_files
     ~modes:[Native; JS]
@@ -1125,7 +1125,7 @@ let _octez_base_unix_tests =
         octez_base_unix |> open_;
         octez_error_monad |> open_;
         data_encoding;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         qcheck_alcotest;
       ]
 
@@ -1140,7 +1140,7 @@ let octez_base_test_helpers =
         octez_base_unix;
         octez_stdlib_unix;
         octez_event_logging_test_helpers;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         alcotest;
         alcotest_lwt;
         qcheck_alcotest;
@@ -1478,7 +1478,7 @@ let _octez_p2p_tests =
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
         octez_p2p |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         octez_event_logging_test_helpers |> open_;
         octez_p2p_services |> open_;
@@ -1753,7 +1753,7 @@ let _tree_encoding_tests =
         octez_base_unix;
         octez_context_disk;
         octez_base_test_helpers |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_webassembly_interpreter;
         qcheck_alcotest;
         alcotest_lwt;
@@ -1779,7 +1779,7 @@ let _octez_context_tests =
         octez_context_disk;
         octez_context_memory;
         octez_stdlib_unix |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_test_helpers_extra;
         alcotest_lwt;
       ]
@@ -2029,7 +2029,7 @@ let _octez_protocol_environment_tests =
         octez_base_unix;
         octez_protocol_environment |> open_;
         alcotest_lwt;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         qcheck_alcotest;
         lwt_unix;
       ]
@@ -2402,7 +2402,7 @@ let _octez_requester_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         octez_stdlib |> open_;
         octez_stdlib_unix;
@@ -2531,7 +2531,7 @@ let _octez_context_merkle_proof_tests =
         octez_context_encoding;
         octez_stdlib_unix |> open_;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
       ]
     ~modules:["test_merkle_proof"]
 
@@ -2783,6 +2783,7 @@ let _octez_mockup_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
         octez_rpc;
         octez_mockup;
         octez_mockup_registration;
@@ -2833,7 +2834,7 @@ let octez_shell_services_test_helpers =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         qcheck_core;
         octez_context_memory;
         alcotest_lwt;
@@ -2850,7 +2851,7 @@ let _octez_shell_service_test_helpers_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_shell_services;
         octez_shell_services_test_helpers;
         qcheck_alcotest;
@@ -2874,7 +2875,7 @@ let _octez_proxy_tests =
         octez_stdlib_unix;
         octez_proxy;
         octez_base_test_helpers |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_shell_services_test_helpers;
         qcheck_alcotest;
         alcotest_lwt;
@@ -2898,7 +2899,7 @@ let _octez_proxy_server_config_tests =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_proxy_server_config;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotest_lwt;
         uri;
@@ -3269,7 +3270,7 @@ let octez_scoru_wasm_tests_helpers =
         octez_base_unix;
         octez_context_disk;
         octez_base_test_helpers |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
         qcheck_alcotest;
@@ -3310,7 +3311,7 @@ let _octez_scoru_wasm_tests =
         octez_base_unix;
         octez_context_disk;
         octez_base_test_helpers |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_scoru_wasm;
         qcheck_alcotest;
         alcotest_lwt;
@@ -3334,7 +3335,7 @@ let _octez_scoru_wasm_fast_tests =
         octez_context_disk;
         octez_base_test_helpers |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
         qcheck_alcotest;
@@ -3815,7 +3816,7 @@ end = struct
               client |> if_some |> open_;
               main |> open_;
               octez_merkle_proof_encoding;
-              octez_test_helpers;
+              octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotest;
               qcheck_alcotest;
@@ -4418,7 +4419,7 @@ module Protocol = Protocol
           [
             alcotest_lwt;
             qcheck_alcotest;
-            octez_test_helpers;
+            octez_test_helpers |> open_;
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_micheline |> open_;
@@ -4449,7 +4450,7 @@ module Protocol = Protocol
             octez_base_test_helpers |> open_;
             octez_base_unix |> if_ N.(number >= 013);
             alcotest_lwt;
-            octez_test_helpers;
+            octez_test_helpers |> open_;
             qcheck_alcotest;
             octez_stdlib_unix;
             octez_micheline |> open_;
@@ -5304,7 +5305,7 @@ let _octez_store_tests =
         Protocol.(parameters_exn alpha |> open_);
         Protocol.(plugin_exn alpha) |> open_;
         alcotest_lwt;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         octez_test_helpers_extra;
       ]
     ~alias:""
@@ -5392,7 +5393,7 @@ let _octez_shell_tests =
         octez_stdlib_unix |> open_;
         octez_validation |> open_;
         octez_event_logging_test_helpers |> open_;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         alcotest_lwt;
       ]
 
@@ -5575,7 +5576,7 @@ let _yes_wallet_test =
         alcotest_lwt;
         lwt_unix;
         qcheck_alcotest;
-        octez_test_helpers;
+        octez_test_helpers |> open_;
         ptime;
       ]
     ~bisect_ppx:false

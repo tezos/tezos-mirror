@@ -21,7 +21,8 @@
   -open Tezos_stdlib
   -open Tezos_error_monad.TzLwtreslib
   -open Data_encoding
-  -open Tezos_hacl)
+  -open Tezos_hacl
+  -open Lib_test)
  (modules (:standard \ test)))
 
 (rule
@@ -67,6 +68,9 @@
   qcheck-alcotest
   tezos-test-helpers)
  (js_of_ocaml)
+ (flags
+  (:standard)
+  -open Lib_test)
  (modules test))
 
 (rule (alias runtest) (package tezos-hacl) (action (run %{dep:./test.exe})))

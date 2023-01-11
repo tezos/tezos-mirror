@@ -21,7 +21,8 @@
  (js_of_ocaml)
  (flags
   (:standard)
-  -open Tezos_stdlib))
+  -open Tezos_stdlib
+  -open Lib_test))
 
 (rule
  (alias runtest)

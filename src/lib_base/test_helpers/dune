@@ -16,4 +16,5 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives))
+  -open Tezos_base.TzPervasives
+  -open Lib_test))

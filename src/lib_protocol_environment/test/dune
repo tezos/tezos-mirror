@@ -18,7 +18,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_environment))
+  -open Tezos_protocol_environment
+  -open Lib_test))
 
 (rule
  (alias runtest)

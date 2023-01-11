@@ -16,7 +16,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_stdlib_unix)
+  -open Tezos_stdlib_unix
+  -open Lib_test)
  (modules test_context test))
 
 (rule
@@ -38,7 +39,8 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_context_disk
-  -open Tezos_stdlib_unix)
+  -open Tezos_stdlib_unix
+  -open Lib_test)
  (modules test_merkle_proof))
 
 (rule
