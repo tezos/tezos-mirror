@@ -788,6 +788,18 @@ module Dal = struct
         GET
         ["levels"; string_of_int published_level; "headers"]
         slot_headers_of_json
+
+    let get_attestable_slots ~attestor ~attested_level =
+      make
+        GET
+        [
+          "profiles";
+          attestor.Account.public_key_hash;
+          "attested_levels";
+          string_of_int attested_level;
+          "attestable_slots";
+        ]
+        (fun json -> JSON.(json |> as_list |> List.map as_bool))
   end
 
   let make
