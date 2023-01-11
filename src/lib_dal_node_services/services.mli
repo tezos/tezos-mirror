@@ -68,9 +68,11 @@ module Types : sig
       (** The slot header was included in an L1 block but was not selected as
           the slot header for that slot index. *)
     | `Unseen ]
-  (** The slot header was never seen in an L1 block. For instance, this
-          could happen if the RPC `PATCH /slots/<commitment>` was called but the
-          corresponding slot header was never included into a block. *)
+  (** The slot header was never seen in an L1 block. For instance, this could
+      happen if the RPC `PATCH /commitments/<commitment>` was called but the
+      corresponding slot header was never included into a block. This means that
+      the publish operation was not sent (yet) to L1, or sent but not included
+      (yet) in a block). *)
 
   (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in *)
