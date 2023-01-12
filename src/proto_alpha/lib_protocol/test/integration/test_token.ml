@@ -51,7 +51,7 @@ let random_amount () =
 let nonce =
   Origination_nonce.Internal_for_tests.initial Tezos_crypto.Operation_hash.zero
 
-let mk_rollup () = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
+let sc_rollup () = Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 
 (** Check balances for a simple transfer from [bootstrap] to new [Implicit]. *)
 let test_simple_balances () =
@@ -139,7 +139,7 @@ let test_allocated () =
   let dest = `Block_fees in
   test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun () ->
   let dest =
-    let bond_id = Bond_id.Tx_rollup_bond_id (mk_rollup ()) in
+    let bond_id = Bond_id.Sc_rollup_bond_id (sc_rollup ()) in
     `Frozen_bonds (Contract.Implicit pkh, bond_id)
   in
   test_allocated_and_deallocated_when_empty ctxt dest
@@ -285,8 +285,8 @@ let test_transferring_to_burned ctxt =
 let test_transferring_to_frozen_bonds ctxt =
   let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
   let contract = Contract.Implicit pkh in
-  let tx_rollup = mk_rollup () in
-  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let sc_rollup = sc_rollup () in
+  let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -435,8 +435,8 @@ let test_transferring_from_collected_fees ctxt =
 let test_transferring_from_frozen_bonds ctxt =
   let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
   let contract = Contract.Implicit pkh in
-  let tx_rollup = mk_rollup () in
-  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let sc_rollup = sc_rollup () in
+  let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
   let amount = random_amount () in
   test_transferring_from_bounded_source
     ctxt
@@ -533,10 +533,10 @@ let build_test_cases () =
   >>=? fun ctxt ->
   wrap (Contract.Delegate.set ctxt (Contract.Implicit user1) (Some baker2))
   >>=? fun ctxt ->
-  let tx_rollup1 = mk_rollup () in
-  let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
-  let tx_rollup2 = mk_rollup () in
-  let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup2 in
+  let sc_rollup1 = sc_rollup () in
+  let bond_id1 = Bond_id.Sc_rollup_bond_id sc_rollup1 in
+  let sc_rollup2 = sc_rollup () in
+  let bond_id2 = Bond_id.Sc_rollup_bond_id sc_rollup2 in
   let user1ic = Contract.Implicit user1 in
   let baker2ic = Contract.Implicit baker2 in
   let src_list =
