@@ -20,6 +20,7 @@ On the reference machine, the benchmarks directory should look like this:
   - cronjob.sh
   - run_all_benchmarks_on_latest_master.sh
   - rustup-init.sh
+  - slack_token
   - snoop_results/
       - _snoop_<DATE>_<COMMIT>/
           - benchmark_results/
@@ -45,6 +46,7 @@ On the reference machine, the benchmarks directory should look like this:
 - `cronjob.sh` is the main script run by Cron. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
 - `run_all_benchmarks_on_latest_master.sh` is the script actually launching the benchmarks and called by `cronjob.sh`. Its sources are in this repository and it needs to be copied to the reference machine whenever it is updated.
 - `rustup-init.sh` handles some external dependencies. How to maintain this file is under discussion.
+- `slack_token` contains an authorization token allowing to send messages to Slack through a specific Slack application (`gas-benchmarks-reports`). Anyone possessing the token can send messages with the application, so the file has restricted access rights. For now, it is used to report the status of the benchmarks run.
 - `snoop_results` contains the result of the benchmarks, with one sub-directory per benchmark run.
   - `STARTED` and `SUCCESS` are marker files that can be used by human beings to have a quick look at the benchmarks process status (they contain the PID).
   - Other files are created by being moved from other locations, as described below.
