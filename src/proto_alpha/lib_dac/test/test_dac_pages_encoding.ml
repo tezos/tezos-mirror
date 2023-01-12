@@ -414,6 +414,28 @@ module Merkle_tree = struct
       let max_page_size = 150 in
       let payload = Bytes.of_string long_payload in
       test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
+
+    module PBT = struct
+      open QCheck2.Gen
+
+      (* Serialization requires [~max_page_size] that guarantees at least two
+         hashes per page. In orher words, we need at least 71 bytes in total since
+         5 bytes is used as a preamble and each hash is 32 bytes long and uses
+         aditional 1 byte for the tag used to identify the version scheme:
+         5 + 2 (32 + 1) = 71 *)
+      let gen_max_page_size = int_range 71 10_000
+
+      let gen_non_empty_payload = bytes_size (int_range 1 10_000)
+
+      let serialization_roundtrip_pbt =
+        let test_serialization_roundtrip (max_page_size, payload) =
+          test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
+        in
+        Tztest.tztest_qcheck2
+          ~name:"PBT for merkle_tree_V0 serialization/deserialization roundtrip"
+          (pair gen_max_page_size gen_non_empty_payload)
+          test_serialization_roundtrip
+    end
   end
 end
 
@@ -572,4 +594,5 @@ let tests =
        repeated pages (Hash chain, V0)"
       `Quick
       Hash_chain.V0.test_serialize;
+    Merkle_tree.V0.PBT.serialization_roundtrip_pbt;
   ]
