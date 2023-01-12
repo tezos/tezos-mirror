@@ -1358,11 +1358,13 @@ let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
   in
   Lwt.return (alias, res)
 
-let spawn_remember_contract ~alias ~address client =
-  spawn_command client ["remember"; "contract"; alias; address]
+let spawn_remember_contract ?(force = false) ~alias ~address client =
+  spawn_command client
+  @@ ["remember"; "contract"; alias; address]
+  @ optional_switch "force" force
 
-let remember_contract ~alias ~address client =
-  spawn_remember_contract ~alias ~address client |> Process.check
+let remember_contract ?force ~alias ~address client =
+  spawn_remember_contract ?force ~alias ~address client |> Process.check
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps

@@ -1062,10 +1062,12 @@ val spawn_originate_contract_at :
   string * Process.t
 
 (** Run [octez-client remember contract <alias> <address>]. *)
-val remember_contract : alias:string -> address:string -> t -> unit Lwt.t
+val remember_contract :
+  ?force:bool -> alias:string -> address:string -> t -> unit Lwt.t
 
 (** Same as [remember_contract], but do not wait for the process to exit. *)
-val spawn_remember_contract : alias:string -> address:string -> t -> Process.t
+val spawn_remember_contract :
+  ?force:bool -> alias:string -> address:string -> t -> Process.t
 
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)
