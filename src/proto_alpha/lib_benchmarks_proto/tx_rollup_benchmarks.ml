@@ -288,10 +288,10 @@ let gen_ticket () =
   make_ticket ticket
 
 (** [input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple] creates
-    [nb_of_couple_addr] of {!couple} where each couple owns
-    [nb_of_ticket_per_couple] of {!ticket} in common. It can later on be used
-    to create transfers between addresses in the same couple of a ticket they
-    both own (that helps to create larger proofs). *)
+    [nb_of_couple_addr] of {!type-couple} where each couple owns
+    [nb_of_ticket_per_couple] of {!type-ticket} in common. It can later on be
+    used to create transfers between addresses in the same couple of a ticket
+    they both own (that helps to create larger proofs). *)
 let input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple =
   (* Prevent an infinite loop, but 0 is semantically stupid as well. *)
   assert (nb_of_couple_addr >= 0) ;
