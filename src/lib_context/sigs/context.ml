@@ -845,7 +845,8 @@ end
 
 (** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.
     Note that the partially applied `get_data kind key` function has the correct
-    type to be provided to {produce,verify}_tree_proof, which is its intended goal. *)
+    type to be provided to [produce_tree_proof] and [verify_tree_proof] which is
+    its intended goal. *)
 module type Storelike = sig
   (* The type of keys in the store *)
   type key = string list
