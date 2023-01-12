@@ -370,7 +370,7 @@ val get_worker_prevalidator : ?chain:string -> unit -> JSON.t t
 (** RPC: [GET /errors] *)
 val get_errors : JSON.t t
 
-(** RPC: [GET /protocols *)
+(** RPC: [GET /protocols] *)
 val get_protocols : string list t
 
 (** RPC: [GET /protocols/<protocol_hash>] *)
@@ -523,7 +523,7 @@ val post_chain_block_helpers_scripts_event_address :
 
 type ctxt_type = Bytes | Json
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/<ctxt_type>/<value_path>
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/<ctxt_type>/<value_path>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
