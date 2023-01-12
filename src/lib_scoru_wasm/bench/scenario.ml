@@ -55,28 +55,38 @@ end
 open Wasm
 open Data
 
+(** Abstraction of the state of a benchmark run. Contains a record of the data
+    generated and the state of the VM (either as a tree or a pvm_state). *)
 type 'a run_state = {benchmark : benchmark; state : 'a; message_counter : int}
 
 let init_run_state benchmark state = {benchmark; state; message_counter = 1}
 
+(** Apply an action of type [a -> b Lwt.t] to the current state of the
+  benchmark run. Can be responsible for changing the type of the state. *)
 let lift_action action =
   let open Lwt_syntax in
   fun run_state ->
     let* state = action run_state.state in
     return {run_state with state}
 
+(** Apply an action of type [a -> (b * c) Lwt.t] to the current state of the
+   benchmark run. [b] is the new state type, [c] is the type of additional
+   information returned by the action. Can be responsible for changing the type
+  of the state. *)
 let lift_action_plus action =
   let open Lwt_syntax in
   fun run_state ->
     let* state, plus = action run_state.state in
     return ({run_state with state}, plus)
 
+(** Lookup information in the state. *)
 let lift_lookup lookup =
   let open Lwt_syntax in
   fun run_state ->
     let* res = lookup run_state.state in
     return res
 
+(** Record new data. *)
 let lift_add_datum add_datum run_state =
   let benchmark = add_datum run_state.benchmark in
   {run_state with benchmark}
@@ -85,12 +95,20 @@ type 'a action = 'a run_state -> 'a run_state Lwt.t
 
 type scenario_step = {label : string; action : tree action}
 
-type scenario = {name : string; kernel : string; actions : scenario_step list}
+type scenario = {
+  name : string;
+  kernel : string;
+  actions : scenario_step list;
+  ignore : bool;
+}
 
-let make_scenario name kernel actions = {name; kernel; actions}
+let make_scenario name kernel actions = {name; kernel; actions; ignore = false}
+
+let ignore_scenario scenario = {scenario with ignore = true}
 
 let make_scenario_step (label : string) (action : tree action) = {label; action}
 
+(** Execution of a scenario step. *)
 let run_step ?(verbose = false) run_state {label; action} =
   let open Lwt_syntax in
   (* before *)
@@ -110,6 +128,7 @@ let run_step ?(verbose = false) run_state {label; action} =
   in
   return @@ lift_add_datum (Data.add_datum label tick time) run_state_after
 
+(** Execution of an action on a state, whether it's a pvm_state or a tree *)
 let run_pvm_action name run_state action =
   let open Lwt_syntax in
   (* Act *)
@@ -119,23 +138,38 @@ let run_pvm_action name run_state action =
   return
   @@ lift_add_datum (Data.add_datum name (Z.of_int64 tick) time) run_state_after
 
+(** [switch_state_type switch label state] apply [switch] on the current state
+    of the VM, changing it's type, and records a datum using the [label] *)
 let switch_state_type switch switch_label a_state =
   let open Lwt_syntax in
   let* time, b_state = Measure.time (fun () -> (lift_action switch) a_state) in
   return @@ lift_add_datum (Data.add_tickless_datum switch_label time) b_state
 
-let exec_phase run_state phase =
+(** Run a [phase] of the execution loop to the VM state *)
+let exec_phase_in_slow_mode run_state phase =
   run_pvm_action
     (Exec.show_phase phase)
     run_state
     (lift_action_plus @@ Exec.execute_on_state phase)
 
-let exec_loop tree_run_state =
+let exec_fast_execution_once state =
+  run_pvm_action "Fast execution" state (lift_action_plus @@ Exec.execute_fast)
+
+(** Predicate governing the reboot strategy. *)
+let should_reboot {state; _} =
+  let open Lwt_syntax in
+  return Internal_state.(state.tick_state = Snapshot)
+
+(** Decode a tree to a pvm_state,
+    apply a function on the state,
+     encode to a tree.
+    And record the corresponding data points.*)
+let exec_on_pvm_state f tree_run_state =
   let open Lwt_syntax in
   let* pvm_run_state =
     switch_state_type decode_pvm_state "Decode tree" tree_run_state
   in
-  let* pvm_run_state = Exec.run_loop exec_phase pvm_run_state in
+  let* pvm_run_state = f pvm_run_state in
   let* tree_run_state =
     switch_state_type
       (fun state ->
@@ -146,20 +180,15 @@ let exec_loop tree_run_state =
   in
   return tree_run_state
 
-let exec_on_message message run_state =
-  let open Lwt_syntax in
-  let* run_state =
-    lift_action
-      (Exec.set_full_input_step
-         message
-         (Int32.of_int run_state.message_counter))
-      run_state
-  in
-  exec_loop {run_state with message_counter = run_state.message_counter + 1}
+let exec_slow =
+  exec_on_pvm_state
+    (Exec.run_loop ~reboot:(Some should_reboot) exec_phase_in_slow_mode)
 
-let exec_on_message_from_file message_path run_state =
-  let message = Exec.read_message message_path in
-  exec_on_message message run_state
+let exec_fast =
+  exec_on_pvm_state (Exec.do_while should_reboot exec_fast_execution_once)
+
+let load_messages level messages tree_run_state =
+  lift_action (Exec.load_messages messages level) tree_run_state
 
 let run_scenario ?(verbose = false) ~benchmark scenario =
   let open Lwt_syntax in
@@ -178,7 +207,8 @@ let run_scenario ?(verbose = false) ~benchmark scenario =
     let* info = lift_lookup Wasm.get_info run_state in
     return (add_final_info time info.current_tick run_state.benchmark)
   in
-  Exec.run scenario.kernel apply_scenario
+  if not scenario.ignore then Exec.run scenario.kernel apply_scenario
+  else return benchmark
 
 let run_scenarios ?(verbose = true) ?(totals = true) ?(irmin = true) filename
     scenarios =

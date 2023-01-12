@@ -28,6 +28,8 @@ module Context = Tezos_context_memory.Context_binary
 (** PVM instance used in benchmark*)
 module Wasm : Tezos_scoru_wasm.Wasm_pvm_sig.S with type tree = Context.tree
 
+module Wasm_fast_vm : Tezos_scoru_wasm.Wasm_vm_sig.S
+
 open Tezos_scoru_wasm
 open Wasm_pvm_state
 
@@ -45,3 +47,5 @@ module PP : sig
 
   val tick_label : Internal_state.tick_state -> string
 end
+
+val builtins : Tezos_scoru_wasm.Builtins.reveals

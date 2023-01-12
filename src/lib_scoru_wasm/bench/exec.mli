@@ -31,9 +31,21 @@ open Tezos_scoru_wasm.Wasm_pvm_state
 (** the different phases in a top level call *)
 type phase = Decoding | Initialising | Linking | Evaluating | Padding
 
-(** [run_loop f a] folds [f] on all phases of an exection *)
-val run_loop : ('a -> phase -> 'a Lwt.t) -> 'a -> 'a Lwt.t
+(** [do_while reboot f a] apply [f] on a state [a] regardless of it's type.
+    Will reboot at the end of the last phase according to [reboot]. *)
+val do_while : ('a -> bool Lwt.t) -> ('a -> 'a Lwt.t) -> 'a -> 'a Lwt.t
 
+(** [run_loop ~reboot f a] folds [f] on all phases of an exection on a state [a]
+    regardless of it's type. Will reboot at the end of the last phase according
+    to the [reboot] predicate.  *)
+val run_loop :
+  ?reboot:('a -> bool Lwt.t) option ->
+  ('a -> phase -> 'a Lwt.t) ->
+  'a ->
+  'a Lwt.t
+
+(** [show_phase phase] returns the name of a given phase,
+    for debugging and logging.*)
 val show_phase : phase -> string
 
 (** execute the PVM until a the end of a top level call
@@ -41,20 +53,35 @@ val show_phase : phase -> string
 val finish_top_level_call_on_state :
   Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
 
+(** [execute_on_state phase state] Execute a given [phase] of the execution loop
+    on the state. *)
 val execute_on_state :
   phase -> Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
 
+(** Execute one top level call using fast execution. *)
+val execute_fast :
+  Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
+
 (** [run path k] execute [k] on the content of the file at [path] *)
 val run : Lwt_io.file_name -> (string -> 'a Lwt.t) -> 'a Lwt.t
-
-val set_full_input_step : string -> int32 -> Wasm.tree -> Wasm.tree Lwt.t
-
-(** [read_message "my_file.out"] returns the content of the file,
-      searched in the input repository for messages*)
-val read_message : string -> string
 
 (** [initial_boot_sector_from_kernel
         "src/lib_scoru_wasm/bench/inputs/my_kernel.wasm"]
        initialize a state from a kernel (byte format) *)
 val initial_boot_sector_from_kernel :
   ?max_tick:int64 -> string -> Wasm.tree Lwt.t
+
+(** Inputs can be given :
+    as a filename containing the input,
+    or directly as a string.*)
+type input = File of string | Str of string
+
+(** Types of messages to send to inbox. Can be either already encoded, or not.
+    If it's not encoded then it must be designated as Deposit or Other
+    to allow encoding *)
+type message = Transfer of input | Other of input | Encoded of input
+
+(** [load_messages messages level state] sends messages to the inbox,
+    at a given level. Will fail if the VM is not accepting input,
+    and advance until next Snapshot.*)
+val load_messages : message list -> int32 -> Wasm.tree -> Wasm.tree Lwt.t

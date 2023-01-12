@@ -40,82 +40,15 @@
 
 open Inputs
 
-(** a simple scenario using a version of the tx_kernel from integration tests*)
-let scenario_tx_kernel_deposit_then_withdraw_to_same_address_ name kernel =
-  Scenario.make_scenario
-    name
-    kernel
-    [
-      Scenario.make_scenario_step
-        "incorrect input"
-        (Scenario.exec_on_message "incorrect");
-      Scenario.make_scenario_step
-        "Deposit"
-        (Scenario.exec_on_message_from_file Messages.Old.deposit);
-      Scenario.make_scenario_step
-        "Withdraw"
-        (Scenario.exec_on_message_from_file Messages.Old.withdrawal);
-    ]
-
-let scenario_tx_kernel_deposit_then_withdraw_to_same_address_no_sig =
-  scenario_tx_kernel_deposit_then_withdraw_to_same_address_
-    "tx_kernel - deposit_then_withdraw_to_same_address NOSIG"
-    Kernels.tx_kernel_vRAM_nosig
-
-let scenario_tx_kernel_deposit_then_withdraw_to_same_address_sig =
-  scenario_tx_kernel_deposit_then_withdraw_to_same_address_
-    "tx_kernel - deposit_then_withdraw_to_same_address SIG"
-    Kernels.tx_kernal_vRam_latest
-
-let scenario_tx_kernel_deposit_transfer_withdraw =
-  Scenario.make_scenario
-    "tx_kernel - deposit_transfer_withdraw"
-    Kernels.tx_kernal_vRam_latest
-    [
-      Scenario.make_scenario_step
-        "First Deposit"
-        (Scenario.exec_on_message_from_file
-           Messages.Deposit_transfer_withdraw.fst_deposit);
-      Scenario.make_scenario_step
-        "Second Deposit"
-        (Scenario.exec_on_message_from_file
-           Messages.Deposit_transfer_withdraw.snd_deposit);
-      Scenario.make_scenario_step
-        "Invalid Message"
-        (Scenario.exec_on_message_from_file
-           Messages.Deposit_transfer_withdraw.invalid_message);
-      Scenario.make_scenario_step
-        "Valid Message"
-        (Scenario.exec_on_message_from_file
-           Messages.Deposit_transfer_withdraw.valid_message);
-    ]
-
-let scenario_tx_kernel_deposit_transfer_withdraw_many_transfers =
-  Scenario.make_scenario
-    "tx_kernel - deposit_transfer_withdraw_many_transfers"
-    Kernels.tx_kernal_vRam_latest
-    [
-      Scenario.make_scenario_step
-        "First Deposit"
-        (Scenario.exec_on_message_from_file
-           Messages.Deposit_transfer_withdraw.fst_deposit);
-      Scenario.make_scenario_step
-        "Second Deposit"
-        (Scenario.exec_on_message_from_file
-           Messages.Deposit_transfer_withdraw.snd_deposit);
-      Scenario.make_scenario_step
-        "many transfers between two actors"
-        (Scenario.exec_on_message_from_file Messages.Large.transfer_two_actors);
-    ]
-
 let scenario_computation_kernel =
   Scenario.make_scenario
     "computation kernel"
     Kernels.computation_kernel
     [
       Scenario.make_scenario_step
-        "Dummy Message"
-        (Scenario.exec_on_message "dummy");
+        "Load inbox"
+        (Scenario.load_messages 1l [Other (Str "dummy")]);
+      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
 
 let scenario_unreachable_kernel =
@@ -124,9 +57,34 @@ let scenario_unreachable_kernel =
     Kernels.unreachable_kernel
     [
       Scenario.make_scenario_step
-        "Dummy Message"
-        (Scenario.exec_on_message "dummy");
+        "Load inbox"
+        (Scenario.load_messages 1l [Other (Str "dummy")]);
+      Scenario.make_scenario_step "Loop" Scenario.exec_slow;
     ]
+
+let demo_input_step =
+  Scenario.make_scenario_step
+    "Load inbox"
+    (Scenario.load_messages
+       0l
+       [
+         Encoded (File Messages.Demo.deposit_blue);
+         Encoded (File Messages.Demo.deposit_green);
+         Encoded (File Messages.Demo.deposit_red)
+         (* Other "gen_messages/transfer_0_000"; *);
+       ])
+
+let scenario_tx_kernel_demo =
+  Scenario.make_scenario
+    "tx_kernel - demo scenario"
+    Kernels.tx_kernel_dac
+    [demo_input_step; Scenario.make_scenario_step "Loop" Scenario.exec_slow]
+
+let scenario_tx_kernel_demo_fast =
+  Scenario.make_scenario
+    "tx_kernel - demo scenario fast"
+    Kernels.tx_kernel_dac
+    [demo_input_step; Scenario.make_scenario_step "Loop" Scenario.exec_fast]
 
 let filename () =
   let t = Unix.localtime (Unix.time ()) in
@@ -142,14 +100,12 @@ let () =
   Lwt_main.run
   @@ Scenario.run_scenarios
        ~verbose:true
-       ~totals:false
+       ~totals:true
        ~irmin:false
        (filename ())
        [
-         scenario_unreachable_kernel;
-         scenario_computation_kernel;
-         scenario_tx_kernel_deposit_then_withdraw_to_same_address_no_sig;
-         scenario_tx_kernel_deposit_then_withdraw_to_same_address_sig;
-         scenario_tx_kernel_deposit_transfer_withdraw;
-         scenario_tx_kernel_deposit_transfer_withdraw_many_transfers;
+         Scenario.ignore_scenario scenario_unreachable_kernel;
+         Scenario.ignore_scenario scenario_computation_kernel;
+         scenario_tx_kernel_demo;
+         scenario_tx_kernel_demo_fast;
        ]
