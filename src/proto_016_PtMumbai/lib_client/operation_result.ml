@@ -872,7 +872,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_timeout_result _ -> "smart rollup refutation timeout"
     | Sc_rollup_execute_outbox_message_result _ ->
         "smart output message execution"
-    | Sc_rollup_recover_bond_result _ -> "smart bond retrieval"
+    | Sc_rollup_recover_bond_result _ -> "smart rollup bond retrieval"
     | Dal_publish_slot_header_result _ ->
         "data availability slot header publishing"
     | Zk_rollup_origination_result _ -> "epoxy originate"
