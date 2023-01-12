@@ -19,7 +19,7 @@ depends: [
   "tezos-scoru-wasm" {with-test}
   "qcheck-alcotest" { with-test & >= "0.18" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
-  "tezt" {with-test}
+  "tezt" { with-test & >= "3.0.0" }
   "tezos-scoru-wasm-test-helpers" {with-test}
   "tezos-webassembly-interpreter-extra" {with-test}
 ]

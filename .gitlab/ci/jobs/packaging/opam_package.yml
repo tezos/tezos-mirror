@@ -1553,8 +1553,6 @@ opam:tezos-workers:
   variables:
     package: tezos-workers
 
-# Ignoring unreleased package tezt.
-
 # Ignoring unreleased package tezt-performance-regression.
 
 # Ignoring unreleased package tezt-self-tests.

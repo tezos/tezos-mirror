@@ -1,7 +1,7 @@
 Tezt: OCaml Tezos Test Framework
 ================================
 
-Tezt is a generic test framework written in OCaml (see :src:`tezt/lib/README.md`).
+`Tezt <https://gitlab.com/nomadic-labs/tezt/>`_ is a generic test framework written in OCaml.
 It focuses on integration tests that launch external processes.
 In particular, Tezt can be used to orchestrate tests involving Tezos nodes and clients.
 

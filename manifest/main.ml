@@ -191,18 +191,6 @@ let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
 let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
 
-let js_of_ocaml =
-  external_lib
-    ~js_compatible:true
-    "js_of_ocaml"
-    V.(at_least "4.0.0" && less_than "5.0.0")
-
-let js_of_ocaml_lwt =
-  external_lib
-    ~js_compatible:true
-    "js_of_ocaml-lwt"
-    V.(at_least "4.0.0" && less_than "5.0.0")
-
 let json_data_encoding =
   external_lib
     ~js_compatible:true
@@ -338,12 +326,25 @@ let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 let tezos_rust_lib =
   opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.3")
 
+let tezt_lib =
+  external_lib
+    ~js_compatible:false
+    "tezt"
+    V.(at_least "3.0.0")
+    ~main_module:"Tezt"
+
+let tezt_core_lib =
+  external_sublib
+    tezt_lib
+    ~js_compatible:true
+    "tezt.core"
+    ~main_module:"Tezt_core"
+
+let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
+
 let tls = external_lib "tls" V.(at_least "0.13.0")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
-
-(* Declare that we depend on the JS-compatible part of unix. *)
-let unix_js = external_lib ~opam:"base-unix" "unix" ~js_compatible:true V.True
 
 let uri = external_lib ~js_compatible:true "uri" V.(at_least "3.1.0")
 
@@ -375,7 +376,6 @@ let () =
       external_lib "odoc" V.True;
       external_lib "ocp-indent" V.True;
       external_lib "ocaml-lsp-server" V.(at_least "1.6.1");
-      external_lib "js_of_ocaml-compiler" V.True;
       external_lib "merge-fmt" V.True;
     ]
 
@@ -3046,40 +3046,6 @@ let octez_shell_benchmarks =
         octez_micheline;
       ]
     ~linkall:true
-
-let tezt_core_lib =
-  public_lib
-    "tezt.core"
-    ~path:"tezt/lib_core"
-    ~ocaml:V.(at_least "4.12")
-    ~bisect_ppx:false
-    ~js_compatible:true
-    ~release_status:Unreleased
-    ~deps:[re; lwt; unix_js; ezjsonm]
-
-let tezt_lib =
-  public_lib
-    "tezt"
-    ~path:"tezt/lib"
-    ~synopsis:
-      "Test framework for unit tests, integration tests, and regression tests"
-    ~opam_homepage:"https://gitlab.com/tezos/tezos/-/tree/master/tezt/lib#tezt"
-    ~opam_doc:"https://tezos.gitlab.io/api/odoc/_html/tezt/Tezt/index.html"
-    ~ocaml:V.(at_least "4.12")
-    ~bisect_ppx:false
-    ~release_status:Unreleased
-    ~deps:[re; lwt_unix; ezjsonm; tezt_core_lib |> open_]
-
-let tezt_js_lib =
-  public_lib
-    "tezt.js"
-    ~path:"tezt/lib_js"
-    ~ocaml:V.(at_least "4.12")
-    ~js_compatible:true
-    ~bisect_ppx:false
-    ~optional:true
-    ~release_status:Unreleased
-    ~deps:[re; ezjsonm; js_of_ocaml; js_of_ocaml_lwt; tezt_core_lib |> open_]
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
   tezt_without_tezt_lib_dependency

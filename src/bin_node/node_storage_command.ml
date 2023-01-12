@@ -124,7 +124,11 @@ module Term = struct
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let*! () =
-        Tezos_context.Context.Checks.Pack.Integrity_check.run ~root ~auto_repair
+        Tezos_context.Context.Checks.Pack.Integrity_check.run
+          ~root
+          ~auto_repair
+          ~always:false
+          ~heads:None
       in
       return_unit)
 
