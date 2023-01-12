@@ -192,6 +192,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let gc _ _ = (* not implemented for in-memory context *) Lwt.return_unit
 
+  let wait_gc_completion _ =
+    (* not implemented for in-memory context *) Lwt.return_unit
+
   let is_gc_allowed _ = (* not implemented for in-memory context *) false
 
   let sync _ = (* not implemented for in-memory context *) Lwt.return_unit

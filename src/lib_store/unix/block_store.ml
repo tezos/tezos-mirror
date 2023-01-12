@@ -1389,7 +1389,9 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                            section, in case it needs to access the block
                            store. *)
                         let* () = finalizer new_head_lafl in
-                        (* We can now trigger the context GC *)
+                        (* We can now trigger the context GC: if the
+                           GC is performed, this call will block until
+                           its end. *)
                         let* () =
                           may_trigger_gc
                             block_store

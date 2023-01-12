@@ -392,6 +392,16 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
             let* () = Events.(emit gc_launch_failure) err in
             return_unit)
 
+  let wait_gc_completion index =
+    let open Lwt_syntax in
+    let* () = sync index in
+    let* r = Store.Gc.wait index.repo in
+    match r with
+    | Ok _stats_opt -> return_unit
+    | Error (`Msg _msg) ->
+        (* Logs will be printed by the [gc] caller. *)
+        return_unit
+
   let is_gc_allowed index = Store.Gc.is_allowed index.repo
 
   (*-- Generic Store Primitives ------------------------------------------------*)

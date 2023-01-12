@@ -80,7 +80,10 @@ type request =
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {context_hash : Context_hash.t}
+  | Context_garbage_collection of {
+      context_hash : Context_hash.t;
+      gc_lockfile_path : string;
+    }
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t
@@ -118,7 +121,7 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
-  | Context_garbage_collection {context_hash} ->
+  | Context_garbage_collection {context_hash; gc_lockfile_path = _} ->
       Format.fprintf
         ppf
         "garbage collecting context below %a"
@@ -382,11 +385,15 @@ let case_context_gc tag =
   case
     tag
     ~title:"context_gc"
-    (obj1 (req "context_hash" Context_hash.encoding))
+    (obj2
+       (req "context_hash" Tezos_crypto.Context_hash.encoding)
+       (req "gc_lockfile_path" string))
     (function
-      | Context_garbage_collection {context_hash} -> Some context_hash
+      | Context_garbage_collection {context_hash; gc_lockfile_path} ->
+          Some (context_hash, gc_lockfile_path)
       | _ -> None)
-    (fun context_hash -> Context_garbage_collection {context_hash})
+    (fun (context_hash, gc_lockfile_path) ->
+      Context_garbage_collection {context_hash; gc_lockfile_path})
 
 let request_encoding =
   let open Data_encoding in

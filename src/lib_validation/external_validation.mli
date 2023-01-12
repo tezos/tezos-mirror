@@ -80,7 +80,10 @@ type request =
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {context_hash : Context_hash.t}
+  | Context_garbage_collection of {
+      context_hash : Context_hash.t;
+      gc_lockfile_path : string;
+    }
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t

@@ -746,6 +746,14 @@ module type TEZOS_CONTEXT = sig
     will return [None]. *)
   val gc : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
 
+  (** [wait_gc_completion index] will return a blocking thread if an
+      Irmin GC is currently ongoing.
+
+      {b Warning}: this currently only applies to GC started in the
+      Irmin instance referenced as [index]; other opened instances
+      will always return instantly. *)
+  val wait_gc_completion : index -> unit Lwt.t
+
   (** Sync the context with disk. Only useful for read-only instances.
       Does not fail when the context is not in read-only mode. *)
   val sync : index -> unit Lwt.t

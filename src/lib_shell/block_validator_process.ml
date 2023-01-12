@@ -45,9 +45,13 @@ type validator_kind =
     }
       -> validator_kind
 
+type simple_kind = External_process | Single_process
+
 (* A common interface for the two type of validation *)
 module type S = sig
   type t
+
+  val kind : simple_kind
 
   val close : t -> unit Lwt.t
 
@@ -89,7 +93,11 @@ module type S = sig
     unit tzresult Lwt.t
 
   val context_garbage_collection :
-    t -> Context_ops.index -> Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t
+    t ->
+    Context_ops.index ->
+    Tezos_crypto.Context_hash.t ->
+    gc_lockfile_path:string ->
+    unit tzresult Lwt.t
 
   val commit_genesis :
     t ->
@@ -191,6 +199,8 @@ module Internal_validator_process = struct
         cache = None;
         preapply_result = None;
       }
+
+  let kind = Single_process
 
   let close _ = Events.(emit close ())
 
@@ -372,7 +382,8 @@ module Internal_validator_process = struct
       header
       operations
 
-  let context_garbage_collection _validator context_index context_hash =
+  let context_garbage_collection _validator context_index context_hash
+      ~gc_lockfile_path:_ =
     let open Lwt_result_syntax in
     let*! () = Context_ops.gc context_index context_hash in
     return_unit
@@ -559,6 +570,8 @@ module External_validator_process = struct
     sandbox_parameters : Data_encoding.json option;
     dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
   }
+
+  let kind = External_process
 
   (* The shutdown_timeout is used when closing the block validator
      process. It aims to allow it to shutdown gracefully. This delay
@@ -864,9 +877,11 @@ module External_validator_process = struct
     in
     send_request validator request Data_encoding.unit
 
-  let context_garbage_collection validator _index context_hash =
+  let context_garbage_collection validator _index context_hash ~gc_lockfile_path
+      =
     let request =
-      External_validation.Context_garbage_collection {context_hash}
+      External_validation.Context_garbage_collection
+        {context_hash; gc_lockfile_path}
     in
     send_request validator request Data_encoding.unit
 
@@ -978,6 +993,10 @@ let init validator_environment validator_kind =
       in
       return (E {validator_process; validator})
 
+let kind (E {validator_process; _}) =
+  let (module M) = validator_process in
+  M.kind
+
 let close (E {validator_process = (module VP); validator}) = VP.close validator
 
 let reconfigure_event_logging (E {validator_process = (module VP); validator})
@@ -1025,8 +1044,12 @@ let precheck_block (E {validator_process = (module VP); validator}) chain_store
   VP.precheck_block validator chain_store ~predecessor header operations
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
-    context_index context_hash =
-  VP.context_garbage_collection validator context_index context_hash
+    context_index context_hash ~gc_lockfile_path =
+  VP.context_garbage_collection
+    validator
+    context_index
+    context_hash
+    ~gc_lockfile_path
 
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id

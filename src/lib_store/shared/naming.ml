@@ -70,6 +70,8 @@ let chain_config_file dir =
 
 let lock_file dir = mk_file dir "lock"
 
+let gc_lockfile dir = mk_file dir "gc_lock"
+
 let reconstruction_lock_file dir = mk_file dir "reconstruction_lock"
 
 let testchains_dir dir = mk_dir dir "testchains"
