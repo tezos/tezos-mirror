@@ -168,12 +168,9 @@ let operations_gen ~(n : int) =
   in
   List.map mk_operation (Operation_hash.Map.bindings ops)
 
-(** The number of operations used by tests that follow *)
-let nb_ops = 100
-
-let mk_ops () =
-  let ops = QCheck2.Gen.generate1 (operations_gen ~n:nb_ops) in
-  assert (Compare.List_length_with.(ops = nb_ops)) ;
+let mk_ops n =
+  let ops = QCheck2.Gen.generate1 (operations_gen ~n) in
+  assert (Compare.List_length_with.(ops = n)) ;
   ops
 
 let pp_classification fmt classification =
@@ -405,7 +402,7 @@ module Toy_filter = struct
 
     let flush _ ~head:_ = assert false
 
-    let remove ~filter_state:_ _ = assert false
+    let remove ~filter_state oph = Operation_hash.Set.remove oph filter_state
 
     let pre_filter _ ~filter_state:_ _ = assert false
 
@@ -482,6 +479,8 @@ let consistent_outcomes ~mempool_is_empty proto_outcome filter_outcome =
     check the returned classification and the updates of the protocol
     and filter internal states. *)
 let test_add_operation ctxt =
+  (* Number of operations that will be added. *)
+  let nb_ops = 100 in
   let open Lwt_result_syntax in
   let (module Chain_store) = make_chain_store ctxt in
   let module P = MakePrevalidation (Chain_store) (Toy_filter) in
@@ -546,7 +545,7 @@ let test_add_operation ctxt =
   let timestamp : Time.Protocol.t = now () in
   let head = Init.genesis_block ~timestamp ctxt in
   let* prevalidation_state = P.create chain_store ~head ~timestamp in
-  let ops = mk_ops () in
+  let ops = mk_ops nb_ops in
   let outcomes =
     QCheck2.Gen.(
       generate ~n:nb_ops (pair proto_add_outcome_gen filter_add_outcome_gen))
@@ -570,6 +569,100 @@ let test_add_operation ctxt =
     final_valid_ops ;
   return_unit
 
+(** Test [Prevalidation.remove_operation]. *)
+let test_remove_operation ctxt =
+  (* Number of operations initially added to the validation state. *)
+  let nb_initial_ops = 20 in
+  (* Number of operations on which we will call [remove_operation]
+     after we have added [nb_initial_ops] operations to the state. We
+     must have [nb_ops_to_remove <= nb_initial_ops]; removal from an
+     empty state will be tested separately. *)
+  let nb_ops_to_remove = 10 in
+  let open Lwt_result_syntax in
+  let (module Chain_store) = make_chain_store ctxt in
+  let module P = MakePrevalidation (Chain_store) (Toy_filter) in
+  let timestamp : Time.Protocol.t = now () in
+  let head = Init.genesis_block ~timestamp ctxt in
+  let* state = P.create chain_store ~head ~timestamp in
+  (* Test removal from empty state. *)
+  let state = P.remove_operation state Operation_hash.zero in
+  assert (
+    Operation_hash.Map.is_empty
+      (P.Internal_for_tests.get_valid_operations state)) ;
+  assert (
+    Operation_hash.Set.is_empty (P.Internal_for_tests.get_filter_state state)) ;
+  (* For each operation that will be removed, we generate a boolean
+     that indicates whether the operation should be present in the
+     prevalidation state. *)
+  let removed_op_was_present =
+    QCheck2.Gen.(generate ~n:nb_ops_to_remove bool)
+  in
+  (* We will need as many original operations to remove as there are
+     occurrences of [false] in [removed_op_was_present]. *)
+  let nb_original_ops_to_remove =
+    List.fold_left (fun n b -> if b then n else n + 1) 0 removed_op_was_present
+  in
+  (* We generate all needed operations at the same time to have
+     [operations_gen]'s guarantee that their hashes are distinct. *)
+  let ops = mk_ops (nb_initial_ops + nb_original_ops_to_remove) in
+  (* Add [nb_initial_ops] operations to the prevalidation state. *)
+  let state = P.Internal_for_tests.set_validation_info state Proto_added in
+  let rec add_ops n state ops =
+    if n <= 0 then return (state, ops)
+    else
+      match ops with
+      | [] ->
+          (* We generated more than [nb_initial_ops] operations. *) assert false
+      | op :: remaining_ops ->
+          let*! state, _op, _classification, _replacement =
+            P.add_operation state F_no_replace op
+          in
+          add_ops (n - 1) state remaining_ops
+  in
+  let* state, ops = add_ops nb_initial_ops state ops in
+  assert (
+    Operation_hash.Map.cardinal
+      (P.Internal_for_tests.get_valid_operations state)
+    = nb_initial_ops) ;
+  (* Call [Prevalidation.remove_operation] on [nb_ops_to_remove]
+     operations, which are already present in the state or not as
+     specified by [removed_op_was_present]. *)
+  let rec remove_ops state old_cardinal removed_op_was_present ops =
+    match removed_op_was_present with
+    | [] -> ()
+    | was_present :: rest_was_present ->
+        let oph, remaining_ops =
+          if was_present then
+            match
+              Operation_hash.Map.choose
+                (P.Internal_for_tests.get_valid_operations state)
+            with
+            | Some (oph, _) -> (oph, ops)
+            | None ->
+                (* More operations have been added to the state than removed. *)
+                assert false
+          else
+            match ops with
+            | op :: remaining_ops -> (op.Shell_operation.hash, remaining_ops)
+            | [] ->
+                (* We generated enough operations for each occurrence of
+                   [false] in [removed_op_was_present]. *)
+                assert false
+        in
+        let state = P.remove_operation state oph in
+        let valid_ops = P.Internal_for_tests.get_valid_operations state in
+        let filter_state = P.Internal_for_tests.get_filter_state state in
+        assert (not (Operation_hash.Map.mem oph valid_ops)) ;
+        assert (not (Operation_hash.Set.mem oph filter_state)) ;
+        let new_cardinal = Operation_hash.Map.cardinal valid_ops in
+        assert (
+          if was_present then new_cardinal = old_cardinal - 1
+          else new_cardinal = old_cardinal) ;
+        remove_ops state new_cardinal rest_was_present remaining_ops
+  in
+  remove_ops state nb_initial_ops removed_op_was_present ops ;
+  return_unit
+
 let () =
   let register_test name f =
     Tztest.tztest name `Quick (Init.wrap_tzresult_lwt_disk f)
@@ -588,5 +681,9 @@ let () =
             "Check classification and state updates"
             test_add_operation;
         ] );
+      (* Run only those tests with:
+         dune exec src/lib_shell/test/test_prevalidation_t.exe -- test remove_operation '0' *)
+      ( "remove_operation",
+        [register_test "Test remove_operation" test_remove_operation] );
     ]
   |> Lwt_main.run
