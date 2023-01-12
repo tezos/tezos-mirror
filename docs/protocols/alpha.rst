@@ -70,6 +70,8 @@ Breaking Changes
 
 - Disable TORU. (MR :gl:`!7087`)
 
+- Remove TORU client commands. (MR :gl:`!7352`)
+
 RPC Changes
 -----------
 
