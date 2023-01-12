@@ -68,5 +68,5 @@ val equal : t -> t -> bool
 val slots_range : lower:int -> upper:int -> t list tzresult
 
 (** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
-      {None} instead of an error. *)
+    [None] instead of an error. *)
 val slots_range_opt : lower:int -> upper:int -> t list option
