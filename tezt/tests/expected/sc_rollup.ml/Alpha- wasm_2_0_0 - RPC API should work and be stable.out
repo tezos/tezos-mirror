@@ -241,7 +241,7 @@ This sequence of operations was run:
 16
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/num_messages
-"8"
+"5"
 
 ./octez-smart-rollup-client-alpha rpc get /global/block/head/status
 "Waiting for input message"
@@ -260,3 +260,28 @@ This sequence of operations was run:
 
 ./octez-smart-rollup-client-alpha rpc get /global/tezos_level
 18
+
+./octez-smart-rollup-client-alpha rpc get /global/block/head
+{ "block_hash": "[BLOCK_HASH]",
+  "level": 18,
+  "predecessor": "[BLOCK_HASH]",
+  "commitment_hash": null,
+  "previous_commitment_hash":
+    "[SC_ROLLUP_COMMITMENT_HASH]",
+  "context": "[SC_ROLLUP_CONTEXT_HASH]",
+  "inbox_witness": "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]",
+  "inbox_hash": "[SC_ROLLUP_INBOX_HASH]",
+  "inbox":
+    { "level": 18,
+      "old_levels_messages":
+        { "index": "17",
+          "content":
+            { "hash":
+                "[SC_ROLLUP_INBOX_MERKELIZED_PAYLOAD_HASHES_HASH]",
+              "level": 18 },
+          "back_pointers":
+            [ "[SC_ROLLUP_INBOX_HASH]",
+              "[SC_ROLLUP_INBOX_HASH]",
+              "[SC_ROLLUP_INBOX_HASH]" ] } },
+  "messages": [ "31352d31", "31352d32", "31352d33", "31352d34", "31352d35" ],
+  "initial_tick": "1430000000000", "num_ticks": "99000000000" }

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Tezos_crypto
 
-module type S = sig
-  module PVM : Pvm.S
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Smart_rollup_context_hash"
 
-  module Accounted_pvm :
-    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Accounted.t
+      let title = "A base58-check encoded hash of a Smart rollup node context"
 
-  module Free_pvm :
-    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
+      let b58check_prefix = "\008\209\216\166"
 
-  (** [process_head node_ctxt head (inbox, messages)] interprets the [messages]
-      associated with a [head]. This requires the [inbox] to be updated
-      beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where
-      [ctxt] is the updated layer 2 context (with the new PVM state),
-      [num_messages] is the number of [messages], [num_ticks] is the number of
-      ticks taken by the PVM for the evaluation and [tick] is the tick reached
-      by the PVM after the evaluation. *)
-  val process_head :
-    Node_context.rw ->
-    'a Context.t ->
-    Layer1.head ->
-    Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
-    ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
+      let size = None
+    end)
 
-  (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
-      for a given [tick] if this [tick] happened before
-      [level]. Otherwise, returns [None].*)
-  val state_of_tick :
-    _ Node_context.t ->
-    Sc_rollup.Tick.t ->
-    Raw_level.t ->
-    (PVM.state * PVM.hash) option tzresult Lwt.t
-
-  (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
-      block [head], or the state at rollup genesis if the block is before the
-      rollup origination. *)
-  val state_of_head :
-    'a Node_context.t ->
-    'a Context.t ->
-    Layer1.head ->
-    ('a Context.t * PVM.state) tzresult Lwt.t
-end
-
-(** Functor to construct an interpreter for a given PVM. *)
-module Make (PVM : Pvm.S) : S with module PVM = PVM
+let () = Base58.check_encoded_prefix b58check_encoding "SRCo" 54

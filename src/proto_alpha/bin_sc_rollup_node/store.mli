@@ -47,12 +47,6 @@ type rw = Store_sigs.rw t
 (** Read only store {!t}. *)
 type ro = Store_sigs.ro t
 
-type state_info = {
-  num_messages : Z.t;
-  num_ticks : Z.t;
-  initial_tick : Sc_rollup.Tick.t;
-}
-
 (** [close store] closes the store. *)
 val close : _ t -> unit Lwt.t
 
@@ -62,81 +56,40 @@ val load : 'a Store_sigs.mode -> string -> 'a store Lwt.t
 (** [readonly store] returns a read-only version of [store]. *)
 val readonly : _ t -> ro
 
-(** Extraneous state information for the PVM *)
-module StateInfo :
+module L2_blocks :
   Store_sigs.Append_only_map
     with type key := Tezos_crypto.Block_hash.t
-     and type value := state_info
+     and type value := Sc_rollup_block.t
      and type 'a store := 'a store
 
-module StateHistoryRepr : sig
-  type event = {
-    tick : Sc_rollup.Tick.t;
-    block_hash : Tezos_crypto.Block_hash.t;
-    predecessor_hash : Tezos_crypto.Block_hash.t;
-    level : Raw_level.t;
+(** Storage for persisting messages downloaded from the L1 node. *)
+module Messages : sig
+  type info = {
+    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor_timestamp : Timestamp.t;
+    messages : Sc_rollup.Inbox_message.t list;
   }
 
-  module TickMap : Map.S with type key := Sc_rollup.Tick.t
-
-  type value = event TickMap.t
-end
-
-(** [StateHistory] represents storage for the PVM state history: it is an
-    extension of [Store_utils.Mutable_value] whose values are lists of bindings
-    indexed by PVM tick numbers, and whose value contains information about the
-    block that the PVM was processing when generating the tick.
-*)
-module StateHistory : sig
   include
-    Store_sigs.Mutable_value
-      with type value := StateHistoryRepr.value
+    Store_sigs.Append_only_map
+      with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
+       and type value := info
        and type 'a store := 'a store
-
-  val insert : rw -> StateHistoryRepr.event -> unit Lwt.t
-
-  val event_of_largest_tick_before :
-    _ t -> Sc_rollup.Tick.t -> StateHistoryRepr.event option tzresult Lwt.t
 end
-
-(** Storage for persisting messages downloaded from the L1 node, indexed by
-    [Tezos_crypto.Block_hash.t]. *)
-module Messages :
-  Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
-     and type value := Sc_rollup.Inbox_message.t list
-     and type 'a store := 'a store
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :
   Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
+    with type key := Sc_rollup.Inbox.Hash.t
      and type value := Sc_rollup.Inbox.t
-     and type 'a store := 'a store
-
-(** Histories from the rollup node. **)
-module Histories :
-  Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
-     and type value := Sc_rollup.Inbox.History.t
-     and type 'a store := 'a store
-
-(** messages histories from the rollup node. Each history contains the messages
-    of one level. The store is indexed by a level in order to maintain a small
-    structure in memory. Only the message history of one level is fetched when
-    computing the proof. *)
-module Payloads_histories :
-  Store_sigs.Append_only_map
-    with type key := Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-     and type value := Sc_rollup.Inbox_merkelized_payload_hashes.History.t
      and type 'a store := 'a store
 
 (** Storage containing commitments and corresponding commitment hashes that the
     rollup node has knowledge of. *)
 module Commitments :
   Store_sigs.Append_only_map
-    with type key := Raw_level.t
-     and type value := Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t
+    with type key := Sc_rollup.Commitment.Hash.t
+     and type value := Sc_rollup.Commitment.t
      and type 'a store := 'a store
 
 (** Storage containing the inbox level of the last commitment produced by the
@@ -153,13 +106,6 @@ module Commitments_published_at_level :
   Store_sigs.Map
     with type key := Sc_rollup.Commitment.Hash.t
      and type value := Raw_level.t
-     and type 'a store := 'a store
-
-(** Storage containing the hashes of contexts retrieved from the L1 node. *)
-module Contexts :
-  Store_sigs.Append_only_map
-    with type key := Tezos_crypto.Block_hash.t
-     and type value := Context.hash
      and type 'a store := 'a store
 
 (** Published slot headers per block hash,

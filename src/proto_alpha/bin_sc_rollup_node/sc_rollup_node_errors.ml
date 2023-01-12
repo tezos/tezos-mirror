@@ -28,8 +28,7 @@ open Protocol.Alpha_context
 let tez_sym = "\xEA\x9C\xA9"
 
 type error +=
-  | Cannot_produce_proof of
-      Sc_rollup.Inbox.t * Sc_rollup.Inbox.History.t * Raw_level.t
+  | Cannot_produce_proof of Sc_rollup.Inbox.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Bad_minimal_fees of string
   | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
@@ -39,7 +38,8 @@ type error +=
       inbox : Sc_rollup.Inbox.t;
     }
   | Missing_PVM_state of Tezos_crypto.Block_hash.t * Int32.t
-  | Cannot_checkout_context of Tezos_crypto.Block_hash.t * string option
+  | Cannot_checkout_context of
+      Tezos_crypto.Block_hash.t * Sc_rollup_context_hash.t option
   | No_batcher
 
 type error +=
@@ -99,27 +99,21 @@ let () =
     ~description:
       "The rollup node is in a state that prevents it from producing \
        refutation proofs."
-    ~pp:(fun ppf (inbox, history, level) ->
+    ~pp:(fun ppf (inbox, level) ->
       Format.fprintf
         ppf
-        "cannot produce proof for inbox %a of level %a with history %a"
+        "cannot produce proof for inbox %a of level %a"
         Sc_rollup.Inbox.pp
         inbox
         Raw_level.pp
-        level
-        Sc_rollup.Inbox.History.pp
-        history)
+        level)
     Data_encoding.(
-      obj3
+      obj2
         (req "inbox" Sc_rollup.Inbox.encoding)
-        (req "history" Sc_rollup.Inbox.History.encoding)
         (req "level" Raw_level.encoding))
     (function
-      | Cannot_produce_proof (inbox, history, level) ->
-          Some (inbox, history, level)
-      | _ -> None)
-    (fun (inbox, history, level) ->
-      Cannot_produce_proof (inbox, history, level)) ;
+      | Cannot_produce_proof (inbox, level) -> Some (inbox, level) | _ -> None)
+    (fun (inbox, level) -> Cannot_produce_proof (inbox, level)) ;
 
   register_error_kind
     ~id:"sc_rollup.node.missing_mode_operators"
@@ -197,14 +191,14 @@ let () =
         "The context %sfor block %a cannot be checkouted"
         (Option.fold
            ~none:""
-           ~some:(fun c -> Hex.(show (of_string c)))
+           ~some:Sc_rollup_context_hash.to_b58check
            context_hash)
         Tezos_crypto.Block_hash.pp
         block)
     Data_encoding.(
       obj2
         (req "block" Tezos_crypto.Block_hash.encoding)
-        (opt "context" (conv Bytes.of_string Bytes.to_string bytes)))
+        (opt "context" Sc_rollup_context_hash.encoding))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)

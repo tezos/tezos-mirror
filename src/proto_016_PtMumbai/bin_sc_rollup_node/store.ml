@@ -50,14 +50,8 @@ let load = IStore.load
 
 let readonly = IStore.readonly
 
-type state_info = {
-  num_messages : Z.t;
-  num_ticks : Z.t;
-  initial_tick : Sc_rollup.Tick.t;
-}
-
-(** Extraneous state information for the PVM *)
-module StateInfo =
+(** L2 blocks *)
+module L2_blocks =
   Make_append_only_map
     (struct
       let path = ["state_info"]
@@ -68,110 +62,54 @@ module StateInfo =
       let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
-      type value = state_info
+      type value = Sc_rollup_block.t
 
-      let name = "state_info"
+      let name = "sc_rollup_block"
 
-      let encoding =
-        let open Data_encoding in
-        conv
-          (fun {num_messages; num_ticks; initial_tick} ->
-            (num_messages, num_ticks, initial_tick))
-          (fun (num_messages, num_ticks, initial_tick) ->
-            {num_messages; num_ticks; initial_tick})
-          (obj3
-             (req "num_messages" Data_encoding.z)
-             (req "num_ticks" Data_encoding.z)
-             (req "initial_tick" Sc_rollup.Tick.encoding))
+      let encoding = Sc_rollup_block.encoding
     end)
 
-module StateHistoryRepr = struct
-  type event = {
-    tick : Sc_rollup.Tick.t;
-    block_hash : Tezos_crypto.Block_hash.t;
-    predecessor_hash : Tezos_crypto.Block_hash.t;
-    level : Raw_level.t;
+(** Unaggregated messages per block *)
+module Messages = struct
+  type info = {
+    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor_timestamp : Timestamp.t;
+    messages : Sc_rollup.Inbox_message.t list;
   }
-
-  module TickMap = Map.Make (Sc_rollup.Tick)
-
-  type value = event TickMap.t
-
-  let event_encoding =
-    let open Data_encoding in
-    conv
-      (fun {tick; block_hash; predecessor_hash; level} ->
-        (tick, block_hash, predecessor_hash, level))
-      (fun (tick, block_hash, predecessor_hash, level) ->
-        {tick; block_hash; predecessor_hash; level})
-      (obj4
-         (req "tick" Sc_rollup.Tick.encoding)
-         (req "block_hash" Tezos_crypto.Block_hash.encoding)
-         (req "predecessor_hash" Tezos_crypto.Block_hash.encoding)
-         (req "level" Raw_level.encoding))
-
-  let name = "state_history"
 
   let encoding =
     let open Data_encoding in
     conv
-      TickMap.bindings
-      (fun bindings -> TickMap.of_seq (List.to_seq bindings))
-      (Data_encoding.list (tup2 Sc_rollup.Tick.encoding event_encoding))
-end
+      (fun {predecessor; predecessor_timestamp; messages} ->
+        (predecessor, predecessor_timestamp, messages))
+      (fun (predecessor, predecessor_timestamp, messages) ->
+        {predecessor; predecessor_timestamp; messages})
+    @@ obj3
+         (req "predecessor" Tezos_crypto.Block_hash.encoding)
+         (req "predecessor_timestamp" Timestamp.encoding)
+         (req
+            "messages"
+            (list @@ dynamic_size Sc_rollup.Inbox_message.encoding))
 
-module StateHistory = struct
   include
-    Make_mutable_value
+    Make_append_only_map
       (struct
-        let path = ["state_history"]
+        let path = ["messages"]
       end)
-      (StateHistoryRepr)
+      (struct
+        type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
 
-  let insert store event =
-    let open Lwt_result_syntax in
-    let open StateHistoryRepr in
-    let*! history = find store in
-    let history =
-      match history with
-      | None -> StateHistoryRepr.TickMap.empty
-      | Some history -> history
-    in
-    set store (TickMap.add event.tick event history)
+        let to_path_representation =
+          Sc_rollup.Inbox_merkelized_payload_hashes.Hash.to_b58check
+      end)
+      (struct
+        type value = info
 
-  let event_of_largest_tick_before store tick =
-    let open Lwt_result_syntax in
-    let open StateHistoryRepr in
-    let*! history = find store in
-    match history with
-    | None -> return_none
-    | Some history -> (
-        let events_before, opt_value, _ = TickMap.split tick history in
-        match opt_value with
-        | Some event -> return (Some event)
-        | None ->
-            return @@ Option.map snd @@ TickMap.max_binding_opt events_before)
+        let name = "messages"
+
+        let encoding = encoding
+      end)
 end
-
-(** Unaggregated messages per block *)
-module Messages =
-  Make_append_only_map
-    (struct
-      let path = ["messages"]
-    end)
-    (struct
-      type key = Tezos_crypto.Block_hash.t
-
-      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-    end)
-    (struct
-      type value = Sc_rollup.Inbox_message.t list
-
-      let name = "messages"
-
-      let encoding =
-        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
-    end)
 
 (** Inbox state for each block *)
 module Inboxes =
@@ -180,9 +118,9 @@ module Inboxes =
       let path = ["inboxes"]
     end)
     (struct
-      type key = Tezos_crypto.Block_hash.t
+      type key = Sc_rollup.Inbox.Hash.t
 
-      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
+      let to_path_representation = Sc_rollup.Inbox.Hash.to_b58check
     end)
     (struct
       type value = Sc_rollup.Inbox.t
@@ -192,67 +130,26 @@ module Inboxes =
       let encoding = Sc_rollup.Inbox.encoding
     end)
 
-(** Message history for the inbox at a given block *)
-module Histories =
-  Make_append_only_map
-    (struct
-      let path = ["histories"]
-    end)
-    (struct
-      type key = Tezos_crypto.Block_hash.t
-
-      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-    end)
-    (struct
-      type value = Sc_rollup.Inbox.History.t
-
-      let name = "inbox_history"
-
-      let encoding = Sc_rollup.Inbox.History.encoding
-    end)
-
-(** payloads history for the inbox at a given block *)
-module Payloads_histories =
-  Make_append_only_map
-    (struct
-      let path = ["payloads_histories"]
-    end)
-    (struct
-      type key = Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t
-
-      let to_path_representation =
-        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.to_b58check
-    end)
-    (struct
-      let name = "payloads_history"
-
-      type value = Sc_rollup.Inbox_merkelized_payload_hashes.History.t
-
-      let encoding = Sc_rollup.Inbox_merkelized_payload_hashes.History.encoding
-    end)
-
 module Commitments =
   Make_append_only_map
     (struct
       let path = ["commitments"; "computed"]
     end)
     (struct
-      type key = Raw_level.t
+      type key = Sc_rollup.Commitment.Hash.t
 
-      let to_path_representation key = Int32.to_string @@ Raw_level.to_int32 key
+      let to_path_representation = Sc_rollup.Commitment.Hash.to_b58check
     end)
     (struct
-      type value = Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t
+      type value = Sc_rollup.Commitment.t
 
-      let name = "commitment_with_hash"
+      let name = "commitment"
 
-      let encoding =
-        Data_encoding.(
-          obj2
-            (req "commitment" Sc_rollup.Commitment.encoding)
-            (req "hash" Sc_rollup.Commitment.Hash.encoding))
+      let encoding = Sc_rollup.Commitment.encoding
     end)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
+   Use file. *)
 module Last_stored_commitment_level =
   Make_mutable_value
     (struct
@@ -282,24 +179,6 @@ module Commitments_published_at_level =
       let name = "raw_level"
 
       let encoding = Raw_level.encoding
-    end)
-
-module Contexts =
-  Make_append_only_map
-    (struct
-      let path = ["contexts"]
-    end)
-    (struct
-      type key = Tezos_crypto.Block_hash.t
-
-      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-    end)
-    (struct
-      type value = Context.hash
-
-      let name = "context"
-
-      let encoding = Context.hash_encoding
     end)
 
 (* Published slot headers per block hash,
@@ -437,15 +316,17 @@ module Dal_confirmed_slots_history =
 (** Confirmed DAL slots histories cache. See documentation of
     {Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories =
-  Make_append_only_map
-    (struct
-      let path = ["dal"; "confirmed_slots_histories_cache"]
-    end)
-    (struct
-      type key = Tezos_crypto.Block_hash.t
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
+     Store single history points in map instead of whole history. *)
+    Make_append_only_map
+      (struct
+        let path = ["dal"; "confirmed_slots_histories_cache"]
+      end)
+      (struct
+        type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-    end)
+        let to_path_representation = Tezos_crypto.Block_hash.to_b58check
+      end)
     (struct
       type value = Dal.Slots_history.History_cache.t
 

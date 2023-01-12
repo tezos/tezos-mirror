@@ -127,3 +127,9 @@ val readonly : _ t -> ro
 
 (** Monad for values with delayed write effects in the node context. *)
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
+
+(** [get_full_l2_block node_ctxt hash] returns the full L2 block for L1 block
+    hash [hash]. The result contains the L2 block and its content (inbox,
+    messages, commitment). *)
+val get_full_l2_block :
+  _ t -> Tezos_crypto.Block_hash.t -> Sc_rollup_block.full Lwt.t

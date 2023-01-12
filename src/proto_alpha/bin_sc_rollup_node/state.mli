@@ -23,17 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol.Alpha_context
+
 (** [is_processed store hash] returns [true] if the block with [hash] has
     already been processed by the daemon. *)
 val is_processed : _ Store.t -> Tezos_crypto.Block_hash.t -> bool Lwt.t
 
 (** [mark_processed_head store head] remembers that the [head] is processed. The
     system should not have to come back to it. *)
-val mark_processed_head : Store.rw -> Layer1.head -> unit Lwt.t
+val save_l2_block : Store.rw -> Sc_rollup_block.t -> unit Lwt.t
 
 (** [last_processed_head_opt store] returns the last processed head if it
     exists. *)
-val last_processed_head_opt : _ Store.t -> Layer1.head option Lwt.t
+val last_processed_head_opt : _ Store.t -> Sc_rollup_block.t option Lwt.t
 
 (** [mark_finalized_head store head] remembers that the [head] is finalized. By
     construction, every block whose level is smaller than [head]'s is also
@@ -56,3 +58,10 @@ val level_of_hash :
 (** [set_block_level_and_hash store head] registers the correspondences
     [head.level |-> head.hash] and [head.hash |-> head.level] in the store. *)
 val set_block_level_and_hash : Store.rw -> Layer1.head -> unit Lwt.t
+
+(** [block_before store tick] returns the last layer 2 block whose initial tick
+    is before [tick]. *)
+val block_before :
+  [> `Read] Store.store ->
+  Sc_rollup.Tick.t ->
+  Sc_rollup_block.t option tzresult Lwt.t

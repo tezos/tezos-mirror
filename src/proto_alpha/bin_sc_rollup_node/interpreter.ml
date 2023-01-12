@@ -36,7 +36,11 @@ module type S = sig
     Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
 
   val process_head :
-    Node_context.rw -> Context.rw -> Layer1.head -> unit tzresult Lwt.t
+    Node_context.rw ->
+    'a Context.t ->
+    Layer1.head ->
+    Sc_rollup.Inbox.t * Sc_rollup.Inbox_message.t list ->
+    ('a Context.t * int * int64 * Sc_rollup.Tick.t) tzresult Lwt.t
 
   val state_of_tick :
     _ Node_context.t ->
@@ -126,7 +130,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   (** [transition_pvm node_ctxt predecessor head] runs a PVM at the
       previous state from block [predecessor] by consuming as many messages
       as possible from block [head]. *)
-  let transition_pvm node_ctxt ctxt predecessor Layer1.{hash; _} =
+  let transition_pvm node_ctxt ctxt predecessor Layer1.{hash = _; _}
+      inbox_messages =
     let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
     let* ctxt, predecessor_state = state_of_head node_ctxt ctxt predecessor in
@@ -134,46 +139,22 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       Free_pvm.eval_block_inbox
         ~fuel:(Fuel.Free.of_ticks 0L)
         node_ctxt
-        hash
+        inbox_messages
         predecessor_state
     in
     let*! state, num_messages, inbox_level, _fuel =
       Delayed_write_monad.apply node_ctxt eval_result
     in
-    (* Write final state to store. *)
     let*! ctxt = PVM.State.set ctxt state in
-    let*! context_hash = Context.commit ctxt in
-    let*! () = Store.Contexts.add node_ctxt.store hash context_hash in
-
-    (* Compute extra information about the state. *)
     let*! initial_tick = PVM.get_tick predecessor_state in
-
-    let*! () =
-      let open Store.StateHistoryRepr in
-      let Layer1.{hash = predecessor_hash; _} = predecessor in
-      let event =
-        {
-          tick = initial_tick;
-          block_hash = hash;
-          predecessor_hash;
-          level = inbox_level;
-        }
-      in
-      Store.StateHistory.insert node_ctxt.store event
-    in
-
     let*! last_tick = PVM.get_tick state in
     (* TODO: #2717
        The number of ticks should not be an arbitrarily-sized integer or
        the difference between two ticks should be made an arbitrarily-sized
        integer too.
     *)
-    let num_ticks = Sc_rollup.Tick.distance initial_tick last_tick in
-    let*! () =
-      Store.StateInfo.add
-        node_ctxt.store
-        hash
-        {num_messages; num_ticks; initial_tick}
+    let num_ticks =
+      Sc_rollup.Tick.distance initial_tick last_tick |> Z.to_int64
     in
     (* Produce events. *)
     let*! state_hash = PVM.state_hash state in
@@ -184,11 +165,10 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         last_tick
         num_messages
     in
-
-    return_unit
+    return (ctxt, num_messages, num_ticks, initial_tick)
 
   (** [process_head node_ctxt head] runs the PVM for the given head. *)
-  let process_head (node_ctxt : _ Node_context.t) ctxt head =
+  let process_head (node_ctxt : _ Node_context.t) ctxt head inbox_messages =
     let open Lwt_result_syntax in
     let first_inbox_level =
       Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
@@ -197,46 +177,48 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       let* predecessor =
         Layer1.get_predecessor node_ctxt.Node_context.l1_ctxt head
       in
-      transition_pvm node_ctxt ctxt predecessor head
+      transition_pvm node_ctxt ctxt predecessor head inbox_messages
     else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
     then
       let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
       (* Write final state to store. *)
       let*! ctxt = PVM.State.set ctxt state in
-      let*! context_hash = Context.commit ctxt in
-      let*! () = Store.Contexts.add node_ctxt.store head.hash context_hash in
 
-      let*! () =
-        Store.StateInfo.add
-          node_ctxt.store
-          head.hash
-          {
-            num_messages = Z.zero;
-            num_ticks = Z.zero;
-            initial_tick = Sc_rollup.Tick.initial;
-          }
-      in
-      return_unit
-    else return_unit
+      (* let*! context_hash = Context.commit ctxt in *)
+      (* let*! () = Store.Contexts.add node_ctxt.store head.hash context_hash in *)
+      return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
+    else return (ctxt, 0, 0L, Sc_rollup.Tick.initial)
 
-  (** [run_for_ticks node_ctxt predecessor_hash hash tick_distance] starts the
-      evaluation of the inbox at block [hash] for at most [tick_distance]. *)
-  let run_for_ticks node_ctxt predecessor_hash hash level tick_distance =
+  (** [run_for_ticks node_ctxt block tick_distance] starts the
+      evaluation of the inbox at [block] for at most [tick_distance]. *)
+  let run_for_ticks node_ctxt (block : Sc_rollup_block.t) tick_distance =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    let pred_level = Raw_level.to_int32 level |> Int32.pred in
-    let* ctxt = Node_context.checkout_context node_ctxt predecessor_hash in
+    let pred_level = Raw_level.to_int32 block.header.level |> Int32.pred in
+    let* ctxt =
+      Node_context.checkout_context node_ctxt block.header.predecessor
+    in
     let* _ctxt, state =
       state_of_head
         node_ctxt
         ctxt
-        Layer1.{hash = predecessor_hash; level = pred_level}
+        Layer1.{hash = block.header.predecessor; level = pred_level}
+    in
+    let*! inbox = Store.Inboxes.get node_ctxt.store block.header.inbox_hash in
+    let*! {predecessor; predecessor_timestamp; messages} =
+      Store.Messages.get node_ctxt.store block.header.inbox_witness
+    in
+    let messages =
+      Sc_rollup.Inbox_message.Internal Start_of_level
+      :: Internal (Info_per_level {predecessor; predecessor_timestamp})
+      :: messages
+      @ [Internal End_of_level]
     in
     let>* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox
         ~fuel:(Fuel.Accounted.of_ticks tick_distance)
         node_ctxt
-        hash
+        (inbox, messages)
         state
     in
     return state
@@ -246,18 +228,14 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       [None].*)
   let state_of_tick node_ctxt tick level =
     let open Lwt_result_syntax in
-    let* closest_event =
-      Store.StateHistory.event_of_largest_tick_before
-        node_ctxt.Node_context.store
-        tick
-    in
-    match closest_event with
+    let* closest_block = State.block_before node_ctxt.Node_context.store tick in
+    match closest_block with
     | None -> return None
     | Some event ->
-        if Raw_level.(event.level > level) then return None
+        if Raw_level.(event.header.level > level) then return None
         else
           let tick_distance =
-            Sc_rollup.Tick.distance tick event.tick |> Z.to_int64
+            Sc_rollup.Tick.distance tick event.initial_tick |> Z.to_int64
           in
           (* TODO: #3384
              We assume that [StateHistory] correctly stores enough
@@ -266,14 +244,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
              [event.block_hash] is the block where the tick
              happened. We should test that this is always true because
              [state_of_tick] is a critical function. *)
-          let* state =
-            run_for_ticks
-              node_ctxt
-              event.predecessor_hash
-              event.block_hash
-              event.level
-              tick_distance
-          in
+          let* state = run_for_ticks node_ctxt event tick_distance in
           let state = Delayed_write_monad.ignore state in
           let*! hash = PVM.state_hash state in
           return (Some (state, hash))

@@ -42,12 +42,17 @@
 module type S = sig
   module PVM : Pvm.S
 
-  (** [process_head node_ctxt head] checks whether a new commitment needs to be
-      computed and stored, by looking at the level of [head] and checking
-      whether it is a multiple of `Commitment.sc_rollup_commitment_period`
-      levels away from [node_ctxt.initial_level]. It uses the functionalities of
-      [PVM] to compute the hash of to be included in the commitment.  *)
-  val process_head : Node_context.rw -> Layer1.head -> unit tzresult Lwt.t
+  (** [process_head node_ctxt ~predecessor head ctxt] builds a new commitment if
+      needed, by looking at the level of [head] and checking whether it is a
+      multiple of `Commitment.sc_rollup_commitment_period` levels away from
+      [node_ctxt.initial_level]. It uses the functionalities of [PVM] to compute
+      the hash of to be included in the commitment.  *)
+  val process_head :
+    Node_context.rw ->
+    predecessor:Tezos_crypto.Block_hash.t ->
+    Layer1.head ->
+    Context.rw ->
+    Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t option tzresult Lwt.t
 
   (** [publish_commitment node_ctxt] publishes the earliest commitment
       stored in [store] that has not been published yet, unless its inbox level

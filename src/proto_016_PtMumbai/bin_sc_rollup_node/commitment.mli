@@ -39,26 +39,4 @@
     commitment that was not published already.
 *)
 
-open Protocol.Alpha_context
-
-module type Mutable_level_store =
-  Store_sigs.Mutable_value
-    with type value := Raw_level.t
-     and type 'a store := 'a Store.store
-
-(** [last_commitment_with_hash (module Last_level_module: Mutable_level_store) store]
-      returns the last commitment and relative hash
-      stored according to the value of level indicated by
-      [module Last_level_module]. If no commitment has been stored for the
-      level indicated by [module Last_level_module], then None is returned.
-      Two possible implementations for [module Last_level_module] are
-      [Store.Last_published_commitment_level] and
-      [Store.Last_stored_commitment_level].
-  *)
-
-val last_commitment_with_hash :
-  (module Mutable_level_store) ->
-  _ Store.t ->
-  (Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t) option Lwt.t
-
 module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM

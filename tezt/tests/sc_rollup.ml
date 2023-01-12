@@ -1400,17 +1400,17 @@ let mode_publish mode publishes _protocol sc_rollup_node sc_rollup_client
       (if publishes then " have" else " never do so") ;
   unit
 
-let commitment_not_stored_if_non_final _protocol sc_rollup_node sc_rollup_client
-    sc_rollup _node client =
+let commitment_not_published_if_non_final _protocol sc_rollup_node
+    sc_rollup_client sc_rollup _node client =
   (* The rollup is originated at level `init_level`, and it requires
      `sc_rollup_commitment_period_in_blocks` levels to store a commitment.
-     There is also a delay of `block_finality_time` before storing a
+     There is also a delay of `block_finality_time` before publishing a
      commitment, to avoid including wrong commitments due to chain
-     reorganisations. Therefore the commitment will be stored and published
+     reorganisations. Therefore the commitment will be published
      when the [Commitment] module processes the block at level
      `init_level + sc_rollup_commitment_period_in_blocks +
-     levels_to_finalise`. At the level before, the commitment will not be
-     neither stored nor published.
+     levels_to_finalise`. At the level before, the commitment will be
+     neither stored but not published.
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -1449,7 +1449,7 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node sc_rollup_client
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
   in
   let stored_inbox_level = Option.map inbox_level commitment in
-  Check.(stored_inbox_level = None)
+  Check.(stored_inbox_level = Some store_commitment_level)
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
@@ -3735,14 +3735,14 @@ let test_rpcs ~kind =
   let l2_block_hash = JSON.as_string l2_block_hash in
   Check.((l1_block_hash = l2_block_hash) string)
     ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
-  let* l1_block_hash =
+  let* l1_block_hash_5 =
     RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
-  let*! l2_block_hash =
+  let*! l2_block_hash_5 =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "5"; "hash"]
   in
-  let l2_block_hash = JSON.as_string l2_block_hash in
-  Check.((l1_block_hash = l2_block_hash) string)
+  let l2_block_hash_5 = JSON.as_string l2_block_hash_5 in
+  Check.((l1_block_hash_5 = l2_block_hash_5) string)
     ~error_msg:"Block 5 on L1 is %L where as on L2 it is %R" ;
   let*! l2_finalied_block_level =
     Sc_rollup_client.rpc_get
@@ -3760,7 +3760,7 @@ let test_rpcs ~kind =
       ["global"; "block"; "head"; "num_messages"]
   in
   let l2_num_messages = JSON.as_int l2_num_messages in
-  Check.((l2_num_messages = batch_size + 3) int)
+  Check.((l2_num_messages = batch_size) int)
     ~error_msg:"Number of messages of head is %L but should be %R" ;
   let*! _status =
     Sc_rollup_client.rpc_get
@@ -3793,6 +3793,12 @@ let test_rpcs ~kind =
   let*! _level =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_level"]
   in
+  let*! l2_block =
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "head"]
+  in
+  let l2_block_hash' = JSON.(l2_block |-> "block_hash" |> as_string) in
+  Check.((l2_block_hash' = l2_block_hash) string)
+    ~error_msg:"L2 head is from full block is %L but should be %R" ;
   unit
 
 let test_messages_processed_by_commitment ~kind =
@@ -4003,7 +4009,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_commitment_scenario
     ~variant:"non_final_level"
-    commitment_not_stored_if_non_final
+    commitment_not_published_if_non_final
     protocols
     ~kind ;
   test_commitment_scenario
