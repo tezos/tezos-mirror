@@ -602,7 +602,7 @@ let generate_sc_rollup_recover_bond =
   let+ sc_rollup = random_sc_rollup in
   Sc_rollup_recover_bond {sc_rollup; staker}
 
-(** {By Kind Operation Generator} *)
+(** {2 By Kind Operation Generator} *)
 
 let generator_of ?source = function
   | `KReveal -> generate_manager_operation ?source generate_reveal
