@@ -156,30 +156,49 @@ let bytes_of_prefixed_string (cctxt : #Client_context.full) s =
 
 let bytes_parameter = Tezos_clic.parameter bytes_of_prefixed_string
 
+type 'a file_or_text = File of {path : string; content : 'a} | Text of 'a
+
+let content_of_file_or_text = function
+  | File {content; _} | Text content -> content
+
 let parse_file ~from_text ~read_file ~path =
   let open Lwt_result_syntax in
   let* content = read_file path in
   from_text content
 
 let file_or_text ~from_text ~read_file =
+  let open Lwt_result_syntax in
   Client_aliases.parse_alternatives
     [
-      ("file", fun path -> parse_file ~from_text ~read_file ~path);
-      ("text", from_text);
+      ( "file",
+        fun path ->
+          let* content = parse_file ~from_text ~read_file ~path in
+          return (File {path; content}) );
+      ( "text",
+        fun text ->
+          let* content = from_text text in
+          return (Text content) );
     ]
 
-let file_or_text_parameter ~from_text () =
+let file_or_text_with_origin_parameter ~from_text () =
   Tezos_clic.parameter (fun (cctxt : #Client_context.full) ->
       file_or_text ~from_text:(from_text cctxt) ~read_file:cctxt#read_file)
 
-let json_parameter =
+let file_or_text_parameter ~from_text () =
+  file_or_text_with_origin_parameter ~from_text ()
+  |> Tezos_clic.map_parameter ~f:content_of_file_or_text
+
+let json_with_origin_parameter =
   let from_text (cctxt : #Client_context.full) s =
     match Data_encoding.Json.from_string s with
     | Ok json -> return json
     | Error err ->
         cctxt#error "'%s' is not a valid JSON-encoded value: %s" s err
   in
-  file_or_text_parameter ~from_text ()
+  file_or_text_with_origin_parameter ~from_text ()
+
+let json_parameter =
+  Tezos_clic.map_parameter ~f:content_of_file_or_text json_with_origin_parameter
 
 let data_parameter =
   let open Lwt_syntax in

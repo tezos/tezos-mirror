@@ -138,16 +138,28 @@ val bytes_of_prefixed_string : full -> string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Tezos_clic.parameter
 
+type 'a file_or_text = File of {path : string; content : 'a} | Text of 'a
+
+val content_of_file_or_text : 'a file_or_text -> 'a
+
 val file_or_text :
   from_text:(string -> 'a tzresult Lwt.t) ->
   read_file:(string -> string tzresult Lwt.t) ->
   string ->
-  'a tzresult Lwt.t
+  'a file_or_text tzresult Lwt.t
+
+val file_or_text_with_origin_parameter :
+  from_text:(full -> string -> 'a tzresult Lwt.t) ->
+  unit ->
+  ('a file_or_text, full) Tezos_clic.parameter
 
 val file_or_text_parameter :
   from_text:(full -> string -> 'a tzresult Lwt.t) ->
   unit ->
   ('a, full) Tezos_clic.parameter
+
+val json_with_origin_parameter :
+  (Data_encoding.Json.t file_or_text, full) Tezos_clic.parameter
 
 val json_parameter : (Data_encoding.Json.t, full) Tezos_clic.parameter
 

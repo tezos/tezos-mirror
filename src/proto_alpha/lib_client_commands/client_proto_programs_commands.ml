@@ -176,16 +176,21 @@ let commands () =
                  "invalid output format, expecting one of \"michelson\", \
                   \"json\", \"binary\" or \"ocaml\"."))
   in
+  let file_or_literal_with_origin_param () =
+    param
+      ~name:"source"
+      ~desc:"literal or a path to a file"
+      (Client_proto_args.file_or_text_with_origin_parameter
+         ~from_text:(fun _cctxt s -> Lwt_result_syntax.return s)
+         ())
+  in
   let file_or_literal_param () =
     param
       ~name:"source"
       ~desc:"literal or a path to a file"
-      (parameter (fun cctxt s ->
-           let open Lwt_result_syntax in
-           let*! r = cctxt#read_file s in
-           match r with
-           | Ok v -> return (Some s, v)
-           | Error _ -> return (None, s)))
+      (Client_proto_args.file_or_text_parameter
+         ~from_text:(fun _cctx s -> Lwt_result_syntax.return s)
+         ())
   in
   let handle_parsing_error label (cctxt : Protocol_client_context.full)
       (emacs_mode, no_print_source) program body =
@@ -528,7 +533,9 @@ let commands () =
          enforce_indentation_flag
          display_names_flag
          (Tezos_clic_unix.Scriptable.clic_arg ()))
-      (prefixes ["hash"; "script"] @@ seq_of_param @@ file_or_literal_param ())
+      (prefixes ["hash"; "script"]
+      @@ seq_of_param
+      @@ file_or_literal_with_origin_param ())
       (fun (check, display_names, scriptable)
            expr_strings
            (cctxt : Protocol_client_context.full) ->
@@ -541,7 +548,10 @@ let commands () =
         else
           let* hash_name_rows =
             List.mapi_ep
-              (fun i (src, expr_string) ->
+              (fun i content_with_origin ->
+                let expr_string =
+                  Client_proto_args.content_of_file_or_text content_with_origin
+                in
                 let program =
                   Michelson_v1_parser.parse_toplevel ~check expr_string
                 in
@@ -559,9 +569,9 @@ let commands () =
                     (Script_expr_hash.hash_bytes [bytes])
                 in
                 let name =
-                  Option.value
-                    src
-                    ~default:("Literal script " ^ string_of_int (i + 1))
+                  match content_with_origin with
+                  | Client_proto_args.File {path; _} -> path
+                  | Text _ -> "Literal script " ^ string_of_int (i + 1)
                 in
                 return (hash, name))
               expr_strings
@@ -859,7 +869,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, legacy, check)
-           (_, expr_string)
+           expr_string
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
@@ -942,7 +952,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, data_ty)
-           (_, data_string)
+           data_string
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
