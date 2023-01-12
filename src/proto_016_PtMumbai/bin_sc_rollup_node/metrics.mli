@@ -33,3 +33,16 @@ val metrics_serve : string option -> (unit, tztrace) result Lwt.t
 (** [print_csv_metrics ppf metrics] prints the [metrics] as CSV. *)
 val print_csv_metrics :
   Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit
+
+(** The node info metrics *)
+module Info : sig
+  (** Initializes the metric for rollup info
+      with a the given arguments as label values *)
+  val init_rollup_node_info :
+    id:Protocol.Alpha_context.Sc_rollup.t ->
+    mode:Configuration.mode ->
+    genesis_level:Protocol.Alpha_context.Raw_level.t ->
+    genesis_hash:Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t ->
+    pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
+    unit
+end
