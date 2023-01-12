@@ -215,13 +215,13 @@ module type PROTOCOL = sig
             yet which operations will be included in the future block.
 
             The provided [block_header_data] is not expected to be the final
-            value of the field of the same type in the {!block_header} of the
-            constructed block. Instead, it should be a protocol-specific,
+            value of the field of the same type in the {!type-block_header} of
+            the constructed block. Instead, it should be a protocol-specific,
             good enough, "prototype" of the final value. E.g. if the
-            {!block_header_data} type for the current economic protocol
-            includes a signature, then the provided [block_header_data]
-            should contain a fake signature (since providing a correct
-            signature is not possible at this stage). *)
+            {!block_header_data} type for the current economic protocol includes
+            a signature, then the provided [block_header_data] should contain a
+            fake signature (since providing a correct signature is not possible
+            at this stage). *)
     | Partial_construction of {
         predecessor_hash : Block_hash.t;
         timestamp : Time.t;

@@ -34,7 +34,7 @@ type parameters = {
   number_of_shards : int;
 }
 
-(** An encoding for values of type {!parameters}. *)
+(** An encoding for values of type {!type-parameters}. *)
 val parameters_encoding : parameters Data_encoding.t
 
 (** [make] precomputes the set of values needed by cryptographic primitives

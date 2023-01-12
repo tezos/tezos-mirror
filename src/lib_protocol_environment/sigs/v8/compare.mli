@@ -39,8 +39,8 @@
 (** {2 Signatures and a functor} *)
 
 (** [COMPARABLE] is a signature for basic comparison. It is used only for
-    instantiating full comparison modules of signature {!S} via the functor
-    {!Make}. *)
+    instantiating full comparison modules of signature {!module-type-S} via the
+    functor {!Make}. *)
 module type COMPARABLE = sig
   type t
 
