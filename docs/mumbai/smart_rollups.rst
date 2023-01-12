@@ -759,7 +759,8 @@ allows it to interact with the components of persistent state.
   manipulated with ``store_read`` and ``store_write``).
 
 ``reveal_preimage``
-  Loads in memory the preimage of a 32-byte Blake2B hash.
+  Loads in memory the preimage of a hash. The size of the hash in
+  bytes must be specified as an input to the function.
 
 ``reveal_metadata``
   Loads in memory the address of the smart rollup (20 bytes), and the
@@ -962,6 +963,7 @@ module that exports them (in our case, ``smart_rollup_core``).
        /// code.
        pub fn reveal_preimage(
            hash_addr: *const u8,
+           hash_size: u8,
            dst: *mut u8,
            max_bytes: usize,
        ) -> i32;
