@@ -229,9 +229,9 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
   in
   return res
 
-(** {2. Inbox message helpers.} *)
+(** {2 Inbox message helpers.} *)
 
-(** {1. Above [Alpha_context].} *)
+(** {1 Above [Alpha_context].} *)
 
 let message_serialize msg =
   WithExceptions.Result.get_ok
@@ -406,7 +406,7 @@ let gen_payloads_for_levels ~start_level ~max_level gen_message =
   in
   aux [] (max_level - start_level)
 
-(** {1. Below [Alpha_context].} *)
+(** {1 Below [Alpha_context].} *)
 
 let message_serialize_repr msg =
   WithExceptions.Result.get_ok
