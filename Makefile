@@ -136,10 +136,6 @@ clean-old-names:
 	@rm -f tezos-accuser-013-PtJakart
 	@rm -f tezos-tx-rollup-node-013-PtJakart
 	@rm -f tezos-tx-rollup-client-013-PtJakart
-	@rm -f tezos-baker-014-PtKathma
-	@rm -f tezos-accuser-014-PtKathma
-	@rm -f tezos-tx-rollup-node-014-PtKathma
-	@rm -f tezos-tx-rollup-client-014-PtKathma
 	@rm -f tezos-baker-015-PtLimaPt
 	@rm -f tezos-accuser-015-PtLimaPt
 	@rm -f tezos-tx-rollup-node-015-PtLimaPt
@@ -159,10 +155,6 @@ clean-old-names:
 	@rm -f octez-accuser-013-PtJakart
 	@rm -f octez-tx-rollup-node-013-PtJakart
 	@rm -f octez-tx-rollup-client-013-PtJakart
-	@rm -f octez-baker-014-PtKathma
-	@rm -f octez-accuser-014-PtKathma
-	@rm -f octez-tx-rollup-node-014-PtKathma
-	@rm -f octez-tx-rollup-client-014-PtKathma
 	@rm -f octez-baker-015-PtLimaPt
 	@rm -f octez-accuser-015-PtLimaPt
 	@rm -f octez-tx-rollup-node-015-PtLimaPt

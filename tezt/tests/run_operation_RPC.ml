@@ -611,14 +611,6 @@ let test_fail_inject_signed_arbitrary_operation =
       `Client
       ()
   in
-  let* () =
-    match protocol with
-    (* Due to a bug in Kathmandu, we must first bake a block before
-       injecting the failing_noop operation.
-       See: https://gitlab.com/tezos/tezos/-/issues/4579 *)
-    | Protocol.Kathmandu -> Client.bake_for_and_wait client
-    | _ -> unit
-  in
   [
     ("bootstrap1", "msg1", None);
     ("bootstrap2", "msg2", None);
@@ -631,7 +623,7 @@ let test_fail_inject_signed_arbitrary_operation =
      let* head_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
      let arbitrary =
        match protocol with
-       | Protocol.Kathmandu | Protocol.Lima -> message
+       | Protocol.Lima -> message
        | Protocol.Mumbai | Protocol.Alpha -> Hex.(of_string message |> show)
      in
      let (op_json : JSON.u) =
@@ -659,12 +651,7 @@ let test_fail_inject_signed_arbitrary_operation =
        RPC.Client.spawn client
        @@ RPC.post_chain_block_helpers_scripts_run_operation (Data op_json)
      in
-     let msg =
-       match protocol with
-       | Protocol.Kathmandu ->
-           rex "The failing_noop operation cannot be executed by the protocol"
-       | _ -> rex "A failing_noop operation can never be validated"
-     in
+     let msg = rex "A failing_noop operation can never be validated" in
      let* () = Process.check_error ~msg process in
      unit
 

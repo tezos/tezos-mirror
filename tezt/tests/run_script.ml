@@ -163,7 +163,6 @@ let test_source_and_sender =
      - SENDER, but SOURCE is the zero address (since L). *)
   let expected_source =
     match protocol with
-    | Kathmandu -> Format.sprintf "%S" bootstrap1.public_key_hash
     | Lima | Mumbai | Alpha -> "0x00000000000000000000000000000000000000000000"
   in
   let* _storage =

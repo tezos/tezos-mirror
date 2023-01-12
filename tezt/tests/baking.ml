@@ -414,8 +414,7 @@ let distinct_bakers_increasing_fees state sources =
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
 
-let has_1m_restriction_in_blocks protocol =
-  Protocol.(number protocol >= number Kathmandu)
+let has_1m_restriction_in_blocks _protocol = true
 
 let bake_and_check ?expected_baked_operations state ~protocol ~mempool ~sources
     =

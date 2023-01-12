@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Kathmandu | Lima | Mumbai | Alpha
+type t = Lima | Mumbai | Alpha
 
 (** Protocol parameters.
 

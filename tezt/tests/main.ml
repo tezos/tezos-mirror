@@ -82,8 +82,8 @@ let register_protocol_migration_tests () =
 (* Tests related to one-off protocol migrations used in the past. *)
 let register_older_protocol_migration_tests () =
   Iticket_migration.register
-    ~migrate_from:Protocol.Kathmandu
-    ~migrate_to:Protocol.Lima
+    ~migrate_from:Protocol.Lima
+    ~migrate_to:Protocol.Mumbai
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.
@@ -186,12 +186,12 @@ let register_protocol_specific_because_regression_tests () =
   Consensus_key.register ~protocols:[Alpha] ;
   Dal.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Alpha] ;
-  Increase_paid_storage.register ~protocols:[Kathmandu; Alpha] ;
+  Increase_paid_storage.register ~protocols:[Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Ticket_receipt_and_rpc.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Kathmandu; Lima] ;
-  Tx_rollup_l2_node.register ~protocols:[Kathmandu; Lima] ;
+  Tx_rollup.register ~protocols:[Lima] ;
+  Tx_rollup_l2_node.register ~protocols:[Lima] ;
   Views.register [Alpha] ;
   Zk_rollup.register ~protocols:[Alpha]
 

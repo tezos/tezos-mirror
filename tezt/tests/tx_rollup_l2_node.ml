@@ -2733,7 +2733,7 @@ let test_withdraw_command =
       let* _ =
         let dest =
           match protocol with
-          | Lima | Kathmandu -> Constant.bootstrap2.public_key_hash
+          | Lima -> Constant.bootstrap2.public_key_hash
           | Mumbai | Alpha -> Constant.tz4_account.public_key_hash
         in
         inject_withdraw

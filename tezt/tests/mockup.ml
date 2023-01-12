@@ -1186,12 +1186,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      samples stored in the folder [mockup_protocol_constants]. *)
   let protocol_constants_fixture (protocol : Protocol.t) =
     match protocol with
-    | Kathmandu ->
-        return
-        @@ JSON.parse_file
-             (sf
-                "./tezt/tests/mockup_protocol_constants/protocol_constants-%d.json"
-                (Protocol.number protocol))
     | Lima | Mumbai | Alpha ->
         (* This function should work on all protocols since Lima.  *)
         protocol_constants_fixture_rpc protocol
