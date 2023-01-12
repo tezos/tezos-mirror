@@ -309,10 +309,10 @@ module Block : sig
       invalid blocks file). *)
   val is_known_invalid : chain_store -> Block_hash.t -> bool Lwt.t
 
-  (** [is_known_prechecked chain_store bh] tests that the block [bh]
-      is prechecked in [chain_store] (i.e. the block is present in the
-      prechecked block cache). *)
-  val is_known_prechecked : chain_store -> Block_hash.t -> bool Lwt.t
+  (** [is_known_validated chain_store bh] tests that the block [bh]
+      is validated in [chain_store] (i.e. the block is present in the
+      validated block cache). *)
+  val is_known_validated : chain_store -> Block_hash.t -> bool Lwt.t
 
   (** [is_known chain_store bh] tests that the block [bh] is either
       known valid or known invalid in [chain_store]. *)
@@ -410,14 +410,13 @@ module Block : sig
   val read_predecessor_of_hash_opt :
     chain_store -> Block_hash.t -> block option Lwt.t
 
-  (** [read_prechecked_block chain_store bh] tries to read in the
-      [chain_store]'s prechecked block cache the block [bh].*)
-  val read_prechecked_block :
-    chain_store -> Block_hash.t -> block tzresult Lwt.t
+  (** [read_validated_block chain_store bh] tries to read in the
+      [chain_store]'s validated block cache the block [bh].*)
+  val read_validated_block : chain_store -> Block_hash.t -> block tzresult Lwt.t
 
-  (** [read_prechecked_block_opt chain_store bh] optional version of
-      [read_prechecked_block].*)
-  val read_prechecked_block_opt :
+  (** [read_validated_block_opt chain_store bh] optional version of
+      [read_validated_block].*)
+  val read_validated_block_opt :
     chain_store -> Block_hash.t -> block option Lwt.t
 
   (** [store_block chain_store ~block_header ~operations
@@ -428,7 +427,7 @@ module Block : sig
      the newly created block is returned.
 
       If the block was successfully stored, then the block is removed
-     from the prechecked block cache. *)
+     from the validated block cache. *)
   val store_block :
     chain_store ->
     block_header:Block_header.t ->
@@ -436,10 +435,10 @@ module Block : sig
     Block_validation.result ->
     block option tzresult Lwt.t
 
-  (** [store_prechecked_block chain_store ~hash ~block_header ~operations]
-      stores in [chain_store]'s prechecked block cache the block with
+  (** [store_validated_block chain_store ~hash ~block_header ~operations]
+      stores in [chain_store]'s validated block cache the block with
       its [block_header] and [operations]. *)
-  val store_prechecked_block :
+  val store_validated_block :
     chain_store ->
     hash:Block_hash.t ->
     block_header:Block_header.t ->

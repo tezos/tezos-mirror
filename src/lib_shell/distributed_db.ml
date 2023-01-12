@@ -291,7 +291,7 @@ let inject_operation chain_db h op =
     op
 
 let inject_prechecked_block chain_db hash block_header operations =
-  Store.Block.store_prechecked_block
+  Store.Block.store_validated_block
     chain_db.reader_chain_db.chain_store
     ~hash
     ~block_header

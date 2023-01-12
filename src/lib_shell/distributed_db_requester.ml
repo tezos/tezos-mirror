@@ -207,7 +207,7 @@ module Block_header_storage = struct
     let* b = Store.Block.is_known_valid chain_store hash in
     match b with
     | true -> Lwt.return_true
-    | false -> Store.Block.is_known_prechecked chain_store hash
+    | false -> Store.Block.is_known_validated chain_store hash
 
   let read chain_store h =
     let open Lwt_result_syntax in
@@ -215,7 +215,7 @@ module Block_header_storage = struct
       let*! r = Store.Block.read_block chain_store h in
       match r with
       | Ok b -> return b
-      | Error _ -> Store.Block.read_prechecked_block chain_store h
+      | Error _ -> Store.Block.read_validated_block chain_store h
     in
     return (Store.Block.header b)
 
@@ -225,7 +225,7 @@ module Block_header_storage = struct
       let* o = Store.Block.read_block_opt chain_store h in
       match o with
       | Some b -> Lwt.return_some b
-      | None -> Store.Block.read_prechecked_block_opt chain_store h
+      | None -> Store.Block.read_validated_block_opt chain_store h
     in
     Lwt.return (Option.map Store.Block.header b)
 end

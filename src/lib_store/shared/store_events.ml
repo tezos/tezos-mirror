@@ -83,12 +83,12 @@ let store_block =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
-let store_prechecked_block =
+let store_validated_block =
   declare_1
     ~section
     ~level:Info
-    ~name:"store_prechecked_block"
-    ~msg:"prechecked block {block} was stored"
+    ~name:"store_validated_block"
+    ~msg:"validated block {block} was stored"
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
