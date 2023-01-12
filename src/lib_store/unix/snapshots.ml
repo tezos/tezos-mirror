@@ -2497,7 +2497,18 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let* () = Exporter.write_floating_blocks snapshot_exporter ~f in
     return_ok_unit
 
-  let export_rolling ~store_dir ~context_dir ~block ~rolling genesis =
+  let export_context snapshot_exporter ~context_dir context_hash =
+    let open Lwt_result_syntax in
+    let*! context_index = Context.init ~readonly:true context_dir in
+    Animation.three_dots ~progress_display_mode:Auto ~msg:"Exporting context"
+    @@ fun () ->
+    Lwt.finalize
+      (fun () ->
+        Exporter.export_context snapshot_exporter context_index context_hash)
+      (fun () -> Context.close context_index)
+
+  let export_rolling snapshot_exporter ~store_dir ~context_dir ~block ~rolling
+      genesis =
     let open Lwt_result_syntax in
     let export_rolling_f chain_store =
       let* () = check_history_mode chain_store ~rolling in
@@ -2556,18 +2567,23 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               || Store.Block.is_genesis chain_store (fst block))
             protocol_levels)
       in
-      let* pred_resulting_context =
+      let* pred_resulting_context_hash =
         Store.Block.resulting_context_hash chain_store pred_block
       in
       let* resulting_context_hash =
         Store.Block.resulting_context_hash chain_store export_block
+      in
+      let* () =
+        export_context
+          snapshot_exporter
+          ~context_dir
+          pred_resulting_context_hash
       in
       return
         ( export_mode,
           export_block,
           resulting_context_hash,
           pred_block,
-          pred_resulting_context,
           protocol_levels,
           (return_unit, floating_block_stream) )
     in
@@ -2575,7 +2591,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
            export_block,
            resulting_context_hash,
            pred_block,
-           pred_resulting_context,
            protocol_levels,
            (return_unit, floating_block_stream) ) =
       Store.Unsafe.open_for_snapshot_export
@@ -2589,7 +2604,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         export_block,
         resulting_context_hash,
         pred_block,
-        pred_resulting_context,
         protocol_levels,
         (return_unit, floating_block_stream) )
 
@@ -2656,18 +2670,23 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 Compare.Int32.(
                   max_cemented_level > Store.Block.level export_block)
           in
-          let* pred_resulting_context =
+          let* pred_resulting_context_hash =
             Store.Block.resulting_context_hash chain_store pred_block
           in
           let* resulting_context_hash =
             Store.Block.resulting_context_hash chain_store export_block
+          in
+          let* () =
+            export_context
+              snapshot_exporter
+              ~context_dir
+              pred_resulting_context_hash
           in
           return
             ( export_mode,
               export_block,
               resulting_context_hash,
               pred_block,
-              pred_resulting_context,
               protocol_levels,
               cemented_table,
               (ro_fd, rw_fd),
@@ -2680,7 +2699,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     let* ( export_mode,
            export_block,
-           resulting_context_hash,
            pred_block,
            pred_resulting_context,
            protocol_levels,
@@ -2728,7 +2746,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return
       ( export_mode,
         export_block,
-        resulting_context_hash,
         pred_block,
         pred_resulting_context,
         protocol_levels,
@@ -2764,11 +2781,16 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                  export_block,
                  resulting_context_hash,
                  pred_block,
-                 pred_resulting_context,
                  protocol_levels,
                  (reading_thread, floating_block_stream) ) =
             if rolling then
-              export_rolling ~store_dir ~context_dir ~block ~rolling genesis
+              export_rolling
+                snapshot_exporter
+                ~store_dir
+                ~context_dir
+                ~block
+                ~rolling
+                genesis
             else
               export_full
                 snapshot_exporter
@@ -2797,24 +2819,6 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               ~resulting_context_hash
           in
           let* metadata =
-            (* TODO: when the context's GC is implemented, make sure a context
-               pruning cannot occur while the dump context is being run. For
-               now, it is performed outside the lock to allow the node from
-               getting stuck while waiting a merge. *)
-            let*! context_index = Context.init ~readonly:true context_dir in
-            let* () =
-              Animation.three_dots
-                ~progress_display_mode:Auto
-                ~msg:"Exporting context"
-              @@ fun () ->
-              Lwt.finalize
-                (fun () ->
-                  Exporter.export_context
-                    snapshot_exporter
-                    context_index
-                    pred_resulting_context)
-                (fun () -> Context.close context_index)
-            in
             return
               (Snapshot_metadata.Current
                  {
