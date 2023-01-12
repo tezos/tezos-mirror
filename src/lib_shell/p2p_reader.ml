@@ -120,7 +120,7 @@ let read_block {disk; _} h =
       let* o = Store.Block.read_block_opt chain_store h in
       let* o =
         match o with
-        | None -> Store.Block.read_prechecked_block_opt chain_store h
+        | None -> Store.Block.read_validated_block_opt chain_store h
         | Some b -> Lwt.return_some b
       in
       Option.map_s (fun b -> Lwt.return (Store.Chain.chain_id chain_store, b)) o)
