@@ -44,50 +44,44 @@
 open Protocol
 open Alpha_context
 
+let add_level level increment =
+  (* We only use this function with positive increments so it is safe *)
+  if increment < 0 then invalid_arg "Commitment.add_level negative increment" ;
+  Raw_level.Internal_for_tests.add level increment
+
 let sc_rollup_commitment_period node_ctxt =
-  Int32.of_int
-  @@ node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
-       .commitment_period_in_blocks
+  node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
+    .commitment_period_in_blocks
 
 let sc_rollup_challenge_window node_ctxt =
-  Int32.of_int
-    node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
-      .challenge_window_in_blocks
+  node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
+    .challenge_window_in_blocks
 
 let next_lcc_level node_ctxt =
-  Environment.wrap_tzresult @@ Raw_level.of_int32
-  @@ Int32.add
-       (Raw_level.to_int32 node_ctxt.Node_context.lcc.level)
-       (sc_rollup_commitment_period node_ctxt)
+  add_level
+    node_ctxt.Node_context.lcc.level
+    (sc_rollup_commitment_period node_ctxt)
 
+(** Returns the next level for which a commitment can be published, i.e. the
+    level that is [commitment_period] blocks after the last published one. It
+    returns [None] if this level is not finalized because we only publish
+    commitments for inbox of finalized L1 blocks. *)
 let next_publishable_level node_ctxt =
-  let open Lwt_result_syntax in
+  let open Lwt_option_syntax in
   let lpc_level =
     match node_ctxt.Node_context.lpc with
     | None -> node_ctxt.genesis_info.level
     | Some lpc -> lpc.inbox_level
   in
   let next_level =
-    Int32.add
-      (Raw_level.to_int32 lpc_level)
-      (sc_rollup_commitment_period node_ctxt)
+    add_level lpc_level (sc_rollup_commitment_period node_ctxt)
   in
-  let*! finalized_level = State.get_finalized_head_opt node_ctxt.store in
-  match finalized_level with
-  | None -> return_none
-  | Some finalized_level ->
-      if finalized_level.level < next_level then return_none
-      else
-        let*? next_level =
-          Environment.wrap_tzresult @@ Raw_level.of_int32 next_level
-        in
-        return_some next_level
+  let* finalized_level = State.get_finalized_head_opt node_ctxt.store in
+  if Raw_level.(of_int32_exn finalized_level.level < next_level) then fail
+  else return next_level
 
 let next_commitment_level node_ctxt last_commitment_level =
-  Environment.wrap_tzresult @@ Raw_level.of_int32
-  @@ Int32.add
-       (Raw_level.to_int32 last_commitment_level)
-       (sc_rollup_commitment_period node_ctxt)
+  add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
 module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   module PVM = PVM
@@ -164,7 +158,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let*! last_commitment =
         Store.Commitments.get node_ctxt.store last_commitment_hash
       in
-      let*? next_commitment_level =
+      let next_commitment_level =
         next_commitment_level node_ctxt last_commitment.inbox_level
       in
       if Raw_level.(current_level = next_commitment_level) then
@@ -267,8 +261,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     (* Check level of next publishable commitment and avoid publishing if it is
        on or before the last cemented commitment.
     *)
-    let*? next_lcc_level = next_lcc_level node_ctxt in
-    let* next_publishable_level = next_publishable_level node_ctxt in
+    let next_lcc_level = next_lcc_level node_ctxt in
+    let*! next_publishable_level = next_publishable_level node_ctxt in
     match next_publishable_level with
     | None -> return_unit
     | Some next_publishable_level ->
@@ -300,9 +294,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         node_ctxt.Node_context.store
         commitment_hash
     in
-    Int32.add
-      (Raw_level.to_int32 published_at_level)
-      (sc_rollup_challenge_window node_ctxt)
+    add_level published_at_level (sc_rollup_challenge_window node_ctxt)
 
   let can_be_cemented node_ctxt earliest_cementing_level head_level
       commitment_hash =
@@ -334,7 +326,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let cement_commitment_if_possible ({Node_context.store; _} as node_ctxt)
       Layer1.{level = head_level; _} =
     let open Lwt_result_syntax in
-    let*? next_level_to_cement = next_lcc_level node_ctxt in
+    let next_level_to_cement = next_lcc_level node_ctxt in
     let*! block = block_of_known_level store next_level_to_cement in
     match block with
     | None | Some {header = {commitment_hash = None; _}; _} ->
@@ -355,7 +347,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
               can_be_cemented
                 node_ctxt
                 earliest_cementing_level
-                head_level
+                (Raw_level.of_int32_exn head_level)
                 commitment_hash
             in
             if green_flag then cement_commitment node_ctxt commitment_hash
