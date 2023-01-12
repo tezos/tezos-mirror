@@ -214,6 +214,56 @@ module BLS_normal_wallet = struct
     test_bls_gen_keys ()
 end
 
+module Wallet = struct
+  let test_duplicate_alias () =
+    Test.register
+      ~__FILE__
+      ~tags:["client"; "keys"; "duplicate"]
+      ~title:"Add a duplicate address"
+    @@ fun () ->
+    let* client = Client.init () in
+    let* (_ : string) = Client.gen_keys client ~alias:"foo" in
+    let* account_foo = Client.show_address client ~alias:"foo" in
+    let msg =
+      rex
+        "this public key hash is already aliased as foo, use --force to insert \
+         duplicate"
+    in
+    let* () =
+      Client.spawn_add_address client ~alias:"baz" ~src:account_foo.alias
+      |> Process.check_error ~msg
+    in
+    let* () =
+      Client.spawn_add_address
+        client
+        ~alias:"baz"
+        ~src:account_foo.public_key_hash
+      |> Process.check_error ~msg
+    in
+    let* _alias2 =
+      Client.add_address client ~force:true ~alias:"baz" ~src:"foo"
+    in
+    (* Check that we can read the secret key of [foo],
+       and that the original [foo] is equal to [baz]
+       (modulo the alias) *)
+    let* account_foo2 = Client.show_address ~alias:"foo" client in
+    let* account_baz = Client.show_address ~alias:"baz" client in
+    Check.(
+      (account_foo = account_foo2)
+        Account.key_typ
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    Check.(
+      (account_foo = {account_baz with alias = "foo"})
+        Account.key_typ
+        ~__LOC__
+        ~error_msg:"Expected %R, got %L") ;
+    return ()
+
+  let register_protocol_independent () = test_duplicate_alias ()
+end
+
 let register_protocol_independent () =
   BLS_aggregate_wallet.register_protocol_independent () ;
-  BLS_normal_wallet.register_protocol_independent ()
+  BLS_normal_wallet.register_protocol_independent () ;
+  Wallet.register_protocol_independent ()

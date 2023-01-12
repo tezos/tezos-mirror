@@ -169,11 +169,6 @@ class TestRawContext:
         client.transfer(10, keys[3], keys[4], TRANSFER_ARGS)
         utils.bake(client)
 
-    def test_duplicate_alias(self, client: Client):
-        client.add_address("baz", "foo", force=True)
-        show_foo = client.show_address("foo", show_secret=True)
-        assert show_foo.secret_key is not None
-
 
 @pytest.mark.incremental
 class TestRememberContract:
