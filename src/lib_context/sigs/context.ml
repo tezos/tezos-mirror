@@ -843,8 +843,8 @@ module type TEZOS_CONTEXT = sig
     context -> Operation_metadata_list_list_hash.t -> context Lwt.t
 end
 
-(** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.
-    Note that the partially applied `get_data kind key` function has the correct
+(** Functor [With_get_data] adds a [get_data] function to modules of signature [S].
+    Note that the partially applied [get_data kind key] function has the correct
     type to be provided to [produce_tree_proof] and [verify_tree_proof] which is
     its intended goal. *)
 module type Storelike = sig
