@@ -567,20 +567,18 @@ Developing WASM Kernels
 A rollup is primarily characterized by the semantics it gives to the
 input messages it processes. This semantics is provided at origination
 time as a WASM program (in the case of the ``wasm_2_0_0`` kind) called
-a *kernel*. More precisely, a *kernel* is a WASM module encoded in the
+a *kernel*. More concretely, the kernel is a WASM module encoded in the
 binary format defined by the WASM standard.
 
-Though compliance with the WASM standard was a key requirement for
-smart rollups, there is a caveat to this claim. This is due to the
-particular constraints web3 developers are very familiar with, namely
-programs must be fully deterministic. As a consequence,
+Except for necessary restrictions to ensure determinism (a key requirement for any web3 technology), we support the full WASM language.
+More precisely, determinism is ensured by the following restrictions:
 
 #. Instructions and types related to floating-point arithmetic are not
    supported. This is because IEEE floats are not deterministic, as
    the standard includes undefined behaviors operations.
-#. The call stack of the WASM kernel is restricted to 300.
+#. The length of the call stack of the WASM kernel is restricted to 300.
 
-A valid kernel is a WASM module that satisfies the following
+Modulo the limitations above, a valid kernel is a WASM module that satisfies the following
 constraints:
 
 #. It exports a function ``kernel_run`` that takes no argument and
@@ -620,12 +618,12 @@ The contents of the resulting ``hello.wasm`` file is a valid WASM
 kernel, though its relevance as a decentralized application is
 debatable.
 
-One of the benefit of choosing WASM as the programming language for
+One of the benefits of choosing WASM as the programming language for
 smart rollups is that WASM has gradually become a ubiquitous
-compilation target over the years. To the point where mainstream,
+compilation target over the years. Its popularity has grown to the point where mainstream,
 industrial languages like Go or Rust now natively compile to
 WASM. Thus, ``cargo`` —the official Rust package manager— provides an
-official target to compile Rust to ``.wasm`` binary files that are
+official target to compile Rust to ``.wasm`` binary files, which are
 valid WASM kernels. This means that, for this particular example, one
 can build a WASM kernel while enjoying the strengths and convenience
 of the Rust language and the Rust ecosystem.
@@ -648,7 +646,7 @@ implement WASM kernels.
 Execution Environment
 ^^^^^^^^^^^^^^^^^^^^^
 In a nutshell, the life cycle of a smart rollup is a never-ending
-interleaving of fetching inputs from the layer-1, and executing the
+loop of fetching inputs from the layer-1, and executing the
 ``kernel_run`` function exposed by the WASM kernel.
 
 State
@@ -666,8 +664,10 @@ The smart rollup carries two states:
    file system.
 
 The durable storage is a persistent tree, whose contents is addressed
-by path-like keys. The WASM kernel can write and read raw bytes stored
-under a given path (files), but can also interact (delete, copy, move,
+by path-like keys. A path in the storage may contain: a value (also called file) consisting of a sequence of raw bytes, and/or any number of subtrees (also called directories), that is, the paths in the storage prefixed by the current path.
+Thus, unlike most file systems, a path in the durable storage may be at the same time a file and a directory (a set of sub-paths).
+The WASM kernel can write and read the raw bytes stored
+under a given path (the file), but can also interact (delete, copy, move,
 etc.) with subtrees (directories). The value and subtrees at key
 ``/readonly`` are not writable by a kernel, but can be used by the PVM
 to give information to the kernel.
@@ -684,7 +684,7 @@ purpose from the ones it does not need to process.
 
 Once the inbox has been populated with the inputs of the Tezos block,
 the ``kernel_run`` function is called, from a clean “transient”
-state. More precisely, the WASM kernel is parsed, linked, initialized,
+state. More precisely, the WASM kernel is re-initialized,
 then ``kernel_run`` is called.
 
 By default, the WASM kernel yields when ``kernel_run`` returns. In
@@ -700,12 +700,16 @@ reboots for each Tezos level.
 
 A call to ``kernel_run`` cannot take an arbitrary amount of time to
 complete, because diverging computations are not compatible with the
-optimistic rollup infrastructure of Tezos. To dodge the halting
-problem, the reference interpreter of WASM used during the rejection
+optimistic rollup infrastructure of Tezos.
+To dodge the halting
+problem, the reference interpreter of WASM (used during the refutation game)
 enforces a bound on the number of ticks used in a call to
 ``kernel_run``. Once the maximum number of ticks is reached, the
 execution of ``kernel_run`` is trapped (*i.e.*, interrupted with an
 error).
+In turn, the fast execution engine does not enforce this time limit. Hence,
+it is the responsibility of the kernel developer to implement a ``kernel_run`` which does not exceed its tick budget.
+
 
 The current bound is set to 11,000,000,000 ticks.
 ``octez-smart-rollup-wasm-debugger`` is probably the best tool available to
@@ -726,14 +730,14 @@ Host Functions
 At its core, the WASM machine defined in the WASM standard is just a
 very evolved arithmetic machine. It needs to be enriched with
 so-called host functions in order to be used for greater purposes. The
-host functions provides an API to the WASM program to interact with an
-“outer world.”  In a browser, this API typically allows the WASM
+host functions provide an API to the WASM program to interact with an
+“outer world”.  In a browser for instance, this API typically allows the WASM
 program to interact with the `DOM
 <https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model>`_
 of the webpage.
 
 As for smart rollups, the host functions exposed to a WASM kernel
-allows it to interact with the components of persistent state.
+allow it to interact with the components of persistent state:
 
 ``read_input``
   Loads the oldest input still present in the inbox of the smart
@@ -748,13 +752,13 @@ allows it to interact with the components of persistent state.
   commitment acknowledging the call to this host function is cemented.
 
 ``write_debug``
-  Is considered as a no-op, but can be used by the WASM kernel to log
+  Can be used by the WASM kernel to log
   events which can potentially be interpreted by an instrumented
   rollup node.
 
 ``store_has``
-  Reports the kind of data stored under a given path in the durable
-  storage: a directory, a file, neither or both.
+  Returns the kind of data (if any) stored in the durable storage under a given
+  path: a directory, a file, neither or both.
 
 ``store_delete``
   Cuts the subtree under a given path out of the durable storage.
@@ -774,7 +778,7 @@ allows it to interact with the components of persistent state.
   Writes at most 4,096 bytes from a buffer in the memory of the WASM
   kernel to a file of the durable storage, increasing its size if
   necessary. Note that files in the durable storage cannot exceed
-  2,147,483,647 bytes (:math:`2^31 - 1`, around 2GB).
+  :math:`2^{31} - 1` bytes (i.e. 2GB - 1).
 
 ``store_value_size``
   Returns the size (in bytes) of a file under a given key in the
@@ -802,7 +806,7 @@ allows it to interact with the components of persistent state.
 
 These host functions use a "C-like" API. In particular, most of them
 return a signed 32bit integer, where negative values are reserved for
-conveying errors.
+conveying errors, as shown in the next table.
 
 ======= =======================================================================================================
  Code    Description
@@ -821,8 +825,8 @@ conveying errors.
 Implementing a WASM Kernel in Rust
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Though WASM is a good fit for writing computation intensive, arbitrary
-programs, it remains a low-level, stack-based, memory unsafe language.
+Though WASM is a good fit for efficiently executing computation-intensive, arbitrary
+programs, it is a low-level, stack-based, memory unsafe language.
 Fortunately, it was designed to be a compilation target, not a
 language whose program would be written directly by developers.
 
@@ -835,7 +839,7 @@ vulnerabilities that arbitrary WASM programs may suffer from.
 Setting-up Rust
 """""""""""""""
 
-```rustup`` <https://rustup.rs>`_ is the standard to get Rust. Once
+`rustup <https://rustup.rs>`_ is the standard way to get Rust. Once
 ``rustup`` is installed, enabling WASM as a compilation target is as
 simple as running the following command.
 
@@ -855,7 +859,7 @@ which only provides a 32bit address space.
 
 The simplest kernel one can implement in Rust (the one that returns
 directly after being called, without doing anything particular) is the
-following.
+following ``src/noop.rs``.
 
 .. code:: rust
 
@@ -906,8 +910,8 @@ a ``.cargo/config.toml`` file, containing the following line.
 Host Functions in Rust
 """"""""""""""""""""""
 
-Exposing host functions exported by the WASM runtime to a Rust program
-is actually really straightforward. The ``link`` pragma is used to specify the
+The host functions exported by the WASM runtime to Rust programs
+are exposed by the following API. The ``link`` pragma is used to specify the
 module that exports them (in our case, ``smart_rollup_core``).
 
 .. code:: rust
@@ -1005,7 +1009,7 @@ module that exports them (in our case, ``smart_rollup_core``).
    }
 
 These functions are marked as ``unsafe`` for Rust. It is possible to
-provide safe API on top of them. For instance, the ``read_input`` host
+provide a safe API on top of them. For instance, the ``read_input`` host
 function can be used to declare a safe function which allocates a
 fresh Rust Vector to receive the input.
 
@@ -1063,17 +1067,20 @@ Testing your Kernel
    section is still under active development. A preliminary version can be found
    in `the Octez repository <https://gitlab.com/tezos/tezos>`_.
 
-   To get ``octez-smart-rollup-wasm-debugger``, the easiest way is to build
-   Octez from source. See the `usual instructions
-   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_.
-
-   For now, ``octez-smart-rollup-wasm-debugger`` is **not** part of Octez, and
-   is only provided for developers interested in testing Tezos smart rollup
+   However, ``octez-smart-rollup-wasm-debugger`` is **not** currently
+   considered a part of Octez, and is only provided for developers
+   interested in testing Tezos smart rollup
    infrastructure before its release on mainnet.
 
-Testing kernels can be useful during its development, without relying on
-starting a rollup on a test network. We provide a debugger as a mean to evaluate
-the WASM PVM without relying on any node and network: ``octez-smart-rollup-wasm-debugger``.
+   To get the ``octez-smart-rollup-wasm-debugger`` executable, the
+   easiest way is to build Octez from source. See the `usual
+   instructions
+   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_.
+
+Testing a kernel without having to start a rollup node on a test network is very convenient. We provide a
+*read-eval-print-loop* (REPL) as a means to evaluate the WASM PVM
+without relying on any node and network:
+``octez-smart-rollup-wasm-debugger``.
 
 .. code:: sh
 
@@ -1129,8 +1136,8 @@ two messages:
   ]
 
 Note that the `sender`, `source` and `destination` fields are optional
-and will be given default values by the debugger (which are the *zero*
-adresses). If no input file is given it will be assumed empty. If no
+and will be given default values by the debugger (i.e., the *zero*
+address). If no input file is given it will be assumed empty. If no
 rollup address is given, it will use a default address which is the
 *zero* address: ``scr1AFyXAWFS3c6S2D617o8NGRvazoMJPEw6s``.
 
@@ -1191,8 +1198,8 @@ the kernel side. We can now start a `kernel_run` evaluation:
 
 
 The memory of the interpreter is flushed between two `kernel_run`
-call (at the `Snapshot` internal state), however the ``durable
-storage`` can be used as a persistent memory. Let's assume this kernel
+calls (at the `Snapshot` internal state), however the durable
+storage can be used as a persistent memory. Let's assume this kernel
 wrote data at key `/store/key`:
 
 .. code::
