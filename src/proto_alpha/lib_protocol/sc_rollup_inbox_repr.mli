@@ -354,8 +354,8 @@ val finalize_inbox_level_no_history :
   t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t tzresult
 
 (** [genesis ~timestamp ~predecessor level] initializes the inbox at some
-    given [level] with: SOL, Info_per_level {timestamp; predecessor} and EOL
-    inside. *)
+    given [level] with: [SOL], [Info_per_level {timestamp; predecessor}] and
+    [EOL] inside. *)
 val genesis :
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
