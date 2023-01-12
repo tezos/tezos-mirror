@@ -75,7 +75,7 @@ module type T = sig
       production, and mocked in tests *)
   type chain_store
 
-  (** The type used internally by this module. Created by {!create} and
+  (** The type used internally by this module. Created by {!val-create} and
       then passed back and possibly updated by {!apply_operation}. *)
   type t
 
@@ -107,7 +107,7 @@ module type T = sig
     unit ->
     t tzresult Lwt.t
 
-  (** Values returned by {!create}. They are obtained from the result
+  (** Values returned by {!val-create}. They are obtained from the result
       of the protocol [apply_operation] function and the classification of
       errors. *)
   type result =
@@ -122,11 +122,11 @@ module type T = sig
   val apply_operation : t -> protocol_operation operation -> result Lwt.t
 
   (** [validation_state t] returns the subset of [t] corresponding
-      to the type {!validation_state} of the protocol. *)
+      to the type {!type-validation_state} of the protocol. *)
   val validation_state : t -> validation_state
 
   (** Updates the subset of [t] corresponding to the type
-      {!validation_state} of the protocol. *)
+      {!type-validation_state} of the protocol. *)
   val set_validation_state : t -> validation_state -> t
 
   val pp_result : Format.formatter -> result -> unit

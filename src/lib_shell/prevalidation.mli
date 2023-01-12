@@ -58,7 +58,7 @@ module type T = sig
       production, and mocked in tests *)
   type chain_store
 
-  (** The state used internally by this module. Created by {!create}
+  (** The state used internally by this module. Created by {!val-create}
       and then passed back and possibly updated by {!add_operation} and
       {!remove_operation}.
 
