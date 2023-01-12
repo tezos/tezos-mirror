@@ -61,29 +61,29 @@ module Make_table (H : H) : sig
   (** Type of persistent hash tables *)
   type t
 
-  (** Persistent version of {!H.replace} *)
+  (** Persistent version of {!module-type-H.replace} *)
   val replace : t -> key -> value -> unit tzresult Lwt.t
 
-  (** Persistent version of {!H.remove} *)
+  (** Persistent version of {!module-type-H.remove} *)
   val remove : t -> key -> unit tzresult Lwt.t
 
-  (** Same as {!H.find} *)
+  (** Same as {!module-type-H.find} *)
   val find : t -> key -> value option
 
-  (** Same as {!H.mem} *)
+  (** Same as {!module-type-H.mem} *)
   val mem : t -> key -> bool
 
-  (** Same as {!H.iter_s} *)
+  (** Same as {!module-type-H.iter_s} *)
   val iter_s : (key -> value -> unit Lwt.t) -> t -> unit Lwt.t
 
-  (** Same as {!H.iter_es} *)
+  (** Same as {!module-type-H.iter_es} *)
   val iter_es :
     (key -> value -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t
 
-  (** Same as {!H.length} *)
+  (** Same as {!module-type-H.length} *)
   val length : t -> int
 
-  (** Persistent version of {!H.replace_seq} *)
+  (** Persistent version of {!module-type-H.replace_seq} *)
   val replace_seq : t -> (key * value) Seq.t -> unit tzresult Lwt.t
 
   (** [load_from_disk ~warn_unreadable ~initial_size ~data_dir] creates a hash
