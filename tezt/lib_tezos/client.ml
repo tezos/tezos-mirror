@@ -783,6 +783,14 @@ let gen_and_show_keys ?alias ?sig_alg client =
   let* alias = gen_keys ?alias ?sig_alg client in
   show_address ~alias client
 
+let spawn_add_address ?(force = false) client ~alias ~src =
+  spawn_command client
+  @@ ["add"; "address"; alias; src]
+  @ optional_switch "force" force
+
+let add_address ?force client ~alias ~src =
+  spawn_add_address ?force client ~alias ~src |> Process.check
+
 let spawn_bls_gen_keys ?hooks ?(force = false) ?alias client =
   let alias =
     match alias with
