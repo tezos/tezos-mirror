@@ -204,7 +204,7 @@ val begin_application :
     The partial validation mode is intended for quickly assessing a
     series of blocks in a cousin branch (multipass
     validation). Therefore, it is the only mode in which the given
-    {!type:context} may be based on any recent ancestor block of the
+    {!type-context} may be based on any recent ancestor block of the
     block to validate, instead of only its predecessor (where recent
     means having a greater level than the [last_allowed_fork_level] of
     the current head). *)
