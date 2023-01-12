@@ -67,7 +67,6 @@ The value of the additional field ``category`` designates one of the following f
 * ``"subsidy"`` is the source of tokens minted to subsidize the liquidity baking CPMM contract
 * ``"invoice"`` is the source of tokens minted to compensate some users who have contributed to the betterment of the chain
 * ``"commitment"`` is the source of tokens minted to match commitments made by some users to supply funds for the chain
-* ``"Tx_rollup_rejection_rewards"`` is the source of tokens minted to reward an account for injecting a transaction rollup rejection operation
 * ``"Sc_rollup_refutation_rewards"`` is the source of tokens minted to reward an account for winning a smart-contract rollup refutation game
 * ``"bootstrap"`` is analogous to ``"commitment"`` but is for internal use or testing.
   It will not be used during normal operation on mainnet, but may be used on test networks or in sandboxed mode
@@ -121,7 +120,6 @@ The field ``category`` of a sink account may have one of the following values:
   - the field ``delegate`` contains the public key hash of the delegate
   - the field ``participation`` has the value ``"true"`` if participation was not sufficient and has the value ``"false"`` otherwise
   - the field ``revelation`` has the value ``"true"`` if the delegate has not revealed his nonce and has the value ``"false"`` otherwise.
-* ``"Tx_rollup_rejection_punishments"`` is the destination of tokens burned as punishment for submitting erroneous commitments
 * ``"Sc_rollup_refutation_punishments"`` is the destination of tokens burned as punishment for submitting bad commitments that have been refuted
 * ``"burned"`` is only for internal use and testing.
   It will not appear on mainnet, but may appear on test networks or in sandboxed mode.
