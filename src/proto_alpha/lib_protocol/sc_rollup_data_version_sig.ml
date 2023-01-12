@@ -28,8 +28,8 @@
     the values in future iterations of the protocol.
 
     We allow the possibility to modify the values by introducing
-    a {!versioned} value that is the only values written in the storage.
-    
+    a {!S.versioned} value that is the only values written in the storage.
+
     In future versions, the versioning is supposed to let us reinterpret old
     stored values within the new protocol implementation. That is, each
     access to the storage will transform old stored values to the

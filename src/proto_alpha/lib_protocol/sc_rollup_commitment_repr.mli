@@ -75,7 +75,6 @@ module V1 : sig
       {ul {li [compressed_state] = [genesis_state_hash]}
           {li [inbox_level] = [origination_level]}
           {li [predecessor] = {!Hash.zero}}
-          {li [number_of_messages] = {!Sc_rollup_repr.Number_of_messages.min_value}}
           {li [number_of_ticks] = {!Sc_rollup_repr.Number_of_ticks.min_value}}}
 
       where {!Sc_rollup_repr.Number_of_messages.min_value} and

@@ -107,8 +107,7 @@ val ediv_n : n num -> 'a num -> ('a num * n num) option
     Use {!add_n} when working with naturals to preserve the sign. *)
 val add : _ num -> _ num -> z num
 
-(** Sign agnostic subtraction.
-    Use {!sub_n} when working with naturals to preserve the sign. *)
+(** Sign agnostic subtraction. *)
 val sub : _ num -> _ num -> z num
 
 (** Sign agnostic multiplication.
