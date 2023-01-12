@@ -109,7 +109,7 @@ val assert_feature_enabled : t -> unit tzresult
 (** [originate ~ctxt_before_op ~ctxt ~public_parameters ~transcript
                ~circuits_info ~init_state ~nb_ops]
     applies the origination operation for a ZK rollup.
-    See {!Zk_rollup_storage:originate}.
+    See {!Zk_rollup_storage.originate}.
 
     May fail with:
     {ul
