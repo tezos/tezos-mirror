@@ -67,14 +67,6 @@ let ensure_kind infos kind =
       | Set_deposits_limit _, K_Set_deposits_limit
       | Update_consensus_key _, K_Update_consensus_key
       | Increase_paid_storage _, K_Increase_paid_storage
-      | Tx_rollup_origination, K_Tx_rollup_origination
-      | Tx_rollup_submit_batch _, K_Tx_rollup_submit_batch
-      | Tx_rollup_commit _, K_Tx_rollup_commit
-      | Tx_rollup_return_bond _, K_Tx_rollup_return_bond
-      | Tx_rollup_finalize_commitment _, K_Tx_rollup_finalize
-      | Tx_rollup_remove_commitment _, K_Tx_rollup_remove_commitment
-      | Tx_rollup_rejection _, K_Tx_rollup_reject
-      | Tx_rollup_dispatch_tickets _, K_Tx_rollup_dispatch_tickets
       | Transfer_ticket _, K_Transfer_ticket
       | Sc_rollup_originate _, K_Sc_rollup_origination
       | Sc_rollup_add_messages _, K_Sc_rollup_add_messages

@@ -202,9 +202,8 @@ let string_token ~ticketer content =
     {ticketer; contents_type = Script_typed_ir.string_t; contents}
 
 (** Initializes one address for operations and one baker. *)
-let init ?tx_rollup_enable () =
-  Context.init2 ?tx_rollup_enable ~consensus_threshold:0 ()
-  >|=? fun (block, (src0, src1)) ->
+let init () =
+  Context.init2 ~consensus_threshold:0 () >|=? fun (block, (src0, src1)) ->
   let baker = Context.Contract.pkh src0 in
   (baker, src1, block)
 
@@ -1213,61 +1212,6 @@ let test_transfer_big_map_with_tickets () =
         };
       ]
 
-(** Test transfer a ticket to a tx_rollup. *)
-let test_tx_rollup_deposit_one_ticket () =
-  let open Lwt_result_syntax in
-  let* _baker, src, block = init ~tx_rollup_enable:true () in
-  let* ticketer = one_ticketer block in
-  let* incr = Incremental.begin_construction block in
-  let* operation, tx_rollup =
-    Op.tx_rollup_origination (I incr) src ~fee:(Test_tez.of_int 10)
-  in
-  let* incr = Incremental.add_operation incr operation in
-
-  let*? ticket_ty =
-    Script_typed_ir.(ticket_t Micheline.dummy_location string_t)
-    |> Environment.wrap_tzresult
-  in
-  let*? (Ty_ex_c parameters_ty) =
-    Script_typed_ir.(
-      pair_t Micheline.dummy_location ticket_ty tx_rollup_l2_address_t)
-    |> Environment.wrap_tzresult
-  in
-  let amount = one in
-  let*? contents =
-    Script_string.of_string "white" |> Environment.wrap_tzresult
-  in
-  let l2_destination =
-    Indexable.value
-    @@ Tx_rollup_l2_address.of_b58check_exn
-         "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
-  in
-  let parameters =
-    (Script_typed_ir.{ticketer; contents; amount}, l2_destination)
-  in
-
-  let* operation, incr =
-    transfer_operation_to_tx_rollup
-      ~incr
-      ~src:(Contract src)
-      ~tx_rollup
-      ~parameters_ty
-      ~parameters
-  in
-  let* ticket_diffs, ctxt = ticket_diffs_of_operations incr [operation] in
-  assert_equal_ticket_token_diffs
-    ctxt
-    ~loc:__LOC__
-    ticket_diffs
-    ~expected:
-      [
-        {
-          ticket_token = string_token ~ticketer "white";
-          total_amount = nat 1;
-          destinations = [(Destination.Tx_rollup tx_rollup, one)];
-        };
-      ]
-
 (** Test transferring a list of multiple tickets where two of them have zero
     amounts fails. *)
 let test_transfer_fails_on_multiple_zero_tickets () =
@@ -1394,10 +1338,6 @@ let tests =
       "Test transfer big-map with tickets"
       `Quick
       test_transfer_big_map_with_tickets;
-    Tztest.tztest
-      "Test tx rollup deposit one ticket"
-      `Quick
-      test_tx_rollup_deposit_one_ticket;
     Tztest.tztest
       "Test transfer fails on multiple zero tickets"
       `Quick

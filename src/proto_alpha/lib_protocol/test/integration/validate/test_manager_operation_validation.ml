@@ -579,7 +579,6 @@ let tests =
         ctxt =
           {
             infos.ctxt with
-            tx_rollup = infos_op.ctxt.tx_rollup;
             sc_rollup = infos_op.ctxt.sc_rollup;
             zk_rollup = infos_op.ctxt.zk_rollup;
           };

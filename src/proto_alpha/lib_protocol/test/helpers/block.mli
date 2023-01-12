@@ -132,9 +132,6 @@ val genesis :
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
-  ?tx_rollup_enable:bool ->
-  ?tx_rollup_sunset_level:int32 ->
-  ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
   ?dal_enable:bool ->
@@ -294,9 +291,6 @@ val prepare_initial_context_params :
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
-  ?tx_rollup_enable:bool ->
-  ?tx_rollup_sunset_level:int32 ->
-  ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
   ?dal_enable:bool ->

@@ -71,14 +71,6 @@ let manager_kinds =
     `KSet_deposits_limit;
     `KIncrease_paid_storage;
     `KRegister_global_constant;
-    `KTx_rollup_origination;
-    `KTx_rollup_submit_batch;
-    `KTx_rollup_commit;
-    `KTx_rollup_return_bond;
-    `KTx_rollup_finalize_commitment;
-    `KTx_rollup_remove_commitment;
-    `KTx_rollup_rejection;
-    `KTx_rollup_dispatch_tickets;
     `KTransfer_ticket;
     `KDal_publish_slot_header;
     `KSc_rollup_originate;
@@ -250,13 +242,6 @@ let block_headers =
     [bh1; bh2; bh3]
 
 let random_block_header = QCheck2.Gen.oneofl block_headers
-
-let random_tx_rollup =
-  let open QCheck2.Gen in
-  let module G = Gen_hash (Tezos_crypto.Operation_hash) in
-  let+ oph = G.gen in
-  let nonce = Origination_nonce.Internal_for_tests.initial oph in
-  Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
 
 let random_sc_rollup =
   let module G = Gen_hash (Sc_rollup.Address) in
@@ -530,117 +515,6 @@ let generate_register_global_constant =
   let value = Script_repr.lazy_expr (Expr.from_string "Pair 1 2") in
   QCheck2.Gen.pure (Register_global_constant {value})
 
-let generate_tx_rollup_origination = QCheck2.Gen.pure Tx_rollup_origination
-
-let generate_tx_rollup_submit_batch =
-  let open QCheck2.Gen in
-  let+ tx_rollup = random_tx_rollup in
-  let content = "batch" in
-  let burn_limit = None in
-  Tx_rollup_submit_batch {tx_rollup; content; burn_limit}
-
-let generate_tx_rollup_commit =
-  let open QCheck2.Gen in
-  let+ tx_rollup = random_tx_rollup in
-  let commitment : Tx_rollup_commitment.Full.t =
-    {
-      level = Tx_rollup_level.root;
-      messages = [];
-      predecessor = None;
-      inbox_merkle_root = Tx_rollup_inbox.Merkle.merklize_list [];
-    }
-  in
-  Tx_rollup_commit {tx_rollup; commitment}
-
-let generate_tx_rollup_return_bond =
-  let open QCheck2.Gen in
-  let+ tx_rollup = random_tx_rollup in
-  Tx_rollup_return_bond {tx_rollup}
-
-let generate_tx_finalize_commitment =
-  let open QCheck2.Gen in
-  let+ tx_rollup = random_tx_rollup in
-  Tx_rollup_finalize_commitment {tx_rollup}
-
-let generate_tx_rollup_remove_commitment =
-  let open QCheck2.Gen in
-  let+ tx_rollup = random_tx_rollup in
-  Tx_rollup_remove_commitment {tx_rollup}
-
-let generate_tx_rollup_rejection =
-  let open QCheck2.Gen in
-  let+ tx_rollup = random_tx_rollup in
-  let message, _ = Tx_rollup_message.make_batch "" in
-  let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
-  let message_path =
-    match Tx_rollup_inbox.Merkle.compute_path [message_hash] 0 with
-    | Ok message_path -> message_path
-    | _ -> raise (Invalid_argument "Single_message_inbox.message_path")
-  in
-  let proof : Tx_rollup_l2_proof.t =
-    {
-      version = 1;
-      before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-      after = `Value Tezos_crypto.Context_hash.zero;
-      state = Seq.empty;
-    }
-  in
-  let previous_message_result : Tx_rollup_message_result.t =
-    {
-      context_hash = Tx_rollup_message_result.empty_l2_context_hash;
-      withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
-    }
-  in
-  let level = Tx_rollup_level.root in
-  let message_result_hash = Tx_rollup_message_result_hash.zero in
-  let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-  let previous_message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-  let message_position = 0 in
-  let proof = Tx_rollup_l2_proof.serialize_proof_exn proof in
-  Tx_rollup_rejection
-    {
-      tx_rollup;
-      level;
-      message;
-      message_position;
-      message_path;
-      message_result_hash;
-      message_result_path;
-      previous_message_result;
-      previous_message_result_path;
-      proof;
-    }
-
-let generate_tx_dispatch_tickets =
-  let open QCheck2.Gen in
-  let* tx_rollup = random_tx_rollup in
-  let* source = random_pkh in
-  let+ contract = random_contract in
-  let level = Tx_rollup_level.root in
-  let message_index = 0 in
-  let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-  let context_hash = Tezos_crypto.Context_hash.zero in
-  let reveal =
-    Tx_rollup_reveal.
-      {
-        contents = Script.lazy_expr (Expr.from_string "1");
-        ty = Script.lazy_expr (Expr.from_string "nat");
-        ticketer = contract;
-        amount = Tx_rollup_l2_qty.of_int64_exn 10L;
-        claimer = source;
-      }
-  in
-  let tickets_info = [reveal] in
-  Tx_rollup_dispatch_tickets
-    {
-      tx_rollup;
-      level;
-      context_hash;
-      message_index;
-      message_result_path;
-      tickets_info;
-    }
-
 let generate_transfer_ticket =
   let open QCheck2.Gen in
   let* ticketer = random_contract in
@@ -747,26 +621,10 @@ let generator_of ?source = function
   | `KDelegation -> generate_manager_operation ?source generate_delegation
   | `KRegister_global_constant ->
       generate_manager_operation ?source generate_register_global_constant
-  | `KTx_rollup_origination ->
-      generate_manager_operation ?source generate_tx_rollup_origination
   | `KTransfer_ticket ->
       generate_manager_operation ?source generate_transfer_ticket
   | `KDal_publish_slot_header ->
       generate_manager_operation ?source generate_dal_publish_slot_header
-  | `KTx_rollup_submit_batch ->
-      generate_manager_operation ?source generate_tx_rollup_submit_batch
-  | `KTx_rollup_commit ->
-      generate_manager_operation ?source generate_tx_rollup_commit
-  | `KTx_rollup_return_bond ->
-      generate_manager_operation ?source generate_tx_rollup_return_bond
-  | `KTx_rollup_finalize_commitment ->
-      generate_manager_operation ?source generate_tx_finalize_commitment
-  | `KTx_rollup_remove_commitment ->
-      generate_manager_operation ?source generate_tx_rollup_remove_commitment
-  | `KTx_rollup_rejection ->
-      generate_manager_operation ?source generate_tx_rollup_rejection
-  | `KTx_rollup_dispatch_tickets ->
-      generate_manager_operation ?source generate_tx_dispatch_tickets
   | `KSc_rollup_originate ->
       generate_manager_operation ?source generate_sc_rollup_originate
   | `KSc_rollup_add_messages ->

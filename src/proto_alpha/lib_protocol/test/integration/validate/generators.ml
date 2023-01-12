@@ -81,7 +81,6 @@ type ctxt_cstrs = {
   src_cstrs : cstrs;
   dest_cstrs : cstrs;
   del_cstrs : cstrs;
-  tx_cstrs : cstrs;
   sc_cstrs : cstrs;
   zk_cstrs : cstrs;
 }
@@ -112,7 +111,6 @@ let default_ctxt_cstrs =
     src_cstrs = default_cstrs;
     dest_cstrs = default_cstrs;
     del_cstrs = default_cstrs;
-    tx_cstrs = default_cstrs;
     sc_cstrs = default_cstrs;
     zk_cstrs = default_cstrs;
   }
@@ -240,7 +238,6 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
        src_cstrs;
        dest_cstrs;
        del_cstrs;
-       tx_cstrs;
        sc_cstrs;
        zk_cstrs;
      } ->
@@ -249,7 +246,6 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
   let* fund_src = gen_tez src_cstrs in
   let* fund_dest = gen_tez dest_cstrs in
   let* fund_del = gen_tez del_cstrs in
-  let* fund_tx = gen_tez tx_cstrs in
   let* fund_sc = gen_tez sc_cstrs in
   let+ fund_zk = gen_tez zk_cstrs in
   {
@@ -258,7 +254,6 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
     fund_dest;
     fund_del;
     reveal_accounts = true;
-    fund_tx;
     fund_sc;
     fund_zk;
     flags = all_enabled;

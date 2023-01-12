@@ -385,15 +385,6 @@ module Delegate = struct
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end
 
-module Tx_rollup = struct
-  let state ctxt tx_rollup = Tx_rollup_services.state rpc_ctxt ctxt tx_rollup
-
-  let inbox ctxt tx_rollup = Tx_rollup_services.inbox rpc_ctxt ctxt tx_rollup
-
-  let commitment ctxt tx_rollup =
-    Tx_rollup_services.commitment rpc_ctxt ctxt tx_rollup
-end
-
 module Sc_rollup = struct
   let inbox ctxt =
     Environment.RPC_context.make_call0
@@ -479,8 +470,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
     ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
-    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
+    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
     ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
@@ -509,9 +499,6 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?origination_size
     ?blocks_per_cycle
     ?cycles_per_voting_period
-    ?tx_rollup_enable
-    ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size
     ?sc_rollup_enable
     ?sc_rollup_arith_pvm_enable
     ?dal_enable

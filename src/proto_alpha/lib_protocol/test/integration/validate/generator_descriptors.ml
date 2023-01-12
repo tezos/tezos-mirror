@@ -56,13 +56,12 @@ let init_manager_state bootstraps block =
       block;
       bootstraps;
       originated_contract = None;
-      tx_rollup = None;
       sc_rollup = None;
       zk_rollup = None;
     }
   in
   let accounts =
-    {sources = []; dest = None; del = None; tx = None; sc = None; zk = None}
+    {sources = []; dest = None; del = None; sc = None; zk = None}
   in
   {ctxt; accounts; flags = all_enabled}
 
@@ -690,7 +689,6 @@ let update_state_with_infos {Manager.ctxt; accounts; flags}
     {
       ctxt with
       originated_contract = ctxt2.originated_contract;
-      tx_rollup = ctxt2.tx_rollup;
       sc_rollup = ctxt2.sc_rollup;
       zk_rollup = ctxt2.zk_rollup;
     }
@@ -700,7 +698,6 @@ let update_state_with_infos {Manager.ctxt; accounts; flags}
       accounts with
       dest = accounts2.dest;
       del = accounts2.del;
-      tx = accounts2.tx;
       sc = accounts2.sc;
       zk = accounts2.zk;
     }

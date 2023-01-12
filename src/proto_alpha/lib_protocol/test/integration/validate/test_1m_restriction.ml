@@ -45,7 +45,6 @@ let ctxt_cstrs_default =
     src_cstrs = Pure 1500000;
     dest_cstrs = Pure 15000;
     del_cstrs = Pure 150000;
-    tx_cstrs = Pure 15000;
     sc_cstrs = Pure 15000;
     zk_cstrs = Pure 15000;
   }
