@@ -181,8 +181,6 @@ let input_source_encoding =
         (fun pkh -> Wallet_pkh pkh);
     ]
 
-let input_source_list_encoding = Data_encoding.list input_source_encoding
-
 let injected_operations_encoding =
   let open Data_encoding in
   list
@@ -886,29 +884,12 @@ let group =
   Tezos_clic.
     {name = "stresstest"; title = "Commands for stress-testing the network"}
 
-type pool_source =
-  | From_string of {json : Ezjsonm.value}
-  | From_file of {path : string; json : Ezjsonm.value}
+let input_source_list_encoding = Data_encoding.list input_source_encoding
 
-let json_of_pool_source = function
-  | From_string {json} | From_file {json; _} -> json
-
-let json_file_or_text_parameter =
-  Tezos_clic.parameter (fun _ p ->
-      let open Lwt_result_syntax in
-      match String.split ~limit:1 ':' p with
-      | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
-      | ["file"; path] ->
-          let+ json = Lwt_utils_unix.Json.read_file path in
-          From_file {path; json}
-      | _ -> (
-          if Sys.file_exists p then
-            let+ json = Lwt_utils_unix.Json.read_file p in
-            From_file {path = p; json}
-          else
-            try return (From_string {json = Ezjsonm.from_string p})
-            with Ezjsonm.Parse_error _ ->
-              failwith "Neither an existing file nor valid JSON: '%s'" p))
+let pool_source_param =
+  Client_proto_args.json_encoded_with_origin_parameter
+    ~name:"input source list"
+    input_source_list_encoding
 
 let seed_arg =
   let open Tezos_clic in
@@ -972,17 +953,9 @@ let smart_contract_parameters_arg =
          "A JSON object that maps smart contract aliases to objects with three \
           fields: probability in [0;1], invocation_fee, and \
           invocation_gas_limit.")
-    (parameter (fun (cctxt : Protocol_client_context.full) s ->
-         match Data_encoding.Json.from_string s with
-         | Ok json ->
-             Lwt_result_syntax.return
-               (Data_encoding.Json.destruct
-                  Smart_contracts.contract_parameters_collection_encoding
-                  json)
-         | Error _ ->
-             cctxt#error
-               "While parsing --smart-contract-parameters: invalid JSON %s"
-               s))
+    (Client_proto_args.json_encoded_parameter
+       ~name:"smart contract"
+       Smart_contracts.contract_parameters_collection_encoding)
 
 let strategy_arg =
   let open Tezos_clic in
@@ -1100,14 +1073,14 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
   in
   let open Lwt_syntax in
   match pool_source with
-  | From_string _ ->
+  | Client_proto_args.Text _ ->
       (* If the initial pool was given directly as json, save pool to
          a temp file. *)
       let path = Filename.temp_file "client-stresstest-pool-" ".json" in
       let* () = cctxt#message "writing back address pool in file %s" path in
       let* r = Lwt_utils_unix.Json.write_file path json in
       catch_write_error r
-  | From_file {path; _} ->
+  | File {path; _} ->
       (* If the pool specification was a json file, save pool to
          the same file. *)
       let* () = cctxt#message "writing back address pool in file %s" path in
@@ -1137,7 +1110,7 @@ let generate_random_transactions =
          ~name:"sources.json"
          ~desc:
            {|List of accounts from which to perform transfers in JSON format. The input JSON must be an array of objects of the form {"pkh":"<pkh>","pk":"<pk>","sk":"<sk>"} or  {"alias":"<alias from wallet>"} or {"pkh":"<pkh from wallet>"} with the pkh, pk and sk encoded in B58 form."|}
-         json_file_or_text_parameter
+         pool_source_param
     @@ stop)
     (fun ( seed,
            tps,
@@ -1151,7 +1124,7 @@ let generate_random_transactions =
            level_limit,
            verbose_flag,
            debug_flag )
-         sources_json
+         pool_source
          (cctxt : Protocol_client_context.full) ->
       let open Lwt_result_syntax in
       (verbosity :=
@@ -1183,12 +1156,7 @@ let generate_random_transactions =
         |> set_option level_limit (fun parameter level_limit ->
                {parameter with level_limit = Some level_limit})
       in
-      match
-        Data_encoding.Json.destruct
-          input_source_list_encoding
-          (json_of_pool_source sources_json)
-      with
-      | exception _ -> cctxt#error "Could not decode list of sources"
+      match Client_proto_args.content_of_file_or_text pool_source with
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
           let*! () =
@@ -1251,7 +1219,7 @@ let generate_random_transactions =
                 | Error e ->
                     cctxt#message "Error: %a" Error_monad.pp_print_trace e)
           in
-          let save_pool () = save_pool_callback cctxt sources_json state in
+          let save_pool () = save_pool_callback cctxt pool_source state in
           (* Register a callback for saving the pool when the tool is interrupted
              through ctrl-c *)
           let exit_callback_id =

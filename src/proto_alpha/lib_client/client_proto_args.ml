@@ -208,6 +208,45 @@ let data_parameter =
   in
   file_or_text_parameter ~from_text ()
 
+let safe_decode_json (cctxt : #Client_context.full) ~name
+    ?(pp_error = fun _json fmt exn -> Data_encoding.Json.print_error fmt exn)
+    encoding json =
+  let open Lwt_result_syntax in
+  match Data_encoding.Json.destruct encoding json with
+  | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+      cctxt#error
+        "@[<v 2>could not decode %s JSON:@,%a@]"
+        name
+        (pp_error json)
+        exn
+  | exception ((Stack_overflow | Out_of_memory) as exc) -> raise exc
+  | exception exc ->
+      cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
+  | expr -> return expr
+
+let json_encoded_with_origin_parameter ~name ?pp_error encoding =
+  let open Lwt_result_syntax in
+  Tezos_clic.map_es_parameter
+    ~f:(fun (cctxt : #Client_context.full) json_with_origin ->
+      match json_with_origin with
+      | File {path; content} ->
+          let+ content =
+            safe_decode_json ~name ?pp_error cctxt encoding content
+          in
+          File {path; content}
+      | Text content ->
+          let+ content = safe_decode_json ~name cctxt encoding content in
+          Text content)
+    json_with_origin_parameter
+
+let json_encoded_parameter ~name ?pp_error encoding =
+  Tezos_clic.map_parameter
+    ~f:content_of_file_or_text
+    (json_encoded_with_origin_parameter ~name ?pp_error encoding)
+
+let json_encoded_param ~name ~desc ?pp_error encoding =
+  Tezos_clic.param ~name ~desc (json_encoded_parameter ~name ?pp_error encoding)
+
 let binary_encoded_parameter ~name encoding =
   let open Lwt_result_syntax in
   let from_text (cctxt : #Client_context.full) s =

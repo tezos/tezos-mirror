@@ -161,6 +161,34 @@ val file_or_text_parameter :
 val json_with_origin_parameter :
   (Data_encoding.Json.t file_or_text, full) Tezos_clic.parameter
 
+val safe_decode_json :
+  full ->
+  name:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'a Data_encoding.t ->
+  Data_encoding.json ->
+  'a tzresult Lwt.t
+
+val json_encoded_with_origin_parameter :
+  name:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'a Data_encoding.t ->
+  ('a file_or_text, full) Tezos_clic.parameter
+
+val json_encoded_parameter :
+  name:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'a Data_encoding.t ->
+  ('a, full) Tezos_clic.parameter
+
+val json_encoded_param :
+  name:string ->
+  desc:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'b Data_encoding.t ->
+  ('a, full) Tezos_clic.params ->
+  ('b -> 'a, full) Tezos_clic.params
+
 val json_parameter : (Data_encoding.Json.t, full) Tezos_clic.parameter
 
 val data_parameter : (Michelson_v1_parser.parsed, full) Tezos_clic.parameter

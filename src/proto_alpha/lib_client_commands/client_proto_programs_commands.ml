@@ -37,19 +37,6 @@ open Client_proto_programs
 open Client_proto_args
 open Client_proto_contracts
 
-let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
-  match Data_encoding.Json.destruct encoding json with
-  | exception Data_encoding.Json.Cannot_destruct (_, exc) ->
-      cctxt#error
-        "could not decode json (%a)"
-        (Data_encoding.Json.print_error ~print_unknown:(fun fmt exc ->
-             Format.fprintf fmt "%s" (Printexc.to_string exc)))
-        exc
-  | exception ((Stack_overflow | Out_of_memory) as exc) -> raise exc
-  | exception exc ->
-      cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
-  | expr -> Lwt_result_syntax.return expr
-
 let commands () =
   let open Tezos_clic in
   let show_types_switch =
@@ -907,8 +894,11 @@ let commands () =
               match Data_encoding.Json.from_string expr_string with
               | Error err -> cctxt#error "%s" err
               | Ok json ->
-                  safe_decode_json cctxt Alpha_context.Script.expr_encoding json
-              )
+                  safe_decode_json
+                    ~name:"script"
+                    cctxt
+                    Alpha_context.Script.expr_encoding
+                    json)
           | `Binary -> (
               let* bytes = bytes_of_prefixed_string cctxt expr_string in
               match
@@ -1002,6 +992,7 @@ let commands () =
               | Ok json -> (
                   let* expr =
                     safe_decode_json
+                      ~name:"script"
                       cctxt
                       Alpha_context.Script.expr_encoding
                       json

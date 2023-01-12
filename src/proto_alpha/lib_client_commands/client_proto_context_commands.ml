@@ -1008,42 +1008,28 @@ let commands_network network () =
           (args2 (Secret_key.force_switch ()) encrypted_switch)
           (prefixes ["activate"; "account"]
           @@ Secret_key.fresh_alias_param @@ prefixes ["with"]
-          @@ param
+          @@ Client_proto_args.json_encoded_param
                ~name:"activation_key"
                ~desc:
                  "Activate an Alphanet/Zeronet faucet account from the JSON \
                   (file or directly inlined)."
-               json_parameter
+               Client_proto_context.activation_key_encoding
           @@ stop)
-          (fun (force, encrypted) name activation_json cctxt ->
+          (fun (force, encrypted) name activation_key cctxt ->
             let open Lwt_result_syntax in
             let* name = Secret_key.of_fresh cctxt force name in
-            match
-              Data_encoding.Json.destruct
-                Client_proto_context.activation_key_encoding
-                activation_json
-            with
-            | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-                Format.kasprintf
-                  (fun s -> failwith "%s" s)
-                  "Invalid activation file: %a %a"
-                  (fun ppf -> Data_encoding.Json.print_error ppf)
-                  exn
-                  Data_encoding.Json.pp
-                  activation_json
-            | key ->
-                let* _res =
-                  activate_account
-                    cctxt
-                    ~chain:cctxt#chain
-                    ~block:cctxt#block
-                    ?confirmations:cctxt#confirmations
-                    ~encrypted
-                    ~force
-                    key
-                    name
-                in
-                return_unit);
+            let* _res =
+              activate_account
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ?confirmations:cctxt#confirmations
+                ~encrypted
+                ~force
+                activation_key
+                name
+            in
+            return_unit);
       ]
   | Some `Mainnet ->
       [
@@ -1326,7 +1312,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "using"
-      @@ param
+      @@ json_encoded_param
            ~name:"transfers.json"
            ~desc:
              "List of operations originating from the source contract in JSON \
@@ -1335,7 +1321,30 @@ let commands_rw () =
               \"amount\": qty (, <field>: <val> ...) } (, ...) ]', where an \
               optional <field> can either be \"fee\", \"gas-limit\", \
               \"storage-limit\", \"arg\", or \"entrypoint\"."
-           json_parameter
+           ~pp_error:(fun json fmt exn ->
+             match (json, exn) with
+             | `A lj, Data_encoding.Json.Cannot_destruct ([`Index n], exn) ->
+                 Format.fprintf
+                   fmt
+                   "Invalid transfer at index %i: %a %a"
+                   n
+                   (fun ppf -> Data_encoding.Json.print_error ppf)
+                   exn
+                   (Format.pp_print_option Data_encoding.Json.pp)
+                   (List.nth_opt lj n)
+             | _, (Data_encoding.Json.Cannot_destruct _ as exn) ->
+                 Format.fprintf
+                   fmt
+                   "Invalid transfer file: %a %a"
+                   (fun ppf -> Data_encoding.Json.print_error ppf)
+                   exn
+                   Data_encoding.Json.pp
+                   json
+             | _, exn -> raise exn
+             (* this case can't happen because only `Cannot_destruct` error are
+                given to this pp *))
+           (Data_encoding.list
+              Client_proto_context.batch_transfer_operation_encoding)
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -1351,7 +1360,7 @@ let commands_rw () =
              entrypoint,
              replace_by_fees )
            source
-           operations_json
+           operations
            cctxt ->
         (* When --force is used we want to inject the transfer even if it fails.
            In that case we cannot rely on simulation to compute limits and fees
@@ -1382,12 +1391,7 @@ let commands_rw () =
             source
             i
         in
-        match
-          Data_encoding.Json.destruct
-            (Data_encoding.list
-               Client_proto_context.batch_transfer_operation_encoding)
-            operations_json
-        with
+        match operations with
         | [] -> cctxt#error "Empty operation list"
         | operations ->
             let* source =
@@ -1434,33 +1438,7 @@ let commands_rw () =
                 cctxt
                 errors
             in
-            return_unit
-        | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
-          -> (
-            match (path, operations_json) with
-            | [`Index n], `A lj -> (
-                match List.nth_opt lj n with
-                | Some j ->
-                    failwith
-                      "Invalid transfer at index %i: %a %a"
-                      n
-                      (fun ppf -> Data_encoding.Json.print_error ppf)
-                      exn2
-                      Data_encoding.Json.pp
-                      j
-                | _ ->
-                    failwith
-                      "Invalid transfer at index %i: %a"
-                      n
-                      (fun ppf -> Data_encoding.Json.print_error ppf)
-                      exn2)
-            | _ ->
-                failwith
-                  "Invalid transfer file: %a %a"
-                  (fun ppf -> Data_encoding.Json.print_error ppf)
-                  exn
-                  Data_encoding.Json.pp
-                  operations_json));
+            return_unit);
     command
       ~group
       ~desc:"Execute an Epoxy origination operation.\n"
