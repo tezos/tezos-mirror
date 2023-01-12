@@ -296,7 +296,8 @@ val finalize_block : validation_state -> unit tzresult Lwt.t
     However, this function does not check for conflicts with
     previously validated operations, nor global block properties such
     as the respect of the block gas limit. This allows the function to
-    only take an {!info} as input rather than a full {!validation_state}.
+    only take an {!type-info} as input rather than a full
+    {!type-validation_state}.
 
     This function is intended for {!Mempool_validation} exclusively. *)
 val check_operation :

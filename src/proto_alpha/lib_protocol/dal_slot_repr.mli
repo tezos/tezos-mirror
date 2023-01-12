@@ -85,17 +85,17 @@ module Header : sig
       and the slot's index. *)
   type id = {published_level : Raw_level_repr.t; index : Dal_slot_index_repr.t}
 
-  (** For Layer-1, a slot is described by its slot {!id} and the
+  (** For Layer-1, a slot is described by its slot {!type-id} and the
      slot's commitment. *)
   type t = {id : id; commitment : Commitment.t}
 
-  (** encoding for values of type {!id}. *)
+  (** encoding for values of type {!type-id}. *)
   val id_encoding : id Data_encoding.t
 
   (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
 
-  (** pretty-printer for values of type {!id}. *)
+  (** pretty-printer for values of type {!type-id}. *)
   val pp_id : Format.formatter -> id -> unit
 
   (** pretty-printer for values of type {!t}. *)
