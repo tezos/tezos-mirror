@@ -73,7 +73,7 @@ type key
 (** [max_key_length] is the maximum length of a key in bytes. *)
 val max_key_length : int
 
-(** raise @Invalid_key *)
+(** @raise Invalid_key *)
 val key_of_string_exn : string -> key
 
 val key_of_string_opt : string -> key option
