@@ -172,62 +172,6 @@ class TestRawContext:
 
 @pytest.mark.incremental
 class TestRememberContract:
-    @pytest.mark.parametrize(
-        "contract_name,non_originated_contract_address",
-        [
-            ("test", "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"),
-            ("test-2", "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9"),
-        ],
-    )
-    def test_non_originated_contract_no_forcing_not_saved_before(
-        self,
-        client,
-        contract_name,
-        non_originated_contract_address,
-    ):
-        client.remember_contract(contract_name, non_originated_contract_address)
-
-    # As it is always the same client, the contracts have been saved
-    # before
-    @pytest.mark.parametrize(
-        "contract_name,non_originated_contract_address",
-        [
-            ("test", "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"),
-            ("test-2", "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9"),
-        ],
-    )
-    def test_non_originated_contract_with_forcing_and_saved_before(
-        self,
-        client,
-        contract_name,
-        non_originated_contract_address,
-    ):
-        client.remember_contract(
-            contract_name, non_originated_contract_address, force=True
-        )
-
-    # As it is always the same client, the contracts have been saved
-    # before
-    @pytest.mark.parametrize(
-        "contract_name,non_originated_contract_address",
-        [
-            ("test", "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"),
-            ("test-2", "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9"),
-        ],
-    )
-    def test_non_originated_contract_no_forcing_and_saved_before(
-        self,
-        client,
-        contract_name,
-        non_originated_contract_address,
-    ):
-        expected_error = f"The contract alias {contract_name} already exists"
-
-        with assert_run_failure(expected_error):
-            client.remember_contract(
-                contract_name, non_originated_contract_address, force=False
-            )
-
     # Test operation size.
     def test_operation_size_originate_byte_contract(self, client: Client):
         contract = find_script(['opcodes', 'bytes'])

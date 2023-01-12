@@ -260,10 +260,35 @@ module Wallet = struct
         ~error_msg:"Expected %R, got %L") ;
     return ()
 
+  let test_remember_contract =
+    Protocol.register_test
+      ~__FILE__
+      ~tags:["client"; "contract"; "remember"]
+      ~title:"Test remember contract"
+    @@ fun protocol ->
+    let* client = Client.init_mockup ~protocol () in
+    [
+      ("test", "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc");
+      ("test-2", "KT1TZCh8fmUbuDqFxetPWC2fsQanAHzLx4W9");
+    ]
+    |> Lwt_list.iter_s @@ fun (alias, address) ->
+       let* () = Client.remember_contract client ~alias ~address in
+       let* () = Client.remember_contract client ~force:true ~alias ~address in
+       let* () =
+         Client.spawn_remember_contract client ~alias ~address
+         |> Process.check_error
+              ~msg:(rex ("The contract alias " ^ alias ^ " already exists"))
+       in
+       unit
+
   let register_protocol_independent () = test_duplicate_alias ()
+
+  let register protocols = test_remember_contract protocols
 end
 
 let register_protocol_independent () =
   BLS_aggregate_wallet.register_protocol_independent () ;
   BLS_normal_wallet.register_protocol_independent () ;
   Wallet.register_protocol_independent ()
+
+let register ~protocols = Wallet.register protocols
