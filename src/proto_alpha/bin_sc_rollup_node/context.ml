@@ -75,10 +75,8 @@ let istore_hash_to_hash h =
   IStore.Hash.to_raw_string h |> Sc_rollup_context_hash.of_string_exn
 
 let load : type a. a mode -> string -> a raw_index Lwt.t =
- fun mode data_dir ->
+ fun mode path ->
   let open Lwt_syntax in
-  let open Configuration in
-  let path = default_context_dir data_dir in
   let readonly = match mode with Read_only -> true | Read_write -> false in
   let+ repo = IStore.Repo.v (Irmin_pack.config ~readonly path) in
   {path; repo}
