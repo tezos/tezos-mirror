@@ -42,7 +42,7 @@ type t
 (** Because of the shell/protocol separation, cryptographic primitives
    need to be splitted. An interface, called the {!module:Verifier}
    aims to be provided for the economic protocol. The other interface,
-   called the {!module:Builder} is for the shell.
+   called the [Builder] is for the shell.
 
     A [Verifier], as hinted by the name, mainly needs to check
    proofs:
