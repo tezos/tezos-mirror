@@ -45,6 +45,8 @@ type commands =
   | Show_memory of int32 * int
   | Step of eval_step
   | Load_inputs
+  | Reveal_preimage of string option
+  | Reveal_metadata
   | Unknown of string
   | Stop
 
@@ -76,25 +78,69 @@ let parse_commands s =
     | ["step"; step] -> (
         match parse_eval_step step with Some s -> Step s | None -> Unknown s)
     | ["load"; "inputs"] -> Load_inputs
+    | ["reveal"; "preimage"] -> Reveal_preimage None
+    | ["reveal"; "preimage"; hex_encoded_preimage] ->
+        Reveal_preimage (Some hex_encoded_preimage)
+    | ["reveal"; "metadata"] -> Reveal_metadata
     | ["stop"] -> Stop
     | _ -> Unknown s
   in
   go command
 
-let reveal_builtins =
+let build_metadata config =
+  Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Metadata.(
+    {
+      address = config.Config.destination;
+      origination_level =
+        Tezos_protocol_alpha.Protocol.Alpha_context.Raw_level.of_int32_exn 0l;
+    }
+    |> Data_encoding.Binary.to_string_exn encoding)
+
+let reveal_preimage_manually retries hash =
+  let open Lwt_syntax in
+  let* () = Lwt_io.printf "Preimage for hash %s not found.\n%!" hash in
+  let rec input_preimage retries : string Lwt.t =
+    if retries <= 0 then Stdlib.failwith "Too much retry, aborting"
+    else
+      let* () = Lwt_io.printf "> " in
+      let* input =
+        Lwt.catch
+          (fun () ->
+            let* i = Lwt_io.read_line Lwt_io.stdin in
+            return_some i)
+          (fun _ -> return_none)
+      in
+      match Option.bind input (fun bytes -> Hex.to_string (`Hex bytes)) with
+      | Some preimage -> Lwt.return preimage
+      | None ->
+          let* () =
+            Lwt_io.printf
+              "Error: the preimage is not a valid hexadecimal value.\n%!"
+          in
+          input_preimage (pred retries)
+  in
+  input_preimage retries
+
+let reveal_preimage_builtin retries hash =
+  let (`Hex hex) = Hex.of_string hash in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
+     Let the user override this hardcoded value. *)
+  Lwt.catch
+    (fun () ->
+      let path = "preimages/" ^ hex in
+      let ch = open_in path in
+      let s = really_input_string ch (in_channel_length ch) in
+      close_in ch ;
+      Lwt.return s)
+    (fun _ -> reveal_preimage_manually retries hex)
+
+let reveal_builtins config =
   Tezos_scoru_wasm.Builtins.
     {
-      reveal_preimage =
-        (fun hash ->
-          let (`Hex hex) = Hex.of_string hash in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
-             Let the user override this hardcoded value. *)
-          let path = "preimages/" ^ hex in
-          let ch = open_in path in
-          let s = really_input_string ch (in_channel_length ch) in
-          close_in ch ;
-          Lwt.return s);
-      reveal_metadata = (fun () -> Lwt.return "not implemented yet");
+      (* We retry 3 times to reveal the preimage manually, this should be
+         configurable at some point. *)
+      reveal_preimage = reveal_preimage_builtin 3;
+      reveal_metadata = (fun () -> Lwt.return (build_metadata config));
     }
 
 let write_debug =
@@ -111,17 +157,19 @@ let compute_step tree =
 (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
-let eval_to_result tree = trap_exn (fun () -> eval_to_result tree)
+let eval_to_result config tree =
+  trap_exn (fun () ->
+      eval_to_result ~write_debug ~reveal_builtins:(reveal_builtins config) tree)
 
 (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
    starts a new one if already at snapshot point). *)
-let eval_kernel_run tree =
+let eval_kernel_run config tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
       let* tree, _ =
         Wasm_fast.compute_step_many
-          ~reveal_builtins
+          ~reveal_builtins:(reveal_builtins config)
           ~write_debug
           ~stop_at_snapshot:true
           ~max_steps:Int64.max_int
@@ -132,14 +180,14 @@ let eval_kernel_run tree =
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
 (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-let eval_until_input_requested tree =
+let eval_until_input_requested config tree =
   let open Lwt_syntax in
   trap_exn (fun () ->
       let* info_before = Wasm.get_info tree in
       let* tree =
         eval_until_input_requested
           ~fast_exec:true
-          ~reveal_builtins:(Some reveal_builtins)
+          ~reveal_builtins:(Some (reveal_builtins config))
           ~write_debug
           ~max_steps:Int64.max_int
           tree
@@ -149,11 +197,11 @@ let eval_until_input_requested tree =
         Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick ))
 
 (* Eval dispatcher. *)
-let eval = function
+let eval config = function
   | Tick -> compute_step
-  | Result -> eval_to_result
-  | Kernel_run -> eval_kernel_run
-  | Inbox -> eval_until_input_requested
+  | Result -> eval_to_result config
+  | Kernel_run -> eval_kernel_run config
+  | Inbox -> eval_until_input_requested config
 
 let set_raw_message_input_step level counter encoded_message tree =
   Wasm.set_input_step (input_info level counter) encoded_message tree
@@ -228,9 +276,9 @@ let show_status tree =
 
 (* [step kind tree] evals according to the step kind and prints the number of
    ticks elapsed and the new status. *)
-let step kind tree =
+let step config kind tree =
   let open Lwt_result_syntax in
-  let* tree, ticks = eval kind tree in
+  let* tree, ticks = eval config kind tree in
   let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
   let*! () = show_status tree in
   return tree
@@ -380,9 +428,43 @@ let show_memory tree address length =
             state
       | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
+(* [reveal_preimage hex tree] checks the current state is waiting for a
+   preimage, parses [hex] as an hexadecimal representation of the data or use
+   the builtin if none is given, and does a reveal step. *)
+let reveal_preimage bytes tree =
+  let open Lwt_syntax in
+  let* info = Wasm.get_info tree in
+  match
+    ( info.Tezos_scoru_wasm.Wasm_pvm_state.input_request,
+      Option.bind bytes (fun bytes -> Hex.to_bytes (`Hex bytes)) )
+  with
+  | ( Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required (Reveal_raw_data _)),
+      Some preimage ) ->
+      Wasm.reveal_step preimage tree
+  | Reveal_required (Reveal_raw_data hash), None ->
+      Lwt.catch
+        (fun () ->
+          let* preimage = reveal_preimage_builtin 1 hash in
+          Wasm.reveal_step (String.to_bytes preimage) tree)
+        (fun _ -> return tree)
+  | _ ->
+      let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
+      tree
+
+let reveal_metadata config tree =
+  let open Lwt_syntax in
+  let* info = Wasm.get_info tree in
+  match info.Tezos_scoru_wasm.Wasm_pvm_state.input_request with
+  | Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required Reveal_metadata) ->
+      let data = build_metadata config in
+      Wasm.reveal_step (Bytes.of_string data) tree
+  | _ ->
+      let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
+      tree
+
 (* [handle_command command tree inboxes level] dispatches the commands to their
    actual implementation. *)
-let handle_command c tree inboxes level =
+let handle_command c config tree inboxes level =
   let open Lwt_result_syntax in
   let command = parse_commands c in
   let return ?(tree = tree) () = return (tree, inboxes, level) in
@@ -402,7 +484,7 @@ let handle_command c tree inboxes level =
         let*! () = show_status tree in
         return ()
     | Step kind ->
-        let* tree = step kind tree in
+        let* tree = step config kind tree in
         return ~tree ()
     | Show_inbox ->
         let*! () = show_inbox tree in
@@ -419,6 +501,12 @@ let handle_command c tree inboxes level =
     | Show_memory (address, length) ->
         let*! () = show_memory tree address length in
         return ()
+    | Reveal_preimage bytes ->
+        let*! tree = reveal_preimage bytes tree in
+        return ~tree ()
+    | Reveal_metadata ->
+        let*! tree = reveal_metadata config tree in
+        return ~tree ()
     | Unknown s ->
         let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
         return ()
