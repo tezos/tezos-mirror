@@ -627,6 +627,12 @@ end
    reduce the import time. *)
 let default_index_log_size = 30_000_000
 
+let snapshot_rw_file_perm = 0o644
+
+let snapshot_ro_file_perm = 0o444
+
+let snapshot_dir_perm = 0o755
+
 module Snapshot_metadata = struct
   type metadata = {
     chain_name : Distributed_db_version.Name.t;
@@ -1139,7 +1145,9 @@ end = struct
 
   let open_out ~file =
     let open Lwt_syntax in
-    let* fd = Lwt_unix.openfile file Unix.[O_WRONLY; O_CREAT] 0o777 in
+    let* fd =
+      Lwt_unix.openfile file Unix.[O_WRONLY; O_CREAT] snapshot_rw_file_perm
+    in
     let data_pos = Int64.of_int Header.length in
     let* _ = Lwt_unix.LargeFile.lseek fd data_pos SEEK_SET in
     Lwt.return {current_pos = 0L; data_pos; fd}
@@ -1266,7 +1274,7 @@ end = struct
 
   let add_file_and_finalize tar ~file ~filename =
     let open Lwt_syntax in
-    let* fd = Lwt_unix.openfile file [Unix.O_RDONLY] 0o777 in
+    let* fd = Lwt_unix.openfile file [Unix.O_RDONLY] snapshot_ro_file_perm in
     let* stat = Lwt_unix.LargeFile.fstat fd in
     let file_size = stat.st_size in
     let* () = copy_n fd tar.fd file_size in
@@ -1342,7 +1350,7 @@ end = struct
 
   let open_in ~file =
     let open Lwt_syntax in
-    let* fd = Lwt_unix.openfile file Unix.[O_RDONLY] 0o444 in
+    let* fd = Lwt_unix.openfile file Unix.[O_RDONLY] snapshot_ro_file_perm in
     let data_pos = Int64.of_int Header.length in
     let files = None in
     Lwt.return {current_pos = 0L; data_pos; fd; files}
@@ -1481,7 +1489,12 @@ end = struct
   let copy_to_file tar {header; data_ofs} ~dst =
     let open Lwt_syntax in
     let* _ = Lwt_unix.LargeFile.lseek tar.fd data_ofs SEEK_SET in
-    let* fd = Lwt_unix.openfile dst Unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o644 in
+    let* fd =
+      Lwt_unix.openfile
+        dst
+        Unix.[O_WRONLY; O_CREAT; O_TRUNC]
+        snapshot_rw_file_perm
+    in
     Lwt.finalize
       (fun () -> copy_n tar.fd fd header.Tar.Header.file_size)
       (fun () -> Lwt_unix.close fd)
@@ -1546,11 +1559,17 @@ module Raw_exporter : EXPORTER = struct
     in
     let* () = ensure_valid_export_path snapshot_dir in
     let* () = ensure_valid_tmp_snapshot_path snapshot_tmp_dir in
-    let*! () = Lwt_unix.mkdir (Naming.dir_path snapshot_tmp_dir) 0o755 in
+    let*! () =
+      Lwt_unix.mkdir (Naming.dir_path snapshot_tmp_dir) snapshot_dir_perm
+    in
     let snapshot_cemented_dir = Naming.cemented_blocks_dir snapshot_tmp_dir in
-    let*! () = Lwt_unix.mkdir (Naming.dir_path snapshot_cemented_dir) 0o755 in
+    let*! () =
+      Lwt_unix.mkdir (Naming.dir_path snapshot_cemented_dir) snapshot_dir_perm
+    in
     let snapshot_protocol_dir = Naming.protocol_store_dir snapshot_tmp_dir in
-    let*! () = Lwt_unix.mkdir (Naming.dir_path snapshot_protocol_dir) 0o755 in
+    let*! () =
+      Lwt_unix.mkdir (Naming.dir_path snapshot_protocol_dir) snapshot_dir_perm
+    in
     let version_file =
       Naming.snapshot_version_file snapshot_tmp_dir |> Naming.file_path
     in
@@ -1585,7 +1604,12 @@ module Raw_exporter : EXPORTER = struct
     let file =
       Naming.(snapshot_block_data_file t.snapshot_tmp_dir |> file_path)
     in
-    let* fd = Lwt_unix.openfile file Unix.[O_CREAT; O_TRUNC; O_WRONLY] 0o444 in
+    let* fd =
+      Lwt_unix.openfile
+        file
+        Unix.[O_CREAT; O_TRUNC; O_WRONLY]
+        snapshot_rw_file_perm
+    in
     Lwt.finalize
       (fun () -> Lwt_utils_unix.write_bytes fd bytes)
       (fun () -> Lwt_unix.close fd)
@@ -1686,7 +1710,10 @@ module Raw_exporter : EXPORTER = struct
       Naming.(snapshot_floating_blocks_file t.snapshot_tmp_dir |> file_path)
     in
     let* fd =
-      Lwt_unix.openfile floating_file Unix.[O_CREAT; O_TRUNC; O_WRONLY] 0o444
+      Lwt_unix.openfile
+        floating_file
+        Unix.[O_CREAT; O_TRUNC; O_WRONLY]
+        snapshot_rw_file_perm
     in
     Lwt.finalize (fun () -> f fd) (fun () -> Lwt_unix.close fd)
 
@@ -1697,7 +1724,7 @@ module Raw_exporter : EXPORTER = struct
         Naming.(
           snapshot_protocol_levels_file t.snapshot_tmp_dir |> encoded_file_path)
         Unix.[O_CREAT; O_TRUNC; O_WRONLY]
-        0o444
+        snapshot_rw_file_perm
     in
     Lwt.finalize (fun () -> f fd) (fun () -> Lwt_unix.close fd)
 
@@ -1774,7 +1801,9 @@ module Tar_exporter : EXPORTER = struct
     in
     let* () = ensure_valid_export_path snapshot_file in
     let* () = ensure_valid_tmp_snapshot_path snapshot_tmp_dir in
-    let*! () = Lwt_unix.mkdir (Naming.dir_path snapshot_tmp_dir) 0o755 in
+    let*! () =
+      Lwt_unix.mkdir (Naming.dir_path snapshot_tmp_dir) snapshot_dir_perm
+    in
     let snapshot_tmp_cemented_dir =
       Naming.cemented_blocks_dir snapshot_tmp_dir
     in
@@ -2597,13 +2626,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         Lwt_unix.openfile
           (Naming.file_path ro_floating_blocks)
           [Unix.O_RDONLY]
-          0o444
+          snapshot_ro_file_perm
       in
       let*! rw_fd =
         Lwt_unix.openfile
           (Naming.file_path rw_floating_blocks)
           [Unix.O_RDONLY]
-          0o644
+          snapshot_rw_file_perm
       in
       Lwt.catch
         (fun () ->
@@ -3151,7 +3180,10 @@ module Raw_importer : IMPORTER = struct
       Lwt.catch
         (fun () ->
           let*! fd =
-            Lwt_unix.openfile context_file_path Lwt_unix.[O_RDONLY] 0o444
+            Lwt_unix.openfile
+              context_file_path
+              Lwt_unix.[O_RDONLY]
+              snapshot_ro_file_perm
           in
           return fd)
         (function
@@ -3350,7 +3382,12 @@ module Raw_importer : IMPORTER = struct
     if not (Sys.file_exists floating_blocks_file) then
       return (return_unit, Lwt_stream.of_list [])
     else
-      let*! fd = Lwt_unix.openfile floating_blocks_file Unix.[O_RDONLY] 0o444 in
+      let*! fd =
+        Lwt_unix.openfile
+          floating_blocks_file
+          Unix.[O_RDONLY]
+          snapshot_ro_file_perm
+      in
       let stream, bounded_push = Lwt_stream.create_bounded 1000 in
       let rec loop ?pred_block nb_bytes_left =
         if nb_bytes_left < 0 then tzfail Corrupted_floating_store
@@ -3483,9 +3520,9 @@ module Tar_importer : IMPORTER = struct
 
   let restore_context t ~dst_context_dir =
     let open Lwt_result_syntax in
-    let*! () = Lwt_unix.mkdir dst_context_dir 0o755 in
+    let*! () = Lwt_unix.mkdir dst_context_dir snapshot_dir_perm in
     let index = Filename.concat dst_context_dir "index" in
-    let*! () = Lwt_unix.mkdir index 0o755 in
+    let*! () = Lwt_unix.mkdir index snapshot_dir_perm in
     let*! context_files =
       Onthefly.find_files_with_common_path t.tar ~pattern:"context"
     in
@@ -3655,12 +3692,18 @@ module Tar_importer : IMPORTER = struct
       let hash_index_dir =
         Naming.(cemented_blocks_hash_index_dir t.dst_cemented_dir |> dir_path)
       in
-      let* () = Lwt_unix.mkdir level_index_dir 0o755 in
-      let* () = Lwt_unix.mkdir hash_index_dir 0o755 in
+      let* () = Lwt_unix.mkdir level_index_dir snapshot_dir_perm in
+      let* () = Lwt_unix.mkdir hash_index_dir snapshot_dir_perm in
       let* () =
-        Lwt_unix.mkdir Filename.(concat level_index_dir "index") 0o755
+        Lwt_unix.mkdir
+          Filename.(concat level_index_dir "index")
+          snapshot_dir_perm
       in
-      let* () = Lwt_unix.mkdir Filename.(concat hash_index_dir "index") 0o755 in
+      let* () =
+        Lwt_unix.mkdir
+          Filename.(concat hash_index_dir "index")
+          snapshot_dir_perm
+      in
       List.iter_s
         (fun file ->
           Onthefly.copy_to_file
@@ -4113,7 +4156,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     (* Create directories *)
     let*! () =
       List.iter_s
-        (Lwt_utils_unix.create_dir ~perm:0o755)
+        (Lwt_utils_unix.create_dir ~perm:snapshot_dir_perm)
         [
           Naming.dir_path dst_store_dir;
           Naming.dir_path dst_protocol_dir;
