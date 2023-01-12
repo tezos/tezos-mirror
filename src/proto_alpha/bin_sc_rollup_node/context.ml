@@ -62,22 +62,17 @@ type ro = [`Read] t
 
 type commit = IStore.commit
 
-type hash = IStore.hash
+type hash = Sc_rollup_context_hash.t
 
 type path = string list
 
-let hash_encoding =
-  let open Data_encoding in
-  conv
-    (fun h -> IStore.Hash.to_raw_string h |> Bytes.unsafe_of_string)
-    (fun b -> Bytes.unsafe_to_string b |> IStore.Hash.unsafe_of_raw_string)
-    (Fixed.bytes IStore.Hash.hash_size)
+let () = assert (Sc_rollup_context_hash.size = IStore.Hash.hash_size)
 
-let hash_to_raw_string = IStore.Hash.to_raw_string
+let hash_to_istore_hash h =
+  Sc_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
-let pp_hash fmt h =
-  IStore.Hash.to_raw_string h
-  |> Hex.of_string |> Hex.show |> Format.pp_print_string fmt
+let istore_hash_to_hash h =
+  IStore.Hash.to_raw_string h |> Sc_rollup_context_hash.of_string_exn
 
 let load : type a. a mode -> string -> a raw_index Lwt.t =
  fun mode data_dir ->
@@ -99,11 +94,11 @@ let raw_commit ?(message = "") index tree =
 let commit ?message ctxt =
   let open Lwt_syntax in
   let+ commit = raw_commit ?message ctxt.index ctxt.tree in
-  IStore.Commit.hash commit
+  IStore.Commit.hash commit |> istore_hash_to_hash
 
 let checkout index key =
   let open Lwt_syntax in
-  let* o = IStore.Commit.of_hash index.repo key in
+  let* o = IStore.Commit.of_hash index.repo (hash_to_istore_hash key) in
   match o with
   | None -> return_none
   | Some commit ->

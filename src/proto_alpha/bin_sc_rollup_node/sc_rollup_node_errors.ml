@@ -38,7 +38,8 @@ type error +=
       inbox : Sc_rollup.Inbox.t;
     }
   | Missing_PVM_state of Tezos_crypto.Block_hash.t * Int32.t
-  | Cannot_checkout_context of Tezos_crypto.Block_hash.t * string option
+  | Cannot_checkout_context of
+      Tezos_crypto.Block_hash.t * Sc_rollup_context_hash.t option
   | No_batcher
 
 type error +=
@@ -190,14 +191,14 @@ let () =
         "The context %sfor block %a cannot be checkouted"
         (Option.fold
            ~none:""
-           ~some:(fun c -> Hex.(show (of_string c)))
+           ~some:Sc_rollup_context_hash.to_b58check
            context_hash)
         Tezos_crypto.Block_hash.pp
         block)
     Data_encoding.(
       obj2
         (req "block" Tezos_crypto.Block_hash.encoding)
-        (opt "context" (conv Bytes.of_string Bytes.to_string bytes)))
+        (opt "context" Sc_rollup_context_hash.encoding))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)

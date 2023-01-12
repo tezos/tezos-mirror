@@ -155,7 +155,7 @@ let checkout_context node_ctxt block_hash =
   | None ->
       tzfail
         (Sc_rollup_node_errors.Cannot_checkout_context
-           (block_hash, Some (Context.hash_to_raw_string context_hash)))
+           (block_hash, Some context_hash))
   | Some ctxt -> return ctxt
 
 let metadata node_ctxt =

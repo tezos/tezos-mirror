@@ -49,20 +49,10 @@ type ro = [`Read] t
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!commit} hash. *)
-type hash
+type hash = Sc_rollup_context_hash.t
 
 (** The type of commits for the context. *)
 type commit
-
-(** [hash_encoding] is the encoding for context hashes, of type {!hash}. *)
-val hash_encoding : hash Data_encoding.t
-
-(** [hash_to_raw_string h] is the raw string representation for the hash [h]. *)
-val hash_to_raw_string : hash -> string
-
-(** [pp_hash fmt h] prints the hash [h] in hexadecimal notation on the formatter
-    [fmt]. *)
-val pp_hash : Format.formatter -> hash -> unit
 
 (** [load data_dir] initializes from disk a context using the [data_dir]. *)
 val load : 'a mode -> string -> 'a index Lwt.t
