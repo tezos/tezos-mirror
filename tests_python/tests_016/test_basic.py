@@ -15,34 +15,6 @@ class TestRawContext:
     def test_bake(self, client: Client):
         utils.bake(client, 'bootstrap4')
 
-    def test_originate_contract_noop(self, client: Client):
-        contract = find_script(['opcodes', 'noop'])
-        client.remember('noop', contract)
-        client.typecheck(contract)
-        client.originate(
-            'noop', 1000, 'bootstrap1', contract, ['--burn-cap', '0.295']
-        )
-        utils.bake(client)
-
-    def test_transfer_to_noop(self, client: Client):
-        client.transfer(10, 'bootstrap1', 'noop', ['--arg', 'Unit'])
-        utils.bake(client)
-
-    def test_contract_hardlimit(self, client: Client):
-        contract = find_script(['mini_scenarios', 'hardlimit'])
-        client.originate(
-            'hardlimit',
-            1000,
-            'bootstrap1',
-            contract,
-            ['--init', '3', '--burn-cap', '0.341'],
-        )
-        utils.bake(client)
-        client.transfer(10, 'bootstrap1', 'hardlimit', ['--arg', 'Unit'])
-        utils.bake(client)
-        client.transfer(10, 'bootstrap1', 'hardlimit', ['--arg', 'Unit'])
-        utils.bake(client)
-
     def test_activate_accounts(self, client: Client, session):
         account = f"{ACCOUNT_PATH}/king_commitment.json"
         session['keys'] += ['king', 'queen']
