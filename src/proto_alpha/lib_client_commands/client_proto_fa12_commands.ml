@@ -49,12 +49,13 @@ let amount_param () =
   Tezos_clic.param
     ~name:"amount"
     ~desc:"number of tokens"
-    (Tezos_clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
          try
            let v = Z.of_string s in
            assert (Compare.Z.(v >= Z.zero)) ;
            Lwt_result_syntax.return v
-         with _ -> failwith "invalid amount (must be a non-negative number)"))
+         with _ ->
+           cctxt#error "invalid amount (must be a non-negative number)"))
 
 let tez_amount_arg =
   tez_arg ~default:"0" ~parameter:"tez-amount" ~doc:"amount in \xEA\x9C\xA9"
@@ -112,11 +113,12 @@ let view_options =
 let dummy_callback =
   Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero
 
-let get_contract_caller_keys cctxt (caller : Contract.t) =
+let get_contract_caller_keys (cctxt : #Client_context.full)
+    (caller : Contract.t) =
   let open Lwt_result_syntax in
   match caller with
   | Originated _ ->
-      failwith "only implicit accounts can be the source of a contract call"
+      cctxt#error "only implicit accounts can be the source of a contract call"
   | Implicit source ->
       let* _, caller_pk, caller_sk = Client_keys.get_key cctxt source in
       return (source, caller_pk, caller_sk)
@@ -634,7 +636,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
               operations_json
           with
-          | [] -> failwith "Empty operation list"
+          | [] -> cctxt#error "Empty operation list"
           | operations ->
               let* source, src_pk, src_sk =
                 get_contract_caller_keys cctxt caller

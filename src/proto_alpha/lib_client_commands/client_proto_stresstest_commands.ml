@@ -386,7 +386,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
   let rec loop () : unit tzresult Lwt.t =
     let*! block_hash_and_header = Lwt_stream.get heads_stream in
     match block_hash_and_header with
-    | None -> Error_monad.failwith "unexpected end of block stream@."
+    | None -> cctxt#error "unexpected end of block stream@."
     | Some ((new_block_hash, _block_header) as block_hash_and_header) ->
         Lwt.catch
           (fun () ->
@@ -420,7 +420,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
               in
               return_unit)
           (fun exn ->
-            Error_monad.failwith
+            cctxt#error
               "An exception occurred on a function bound on new heads : %s@."
               (Printexc.to_string exn))
   in
@@ -998,11 +998,11 @@ let strategy_arg =
 let gas_limit_arg =
   let open Tezos_clic in
   let gas_limit_kind =
-    parameter (fun _ s ->
+    parameter (fun (cctxt : #Client_context.full) s ->
         try
           let v = Z.of_string s in
           Lwt_result_syntax.return (Gas.Arith.integral_exn v)
-        with _ -> failwith "invalid gas limit (must be a positive number)")
+        with _ -> cctxt#error "invalid gas limit (must be a positive number)")
   in
   arg
     ~long:"gas-limit"
@@ -1019,13 +1019,14 @@ let gas_limit_arg =
 let storage_limit_arg =
   let open Tezos_clic in
   let storage_limit_kind =
-    parameter (fun _ s ->
+    parameter (fun (cctxt : #Client_context.full) s ->
         try
           let v = Z.of_string s in
           assert (Compare.Z.(v >= Z.zero)) ;
           Lwt_result_syntax.return v
         with _ ->
-          failwith "invalid storage limit (must be a positive number of bytes)")
+          cctxt#error
+            "invalid storage limit (must be a positive number of bytes)")
   in
   arg
     ~long:"storage-limit"
@@ -1538,12 +1539,12 @@ let source_key_arg =
     ~desc:
       "Source key public key hash from which the tokens will be transferred to \
        start the funding."
-    (parameter (fun _ s ->
+    (parameter (fun (cctxt : #Client_context.full) s ->
          let r = Tezos_crypto.Signature.Public_key_hash.of_b58check s in
          match r with
          | Ok pkh -> Lwt_result_syntax.return pkh
          | Error e ->
-             failwith
+             cctxt#error
                "Cannot read public key hash: %a"
                Error_monad.pp_print_trace
                e))
@@ -1557,11 +1558,11 @@ let batch_size_arg =
       "Maximum number of operations that can be put into a single batch (250 \
        by default)"
     ~default:"250"
-    (parameter (fun _ s ->
+    (parameter (fun (cctxt : #Client_context.full) s ->
          match int_of_string_opt s with
          | Some i when i > 0 -> Lwt_result_syntax.return i
-         | Some _ -> failwith "Integer must be positive."
-         | None -> failwith "Cannot read integer"))
+         | Some _ -> cctxt#error "Integer must be positive."
+         | None -> cctxt#error "Cannot read integer"))
 
 let batches_per_block_arg =
   let open Tezos_clic in
@@ -1572,11 +1573,11 @@ let batches_per_block_arg =
       "Maximum number of batches that can be put into a single block (100 by \
        default)"
     ~default:"100"
-    (parameter (fun _ s ->
+    (parameter (fun (cctxt : #Client_context.full) s ->
          match int_of_string_opt s with
          | Some i when i > 0 -> Lwt_result_syntax.return i
-         | Some _ -> failwith "Integer must be positive."
-         | None -> failwith "Cannot read integer"))
+         | Some _ -> cctxt#error "Integer must be positive."
+         | None -> cctxt#error "Cannot read integer"))
 
 let initial_amount_arg =
   let open Tezos_clic in
@@ -1587,14 +1588,14 @@ let initial_amount_arg =
       "Number of token, in μtz, that will be funded on each of the accounts to \
        fund (1 by default)"
     ~default:"1_000_000"
-    (parameter (fun _ s ->
+    (parameter (fun (cctxt : #Client_context.full) s ->
          match Int64.of_string_opt s with
          | Some i when i > 0L -> (
              try Lwt_result_syntax.return (Tez.of_mutez_exn i)
              with e ->
-               failwith "Cannot convert to Tez.t:%s" (Printexc.to_string e))
-         | Some _ -> failwith "Integer must be positive."
-         | None -> failwith "Cannot read integer"))
+               cctxt#error "Cannot convert to Tez.t:%s" (Printexc.to_string e))
+         | Some _ -> cctxt#error "Integer must be positive."
+         | None -> cctxt#error "Cannot read integer"))
 
 (* Monitors the node's head to inject transaction batches. *)
 let inject_batched_txs cctxt (source_pkh, source_pk, source_sk)
@@ -1884,7 +1885,7 @@ let fund_accounts_from_source : Protocol_client_context.full Tezos_clic.command
       let* () =
         let req_balance = Tez.mul_exn starter_initial_amount nb_starters in
         if Tez.(source_balance < req_balance) then
-          failwith
+          cctxt#error
             "Not enough funds to init starter accounts: %a are needed, only %a \
              is available on %a@."
             Tez.pp

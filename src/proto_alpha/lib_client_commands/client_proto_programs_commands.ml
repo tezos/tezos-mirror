@@ -135,10 +135,10 @@ let commands () =
     param ~name ~desc Client_proto_args.bytes_parameter
   in
   let signature_parameter =
-    parameter (fun _cctxt s ->
+    parameter (fun (cctxt : #Client_context.full) s ->
         match Tezos_crypto.Signature.of_b58check_opt s with
         | Some s -> Lwt_result_syntax.return s
-        | None -> failwith "Not given a valid signature")
+        | None -> cctxt#error "Not given a valid signature")
   in
   let convert_input_format_param =
     let open Lwt_result_syntax in
@@ -147,13 +147,13 @@ let commands () =
       ~desc:"format of the input for conversion"
       (parameter
          ~autocomplete:(fun _ -> return ["michelson"; "json"; "binary"])
-         (fun _ s ->
+         (fun (cctxt : #Client_context.full) s ->
            match String.lowercase_ascii s with
            | "michelson" -> return `Michelson
            | "json" -> return `JSON
            | "binary" -> return `Binary
            | _ ->
-               failwith
+               cctxt#error
                  "invalid input format, expecting one of \"michelson\", \
                   \"json\" or \"binary\"."))
   in
@@ -165,14 +165,14 @@ let commands () =
       (parameter
          ~autocomplete:(fun _ ->
            return ["michelson"; "json"; "binary"; "ocaml"])
-         (fun _ s ->
+         (fun (cctxt : #Client_context.full) s ->
            match String.lowercase_ascii s with
            | "michelson" -> return `Michelson
            | "json" -> return `JSON
            | "binary" -> return `Binary
            | "ocaml" -> return `OCaml
            | _ ->
-               failwith
+               cctxt#error
                  "invalid output format, expecting one of \"michelson\", \
                   \"json\", \"binary\" or \"ocaml\"."))
   in
@@ -595,7 +595,7 @@ let commands () =
         let open Lwt_result_syntax in
         let* () =
           if Bytes.get bytes 0 != '\005' then
-            failwith
+            cctxt#error
               "Not a piece of packed Michelson data (must start with `0x05`)"
           else return_unit
         in
@@ -606,7 +606,7 @@ let commands () =
             Alpha_context.Script.expr_encoding
             bytes
         with
-        | None -> failwith "Could not decode bytes"
+        | None -> cctxt#error "Could not decode bytes"
         | Some expr ->
             let*! () =
               cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
@@ -900,13 +900,13 @@ let commands () =
                   safe_decode_json cctxt Alpha_context.Script.expr_encoding json
               )
           | `Binary -> (
-              let* bytes = bytes_of_prefixed_string expr_string in
+              let* bytes = bytes_of_prefixed_string cctxt expr_string in
               match
                 Data_encoding.Binary.of_bytes_opt
                   Alpha_context.Script.expr_encoding
                   bytes
               with
-              | None -> failwith "Could not decode bytes"
+              | None -> cctxt#error "Could not decode bytes"
               | Some expr -> return expr)
         in
         let output =
@@ -965,7 +965,7 @@ let commands () =
           in
           match r with
           | Error errs ->
-              failwith
+              cctxt#error
                 "%a"
                 (Michelson_v1_error_reporter.report_errors
                    ~details:false
@@ -1000,13 +1000,13 @@ let commands () =
                   | None -> return expr
                   | Some ty -> typecheck_expr ~expr ~ty))
           | `Binary -> (
-              let* bytes = bytes_of_prefixed_string data_string in
+              let* bytes = bytes_of_prefixed_string cctxt data_string in
               match
                 Data_encoding.Binary.of_bytes_opt
                   Alpha_context.Script.expr_encoding
                   bytes
               with
-              | None -> failwith "Could not decode bytes"
+              | None -> cctxt#error "Could not decode bytes"
               | Some expr -> (
                   match data_ty with
                   | None -> return expr

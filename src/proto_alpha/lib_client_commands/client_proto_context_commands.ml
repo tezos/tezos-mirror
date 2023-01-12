@@ -77,9 +77,9 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> return_some data
 
 let block_hash_param =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try Lwt_result_syntax.return (Tezos_crypto.Block_hash.of_b58check_exn s)
-      with _ -> failwith "Parameter '%s' is an invalid block hash" s)
+      with _ -> cctxt#error "Parameter '%s' is an invalid block hash" s)
 
 let group =
   {
@@ -92,19 +92,19 @@ let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 let binary_description =
   {Tezos_clic.name = "description"; title = "Binary Description"}
 
-let tez_of_string_exn index field s =
+let tez_of_string_exn (cctxt : #Client_context.full) index field s =
   let open Lwt_result_syntax in
   match Tez.of_string s with
   | Some t -> return t
   | None ->
-      failwith
+      cctxt#error
         "Invalid \xEA\x9C\xA9 notation at entry %i, field \"%s\": %s"
         index
         field
         s
 
-let tez_of_opt_string_exn index field s =
-  Option.map_es (tez_of_string_exn index field) s
+let tez_of_opt_string_exn (cctxt : #Client_context.full) index field s =
+  Option.map_es (tez_of_string_exn cctxt index field) s
 
 let check_smart_contract = Managed_contract.check_smart_contract
 
@@ -606,9 +606,9 @@ let commands_ro () =
       @@ param
            ~name:"operation"
            ~desc:"Operation to be looked up"
-           (parameter (fun _ x ->
+           (parameter (fun (cctxt : #Client_context.full) x ->
                 match Tezos_crypto.Operation_hash.of_b58check_opt x with
-                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | None -> cctxt#error "Invalid operation hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ stop)
       (fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
@@ -960,8 +960,8 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
       cctxt
       batch.destination
   in
-  let* amount = tez_of_string_exn index "amount" batch.amount in
-  let* batch_fee = tez_of_opt_string_exn index "fee" batch.fee in
+  let* amount = tez_of_string_exn cctxt index "amount" batch.amount in
+  let* batch_fee = tez_of_opt_string_exn cctxt index "fee" batch.fee in
   let fee = Option.either batch_fee fee in
   let arg = Option.either batch.arg arg in
   let gas_limit = Option.either batch.gas_limit gas_limit in
@@ -1055,12 +1055,12 @@ let commands_network network () =
           @@ Public_key_hash.alias_param @@ prefixes ["with"]
           @@ param
                ~name:"code"
-               (Tezos_clic.parameter (fun _ctx code ->
+               (Tezos_clic.parameter (fun (cctxt : #Client_context.full) code ->
                     match
                       Blinded_public_key_hash.activation_code_of_hex code
                     with
                     | Some c -> Lwt_result_syntax.return c
-                    | None -> failwith "Hexadecimal parsing failure"))
+                    | None -> cctxt#error "Hexadecimal parsing failure"))
                ~desc:"Activation code obtained from the Tezos foundation."
           @@ stop)
           (fun dry_run (name, _pkh) code cctxt ->
@@ -1388,7 +1388,7 @@ let commands_rw () =
                Client_proto_context.batch_transfer_operation_encoding)
             operations_json
         with
-        | [] -> failwith "Empty operation list"
+        | [] -> cctxt#error "Empty operation list"
         | operations ->
             let* source =
               match source with
@@ -2120,9 +2120,9 @@ let commands_rw () =
       @@ param
            ~name:"operation"
            ~desc:"Operation to be included"
-           (parameter (fun _ x ->
+           (parameter (fun (cctxt : #Client_context.full) x ->
                 match Tezos_crypto.Operation_hash.of_b58check_opt x with
-                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | None -> cctxt#error "Invalid operation hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ prefixes ["to"; "be"; "included"]
       @@ stop)
@@ -2160,10 +2160,9 @@ let commands_rw () =
            (param
               ~name:"proposal"
               ~desc:"the protocol hash proposal to be submitted"
-              (parameter (fun _ x ->
+              (parameter (fun (cctxt : #Client_context.full) x ->
                    match Tezos_crypto.Protocol_hash.of_b58check_opt x with
-                   | None ->
-                       Error_monad.failwith "Invalid proposal hash: '%s'" x
+                   | None -> cctxt#error "Invalid proposal hash: '%s'" x
                    | Some hash -> Lwt_result_syntax.return hash))))
       (fun (dry_run, verbose_signing, force)
            src_pkh
@@ -2320,7 +2319,7 @@ let commands_rw () =
                     |> String.map (function '\n' | '\t' -> ' ' | c -> c))
               | el -> cctxt#message "Error:@ %a" pp_print_trace el
             in
-            failwith "Failed to submit proposals");
+            cctxt#error "Failed to submit proposals");
     command
       ~group
       ~desc:"Submit a ballot"
@@ -2340,9 +2339,9 @@ let commands_rw () =
       @@ param
            ~name:"proposal"
            ~desc:"the protocol hash proposal to vote for"
-           (parameter (fun _ x ->
+           (parameter (fun (cctxt : #Client_context.full) x ->
                 match Tezos_crypto.Protocol_hash.of_b58check_opt x with
-                | None -> failwith "Invalid proposal hash: '%s'" x
+                | None -> cctxt#error "Invalid proposal hash: '%s'" x
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ param
            ~name:"ballot"
@@ -2350,14 +2349,14 @@ let commands_rw () =
            (parameter
               ~autocomplete:(fun _ ->
                 Lwt_result_syntax.return ["yea"; "nay"; "pass"])
-              (fun _ s ->
+              (fun (cctxt : #Client_context.full) s ->
                 let open Lwt_result_syntax in
                 (* We should have [Vote.of_string]. *)
                 match String.lowercase_ascii s with
                 | "yay" | "yea" -> return Vote.Yay
                 | "nay" -> return Vote.Nay
                 | "pass" -> return Vote.Pass
-                | s -> failwith "Invalid ballot: '%s'" s))
+                | s -> cctxt#error "Invalid ballot: '%s'" s))
       @@ stop)
       (fun (verbose_signing, dry_run, force)
            src_pkh
@@ -2782,7 +2781,7 @@ let commands_rw () =
           | `Json messages -> (
               match Data_encoding.(Json.destruct (list string) messages) with
               | exception _ ->
-                  failwith
+                  cctxt#error
                     "Could not read list of messages (expected list of bytes)"
               | "raw" :: messages -> return messages
               | "hex" :: messages ->
@@ -2791,7 +2790,7 @@ let commands_rw () =
                       (fun message ->
                         match Hex.to_string (`Hex message) with
                         | None ->
-                            failwith
+                            cctxt#error
                               "'%s' is not a valid hex encoded message"
                               message
                         | Some msg -> return [msg])
