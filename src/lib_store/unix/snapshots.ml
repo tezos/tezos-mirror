@@ -2774,19 +2774,17 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                getting stuck while waiting a merge. *)
             let*! context_index = Context.init ~readonly:true context_dir in
             let* () =
-              let*! finish_progress =
-                Animation.three_dots "Exporting context"
-              in
+              Animation.three_dots
+                ~progress_display_mode:Auto
+                ~msg:"Exporting context"
+              @@ fun () ->
               Lwt.finalize
                 (fun () ->
                   Exporter.export_context
                     snapshot_exporter
                     context_index
                     pred_resulting_context)
-                (fun () ->
-                  let*! () = Context.close context_index in
-                  finish_progress () ;
-                  Lwt.return_unit)
+                (fun () -> Context.close context_index)
             in
             return
               (Snapshot_metadata.Current
@@ -4007,14 +4005,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         in
         return (genesis_ctxt_hash, context_index)
       else
-        let*! finish_progress = Animation.three_dots "Importing context" in
         let* () =
-          Lwt.finalize
-            (fun () ->
-              Importer.restore_context snapshot_importer ~dst_context_dir)
-            (fun () ->
-              finish_progress () ;
-              Lwt.return_unit)
+          Animation.three_dots
+            ~progress_display_mode:Auto
+            ~msg:"Importing context"
+          @@ fun () ->
+          Importer.restore_context snapshot_importer ~dst_context_dir
         in
         let*! context_index =
           Context.init
