@@ -85,7 +85,8 @@ val implicit_encoding : Signature.Public_key_hash.t Data_encoding.t
     compatible with the [encoding] of contracts for originated accounts. *)
 val originated_encoding : Contract_hash.t Data_encoding.t
 
-(** [cases f g] exports the {!Data_encoding.cases} used to define {!encoding}.
+(** [cases f g] exports the {!type-Data_encoding.case}s used to define
+    {!encoding}.
 
     The only reason why we export that is to let {!Destination_repr.encoding}
     use it. This allows the latter to be compatible with {!encoding}, which

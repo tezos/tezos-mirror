@@ -194,11 +194,11 @@ end
     increasing order by level, and by slot index, for the slots of the same
     level.
 
-    This module also defines a bounded history cache (type {History_cache.t})
-    that allows to remember recent values of a skip list of type {!t}
-    (indexed by the skip lists' hashes). This structure is meant to be
-    maintained and used by the rollup node to produce refutation proofs
-    involving DAL slot inputs.
+    This module also defines a bounded history cache (type
+    {!type-History_cache.t}) that allows to remember recent values of a skip
+    list of type {!t} (indexed by the skip lists' hashes). This structure is
+    meant to be maintained and used by the rollup node to produce refutation
+    proofs involving DAL slot inputs.
 
     Note on terminology: "confirmed slot" is another name for "attested slot".
 *)
