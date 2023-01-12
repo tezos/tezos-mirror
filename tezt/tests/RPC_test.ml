@@ -1097,6 +1097,59 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint client
     @@ RPC.get_chain_block_context_raw ~ctxt_type:Bytes ~value_path:[] ()
   in
+  let* delegates =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_raw
+         ~depth:2
+         ~ctxt_type:Bytes
+         ~value_path:["delegates"]
+         ()
+  in
+  Check.(
+    (JSON.unannotate delegates
+    = `O
+        [
+          ( "ed25519",
+            `O
+              [
+                ("02298c03ed7d454a101eb7022bc95f7e5f41ac78", `Null);
+                ("a9ceae0f8909125492a7c4700acc59274cc6c846", `Null);
+                ("c55cf02dbeecc978d9c84625dcae72bb77ea4fbd", `Null);
+                ("dac9f52543da1aed0bc1d6b46bf7c10db7014cd6", `Null);
+                ("e7670f32038107a59a2b9cfefae36ea21f5aa63c", `Null);
+              ] );
+        ])
+      json_u
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  let* () =
+    let spawn_get_chain_block_context_raw ?depth ~error_msg value_path =
+      let*? process =
+        RPC.Client.spawn ?endpoint client
+        @@ RPC.get_chain_block_context_raw
+             ?depth
+             ~ctxt_type:Bytes
+             ~value_path
+             ()
+      in
+      Process.check_error ~msg:(rex error_msg) process
+    in
+    let* () =
+      spawn_get_chain_block_context_raw
+        ["non-existent"]
+        ~error_msg:"No service found at this URL"
+    in
+    let* () =
+      spawn_get_chain_block_context_raw
+        ~depth:(-1)
+        []
+        ~error_msg:"Failed to parse argument 'depth' \\(\"-1\"\\)"
+    in
+    spawn_get_chain_block_context_raw
+      ~depth:0
+      ["non-existent"]
+      ~error_msg:"No service found at this URL"
+  in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
   let* _ =
