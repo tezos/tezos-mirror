@@ -82,10 +82,13 @@ let spawn_command ?(env = String_map.empty) ?hooks signer command =
 let passfile = ref ""
 
 let spawn_import_secret_key signer (key : Account.key) =
-  match key.secret_key with
-  | Unencrypted sk ->
-      let sk_uri = "unencrypted:" ^ sk in
-      spawn_command signer ["import"; "secret"; "key"; key.alias; sk_uri]
+  let sk_uri =
+    match key.secret_key with
+    | Unencrypted sk -> "unencrypted:" ^ sk
+    | Encrypted _ ->
+        Test.fail "[spawn_import_secret_key] expected an unencrypted key"
+  in
+  spawn_command signer ["import"; "secret"; "key"; key.alias; sk_uri]
 
 let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check

@@ -188,6 +188,30 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
   @ base_dir_arg client @ config_file_arg @ command
 
+let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
+    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
+    client command =
+  let env =
+    (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
+    String_map.update
+      "TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER"
+      (fun o -> Option.value ~default:"Y" o |> Option.some)
+      env
+  in
+  let protocol_arg = Cli_arg.optional_arg "protocol" Fun.id protocol_hash in
+  Process.spawn_with_stdin
+    ~name:client.name
+    ~color:client.color
+    ~env
+    ?log_command
+    ?log_status_on_exit
+    ?log_output
+    ?hooks
+    (if admin then client.admin_path else client.path)
+  @@ endpoint_arg ?endpoint client
+  @ protocol_arg @ media_type_arg client.mode @ mode_arg client
+  @ base_dir_arg client @ command
+
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
   for i = 0 to String.length str - 1 do
@@ -470,10 +494,24 @@ let spawn_version client = spawn_command client ["--version"]
 
 let version client = spawn_version client |> Process.check
 
+let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
+    (key : Account.key) =
+  let sk_uri =
+    match key.secret_key with
+    | Encrypted _ -> Account.uri_of_secret_key key.secret_key
+    | Unencrypted _ -> Test.fail "Unencrypted key"
+  in
+  spawn_command_with_stdin
+    ?hooks
+    ?endpoint
+    client
+    (["import"; "secret"; "key"; key.alias; sk_uri]
+    @ if force then ["--force"] else [])
+
 let spawn_import_secret_key ?endpoint client (key : Account.key) =
   let sk_uri =
-    let (Unencrypted sk) = key.secret_key in
-    "unencrypted:" ^ sk
+    "unencrypted:"
+    ^ Account.require_unencrypted_secret_key ~__LOC__ key.secret_key
   in
   spawn_command ?endpoint client ["import"; "secret"; "key"; key.alias; sk_uri]
 
@@ -864,8 +902,8 @@ let bls_gen_and_show_keys ?alias client =
 let spawn_bls_import_secret_key ?hooks ?(force = false)
     (key : Account.aggregate_key) client =
   let sk_uri =
-    let (Unencrypted sk) = key.aggregate_secret_key in
-    "aggregate_unencrypted:" ^ sk
+    "aggregate_unencrypted:"
+    ^ Account.require_unencrypted_secret_key ~__LOC__ key.aggregate_secret_key
   in
   spawn_command
     ?hooks
@@ -969,6 +1007,13 @@ let multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
   in
   {value; run = Process.check}
 
+let spawn_register_delegate ?endpoint ~delegate client =
+  spawn_command ?endpoint client ["register"; "key"; delegate; "as"; "delegate"]
+
+let register_delegate ?endpoint ~delegate client =
+  spawn_register_delegate ?endpoint ~delegate client
+  |> Process.check_and_read_stdout
+
 let spawn_get_delegate ?endpoint ~src client =
   spawn_command ?endpoint client ["get"; "delegate"; "for"; src]
 
@@ -979,7 +1024,8 @@ let get_delegate ?endpoint ~src client =
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
 let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
-    ?(force_low_fee = false) ?expect_failure ~src ~delegate client =
+    ?(force_low_fee = false) ?expect_failure ?(simulation = false) ~src
+    ~delegate client =
   let value =
     spawn_command
       ?endpoint
@@ -988,6 +1034,7 @@ let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
       @ ["set"; "delegate"; "for"; src; "to"; delegate]
       @ optional_arg "fee" Tez.to_string fee
       @ optional_arg "fee-cap" Tez.to_string fee_cap
+      @ (if simulation then ["--simulation"] else [])
       @ if force_low_fee then ["--force-low-fee"] else [])
   in
   {value; run = Process.check ?expect_failure}
@@ -1423,7 +1470,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
        JSON is simpler). *)
     let open Account in
     let account_to_obj account =
-      let (Unencrypted sk) = account.secret_key in
+      let sk = require_unencrypted_secret_key ~__LOC__ account.secret_key in
       `O
         [
           ("pkh", `String account.public_key_hash);

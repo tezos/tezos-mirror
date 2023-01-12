@@ -440,8 +440,8 @@ let show_address ?hooks ~alias sc_client =
 let spawn_import_secret_key ?hooks ?(force = false)
     (key : Account.aggregate_key) sc_client =
   let sk_uri =
-    let (Unencrypted sk) = key.aggregate_secret_key in
-    "aggregate_unencrypted:" ^ sk
+    "aggregate_unencrypted:"
+    ^ Account.require_unencrypted_secret_key ~__LOC__ key.aggregate_secret_key
   in
   spawn_command
     ?hooks

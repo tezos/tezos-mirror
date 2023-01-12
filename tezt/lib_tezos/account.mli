@@ -29,7 +29,8 @@
     add new constructors for other keys here, as needed. *)
 type secret_key =
   | Unencrypted of string
-      (** The string does NOT contain the 'unencrypted:' prefix *)
+      (** The string does NOT contain the 'encrypted:' prefix *)
+  | Encrypted of string
 
 (** Keys associated to an account. For example:
 {[
@@ -47,9 +48,6 @@ type key = {
   public_key : string;
   secret_key : secret_key;
 }
-
-(** A [Check.typ] for [secret_key] *)
-val secret_key_typ : secret_key Check.typ
 
 (** A [Check.typ] for [key] *)
 val key_typ : key Check.typ
@@ -83,6 +81,18 @@ val sign_bytes :
   signer:key ->
   bytes ->
   Tezos_crypto.Signature.t
+
+(** [require_unencrypted_secret_key ~__LOC__ key] returns [sk] if [key] is [Unencrypted sk], or fails. *)
+val require_unencrypted_secret_key : __LOC__:string -> secret_key -> string
+
+(** [uri_of_secret_key secret_key] returns [secret_key] as an URI. 
+    
+    The URI of a secret key is its contents prefixed [unencrypted:] respectively
+    [encrypted:] if it is unencrypted respetively encrypted. *)
+val uri_of_secret_key : secret_key -> string
+
+(** A [Check.typ] for [secret_key] *)
+val secret_key_typ : secret_key Check.typ
 
 (** [write keys ~base_dir] writes the keys into the [octez-client]'s data
    directory [base_dir]. This function has the same effect

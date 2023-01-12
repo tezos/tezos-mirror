@@ -47,8 +47,8 @@ module BLS_aggregate_wallet = struct
         expected.aggregate_public_key
         shown.aggregate_public_key
     else if expected.aggregate_secret_key <> shown.aggregate_secret_key then
-      let (Unencrypted sk) = shown.aggregate_secret_key in
-      let (Unencrypted expected_sk) = shown.aggregate_secret_key in
+      let sk = Account.uri_of_secret_key shown.aggregate_secret_key in
+      let expected_sk = Account.uri_of_secret_key shown.aggregate_secret_key in
       Test.fail
         ~__LOC__
         "Expecting %s, got %s as secret key from the client "
@@ -162,8 +162,8 @@ module BLS_normal_wallet = struct
         expected.public_key
         shown.public_key
     else if expected.secret_key <> shown.secret_key then
-      let (Unencrypted sk) = shown.secret_key in
-      let (Unencrypted expected_sk) = shown.secret_key in
+      let sk = Account.uri_of_secret_key shown.secret_key in
+      let expected_sk = Account.uri_of_secret_key shown.secret_key in
       Test.fail
         ~__LOC__
         "Expecting %s, got %s as secret key from the client "
