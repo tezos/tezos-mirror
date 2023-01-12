@@ -182,7 +182,7 @@ let process_head (node_ctxt : _ Node_context.t)
   let first_inbox_level =
     Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
   in
-  if level >= first_inbox_level then
+  if level >= first_inbox_level then (
     (*
 
           We compute the inbox of this block using the inbox of its
@@ -192,6 +192,8 @@ let process_head (node_ctxt : _ Node_context.t)
     *)
     let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
     let* inbox = State.inbox_of_head node_ctxt predecessor in
+    let inbox_metrics = Metrics.Inbox.metrics in
+    Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
     let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
     let* ctxt =
       if Raw_level.(level <= node_ctxt.Node_context.genesis_info.level) then
@@ -220,6 +222,8 @@ let process_head (node_ctxt : _ Node_context.t)
         inbox
         collected_messages
     in
+    Metrics.Inbox.Stats.head_messages_list :=
+      messages_with_protocol_internal_messages ;
     let*! () =
       State.add_messages
         node_ctxt.store
@@ -237,7 +241,7 @@ let process_head (node_ctxt : _ Node_context.t)
         inbox,
         witness_hash,
         messages_with_protocol_internal_messages,
-        ctxt )
+        ctxt ))
   else
     let* inbox = genesis_inbox node_ctxt in
     return
