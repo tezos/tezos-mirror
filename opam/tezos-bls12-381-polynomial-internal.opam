@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "ppx_repr" { >= "0.6.0" }
-  "bls12-381" { >= "5.0.0" & < "5.1.0" }
+  "bls12-381" { >= "6.0.1" & < "6.1.0" }
   "bigstringaf" { >= "0.5.0" }
   "alcotest" { with-test & >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.20" }
