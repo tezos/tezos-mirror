@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/pair_id.tz on storage None and input '(Pair False False)' --level 1 --trace-stack
+./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/pair_id.tz on storage None and input '(Pair False False)' --level 1 --trace-stack
 storage
   (Some (Pair False False))
 emitted operations
