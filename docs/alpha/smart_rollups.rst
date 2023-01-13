@@ -42,7 +42,7 @@ is to deploy a kernel that implements the Ethereum Virtual Machine
 (EVM) and to get as a result an EVM-compatible layer-2 running on top
 of the Tezos blockchain. WASM rollups are not limited to this use case
 though: they are fully programmable, hence their names, smart
-optimistic rollups, as they are very close to smart-contracts in terms
+optimistic rollups, as they are very close to smart contracts in terms
 of expressivity.
 
 The purpose of this documentation is to give:
@@ -54,7 +54,7 @@ The purpose of this documentation is to give:
 Overview
 --------
 
-Just like smart-contracts, rollups are decentralized software
+Just like smart contracts, rollups are decentralized software
 components. As such, any user can originate, operate, and interact
 with a rollup. For the sake of clarity, we will distinguish three
 kinds of users in this documentation: operators, kernel developers,
@@ -80,7 +80,7 @@ There are two channels of communication to interact with smart rollups:
    information to all the rollups. This unique inbox contains two
    kinds of messages: *external* messages are pushed through a layer-1
    manager operation while *internal* messages are pushed by layer-1
-   smart-contracts or the protocol itself. More information about
+   smart contracts or the protocol itself. More information about
    these two kinds of messages can be found below.
 
 #. a **reveal data channel** allows the rollup to retrieve data
@@ -148,7 +148,7 @@ Origination
 When originated, a rollup is characterized by the name of the device
 it runs – the so-called Proof-generating Virtual Machine (PVM) – by
 the source code of the rollup running under this device, and by the
-Michelson type of the entrypoint used by layer-1 smart-contracts to
+Michelson type of the entrypoint used by layer-1 smart contracts to
 communicate with the rollup through internal messages.
 
 Processing
@@ -187,12 +187,22 @@ progress. A commitment is always based on a parent commitment (except
 for the genesis commitment that is automatically published at
 origination time).
 
+Since the PVM is deterministic and the inputs are completely
+determined by the layer-1 rollups inbox and the reveal channel, there
+is only one honest commitment. In other words, if two distinct
+commitments are published for the same commitment period, one of them
+must be wrong.
+
 Notice that, to publish a commitment, an operator must provide a
 deposit of 10,000 tez. For this reason, the operator is said to be a
 **staker**. Several users can stake on the same commitment. When a
 staker publishes a new commitment based on a commitment she is staking
 on, she does not have to provide a new deposit: the deposit also
 applies to this new commitment.
+
+There is no need to synchronize between operators: if two honest
+operators publish the same commitment for a given commitment period,
+the commitment will be published with two stakes on it.
 
 A commitment is optimistically trusted but it can be refuted until it
 is said to be **cemented** (i.e., final, unchangeable). Indeed, right
@@ -229,9 +239,9 @@ A refutation game is decomposed into two main steps: a dissection
 mechanism and a final conflict resolution phase. During the first
 phase, the two stakers exchange hashes about intermediate states of
 the rollups in a way that allows them to converge to the very first
-tick on which they disagree. During the final phase, the stakers must
-provide a proof that they correctly interpreted this conflicting
-tick.
+tick on which they disagree. The exact number of hashes exchanged at a
+given step is PVM-dependent. During the final phase, the stakers must
+provide a proof that they correctly interpreted this conflicting tick.
 
 The layer-1 PVM then determines whether these proofs are valid. There
 are only two possible outcomes: either one of the staker has provided
@@ -277,14 +287,14 @@ Prerequisites
 ^^^^^^^^^^^^^
 
 To experiment with the commands described in this section, we use
-the `Mondaynet <https://teztnets.xyz/mondaynet-about>`_.
+the `Dailynet <https://teztnets.xyz/dailynet-about>`_.
 In this section, we assume that ``${OPERATOR_ADDR}`` is a valid
-implicit account on MondayNet owned by the reader.
+implicit account on DailyNet owned by the reader.
 
 Notice that you need a specific development version of Octez to
-participate to MondayNet. This version is either available from
+participate to DailyNet. This version is either available from
 docker images or can be compiled from sources. Please refer to the
-`Mondaynet <https://teztnets.xyz/mondaynet-about>`_ website
+`Dailynet <https://teztnets.xyz/dailynet-about>`_ website
 for installation details.
 
 An Octez rollup node needs an Octez tezos node to run. We assume that
@@ -296,7 +306,7 @@ a rollup node has been launched locally, typically by issuing:
    octez-node run --data-dir "${ONODE_DIR}" --network "${NETWORK}" --rpc-addr 127.0.0.1
 
 in a terminal where ``${NETWORK}`` is of the
-form ``https://teztnets.xyz/mondaynet-YYYY-MM-DD``
+form ``https://teztnets.xyz/dailynet-YYYY-MM-DD``
 and ``${ONODE_DIR}`` is a path for the Octez node store.
 
 The commands will only work when ``proto_alpha`` is activated.
@@ -343,7 +353,7 @@ can be obtained through
 
 .. code:: sh
 
-     xxd -ps -c 0 <kernel.wasm>
+     xxd -ps -c 0 <kernel.wasm> | tr -d '\n'
 
 To experiment, we propose that you use the value ``${KERNEL}``
 defined in the :download:`given file <sr_boot_kernel.sh>`.
@@ -356,44 +366,45 @@ If everything went well, the origination command results in:
 
 ::
 
-  This sequence of operations was run:
-    Manager signed operations:
-      From: tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX
-      Fee to the baker: ꜩ0.000357
-      Expected counter: 10
-      Gas limit: 1000
-      Storage limit: 0 bytes
-      Balance updates:
-        tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX ... -ꜩ0.000357
-        payload fees(the block proposer) ....... +ꜩ0.000357
-      Revelation of manager public key:
-        Contract: tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX
-        Key: edpkukxtw4fHmffj4wtZohVKwNwUZvYm6HMog5QMe9EyYK3QwRwBjp
-        This revelation was successfully applied
-        Consumed gas: 1000
-    Manager signed operations:
-      From: tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX
-      Fee to the baker: ꜩ0.004617
-      Expected counter: 11
-      Gas limit: 3227
-      Storage limit: 10711 bytes
-      Balance updates:
-        tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX ... -ꜩ0.004617
-        payload fees(the block proposer) ....... +ꜩ0.004617
-      Smart contract rollup origination:
-        Kind: wasm_2_0_0
-        Parameter type: bytes
-        Boot sector Blake2B hash: '789431137a40057a39867cbc5cd7f984139360559c655c0508821b9be8047a02'
-        This smart contract rollup origination was successfully applied
-        Consumed gas: 3126.633
-        Storage size: 10691 bytes
-        Address: scr1BBMMrm3Zhq1S2Qy2LpRXdu4ebtW9sBrtY
-        Genesis commitment hash: scc13y58tqmHJtWhWY5Sa3BLu7W3FUjsFZrLCyvdu78VTnmf4aEVWe
-        Balance updates:
-          tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX ... -ꜩ2.67275
-          storage fees ........................... +ꜩ2.67275
+   This sequence of operations was run:
+     Manager signed operations:
+       From: tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX
+       Fee to the baker: ꜩ0.000357
+       Expected counter: 36
+       Gas limit: 1000
+       Storage limit: 0 bytes
+       Balance updates:
+         tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX ... -ꜩ0.000357
+         payload fees(the block proposer) ....... +ꜩ0.000357
+       Revelation of manager public key:
+         Contract: tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX
+         Key: edpkukxtw4fHmffj4wtZohVKwNwUZvYm6HMog5QMe9EyYK3QwRwBjp
+         This revelation was successfully applied
+         Consumed gas: 1000
+     Manager signed operations:
+       From: tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX
+       Fee to the baker: ꜩ0.000956
+       Expected counter: 37
+       Gas limit: 2849
+       Storage limit: 6572 bytes
+       Balance updates:
+         tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX ... -ꜩ0.000956
+         payload fees(the block proposer) ....... +ꜩ0.000956
+       Smart rollup origination:
+         Kind: wasm_2_0_0
+         Parameter type: bytes
+         Kernel Blake2B hash: '24df9e3c520dd9a9c49b447766e8a604d31138c1aacb4a67532499c6a8b348cc'
+         This smart rollup origination was successfully applied
+         Consumed gas: 2748.269
+         Storage size: 6552 bytes
+         Address: sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf
+         Genesis commitment hash: src13wCGc2nMVfN7rD1rgeG3g1q7oXYX2m5MJY5ZRooVhLt7JwKXwX
+         Balance updates:
+           tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX ... -ꜩ1.638
+           storage fees ........................... +ꜩ1.638
 
-The address ``scr1BBMMrm3Zhq1S2Qy2LpRXdu4ebtW9sBrtY`` is the smart rollup address.
+
+The address ``sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf`` is the smart rollup address.
 Let's write it ``${SOR_ADDR}`` from now on.
 
 Deploying a rollup node
@@ -497,16 +508,162 @@ processes the inbox of each level.
 Sending an external inbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+The Octez client can be used to send an external message into the
+rollup inbox. Assuming that ``${EMESSAGE}`` is the hexadecimal
+representation of the message payload, one can do:
+
+.. code:: sh
+
+    octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+     send sc rollup message "hex:[ \"${EMESSAGE}\" ]" \
+     from "${OPERATOR_ADDR}"
+
+to inject such an external message.
+So let us focus now on producing a viable contents for ``${EMESSAGE}``.
+
+The kernel used previously in our running example is a simple "echo"
+kernel that copies its input as a new message of its outbox.
+Therefore, the input must be a valid binary encoding of an outbox
+message to make this work. Specifically, assuming that we have
+originated a layer-1 smart contract as follows:
+
+.. code:: sh
+
+   octez-client -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+     originate contract go transferring 1 from "${OPERATOR_ADDR}" \
+     running 'parameter string; storage string; code {CAR; NIL operation; PAIR};' \
+     --init '""' --burn-cap 0.4
+
+and that this contract is identified by a address ``${CONTRACT}``, then one
+can encode an outbox transaction using the Octez rollup client as follows:
+
+.. code:: sh
+
+    MESSAGE='[ { \
+      "destination" : "${CONTRACT}", \
+      "parameters" : "\"Hello world\"", \
+      "entrypoint" : "default" } ]'
+
+
+    EMESSAGE=$(octez-smart-rollup-client-alpha encode outbox message "${MESSAGE}")
+
+
+.. _triggering_execution_outbox_message_alpha:
+
+Triggering the execution of an outbox message
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once an outbox message has been pushed to the outbox by the kernel at
+some level ``${L}``, the user needs to wait for the commitment that
+includes this level to be cemented. On Dailynet, the cementation
+process of a non disputed commitment is 40 blocks long while on
+Mainnet, it is 2 weeks long.
+
+When the commitment is cemented, one can observe that the outbox is
+populated as follows:
+
+.. code:: sh
+
+   octez-smart-rollup-client-alpha rpc get \
+     /global/block/cemented/outbox/${L}/messages
+
+Here is the output for this command:
+
+.. code::
+
+   [ { "outbox_level": ${L}, "message_index": "0",
+    "message":
+      { "transactions":
+          [ { "parameters": { "string": "Hello world" },
+              "destination": "${CONTRACT}",
+              "entrypoint": "default" } ] } } ]
+
+
+At this point, the actual execution of a given outbox message can be
+triggered. This requires to precompute a proof that this outbox message
+is indeed in the outbox. In the case of our running example, this
+proof is retrieved as follows:
+
+.. code:: sh
+
+   PROOF=$(octez-smart-rollup-client-alpha get proof for message 0 \
+     of outbox at level "${L}" \
+     transferring "${MESSAGE}")
+
+Finally, the execution of the outbox message is done as follows:
+
+.. code:: sh
+
+   "${TEZOS_PATH}/octez-client" -d "${OCLIENT_DIR}" -p ProtoALphaAL \
+           execute outbox message of smart rollup "${SOR_ADDR}" \
+           from "${OPERATOR_ADDR}" for commitment hash "${LCC}" \
+           and output proof "${PROOF}"
+
+where ``${LCC}`` is the hash of the latest cemented commitment.
+Notice that anyone can trigger the execution of an outbox message
+(not only an operator as in this example).
+
+One can check in the receipt that the contract has indeed been called
+with the parameter ``"Hello world"`` through an internal
+operation. More complex parameters, typically containing assets
+represented as tickets, can be used as long as they match the type of
+the entrypoint of the destination smart contract.
 
 .. _sending_internal_inbox_message_alpha:
 
 Sending an internal inbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _triggering_execution_outbox_message_alpha:
+A smart contract can push an internal message in the rollup inbox
+using the Michelson ``TRANSFER_TOKENS`` instruction targetting a
+specific rollup address. The parameter of this transfer must be a
+value of the Michelson type declared at the origination of this
+rollup.
 
-Triggering the execution of an outbox message
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Remember that our running example rollup has been originated with:
+
+.. code:: sh
+
+    octez-client originate smart rollup from "${OPERATOR_ADDR}" \
+      of kind wasm_2_0_0 \
+      of type bytes \
+      booting with "${KERNEL}" \
+      -burn-cap 999
+
+The fragment ``of type bytes`` of this command declares that the
+rollup is expecting values of type `bytes`. (Notice any Michelson type
+could have been used instead. To transfer tickets to a rollup, this
+type must mention tickets.)
+
+Here is an example of a Michelson script that sends an internal
+message to the rollup of our running example. The payload of the
+internal message is the value passed as parameter of type `bytes`
+to the rollup.
+
+::
+
+      {
+        parameter (bytes %%default);
+        storage (unit);
+
+        code
+          {
+            CAR;
+            PUSH address "${SOR_ADDR}";
+            CONTRACT bytes;
+            IF_NONE { PUSH string "Invalid address"; FAILWITH; }
+                    {
+                      PUSH mutez 0;
+                      DIG 2;
+                      TRANSFER_TOKENS;
+                      NIL operation;
+                      SWAP;
+                      CONS;
+                      PUSH unit Unit;
+                      SWAP;
+                      PAIR;
+                    }
+          }
 
 .. _populating_the_reveal_channel_alpha:
 
