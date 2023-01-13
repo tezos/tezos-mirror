@@ -69,9 +69,9 @@ val one : t
 
 (** This version adds no messages. However, the semantics of the
    message [Current_head] is changed. In particular, a peer can send a
-   message [Current_head] which was only [prechecked] but the block
-   was not validated yet. This means that a [peer] which sends a
-   [Current_head] message with a block for which the [precheck]
+   message [Current_head] which was only [validated] but the block
+   was not applied yet. This means that a [peer] which sends a
+   [Current_head] message with a block for which the [validate]
    function will return [true] but is invalid should not be kicked
    anymore. *)
 val two : t
