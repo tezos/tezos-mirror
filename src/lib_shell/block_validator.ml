@@ -480,7 +480,8 @@ let on_completion :
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Application_error_after_precheck errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
-      Prometheus.Counter.inc_one metrics.validation_errors_after_precheck_count ;
+      Prometheus.Counter.inc_one
+        metrics.application_errors_after_validation_count ;
       match Request.view request with
       | Validation v ->
           let* () =
@@ -491,7 +492,7 @@ let on_completion :
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Precheck_failed errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
-      Prometheus.Counter.inc_one metrics.precheck_failed_count ;
+      Prometheus.Counter.inc_one metrics.validation_failed_count ;
       match Request.view request with
       | Validation v -> (
           match errs with
