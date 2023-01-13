@@ -352,6 +352,16 @@ val load :
 val register_gc_callback :
   block_store -> (Block_hash.t -> unit tzresult Lwt.t) -> unit
 
+(** [register_split_callback chain_store callback] installs a
+    [callback] that may be triggered during a [set_head] in order to
+    split the context into a new chunk. *)
+val register_split_callback :
+  block_store -> (unit -> unit tzresult Lwt.t) -> unit
+
+(** [split_context block_store] calls the callback registered by
+    [register_split_callback] if any. *)
+val split_context : t -> unit tzresult Lwt.t
+
 (** [close block_store] closes the [block_store] and every underlying
     opened stores.
 

@@ -99,6 +99,8 @@ module type S = sig
     gc_lockfile_path:string ->
     unit tzresult Lwt.t
 
+  val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
+
   val commit_genesis :
     t ->
     chain_id:Tezos_crypto.Chain_id.t ->
@@ -386,6 +388,11 @@ module Internal_validator_process = struct
       ~gc_lockfile_path:_ =
     let open Lwt_result_syntax in
     let*! () = Context_ops.gc context_index context_hash in
+    return_unit
+
+  let context_split _validator context_index =
+    let open Lwt_result_syntax in
+    let () = Context_ops.split context_index in
     return_unit
 
   let commit_genesis validator ~chain_id =
@@ -885,6 +892,10 @@ module External_validator_process = struct
     in
     send_request validator request Data_encoding.unit
 
+  let context_split validator _index =
+    let request = External_validation.Context_split in
+    send_request validator request Data_encoding.unit
+
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Tezos_crypto.Context_hash.encoding
@@ -1050,6 +1061,10 @@ let context_garbage_collection (E {validator_process = (module VP); validator})
     context_index
     context_hash
     ~gc_lockfile_path
+
+let context_split (E {validator_process = (module VP); validator}) context_index
+    =
+  VP.context_split validator context_index
 
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id

@@ -208,6 +208,11 @@ let wait_gc_completion context_index =
   | Disk_index index -> Context.wait_gc_completion index
   | Memory_index index -> Tezos_context_memory.Context.wait_gc_completion index
 
+let split context_index =
+  match context_index with
+  | Disk_index index -> Context.split index
+  | Memory_index index -> Tezos_context_memory.Context.split index
+
 let sync = function
   | Disk_index index -> Context.sync index
   | Memory_index index -> Tezos_context_memory.Context.sync index

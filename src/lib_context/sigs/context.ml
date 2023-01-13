@@ -740,10 +740,16 @@ module type TEZOS_CONTEXT = sig
     context ->
     Tezos_crypto.Context_hash.t Lwt.t
 
-  (** [gc t h] removes from disk all the data older than the commit
-    [hash]. Every operations working on checkouts greater or equal to
-    [h] will continue to work. Calling [checkout h'] on GC-ed commits
-    will return [None]. *)
+  (** [gc index commit_hash] removes from disk all the data older than
+      the [commit_hash]. Operations needing to checkout commits
+      greater or equal to [commit_hash] will continue to work. Calling
+      [checkout h'] on GC-ed commits will return [None].
+
+      From the irmin point of view, a successful gc call on a
+      [commit_hash] will result in a new prefix file containing that
+      [commit_hash] as a root commit. This prefix file is considered
+      as standalone as all the data referenced by that commit is
+      contained in that file. *)
   val gc : index -> Tezos_crypto.Context_hash.t -> unit Lwt.t
 
   (** [wait_gc_completion index] will return a blocking thread if an
@@ -763,6 +769,24 @@ module type TEZOS_CONTEXT = sig
      means that the context was run, at least once, with the indexing
      strategy mode "always", which is not suitable for GC.*)
   val is_gc_allowed : index -> bool
+
+  (** [split index] creates a new suffix file, also called "chunk",
+      into the irmin's file hierarchy.
+
+      To be optimal, the split function is expected to be called
+      directly after committing, to the context, a commit (of hash
+      [context_hash]) that will be a future candidate of a GC
+      target. Thus, the commit [commit_hash] is the last commit stored
+      on a given chunk. The GC called on that [commit_hash] will be
+      able to extract that [commit_hash] into a new prefix file, and
+      then, drop the whole chunk.
+
+      If the last commit of a chunk appears not to be the candidate of
+      a future GC, it may result in keeping chunks containing
+      partially needed data. This is not an issue, but it should be
+      avoided to prevent storing unnecessary data and thus, to
+      minimize the disk footprint. *)
+  val split : index -> unit
 
   val set_head :
     index ->

@@ -1713,6 +1713,10 @@ module Chain = struct
   (* Not implemented as both the store and context garbage collection
      are disabled in the mockup mode.*)
   let register_gc_callback _ _ = ()
+
+  (* Not implemented as both the store and context garbage collection
+     are disabled in the mockup mode.*)
+  let register_split_callback _ _ = ()
 end
 
 module Protocol = struct

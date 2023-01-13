@@ -492,6 +492,15 @@ let register_garbage_collect_callback w =
   in
   Store.Chain.register_gc_callback nv.parameters.chain_store gc_synchronous_call
 
+let register_split_callback w =
+  let nv = Worker.state w in
+  let chain_store = nv.parameters.chain_store in
+  let index = Store.(context_index (Chain.global_store chain_store)) in
+  let split () =
+    Block_validator.context_split nv.parameters.block_validator index
+  in
+  Store.Chain.register_split_callback nv.parameters.chain_store split
+
 let may_synchronise_context synchronisation_state chain_store =
   if
     not
@@ -915,6 +924,7 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
     (Store.Chain.chain_id chain_store)
     w ;
   register_garbage_collect_callback w ;
+  register_split_callback w ;
   Lwt_watcher.notify global_chains_input (Store.Chain.chain_id chain_store, true) ;
   return w
 
