@@ -156,27 +156,14 @@ let safe_find_metrics hash =
       end) in
       Lwt.return (module Metrics : METRICS)
 
-type filter_t =
-  | Recent of (module FILTER)
-  | Legacy of (module Legacy_mempool_plugin.FILTER)
+let filter_table : (module FILTER) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
 
-let is_recent_proto (module Proto : Registered_protocol.T) =
-  Proto.(compare environment_version V7 >= 0)
-
-let no_filter (module Proto : Registered_protocol.T) =
-  if is_recent_proto (module Proto) then Recent (module No_filter (Proto))
-  else Legacy (module Legacy_mempool_plugin.No_filter (Proto))
-
-let filter_table : filter_t Protocol_hash.Table.t = Protocol_hash.Table.create 5
-
-let add_to_filter_table proto_hash (filter : filter_t) =
+let add_to_filter_table proto_hash filter =
   assert (not (Protocol_hash.Table.mem filter_table proto_hash)) ;
   Protocol_hash.Table.add filter_table proto_hash filter
 
 let register_filter (module Filter : FILTER) =
-  add_to_filter_table Filter.Proto.hash (Recent (module Filter))
-
-let register_legacy_filter (module Filter : Legacy_mempool_plugin.FILTER) =
-  add_to_filter_table Filter.Proto.hash (Legacy (module Filter))
+  add_to_filter_table Filter.Proto.hash (module Filter)
 
 let find_filter = Protocol_hash.Table.find filter_table

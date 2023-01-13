@@ -381,9 +381,10 @@ let safe_get_prevalidator_filter hash =
             "chain_validator: missing protocol '%a' for the current block."
             Protocol_hash.pp_short
             hash
-      | Some protocol ->
+      | Some (module Proto : Registered_protocol.T) ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
-          return_ok (Shell_plugin.no_filter protocol))
+          return_ok
+            (module Shell_plugin.No_filter (Proto) : Shell_plugin.FILTER))
 
 let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
