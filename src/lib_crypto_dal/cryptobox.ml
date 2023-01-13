@@ -247,6 +247,8 @@ module Inner = struct
         (* Same argument. *)
         assert false
     end)
+
+    let of_b58check = of_b58check
   end
 
   module Commitment_proof = struct
