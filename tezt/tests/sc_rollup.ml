@@ -750,8 +750,9 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node _rollup_client _sc_rollup
   let* () = Sc_rollup_node.run sc_rollup_node [] in
   let* () = send_messages num_messages client in
   let* level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (level + num_messages)
+    Sc_rollup_node.wait_for_level sc_rollup_node (Node.get_level node)
   in
+  let* () = Lwt_unix.sleep 1. in
   Log.info "Terminating Tezos node" ;
   let* () = Node.terminate node in
   Log.info "Waiting before restarting Tezos node" ;
