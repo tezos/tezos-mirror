@@ -18,24 +18,7 @@ It requires protocol environment V9, compared to V8 for Mumbai. (MR :gl:`!7178`)
 Smart Rollups
 -------------
 
-- Remove redundant ``level_proof`` field. (MR :gl:`!7109`)
-
-- Fix error description. (MR :gl:`!7114`)
-
-- Weaken condition on LCC. (MR :gl:`!6968`)
-
-- Let SENDER return the address of the rollup for outbox message.
-  (MR :gl:`!7130`)
-
 - Update gas model for decoding output proofs. (MR :gl:`!7116`)
-
-- Require conflicting commitments hashes to start game. (MR :gl:`!7054`)
-
-- Fix bug in skip list. (MR :gl:`!7189`)
-
-- Introduce feature flag for the Arith PVM. (MR :gl:`!7220`)
-
-- Stake on a commitment rather than on a branch. (MR :gl:`!7067`)
 
 - Improve readability of ``assert_commitment_not_too_far_ahead``.
   (MR :gl:`!7231`)
@@ -46,15 +29,6 @@ Smart Rollups
 - Remove dead code: legacy Internal for Tests signatures (MR :gl:`!7234`)
 
 - Prefer hex over b58check to encode filenames. (MR :gl:`!7181`)
-
-- Use basis 4 for skip lists. (MR :gl:`!7213`)
-
-- Enable Smart Rollups on mainnet and adjust related constants. (MR :gl:`!7233`)
-
-- Rename SCORU to Smart Rollups. (MRs :gl:`!7247`, :gl:`!7248`, :gl:`!7253`,
-  :gl:`!7254`, :gl:`!7271`)
-
-- Expose hash functions and structure for node. (MR :gl:`!7161`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -67,10 +41,6 @@ Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
 
 Breaking Changes
 ----------------
-
-- Disable TORU. (MR :gl:`!7087`)
-
-- Remove TORU client commands. (MR :gl:`!7352`)
 
 RPC Changes
 -----------

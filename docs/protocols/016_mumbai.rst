@@ -33,8 +33,8 @@ now support ``bytes``. (MR :gl:`!6055`)
 - Michelson opcodes ``NAT``, ``INT`` and ``BYTES`` for bytes-int and bytes-nat
   conversions. (MR :gl:`!6681`)
 
-Smart Contract Optimistic Rollups (ongoing)
--------------------------------------------
+Smart Rollups
+-------------
 
 Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6252`, :gl:`!6396`, :gl:`!6364`, :gl:`!6413`, :gl:`!6545`, :gl:`!6543`,
@@ -46,7 +46,10 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6946`, :gl:`!6954`, :gl:`!6942`, :gl:`!6963`, :gl:`!5741`, :gl:`!6974`,
 :gl:`!7013`, :gl:`!7015`, :gl:`!6980`, :gl:`!6993`, :gl:`!6949`, :gl:`!6930`,
 :gl:`!6991`, :gl:`!6955`, :gl:`!6937`, :gl:`!7010`, :gl:`!7027`, :gl:`!7034`,
-:gl:`!7045`, :gl:`!7036`, :gl:`!6987`, :gl:`!7016`, :gl:`!6380`)
+:gl:`!7045`, :gl:`!7036`, :gl:`!6987`, :gl:`!7016`, :gl:`!6380`, :gl:`!7109`,
+:gl:`!7114`, :gl:`!6968`, :gl:`!7130`, :gl:`!7054`, :gl:`!7189`, :gl:`!7220`,
+:gl:`!7067`, :gl:`!7213`, :gl:`!7233`, :gl:`!7247`, :gl:`!7248`, :gl:`!7253`,
+:gl:`!7254`, :gl:`!7271`, :gl:`!7161`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -64,6 +67,8 @@ Distribution of rollup operations data off-chain. (MRs :gl:`!6174`, :gl:`!6388`,
 
 Breaking Changes
 ----------------
+
+- Disable TORU. (MR :gl:`!7087`)
 
 RPC Changes
 -----------
