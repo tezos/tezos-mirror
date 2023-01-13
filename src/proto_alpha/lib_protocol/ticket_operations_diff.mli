@@ -44,10 +44,7 @@ type ticket_token_diff = private {
     operations, [ops]. The diffs result from either a [Transaction] operation
     with parameters containing tickets, or an [Origination] operation with the
     initial storage containing tickets.
-
-    Tickets with amount zero are *not* allowed. If a zero-amount ticket is
-    encountered, a {!Ticket_scanner.Forbidden_zero_ticket_quantity} error is
-    returned. *)
+    *)
 val ticket_diffs_of_operations :
   Alpha_context.context ->
   Script_typed_ir.packed_internal_operation list ->
