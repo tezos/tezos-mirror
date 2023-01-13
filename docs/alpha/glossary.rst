@@ -161,8 +161,7 @@ _`Layer 2`
     greater scalability in speed and throughput can be achieved by the ecosystem overall, since the number of transactions
     the layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
     the security of the L1 chain backs those operations. In Tezos there are a number of layer 2 solutions,
-    including :doc:`TORUs (Transaction Optimistic Rollups) <transaction_rollups>`,
-    `Smart Optimistic Rollups`_,
+    including :doc:`Smart Optimistic Rollups <smart_rollups>`,
     validity or ZK-Rollups `Epoxy <https://research-development.nomadic-labs.com/files/cryptography.html>`_ ,
     zkChannels, and sidechains such as `Deku <https://www.marigold.dev/deku>`_.
 

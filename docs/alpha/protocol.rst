@@ -74,11 +74,6 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
-   transaction_rollups
-
-.. toctree::
-   :maxdepth: 2
-
    smart_rollups
 
 .. toctree::

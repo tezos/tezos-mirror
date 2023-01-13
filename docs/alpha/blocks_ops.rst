@@ -200,16 +200,6 @@ Moreover, all operations necessary to implement Tezos' *enshrined*
 Layer 2 solutions into the economic protocol are also manager
 operations:
 
-.. FIXME tezos/tezos#3916: expand documentation of TORU operations.
-
-- :doc:`Transaction Optimistic Rollups<transaction_rollups>` are
-  implemented using the following manager operations:
-  ``Tx_rollup_origination``, ``Tx_rollup_submit_batch``,
-  ``Tx_rollup_commit``, ``Tx_rollup_return_bond``,
-  ``Tx_rollup_finalize_commitment``, ``Tx_rollup_remove_commitment``,
-  ``Tx_rollup_rejection``, ``Tx_rollup_rejection``,
-  ``Transfer_ticket``.
-
 .. _manager_operations_batches_alpha:
 
 Manager Operation Batches
