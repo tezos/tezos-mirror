@@ -597,10 +597,82 @@ let test_misc_manager_ops_from_fresh_account =
   in
   unit
 
+let test_fail_inject_signed_arbitrary_operation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Test that failing_noop operations are never validated"
+    ~tags:(run_operation_tags @ ["failing_noop"])
+  @@ fun protocol ->
+  Log.info "Initialize a node and a client." ;
+  let* _node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  let* () =
+    match protocol with
+    (* Due to a bug in Kathmandu, we must first bake a block before
+       injecting the failing_noop operation.
+       See: https://gitlab.com/tezos/tezos/-/issues/4579 *)
+    | Protocol.Kathmandu -> Client.bake_for_and_wait client
+    | _ -> unit
+  in
+  [
+    ("bootstrap1", "msg1", None);
+    ("bootstrap2", "msg2", None);
+    ("bootstrap3", "msg3", Some "head");
+    ("bootstrap4", "msg4", Some "head");
+  ]
+  |> Lwt_list.iter_s @@ fun (src, message, branch) ->
+     let* signature = Client.sign_message client ?branch message ~src in
+     let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
+     let* head_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
+     let arbitrary =
+       match protocol with
+       | Protocol.Kathmandu | Protocol.Lima -> message
+       | Protocol.Mumbai | Protocol.Alpha -> Hex.(of_string message |> show)
+     in
+     let (op_json : JSON.u) =
+       `O
+         [
+           ( "operation",
+             `O
+               [
+                 ("branch", `String head_hash);
+                 ( "contents",
+                   `A
+                     [
+                       `O
+                         [
+                           ("kind", `String "failing_noop");
+                           ("arbitrary", `String arbitrary);
+                         ];
+                     ] );
+                 ("signature", `String signature);
+               ] );
+           ("chain_id", `String chain_id);
+         ]
+     in
+     let*? process =
+       RPC.Client.spawn client
+       @@ RPC.post_chain_block_helpers_scripts_run_operation (Data op_json)
+     in
+     let msg =
+       match protocol with
+       | Protocol.Kathmandu ->
+           rex "The failing_noop operation cannot be executed by the protocol"
+       | _ -> rex "A failing_noop operation can never be validated"
+     in
+     let* () = Process.check_error ~msg process in
+     unit
+
 let register ~protocols =
   test_run_proposals protocols ;
   test_batch_inconsistent_sources protocols ;
   test_inconsistent_counters protocols ;
   test_bad_revelations protocols ;
   test_correct_batch protocols ;
-  test_misc_manager_ops_from_fresh_account protocols
+  test_misc_manager_ops_from_fresh_account protocols ;
+  test_fail_inject_signed_arbitrary_operation protocols
