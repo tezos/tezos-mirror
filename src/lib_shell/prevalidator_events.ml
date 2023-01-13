@@ -120,6 +120,17 @@ let request_completed_notice =
     ("view", Request.encoding)
     ("worker_status", Worker_types.request_status_encoding)
 
+let request_completed_info =
+  declare_2
+    ~section
+    ~name:"request_completed_info"
+    ~msg:"{view} in {worker_status}"
+    ~level:Info
+    ~pp1:Request.pp
+    ~pp2:Worker_types.pp_status_completed
+    ("view", Request.encoding)
+    ("worker_status", Worker_types.request_status_encoding)
+
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/1266
 
    The level duplication is an intermediate solution. Those events are

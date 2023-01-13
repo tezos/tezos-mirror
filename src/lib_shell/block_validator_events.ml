@@ -32,7 +32,7 @@ let validation_success =
     ~section
     ~name:"validation_success"
     ~msg:"block {block} validated in {worker_status}"
-    ~level:Notice
+    ~level:Info
     ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status_completed
     ("block", Block_hash.encoding)
@@ -99,7 +99,7 @@ let validation_failure_after_precheck =
   declare_3
     ~section
     ~name:"validation_failure_after_precheck"
-    ~level:Info
+    ~level:Notice
     ~msg:
       "validation of block {block} failed but precheck succeeded, \
        {worker_status}: {errors}"
@@ -127,7 +127,7 @@ let prechecked_block =
   declare_1
     ~section
     ~name:"prechecked_block"
-    ~level:Notice
+    ~level:Info
     ~msg:"prechecked block {hash}"
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
