@@ -559,10 +559,10 @@ let operation_and_block_validation protocol manager_kind tag =
   let application_time = ref 0. in
   let on_bake_event u Node.{name; value = _; timestamp} =
     match name with
-    | "prechecking_block.v0" -> validation_time := timestamp
-    | "prechecked_block.v0" -> validation_time := timestamp -. !validation_time
-    | "validating_block.v0" -> application_time := timestamp
-    | "validation_success.v0" ->
+    | "validating_block.v0" -> validation_time := timestamp
+    | "validated_block.v0" -> validation_time := timestamp -. !validation_time
+    | "applying_block.v0" -> application_time := timestamp
+    | "validation_and_application_success.v0" ->
         application_time := timestamp -. !application_time ;
         Lwt.wakeup u ()
     | _ -> ()
