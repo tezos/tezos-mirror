@@ -157,7 +157,7 @@ let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
   let*! () = Events.(emit prechecked_block) block_hash in
   (* Add the block and operations to the cache of the ddb to make them
      available to our peers *)
-  Distributed_db.inject_prechecked_block
+  Distributed_db.inject_validated_block
     chain_db
     block_hash
     block_header
@@ -271,7 +271,7 @@ let on_validation_request w
                       if precheck_and_notify then
                         (* Headers which have been preapplied can be advertised
                            before being fully applied. *)
-                        Distributed_db.Advertise.prechecked_head chain_db header ;
+                        Distributed_db.Advertise.validated_head chain_db header ;
                       let* result =
                         protect ~canceler:(Worker.canceler w) (fun () ->
                             protect ?canceler (fun () ->
