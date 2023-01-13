@@ -126,19 +126,7 @@ module Profile_handlers = struct
     Profile_manager.get_profiles store
 
   let get_assigned_shard_indices ctxt pkh level () () =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4496
-       Cache DAL comittee in DAL context. *)
-    let open Lwt_result_syntax in
-    let*? {plugin = (module Plugin); _} = Node_context.get_ready ctxt in
-    let cctxt = Node_context.get_tezos_node_cctxt ctxt in
-    let+ committee = Plugin.get_committee cctxt ~level in
-    match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
-    | None -> []
-    | Some (s, n) ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4540
-           Consider returning some abstract representation of [(s, n)]
-           instead of [int list] *)
-        Stdlib.List.init n (fun i -> s + i)
+    Node_context.fetch_assigned_shard_indicies ctxt ~level ~pkh
 end
 
 let add_service registerer service handler directory =

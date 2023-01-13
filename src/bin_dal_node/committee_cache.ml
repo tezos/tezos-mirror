@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [shards_max_mutexes] is the limit of simultaneous mutexes on shard storage.
-     see [Shard_store.init].
-*)
-val shards_max_mutexes : int
+module Level_map =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      include Int32
 
-(** [committee_cache_size] is the size of the DAL committee cache. *)
-val committee_cache_size : int
+      let hash = Hashtbl.hash
+    end)
+
+type shard_indices = {start_index : int; offset : int}
+
+type committee = shard_indices Tezos_crypto.Signature.Public_key_hash.Map.t
+
+type t = committee Level_map.t
+
+let create ~max_size = Level_map.create max_size
+
+let find t ~level = Level_map.find_opt t level
+
+let add t ~level ~committee = Level_map.replace t level committee

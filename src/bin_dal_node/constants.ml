@@ -26,3 +26,7 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4458
           Better handling of this limitation *)
 let shards_max_mutexes = 50
+
+(* Fewer cache sizes should be enough in practice,
+   but we cache 50 since each cache entry has quite a small memory footprint. *)
+let committee_cache_size = 50
