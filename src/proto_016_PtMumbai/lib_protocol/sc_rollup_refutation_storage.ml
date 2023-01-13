@@ -604,11 +604,11 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
     let parent_commitment = our_commitment.predecessor in
     return {other; their_commitment; our_commitment; parent_commitment}
   in
-  let* stakers_commitments =
-    Sc_rollup_stake_storage.stakers_commitments_uncarbonated ctxt rollup
+  let*! stakers =
+    Sc_rollup_stake_storage.stakers_pkhs_uncarbonated ctxt ~rollup
   in
   List.fold_left_es
-    (fun conflicts (other_staker, _other_staker_commitment) ->
+    (fun conflicts other_staker ->
       let*! res = get_conflict_point ctxt rollup staker other_staker in
       match res with
       | Ok (conflict_point, _) ->
@@ -618,4 +618,4 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
           return (conflict :: conflicts)
       | Error _ -> return conflicts)
     []
-    stakers_commitments
+    stakers

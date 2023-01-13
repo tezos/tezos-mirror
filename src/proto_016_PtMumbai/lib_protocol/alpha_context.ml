@@ -65,6 +65,11 @@ module Sc_rollup = struct
   module Inbox_merkelized_payload_hashes =
     Sc_rollup_inbox_merkelized_payload_hashes_repr
 
+  module Staker = struct
+    include Sc_rollup_repr.Staker
+    module Index = Sc_rollup_staker_index_repr
+  end
+
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
