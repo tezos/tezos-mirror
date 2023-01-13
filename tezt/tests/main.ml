@@ -187,17 +187,17 @@ let register_protocol_tests_that_use_supports_correctly () =
    those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
-  Consensus_key.register ~protocols:[Alpha] ;
+  Consensus_key.register ~protocols:[Mumbai; Alpha] ;
   Dal.register ~protocols:[Alpha] ;
-  Hash_data.register ~protocols:[Alpha] ;
-  Increase_paid_storage.register ~protocols:[Alpha] ;
-  Sc_rollup.register ~protocols:[Alpha] ;
-  Test_contract_bls12_381.register ~protocols:[Alpha] ;
-  Ticket_receipt_and_rpc.register ~protocols:[Alpha] ;
+  Hash_data.register ~protocols:[Mumbai; Alpha] ;
+  Increase_paid_storage.register ~protocols:[Mumbai; Alpha] ;
+  Sc_rollup.register ~protocols:[Mumbai; Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Mumbai; Alpha] ;
+  Ticket_receipt_and_rpc.register ~protocols:[Mumbai; Alpha] ;
   Tx_rollup.register ~protocols:[Lima] ;
   Tx_rollup_l2_node.register ~protocols:[Lima] ;
-  Views.register [Alpha] ;
-  Zk_rollup.register ~protocols:[Alpha]
+  Views.register [Mumbai; Alpha] ;
+  Zk_rollup.register ~protocols:[Mumbai; Alpha]
 
 let () =
   register_protocol_independent_tests () ;

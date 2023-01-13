@@ -2984,7 +2984,11 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
-  (match List.filter Protocol.(fun proto -> proto = Alpha) protocols with
+  (match
+     List.filter
+       Protocol.(function Mumbai | Alpha -> true | _ -> false)
+       protocols
+   with
   | [] -> ()
   | protocols -> test_withdrawals_tz4 protocols) ;
   test_single_signer protocols ;
