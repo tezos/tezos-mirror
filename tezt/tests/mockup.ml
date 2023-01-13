@@ -1130,7 +1130,7 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      initialization, while attempting to change each parameter from
      the default in order to verify that config initialization
      respects all fields of the input. *)
-  let protocol_constants_fixture_rpc protocol =
+  let protocol_constants_fixture protocol =
     (* create a temporary client used to call RPC in the given
        protocol *)
     let client = Client.create_with_mode Client.Mockup in
@@ -1179,22 +1179,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
              parametric_constants_succ
              constant_parametric_constants)
           mockup_constants)
-  in
-  (* To fetch a distinct sample of protocol constants, we rely on the
-     RPC [/chains/main/blocks/head/context/constants/parametric]
-     introduced in Lima. For earlier protocols, we rely on hardcoded
-     samples stored in the folder [mockup_protocol_constants]. *)
-  let protocol_constants_fixture (protocol : Protocol.t) =
-    match protocol with
-    | Kathmandu ->
-        return
-        @@ JSON.parse_file
-             (sf
-                "./tezt/tests/mockup_protocol_constants/protocol_constants-%d.json"
-                (Protocol.number protocol))
-    | Lima | Mumbai | Alpha ->
-        (* This function should work on all protocols since Lima.  *)
-        protocol_constants_fixture_rpc protocol
   in
 
   let get_state_using_config_show_mockup ~protocol mockup_client =

@@ -882,98 +882,6 @@ module Revamped = struct
       ~outdated:[oph2]
       client
 
-  (** This test checks that an operation with a wrong signature that is
-      initially branch_delayed (1 M) will be correctly
-      reclassifed after the ban of the two successive applied operations from
-      the same manager, followed by a flush. *)
-  let wrong_signed_branch_delayed_becomes_refused =
-    Protocol.register_test
-      ~__FILE__
-      ~supports:
-        (Protocol.Until_protocol
-           14
-           (* Since protocol 15, the 1M restriction check is done
-              after the validation of the op (which includes the
-              signature checks) *))
-      ~title:"Reclassify branch_delayed operation with wrong signature"
-      ~tags:["mempool"; "wrong"; "signature"]
-    @@ fun protocol ->
-    log_step 1 "Initialize a node and a client." ;
-    let* _node, client =
-      Client.init_with_protocol
-        ~nodes_args:[Synchronisation_threshold 0]
-        ~protocol
-        `Client
-        ()
-    in
-
-    log_step 2 "Inject a transfer with a correct counter." ;
-    let* (`OpHash oph1) =
-      Operation.Manager.(inject [make ~fee:1_000 @@ transfer ()] client)
-    in
-
-    log_step
-      3
-      "Inject a second transfer with a correct counter with lower fee than the \
-       previous operation to avoid replacing it and be rejected with the 1M \
-       restriction." ;
-    let* (`OpHash oph2) =
-      Operation.Manager.(
-        inject ~force:true [make ~fee:999 @@ transfer ()] client)
-    in
-
-    log_step
-      4
-      "Inject a transfer with a correct counter, but with less fees and \
-       ill-signed." ;
-    let* (`OpHash oph3) =
-      Operation.Manager.(
-        inject
-          ~force:true
-          ~signer:Constant.bootstrap2
-          [make ~fee:998 @@ transfer ()]
-          client)
-    in
-
-    log_step
-      5
-      "Check that the mempool contains %s as applied and %s + %s as \
-       branch_delayed."
-      oph1
-      oph2
-      oph3 ;
-    let* () =
-      check_mempool ~applied:[oph1] ~branch_delayed:[oph2; oph3] client
-    in
-
-    log_step 6 "Ban the operation %s." oph1 ;
-    let* _ =
-      RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
-    in
-
-    log_step
-      7
-      "Check that the mempool contains %s as applied and %s as branch_delayed."
-      oph2
-      oph3 ;
-    let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph3] client in
-
-    log_step 8 "Ban the operation %s." oph2 ;
-    let* _ =
-      RPC.Client.call client
-      @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph2)) ()
-    in
-
-    log_step
-      9
-      "Check that the mempool contains %s as refused and that %s + %s are not \
-       in the mempool anymore."
-      oph3
-      oph2
-      oph1 ;
-    check_mempool ~refused:[oph3] client
-
   (** This test checks that an operation applied is not reclassified and stays
       applied after the ban of a branch_delayed operation. *)
   let one_operation_per_manager_per_block_ban =
@@ -4231,7 +4139,6 @@ let register ~protocols =
   Revamped.unban_all_operations protocols ;
   Revamped.test_prefiltered_limit protocols ;
   Revamped.test_prefiltered_limit_remove protocols ;
-  Revamped.wrong_signed_branch_delayed_becomes_refused protocols ;
   Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;

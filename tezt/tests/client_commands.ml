@@ -52,7 +52,7 @@ module Helpers = struct
 
   let supported_signature_schemes = function
     | Protocol.Alpha | Mumbai -> ["ed25519"; "secp256k1"; "p256"; "bls"]
-    | Lima | Kathmandu -> ["ed25519"; "secp256k1"; "p256"]
+    | Lima -> ["ed25519"; "secp256k1"; "p256"]
 
   let airdrop_and_reveal client accounts =
     Log.info "Airdrop 1000tz to each account" ;
@@ -461,7 +461,7 @@ module Transfer = struct
     let* _node, client = Client.init_with_protocol `Client ~protocol () in
     let* () =
       match protocol with
-      | Kathmandu | Lima -> unit
+      | Lima -> unit
       | Mumbai | Alpha ->
           let* () = Client.import_secret_key client Constant.tz4_account in
           airdrop_and_reveal client [Constant.tz4_account]
@@ -474,7 +474,7 @@ module Transfer = struct
     in
     let msg =
       match protocol with
-      | Kathmandu | Lima -> rex "Invalid contract notation \"tz4.*\""
+      | Lima -> rex "Invalid contract notation \"tz4.*\""
       | Mumbai | Alpha ->
           rex
             "The delegate tz4.*\\w is forbidden as it is a BLS public key hash"

@@ -53,7 +53,7 @@ where args can be:
 
 Examples:
 
-$ dune exec ./tests_python/scripts/michelson_script_locator.exe -- -a action=find_all -a directories=mini_scenarios -a protocol=014
+$ dune exec ./tests_python/scripts/michelson_script_locator.exe -- -a action=find_all -a directories=mini_scenarios -a protocol=015
 mini_scenarios/add_clear_tickets
 ...
 $ dune exec ./tests_python/scripts/michelson_script_locator.exe -- -a action=find -a name=mini_scenarios/add_clear_tickets -a protocol=015

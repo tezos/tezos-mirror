@@ -116,15 +116,6 @@ let register_migration_test chain_id =
   in
   let expected_dictator, expected_period =
     match (chain_id, to_protocol) with
-    | Chain_id_ghostnet, Kathmandu ->
-        ( Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8",
-          {
-            Voting.index = 1;
-            kind = Proposal;
-            start_position = 8;
-            position = 2;
-            remaining = 1;
-          } )
     | Chain_id_ghostnet, Lima ->
         ( None,
           {

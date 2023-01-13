@@ -878,8 +878,6 @@ let test_submit_from_originated_source =
   let msg =
     match protocol with
     | Lima | Mumbai | Alpha -> rex "Erroneous command line argument"
-    | Kathmandu ->
-        rex "Only implicit accounts can submit transaction rollup batches"
   in
   let* () = Process.check_error ~exit_code:1 ~msg process in
   unit
