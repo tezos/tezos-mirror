@@ -125,6 +125,8 @@ Node
   file. The node's ``run`` now fails immediately in this case. (MR
   :gl:`!7323`)
 
+- Improved the disk usage footprint when running a context pruning.
+
 Client
 ------
 
