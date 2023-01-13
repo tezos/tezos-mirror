@@ -274,50 +274,6 @@ let error_state_gen =
       fallback_error;
     ]
 
-let pp_interpreter_error out
-    Wasm_pvm_errors.{raw_exception = Truncated raw_exception; explanation} =
-  Format.fprintf
-    out
-    "@[<hv 2>{ raw_exception: %s; explanation: %s }@]"
-    raw_exception
-    (match explanation with
-    | None -> "None"
-    | Some (Truncated s) -> "Some: " ^ s)
-
-let pp_fallback_cause out = function
-  | Wasm_pvm_errors.Decode_cause error ->
-      Format.fprintf out "@[<hv 2>Decode_cause %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Link_cause (Truncated error) ->
-      Format.fprintf out "@[<hv 2>Link_cause %s@]" error
-  | Wasm_pvm_errors.Init_cause error ->
-      Format.fprintf out "@[<hv 2>Init_cause %a@]" pp_interpreter_error error
-
-let pp_error_state out = function
-  | Wasm_pvm_errors.Eval_error error ->
-      Format.fprintf out "@[<hv 2>Eval_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Decode_error error ->
-      Format.fprintf out "@[<hv 2>Decode_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Link_error (Truncated error) ->
-      Format.fprintf out "@[<hv 2>Link_error %s@]" error
-  | Wasm_pvm_errors.Init_error error ->
-      Format.fprintf out "@[<hv 2>Init_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Invalid_state (Truncated err) ->
-      Format.fprintf out "@[<hv 2>Invalid_state (%s)@]" err
-  | Wasm_pvm_errors.Unknown_error (Truncated err) ->
-      Format.fprintf out "@[<hv 2>Unknown_error (%s)@]" err
-  | Wasm_pvm_errors.Too_many_ticks ->
-      Format.fprintf out "@[<hv 2>Too_many_ticks@]"
-  | Wasm_pvm_errors.Too_many_reboots ->
-      Format.fprintf out "@[<hv 2>Too_many_reboots@]"
-  | Wasm_pvm_errors.No_fallback_kernel cause ->
-      Format.fprintf
-        out
-        "@[<hv 2>No_fallback_kernel (%a)@]"
-        pp_fallback_cause
-        cause
-
-let print_error_state = Format.asprintf "%a" pp_error_state
-
 let check_interpreter_error error error' =
   error.Wasm_pvm_errors.raw_exception = error'.Wasm_pvm_errors.raw_exception
   && error.explanation = error'.explanation
@@ -351,7 +307,7 @@ let tests =
       "Wasm_pvm_errors"
       `Quick
       (Test_encodings_util.make_test
-         ~print:print_error_state
+         ~print:Wasm_utils.print_error_state
          (Tezos_tree_encoding.value [] Wasm_pvm_errors.encoding)
          error_state_gen
          error_state_check);

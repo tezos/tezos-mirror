@@ -41,6 +41,7 @@ module Parser = Binary_parser_encodings
 module Utils = struct
   module V = Lazy_vector.Int32Vector
   module C = Chunked_byte_vector
+  include Encodings_util
   include Test_encodings_util
 end
 

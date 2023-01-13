@@ -15,7 +15,7 @@ depends: [
   "tezos-base-test-helpers"
   "tezos-client-alpha"
   "tezos-scoru-wasm"
-  "tezos-scoru-wasm-test-helpers"
+  "tezos-scoru-wasm-helpers"
   "tezos-webassembly-interpreter"
   "tezos-webassembly-interpreter-extra"
 ]

@@ -3257,12 +3257,12 @@ let octez_node_config =
         octez_validation |> open_;
       ]
 
-let octez_scoru_wasm_tests_helpers =
-  private_lib
-    "test_scoru_wasm_test_helpers"
-    ~path:"src/lib_scoru_wasm/test/helpers"
-    ~opam:"tezos-scoru-wasm-test-helpers"
-    ~synopsis:"Helpers for testing for the scoru-wasm functionality"
+let octez_scoru_wasm_helpers =
+  public_lib
+    "tezos-scoru-wasm-helpers"
+    ~path:"src/lib_scoru_wasm/helpers"
+    ~opam:"tezos-scoru-wasm-helpers"
+    ~synopsis:"Helpers for the smart rollup wasm functionality and debugger"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3280,6 +3280,29 @@ let octez_scoru_wasm_tests_helpers =
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
+let octez_scoru_wasm_tests_helpers =
+  private_lib
+    "tezos_scoru_wasm_test_helpers"
+    ~path:"src/lib_scoru_wasm/test/helpers"
+    ~opam:"tezos-scoru-wasm-test-helpers"
+    ~synopsis:"Helpers for test of the smart rollup wasm functionality"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_context_disk;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers;
+        octez_scoru_wasm;
+        octez_scoru_wasm_fast;
+        octez_scoru_wasm_helpers;
+        qcheck_alcotest;
+        alcotest_lwt;
+        octez_webassembly_interpreter_extra |> open_;
+      ]
+    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+
 let _octez_scoru_wasm_benchmark =
   private_exe
     "benchmark_scoru_wasm"
@@ -3293,7 +3316,7 @@ let _octez_scoru_wasm_benchmark =
         octez_webassembly_interpreter;
         octez_context_memory;
         octez_scoru_wasm;
-        octez_scoru_wasm_tests_helpers;
+        octez_scoru_wasm_helpers;
         lwt_unix;
       ]
     ~preprocess:[pps ppx_deriving_show]
@@ -3315,7 +3338,7 @@ let _octez_scoru_wasm_tests =
         octez_scoru_wasm;
         qcheck_alcotest;
         alcotest_lwt;
-        tezt_lib;
+        octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
         octez_webassembly_interpreter_extra |> open_;
       ]
@@ -3334,6 +3357,7 @@ let _octez_scoru_wasm_fast_tests =
         octez_base_unix;
         octez_context_disk;
         octez_base_test_helpers |> open_;
+        octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
         octez_test_helpers |> open_;
         octez_scoru_wasm;
@@ -3853,7 +3877,7 @@ end = struct
               octez_test_helpers |> open_;
               test_helpers |> if_some |> open_;
               alcotest_lwt;
-              octez_scoru_wasm_tests_helpers |> if_ N.(number >= 016) |> open_;
+              octez_scoru_wasm_helpers |> if_ N.(number >= 016) |> open_;
               octez_stdlib |> if_ N.(number >= 013) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_scoru_wasm;
@@ -5988,7 +6012,7 @@ let _octez_scoru_wasm_debugger =
     ~path:"src/bin_wasm_debugger"
     ~opam:"octez-smart-rollup-wasm-debugger"
     ~synopsis:"Tezos: Debugger for the smart rollups’ WASM kernels"
-    ~release_status:Experimental
+    ~release_status:Released
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -6000,7 +6024,7 @@ let _octez_scoru_wasm_debugger =
            available. *)
         Protocol.(client_exn alpha);
         octez_scoru_wasm;
-        octez_scoru_wasm_tests_helpers |> open_;
+        octez_scoru_wasm_helpers |> open_;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
       ]

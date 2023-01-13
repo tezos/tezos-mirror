@@ -314,7 +314,12 @@ opam:octez-smart-rollup-node-PtMumbai:
 
 # Ignoring unreleased package octez-smart-rollup-node-alpha.
 
-# Ignoring unreleased package octez-smart-rollup-wasm-debugger.
+opam:octez-smart-rollup-wasm-debugger:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-smart-rollup-wasm-debugger
 
 # Ignoring unreleased package octez-snoop.
 
@@ -371,7 +376,7 @@ opam:tezos-baking-014-PtKathma-commands:
 opam:tezos-baking-015-PtLimaPt:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-baking-015-PtLimaPt
 
@@ -664,7 +669,7 @@ opam:tezos-dal-node-lib:
 opam:tezos-dal-node-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-dal-node-services
 
@@ -720,7 +725,7 @@ opam:tezos-embedded-protocol-005-PsBabyM1:
 opam:tezos-embedded-protocol-006-PsCARTHA:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-006-PsCARTHA
 
@@ -965,7 +970,7 @@ opam:tezos-p2p:
 opam:tezos-p2p-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-p2p-services
 
@@ -1084,7 +1089,7 @@ opam:tezos-protocol-013-PtJakart:
 opam:tezos-protocol-014-PtKathma:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-014-PtKathma
 
@@ -1246,7 +1251,7 @@ opam:tezos-protocol-plugin-013-PtJakart-registerer:
 opam:tezos-protocol-plugin-014-PtKathma:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-plugin-014-PtKathma
 
@@ -1285,7 +1290,7 @@ opam:tezos-protocol-plugin-016-PtMumbai:
 opam:tezos-protocol-plugin-016-PtMumbai-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-protocol-plugin-016-PtMumbai-registerer
 
@@ -1394,6 +1399,13 @@ opam:tezos-scoru-wasm-fast:
     package: tezos-scoru-wasm-fast
 
 # Ignoring unreleased package tezos-scoru-wasm-fast-test.
+
+opam:tezos-scoru-wasm-helpers:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: tezos-scoru-wasm-helpers
 
 # Ignoring unreleased package tezos-scoru-wasm-test.
 
@@ -1544,7 +1556,12 @@ opam:tezos-webassembly-interpreter:
   variables:
     package: tezos-webassembly-interpreter
 
-# Ignoring unreleased package tezos-webassembly-interpreter-extra.
+opam:tezos-webassembly-interpreter-extra:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezos-webassembly-interpreter-extra
 
 opam:tezos-workers:
   extends:

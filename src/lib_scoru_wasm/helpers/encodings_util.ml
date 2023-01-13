@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,29 +24,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** PVM instance used in benchmark*)
-module Wasm :
-  Tezos_scoru_wasm.Wasm_pvm_sig.S
-    with type tree = Tezos_scoru_wasm_helpers.Encodings_util.Context.tree
+(* Use context-binary for testing. *)
+module Context = Tezos_context_memory.Context_binary
+include Tezos_tree_encoding
 
-module Wasm_fast_vm : Tezos_scoru_wasm.Wasm_vm_sig.S
+type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-open Tezos_scoru_wasm
-open Wasm_pvm_state
+module Tree = struct
+  type t = Context.t
 
-val encode_pvm_state : Internal_state.pvm_state -> Wasm.tree -> Wasm.tree Lwt.t
+  type tree = Context.tree
 
-val decode_pvm_state : Wasm.tree -> Internal_state.pvm_state Lwt.t
+  type key = Context.key
 
-val get_tick_from_tree : Wasm.tree -> Z.t Lwt.t
+  type value = Context.value
 
-val get_tick_from_pvm_state : Internal_state.pvm_state -> Z.t Lwt.t
+  include Context.Tree
 
-(** Pretty Printing utilities*)
-module PP : sig
-  val pp_error_state : Wasm_pvm_errors.t -> string
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
-  val tick_label : Internal_state.tick_state -> string
+  let wrap t = Tree t
 end
 
-val builtins : Tezos_scoru_wasm.Builtins.reveals
+module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (Tree)
+
+let empty_tree () =
+  let open Lwt_syntax in
+  let* index = Context.init "/tmp" in
+  let empty_store = Context.empty index in
+  return @@ Context.Tree.empty empty_store
