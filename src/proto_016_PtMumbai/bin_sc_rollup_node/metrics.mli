@@ -23,6 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The collector registry for the rollup node metrics. *)
+val sc_rollup_node_registry : Prometheus.CollectorRegistry.t
+
 (** [metrics_server metrics_addr] runs a server for the rollup metrics on [metrics_addr].
     The metrics are accessible thanks to a [/metrics] request. *)
 val metrics_serve : string option -> (unit, tztrace) result Lwt.t
+
+(** [print_csv_metrics ppf metrics] prints the [metrics] as CSV. *)
+val print_csv_metrics :
+  Format.formatter -> 'a Prometheus.MetricFamilyMap.t -> unit
+
+(** The node info metrics *)
+module Info : sig
+  (** Initializes the metric for rollup info
+      with a the given arguments as label values *)
+  val init_rollup_node_info :
+    id:Protocol.Alpha_context.Sc_rollup.t ->
+    mode:Configuration.mode ->
+    genesis_level:Protocol.Alpha_context.Raw_level.t ->
+    genesis_hash:Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t ->
+    pvm_kind:Protocol.Alpha_context.Sc_rollup.Kind.t ->
+    unit
+end
+
+(** The metrics related to Inboxes *)
+module Inbox : sig
+  (** The type of an inbox metrics *)
+  type t = {head_inbox_level : Prometheus.Gauge.t}
+
+  (** The stats for the inboxes *)
+  module Stats : sig
+    (** The list of messages from the head *)
+    val head_messages_list :
+      Protocol.Alpha_context.Sc_rollup.Inbox_message.t list ref
+  end
+
+  (** The inboxes metrics *)
+  val metrics : t
+end

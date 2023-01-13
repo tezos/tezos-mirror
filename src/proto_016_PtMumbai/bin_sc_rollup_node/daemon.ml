@@ -494,6 +494,12 @@ module Make (PVM : Pvm.S) = struct
       in
       daemonize configuration node_ctxt
     in
+    Metrics.Info.init_rollup_node_info
+      ~id:node_ctxt.rollup_address
+      ~mode:configuration.mode
+      ~genesis_level:node_ctxt.genesis_info.level
+      ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+      ~pvm_kind:node_ctxt.kind ;
     start ()
 end
 
