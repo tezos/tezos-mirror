@@ -23,14 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4596
+   properly document this modules, including side-effects and
+   interaction with [P2p_pool]. *)
+
 (** This module manages incoming [accept] and outgoing connections [connect].
 
     [connect] and [accept] try to authenticate the remote point, and agree
     on protocol version. They ultimately returns a [P2p_conn.t] which provides
     the highest-level view of a connection in [lib_p2p].
-
-    TODO: properly document this modules, including side-effects and
-          interaction with [P2p_pool].
 
     Functions of this module can trigger two types of events. They can *log*
     [P2p_connection.P2p_event.t], and they can trigger condition variables

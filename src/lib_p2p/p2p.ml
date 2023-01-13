@@ -241,7 +241,9 @@ module Real = struct
     P2p_maintenance.activate t.maintenance ;
     ()
 
-  let roll _net () = Lwt.return_unit (* TODO implement *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4597
+     Implement [roll] function. *)
+  let roll _net () = Lwt.return_unit
 
   (* returns when all workers have shut down in the opposite
      creation order. *)

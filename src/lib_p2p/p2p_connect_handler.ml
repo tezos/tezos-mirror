@@ -250,7 +250,8 @@ let is_acceptable t connection_point_info peer_info incoming version =
     (* Point is acceptable, checking if peer is. *)
     match P2p_peer_state.get peer_info with
     | Accepted _
-    (* TODO: in some circumstances cancel and accept... *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4679
+       in some circumstances cancel and accept... *)
     | Running _ ->
         P2p_rejection.(rejecting Already_connected)
     (* All right, welcome ! *)
