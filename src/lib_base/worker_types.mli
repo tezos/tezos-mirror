@@ -71,4 +71,8 @@ val full_status_encoding :
   error list Data_encoding.t ->
   'req full_status Data_encoding.t
 
+(** Exhaustive status pretty printer *)
 val pp_status : Format.formatter -> request_status -> unit
+
+(** Pretty-prints the completion time *)
+val pp_status_completed : Format.formatter -> request_status -> unit
