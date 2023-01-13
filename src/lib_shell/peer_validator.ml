@@ -423,7 +423,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
         return_ok_unit
     | Distributed_db.Operations.Canceled _ :: _ -> (
         (* Given two nodes A and B (remote). This may happen if A
-           prechecks a block, sends it to B. B prechecks a block, sends
+           validates a block, sends it to B. B validates a block, sends
            it to A. A tries to fetch operations of the block to B, in
            the meantime, A validates the block and cancels the fetching.
         *)
