@@ -16,7 +16,7 @@ trace
   - location: 11 (just consumed gas: 0.010)
     [ 0x06
       0 ]
-  - location: 14 (just consumed gas: 0.070)
+  - location: 14 (just consumed gas: 0.065)
     [ 0x06 ]
   - location: 15 (just consumed gas: 0.010)
     [ 0x06
@@ -34,7 +34,7 @@ trace
   - location: 31 (just consumed gas: 0.010)
     [ 0x06
       1 ]
-  - location: 34 (just consumed gas: 0.070)
+  - location: 34 (just consumed gas: 0.065)
     [ 0x000c ]
   - location: 35 (just consumed gas: 0.010)
     [ 0x000c
@@ -52,7 +52,7 @@ trace
   - location: 51 (just consumed gas: 0.010)
     [ 0x06
       8 ]
-  - location: 54 (just consumed gas: 0.070)
+  - location: 54 (just consumed gas: 0.065)
     [ 0x0600 ]
   - location: 55 (just consumed gas: 0.010)
     [ 0x0600
@@ -70,7 +70,7 @@ trace
   - location: 71 (just consumed gas: 0.010)
     [ 0x0006
       1 ]
-  - location: 74 (just consumed gas: 0.071)
+  - location: 74 (just consumed gas: 0.066)
     [ 0x00000c ]
   - location: 75 (just consumed gas: 0.010)
     [ 0x00000c

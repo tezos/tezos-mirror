@@ -1,7 +1,7 @@
 
 ./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/opcodes/sets.tz --details
 Well typed
-Gas remaining: 1039953.534 units remaining
+Gas remaining: 1039952.034 units remaining
 { parameter unit ;
   storage unit ;
   code { DROP
