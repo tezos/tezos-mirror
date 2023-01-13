@@ -213,9 +213,7 @@ let create ~protocol ?runner ?data_dir ?(addr = "127.0.0.1")
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
-  let path =
-    String.concat "-" [Constant.tx_rollup_node; Protocol.daemon_name protocol]
-  in
+  let path = Protocol.tx_rollup_node protocol in
   let tx_node =
     create
       ?runner

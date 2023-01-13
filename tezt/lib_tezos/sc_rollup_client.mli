@@ -51,13 +51,13 @@ type simulation_result = {
   num_ticks : int;
 }
 
-(** [create ?name ?path ?base_dir ?path node] returns a fresh client
+(** [create ~protocol ?name ?base_dir node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
    communicating with the specified [node]. *)
 val create :
+  protocol:Protocol.t ->
   ?name:string ->
-  ?path:string ->
   ?base_dir:string ->
   ?color:Log.Color.t ->
   Sc_rollup_node.t ->
