@@ -1271,7 +1271,7 @@ module Make (Proto : Protocol_plugin.T) = struct
     in
     return (preapply_result, (result, context))
 
-  let precheck block_hash chain_id ~(predecessor_block_header : Block_header.t)
+  let validate block_hash chain_id ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_hash ~predecessor_context
       ~predecessor_resulting_context_hash ~cache
       ~(block_header : Block_header.t) operations =
@@ -1315,13 +1315,13 @@ module Make (Proto : Protocol_plugin.T) = struct
     let* () = Proto.finalize_validation state in
     return_unit
 
-  let precheck chain_id ~(predecessor_block_header : Block_header.t)
+  let validate chain_id ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_hash ~predecessor_context
       ~predecessor_resulting_context_hash ~cache
       ~(block_header : Block_header.t) operations =
     let block_hash = Block_header.hash block_header in
     trace (invalid_block block_hash Economic_protocol_error)
-    @@ precheck
+    @@ validate
          block_hash
          chain_id
          ~predecessor_block_header
@@ -1435,7 +1435,7 @@ let recompute_metadata ~chain_id ~predecessor_block_header ~predecessor_context
       tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
-let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
+let validate ~chain_id ~predecessor_block_header ~predecessor_block_hash
     ~predecessor_context ~predecessor_resulting_context_hash ~cache block_header
     operations =
   let open Lwt_result_syntax in
@@ -1445,7 +1445,7 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
   let module Block_validation = Make (Proto) in
-  Block_validation.precheck
+  Block_validation.validate
     chain_id
     ~predecessor_block_header
     ~predecessor_block_hash
@@ -1455,7 +1455,7 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     ~block_header
     operations
 
-let apply ?simulate ?cached_result ?(should_precheck = true)
+let apply ?simulate ?cached_result ?(should_validate = true)
     {
       chain_id;
       user_activated_upgrades;
@@ -1474,8 +1474,8 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
     Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
   let* () =
-    if should_precheck && Proto.(compare environment_version V7 >= 0) then
-      precheck
+    if should_validate && Proto.(compare environment_version V7 >= 0) then
+      validate
         ~chain_id
         ~predecessor_block_header
         ~predecessor_block_hash:block_header.Block_header.shell.predecessor
@@ -1525,7 +1525,7 @@ let retry_with_force_loaded_cache ?(event = fun () -> Lwt.return_unit) ~cache f
       tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
-let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
+let apply ?simulate ?cached_result ?should_validate apply_environment ~cache
     block_header operations =
   let block_hash = Block_header.hash block_header in
   let event () = Event.(emit inherited_inconsistent_cache_apply) block_hash in
@@ -1533,7 +1533,7 @@ let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
     apply
       ?simulate
       ?cached_result
-      ?should_precheck
+      ?should_validate
       apply_environment
       ~cache
       block_hash

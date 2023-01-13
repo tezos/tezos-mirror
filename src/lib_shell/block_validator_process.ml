@@ -299,7 +299,7 @@ module Internal_validator_process = struct
       Block_validation.apply
         ~simulate
         ?cached_result:validator.preapply_result
-        ~should_precheck
+        ~should_validate:should_precheck
         env
         block_header
         operations
@@ -405,7 +405,7 @@ module Internal_validator_process = struct
           `Inherited (block_cache, predecessor_resulting_context_hash)
     in
     let predecessor_block_hash = Store.Block.hash predecessor in
-    Block_validation.precheck
+    Block_validation.validate
       ~chain_id
       ~predecessor_block_header
       ~predecessor_block_hash
@@ -935,7 +935,7 @@ module External_validator_process = struct
           predecessor_resulting_context_hash;
           operations;
           max_operations_ttl;
-          should_precheck;
+          should_validate = should_precheck;
           simulate;
         }
     in
@@ -974,7 +974,7 @@ module External_validator_process = struct
       Store.Block.resulting_context_hash chain_store predecessor
     in
     let request =
-      External_validation.Precheck
+      External_validation.Validate
         {
           chain_id;
           predecessor_block_header;

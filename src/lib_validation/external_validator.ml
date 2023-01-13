@@ -59,7 +59,7 @@ module Events = struct
       ~section
       ~level:Info
       ~name:"validation_request"
-      ~msg:"prechecking and applying block {block}"
+      ~msg:"validating and applying block {block}"
       ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
@@ -81,12 +81,12 @@ module Events = struct
       ~pp1:Block_hash.pp
       ("hash", Block_hash.encoding)
 
-  let precheck_request =
+  let validate_request =
     declare_1
       ~section
       ~level:Info
-      ~name:"precheck_request"
-      ~msg:"prechecking block {hash}"
+      ~name:"validate_request"
+      ~msg:"validate block {hash}"
       ~pp1:Block_hash.pp
       ("hash", Block_hash.encoding)
 
@@ -297,11 +297,11 @@ let handle_request :
         predecessor_resulting_context_hash;
         operations;
         max_operations_ttl;
-        should_precheck;
+        should_validate;
         simulate;
       } ->
       let*! () =
-        if should_precheck then Events.(emit validation_request block_header)
+        if should_validate then Events.(emit validation_request block_header)
         else Events.(emit application_request block_header)
       in
       let*! block_application_result =
@@ -344,7 +344,7 @@ let handle_request :
             Block_validation.apply
               ~simulate
               ?cached_result
-              ~should_precheck
+              ~should_validate
               env
               block_header
               operations
@@ -427,7 +427,7 @@ let handle_request :
         | Error _ as err -> Lwt.return (err, None)
       in
       continue res cache cachable_result
-  | External_validation.Precheck
+  | External_validation.Validate
       {
         chain_id;
         predecessor_block_header;
@@ -437,8 +437,8 @@ let handle_request :
         operations;
         hash;
       } ->
-      let*! () = Events.(emit precheck_request hash) in
-      let*! block_precheck_result =
+      let*! () = Events.(emit validate_request hash) in
+      let*! block_validate_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
               let*! o =
@@ -461,7 +461,7 @@ let handle_request :
         let*! protocol_hash = Context_ops.get_protocol predecessor_context in
         let* () = load_protocol protocol_hash protocol_root in
         with_retry_to_load_protocol protocol_root (fun () ->
-            Block_validation.precheck
+            Block_validation.validate
               ~chain_id
               ~predecessor_block_header
               ~predecessor_block_hash
@@ -471,7 +471,7 @@ let handle_request :
               header
               operations)
       in
-      continue block_precheck_result cache cached_result
+      continue block_validate_result cache cached_result
   | External_validation.Fork_test_chain {chain_id; context_hash; forked_header}
     ->
       let*! () = Events.(emit fork_test_chain_request forked_header) in
