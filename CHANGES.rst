@@ -22,6 +22,13 @@ or which will affect users in the future (deprecated features),
 not refactorings or tests. Changes to the documentation do not need to
 be documented here either.
 
+General
+-------
+
+- **Breaking change**: Symbolic links from old-names ``tezos-*`` to new-names ``octez-*``
+  have been removed.
+  Old names are not supported anymore.
+
 Node
 ----
 
