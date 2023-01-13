@@ -60,10 +60,11 @@ let remove_existing_records () =
   Array.iter remove_if_looks_like_a_record (Sys.readdir records_directory)
 
 let fetch_pipeline_records () =
+  let project = Uri.pct_encode project in
   let* jobs =
     get_all_pages
-      ("https://gitlab.com/api/v4/projects/" ^ Uri.pct_encode project
-     ^ "/pipelines/" ^ string_of_int pipeline ^ "/jobs")
+      ("https://gitlab.com/api/v4/projects/" ^ project ^ "/pipelines/"
+     ^ string_of_int pipeline ^ "/jobs")
   in
   let get_record job =
     let job_id = JSON.(job |-> "id" |> as_int) in
@@ -72,8 +73,9 @@ let fetch_pipeline_records () =
     | None -> None
     | Some index ->
         Some
-          ( "https://gitlab.com/" ^ project ^ "/-/jobs/" ^ string_of_int job_id
-            ^ "/artifacts/file/tezt-results-" ^ index ^ ".json",
+          ( "https://gitlab.com/api/v4/projects/" ^ project ^ "/jobs/"
+            ^ string_of_int job_id ^ "/artifacts/tezt-results-" ^ index
+            ^ ".json",
             index )
   in
   let records = List.filter_map get_record jobs in
