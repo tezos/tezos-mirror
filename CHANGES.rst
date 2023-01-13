@@ -177,6 +177,8 @@ Docker Images
 Rollups
 -------
 
+- Release ``octez-smart-rollup-wasm-debugger`` as part of the Octez distribution (MR :gl:`!7295`). See the smart rollups documentation for its functionalities and how to use it to test and debug kernels.
+
 Miscellaneous
 -------------
 
