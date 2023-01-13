@@ -97,7 +97,8 @@ module Default_answerer = struct
               log (Advertise_sent {source = source_peer_id}) ;
               return_unit
           | Ok false ->
-              (* if not sent then ?? TODO count dropped message ?? *)
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/4594
+                 if not sent then ?? TODO count dropped message ?? *)
               return_unit
           | Error err as error ->
               let*! () =
