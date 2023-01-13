@@ -10,11 +10,6 @@
   test_prevalidator_classification
   test_prevalidator_classification_operations
   test_prevalidator_pending_operations
-  legacy_test_prevalidation
-  legacy_test_prevalidation_t
-  legacy_test_prevalidator_classification
-  legacy_test_prevalidator_classification_operations
-  legacy_test_prevalidator_pending_operations
   test_peer_validator)
  (libraries
   tezos-base
@@ -89,32 +84,6 @@
  (alias runtest)
  (package tezos-shell)
  (action (run %{dep:./test_prevalidator_pending_operations.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidation.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidation_t.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidator_classification.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action
-  (run %{dep:./legacy_test_prevalidator_classification_operations.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./legacy_test_prevalidator_pending_operations.exe})))
 
 (rule
  (alias runtest)

@@ -56,11 +56,11 @@ let create limits (filter : Shell_plugin.filter_t) chain_db =
         | Recent (module Filter) ->
             Prevalidator_internal.make limits chain_db chain_id (module Filter)
         | Legacy (module Filter) ->
-            Legacy_prevalidator_internal.make
-              limits
-              chain_db
-              chain_id
-              (module Filter)
+            (* Legacy filters are for protocols Kathmandu and before,
+               which are no longer supported by the mempool. We do not
+               write a cleaner error because this will go away in the
+               very next commit anyway. *)
+            assert false
       in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=

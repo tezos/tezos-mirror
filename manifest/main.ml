@@ -5516,11 +5516,6 @@ let _octez_shell_tests =
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
-      "legacy_test_prevalidation";
-      "legacy_test_prevalidation_t";
-      "legacy_test_prevalidator_classification";
-      "legacy_test_prevalidator_classification_operations";
-      "legacy_test_prevalidator_pending_operations";
       "test_peer_validator";
     ]
     ~path:"src/lib_shell/test"
