@@ -154,4 +154,4 @@ let tests =
         nonce_gens)
     []
     voting_periods
-  |> Lib_test.Qcheck2_helpers.qcheck_wrap_lwt
+  |> Qcheck2_helpers.qcheck_wrap_lwt

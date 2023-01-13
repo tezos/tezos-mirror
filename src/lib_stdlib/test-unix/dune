@@ -18,7 +18,8 @@
   qcheck-alcotest)
  (flags
   (:standard)
-  -open Tezos_stdlib))
+  -open Tezos_stdlib
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

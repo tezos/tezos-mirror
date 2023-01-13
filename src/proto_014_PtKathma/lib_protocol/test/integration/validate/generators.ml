@@ -252,7 +252,7 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
 
 let wrap ~name ?print ?(count = 1) ?check ~(gen : 'a QCheck2.Gen.t)
     (f : 'a -> bool tzresult Lwt.t) =
-  Lib_test.Qcheck2_helpers.qcheck_make_result_lwt
+  Qcheck2_helpers.qcheck_make_result_lwt
     ~name
     ?print
     ~count

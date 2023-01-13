@@ -27,7 +27,7 @@
    checks most errors directly. So we don't need the syntactic support to
    alleviate the error handling. *)
 open Support.Lib.Monad.Lwt_syntax
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 module IntESHashtbl = Support.Lib.Hashtbl.Make_es (struct
   type t = int

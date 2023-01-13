@@ -217,7 +217,7 @@ let conflict_free_tests =
       let* (_ : infos) = validate_diagnostic ~mode infos [op2; op1] in
       return_true)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 let tests : (string * [`Quick | `Slow] * (unit -> unit Lwt.t)) trace =
   qcheck_wrap_lwt

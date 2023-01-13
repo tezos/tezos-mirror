@@ -34,7 +34,7 @@
 
 open Tezos_protocol_environment.Internal_for_tests.Environment_cache
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 module Test = QCheck2.Test
 

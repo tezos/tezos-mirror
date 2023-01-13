@@ -90,8 +90,8 @@ let raw_operation_with_hash_gen ?proto_gen ?block_hash_t () :
 
 let q_in_0_1 () =
   let open QCheck2.Gen in
-  let* q = Lib_test.Qcheck2_helpers.int64_range_gen 1L Int64.max_int in
-  let+ p = Lib_test.Qcheck2_helpers.int64_range_gen 0L q in
+  let* q = Qcheck2_helpers.int64_range_gen 1L Int64.max_int in
+  let+ p = Qcheck2_helpers.int64_range_gen 0L q in
   Q.make (Z.of_int64 p) (Z.of_int64 q)
 
 let priority_gen () : Pending_operations.priority QCheck2.Gen.t =

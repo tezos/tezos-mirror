@@ -14,7 +14,8 @@
   (:standard)
   -open Tezos_base
   -open Tezos_base_unix
-  -open Tezos_error_monad))
+  -open Tezos_error_monad
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

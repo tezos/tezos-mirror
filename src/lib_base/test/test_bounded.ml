@@ -422,5 +422,5 @@ let () =
     "Bounded"
     [
       ("Int32", int32_checks);
-      ("Round-trip property", Lib_test.Qcheck2_helpers.qcheck_wrap tests);
+      ("Round-trip property", Qcheck2_helpers.qcheck_wrap tests);
     ]

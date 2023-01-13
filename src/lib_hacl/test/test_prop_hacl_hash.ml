@@ -32,7 +32,7 @@
                   SHA512.
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2
 
 module Hash_Properties (Desc : sig

@@ -577,8 +577,8 @@ let test_round_and_offset_correction =
     ~name:"round_and_offset is correct"
     QCheck2.(
       Gen.pair
-        Lib_test.Qcheck2_helpers.(Gen.pair uint16 uint16)
-        (Lib_test.Qcheck2_helpers.int64_range_gen 0L 100000L))
+        Qcheck2_helpers.(Gen.pair uint16 uint16)
+        (Qcheck2_helpers.int64_range_gen 0L 100000L))
     (fun ((first_round_duration, delay_increment_per_round), level_offset) ->
       QCheck2.assume (first_round_duration > 0) ;
       QCheck2.assume (delay_increment_per_round > 0) ;

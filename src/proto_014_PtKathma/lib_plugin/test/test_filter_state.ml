@@ -30,7 +30,7 @@
     Subject:      Unit tests the filter tests function of the plugin
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Plugin.Mempool
 open Test_utils
 

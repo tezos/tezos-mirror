@@ -31,8 +31,7 @@
     Subject:      Tx rollup l2 encoding
 *)
 
-open Lib_test
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Protocol.Indexable
 open Protocol.Tx_rollup_l2_batch
 open Protocol.Tx_rollup_l2_apply

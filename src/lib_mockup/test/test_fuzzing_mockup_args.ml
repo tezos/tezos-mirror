@@ -31,7 +31,7 @@
 *)
 
 open Tezos_mockup_registration.Mockup_args
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 let chain_id_gen = QCheck2.Gen.(map Chain_id.of_string string)
 

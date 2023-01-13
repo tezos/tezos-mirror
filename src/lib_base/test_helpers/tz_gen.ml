@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open QCheck2.Gen
 
 let ipv4 = map Ipaddr.V4.of_int32 int32
@@ -35,7 +35,7 @@ let ipv4_as_v6 = map Ipaddr.v6_of_v4 ipv4
 let addr_port_id =
   let open P2p_point.Id in
   let* addr = map Ipaddr.V4.to_string ipv4
-  and* port = opt Lib_test.Qcheck2_helpers.uint16 in
+  and* port = opt Qcheck2_helpers.uint16 in
   pure {addr; port; peer_id = None}
 
 let port = uint16

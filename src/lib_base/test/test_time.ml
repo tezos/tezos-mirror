@@ -32,7 +32,7 @@
 *)
 
 open Time
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 module Protocol = struct
   include Protocol

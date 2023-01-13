@@ -40,7 +40,7 @@
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 open Shell_operation
 module Classification = Prevalidator_classification
 

@@ -30,7 +30,7 @@
     Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 (* Verify the default behavior of split is handling multiple instances of the
    separator in a row
@@ -67,7 +67,7 @@ let test_split =
 
 let split_tests =
   [("handles a duplicated separator", `Quick, test_split_duplicated_separator)]
-  @ Lib_test.Qcheck2_helpers.qcheck_wrap [test_split]
+  @ Qcheck2_helpers.qcheck_wrap [test_split]
 
 let test_chunk_empty () =
   match TzString.chunk_bytes 1 Bytes.empty with
@@ -128,7 +128,7 @@ let chunk_bytes_tests =
       `Quick,
       test_chunk_no_error_if_complete_chunks );
   ]
-  @ Lib_test.Qcheck2_helpers.qcheck_wrap [test_chunk_concat]
+  @ Qcheck2_helpers.qcheck_wrap [test_chunk_concat]
 
 let () =
   Alcotest.run

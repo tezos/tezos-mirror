@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name lib_test)
+ (name tezos_test_helpers)
  (public_name tezos-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries

@@ -13,6 +13,7 @@
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-014-PtKathma
+  tezos-test-helpers
   tezos-014-PtKathma-test-helpers
   alcotest-lwt
   tezos-stdlib
@@ -25,6 +26,7 @@
   -open Tezos_micheline
   -open Tezos_client_014_PtKathma
   -open Tezos_protocol_014_PtKathma
+  -open Tezos_test_helpers
   -open Tezos_014_PtKathma_test_helpers
   -open Tezos_stdlib))
 

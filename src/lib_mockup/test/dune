@@ -6,6 +6,7 @@
  (libraries
   tezos-base
   tezos-base-test-helpers
+  tezos-test-helpers
   tezos-rpc
   tezos-mockup
   tezos-mockup-registration
@@ -15,7 +16,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Tezos_test_helpers))
 
 (rule
  (alias runtest)

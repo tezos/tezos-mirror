@@ -25,7 +25,6 @@
 
 open Liquidity_baking_machine
 open QCheck2.Gen
-open Lib_test
 
 let total_xtz = 32_000_000_000_000L
 

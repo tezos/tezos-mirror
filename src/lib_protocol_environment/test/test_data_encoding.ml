@@ -61,7 +61,7 @@ let test_unparsable_lazyexpr () =
         ("y", `O [("unparsed-binary", `String "01020304")]);
       ]
   in
-  Lib_test.Assert.equal
+  Assert.equal
     ~pp:Data_encoding.Json.pp
     ~msg:"Constructed json is incorrect"
     ~loc:__LOC__

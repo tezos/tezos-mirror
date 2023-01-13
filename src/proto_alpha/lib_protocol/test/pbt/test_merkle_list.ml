@@ -31,7 +31,7 @@
     Subject:      Tx rollup l2 encoding
 *)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 (* ------ generators -------------------------------------------------------- *)
 

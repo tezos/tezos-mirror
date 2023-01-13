@@ -13,6 +13,7 @@
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-016-PtMumbai
+  tezos-test-helpers
   tezos-016-PtMumbai-test-helpers
   alcotest-lwt
   test_scoru_wasm_test_helpers
@@ -29,6 +30,7 @@
   -open Tezos_client_016_PtMumbai
   -open Tezos_protocol_016_PtMumbai_parameters
   -open Tezos_protocol_016_PtMumbai
+  -open Tezos_test_helpers
   -open Tezos_016_PtMumbai_test_helpers
   -open Test_scoru_wasm_test_helpers
   -open Tezos_stdlib

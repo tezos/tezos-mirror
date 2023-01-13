@@ -29,7 +29,7 @@
     Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 module String = struct
   include String

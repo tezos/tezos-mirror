@@ -30,7 +30,7 @@
     Subject:      Test the cache used for Wasmer modules
 *)
 
-module Assert = Lib_test.Assert
+module Assert = Assert
 
 module IntHash = struct
   type t = int

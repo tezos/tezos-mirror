@@ -30,7 +30,7 @@
     Subject:      Property-tests over the interface S.SIGNATURE and its
                   instantiations.
 *)
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 open QCheck2
 

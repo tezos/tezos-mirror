@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 module Proof = Tezos_context_sigs.Context.Proof_types
 
 let raw_context_gen =

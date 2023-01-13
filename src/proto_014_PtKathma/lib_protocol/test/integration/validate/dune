@@ -9,6 +9,7 @@
   tezos-protocol-014-PtKathma
   qcheck-alcotest
   tezos-client-014-PtKathma
+  tezos-test-helpers
   tezos-014-PtKathma-test-helpers
   tezos-base-test-helpers
   tezos-protocol-plugin-014-PtKathma)
@@ -18,6 +19,7 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_014_PtKathma
   -open Tezos_client_014_PtKathma
+  -open Tezos_test_helpers
   -open Tezos_014_PtKathma_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_plugin_014_PtKathma))

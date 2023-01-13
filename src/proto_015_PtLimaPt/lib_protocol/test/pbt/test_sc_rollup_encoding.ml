@@ -33,7 +33,7 @@
 
 open Protocol
 open QCheck2
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 let lift k = Lwt.map Environment.wrap_tzresult k
 

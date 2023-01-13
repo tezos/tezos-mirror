@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Test_fuzzing_tests
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 module ListWithBase = struct
   type 'a elt = 'a

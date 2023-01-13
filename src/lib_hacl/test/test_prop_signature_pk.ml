@@ -33,7 +33,7 @@
                   This is currently only relevant for Hacl.P256 since it is
                   the only scheme in which these 2 functions are different.
 *)
-open Lib_test.Qcheck2_helpers
+open Qcheck2_helpers
 
 open QCheck2
 
