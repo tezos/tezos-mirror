@@ -64,12 +64,12 @@ val create :
 
 type block_validity =
   | Valid
-  | Unapplicable_after_precheck of
-      error trace (* precheck succeeded but application failed *)
+  | Inapplicable_after_validation of
+      error trace (* validation succeeded but application failed *)
   | Invalid of error trace
-(* Invalid (precheck failed) *)
+(* Invalid (validation failed) *)
 
-(** [precheck_and_apply ?precheck_and_notify validator ddb hash header ops]
+(** [validate_and_apply ?validate_and_notify validator ddb hash header ops]
     validates a block [header] [ops] of hash [hash]. It is a no-op in the
     following cases:
 
@@ -101,12 +101,12 @@ type block_validity =
    block a second time.
 
  *)
-val precheck_and_apply :
+val validate_and_apply :
   t ->
   ?canceler:Lwt_canceler.t ->
   ?peer:P2p_peer.Id.t ->
   ?notify_new_block:(new_block -> unit) ->
-  ?precheck_and_notify:bool ->
+  ?validate_and_notify:bool ->
   Distributed_db.chain_db ->
   Block_hash.t ->
   Block_header.t ->

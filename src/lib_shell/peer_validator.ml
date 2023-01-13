@@ -187,9 +187,9 @@ let validate_new_head w hash (header : Block_header.t) =
   | `Ok -> (
       let*! () = Events.(emit requesting_new_head_validation) block_received in
       let*! v =
-        Block_validator.precheck_and_apply
+        Block_validator.validate_and_apply
           ~notify_new_block:pv.parameters.notify_new_block
-          ~precheck_and_notify:true
+          ~validate_and_notify:true
           pv.parameters.block_validator
           pv.parameters.chain_db
           hash
@@ -202,14 +202,12 @@ let validate_new_head w hash (header : Block_header.t) =
              or, at least, by a worker termination which will close the
              connection. *)
           Lwt.return_error errs
-      | Unapplicable_after_precheck _errs ->
-          let*! () =
-            Events.(emit ignoring_prechecked_invalid_block) block_received
-          in
+      | Inapplicable_after_validation _errs ->
+          let*! () = Events.(emit ignoring_inapplicable_block) block_received in
           (* We do not kickban the peer if the block received was
-             successfully prechecked but invalid -- this means that he
-             could have propagated a precheckable block before terminating
-             its validation *)
+             successfully validated but inapplicable -- this means that he
+             could have propagated a validated block before terminating
+             its application *)
           return_unit
       | Valid ->
           let*! () = Events.(emit new_head_validation_end) block_received in

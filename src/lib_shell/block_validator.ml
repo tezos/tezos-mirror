@@ -31,12 +31,12 @@ open Block_validator_errors
 type validation_result =
   | Already_committed
   | Outdated_block
-  | Prechecked_and_applied
+  | Validated_and_applied
   | Application_error of error trace
   | Preapplied of (Block_header.shell_header * error Preapply_result.t list)
   | Preapplication_error of error trace
-  | Application_error_after_precheck of error trace
-  | Precheck_failed of error trace
+  | Application_error_after_validation of error trace
+  | Validation_failed of error trace
 
 type new_block = {
   block : Store.Block.t;
@@ -64,7 +64,7 @@ module Types = struct
     validation_process : Block_validator_process.t;
     limits : Shell_limits.block_validator_limits;
     start_testchain : bool;
-    invalid_blocks_after_precheck : error trace Block_hash_ring.t;
+    inapplicable_blocks_after_validation : error trace Block_hash_ring.t;
   }
 
   type parameters =
@@ -85,7 +85,7 @@ module Request = struct
     hash : Block_hash.t;
     header : Block_header.t;
     operations : Operation.t list list;
-    precheck_and_notify : bool;
+    validate_and_notify : bool;
   }
 
   type preapplication_request = {
@@ -141,10 +141,10 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
       tzfail (invalid_block hash error)
   | None | Some _ -> return_unit
 
-let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
+let validate_block bvp chain_db chain_store ~predecessor block_header block_hash
     operations bv_operations =
   let open Lwt_result_syntax in
-  let*! () = Events.(emit prechecking_block) block_hash in
+  let*! () = Events.(emit validating_block) block_hash in
   let* () =
     Block_validator_process.validate_block
       bvp
@@ -154,7 +154,7 @@ let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
       block_hash
       bv_operations
   in
-  let*! () = Events.(emit prechecked_block) block_hash in
+  let*! () = Events.(emit validated_block) block_hash in
   (* Add the block and operations to the cache of the ddb to make them
      available to our peers *)
   Distributed_db.inject_validated_block
@@ -191,7 +191,7 @@ let on_validation_request w
       hash;
       header;
       operations;
-      precheck_and_notify;
+      validate_and_notify;
     } =
   let open Lwt_result_syntax in
   let bv = Worker.state w in
@@ -207,13 +207,13 @@ let on_validation_request w
       let*? () = check_operations_merkle_root hash header operations in
       let*! r =
         match
-          Block_hash_ring.find_opt bv.invalid_blocks_after_precheck hash
+          Block_hash_ring.find_opt bv.inapplicable_blocks_after_validation hash
         with
         | Some errs ->
-            (* If the block is invalid but has been previously
-               successfuly prechecked, we directly return with the cached
+            (* If the block is inapplicable but has been previously
+               successfuly validated, we directly return with the cached
                errors. This way, multiple propagation won't happen. *)
-            return (Application_error_after_precheck errs)
+            return (Application_error_after_validation errs)
         | None -> (
             let*! o = Store.Block.read_invalid_block_opt chain_store hash in
             match o with
@@ -255,7 +255,7 @@ let on_validation_request w
                     protect ~canceler:(Worker.canceler w) (fun () ->
                         protect ?canceler (fun () ->
                             with_retry_to_load_protocol (fun () ->
-                                precheck_block
+                                validate_block
                                   bv.validation_process
                                   chain_db
                                   chain_store
@@ -266,9 +266,9 @@ let on_validation_request w
                                   bv_operations)))
                   in
                   match r with
-                  | Error errs -> return (Precheck_failed errs)
+                  | Error errs -> return (Validation_failed errs)
                   | Ok () -> (
-                      if precheck_and_notify then
+                      if validate_and_notify then
                         (* Headers which have been preapplied can be advertised
                            before being fully applied. *)
                         Distributed_db.Advertise.validated_head chain_db header ;
@@ -307,7 +307,7 @@ let on_validation_request w
                               resulting_context_hash =
                                 result.validation_store.resulting_context_hash;
                             } ;
-                          return Prechecked_and_applied
+                          return Validated_and_applied
                       | None -> return Already_committed)))
       in
       match r with
@@ -315,7 +315,7 @@ let on_validation_request w
       | Error errs ->
           let* () =
             if
-              (not precheck_and_notify)
+              (not validate_and_notify)
               && List.exists
                    (function Invalid_block _ -> true | _ -> false)
                    errs
@@ -324,9 +324,12 @@ let on_validation_request w
                   Distributed_db.commit_invalid_block chain_db hash header errs)
             else return_unit
           in
-          if precheck_and_notify then (
-            Block_hash_ring.replace bv.invalid_blocks_after_precheck hash errs ;
-            return (Application_error_after_precheck errs))
+          if validate_and_notify then (
+            Block_hash_ring.replace
+              bv.inapplicable_blocks_after_validation
+              hash
+              errs ;
+            return (Application_error_after_validation errs))
           else return (Application_error errs))
 
 let on_preapplication_request w
@@ -379,14 +382,14 @@ type launch_error = |
 let on_launch _ _ (limits, start_testchain, db, validation_process) :
     (_, launch_error) result Lwt.t =
   let protocol_validator = Protocol_validator.create db in
-  let invalid_blocks_after_precheck = Block_hash_ring.create 50 in
+  let inapplicable_blocks_after_validation = Block_hash_ring.create 50 in
   Lwt.return_ok
     {
       Types.protocol_validator;
       validation_process;
       limits;
       start_testchain;
-      invalid_blocks_after_precheck;
+      inapplicable_blocks_after_validation;
     }
 
 let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
@@ -439,17 +442,18 @@ let on_completion :
   match (request, v) with
   | Request.Request_validation {hash; _}, Already_committed ->
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
-      let* () = Events.(emit previously_validated) hash in
+      let* () = Events.(emit previously_validated_and_applied) hash in
       Lwt.return_unit
   | Request.Request_validation {hash; _}, Outdated_block ->
       Prometheus.Counter.inc_one metrics.outdated_blocks_count ;
-      let* () = Events.(emit previously_validated) hash in
+      let* () = Events.(emit previously_validated_and_applied) hash in
       Lwt.return_unit
-  | Request.Request_validation _, Prechecked_and_applied -> (
+  | Request.Request_validation _, Validated_and_applied -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validated_blocks_count ;
       match Request.view request with
-      | Validation v -> Events.(emit validation_success) (v.block, st)
+      | Validation v ->
+          Events.(emit validation_and_application_success) (v.block, st)
       | _ -> (* assert false *) Lwt.return_unit)
   | Request.Request_validation _, Application_error errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
@@ -478,19 +482,20 @@ let on_completion :
           let* () = check_and_quit_on_irmin_errors errs in
           return_unit
       | _ -> (* assert false *) Lwt.return_unit)
-  | Request.Request_validation _, Application_error_after_precheck errs -> (
+  | Request.Request_validation _, Application_error_after_validation errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one
         metrics.application_errors_after_validation_count ;
       match Request.view request with
       | Validation v ->
           let* () =
-            Events.(emit application_failure_after_precheck) (v.block, st, errs)
+            Events.(emit application_failure_after_validation)
+              (v.block, st, errs)
           in
           let* () = check_and_quit_on_irmin_errors errs in
           return_unit
       | _ -> (* assert false *) Lwt.return_unit)
-  | Request.Request_validation _, Precheck_failed errs -> (
+  | Request.Request_validation _, Validation_failed errs -> (
       Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_failed_count ;
       match Request.view request with
@@ -500,7 +505,7 @@ let on_completion :
               (* Ignore requests cancellation *)
               Lwt.return_unit
           | errs ->
-              let* () = Events.(emit precheck_failure) (v.block, st, errs) in
+              let* () = Events.(emit validation_failure) (v.block, st, errs) in
               let* () = check_and_quit_on_irmin_errors errs in
               return_unit)
       | _ -> (* assert false *) Lwt.return_unit)
@@ -544,18 +549,18 @@ let shutdown = Worker.shutdown
 
 type block_validity =
   | Valid
-  | Unapplicable_after_precheck of error trace
+  | Inapplicable_after_validation of error trace
   | Invalid of error trace
 
-let precheck_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
-    ?(precheck_and_notify = false) chain_db hash (header : Block_header.t)
+let validate_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
+    ?(validate_and_notify = false) chain_db hash (header : Block_header.t)
     operations =
   let open Lwt_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let* b = Store.Block.is_known_valid chain_store hash in
   match b with
   | true ->
-      let* () = Events.(emit previously_validated) hash in
+      let* () = Events.(emit previously_validated_and_applied) hash in
       return Valid
   | false -> (
       let* r =
@@ -575,15 +580,15 @@ let precheck_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
                hash;
                header;
                operations;
-               precheck_and_notify;
+               validate_and_notify;
              })
       in
       match r with
-      | Ok (Prechecked_and_applied | Already_committed | Outdated_block) ->
+      | Ok (Validated_and_applied | Already_committed | Outdated_block) ->
           return Valid
-      | Ok (Application_error_after_precheck errs) ->
-          return (Unapplicable_after_precheck errs)
-      | Ok (Precheck_failed errs)
+      | Ok (Application_error_after_validation errs) ->
+          return (Inapplicable_after_validation errs)
+      | Ok (Validation_failed errs)
       | Ok (Application_error errs)
       | Error (Request_error errs) ->
           return (Invalid errs)
