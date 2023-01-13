@@ -87,8 +87,7 @@ Transaction Optimistic Rollups
 ------------------------------
 
 Rollups is a new feature of the protocol supporting execution of transactions
-off-chain. See separate :doc:`documentation <../alpha/transaction_rollups>` for
-details. (MRs :gl:`!3915`, :gl:`!4198`, :gl:`!4200`, :gl:`!4203`, :gl:`!4332`,
+off-chain. (MRs :gl:`!3915`, :gl:`!4198`, :gl:`!4200`, :gl:`!4203`, :gl:`!4332`,
 :gl:`!4428`, :gl:`!4309`, :gl:`!4360`, :gl:`!4369`, :gl:`!4447`, :gl:`!4357`,
 :gl:`!4344`, :gl:`!4480`, :gl:`!4275`, :gl:`!4017`, :gl:`!4489`, :gl:`!4499`,
 :gl:`!4496`, :gl:`!4515`, :gl:`!4453`, :gl:`!4508`, :gl:`!4531`, :gl:`!4484`,
