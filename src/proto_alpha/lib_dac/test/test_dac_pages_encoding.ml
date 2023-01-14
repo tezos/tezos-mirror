@@ -279,10 +279,11 @@ module Merkle_tree = struct
 
     (* We use 50 bytes as the size of a page. Of these, 5 bytes are used for
        the preamble, which leaves 45 bytes of space for storing hashes in a
-       page. The size of a hash is 32 bytes, therefore only floor(45/2) = 1
-       hashes can be stored for each page. Because the serialization process
-       requires a page size that can contain at least two hashes, the
-       serialization of any content will fail in this case.
+       page. The overall size of a hash is 33 bytes (32 bytes for the inner hash
+       plus 1 byte for the tag identifying the hashing scheme of the hash),
+       therefore only floor(45/33) = 1 hashes can be stored for each page.
+       Because the serialization process requires a page size that can contain
+       at least two hashes, the serialization of any content will fail in this case.
     *)
     let serialize_one_hash_per_page_fails () =
       let payload =
@@ -296,7 +297,8 @@ module Merkle_tree = struct
 
     let serialize_empty_payload_fails () =
       (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
+         have a fixed size of 33 bytes (32 bytes for inner hash and 1 byte for
+         hashing sheme tag of the hash), and 5 bytes are used for the preamble,
          we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
          this value to 80. *)
       test_serialization_fails_with
@@ -307,7 +309,8 @@ module Merkle_tree = struct
 
     let one_page_roundtrip () =
       (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
+         have a fixed size of 33 bytes (32 bytes for inner hash and 1 byte for
+         hashing sheme tag of the hash), and 5 bytes are used for the preamble,
          we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
          this value to 80. *)
       let max_page_size = 80 in
@@ -322,18 +325,14 @@ module Merkle_tree = struct
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
          for the page prefix. This leaves 75 bytes to store the payload to be
          serialized in a page. It also means that a `Hashes` page can contain
-         at most 2 hashes of size 33 bytes each. If we try to serialize a
+         at most 2 hashes of size 33 bytes each (32 bytes for inner hash and 1
+         byte for hashing sheme tag of the hash). If we try to serialize a
          payload between 151 and 225 bytes (included), then the serialized
          payload should be spread among a total of 6 pages. Of these,
          225/75 = 3 pages are used to store the payload, ceil(3/2) = 2 pages
          are used for storing the 3 hashes of the 3 payload pages, and
          ceil(2/2) = 1 page is used for storing the 2 hashes of the previous
          pages. *)
-
-      (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
-         this value to 80. *)
       let max_page_size = 80 in
       let payload =
         Bytes.of_string
@@ -351,18 +350,14 @@ module Merkle_tree = struct
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
          for the page prefix. This leaves 75 bytes to store the contents to be
          serialized in a page. It also means that a `Hashes` page can contain
-         at most 2 hashes of size 32 bytes each. If we try to serialize a
+         at most 2 hashes of size 33 bytes each (32 bytes for inner hash and 1
+         byte for hashing sheme tag of the hash). If we try to serialize a
          payload of 225 repetitions of the same character, then only one
          payload page will be produced. However, the hash of this page will be
          repeated three times across two pages represent nodes of the Merkle
          tree. Finally, another page will be used for storing the Merkle tree
          root page, which contains the two hashes of the Merkle tree nodes
          above. In total, the serialization should be spread among 4 pages. *)
-
-      (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
-         this value to 80. *)
       let max_page_size = 80 in
       let payload =
         List.repeat 225 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
