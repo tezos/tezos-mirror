@@ -32,3 +32,7 @@ val stored_slot_content : Cryptobox.Commitment.t t
 (** Storing a slot's shards event. The given parameters are the slot's
     commitment hash and the number of its shards. *)
 val stored_slot_shards : (string * int) t
+
+(** Decoding a value failed. See {!Types.kind} for kind of considered
+    values. *)
+val decoding_data_failed : Types.kind t
