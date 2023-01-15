@@ -151,9 +151,11 @@ let connectable t start_time expected seen_points =
     It repeats two operations until the number of connections is reached:
       - get [max_to_contact] points
       - connect to many of them as possible
+*)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4601
 
-   TODO why not the simpler implementation. Sort all candidates points,
-        and try to connect to [n] of them. *)
+   Why not the simpler implementation. Sort all candidates points, and try to
+   connect to [n] of them. *)
 let rec try_to_contact_loop t start_time ~seen_points min_to_contact
     max_to_contact =
   let open Lwt_syntax in
@@ -211,8 +213,10 @@ let ask_for_more_contacts t =
              [
                P2p_trigger.wait_new_peer t.triggers;
                P2p_trigger.wait_new_point t.triggers;
-               (* TODO exponential back-off, or wait for the existence
-                  of a non grey-listed peer? *)
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/4602
+
+                  Exponential back-off, or wait for the existence of a non
+                  grey-listed peer? *)
                Lwt_unix.sleep
                  (Ptime.Span.to_float_s t.config.time_between_looking_for_peers);
              ]))
