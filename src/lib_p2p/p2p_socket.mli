@@ -65,7 +65,7 @@ val info : ('msg, 'meta) t -> 'meta P2p_connection.Info.t
     [authenticate]. *)
 val local_metadata : ('msg, 'meta) t -> 'meta
 
-(** [local_metadata t] returns the remote metadata, communicated by the
+(** [remote_metadata t] returns the remote metadata, communicated by the
     remote host when the session was established. *)
 val remote_metadata : ('msg, 'meta) t -> 'meta
 
@@ -75,8 +75,8 @@ val private_node : ('msg, 'meta) t -> bool
 
     These should be used together
     to implement the session establishment protocol. Session establishment
-    proceeds in three synchronous, symmetric, steps. First two steps are
-    implemented by [authenticate]. Third step is implemented by either [accept]
+    proceeds in three synchronous, symmetric, steps. The first two steps are
+    implemented by [authenticate]. The third step is implemented by either [accept]
     or [nack].
 
     1. Hosts send each other an authentication message. The message contains
