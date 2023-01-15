@@ -24,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO test `close ~wait:true`. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4603
+
+   test `close ~wait:true`.
+*)
 module Events = P2p_events.P2p_socket
 
 module Crypto = struct
@@ -388,7 +391,9 @@ let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
       ~canceler
       (P2p_io_scheduler.to_readable scheduled_conn)
   in
-  (* TODO: make the below bytes-to-string copy-conversion unnecessary.
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4604
+
+     make the below bytes-to-string copy-conversion unnecessary.
      This requires making the consumer of the [recv_msg] value
      ([Crypto_box.generate_nonces]) able to work with strings directly. *)
   let recv_msg = Bytes.of_string recv_msg in
