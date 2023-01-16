@@ -5,8 +5,8 @@
 let
   opam-nix-integration = import (
     fetchTarball {
-      url = "https://github.com/vapourismo/opam-nix-integration/archive/a1a4c9815d1286efe1299e1f66369bb1c3605ace.tar.gz";
-      sha256 = "159nrv8fn6zmg2hifgray5azxd8p9vbb28zda8svrdh2h60x962r";
+      url = "https://github.com/vapourismo/opam-nix-integration/archive/ecb053e5198f6b36b41db2b351c51a78b484d9fa.tar.gz";
+      sha256 = "1nkzrfdn5v02lki78fhca1r2npw9rp5qijmj0qzrbn64gdzxd2ml";
     }
   );
 
@@ -99,36 +99,37 @@ let
     dune = addFrameworksInputs [ "CoreServices" "Foundation" ] prev.dune;
   };
 
-  packageSet = pkgs.opam-nix-integration.makePackageSet {
-    repository = tezos-opam-repository;
+  packageSet = pkgs.opamPackages.overrideScope' (pkgs.lib.composeManyExtensions [
+    # Set the opam-repository which has the package descriptions.
+    (final: prev: {
+      repository = prev.repository.override { src = tezos-opam-repository; };
+    })
 
-    overlays = [
-      # First overlay simply picks the package versions from Tezos'
-      # opam-repository.
-      (final: prev:
-        builtins.mapAttrs
-          (name: versions: versions.latest)
-          prev.repository.packages
-      )
+    # First overlay simply picks the package versions from Tezos'
+    # opam-repository.
+    (final: prev:
+      builtins.mapAttrs
+        (name: versions: versions.latest)
+        prev.repository.packages
+    )
 
-      # Tweak common packages.
-      common-overlay
+    # Tweak common packages.
+    common-overlay
 
-      # Overlays for MacOS
-      (if pkgs.stdenv.isDarwin then darwin-overlay else final: prev: { })
+    # Overlays for MacOS
+    (if pkgs.stdenv.isDarwin then darwin-overlay else final: prev: { })
 
-      # Tweak the dependencies.
-      (final: prev: {
-        conf-rust-2021 = prev.conf-rust.overrideAttrs (old: {
-          propagatedNativeBuildInputs =
-            (old.propagatedNativeBuildInputs or [ ])
-            ++
-            # Upstream conf-rust* packages don't request libiconv
-            [ pkgs.libiconv ];
-        });
-      })
-    ];
-  };
+    # Tweak the dependencies.
+    (final: prev: {
+      conf-rust-2021 = prev.conf-rust.overrideAttrs (old: {
+        propagatedNativeBuildInputs =
+          (old.propagatedNativeBuildInputs or [ ])
+          ++
+          # Upstream conf-rust* packages don't request libiconv
+          [ pkgs.libiconv ];
+      });
+    })
+  ]);
 
   packages =
     builtins.filter
@@ -164,31 +165,37 @@ let
       ''
   );
 
-  devPackageSet = pkgs.opam-nix-integration.makePackageSet {
-    repository = fetchTarball "https://github.com/ocaml/opam-repository/archive/${opam-repository-rev}.tar.gz";
+  devPackageSet = pkgs.opamPackages.overrideScope' (
+    pkgs.lib.composeManyExtensions [
+      # Set the opam-repository which has the package descriptions.
+      (final: prev: {
+        repository = prev.repository.override {
+          src = fetchTarball "https://github.com/ocaml/opam-repository/archive/${opam-repository-rev}.tar.gz";
+        };
+      })
 
-    packageSelection = {
-      packageConstraints = [
-        "ocaml=${packageSet.ocaml.version}"
-        "utop=2.9.0"
-        "ocaml-lsp-server>=1.9.0"
-        "merlin"
-        "odoc"
-        "ocp-indent"
-        "js_of_ocaml-compiler"
-        "ocamlformat-rpc"
-        "merge-fmt"
-      ];
-    };
+      # Specify the constraints we have.
+      (final: prev: prev.repository.select {
+        packageConstraints = [
+          "ocaml=${packageSet.ocaml.version}"
+          "utop=2.9.0"
+          "ocaml-lsp-server>=1.9.0"
+          "merlin"
+          "odoc"
+          "ocp-indent"
+          "js_of_ocaml-compiler"
+          "ocamlformat-rpc"
+          "merge-fmt"
+        ];
+      })
 
-    overlays = [
       # Tweak common packages.
       common-overlay
 
       # Overlays for MacOS
       (if pkgs.stdenv.isDarwin then darwin-overlay else final: prev: { })
-    ];
-  };
+    ]
+  );
 
 in
 
