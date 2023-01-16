@@ -90,4 +90,4 @@ let tests =
     ("list", `Quick, test_list);
   ]
 
-let () = Alcotest.run "json-data-encoding" [("exn", tests)]
+let () = Alcotest.run "json-data-encoding" [("destruct", tests)]
