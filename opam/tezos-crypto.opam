@@ -23,7 +23,7 @@ depends: [
   "bls12-381" { >= "5.0.0" & < "5.1.0" }
   "bls12-381-signature" { = "1.0.0" }
   "alcotest" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" { with-test & >= "0.18" }
+  "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-test-helpers" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
