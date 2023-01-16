@@ -36,17 +36,12 @@
 
 type slot = bytes
 
-(** [split_and_store watcher dal_constants store slot] splits [slot] in shards,
-    stores it onto the [store] and returns the corresponding [slot_header],
-    using [dal_constants].
-
-    [watcher] is notified when the slot is added to the store. *)
-val split_and_store :
-  Cryptobox.commitment Lwt_watcher.input ->
+val save_shards_of_slot :
+  Store.node_store ->
   Cryptobox.t ->
-  Shard_store.t ->
   slot ->
-  (Cryptobox.Commitment.t * Cryptobox.commitment_proof) tzresult Lwt.t
+  Cryptobox.commitment ->
+  unit tzresult Lwt.t
 
 (** [get_shard dal_constants store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id]. *)

@@ -131,21 +131,16 @@ let save store watcher slot_header shards =
   Lwt_watcher.notify watcher slot_header ;
   return_unit
 
-let split_and_store watcher cryptobox store slot =
-  let r =
-    let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot cryptobox slot in
-    let commitment = Cryptobox.commit cryptobox polynomial in
-    let proof = Cryptobox.prove_commitment cryptobox polynomial in
-    return (polynomial, commitment, proof)
-  in
+let save_shards_of_slot node_store cryptobox slot commitment =
   let open Lwt_result_syntax in
-  match r with
-  | Ok (polynomial, commitment, commitment_proof) ->
-      let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-      let* () = save store watcher commitment shards in
-      Lwt.return_ok (commitment, commitment_proof)
-  | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
+  let open Store in
+  let* polynomial =
+    match Cryptobox.polynomial_from_slot cryptobox slot with
+    | Ok p -> return p
+    | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
+  in
+  let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  save node_store.shard_store node_store.slots_watcher commitment shards
 
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with

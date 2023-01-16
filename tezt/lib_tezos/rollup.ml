@@ -637,16 +637,6 @@ module Dal = struct
     let get_bytes_from_json_string_node json =
       JSON.as_string json |> decode_hex_string_to_bytes
 
-    let split_slot slot =
-      let slot =
-        JSON.parse
-          ~origin:"dal_node_split_slot_rpc"
-          (encode_bytes_to_hex_string slot)
-      in
-      let data : RPC_core.data = Data (JSON.unannotate slot) in
-      make ~data POST ["slot"; "split"] @@ fun json ->
-      JSON.(json |-> "commitment" |> as_string, json |-> "proof" |> as_string)
-
     let slot_pages slot_header =
       make GET ["slot"; "pages"; slot_header] (fun pages ->
           pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
