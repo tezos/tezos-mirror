@@ -778,7 +778,13 @@ module Dal = struct
     let get_assigned_shard_indices ~level ~pkh =
       make
         GET
-        ["profiles"; pkh; string_of_int level; "assigned-shard-indices"]
+        [
+          "profiles";
+          pkh;
+          "attested_levels";
+          string_of_int level;
+          "assigned_shard_indices";
+        ]
         (fun json -> JSON.(json |> as_list |> List.map as_int))
 
     let get_published_level_headers ?status published_level =

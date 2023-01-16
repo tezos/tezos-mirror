@@ -329,7 +329,7 @@ let get_assigned_shard_indices :
     ~output:Data_encoding.(list int16)
     Tezos_rpc.Path.(
       open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
-      /: Tezos_rpc.Arg.int32 / "assigned-shard-indices")
+      / "attested_levels" /: Tezos_rpc.Arg.int32 / "assigned_shard_indices")
 
 let get_attestable_slots :
     < meth : [`GET]

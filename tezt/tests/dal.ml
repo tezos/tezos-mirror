@@ -1723,7 +1723,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   check_profiles ~__LOC__ ~expected:[profile1; profile2]
 
 (* Check that result of the DAL node's
-   GET /profile/<public_key_hash>/<level>/assigned-shard-indices
+   GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices
    is consistent with the result of the L1 node GET dal/shards . *)
 let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
     node _client dal_node =
@@ -2125,7 +2125,8 @@ let register ~protocols =
     test_dal_node_test_patch_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    "dal node GET /profile/<public_key_hash>/<level>/assigned-shard-indices"
+    "dal node GET \
+     /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
     test_dal_node_get_assigned_shard_indices
     protocols ;
   scenario_with_layer1_and_dal_nodes
