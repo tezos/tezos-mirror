@@ -322,10 +322,14 @@ val spawn_config_reset : t -> argument list -> Process.t
 (** A snapshot history mode for exports *)
 type snapshot_history_mode = Rolling_history | Full_history
 
+(** A snapshot file format for exports *)
+type export_format = Tar | Raw
+
 (** Run [octez-node snapshot export]. *)
 val snapshot_export :
   ?history_mode:snapshot_history_mode ->
   ?export_level:int ->
+  ?export_format:export_format ->
   t ->
   string ->
   unit Lwt.t
@@ -334,6 +338,7 @@ val snapshot_export :
 val spawn_snapshot_export :
   ?history_mode:snapshot_history_mode ->
   ?export_level:int ->
+  ?export_format:export_format ->
   t ->
   string ->
   Process.t

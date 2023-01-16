@@ -106,14 +106,6 @@ module type TEZOS_CONTEXT_UNIX = sig
 
   (** {2 Context dumping} *)
 
-  val dump_context :
-    index ->
-    Tezos_crypto.Context_hash.t ->
-    fd:Lwt_unix.file_descr ->
-    on_disk:bool ->
-    progress_display_mode:Animation.progress_display_mode ->
-    int tzresult Lwt.t
-
   (** Rebuild a context from a given snapshot. *)
   val restore_context :
     index ->
@@ -409,6 +401,21 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let is_gc_allowed index = Store.Gc.is_allowed index.repo
 
   let split index = Store.split index.repo
+
+  let export_snapshot index context_hash ~path =
+    let open Lwt_syntax in
+    let* commit_opt =
+      Store.Commit.of_hash index.repo (Hash.of_context_hash context_hash)
+    in
+    match commit_opt with
+    | None ->
+        Fmt.failwith
+          "%a: unknown context hash"
+          Tezos_crypto.Context_hash.pp
+          context_hash
+    | Some commit ->
+        let h = Store.Commit.key commit in
+        Store.create_one_commit_store index.repo h path
 
   (*-- Generic Store Primitives ------------------------------------------------*)
 
@@ -1152,20 +1159,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   open Tezos_context_dump
   module Context_dumper = Context_dump.Make (Dumpable_context)
-
-  (* provides functions dump_context and restore_context *)
-  let dump_context idx data ~fd ~on_disk ~progress_display_mode =
-    let open Lwt_syntax in
-    let* res =
-      Context_dumper.dump_context_fd
-        idx
-        data
-        ~context_fd:fd
-        ~on_disk
-        ~progress_display_mode
-    in
-    let* () = Lwt_unix.fsync fd in
-    Lwt.return res
 
   let restore_context idx ~expected_context_hash ~nb_context_elements ~fd
       ~in_memory ~progress_display_mode =

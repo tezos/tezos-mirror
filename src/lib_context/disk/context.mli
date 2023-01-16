@@ -49,15 +49,6 @@ module type TEZOS_CONTEXT_UNIX = sig
 
   (** {2 Context dumping} *)
 
-  (** [dump_context] is used to export snapshots of the context at given hashes. *)
-  val dump_context :
-    index ->
-    Tezos_crypto.Context_hash.t ->
-    fd:Lwt_unix.file_descr ->
-    on_disk:bool ->
-    progress_display_mode:Animation.progress_display_mode ->
-    int tzresult Lwt.t
-
   (** Rebuild a context from a given snapshot. *)
   val restore_context :
     index ->

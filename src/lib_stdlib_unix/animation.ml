@@ -74,8 +74,15 @@ let make_with_animation ppf ~make ~on_retry seed =
   Format.fprintf ppf "%s%s\n%!" clean init ;
   Lwt.return result
 
-let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
-    ~progress_display_mode ~pp_print_step f =
+type 'a progress_fun =
+  | With_progress of {
+      step : (unit -> unit Lwt.t) -> 'a Lwt.t;
+      pp_print_step : Format.formatter -> int -> unit;
+    }
+  | Unknown_progress of {f : unit -> 'a Lwt.t; msg : string}
+
+let generic_display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
+    ~progress_display_mode progress_fun =
   if every <= 0 then
     raise
       (Invalid_argument "display_progress: negative or null repetition period") ;
@@ -86,7 +93,10 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
     | Always -> Lwt.return_true
     | Never -> Lwt.return_false
   in
-  if not print_progress then f (fun () -> Lwt.return_unit)
+  if not print_progress then
+    match progress_fun with
+    | With_progress {step; _} -> step (fun () -> Lwt.return_unit)
+    | Unknown_progress {f; _} -> f ()
   else
     let clear_line fmt = Format.fprintf fmt "\027[2K\r" in
     let stream, notifier = Lwt_stream.create () in
@@ -96,7 +106,10 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
     in
     let main_promise =
       Lwt.finalize
-        (fun () -> f wrapped_notifier)
+        (fun () ->
+          match progress_fun with
+          | With_progress {step; _} -> step wrapped_notifier
+          | Unknown_progress {f; _} -> f ())
         (fun () ->
           notifier None ;
           Lwt.return_unit)
@@ -107,6 +120,11 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
     let pp_cpt = ref 0 in
     let rec tick_promise () =
       let* () = Lwt_unix.sleep 1. in
+      let* () =
+        match progress_fun with
+        | Unknown_progress _ -> wrapped_notifier ()
+        | _ -> Lwt.return_unit
+      in
       incr pp_cpt ;
       tick_promise ()
     in
@@ -115,11 +133,17 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
     let dots () = dot_array.(!pp_cpt mod 4) in
     let pp () =
       clear_line fmt ;
-      Format.fprintf fmt "%a%s%!" pp_print_step !cpt (dots ())
+      match progress_fun with
+      | With_progress {pp_print_step; _} ->
+          Format.fprintf fmt "%a%s%!" pp_print_step !cpt (dots ())
+      | Unknown_progress {msg; _} -> Format.fprintf fmt "%s%s%!" msg (dots ())
     in
     let pp_done () =
       clear_line fmt ;
-      Format.fprintf fmt "%a Done@\n%!" pp_print_step !cpt
+      match progress_fun with
+      | With_progress {pp_print_step; _} ->
+          Format.fprintf fmt "%a Done@\n%!" pp_print_step !cpt
+      | Unknown_progress {msg; _} -> Format.fprintf fmt "%s Done@\n%!" msg
     in
     pp () ;
     incr cpt ;
@@ -137,3 +161,16 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
     decr cpt ;
     pp_done () ;
     Lwt.return e
+
+let display_progress ?every ?out ~progress_display_mode ~pp_print_step step =
+  generic_display_progress
+    ?every
+    ?out
+    ~progress_display_mode
+    (With_progress {step; pp_print_step})
+
+let three_dots ?out ~progress_display_mode ~msg f =
+  generic_display_progress
+    ?out
+    ~progress_display_mode
+    (Unknown_progress {f; msg})

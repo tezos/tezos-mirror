@@ -432,8 +432,10 @@ end
 
 type snapshot_history_mode = Rolling_history | Full_history
 
-let spawn_snapshot_export ?(history_mode = Full_history) ?export_level node file
-    =
+type export_format = Tar | Raw
+
+let spawn_snapshot_export ?(history_mode = Full_history) ?export_level
+    ?(export_format = Tar) node file =
   spawn_command
     node
     (["snapshot"; "export"; "--data-dir"; node.persistent_state.data_dir]
@@ -441,10 +443,13 @@ let spawn_snapshot_export ?(history_mode = Full_history) ?export_level node file
       | Full_history -> []
       | Rolling_history -> ["--rolling"])
     @ optional_arg "block" string_of_int export_level
+    @ (["--export-format"]
+      @ match export_format with Tar -> ["tar"] | Raw -> ["raw"])
     @ [file])
 
-let snapshot_export ?history_mode ?export_level node file =
-  spawn_snapshot_export ?history_mode ?export_level node file |> Process.check
+let snapshot_export ?history_mode ?export_level ?export_format node file =
+  spawn_snapshot_export ?history_mode ?export_level ?export_format node file
+  |> Process.check
 
 let spawn_snapshot_import ?(reconstruct = false) node file =
   spawn_command

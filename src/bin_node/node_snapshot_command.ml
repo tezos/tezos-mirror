@@ -130,7 +130,7 @@ module Term = struct
         else tzfail (Cannot_locate_file path)
 
   let export data_dir config_file snapshot_path block export_format rolling
-      on_disk_index progress_display_mode =
+      progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -182,15 +182,13 @@ module Term = struct
         ~context_dir
         ~chain_name
         ~block
-        ~on_disk:on_disk_index
         ~progress_display_mode
         genesis
     in
     Shared_arg.process_command run
 
   let import data_dir config_file operation_metadata_size_limit snapshot_path
-      block disable_check reconstruct in_memory_index sandbox_file
-      progress_display_mode =
+      block disable_check reconstruct sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -297,7 +295,6 @@ module Term = struct
               ~operation_metadata_size_limit:
                 node_config.shell.block_validator_limits
                   .operation_metadata_size_limit
-              ~in_memory:in_memory_index
               ~progress_display_mode
               genesis)
       in
@@ -331,16 +328,12 @@ module Term = struct
       let* snapshot_path = check_snapshot_path snapshot_path in
       let* snapshot_header = Snapshots.read_snapshot_header ~snapshot_path in
       if format_json then
-        let json =
-          Data_encoding.Json.construct
-            Snapshots.snapshot_header_encoding
-            snapshot_header
-        in
+        let json = Snapshots.Snapshot_header.to_json snapshot_header in
         Format.printf "@[<v 2>%a@]@." Data_encoding.Json.pp json
       else
         Format.printf
           "@[<v 2>Snapshot information:@ %a@]@."
-          Snapshots.pp_snapshot_header
+          Snapshots.Snapshot_header.pp
           snapshot_header ;
       return_unit
     in
@@ -416,22 +409,6 @@ module Term = struct
     in
     Arg.(value & flag & info ~doc ["reconstruct"])
 
-  let in_memory_index =
-    let open Cmdliner in
-    let doc =
-      "Imports a snapshot with in-memory indexes to speed up the procedure. As \
-       a counter part, the import will requires more memory."
-    in
-    Arg.(value & flag & info ~doc ["in-memory"])
-
-  let on_disk_index =
-    let open Cmdliner in
-    let doc =
-      "Exports a snapshot with on-disk indexes, in order to use less memory. \
-       As a counter part, the export will requires more time."
-    in
-    Arg.(value & flag & info ~doc ["on-disk"])
-
   let sandbox =
     let open Cmdliner in
     let doc =
@@ -485,7 +462,7 @@ module Term = struct
           ret
             (const export $ Shared_arg.Term.data_dir
            $ Shared_arg.Term.config_file $ file_arg $ block $ export_format
-           $ export_rolling $ on_disk_index $ progress_display_mode));
+           $ export_rolling $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"allows to import a snapshot from a given file" "import")
         Term.(
@@ -493,8 +470,7 @@ module Term = struct
             (const import $ Shared_arg.Term.data_dir
            $ Shared_arg.Term.config_file
            $ Shared_arg.Term.operation_metadata_size_limit $ file_arg $ block
-           $ disable_check $ reconstruct $ in_memory_index $ sandbox
-           $ progress_display_mode));
+           $ disable_check $ reconstruct $ sandbox $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"displays information about the snapshot file" "info")
         Term.(ret (const get_info $ file_arg $ format_json));

@@ -186,15 +186,6 @@ module type S = sig
 
   type context_hash
 
-  (* Dump a context and returns the number of elements written. *)
-  val dump_context_fd :
-    index ->
-    context_hash ->
-    context_fd:Lwt_unix.file_descr ->
-    on_disk:bool ->
-    progress_display_mode:Animation.progress_display_mode ->
-    int tzresult Lwt.t
-
   val restore_context_fd :
     index ->
     expected_context_hash:context_hash ->

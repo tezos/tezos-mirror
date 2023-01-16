@@ -121,27 +121,10 @@ let read_mbytes rbuf b =
   Bytes.blit_string string 0 b 0 (Bytes.length b) ;
   return ()
 
-let set_int64 buf i =
-  let b = Bytes.create 8 in
-  EndianBytes.BigEndian.set_int64 b 0 i ;
-  Buffer.add_bytes buf b
-
 let get_int64 rbuf =
   let open Lwt_result_syntax in
   let* s = read_string ~len:8 rbuf in
   return @@ EndianString.BigEndian.get_int64 s 0
-
-let flush written context_fd buf =
-  let contents = Buffer.contents buf in
-  Buffer.clear buf ;
-  written := !written + String.length contents ;
-  Lwt_utils_unix.write_string context_fd contents
-
-let set_mbytes written context_fd buf b =
-  set_int64 buf (Int64.of_int (Bytes.length b)) ;
-  Buffer.add_bytes buf b ;
-  if Buffer.length buf > 1_000_000 then flush written context_fd buf
-  else Lwt.return_unit
 
 module Make (I : Dump_interface) = struct
   type command =
@@ -216,96 +199,6 @@ module Make (I : Dump_interface) = struct
     let open Lwt_result_syntax in
     let* bytes = get_mbytes rbuf in
     return (Data_encoding.Binary.of_bytes_exn command_encoding bytes)
-
-  (* Getter and setters *)
-
-  let set_root written context_fd buf =
-    let root = Root in
-    let bytes = Data_encoding.Binary.to_bytes_exn command_encoding root in
-    set_mbytes written context_fd buf bytes
-
-  let set_tree written context_fd ~notify buf (tree : I.Snapshot.t) =
-    let open Lwt_syntax in
-    let x =
-      match tree with Inode node -> Inode node | Blob blob -> Blob blob
-    in
-    let s =
-      match Data_encoding.Binary.to_bytes command_encoding x with
-      | Ok s -> s
-      | Error error ->
-          Fmt.failwith
-            "error write %a"
-            Data_encoding.Binary.pp_write_error
-            error
-    in
-    let* () = set_mbytes written context_fd buf s in
-    notify ()
-
-  let set_eoc written context_fd buf info parents =
-    let eoc = Eoc {info; parents} in
-    let bytes = Data_encoding.Binary.to_bytes_exn command_encoding eoc in
-    set_mbytes written context_fd buf bytes
-
-  let set_end written context_fd buf =
-    let bytes = Data_encoding.Binary.to_bytes_exn command_encoding Eof in
-    set_mbytes written context_fd buf bytes
-
-  let serialize_tree written context_fd ~notify ~on_disk buf tree idx =
-    I.tree_iteri_unique
-      ~on_disk
-      idx
-      (fun sub_tree -> set_tree written context_fd ~notify buf sub_tree)
-      tree
-
-  let dump_context_fd idx context_hash ~context_fd ~on_disk
-      ~progress_display_mode =
-    let open Lwt_result_syntax in
-    (* Dumping *)
-    let buf = Buffer.create 1_000_000 in
-    let written = ref 0 in
-    Lwt.catch
-      (fun () ->
-        let*! o = I.checkout idx context_hash in
-        match o with
-        | None ->
-            (* FIXME: dirty *)
-            tzfail @@ Context_not_found (I.Commit_hash.to_bytes context_hash)
-        | Some ctxt ->
-            Animation.display_progress
-              ~every:1000
-              ~progress_display_mode
-              ~pp_print_step:(fun fmt i ->
-                Format.fprintf
-                  fmt
-                  "Copying context: %dK elements, %s written"
-                  (i / 1000)
-                  (if !written > 1_048_576 then
-                   Format.asprintf "%dMiB" (!written / 1_048_576)
-                  else Format.asprintf "%dKiB" (!written / 1_024)))
-              (fun notify ->
-                let*! () = set_root written context_fd buf in
-                let tree = I.context_tree ctxt in
-                let*! elements =
-                  serialize_tree
-                    written
-                    context_fd
-                    ~notify
-                    ~on_disk
-                    buf
-                    tree
-                    idx
-                in
-                let parents = I.context_parents ctxt in
-                let*! () =
-                  set_eoc written context_fd buf (I.context_info ctxt) parents
-                in
-                let*! () = set_end written context_fd buf in
-                let*! () = flush written context_fd buf in
-                return elements))
-      (function
-        | Unix.Unix_error (e, _, _) ->
-            tzfail @@ System_write_error (Unix.error_message e)
-        | err -> Lwt.fail err)
 
   (* Restoring *)
 

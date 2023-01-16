@@ -33,16 +33,18 @@ module Event = struct
 
   (* Notice *)
   let export_info =
-    declare_2
+    declare_3
       ~section
       ~level:Notice
       ~name:"export_info"
       ~msg:
-        "exporting a snapshot in {history_mode} mode, targeting block hash \
-         {block}"
-      ~pp1:History_mode.pp_short
+        "exporting a snapshot (v{version}) in {history_mode} mode, targeting \
+         block hash {block}"
+      ~pp1:Format.pp_print_int
+      ("version", Data_encoding.int31)
+      ~pp2:History_mode.pp_short
       ("history_mode", History_mode.encoding)
-      ~pp2:pp_block_descriptor
+      ~pp3:pp_block_descriptor
       ("block", block_descriptor_encoding)
 
   let export_success =
@@ -64,35 +66,15 @@ module Event = struct
       ("filename", Data_encoding.string)
 
   let import_info =
-    let option_pp ~default pp fmt = function
-      | None -> Format.fprintf fmt "%s" default
-      | Some x -> Format.fprintf fmt "%a" pp x
-    in
     declare_2
       ~section
       ~level:Notice
       ~name:"import_info"
-      ~msg:"importing data from snapshot {filename}{metadata}"
+      ~msg:"importing data from snapshot {filename}: {header}"
       ~pp1:Format.pp_print_string
       ("filename", Data_encoding.string)
-      ~pp2:(fun fmt v ->
-        Format.fprintf
-          fmt
-          "%a"
-          (option_pp ~default:" (legacy)" (fun fmt metadata ->
-               Format.fprintf fmt ": %s" metadata))
-          v)
-      ("metadata", Data_encoding.(option string))
-
-  let import_on_disk_mode =
-    declare_0
-      ~section
-      ~level:Notice
-      ~name:"import_on_disk_mode"
-      ~msg:
-        "importing snapshot in on-disk mode. Mind using the --in-memory flag \
-         to allow a faster import which uses a higher quantity of ram"
-      ()
+      ~pp2:Format.pp_print_string
+      ("header", Data_encoding.(string))
 
   let import_unspecified_hash =
     declare_0
@@ -131,6 +113,16 @@ module Event = struct
       ~msg:"cleaning up artifacts after failure"
       ()
 
+  let suggest_no_check =
+    declare_0
+      ~section
+      ~level:Notice
+      ~name:"suggest_no_check"
+      ~msg:
+        "Note: the import of a snapshot can be sped up using the '--no-check' \
+         option. Only use this option if you fully trust the snapshot source."
+      ()
+
   (* Info *)
   let validate_protocol_sources =
     declare_1
@@ -140,4 +132,16 @@ module Event = struct
       ~msg:"validating protocol {hash} against sources"
       ~pp1:Protocol_hash.pp
       ("hash", Protocol_hash.encoding)
+
+  (* Warning *)
+  let warn_no_check =
+    declare_0
+      ~section
+      ~level:Warning
+      ~name:"warn_no_check"
+      ~msg:
+        "Warning: to speed up the import, the consistency of the imported data \
+         will not be fully checked. It is not recommended to use this option \
+         with a snapshot downloaded from an untrusted source"
+      ()
 end

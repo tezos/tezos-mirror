@@ -3033,6 +3033,32 @@ module Unsafe = struct
     protect
       (fun () ->
         let*! context_index = Context.init ~readonly:true context_dir in
+        let*! fd =
+          Lwt_unix.openfile
+            (Naming.gc_lockfile chain_dir |> Naming.file_path)
+            [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
+            0o644
+        in
+        let*! is_locked =
+          Lwt.catch
+            (fun () ->
+              let*! () = Lwt_unix.lockf fd Unix.F_TEST 0o644 in
+              Lwt.return_false)
+            (fun (_ : exn) -> Lwt.return_true)
+        in
+        let*! () =
+          if not is_locked then Lwt.return_unit
+          else
+            Animation.three_dots
+              ~progress_display_mode:Auto
+              ~msg:
+                "The storage is locked by a context prunning. Waiting for it \
+                 to finish before exporting the snapshot"
+            @@ fun () ->
+            Lwt.finalize
+              (fun () -> Lwt_unix.lockf fd Unix.F_RLOCK 0o644)
+              (fun () -> Lwt_unix.close fd)
+        in
         let* store =
           load_store
             store_dir

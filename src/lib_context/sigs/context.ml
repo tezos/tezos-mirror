@@ -788,6 +788,19 @@ module type TEZOS_CONTEXT = sig
       minimize the disk footprint. *)
   val split : index -> unit
 
+  (** [export_snapshot index context_hash ~path] exports the context
+      corresponding to [context_hash], if found in [index], into the
+      given folder path.
+      As the export uses the GC's behaviour to extract a single commit
+      into a standalone fresh store, it is not possible to export a
+      snapshot while a GC is running. This call will hang until the GC
+      has finished.
+
+      Note: there is no associated [import_snapshot] function as the
+      import consist in copying the exported store. *)
+  val export_snapshot :
+    index -> Tezos_crypto.Context_hash.t -> path:string -> unit Lwt.t
+
   val set_head :
     index ->
     Tezos_crypto.Chain_id.t ->
