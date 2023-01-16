@@ -58,3 +58,18 @@ git checkout tx-kernel-vRAM
 ./scripts/build-unit-kernel.sh "test-kernel,wee_alloc"
 mv test-kernel,wee_alloc.wasm computation.wasm
 ```
+
+## [tx-kernel-no-verif.wasm](./tx-kernel-no-verif.wasm)
+
+This kernel is TORU-style kernel for transferring tickets between accounts. The `no-verif` variant disables
+bls signature-verification, which otherwise take too long in the slow-PVM to run in CI.
+
+It can be reproduced in the kernel repository like so:
+
+```
+git checkout 69f69144764dcd59dcc1fd144bf6e8f707f0431e
+
+cargo make wasm-tx-kernel-no-sig-verif
+cp target/wasm32-unknown-unknown/release/kernel_core.wasm tx-kernel-no-sig-verif.wasm
+wasm-strip tx-kernel-no-sig-verif.wasm
+```
