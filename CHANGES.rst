@@ -127,6 +127,9 @@ Node
 
 - Improved the disk usage footprint when running a context pruning.
 
+- **Breaking Changes:** Removed ``kathmandunet`` from the list of
+  known networks (for ``--network`` command-line argument).
+
 Client
 ------
 
