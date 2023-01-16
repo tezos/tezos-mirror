@@ -520,3 +520,9 @@ let read_test_messages names =
       let message_file = locate_file name in
       Lwt_io.with_file ~mode:Lwt_io.Input message_file Lwt_io.read)
     names
+
+(** Can be passed to be used as a host function
+    [compute_step_many ~write_debug:write_debug_on_stdout ...] *)
+let write_debug_on_stdout =
+  Tezos_scoru_wasm.Builtins.Printer
+    (fun msg -> Lwt.return @@ Format.printf "%s\n%!" msg)
