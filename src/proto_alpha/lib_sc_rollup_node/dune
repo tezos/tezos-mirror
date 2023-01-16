@@ -20,7 +20,7 @@
   tezos-rpc-http
   tezos-rpc-http-server
   tezos-workers
-  tezos_dal_node_services
+  tezos-dal-node-services
   tezos_dal_node_lib
   tezos-shell-services
   tezos-smart-rollup-alpha

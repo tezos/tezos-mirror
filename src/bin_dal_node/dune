@@ -20,7 +20,7 @@
   tezos-stdlib-unix
   tezos-stdlib
   tezos_dal_node_lib
-  tezos_dal_node_services
+  tezos-dal-node-services
   tezos_layer2_store
   tezos-crypto-dal
   irmin-pack
