@@ -410,6 +410,9 @@ module Merkle_tree = struct
       let payload = Bytes.of_string long_payload in
       test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4608
+        Define helper function that calculates expected number of pages given the
+        payload and use it for PBT expected number of pages given payload *)
     module PBT = struct
       open QCheck2.Gen
 
