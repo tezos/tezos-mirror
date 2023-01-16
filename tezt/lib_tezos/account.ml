@@ -33,6 +33,35 @@ type key = {
   secret_key : secret_key;
 }
 
+let secret_key_equal secret_key1 secret_key2 =
+  match (secret_key1, secret_key2) with
+  | Unencrypted s1, Unencrypted s2 -> String.equal s1 s2
+
+let uri_of_secret_key = function
+  | Unencrypted secret_key -> "unencrypted:" ^ secret_key
+
+let secret_key_typ : secret_key Check.typ =
+  Check.equalable
+    (fun fmt secret_key ->
+      Format.fprintf fmt "%s" (uri_of_secret_key secret_key))
+    (fun secret_key1 secret_key2 -> secret_key_equal secret_key1 secret_key2)
+
+let key_typ : key Check.typ =
+  Check.equalable
+    (fun fmt {alias; public_key_hash; public_key; secret_key} ->
+      Format.fprintf
+        fmt
+        "{alias: %S; public_key_hash: %S; public_key: %s; secret_key: %S}"
+        alias
+        public_key_hash
+        public_key
+        (uri_of_secret_key secret_key))
+    (fun key1 key2 ->
+      String.equal key1.alias key2.alias
+      && String.equal key1.public_key_hash key2.public_key_hash
+      && String.equal key1.public_key key2.public_key
+      && secret_key_equal key1.secret_key key2.secret_key)
+
 type aggregate_key = {
   aggregate_alias : string;
   aggregate_public_key_hash : string;

@@ -610,6 +610,14 @@ val gen_keys : ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
 val gen_and_show_keys :
   ?alias:string -> ?sig_alg:string -> t -> Account.key Lwt.t
 
+(** Run [octez-client add address <alias> <src>]. *)
+val add_address : ?force:bool -> t -> alias:string -> src:string -> unit Lwt.t
+
+(** Same as [add_address] but do not wait for the process to
+    exit. *)
+val spawn_add_address :
+  ?force:bool -> t -> alias:string -> src:string -> Process.t
+
 (** Run [octez-client bls gen keys <alias>]. *)
 val bls_gen_keys :
   ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
@@ -1054,10 +1062,12 @@ val spawn_originate_contract_at :
   string * Process.t
 
 (** Run [octez-client remember contract <alias> <address>]. *)
-val remember_contract : alias:string -> address:string -> t -> unit Lwt.t
+val remember_contract :
+  ?force:bool -> alias:string -> address:string -> t -> unit Lwt.t
 
 (** Same as [remember_contract], but do not wait for the process to exit. *)
-val spawn_remember_contract : alias:string -> address:string -> t -> Process.t
+val spawn_remember_contract :
+  ?force:bool -> alias:string -> address:string -> t -> Process.t
 
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)

@@ -48,6 +48,12 @@ type key = {
   secret_key : secret_key;
 }
 
+(** A [Check.typ] for [secret_key] *)
+val secret_key_typ : secret_key Check.typ
+
+(** A [Check.typ] for [key] *)
+val key_typ : key Check.typ
+
 (** Keys associated to an aggregatable account. For example:
 {[
     {

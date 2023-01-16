@@ -783,6 +783,14 @@ let gen_and_show_keys ?alias ?sig_alg client =
   let* alias = gen_keys ?alias ?sig_alg client in
   show_address ~alias client
 
+let spawn_add_address ?(force = false) client ~alias ~src =
+  spawn_command client
+  @@ ["add"; "address"; alias; src]
+  @ optional_switch "force" force
+
+let add_address ?force client ~alias ~src =
+  spawn_add_address ?force client ~alias ~src |> Process.check
+
 let spawn_bls_gen_keys ?hooks ?(force = false) ?alias client =
   let alias =
     match alias with
@@ -1350,11 +1358,13 @@ let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
   in
   Lwt.return (alias, res)
 
-let spawn_remember_contract ~alias ~address client =
-  spawn_command client ["remember"; "contract"; alias; address]
+let spawn_remember_contract ?(force = false) ~alias ~address client =
+  spawn_command client
+  @@ ["remember"; "contract"; alias; address]
+  @ optional_switch "force" force
 
-let remember_contract ~alias ~address client =
-  spawn_remember_contract ~alias ~address client |> Process.check
+let remember_contract ?force ~alias ~address client =
+  spawn_remember_contract ?force ~alias ~address client |> Process.check
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
