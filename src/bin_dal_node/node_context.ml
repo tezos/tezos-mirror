@@ -39,6 +39,7 @@ type t = {
   store : Store.node_store;
   tezos_node_cctxt : Client_context.full;
   neighbors_cctxts : Dal_node_client.cctxt list;
+  committee_cache : Committee_cache.t;
 }
 
 let init config store cctxt =
@@ -48,7 +49,15 @@ let init config store cctxt =
         Dal_node_client.make_unix_cctxt ~addr ~port)
       config.Configuration.neighbors
   in
-  {status = Starting; config; store; tezos_node_cctxt = cctxt; neighbors_cctxts}
+  {
+    status = Starting;
+    config;
+    store;
+    tezos_node_cctxt = cctxt;
+    neighbors_cctxts;
+    committee_cache =
+      Committee_cache.create ~max_size:Constants.committee_cache_size;
+  }
 
 let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
@@ -86,3 +95,28 @@ let get_store ctxt = ctxt.store
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
+
+let fetch_assigned_shard_indicies ctxt ~level ~pkh =
+  let open Lwt_result_syntax in
+  let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
+  let+ committee =
+    match Committee_cache.find cache ~level with
+    | Some committee -> return committee
+    | None ->
+        let*? {plugin = (module Plugin); _} = get_ready ctxt in
+        let+ committee = Plugin.get_committee cctxt ~level in
+        let committee =
+          Tezos_crypto.Signature.Public_key_hash.Map.map
+            (fun (start_index, offset) -> Committee_cache.{start_index; offset})
+            committee
+        in
+        Committee_cache.add cache ~level ~committee ;
+        committee
+  in
+  match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
+  | None -> []
+  | Some {start_index; offset} ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4540
+         Consider returning some abstract representation of [(s, n)]
+         instead of [int list] *)
+      Stdlib.List.init offset (fun i -> start_index + i)
