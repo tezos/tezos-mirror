@@ -52,7 +52,7 @@ val preapply_block :
 
 (** Fetch a proposal from the node.
 
-    @param cache is unset by default 
+    @param cache is unset by default
 *)
 val proposal :
   #Tezos_rpc.Context.simple ->
@@ -74,3 +74,11 @@ val await_protocol_activation :
   chain:Shell_services.chain ->
   unit ->
   unit tzresult Lwt.t
+
+(** [get_attestable_slots ctxt pkk ~level] calls the DAL node RPC
+    /profiles/<pkh>/attested_levels/<level>/attestable_slots *)
+val get_attestable_slots :
+  Tezos_rpc.Context.generic ->
+  public_key_hash ->
+  level:int32 ->
+  Tezos_dal_node_services.Services.Types.attestable_slots tzresult Lwt.t
