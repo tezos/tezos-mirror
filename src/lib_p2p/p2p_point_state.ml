@@ -109,10 +109,10 @@ module Info = struct
   let known_public s = s.known_public
 
   let can_reconnect ~now {reconnection_info; _} =
-    (* TODO : use Option.map_default when will be available *)
-    match reconnection_info with
-    | None -> false
-    | Some gr -> Time.System.compare now gr.end_time <= 0
+    Option.fold
+      ~none:false
+      ~some:(fun gr -> Time.System.compare now gr.end_time <= 0)
+      reconnection_info
 
   let reconnection_time {reconnection_info; _} =
     Option.map (fun gr -> gr.end_time) reconnection_info
