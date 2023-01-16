@@ -65,6 +65,8 @@ module Types = struct
      Add missing profiles. *)
   type profile = Attestor of Tezos_crypto.Signature.public_key_hash
 
+  type with_proof = {with_proof : bool}
+
   (* Auxiliary functions.  *)
 
   (* Encodings associated  to the types. *)
@@ -145,6 +147,13 @@ module Types = struct
           (function Attestor attest -> Some ((), attest))
           (function (), attest -> Attestor attest);
       ]
+
+  let with_proof_encoding =
+    let open Data_encoding in
+    conv
+      (fun {with_proof} -> with_proof)
+      (fun with_proof -> {with_proof})
+      (obj1 (req "with_proof" bool))
 
   (* String parameters queries. *)
 
@@ -235,6 +244,25 @@ let get_commitment_proof :
     ~output:Cryptobox.Commitment_proof.encoding
     Tezos_rpc.Path.(
       open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "proof")
+
+let put_commitment_shards :
+    < meth : [`PUT]
+    ; input : Types.with_proof
+    ; output : unit
+    ; prefix : unit
+    ; params : unit * Cryptobox.commitment
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.put_service
+    ~description:
+      "Compute and save the shards of the slot associated to the given \
+       commitment. If the input's flag is true, the proofs associated with \
+       each given shards are also computed."
+    ~query:Tezos_rpc.Query.empty
+    ~input:Types.with_proof_encoding
+    ~output:Data_encoding.unit
+    Tezos_rpc.Path.(
+      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "shards")
 
 let get_commitment_by_published_level_and_index :
     < meth : [`GET]
