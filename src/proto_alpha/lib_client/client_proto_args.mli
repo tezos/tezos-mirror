@@ -134,7 +134,7 @@ val uri_parameter : (Uri.t, full) Tezos_clic.parameter
 
 val string_parameter : (string, full) Tezos_clic.parameter
 
-val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
+val bytes_of_prefixed_string : full -> string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Tezos_clic.parameter
 
@@ -145,7 +145,7 @@ val file_or_text :
   'a tzresult Lwt.t
 
 val file_or_text_parameter :
-  from_text:(string -> 'a tzresult Lwt.t) ->
+  from_text:(full -> string -> 'a tzresult Lwt.t) ->
   unit ->
   ('a, full) Tezos_clic.parameter
 

@@ -139,22 +139,22 @@ let () =
 let string_parameter = Tezos_clic.parameter (fun _ x -> return x)
 
 let int_parameter =
-  Tezos_clic.parameter (fun _ p ->
-      try return (int_of_string p) with _ -> failwith "Cannot read int")
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
+      try return (int_of_string p) with _ -> cctxt#error "Cannot read int")
 
 let uri_parameter = Tezos_clic.parameter (fun _ x -> return (Uri.of_string x))
 
-let bytes_of_prefixed_string s =
+let bytes_of_prefixed_string (cctxt : #Client_context.full) s =
   match
     if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then None
     else Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2)))
   with
   | Some s -> return s
   | None ->
-      failwith "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
+      cctxt#error
+        "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
 
-let bytes_parameter =
-  Tezos_clic.parameter (fun _ s -> bytes_of_prefixed_string s)
+let bytes_parameter = Tezos_clic.parameter bytes_of_prefixed_string
 
 let parse_file ~from_text ~read_file ~path =
   let open Lwt_result_syntax in
@@ -170,19 +170,20 @@ let file_or_text ~from_text ~read_file =
 
 let file_or_text_parameter ~from_text () =
   Tezos_clic.parameter (fun (cctxt : #Client_context.full) ->
-      file_or_text ~from_text ~read_file:cctxt#read_file)
+      file_or_text ~from_text:(from_text cctxt) ~read_file:cctxt#read_file)
 
 let json_parameter =
-  let from_text s =
+  let from_text (cctxt : #Client_context.full) s =
     match Data_encoding.Json.from_string s with
     | Ok json -> return json
-    | Error err -> failwith "'%s' is not a valid JSON-encoded value: %s" s err
+    | Error err ->
+        cctxt#error "'%s' is not a valid JSON-encoded value: %s" s err
   in
   file_or_text_parameter ~from_text ()
 
 let data_parameter =
   let open Lwt_syntax in
-  let from_text input =
+  let from_text (_cctxt : #Client_context.full) input =
     return @@ Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression input
   in
@@ -303,20 +304,20 @@ let tez_param ~name ~desc next =
     next
 
 let non_negative_z_parameter =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try
         let v = Z.of_string s in
         error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
         >>?= fun () -> return v
-      with _ -> failwith "Invalid number, must be a non negative number.")
+      with _ -> cctxt#error "Invalid number, must be a non negative number.")
 
 let non_negative_z_param ~name ~desc next =
   Tezos_clic.param ~name ~desc non_negative_z_parameter next
 
 let counter_parameter =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       match Manager_counter.Internal_for_injection.of_string s with
-      | None -> failwith "Invalid counter, must be a non-negative number."
+      | None -> cctxt#error "Invalid counter, must be a non-negative number."
       | Some c -> return c)
 
 let non_negative_parameter =
@@ -340,10 +341,10 @@ let default_fee_arg =
     (tez_parameter "--default-fee")
 
 let level_kind =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       match Option.bind (Script_int.of_string s) Script_int.is_nat with
       | Some n -> return n
-      | None -> failwith "invalid level (must be a positive number)")
+      | None -> cctxt#error "invalid level (must be a positive number)")
 
 let level_arg =
   Tezos_clic.arg
@@ -353,21 +354,21 @@ let level_arg =
     level_kind
 
 let raw_level_parameter =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       match Int32.of_string_opt s with
       | Some i when i >= 0l ->
           Lwt.return @@ Environment.wrap_tzresult (Raw_level.of_int32 i)
       | _ ->
-          failwith
+          cctxt#error
             "'%s' is not a valid level (should be a non-negative int32 value)"
             s)
 
 let timestamp_parameter =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       match Script_timestamp.of_string s with
       | Some time -> return time
       | None ->
-          failwith
+          cctxt#error
             "invalid timestamp, must be either a RFC 3339 string or a number \
              of seconds since epoch.")
 
@@ -381,11 +382,11 @@ let now_arg =
     timestamp_parameter
 
 let gas_limit_kind =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try
         let v = Z.of_string s in
         return (Gas.Arith.integral_exn v)
-      with _ -> failwith "invalid gas limit (must be a positive number)")
+      with _ -> cctxt#error "invalid gas limit (must be a positive number)")
 
 let gas_limit_arg =
   Tezos_clic.arg
@@ -422,13 +423,13 @@ let unlimited_gas_arg =
     ()
 
 let storage_limit_kind =
-  Tezos_clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try
         let v = Z.of_string s in
         assert (Compare.Z.(v >= Z.zero)) ;
         return v
       with _ ->
-        failwith "invalid storage limit (must be a positive number of bytes)")
+        cctxt#error "invalid storage limit (must be a positive number of bytes)")
 
 let storage_limit_arg =
   Tezos_clic.arg
@@ -554,21 +555,21 @@ let no_confirmation =
     ()
 
 let signature_parameter =
-  Tezos_clic.parameter (fun _cctxt s ->
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       match Tezos_crypto.Signature.of_b58check_opt s with
       | Some s -> return s
-      | None -> failwith "Not given a valid signature")
+      | None -> cctxt#error "Not given a valid signature")
 
 let unparsing_mode_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _cctxt ->
       return ["Readable"; "Optimized"; "Optimized_legacy"])
-    (fun _cctxt s ->
+    (fun (cctxt : #Client_context.full) s ->
       match s with
       | "Readable" -> return Script_ir_unparser.Readable
       | "Optimized" -> return Script_ir_unparser.Optimized
       | "Optimized_legacy" -> return Script_ir_unparser.Optimized_legacy
-      | _ -> failwith "Unknown unparsing mode %s" s)
+      | _ -> cctxt#error "Unknown unparsing mode %s" s)
 
 let unparsing_mode_arg ~default =
   Tezos_clic.default_arg
@@ -629,11 +630,11 @@ end
 
 module Sc_rollup_params = struct
   let sc_rollup_address_parameter =
-    Tezos_clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
         match Alpha_context.Sc_rollup.Address.of_b58check_opt s with
         | Some c -> return c
         | None ->
-            failwith
+            cctxt#error
               "Parameter '%s' is an invalid smart rollup address encoded in a \
                base58 string."
               s)
@@ -643,41 +644,41 @@ module Sc_rollup_params = struct
     Tezos_clic.param ~name ~desc sc_rollup_address_parameter next
 
   let rollup_kind_parameter =
-    Tezos_clic.parameter (fun _ name ->
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) name ->
         match Sc_rollup.Kind.of_string name with
         | None ->
-            failwith
+            cctxt#error
               "Parameter '%s' is not a valid rollup name (must be one of %s)"
               name
               (String.concat ", " Sc_rollup.Kind.(List.map to_string all))
         | Some k -> return k)
 
   let boot_sector_parameter =
-    let from_text s =
+    let from_text (cctxt : #Client_context.full) s =
       return (fun (Sc_rollup.PVM.Packed (module R)) ->
           R.parse_boot_sector s |> function
-          | None -> failwith "Invalid kernel"
+          | None -> cctxt#error "Invalid kernel"
           | Some boot_sector -> return boot_sector)
     in
     file_or_text_parameter ~from_text ()
 
   let messages_parameter =
     let open Lwt_result_syntax in
-    let from_json text =
+    let from_json (cctxt : #Client_context.full) text =
       try
         match Ezjsonm.from_string text with
         | `A messages -> return (`Json (`A (`String "raw" :: messages)))
-        | _ -> failwith "Expecting a list of string"
+        | _ -> cctxt#error "Expecting a list of string"
       with Ezjsonm.Parse_error _ ->
-        failwith "Given text is not valid JSON: '%s'" text
+        cctxt#error "Given text is not valid JSON: '%s'" text
     in
-    let from_json_hex text =
+    let from_json_hex (cctxt : #Client_context.full) text =
       try
         match Ezjsonm.from_string text with
         | `A messages -> return (`Json (`A (`String "hex" :: messages)))
-        | _ -> failwith "Expecting a list of hex-encoded string"
+        | _ -> cctxt#error "Expecting a list of hex-encoded string"
       with Ezjsonm.Parse_error _ ->
-        failwith "Given text is not valid JSON: '%s'" text
+        cctxt#error "Given text is not valid JSON: '%s'" text
     in
     let from_bin_file (cctxt : #Client_context.full) path =
       let* bin = cctxt#read_file path in
@@ -685,45 +686,46 @@ module Sc_rollup_params = struct
     in
     let from_json_file (cctxt : #Client_context.full) path =
       let* json_string = cctxt#read_file path in
-      from_json json_string
+      from_json cctxt json_string
     in
     Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
         Client_aliases.parse_alternatives
           [
-            ("text", from_json);
-            ("hex", from_json_hex);
+            ("text", from_json cctxt);
+            ("hex", from_json_hex cctxt);
             ("file", from_json_file cctxt);
             ("bin", from_bin_file cctxt);
           ]
           p)
 
   let commitment_hash_parameter =
-    Tezos_clic.parameter (fun _ commitment_hash ->
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) commitment_hash ->
         match Sc_rollup.Commitment.Hash.of_b58check_opt commitment_hash with
         | None ->
-            failwith
+            cctxt#error
               "Parameter '%s' is not a valid B58-encoded rollup commitment hash"
               commitment_hash
         | Some hash -> return hash)
 
-  let unchecked_payload_parameter = file_or_text_parameter ~from_text:return ()
+  let unchecked_payload_parameter =
+    file_or_text_parameter ~from_text:(fun _cctxt -> return) ()
 
   let compressed_state_parameter =
-    Tezos_clic.parameter (fun _ state_hash ->
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) state_hash ->
         match Sc_rollup.State_hash.of_b58check_opt state_hash with
         | None ->
-            failwith
+            cctxt#error
               "Parameter '%s' is not a valid B58-encoded compressed state"
               state_hash
         | Some hash -> return hash)
 
   let number_of_ticks_parameter =
-    Tezos_clic.parameter (fun _ nb_of_ticks ->
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) nb_of_ticks ->
         match Int64.of_string_opt nb_of_ticks with
         | Some nb_of_ticks -> (
             match Sc_rollup.Number_of_ticks.of_value nb_of_ticks with
             | None ->
-                failwith
+                cctxt#error
                   "Parameter '%Ld' is out of bounds, it should be between %Ld \
                    and %Ld"
                   nb_of_ticks
@@ -731,16 +733,16 @@ module Sc_rollup_params = struct
                   Sc_rollup.Number_of_ticks.max_value
             | Some nb_of_ticks -> return nb_of_ticks)
         | None ->
-            failwith "'%s' is not valid, should be a int64 value" nb_of_ticks)
+            cctxt#error "'%s' is not valid, should be a int64 value" nb_of_ticks)
 end
 
 module Zk_rollup_params = struct
   let address_parameter =
     let open Lwt_result_syntax in
-    Tezos_clic.parameter (fun _cctxt s ->
+    Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
         match Zk_rollup.Address.of_b58check_opt s with
         | Some c -> return c
-        | None -> failwith "Parameter '%s' is an invalid Epoxy address" s)
+        | None -> cctxt#error "Parameter '%s' is an invalid Epoxy address" s)
 
   let plonk_public_parameters_parameter =
     let open Lwt_result_syntax in
@@ -837,10 +839,10 @@ let fee_parameter_args =
       ~placeholder:"amount"
       ~default:"1.0"
       ~doc:"Set the fee cap"
-      (parameter (fun _ s ->
+      (parameter (fun (cctxt : #Client_context.full) s ->
            match Tez.of_string s with
            | Some t -> return t
-           | None -> failwith "Bad fee cap"))
+           | None -> cctxt#error "Bad fee cap"))
   in
   let burn_cap_arg =
     default_arg
@@ -848,10 +850,10 @@ let fee_parameter_args =
       ~placeholder:"amount"
       ~default:"0"
       ~doc:"Set the burn cap"
-      (parameter (fun _ s ->
+      (parameter (fun (cctxt : #Client_context.full) s ->
            match Tez.of_string s with
            | Some t -> return t
-           | None -> failwith "Bad burn cap"))
+           | None -> cctxt#error "Bad burn cap"))
   in
   Tezos_clic.map_arg
     ~f:

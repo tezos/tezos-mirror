@@ -242,7 +242,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of an origination"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -521,7 +521,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of a contract call"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -595,7 +595,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of a contract call"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -667,7 +667,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of a contract call"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -731,7 +731,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of a contract call"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -798,7 +798,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of a contract call"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
@@ -880,7 +880,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
-              failwith
+              cctxt#error
                 "only implicit accounts can be the source of a contract call"
           | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in

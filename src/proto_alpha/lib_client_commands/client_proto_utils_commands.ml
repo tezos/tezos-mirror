@@ -32,7 +32,7 @@ let unsigned_block_header_param =
   param
     ~name:"unsigned block header"
     ~desc:"A hex or JSON encoded unsigned block header"
-  @@ parameter (fun _ s ->
+  @@ parameter (fun (cctxt : #Client_context.full) s ->
          let open Lwt_result_syntax in
          let bytes_opt = `Hex s |> Hex.to_bytes in
          let enc = Protocol.Alpha_context.Block_header.unsigned_encoding in
@@ -40,17 +40,16 @@ let unsigned_block_header_param =
          |> function
          | Some s -> return s
          | None -> (
-             let error =
-               Exn
-                 (Failure
-                    "Cannot decode unsigned block header: is it valid JSON or \
-                     hexadecimal?")
-             in
              let open Data_encoding.Json in
+             let error =
+               "Cannot decode unsigned block header: is it valid JSON or \
+                hexadecimal?"
+             in
              from_string s |> function
-             | Error _ -> tzfail error
+             | Error _ -> cctxt#error "%s" error
              | Ok json -> (
-                 try destruct enc json |> return with _ -> tzfail error)))
+                 try destruct enc json |> return
+                 with _ -> cctxt#error "%s" error)))
 
 let commands () =
   let open Tezos_clic in
