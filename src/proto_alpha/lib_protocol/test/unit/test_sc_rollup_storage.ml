@@ -36,9 +36,6 @@ open Protocol
 open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 
-(** Lift a computation using using environment errors to use shell errors. *)
-let lift k = Lwt.map Environment.wrap_tzresult k
-
 (** [new_context_n n] creates a context with [n] accounts. *)
 let new_context_n nb_stakers =
   let* b, contracts = Context.init_n nb_stakers () in
@@ -73,7 +70,8 @@ let new_context_2 () =
   | _ -> assert false
 
 let new_sc_rollup ctxt =
-  lift
+  let open Lwt_result_wrap_syntax in
+  wrap
   @@
   let {Michelson_v1_parser.expanded; _}, _ =
     Michelson_v1_parser.parse_expression "unit"
@@ -110,9 +108,10 @@ let assert_not_exist ~loc ~pp comp_lwt =
   Assert.is_none ~loc ~pp res_opt
 
 let assert_balance_changed op ctxt ctxt' account amount =
-  let* _, balance = lift @@ Token.balance ctxt account in
-  let* _, balance' = lift @@ Token.balance ctxt' account in
-  let* balance_op_amount = lift @@ op balance amount in
+  let open Lwt_result_wrap_syntax in
+  let* _, balance = wrap @@ Token.balance ctxt account in
+  let* _, balance' = wrap @@ Token.balance ctxt' account in
+  let* balance_op_amount = wrap @@ op balance amount in
   equal_tez balance' ~loc:__LOC__ balance_op_amount
 
 let assert_balance_increased ctxt ctxt' account amount =
@@ -151,13 +150,14 @@ module Zero = struct
 end
 
 let deposit_stake_and_check_balances ctxt rollup staker =
+  let open Lwt_result_wrap_syntax in
   perform_staking_action_and_check
     ctxt
     rollup
     staker
     (fun ctxt rollup staker_contract stake ->
       let* ctxt', _, _ =
-        lift
+        wrap
         @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
              ctxt
              rollup
@@ -442,16 +442,17 @@ let withdraw ctxt rollup staker =
   return ctxt
 
 let assert_staker_exists ctxt rollup staker =
+  let open Lwt_result_wrap_syntax in
   (* Assert the stake was frozen from the balance. *)
   let stake = Constants_storage.sc_rollup_stake_amount ctxt in
   let* frozen_balance =
-    lift
+    wrap
     @@ Contract_storage.(get_frozen_bonds ctxt (Contract_repr.Implicit staker))
   in
   let* () = equal_tez ~loc:__LOC__ stake frozen_balance in
   (* Assert [staker] was given an index. *)
   let* ctxt, staker_index_opt =
-    lift
+    wrap
     @@ Sc_rollup_staker_index_storage.find_staker_index_unsafe
          ctxt
          rollup
@@ -459,20 +460,21 @@ let assert_staker_exists ctxt rollup staker =
   in
   let* staker_index = Assert.get_some ~loc:__LOC__ staker_index_opt in
   let* _ctxt, exists =
-    lift @@ Sc_rollup_staker_index_storage.is_active ctxt rollup staker_index
+    wrap @@ Sc_rollup_staker_index_storage.is_active ctxt rollup staker_index
   in
   Assert.equal_bool ~loc:__LOC__ true exists
 
 let assert_staker_dont_exists ctxt rollup staker =
+  let open Lwt_result_wrap_syntax in
   (* Assert no stake was frozen from the balance. *)
   let* frozen_balance =
-    lift
+    wrap
     @@ Contract_storage.(get_frozen_bonds ctxt (Contract_repr.Implicit staker))
   in
   let* () = equal_tez ~loc:__LOC__ Tez_repr.zero frozen_balance in
   (* Assert [staker] has no index. *)
   let* _ctxt, staker_index_opt =
-    lift
+    wrap
     @@ Sc_rollup_staker_index_storage.find_staker_index_unsafe
          ctxt
          rollup
@@ -481,11 +483,12 @@ let assert_staker_dont_exists ctxt rollup staker =
   Assert.is_none ~loc:__LOC__ ~pp:Z.pp_print (staker_index_opt :> Z.t option)
 
 let assert_staked_or_not ~staked ctxt rollup hash staker =
+  let open Lwt_result_wrap_syntax in
   let* _ctxt, stakers_index =
-    lift @@ Storage.Sc_rollup.Commitment_stakers.get (ctxt, rollup) hash
+    wrap @@ Storage.Sc_rollup.Commitment_stakers.get (ctxt, rollup) hash
   in
   let* _ctxt, staker_index =
-    lift
+    wrap
     @@ Sc_rollup_staker_index_storage.get_staker_index_unsafe ctxt rollup staker
   in
   Assert.equal_bool
@@ -499,10 +502,11 @@ let assert_not_staked_on = assert_staked_or_not ~staked:false
 
 let assert_commitment_metadata_exists ?publication_level ctxt rollup commitment
     staker =
+  let open Lwt_result_wrap_syntax in
   (* Assert the commitment's metadata exists. *)
   let hash = Commitment_repr.hash_uncarbonated commitment in
   let* _ctxt, actual_publication_level =
-    lift @@ Storage.Sc_rollup.Commitment_added.get (ctxt, rollup) hash
+    wrap @@ Storage.Sc_rollup.Commitment_added.get (ctxt, rollup) hash
   in
   let* () =
     match publication_level with
@@ -515,7 +519,7 @@ let assert_commitment_metadata_exists ?publication_level ctxt rollup commitment
   in
   let* () = assert_staked_on ctxt rollup hash staker in
   let* _ctxt, commitments_hash =
-    lift
+    wrap
     @@ Storage.Sc_rollup.Commitments_per_inbox_level.get
          (ctxt, rollup)
          commitment.inbox_level
@@ -526,10 +530,11 @@ let assert_commitment_metadata_exists ?publication_level ctxt rollup commitment
     (List.mem ~equal:Commitment_repr.Hash.equal hash commitments_hash)
 
 let assert_commitment_exists ctxt rollup commitment =
+  let open Lwt_result_wrap_syntax in
   (* Assert commitment exists. *)
   let hash = Commitment_repr.hash_uncarbonated commitment in
   let* actual_commitment_opt, _ctxt =
-    lift
+    wrap
     @@ Sc_rollup_commitment_storage.get_commitment_opt_unsafe ctxt rollup hash
   in
   let* actual_commitment = Assert.get_some ~loc:__LOC__ actual_commitment_opt in
@@ -537,18 +542,19 @@ let assert_commitment_exists ctxt rollup commitment =
   return_unit
 
 let assert_commitment_metadata_dont_exists ctxt rollup commitment =
+  let open Lwt_result_wrap_syntax in
   (* Assert the commitment's metadata dont exists. *)
   let hash = Commitment_repr.hash_uncarbonated commitment in
   let* _ctxt, exists =
-    lift @@ Storage.Sc_rollup.Commitment_added.mem (ctxt, rollup) hash
+    wrap @@ Storage.Sc_rollup.Commitment_added.mem (ctxt, rollup) hash
   in
   let* () = Assert.equal_bool ~loc:__LOC__ false exists in
   let* _ctxt, exists =
-    lift @@ Storage.Sc_rollup.Commitment_stakers.mem (ctxt, rollup) hash
+    wrap @@ Storage.Sc_rollup.Commitment_stakers.mem (ctxt, rollup) hash
   in
   let* () = Assert.equal_bool ~loc:__LOC__ false exists in
   let* _ctxt, exists =
-    lift
+    wrap
     @@ Storage.Sc_rollup.Commitments_per_inbox_level.mem
          (ctxt, rollup)
          commitment.inbox_level
@@ -556,9 +562,10 @@ let assert_commitment_metadata_dont_exists ctxt rollup commitment =
   Assert.equal_bool ~loc:__LOC__ false exists
 
 let assert_commitment_dont_exists ctxt rollup commitment =
+  let open Lwt_result_wrap_syntax in
   let hash = Commitment_repr.hash_uncarbonated commitment in
   let* commitment_opt, _ctxt =
-    lift
+    wrap
     @@ Sc_rollup_commitment_storage.get_commitment_opt_unsafe ctxt rollup hash
   in
   Assert.is_none ~loc:__LOC__ ~pp:Commitment_repr.pp commitment_opt
@@ -567,10 +574,11 @@ let assert_commitment_dont_exists ctxt rollup commitment =
 
 module Stake_storage_tests = struct
   let test_last_cemented_commitment_hash_with_level_when_genesis () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt = new_context () in
     let* rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
     let* c1, inbox_level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
            ctxt
            rollup
@@ -585,11 +593,12 @@ module Stake_storage_tests = struct
 
   (** Test that deposit initializes the metadata for the staker. *)
   let test_deposit () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, staker = new_context_1 () in
     let contract_staker = Contract_repr.Implicit staker in
     let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let* ctxt_after_deposit, _balance_updates, _staker_index =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
            ctxt
            rollup
@@ -616,6 +625,7 @@ module Stake_storage_tests = struct
 
   (** Test that deposit fails if the staker is underfunded. *)
   let test_deposit_by_underfunded_staker () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, sc_rollup, _genesis_hash = new_context_with_rollup () in
     let staker =
       Sc_rollup_repr.Staker.of_b58check_exn
@@ -640,7 +650,7 @@ module Stake_storage_tests = struct
     let staker_balance = Tez_repr.div_exn stake 2 in
     let staker_contract = Contract_repr.Implicit staker in
     let* ctxt, _ =
-      lift
+      wrap
       @@ Token.transfer ctxt `Minted (`Contract staker_contract) staker_balance
     in
     assert_fails_with
@@ -654,21 +664,23 @@ module Stake_storage_tests = struct
 
   (** Test that a staker can deposit and then withdraw. *)
   let test_deposit_then_withdraw () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, _genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
     let* () = assert_staker_exists ctxt rollup staker in
     let* ctxt, _balance_updates =
-      lift @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
+      wrap @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
     in
     assert_staker_dont_exists ctxt rollup staker
 
   (** Test that an account can stake on more than one rollup. *)
   let test_deposit_on_two_rollups () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, staker = new_context_1 () in
     let assert_frozen_balance ctxt staker expected =
       let* frozen_balance =
-        lift
+        wrap
         @@ Contract_storage.(
              get_frozen_bonds ctxt (Contract_repr.Implicit staker))
       in
@@ -678,7 +690,7 @@ module Stake_storage_tests = struct
     let* () = assert_frozen_balance ctxt staker Tez_repr.zero in
     let* rollup1, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let* ctxt, _balance_updates, _staker_index =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
            ctxt
            rollup1
@@ -687,7 +699,7 @@ module Stake_storage_tests = struct
     let* () = assert_frozen_balance ctxt staker stake in
     let* rollup2, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let* ctxt, _balance_updates, _staker_index =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
            ctxt
            rollup2
@@ -697,10 +709,11 @@ module Stake_storage_tests = struct
 
   (** Test that deposit twice on the same rollup fails. *)
   let test_deposit_twice_fails () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, staker = new_context_1 () in
     let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let* ctxt, _balance_updates, _staker_index =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
            ctxt
            rollup
@@ -718,6 +731,7 @@ module Stake_storage_tests = struct
   (** Test that the staker, the commitment and its metadata exist after
       the publish. *)
   let test_publish () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, staker = new_context_1 () in
     let* rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
     let commitment, _hash =
@@ -726,7 +740,7 @@ module Stake_storage_tests = struct
         ~inbox_level:(valid_inbox_level ctxt 1l)
         ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment in
     (* The staker exists as a stake was deposited. *)
     let* () = assert_staker_exists ctxt rollup staker in
     (* The commitment and its metadata exists in the storage. *)
@@ -737,6 +751,7 @@ module Stake_storage_tests = struct
   (** Test that publish twice to the same level is allowed unless the
       commitment changes. *)
   let test_publish_twice () =
+    let open Lwt_result_wrap_syntax in
     (* In contrary to deposit, cement and withdraw, the same commitment
        can be published twice (and even more). *)
     let* ctxt, staker = new_context_1 () in
@@ -747,11 +762,11 @@ module Stake_storage_tests = struct
         ~inbox_level:(valid_inbox_level ctxt 1l)
         ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment in
     let* () = assert_commitment_exists ctxt rollup commitment in
     let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
     (* Assert that publishing twice succeeds and the commitment still exist. *)
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment in
     let* () = assert_commitment_exists ctxt rollup commitment in
     let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
 
@@ -800,6 +815,7 @@ module Stake_storage_tests = struct
 
   (** Test that two stakers can publish the same commitment. *)
   let test_publish_existing_commitment () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -809,8 +825,8 @@ module Stake_storage_tests = struct
         ~inbox_level:(valid_inbox_level ctxt 1l)
         ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker1 commitment in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker2 commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker1 commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker2 commitment in
     (* [staker2] does exist and stakes on [commitment]. *)
     let* () = assert_staker_exists ctxt rollup staker2 in
     let* () =
@@ -822,6 +838,7 @@ module Stake_storage_tests = struct
   (** Test that publish returns the oldest level at which the commitment
       was published. *)
   let test_publish_returns_oldest_publish_level () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -833,7 +850,7 @@ module Stake_storage_tests = struct
     in
     let ctxt = advance_level_for_commitment ctxt commitment in
     let* _hash, publish_level, ctxt, _balance_updates =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.publish_commitment
            ctxt
            rollup
@@ -842,7 +859,7 @@ module Stake_storage_tests = struct
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt 42 in
     let* _hash, publish_level', _ctxt, _balance_updates =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.publish_commitment
            ctxt
            rollup
@@ -856,6 +873,7 @@ module Stake_storage_tests = struct
 
   (** Test that a commitment can not be published from the future. *)
   let test_publish_fails_on_commitment_from_future () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -876,7 +894,7 @@ module Stake_storage_tests = struct
     in
     let ctxt = advance_level_for_commitment ctxt commitment in
     let* _hash, _publish_level, ctxt, _balance_updates =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.publish_commitment
            ctxt
            rollup
@@ -889,6 +907,7 @@ module Stake_storage_tests = struct
   (** Test that a staker can publish a commitment when its last commimtent was
       cemented. *)
   let test_publish_from_behind_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -898,24 +917,25 @@ module Stake_storage_tests = struct
     let commitment1, hash =
       commitment ~predecessor:genesis_hash ~inbox_level:level1 ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment1 in
-    let* ctxt = lift @@ cement_commitment ctxt rollup commitment1 hash in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment1 in
+    let* ctxt = wrap @@ cement_commitment ctxt rollup commitment1 hash in
     let commitment2, _hash =
       commitment ~predecessor:hash ~inbox_level:level2 ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment2 in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment2 in
     let* () = assert_commitment_exists ctxt rollup commitment2 in
     assert_commitment_metadata_exists ctxt rollup commitment2 staker
 
   (** Test that a staker can join another staker's branch without
       staking explicitely on each commitment. *)
   let test_publish_anywhere_on_branch () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
     (* staker1 creates a first branch. *)
     let commitments = commitments ~predecessor:genesis_hash ctxt 10 in
-    let* ctxt = lift @@ publish_commitments ctxt rollup staker1 commitments in
+    let* ctxt = wrap @@ publish_commitments ctxt rollup staker1 commitments in
 
     (* staker2 will stake on only one commitment. *)
     let to_stake_commitment = Stdlib.List.nth commitments 6 in
@@ -923,7 +943,7 @@ module Stake_storage_tests = struct
       List.filter (( <> ) to_stake_commitment) commitments
     in
     let* ctxt =
-      lift @@ publish_commitment ctxt rollup staker2 to_stake_commitment
+      wrap @@ publish_commitment ctxt rollup staker2 to_stake_commitment
     in
     (* Assert [staker2] is staked on [to_stake_commitment] and not on
        other commitments. *)
@@ -961,15 +981,16 @@ module Stake_storage_tests = struct
 
   (** Test that publishing a commitment at the LCC or behind it fails. *)
   let test_publish_behind_or_at_lcc_fails () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
     let commitments = commitments ~predecessor:genesis_hash ctxt 10 in
     let* ctxt =
-      lift @@ publish_and_cement_commitments ctxt rollup staker commitments
+      wrap @@ publish_and_cement_commitments ctxt rollup staker commitments
     in
     let* _ctxt, last_cemented_inbox_level, _ =
-      lift
+      wrap
       @@ Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
            ctxt
            rollup
@@ -995,6 +1016,7 @@ module Stake_storage_tests = struct
 
   (** Test that cement cleans the commitment's metadata. *)
   let test_cement () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1004,10 +1026,10 @@ module Stake_storage_tests = struct
         ~inbox_level:(valid_inbox_level ctxt 1l)
         ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment in
     let* () = assert_commitment_exists ctxt rollup commitment in
     let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
-    let* ctxt = lift @@ cement_commitment ctxt rollup commitment hash in
+    let* ctxt = wrap @@ cement_commitment ctxt rollup commitment hash in
     assert_commitment_metadata_dont_exists ctxt rollup commitment
 
   (** Test that the entrypoint [cement] fails with a nice error if
@@ -1022,6 +1044,7 @@ module Stake_storage_tests = struct
   (** Test that if [n] stakers stake on the same commitment, it can be
       cemented. *)
   let test_cement_with_n_stakers () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, stakers =
       originate_rollup_and_deposit_with_n_stakers 10
     in
@@ -1032,13 +1055,13 @@ module Stake_storage_tests = struct
         ()
     in
     let* ctxt =
-      lift
+      wrap
       @@ List.fold_left_es
            (fun ctxt staker -> publish_commitment ctxt rollup staker commitment)
            ctxt
            stakers
     in
-    let* ctxt = lift @@ cement_commitment ctxt rollup commitment hash in
+    let* ctxt = wrap @@ cement_commitment ctxt rollup commitment hash in
     assert_commitment_metadata_dont_exists ctxt rollup commitment
 
   (** Create and cement three commitments:
@@ -1049,20 +1072,21 @@ module Stake_storage_tests = struct
      as we deallocate the old LCC when a new LCC is cemented.
   *)
   let test_cement_n_commitments () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
     let commitments = commitments ~predecessor:genesis_hash ctxt 10 in
-    let* ctxt = lift @@ publish_commitments ctxt rollup staker commitments in
+    let* ctxt = wrap @@ publish_commitments ctxt rollup staker commitments in
     let* ctxt =
-      lift
+      wrap
       @@ advance_level_for_cement
            ctxt
            rollup
            (List.rev commitments |> Stdlib.List.hd)
     in
     let* _ctxt, cemented_commitments =
-      lift
+      wrap
       @@ List.fold_left_es
            (fun (ctxt, acc) commitment ->
              let hash = Commitment_repr.hash_uncarbonated commitment in
@@ -1087,6 +1111,7 @@ module Stake_storage_tests = struct
       cementation, and other are completely removed.  Note that the
       metadata for both saved and removed commitments are removed. *)
   let test_cement_clean_commitments () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1099,8 +1124,8 @@ module Stake_storage_tests = struct
         ctxt
         (max_number_of_stored_commitments * 2)
     in
-    let* ctxt = lift @@ publish_commitments ctxt rollup staker commitments in
-    let* ctxt = lift @@ cement_commitments ctxt rollup commitments in
+    let* ctxt = wrap @@ publish_commitments ctxt rollup staker commitments in
+    let* ctxt = wrap @@ cement_commitments ctxt rollup commitments in
     (* Assert that [max_number_of_stored_commitments] cemented commitments
        exists, i.e. the commitment and not its metadata. The rest are cleaned. *)
     let* () =
@@ -1124,6 +1149,7 @@ module Stake_storage_tests = struct
     return_unit
 
   let test_cement_conflicted_branches () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2, staker3 =
       originate_rollup_and_deposit_with_three_stakers ()
     in
@@ -1161,13 +1187,13 @@ module Stake_storage_tests = struct
     in
     (* Conflict begins. *)
     let* ctxt =
-      lift @@ publish_commitments ctxt rollup staker1 honest_commitments
+      wrap @@ publish_commitments ctxt rollup staker1 honest_commitments
     in
     let* ctxt =
-      lift @@ publish_commitments ctxt rollup staker2 dishonest_commitments
+      wrap @@ publish_commitments ctxt rollup staker2 dishonest_commitments
     in
     let* ctxt =
-      lift @@ publish_commitments ctxt rollup staker3 dishonest_commitments
+      wrap @@ publish_commitments ctxt rollup staker3 dishonest_commitments
     in
 
     (* No one can cement their branches. *)
@@ -1191,19 +1217,19 @@ module Stake_storage_tests = struct
 
     (* Simulate a conflict's resolution through [remove_staker]. *)
     let* ctxt, _balance_updates =
-      lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker2
+      wrap @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker2
     in
     (* [staker1] is not yet able to cement, [staker3] still stake on the
        dishonest branch. *)
     let* () = cant_cement ctxt honest_commitments in
     (* Simulate the second conflict's resolution. *)
     let* ctxt, _balance_updates =
-      lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker3
+      wrap @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker3
     in
     (* [staker1] can now cement its branch. The dishonest branch can not
        be cemented, before and after the honest branch was cemented. *)
     let* () = cant_cement ctxt dishonest_commitments in
-    let* ctxt = lift @@ cement_commitments ctxt rollup honest_commitments in
+    let* ctxt = wrap @@ cement_commitments ctxt rollup honest_commitments in
     let* () = cant_cement ctxt dishonest_commitments in
     return_unit
 
@@ -1226,11 +1252,12 @@ module Stake_storage_tests = struct
 
   (** Test that you can withdraw only once (you need to deposit again). *)
   let test_withdraw_twice_fails () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, _genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
     let* ctxt, _balance_updates =
-      lift @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
+      wrap @@ Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
     in
     assert_fails_with
       ~loc:__LOC__
@@ -1240,6 +1267,7 @@ module Stake_storage_tests = struct
   (** Test that withdraw when the stakers's newest staked commitment is
       after the LCC fails. *)
   let test_withdraw_fails_staked_after_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1249,7 +1277,7 @@ module Stake_storage_tests = struct
         ~inbox_level:(valid_inbox_level ctxt 1l)
         ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment in
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker)
@@ -1258,6 +1286,7 @@ module Stake_storage_tests = struct
   (** Test that withdraw succeeds when the the staker staked on a branch older
       than the LCC. *)
   let test_withdraw_staked_before_or_at_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1265,32 +1294,34 @@ module Stake_storage_tests = struct
     let commitment, commitments =
       match commitments with x :: xs -> (x, xs) | _ -> assert false
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker1 commitment in
-    let* ctxt = lift @@ publish_commitments ctxt rollup staker2 commitments in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker1 commitment in
+    let* ctxt = wrap @@ publish_commitments ctxt rollup staker2 commitments in
     let* ctxt =
-      lift
+      wrap
       @@ cement_commitment
            ctxt
            rollup
            commitment
            (Commitment_repr.hash_uncarbonated commitment)
     in
-    let* ctxt = lift @@ cement_commitments ctxt rollup commitments in
-    let* _ctxt = lift @@ withdraw ctxt rollup staker1 in
+    let* ctxt = wrap @@ cement_commitments ctxt rollup commitments in
+    let* _ctxt = wrap @@ withdraw ctxt rollup staker1 in
     return_unit
 
   (** Test that [remove_staker] cleans the stakers' metadata. *)
   let test_remove_staker () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, _genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
     let* ctxt, _balance_updates =
-      lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
+      wrap @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
     in
     assert_staker_dont_exists ctxt rollup staker
 
   (** Test that a staker can come back after being slashed. *)
   let test_come_back_after_remove_staker () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1301,12 +1332,12 @@ module Stake_storage_tests = struct
         ~inbox_level:(valid_inbox_level ctxt 1l)
         ()
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker commitment in
     let* () = assert_commitment_exists ctxt rollup commitment in
     let* () = assert_commitment_metadata_exists ctxt rollup commitment staker in
     (* We simulate a conflict resolution through [remove_staker] *)
     let* ctxt, _balance_updates =
-      lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
+      wrap @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
     in
     let* () = assert_staker_dont_exists ctxt rollup staker in
     (* The staker can come back through a new index. *)
@@ -1318,7 +1349,7 @@ module Stake_storage_tests = struct
             (Tezos_crypto.Context_hash.hash_string ["honest"]);
       }
     in
-    let* ctxt = lift @@ publish_commitment ctxt rollup staker new_commitment in
+    let* ctxt = wrap @@ publish_commitment ctxt rollup staker new_commitment in
     let* () = assert_commitment_exists ctxt rollup new_commitment in
     let* () =
       assert_commitment_metadata_exists ctxt rollup new_commitment staker
@@ -1326,7 +1357,7 @@ module Stake_storage_tests = struct
     let* () = assert_staker_exists ctxt rollup staker in
     (* Furthermore, the commitment can be cemented. *)
     let* _ctxt =
-      lift
+      wrap
       @@ cement_commitment
            ctxt
            rollup
@@ -1336,18 +1367,20 @@ module Stake_storage_tests = struct
     return_unit
 
   let assert_balance_unchanged ctxt ctxt' account =
-    let* _, balance = lift @@ Token.balance ctxt account in
-    let* _, balance' = lift @@ Token.balance ctxt' account in
+    let open Lwt_result_wrap_syntax in
+    let* _, balance = wrap @@ Token.balance ctxt account in
+    let* _, balance' = wrap @@ Token.balance ctxt' account in
     equal_tez ~loc:__LOC__ balance' balance
 
   let remove_staker_and_check_balances ctxt rollup staker =
+    let open Lwt_result_wrap_syntax in
     perform_staking_action_and_check
       ctxt
       rollup
       staker
       (fun ctxt rollup staker_contract stake ->
         let* ctxt', _ =
-          lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
+          wrap @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker
         in
         let* () =
           assert_balance_unchanged ctxt ctxt' (`Contract staker_contract)
@@ -1402,6 +1435,7 @@ module Stake_storage_tests = struct
       (Sc_rollup_errors.Sc_rollup_unknown_commitment Commitment_repr.Hash.zero)
 
   let test_cement_fail_too_recent () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1419,7 +1453,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker commitment
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker commitment
     in
     let min_cementation_level = Raw_level_repr.add level challenge_window in
     let* () =
@@ -1440,6 +1474,7 @@ module Stake_storage_tests = struct
          {current_level = level; min_level = min_cementation_level})
 
   let test_cement_deadline_uses_oldest_add_time () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1453,7 +1488,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment
     in
     let challenge_window =
       Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
@@ -1461,7 +1496,7 @@ module Stake_storage_tests = struct
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
 
     let* c2, _level, _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -1469,11 +1504,12 @@ module Stake_storage_tests = struct
            commitment
     in
     let* _ctxt =
-      lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+      wrap @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
     assert_commitment_hash_equal ~loc:__LOC__ c1 c2
 
   let test_last_cemented_commitment_hash_with_level () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1491,14 +1527,14 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker commitment
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker commitment
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
     let* ctxt, _ =
-      lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+      wrap @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
     let* c1', inbox_level', _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
            ctxt
            rollup
@@ -1510,6 +1546,7 @@ module Stake_storage_tests = struct
       (Raw_level_repr.to_int32 inbox_level')
 
   let test_cement_with_two_stakers () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1523,7 +1560,7 @@ module Stake_storage_tests = struct
           compressed_state = Sc_rollup_repr.State_hash.zero;
         }
     in
-    lift
+    wrap
     @@ let* c1, _level, ctxt =
          advance_level_n_refine_stake ctxt rollup staker1 commitment1
        in
@@ -1550,6 +1587,7 @@ module Stake_storage_tests = struct
        assert_true ctxt
 
   let test_can_remove_staker () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1564,7 +1602,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1576,7 +1614,7 @@ module Stake_storage_tests = struct
         }
     in
     let* _node, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
     in
     let* ctxt = remove_staker_and_check_balances ctxt rollup staker1 in
     let challenge_window =
@@ -1590,6 +1628,7 @@ module Stake_storage_tests = struct
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
 
   let test_can_remove_staker2 () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1604,7 +1643,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1616,7 +1655,7 @@ module Stake_storage_tests = struct
         }
     in
     let* _node, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
     in
     let* ctxt = remove_staker_and_check_balances ctxt rollup staker2 in
     let challenge_window =
@@ -1624,11 +1663,12 @@ module Stake_storage_tests = struct
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
     let* ctxt =
-      lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+      wrap @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
     assert_true ctxt
 
   let test_removed_staker_can_not_withdraw () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1643,7 +1683,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1655,10 +1695,10 @@ module Stake_storage_tests = struct
         }
     in
     let* _node, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
     in
     let* ctxt, _ =
-      lift @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker2
+      wrap @@ Sc_rollup_stake_storage.remove_staker ctxt rollup staker2
     in
     assert_fails_with
       ~loc:__LOC__
@@ -1666,6 +1706,7 @@ module Stake_storage_tests = struct
       Sc_rollup_errors.Sc_rollup_not_staked
 
   let test_no_cement_on_conflict () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1680,7 +1721,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1692,7 +1733,7 @@ module Stake_storage_tests = struct
         }
     in
     let* _node, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -1709,6 +1750,7 @@ module Stake_storage_tests = struct
       Sc_rollup_errors.Sc_rollup_disputed
 
   let test_non_cemented_parent () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1723,7 +1765,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1735,7 +1777,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c2, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
     in
     let challenge_window =
       Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
@@ -1747,6 +1789,7 @@ module Stake_storage_tests = struct
       Sc_rollup_errors.Sc_rollup_parent_not_lcc
 
   let test_finds_conflict_point_at_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1761,7 +1804,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1773,7 +1816,7 @@ module Stake_storage_tests = struct
         }
     in
     let* _c2, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -1781,7 +1824,7 @@ module Stake_storage_tests = struct
            commitment2
     in
     let* (left, _right), _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
            rollup
@@ -1791,6 +1834,7 @@ module Stake_storage_tests = struct
     assert_commitment_hash_equal ~loc:__LOC__ left.hash c1
 
   let test_finds_conflict_point_beneath_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1805,7 +1849,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1817,7 +1861,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c2, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment2
     in
     let commitment3 =
       Commitment_repr.
@@ -1829,7 +1873,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c3, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -1837,7 +1881,7 @@ module Stake_storage_tests = struct
            commitment3
     in
     let* (left, right), _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
            rollup
@@ -1848,6 +1892,7 @@ module Stake_storage_tests = struct
     assert_commitment_hash_equal ~loc:__LOC__ right.hash c3
 
   let test_conflict_point_is_first_point_of_disagreement () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -1862,7 +1907,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -1874,7 +1919,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c2, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment2
     in
     let commitment3 =
       Commitment_repr.
@@ -1886,7 +1931,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c3, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -1903,10 +1948,10 @@ module Stake_storage_tests = struct
         }
     in
     let* _c4, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment4
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment4
     in
     let* (left, right), _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
            rollup
@@ -1917,6 +1962,7 @@ module Stake_storage_tests = struct
     assert_commitment_hash_equal ~loc:__LOC__ right.hash c3
 
   let test_conflict_point_computation_fits_in_gas_limit () =
+    let open Lwt_result_wrap_syntax in
     (* Worst case of conflict point computation: two branches of maximum
        length rooted just after the LCC. *)
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
@@ -1941,10 +1987,10 @@ module Stake_storage_tests = struct
         }
     in
     let* root_commitment_hash, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 root_commitment
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 root_commitment
     in
     let* _node, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -1986,7 +2032,7 @@ module Stake_storage_tests = struct
     in
     let both_branches = List.combine_drop branch_1 branch_2 in
     let* ctxt =
-      lift
+      wrap
       @@ List.fold_left_es
            (fun ctxt ((c1, _c1h), (c2, _c2h)) ->
              let* _ch, _level, ctxt =
@@ -2005,7 +2051,7 @@ module Stake_storage_tests = struct
         (Constants_storage.hard_gas_limit_per_operation ctxt)
     in
     let* (left, right), _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_refutation_storage.Internal_for_tests.get_conflict_point
            ctxt
            rollup
@@ -2021,6 +2067,7 @@ module Stake_storage_tests = struct
     assert_commitment_hash_equal ~loc:__LOC__ right.hash (head_hash branch_2)
 
   let test_no_conflict_point_one_staker_at_lcc_preboot () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2034,7 +2081,7 @@ module Stake_storage_tests = struct
         }
     in
     let* _, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment
     in
     assert_fails_with
       ~loc:__LOC__
@@ -2059,6 +2106,7 @@ module Stake_storage_tests = struct
       Sc_rollup_errors.Sc_rollup_no_conflict
 
   let test_no_conflict_point_one_staker_at_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2073,7 +2121,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -2085,14 +2133,14 @@ module Stake_storage_tests = struct
         }
     in
     let* _node, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker2 commitment2
     in
     let challenge_window =
       Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
     let* ctxt, _ =
-      lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+      wrap @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
     assert_fails_with
       ~loc:__LOC__
@@ -2104,6 +2152,7 @@ module Stake_storage_tests = struct
       Sc_rollup_errors.Sc_rollup_no_conflict
 
   let test_no_conflict_point_both_stakers_at_lcc () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2117,10 +2166,10 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let* _node, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -2132,7 +2181,7 @@ module Stake_storage_tests = struct
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
     let* ctxt, _ =
-      lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+      wrap @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
     in
     assert_fails_with
       ~loc:__LOC__
@@ -2173,6 +2222,7 @@ module Stake_storage_tests = struct
     assert_fails_with_missing_rollup ~loc:__LOC__ Sc_rollup_storage.genesis_info
 
   let test_concurrent_refinement_point_of_conflict () =
+    let open Lwt_result_wrap_syntax in
     let* before_ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2196,7 +2246,7 @@ module Stake_storage_tests = struct
         }
     in
     let* (c1, c2), _ctxt =
-      lift
+      wrap
       @@ let* _c1, _level, ctxt =
            advance_level_n_refine_stake before_ctxt rollup staker1 commitment1
          in
@@ -2210,7 +2260,7 @@ module Stake_storage_tests = struct
            staker2
     in
     let* (c1', c2'), _ctxt =
-      lift
+      wrap
       @@ let* _c2, _level, ctxt =
            advance_level_n_refine_stake before_ctxt rollup staker2 commitment2
          in
@@ -2227,6 +2277,7 @@ module Stake_storage_tests = struct
     assert_commitment_hash_equal ~loc:__LOC__ c2.hash c2'.hash
 
   let test_concurrent_refinement_cement () =
+    let open Lwt_result_wrap_syntax in
     let* before_ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2240,7 +2291,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _ctxt =
-      lift
+      wrap
       @@ let* c1, _level, ctxt =
            advance_level_n_refine_stake before_ctxt rollup staker1 commitment
          in
@@ -2263,7 +2314,7 @@ module Stake_storage_tests = struct
          Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
     in
     let* c2, _ctxt =
-      lift
+      wrap
       @@ let* c2, _level, ctxt =
            advance_level_n_refine_stake before_ctxt rollup staker2 commitment
          in
@@ -2296,6 +2347,7 @@ module Stake_storage_tests = struct
 
   (* Recreating the indexing logic to make sure messages are applied. *)
   let assert_is_already_applied ~loc ctxt rollup level message_index =
+    let open Lwt_result_wrap_syntax in
     let level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
     let level_index =
       let max_active_levels =
@@ -2304,7 +2356,7 @@ module Stake_storage_tests = struct
       Int32.rem (Raw_level_repr.to_int32 level) max_active_levels
     in
     let* _ctxt, level_and_bitset_opt =
-      lift
+      wrap
       @@ Storage.Sc_rollup.Applied_outbox_messages.find
            (ctxt, rollup)
            level_index
@@ -2320,11 +2372,12 @@ module Stake_storage_tests = struct
 
   (** Test outbox for applied messages. *)
   let test_storage_outbox () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt = new_context () in
     let* rollup1, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let level1 = 100 in
     (* Test that is-applied is false for non-recorded messages. *)
-    let* _size_diff, ctxt = lift @@ record ctxt rollup1 level1 1 in
+    let* _size_diff, ctxt = wrap @@ record ctxt rollup1 level1 1 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1 in
     (* Record the same level and message twice should fail. *)
     let* () =
@@ -2333,23 +2386,24 @@ module Stake_storage_tests = struct
         (record ctxt rollup1 level1 1)
         Sc_rollup_errors.Sc_rollup_outbox_message_already_applied
     in
-    let* _size_diff, ctxt = lift @@ record ctxt rollup1 level1 2 in
+    let* _size_diff, ctxt = wrap @@ record ctxt rollup1 level1 2 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 2 in
     (* Record messages for new level. *)
     let level2 = level1 + 3 in
-    let* _size_diff, ctxt = lift @@ record ctxt rollup1 level2 47 in
+    let* _size_diff, ctxt = wrap @@ record ctxt rollup1 level2 47 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level2 47 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1 in
     (* Record for a new rollup. *)
     let* rollup2, _genesis_hash, ctxt = new_sc_rollup ctxt in
-    let* _size_diff, ctxt = lift @@ record ctxt rollup2 level1 1 in
-    let* _size_diff, ctxt = lift @@ record ctxt rollup2 level1 3 in
+    let* _size_diff, ctxt = wrap @@ record ctxt rollup2 level1 1 in
+    let* _size_diff, ctxt = wrap @@ record ctxt rollup2 level1 3 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup2 level1 1 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup2 level1 3 in
     assert_is_already_applied ~loc:__LOC__ ctxt rollup1 level1 1
 
   (** Test limits for applied outbox messages. *)
   let test_storage_outbox_exceed_limits () =
+    let open Lwt_result_wrap_syntax in
     let level = 1234 in
     let* ctxt = new_context () in
     let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
@@ -2374,11 +2428,11 @@ module Stake_storage_tests = struct
       Int32.to_int @@ Constants_storage.sc_rollup_max_active_outbox_levels ctxt
     in
     (* Record message 42 at level 15 *)
-    let* _size_diff, ctxt = lift @@ record ctxt rollup 15 42 in
+    let* _size_diff, ctxt = wrap @@ record ctxt rollup 15 42 in
     let* () = assert_is_already_applied ~loc:__LOC__ ctxt rollup 15 42 in
     (* Record message 42 at level [max_active_levels + 15] *)
     let* _size_diff, ctxt =
-      lift @@ record ctxt rollup (max_active_levels + 15) 42
+      wrap @@ record ctxt rollup (max_active_levels + 15) 42
     in
     (* Record message 42 at level 15 again should fail as it's expired. *)
     let* () =
@@ -2400,6 +2454,7 @@ module Stake_storage_tests = struct
     - [total_size < sc_rollup_max_active_outbox_levels * max_size_per_level]
   *)
   let test_storage_outbox_size_diff () =
+    let open Lwt_result_wrap_syntax in
     (* This is the maximum additional storage space required to store one message.
        It depends on [sc_rollup_max_outbox_messages_per_level]. *)
     let max_size_diff = 19 in
@@ -2413,21 +2468,21 @@ module Stake_storage_tests = struct
       Int32.to_int @@ Constants_storage.sc_rollup_max_active_outbox_levels ctxt
     in
     (* Record a new message. *)
-    let* size_diff, ctxt = lift @@ record ctxt rollup level 1 in
+    let* size_diff, ctxt = wrap @@ record ctxt rollup level 1 in
     (* Size diff is 11 bytes. 4 bytes for level and 7 bytes for a new Z.t *)
     let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 5 in
-    let* size_diff, ctxt = lift @@ record ctxt rollup level 2 in
+    let* size_diff, ctxt = wrap @@ record ctxt rollup level 2 in
     (* Recording a new message in the bitset at a lower index does not occupy
        any additional space. *)
     let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 0 in
     (* Record a new message at the highest index at an existing level. This
        expands the bitset but does not charge for the level. *)
-    let* size_diff, ctxt = lift @@ record ctxt rollup level max_message_index in
+    let* size_diff, ctxt = wrap @@ record ctxt rollup level max_message_index in
     let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) 14 in
     (* Record a new message at the highest index at a new level. This charges for
        space for level and maximum bitset. *)
     let* size_diff, ctxt =
-      lift @@ record ctxt rollup (level + 1) max_message_index
+      wrap @@ record ctxt rollup (level + 1) max_message_index
     in
     let* () =
       Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) max_size_diff
@@ -2435,7 +2490,7 @@ module Stake_storage_tests = struct
     (* Record a new message for a level that resets an index. This replaces the
        bitset with a smaller one. Hence we get a negative size diff. *)
     let* size_diff, _ctxt =
-      lift @@ record ctxt rollup (level + max_active_levels) 0
+      wrap @@ record ctxt rollup (level + max_active_levels) 0
     in
     let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) (-14) in
     return ()
@@ -2448,6 +2503,7 @@ module Stake_storage_tests = struct
           rollup)
 
   let test_get_cemented_commitments_with_levels () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, c0, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -2465,7 +2521,7 @@ module Stake_storage_tests = struct
        commitments that can be stored. *)
     let number_of_commitments = max_num_stored_cemented_commitments + 5 in
     let* commitments, ctxt =
-      lift
+      wrap
       @@ produce_and_refine
            ~number_of_commitments
            ~predecessor:c0
@@ -2475,13 +2531,13 @@ module Stake_storage_tests = struct
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
     (* Cement all commitments that have been produced. *)
-    let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+    let* ctxt = wrap @@ cement_commitments ctxt commitments rollup in
     (* Add genesis commitment to list of produced commitments. *)
     let commitments = c0 :: commitments in
     let number_of_cemented_commitments = List.length commitments in
     (* Fetch cemented commitments that are kept in context. *)
     let* cemented_commitments_with_levels, _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_commitment_storage.Internal_for_tests
          .get_cemented_commitments_with_levels
            ctxt
@@ -2515,6 +2571,7 @@ module Stake_storage_tests = struct
   (* Produces [max_num_stored_cemented_commitments] number of commitments and
      verifies that each of them is an ancestor of the last cemented commitment. *)
   let test_are_commitments_related_when_related () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, c0, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -2531,7 +2588,7 @@ module Stake_storage_tests = struct
        cemented commitments that can be stored. *)
     let number_of_commitments = max_num_stored_cemented_commitments in
     let* commitments, ctxt =
-      lift
+      wrap
       @@ produce_and_refine
            ~number_of_commitments
            ~predecessor:c0
@@ -2541,16 +2598,16 @@ module Stake_storage_tests = struct
     in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
     (* Cement all commitments that have been produced. *)
-    let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+    let* ctxt = wrap @@ cement_commitments ctxt commitments rollup in
     (* Check that check_if_commitments_are_related detects that each
        cemented commitment is an ancestor of the last cemented commitment. *)
     let* lcc, ctxt =
-      lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
+      wrap @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
     in
     commitments
     |> List.iter_es (fun commitment ->
            let* is_commitment_cemented, _ctxt =
-             lift
+             wrap
              @@ Sc_rollup_commitment_storage.check_if_commitments_are_related
                   ctxt
                   rollup
@@ -2562,6 +2619,7 @@ module Stake_storage_tests = struct
   (** Tests that [check_if_commitments_are_related] returns false for two
     unrelated commitments. *)
   let test_unrelated_commitments () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2576,7 +2634,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c1, _level, ctxt =
-      lift @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
+      wrap @@ advance_level_n_refine_stake ctxt rollup staker1 commitment1
     in
     let commitment2 =
       Commitment_repr.
@@ -2588,7 +2646,7 @@ module Stake_storage_tests = struct
         }
     in
     let* c2, _level, ctxt =
-      lift
+      wrap
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
            rollup
@@ -2596,7 +2654,7 @@ module Stake_storage_tests = struct
            commitment2
     in
     let* are_commitments_related, _ctxt =
-      lift
+      wrap
       @@ Sc_rollup_commitment_storage.check_if_commitments_are_related
            ctxt
            rollup
@@ -2606,12 +2664,13 @@ module Stake_storage_tests = struct
     Assert.equal_bool ~loc:__LOC__ are_commitments_related false
 
   let test_fresh_index_correctly_increment () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, _genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
     let assert_staker_index ~__LOC__ ctxt staker expected_index =
       let* _, (found_index : Sc_rollup_staker_index_repr.t) =
-        lift @@ Storage.Sc_rollup.Staker_index.get (ctxt, rollup) staker
+        wrap @@ Storage.Sc_rollup.Staker_index.get (ctxt, rollup) staker
       in
       Assert.equal_z ~loc:__LOC__ (found_index :> Z.t) expected_index
     in
@@ -2619,7 +2678,7 @@ module Stake_storage_tests = struct
     let* () = assert_staker_index ~__LOC__ ctxt staker2 Z.one in
     let Account.{pkh; _} = Account.new_account () in
     let* ctxt, fresh_staker3_index =
-      lift @@ Sc_rollup_staker_index_storage.fresh_staker_index ctxt rollup pkh
+      wrap @@ Sc_rollup_staker_index_storage.fresh_staker_index ctxt rollup pkh
     in
     let* () = assert_staker_index ~__LOC__ ctxt pkh Z.(succ one) in
     Assert.equal_z ~loc:__LOC__ (fresh_staker3_index :> Z.t) Z.(succ one)
@@ -2859,12 +2918,13 @@ end
 
 module Rollup_storage_tests = struct
   let test_genesis_info_of_rollup () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt = new_context () in
     let level_before_rollup = (Raw_context.current_level ctxt).level in
     let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
     let* _ctxt, genesis_info =
-      lift @@ Sc_rollup_storage.genesis_info ctxt rollup
+      wrap @@ Sc_rollup_storage.genesis_info ctxt rollup
     in
     let initial_level = genesis_info.level in
     Assert.equal_int32
@@ -2873,9 +2933,10 @@ module Rollup_storage_tests = struct
       (Raw_level_repr.to_int32 initial_level)
 
   let test_initial_state_is_pre_boot () =
+    let open Lwt_result_wrap_syntax in
     let* ctxt, rollup, genesis_hash = new_context_with_rollup () in
     let* lcc, _ctxt =
-      lift @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
+      wrap @@ Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
     in
     assert_commitment_hash_equal ~loc:__LOC__ lcc genesis_hash
 

@@ -76,8 +76,6 @@ let test_cycle () =
     (Alpha_context.Raw_level.to_int32 curr_level)
     (Int32.add (Alpha_context.Raw_level.to_int32 l) 10l)
 
-let wrap et = et >>= fun e -> Lwt.return (Environment.wrap_tzresult e)
-
 (** Test baking [n] cycles in a raw works smoothly. *)
 let test_bake_n_cycles n () =
   let open Block in

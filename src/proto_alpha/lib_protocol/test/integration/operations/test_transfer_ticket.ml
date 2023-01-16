@@ -35,15 +35,13 @@
 open Protocol
 open Alpha_context
 open Tezos_micheline
-open Lwt_result_syntax
-
-let wrap m = m >|= Environment.wrap_tzresult
 
 (* In this test, a ticketer contract mints and transfers a ticket to an implicit account,
    who further transfers it to another implicit account.
    The ticket balance is inspected for correctness.
 *)
 let test_mint_deposit_withdraw_implicit_transfer () =
+  let open Lwt_result_wrap_syntax in
   let* block, (account, another_account) =
     Context.init2 ~consensus_threshold:0 ()
   in
@@ -154,6 +152,7 @@ let test_mint_deposit_withdraw_implicit_transfer () =
    parameter type under the given entrypoint.
 *)
 let test_contract_as_ticket_transfer_destination () =
+  let open Lwt_result_wrap_syntax in
   let* block, (account, another_account) =
     Context.init2 ~consensus_threshold:0 ()
   in

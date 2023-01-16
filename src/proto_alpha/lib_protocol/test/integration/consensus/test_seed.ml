@@ -278,8 +278,6 @@ let test_revelation_missing_and_late () =
       | Nonce_storage.Too_late_revelation -> true
       | _ -> false)
 
-let wrap e = e >|= Environment.wrap_tzresult
-
 (** Test that we do not distribute endorsing rewards if the nonce was
     not revealed. *)
 let test_unrevealed () =
