@@ -98,7 +98,7 @@ let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_neighbors_cctxts ctxt = ctxt.neighbors_cctxts
 
-let fetch_assigned_shard_indicies ctxt ~level ~pkh =
+let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
   let+ committee =

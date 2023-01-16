@@ -69,7 +69,7 @@ let get_attestable_slots ctxt store cryptobox proto_parameters pkh
     ~attested_level =
   let open Lwt_result_syntax in
   let* shard_indexes =
-    Node_context.fetch_assigned_shard_indicies ctxt ~pkh ~level:attested_level
+    Node_context.fetch_assigned_shard_indices ctxt ~pkh ~level:attested_level
   in
   let expected_number_of_shards = List.length shard_indexes in
   let* () =

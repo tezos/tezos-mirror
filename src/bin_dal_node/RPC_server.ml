@@ -126,7 +126,7 @@ module Profile_handlers = struct
     Profile_manager.get_profiles store
 
   let get_assigned_shard_indices ctxt pkh level () () =
-    Node_context.fetch_assigned_shard_indicies ctxt ~level ~pkh
+    Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
   let get_attestable_slots ctxt pkh attested_level () () =
     let open Lwt_result_syntax in
