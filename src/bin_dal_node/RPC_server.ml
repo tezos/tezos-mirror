@@ -127,6 +127,18 @@ module Profile_handlers = struct
 
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indicies ctxt ~level ~pkh
+
+  let get_attestable_slots ctxt pkh attested_level () () =
+    let open Lwt_result_syntax in
+    let*? {cryptobox; proto_parameters; _} = Node_context.get_ready ctxt in
+    let store = Node_context.get_store ctxt in
+    Profile_manager.get_attestable_slots
+      ctxt
+      store
+      cryptobox
+      proto_parameters
+      pkh
+      ~attested_level
 end
 
 let add_service registerer service handler directory =
@@ -176,6 +188,10 @@ let register_new :
        Tezos_rpc.Directory.register1
        Services.get_published_level_headers
        (Slots_handlers.get_published_level_headers ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register2
+       Services.get_attestable_slots
+       (Profile_handlers.get_attestable_slots ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
