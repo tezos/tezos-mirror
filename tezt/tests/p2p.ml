@@ -428,6 +428,16 @@ let test_advertised_port () =
 
   unit
 
+let known_points node =
+  let* points = RPC.(call node get_network_points) in
+  return
+  @@ List.map
+       (fun (str, _) ->
+         match String.split_on_char ':' str with
+         | [addr; port] -> (addr, int_of_string port)
+         | _ -> Test.fail "Unexpected output from [get_network_points]: %s" str)
+       points
+
 module Known_Points_GC = struct
   (* Create a node that accept only
      1 point in its known points set *)
@@ -456,16 +466,6 @@ module Known_Points_GC = struct
     List.iter
       (fun data -> if not @@ List.mem data super then fail data else ())
       sub
-
-  let known_points node =
-    let* points = RPC.(call node get_network_points) in
-    Lwt.return
-    @@ List.map
-         (fun (str, _) ->
-           match String.split_on_char ':' str with
-           | [addr; port] -> (addr, int_of_string port)
-           | _ -> assert false)
-         points
 
   let test_trusted_preservation () =
     Test.register
@@ -611,12 +611,446 @@ module Connect_handler = struct
   let tests () = connected_peers_with_different_chain_name_test ()
 end
 
+let iter_p l f = Lwt_list.iter_p f l
+
+let iteri_p l f = Lwt_list.iteri_p f l
+
+let point_is_trusted (_point, meta) = JSON.(meta |-> "trusted" |> as_bool)
+
+let point_is_running (_point, meta) =
+  JSON.(meta |-> "state" |-> "event_kind" |> as_string = "running")
+
+let point_is_other point_id (point_id', _meta) = point_id' <> point_id
+
+let peer_is_other peer_id (peer_id', _meta) = peer_id' <> peer_id
+
+(* This test sets up a network of public peers (running the default p2p
+   protocol), with no initial bootstrap peers. It initializes a trusted ring
+   relationship, and checks that points are advertised correctly to the whole
+   network. *)
+let trusted_ring () =
+  Test.register
+    ~__FILE__
+    ~title:"p2p - set a trusted ring"
+    ~tags:["p2p"; "connection"; "trusted"; "ring"]
+  @@ fun () ->
+  let num_nodes = 5 in
+  Log.info "Initialize nodes" ;
+  let node_arguments = [] in
+  let nodes = List.init num_nodes (fun _ -> Node.create node_arguments) in
+  let* () =
+    iter_p nodes @@ fun node ->
+    let* () = Node.run node node_arguments in
+    Node.wait_for_ready node
+  in
+  (* Initially, nobody knows other peers. *)
+  Log.info "Check no peers at init" ;
+  let* () =
+    iter_p nodes @@ fun node ->
+    let* points = known_points node in
+    Check.(
+      (List.length points = 0)
+        int
+        ~__LOC__
+        ~error_msg:("Expected " ^ Node.name node ^ " to have %R points, got %L")) ;
+    unit
+  in
+  Log.info "Add peers" ;
+  let point_id_of_node node =
+    let addr, port = Node.point node in
+    sf "%s:%d" addr port
+  in
+  (* Set up waiters for the connection *)
+  let connection_p =
+    iter_p nodes @@ fun node -> Node.wait_for_connections node (num_nodes - 1)
+  in
+  let* () =
+    iteri_p nodes @@ fun index node ->
+    let neighbour_point_id =
+      point_id_of_node (List.nth nodes ((index + 1) mod num_nodes))
+    in
+    let data = JSON.annotate ~origin:"acl" @@ `O [("acl", `String "trust")] in
+    RPC.(call node @@ patch_network_point neighbour_point_id data)
+  in
+  Log.info "Wait for connections" ;
+  let* () = connection_p in
+  Log.info "Check tables" ;
+  (* Test various assumptions on the point/peer tables. Each peer has
+     exactly one trusted neighbor. Tables don't contain their own
+     peer/point id as running and contain exactly [num_nodes - 1]
+     values. *)
+  (* The prefix of this test should guarantee that maintenance has
+     been performed when this test is run. *)
+  let* () =
+    iter_p nodes @@ fun node ->
+    let point_id = point_id_of_node node in
+    let* peer_id = RPC.(call node @@ get_network_self) in
+    let* points = RPC.(call node @@ get_network_points) in
+    let* peers = RPC.(call node @@ get_network_peers) in
+    let trusted_points = List.filter point_is_trusted points in
+    let running_points = List.filter point_is_running points in
+    (* the set of known points that are not the node itself *)
+    let other_points = List.filter (point_is_other point_id) points in
+    (* the set of known peers that are not the node itself *)
+    let other_peers = List.filter (peer_is_other peer_id) peers in
+    Check.(
+      list_not_mem
+        string
+        ~__LOC__
+        point_id
+        (List.map fst running_points)
+        ~error_msg:"Did not expect to find %L in the set of running points %R" ;
+      list_not_mem
+        string
+        ~__LOC__
+        peer_id
+        (List.map fst peers)
+        ~error_msg:"Did not expect to find %L in the set of running peers %R" ;
+      (List.length trusted_points = 1)
+        int
+        ~__LOC__
+        ~error_msg:"Expected %R trusted points, got %L" ;
+      (List.length other_peers = num_nodes - 1)
+        int
+        ~__LOC__
+        ~error_msg:"Expected %R peers, got %L" ;
+      (List.length other_points = num_nodes - 1)
+        int
+        ~__LOC__
+        ~error_msg:"Expected %R points, got %L") ;
+    unit
+  in
+  unit
+
+(* This test sets up a clique between a set of [M] nodes [N_1;
+   ...; N_M].
+
+   Then, for each node [N_i], it tests setting the [expected_peer_id]
+   on its connection to its neighbor [next(N_i)] (where [next(N_i) =
+   N_((i + 1) % M)]) to the peer id of that neighbor. It checks that
+   no connections are lost.
+
+   Secondly, for each node [N_i], it sets the [expected_peer_id] on the same
+   connection (the one to neighbor [next(N_i)]) to the peer id of
+   [N_i]. It checks that the node consequently loses
+   two connections:
+   - the connection between [N_i] and [next(N_i)]; and
+   - the connection between [prev(N_i)] and [N_i] (where [prev(N_i) = N_((i + 1) % M)]),
+     as [prev(N_i)] will have an erroneous [expected_peer_id]
+     on its connection to [N_i]. *)
+let expected_peer_id () =
+  Test.register
+    ~__FILE__
+    ~title:"Test expected_peer_id"
+    ~tags:["p2p"; "connections"; "expected_peer_id"]
+  @@ fun () ->
+  let num_nodes = 5 in
+  Log.info "Start a clique of %d nodes" num_nodes ;
+  let nodes = Cluster.create num_nodes [] in
+  Cluster.clique nodes ;
+  let* () = Cluster.start ~wait_connections:true nodes in
+  let point_id_of_node node =
+    let addr, port = Node.point node in
+    sf "%s:%d" addr port
+  in
+  let* peer_ids =
+    Lwt_list.map_s
+      (fun node ->
+        let* peer_id = RPC.(call node @@ get_network_self) in
+        Log.info "Peer id of node %s: %s" (Node.name node) peer_id ;
+        return peer_id)
+      nodes
+  in
+  let next index = if index = num_nodes - 1 then 0 else index + 1 in
+  let prev index = if index = 0 then num_nodes - 1 else index - 1 in
+  Log.info "Set [expected_peer_id]" ;
+  (* For all nodes [node], we set [expected_peer_id] on its
+     connection to its neighbor [next(node)] to the peer id of
+     [next(node)]. *)
+  let* () =
+    iteri_p nodes @@ fun index node ->
+    let neighbor_index = next index in
+    let neighbor_point_id = point_id_of_node (List.nth nodes neighbor_index) in
+    let neighbor_peer_id = List.nth peer_ids neighbor_index in
+    let data =
+      JSON.annotate ~origin:"expected_peer_id"
+      @@ `O [("peer_id", `String neighbor_peer_id)]
+    in
+    RPC.(call node @@ patch_network_point neighbor_point_id data)
+  in
+  Log.info
+    "Check expected_peer_id and that we still have %d connected points per node"
+    (num_nodes - 1) ;
+  (* For all nodes, we check that [expected_peer_id] was set
+     properly. Since we set the [expected_peer_id] to the exact peer
+     id of the peer already on that connection, we should not have
+     lost the connection. *)
+  let* () =
+    iteri_p nodes @@ fun index node ->
+    let neighbor_index = next index in
+    let neighbor_point_id = point_id_of_node (List.nth nodes neighbor_index) in
+    let* neighbor_peer =
+      RPC.(call node @@ get_network_point neighbor_point_id)
+    in
+    Check.(
+      (JSON.(neighbor_peer |-> "expected_peer_id" |> as_string)
+      = List.nth peer_ids neighbor_index)
+        string
+        ~__LOC__
+        ~error_msg:
+          ("Expected the expected_peer_id of neighbor of " ^ Node.name node
+         ^ " to be %R, got %L")) ;
+    let* points = RPC.(call node @@ get_network_points) in
+    let connected_points = List.filter point_is_running points in
+    Check.(
+      (List.length connected_points = num_nodes - 1)
+        int
+        ~__LOC__
+        ~error_msg:"Expected %R connected points, got %L") ;
+    unit
+  in
+  Log.info "Set wrong [expected_peer_id]" ;
+  (* For all nodes [node], we set [expected_peer_id] on its
+     connection to its neighbor [next(node)] to the peer id of
+     [node]. Consequently, the node will loose two connections for
+     which we set up promises here: *)
+  let all_disconnections =
+    iteri_p nodes @@ fun index node ->
+    (* Wait for two disconnection events :
+       - one between [node] and [next(node)]
+       - one between [prev(node)] and [node] *)
+    let wait_for_disconnect_from peer_id =
+      Log.info "Node %s expects a disconnect from %s" Node.(name node) peer_id ;
+      Node.wait_for node "disconnection.v0" (fun json_event ->
+          let peer_id' = JSON.(json_event |> as_string) in
+          if peer_id = peer_id' then (
+            Log.info
+              "Node %s was disconnected from %s"
+              Node.(name node)
+              peer_id' ;
+            Some ())
+          else None)
+    in
+    let prev_peer_id = List.nth peer_ids (prev index) in
+    let next_peer_id = List.nth peer_ids (next index) in
+    let* () = wait_for_disconnect_from prev_peer_id
+    and* () = wait_for_disconnect_from next_peer_id in
+    unit
+  in
+  (* Set the wrong [expected_peer_id] *)
+  let* () =
+    iteri_p nodes @@ fun index node ->
+    let neighbor_index = next index in
+    let neighbor_point_id = point_id_of_node (List.nth nodes neighbor_index) in
+    let peer_id = List.nth peer_ids index in
+    let data =
+      JSON.annotate ~origin:"expected_peer_id"
+      @@ `O [("peer_id", `String peer_id)]
+    in
+    RPC.(call node @@ patch_network_point neighbor_point_id data)
+  in
+  Log.info "Waiting for disconnections" ;
+  let* () = all_disconnections in
+  Log.info "Check stats with wrong expected_peer_id" ;
+  (* Each node should now have two connected peers less *)
+  let* () =
+    iter_p nodes @@ fun node ->
+    let* points = RPC.(call node @@ get_network_points) in
+    let connected_points = List.filter point_is_running points in
+    (* We lost two connections *)
+    Check.(
+      (List.length connected_points = num_nodes - 3)
+        int
+        ~__LOC__
+        ~error_msg:"Expected %R connected points, got %L") ;
+    unit
+  in
+  unit
+
+module P2p_stat = struct
+  type peer_id = Peer_id of string
+
+  type point_id = {addr : Unix.inet_addr; port : int}
+
+  let point_id_of_string s =
+    match String.split_on_char ':' s |> List.rev with
+    | port :: addr ->
+        {
+          addr = Unix.inet_addr_of_string (String.concat ":" addr);
+          port = int_of_string port;
+        }
+    | _ -> Test.fail "[point_id_of_string] could not parse: %s" s
+
+  let string_of_point_id {addr; port} =
+    sf "%s:%d" (Unix.string_of_inet_addr addr) port
+
+  type known_peer = {id : peer_id; connected : bool}
+
+  let compare_known_peer peer1 peer2 =
+    let {id = Peer_id peer_id1; connected = connected1} = peer1 in
+    let {id = Peer_id peer_id2; connected = connected2} = peer2 in
+    match String.compare peer_id1 peer_id2 with
+    | 0 -> Bool.compare connected1 connected2
+    | n -> n
+
+  let pp_known_peer fmt {id = Peer_id peer_id; connected} =
+    Format.fprintf fmt "{peer_id: %s; connected: %b}" peer_id connected
+
+  let known_peer_typ = Check.comparable pp_known_peer compare_known_peer
+
+  type known_point = {id : point_id; peer : known_peer}
+
+  let compare_known_point point1 point2 =
+    match
+      String.compare
+        (string_of_point_id point1.id)
+        (string_of_point_id point2.id)
+    with
+    | 0 -> compare_known_peer point1.peer point2.peer
+    | n -> n
+
+  let known_point_typ =
+    let fmt fmt {id; peer} =
+      Format.fprintf
+        fmt
+        "{point_id: %s; %a}"
+        (string_of_point_id id)
+        pp_known_peer
+        peer
+    in
+    Check.comparable fmt compare_known_point
+
+  type p2p_stat = {
+    connections : peer_id list;
+    known_peers : known_peer list;
+    known_points : known_point list;
+  }
+
+  let parse_p2p_stat client_output =
+    let fail ~__LOC__ line =
+      Test.fail
+        ~__LOC__
+        "[parse_p2p_stat] Could not parse line:\n\
+         %s\n\
+        \ when parsing client output:\n\
+         %s"
+        line
+        client_output
+    in
+    let lines = String.(split_on_char '\n' (trim client_output)) in
+    let _prefix, lines = span (( <> ) "GLOBAL STATS") lines in
+    let _global_stats, lines = span (( <> ) "CONNECTIONS") lines in
+    let connections, lines = span (( <> ) "KNOWN PEERS") lines in
+    let known_peers, known_points = span (( <> ) "KNOWN POINTS") lines in
+    let connections =
+      (* Example: *)
+      (* ↘ idscnVnp4ZgHbxBem9ZkaGtmVDdPt3 127.0.0.1:16392 (TEZOS.2 (p2p: 1))  *\) *)
+      List.map
+        (fun line ->
+          match line =~* rex "(id\\w+)" with
+          | Some peer_id -> Peer_id peer_id
+          | None -> fail ~__LOC__ line)
+        (List.tl connections)
+    in
+    let known_peers =
+      (* Example: *)
+      (* ⚏  1 idtn1bQKkQvzgPH5zbD86Bi3eTgQhB ↗ 0 B (0 B/s) ↘ 0 B (0 B/s)   *\) *)
+      List.map
+        (fun line ->
+          match line =~** rex "(⚏|⚌).* (id\\w+)" with
+          | Some (connection, peer_id) ->
+              {id = Peer_id peer_id; connected = connection = "⚌"}
+          | None -> fail ~__LOC__ line)
+        (List.tl known_peers)
+    in
+    let known_points =
+      (* Example: *)
+      (* ⚏  127.0.0.1:16388 (last seen: idtn1bQKkQvzgPH5zbD86Bi3eTgQhB 2023-01-16T13:23:08.499-00:00) *)
+      List.map
+        (fun line ->
+          match line =~*** rex "(⚏|⚌)\\s+(\\S+:\\S+).* (id\\w+)" with
+          | Some (connection, point_id, peer_id) ->
+              {
+                id = point_id_of_string point_id;
+                peer = {connected = connection = "⚌"; id = Peer_id peer_id};
+              }
+          | None -> fail ~__LOC__ line)
+        (List.tl known_points)
+    in
+    {connections; known_peers; known_points}
+
+  (* This test sets up a clique. It compares the output of
+     [octez-admin-client p2p stat] with queries on the node RPC. *)
+  let register () =
+    Test.register
+      ~__FILE__
+      ~title:"Test [octez-admin-client p2p stat]"
+      ~tags:["p2p"; "connections"; "p2p_stat"]
+    @@ fun () ->
+    let num_nodes = 5 in
+    Log.info "Start a clique of %d nodes" num_nodes ;
+    let nodes = Cluster.create num_nodes [] in
+    Cluster.clique nodes ;
+    let* () = Cluster.start ~wait_connections:true nodes in
+    Log.info "Compare RPC information with [octez-admin-client p2p stat]" ;
+    let* () =
+      iter_p nodes @@ fun node ->
+      let* client = Client.init ~endpoint:(Node node) () in
+      let* output = Client.Admin.p2p_stat client in
+      let p2p_stat = parse_p2p_stat output in
+      let* rpc_points =
+        let* points = RPC.(call node @@ get_network_points) in
+        return
+          (List.map
+             (fun (point_id_s, meta) ->
+               {
+                 id = point_id_of_string point_id_s;
+                 peer =
+                   {
+                     id = Peer_id JSON.(meta |-> "p2p_peer_id" |> as_string);
+                     connected =
+                       JSON.(meta |-> "state" |-> "event_kind" |> as_string)
+                       = "running";
+                   };
+               })
+             points)
+      in
+      let* rpc_peers =
+        let* peers = RPC.(call node @@ get_network_peers) in
+        return
+          (List.map
+             (fun (peer_id_s, meta) ->
+               {
+                 id = Peer_id peer_id_s;
+                 connected = JSON.(meta |-> "state" |> as_string) = "running";
+               })
+             peers)
+      in
+      Check.(
+        (List.sort compare_known_point rpc_points
+        = List.sort compare_known_point p2p_stat.known_points)
+          (list known_point_typ)
+          ~__LOC__
+          ~error_msg:"Expected %R, got %L" ;
+        (List.sort compare_known_peer rpc_peers
+        = List.sort compare_known_peer p2p_stat.known_peers)
+          (list known_peer_typ)
+          ~__LOC__
+          ~error_msg:"Expected %R, got %L") ;
+      unit
+    in
+    unit
+end
+
 let register_protocol_independent () =
   Maintenance.tests () ;
   ACL.tests () ;
   test_advertised_port () ;
   Known_Points_GC.tests () ;
-  Connect_handler.tests ()
+  Connect_handler.tests () ;
+  trusted_ring () ;
+  expected_peer_id () ;
+  P2p_stat.register ()
 
 let register ~(protocols : Protocol.t list) =
   check_peer_option protocols ;
