@@ -26,92 +26,18 @@
 open Monad
 include Stdlib.Seq
 
-let cons item t () = Cons (item, t)
+let init ~when_negative_length n f =
+  if n < 0 then Error when_negative_length else Ok (init n f)
 
-let rec append ta tb () =
-  match ta () with Nil -> tb () | Cons (item, ta) -> Cons (item, append ta tb)
+let take ~when_negative_length n s =
+  if n < 0 then Error when_negative_length else Ok (take n s)
 
-let first s = match s () with Nil -> None | Cons (x, _) -> Some x
+let drop ~when_negative_length n s =
+  if n < 0 then Error when_negative_length else Ok (drop n s)
 
-let rec fold_left_e f acc seq =
-  match seq () with
-  | Nil -> Ok acc
-  | Cons (item, seq) ->
-      let open Result_syntax in
-      let* acc = f acc item in
-      fold_left_e f acc seq
-
-let rec fold_left_s f acc seq =
-  let open Lwt_syntax in
-  match seq () with
-  | Nil -> return acc
-  | Cons (item, seq) ->
-      let* acc = f acc item in
-      fold_left_s f acc seq
-
-let fold_left_s f acc seq =
-  let open Lwt_syntax in
-  match seq () with
-  | Nil -> return acc
-  | Cons (item, seq) ->
-      let* acc = lwt_apply2 f acc item in
-      fold_left_s f acc seq
-
-let rec fold_left_es f acc seq =
-  let open Lwt_result_syntax in
-  match seq () with
-  | Nil -> return acc
-  | Cons (item, seq) ->
-      let* acc = f acc item in
-      fold_left_es f acc seq
-
-let fold_left_es f acc seq =
-  let open Lwt_result_syntax in
-  match seq () with
-  | Nil -> return acc
-  | Cons (item, seq) ->
-      let* acc = lwt_apply2 f acc item in
-      fold_left_es f acc seq
-
-let rec iter_e f seq =
-  let open Result_syntax in
-  match seq () with
-  | Nil -> return_unit
-  | Cons (item, seq) ->
-      let* () = f item in
-      iter_e f seq
-
-let rec iter_s f seq =
-  let open Lwt_syntax in
-  match seq () with
-  | Nil -> return_unit
-  | Cons (item, seq) ->
-      let* () = f item in
-      iter_s f seq
-
-let iter_s f seq =
-  let open Lwt_syntax in
-  match seq () with
-  | Nil -> return_unit
-  | Cons (item, seq) ->
-      let* () = Lwt.apply f item in
-      iter_s f seq
-
-let rec iter_es f seq =
-  let open Lwt_result_syntax in
-  match seq () with
-  | Nil -> return_unit
-  | Cons (item, seq) ->
-      let* () = f item in
-      iter_es f seq
-
-let iter_es f seq =
-  let open Lwt_result_syntax in
-  match seq () with
-  | Nil -> return_unit
-  | Cons (item, seq) ->
-      let* () = Lwt.apply f item in
-      iter_es f seq
+module E = Seqes.Standard.Make2 (Result)
+module S = Seqes.Standard.Make1 (Lwt)
+module ES = Seqes.Standard.Make2 (Lwt_result)
 
 let iter_ep f seq =
   let rec iter_ep f seq (acc : (unit, 'error) result Lwt.t list) =
@@ -129,12 +55,40 @@ let iter_p f seq =
   in
   iter_p f seq []
 
-let rec unfold f a () =
-  match f a with None -> Nil | Some (item, a) -> Cons (item, unfold f a)
+let iteri_ep f seq =
+  let rec iteri_ep f i seq (acc : (unit, 'error) result Lwt.t list) =
+    match seq () with
+    | Nil -> Lwt_result_syntax.join acc
+    | Cons (item, seq) -> iteri_ep f (i + 1) seq (lwt_apply2 f i item :: acc)
+  in
+  iteri_ep f 0 seq []
 
-let concat_map = flat_map
+let iteri_p f seq =
+  let rec iteri_p f i seq acc =
+    match seq () with
+    | Nil -> Lwt_syntax.join acc
+    | Cons (item, seq) -> iteri_p f (i + 1) seq (lwt_apply2 f i item :: acc)
+  in
+  iteri_p f 0 seq []
 
-let rec concat seq () =
-  match seq () with
-  | Nil -> Nil
-  | Cons (subseq, restseq) -> append subseq (concat restseq) ()
+let iter2_ep f seqa seqb =
+  let rec iter2_ep f seqa seqb (acc : (unit, 'error) result Lwt.t list) =
+    let a = seqa () in
+    let b = seqb () in
+    match (a, b) with
+    | Nil, Nil | Nil, Cons _ | Cons _, Nil -> Lwt_result_syntax.join acc
+    | Cons (itema, seqa), Cons (itemb, seqb) ->
+        iter2_ep f seqa seqb (lwt_apply2 f itema itemb :: acc)
+  in
+  iter2_ep f seqa seqb []
+
+let iter2_p f seqa seqb =
+  let rec iter2_p f seqa seqb acc =
+    let a = seqa () in
+    let b = seqb () in
+    match (a, b) with
+    | Nil, Nil | Nil, Cons _ | Cons _, Nil -> Lwt_syntax.join acc
+    | Cons (itema, seqa), Cons (itemb, seqb) ->
+        iter2_p f seqa seqb (lwt_apply2 f itema itemb :: acc)
+  in
+  iter2_p f seqa seqb []

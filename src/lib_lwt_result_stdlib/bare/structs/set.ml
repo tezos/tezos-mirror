@@ -29,21 +29,21 @@ module Make (Ord : Stdlib.Map.OrderedType) : S with type elt = Ord.t = struct
   open Seq
   include Stdlib.Set.Make (Ord)
 
-  let iter_e f t = iter_e f (to_seq t)
+  let iter_e f t = E.iter f (to_seq t)
 
-  let iter_s f t = iter_s f (to_seq t)
+  let iter_s f t = S.iter f (to_seq t)
 
   let iter_p f t = iter_p f (to_seq t)
 
-  let iter_es f t = iter_es f (to_seq t)
+  let iter_es f t = ES.iter f (to_seq t)
 
   let iter_ep f t = iter_ep f (to_seq t)
 
-  let fold_e f t init = fold_left_e (fun acc e -> f e acc) init (to_seq t)
+  let fold_e f t init = E.fold_left (fun acc e -> f e acc) init (to_seq t)
 
-  let fold_s f t init = fold_left_s (fun acc e -> f e acc) init (to_seq t)
+  let fold_s f t init = S.fold_left (fun acc e -> f e acc) init (to_seq t)
 
-  let fold_es f t init = fold_left_es (fun acc e -> f e acc) init (to_seq t)
+  let fold_es f t init = ES.fold_left (fun acc e -> f e acc) init (to_seq t)
 
   let min_elt = min_elt_opt
 

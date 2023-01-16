@@ -319,6 +319,8 @@ let secp256k1_internal =
     "secp256k1-internal"
     version
 
+let seqes = external_lib ~js_compatible:true "seqes" V.(at_least "0.2")
+
 let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
 let tar = external_lib "tar" V.True
@@ -538,7 +540,7 @@ let octez_lwt_result_stdlib_bare_sigs =
     ~path:"src/lib_lwt_result_stdlib/bare/sigs"
     ~internal_name:"bare_sigs"
     ~js_compatible:true
-    ~deps:[lwt; octez_lwt_result_stdlib_bare_functor_outputs]
+    ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_functor_outputs]
     ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_bare_structs =
@@ -547,7 +549,7 @@ let octez_lwt_result_stdlib_bare_structs =
     ~path:"src/lib_lwt_result_stdlib/bare/structs"
     ~internal_name:"bare_structs"
     ~js_compatible:true
-    ~deps:[lwt; octez_lwt_result_stdlib_bare_sigs]
+    ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_sigs]
     ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_functor_outputs =
@@ -627,10 +629,7 @@ let _octez_lwt_result_stdlib_tests =
       "test_list_basic";
       "test_list_basic_lwt";
       "test_seq_basic";
-      "test_fuzzing_helpers";
       "test_fuzzing_lib";
-      "test_fuzzing_seq_tiered";
-      "test_fuzzing_seq_against_stdlib";
       "test_fuzzing_list_against_stdlib";
       "test_fuzzing_option_against_stdlib";
       "test_fuzzing_set_against_stdlib";

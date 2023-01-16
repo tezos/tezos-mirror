@@ -48,4 +48,35 @@ module type S = sig
     ('a -> (unit, 'error trace) result Lwt.t) ->
     'a t ->
     (unit, 'error trace) result Lwt.t
+
+  (** Similar to {!iteri} but wraps the iteration in [result Lwt.t]. All the
+      steps of the iteration are started concurrently. The promise [iteri_ep]
+      resolves once all the promises of the traversal resolve. At this point it
+      either:
+      - is rejected if at least one of the promises is, otherwise
+      - is fulfilled with [Error _] if at least one of the promises is,
+        otherwise
+      - is fulfilled with [Ok ()] if all the promises are. *)
+  val iteri_ep :
+    (int -> 'a -> (unit, 'error trace) result Lwt.t) ->
+    'a t ->
+    (unit, 'error trace) result Lwt.t
+
+  (** Similar to {!iter2} but wraps the iteration in [result Lwt.t]. All the
+      steps of the iteration are started concurrently. The promise [iter2_ep]
+      resolves once all the promises of the traversal resolve. At this point it
+      either:
+      - is rejected if at least one of the promises is, otherwise
+      - is fulfilled with [Error _] if at least one of the promises is,
+        otherwise
+      - is fulfilled with [Ok ()] if all the promises are.
+
+      Following the behaviour of the Stdlib, the two-sequence traversors stop as
+      soon as one of the two sequences ends: the suffix of the longer sequence
+      is ignored. *)
+  val iter2_ep :
+    ('a -> 'b -> (unit, 'error trace) result Lwt.t) ->
+    'a t ->
+    'b t ->
+    (unit, 'error trace) result Lwt.t
 end
