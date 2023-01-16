@@ -2354,7 +2354,8 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
       ~error_msg:"State hashes should be different! (%L, %R)") ;
   unit
 
-let test_reveals_fails_on_wrong_hash ~kind =
+let test_reveals_fails_on_wrong_hash =
+  let kind = "arith" in
   test_full_scenario
     ~timeout:120
     ~kind
@@ -2366,7 +2367,7 @@ let test_reveals_fails_on_wrong_hash ~kind =
   @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
   let hash = reveal_hash_hex "Some data" in
   let pvm_dir =
-    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "arith"
+    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind
   in
   let filename = Filename.concat pvm_dir hash in
   let () = Sys.mkdir pvm_dir 0o700 in
@@ -4169,6 +4170,7 @@ let register ~protocols =
     ~boot_sector2:"31"
     ~kind:"arith"
     protocols ;
+  test_reveals_fails_on_wrong_hash protocols ;
   test_reveals_4k protocols ;
   test_reveals_above_4k protocols ;
   (* Specific Wasm PVM tezts *)
