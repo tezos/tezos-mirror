@@ -1150,6 +1150,64 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~binary invalid_kernel () =
   assert (not has_upgrade_error) ;
   return_unit
 
+let test_pvm_reboot_counter ~pvm_max_reboots () =
+  let open Lwt_result_syntax in
+  let reboot_kernel =
+    {|
+(module
+ (import "smart_rollup_core" "store_write"
+     (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
+ (data (i32.const 10) "/kernel/env/reboot")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_run")
+  (call $store_write (i32.const 10) (i32.const 18) (i32.const 0) (i32.const 0) (i32.const 0))))
+    |}
+  in
+  let read_reboot_counter_env tree =
+    let*! durable = wrap_as_durable_storage tree in
+    let durable = Durable.of_storage_exn durable in
+    let*! value = Durable.find_value durable Constants.reboot_counter_key in
+    match value with
+    | None ->
+        failwith
+          "Evaluation error: couldn't find the reboot counter in the durable \
+           storage"
+    | Some value ->
+        let*! value =
+          Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
+        in
+        (* WASM Values in memories are encoded in little-endian order. *)
+        return @@ Bytes.get_int32_le value 0
+  in
+
+  let rec check_counter tree i =
+    let*! info = Wasm.get_info tree in
+    if pvm_max_reboots < i then (
+      (* We have finished looping, the PVM has prevented another
+         execution of kernel_run *)
+      assert (info.input_request = Input_required) ;
+      let* reboot_counter = read_reboot_counter_env tree in
+      assert (reboot_counter = Int32.(succ pvm_max_reboots)) ;
+      return_unit)
+    else (
+      assert (info.input_request = No_input_required) ;
+      let* reboot_counter = read_reboot_counter_env tree in
+      assert (reboot_counter = Int32.(sub pvm_max_reboots i)) ;
+      let*! tree = eval_to_snapshot tree in
+      check_counter tree Int32.(succ i))
+  in
+
+  let*! tree =
+    initial_tree
+      ~max_reboots:(Z.of_int32 pvm_max_reboots)
+      ~from_binary:false
+      reboot_kernel
+  in
+  let*! tree = set_empty_inbox_step 0l tree in
+
+  check_counter tree 0l
+
 let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
   let open Lwt_result_syntax in
   (* Extracted from the kernel, these are the constant values used to build the
@@ -1628,6 +1686,8 @@ let tests =
       test_unkown_host_function_truncated;
     tztest "Test bulk no-ops function properly" `Quick test_bulk_noops;
     tztest "Test durable store io" `Quick test_durable_store_io;
+    tztest "Test /readonly/kernel/env/reboot_counter" `Quick
+    @@ test_pvm_reboot_counter ~pvm_max_reboots:10l;
     tztest "Test reboot" `Quick test_kernel_reboot;
     tztest
       "Test reboot takes too many reboots"
