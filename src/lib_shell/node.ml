@@ -153,7 +153,7 @@ let test_protocol_hashes =
 let store_known_protocols store =
   let open Lwt_syntax in
   let embedded_protocols = Registered_protocol.seq_embedded () in
-  Seq.iter_s
+  Seq.S.iter
     (fun protocol_hash ->
       match Store.Protocol.mem store protocol_hash with
       | true -> Node_event.(emit store_protocol_already_included) protocol_hash

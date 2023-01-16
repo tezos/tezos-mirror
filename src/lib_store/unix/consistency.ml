@@ -411,7 +411,7 @@ let lowest_cemented_metadata cemented_dir =
   | Some metadata_files ->
       let*! m =
         Seq_s.of_seq (Array.to_seq metadata_files)
-        |> Seq_s.filter_map_s
+        |> Seq_s.S.find_map
              (fun {Cemented_block_store.metadata_file; start_level; end_level}
              ->
                let*! lowest_metadata_entry =
@@ -428,7 +428,6 @@ let lowest_cemented_metadata cemented_dir =
                        emit warning_missing_metadata (start_level, end_level))
                in
                Lwt.return lowest_metadata_entry)
-        |> Seq_s.first
       in
       return m
   | None -> return_none

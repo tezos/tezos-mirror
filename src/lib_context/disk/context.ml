@@ -1103,7 +1103,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         | None -> Lwt.return_some (Store.Tree.empty ())
         | Some sub_tree -> add_hash batch sub_tree [step] hash
       in
-      let* o = Seq_es.fold_left_s add (Some (Store.Tree.empty ())) l in
+      let* o = Seq_es.S.fold_left add (Some (Store.Tree.empty ())) l in
       match o with
       | None -> return_none
       | Some tree ->

@@ -228,7 +228,7 @@ module Make_table (H : H) = struct
 
   let replace_seq t seq =
     H.replace_seq t.table seq ;
-    Seq.iter_es
+    Seq.ES.iter
       (fun (k, v) -> write_value (filedata t k) H.value_encoding v)
       seq
 

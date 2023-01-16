@@ -149,11 +149,11 @@ let write_value (type value) ?(override = false)
         return_unit)
 
 let write_values ?override t seq =
-  Seq.iter_es (fun (key, value) -> write_value ?override t key value) seq
+  Seq.ES.iter (fun (key, value) -> write_value ?override t key value) seq
 
 let read_values t seq =
   let open Lwt_syntax in
   Seq_s.of_seq seq
-  |> Seq_s.map_s (fun key ->
+  |> Seq_s.S.map (fun key ->
          let* maybe_value = read_value t key in
          return (key, maybe_value))
