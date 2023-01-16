@@ -95,93 +95,61 @@ module Atom = struct
   let check_float_range min v max =
     if v < min || max < v then raise (Invalid_float {min; v; max})
 
-  let set_int kind buffer ofs v =
-    match kind with
-    | `Int31 | `Uint30 -> TzEndian.set_int32 buffer ofs (Int32.of_int v)
-    | `Int16 | `Uint16 -> TzEndian.set_int16 buffer ofs v
-    | `Int8 | `Uint8 -> TzEndian.set_int8 buffer ofs v
+  let set_int kind endianness buffer ofs v =
+    match (kind, endianness) with
+    | (`Int31 | `Uint30), Encoding.Big_endian ->
+        TzEndian.set_int32 buffer ofs (Int32.of_int v)
+    | (`Int31 | `Uint30), Encoding.Little_endian ->
+        TzEndian.set_int32_le buffer ofs (Int32.of_int v)
+    | (`Int16 | `Uint16), Encoding.Big_endian -> TzEndian.set_int16 buffer ofs v
+    | (`Int16 | `Uint16), Encoding.Little_endian ->
+        TzEndian.set_int16_le buffer ofs v
+    | (`Int8 | `Uint8), _ -> TzEndian.set_int8 buffer ofs v
 
-  let set_intle kind buffer ofs v =
-    match kind with
-    | `Int31 | `Uint30 -> TzEndian.set_int32_le buffer ofs (Int32.of_int v)
-    | `Int16 | `Uint16 -> TzEndian.set_int16_le buffer ofs v
-    | `Int8 | `Uint8 -> TzEndian.set_int8 buffer ofs v
-
-  let int kind state v =
+  let int kind endianness state v =
     check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
     let ofs = state.offset in
     may_resize state (Binary_size.integer_to_size kind) ;
-    set_int kind state.buffer ofs v
+    set_int kind endianness state.buffer ofs v
 
-  let intle kind state v =
-    check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
-    let ofs = state.offset in
-    may_resize state (Binary_size.integer_to_size kind) ;
-    set_intle kind state.buffer ofs v
+  let int8 = int `Int8 Encoding.default_endianness
 
-  let int8 = int `Int8
+  let uint8 = int `Uint8 Encoding.default_endianness
 
-  let uint8 = int `Uint8
+  let int16 endianness = int `Int16 endianness
 
-  let int16 = int `Int16
+  let uint16 endianness = int `Uint16 endianness
 
-  let uint16 = int `Uint16
+  let uint30 endianness = int `Uint30 endianness
 
-  let uint30 = int `Uint30
-
-  let int31 = int `Int31
+  let int31 endianness = int `Int31 endianness
 
   let bool state v = uint8 state (if v then 255 else 0)
 
-  let int32 state v =
+  let int32 endianness state v =
     let ofs = state.offset in
     may_resize state Binary_size.int32 ;
-    TzEndian.set_int32 state.buffer ofs v
+    match endianness with
+    | Encoding.Big_endian -> TzEndian.set_int32 state.buffer ofs v
+    | Encoding.Little_endian -> TzEndian.set_int32_le state.buffer ofs v
 
-  let int64 state v =
+  let int64 endianness state v =
     let ofs = state.offset in
     may_resize state Binary_size.int64 ;
-    TzEndian.set_int64 state.buffer ofs v
+    match endianness with
+    | Encoding.Big_endian -> TzEndian.set_int64 state.buffer ofs v
+    | Encoding.Little_endian -> TzEndian.set_int64_le state.buffer ofs v
 
-  let int16_le = intle `Int16
-
-  let uint16_le = intle `Uint16
-
-  let uint30_le = intle `Uint30
-
-  let int31_le = intle `Int31
-
-  let int32_le state v =
-    let ofs = state.offset in
-    may_resize state Binary_size.int32 ;
-    TzEndian.set_int32_le state.buffer ofs v
-
-  let int64_le state v =
-    let ofs = state.offset in
-    may_resize state Binary_size.int64 ;
-    TzEndian.set_int64_le state.buffer ofs v
-
-  let ranged_int ~minimum ~maximum state v =
+  let ranged_int ~minimum ~endianness ~maximum state v =
     check_int_range minimum v maximum ;
     let v = if minimum >= 0 then v - minimum else v in
     match Binary_size.range_to_size ~minimum ~maximum with
     | `Uint8 -> uint8 state v
-    | `Uint16 -> uint16 state v
-    | `Uint30 -> uint30 state v
+    | `Uint16 -> uint16 endianness state v
+    | `Uint30 -> uint30 endianness state v
     | `Int8 -> int8 state v
-    | `Int16 -> int16 state v
-    | `Int31 -> int31 state v
-
-  let ranged_int_le ~minimum ~maximum state v =
-    check_int_range minimum v maximum ;
-    let v = if minimum >= 0 then v - minimum else v in
-    match Binary_size.range_to_size ~minimum ~maximum with
-    | `Uint8 -> uint8 state v
-    | `Uint16 -> uint16_le state v
-    | `Uint30 -> uint30_le state v
-    | `Int8 -> int8 state v
-    | `Int16 -> int16_le state v
-    | `Int31 -> int31_le state v
+    | `Int16 -> int16 endianness state v
+    | `Int31 -> int31 endianness state v
 
   let n state v =
     if Z.sign v < 0 then raise Invalid_natural ;
@@ -240,8 +208,8 @@ module Atom = struct
       try snd (Hashtbl.find tbl v) with Not_found -> raise No_case_matched
     in
     match Binary_size.enum_size arr with
-    | `Uint30 -> uint30 state value
-    | `Uint16 -> uint16 state value
+    | `Uint30 -> uint30 Encoding.default_endianness state value
+    | `Uint16 -> uint16 Encoding.default_endianness state value
     | `Uint8 -> uint8 state value
 
   let fixed_kind_bytes length state s =
@@ -258,7 +226,9 @@ module Atom = struct
     may_resize state length ;
     Bytes.blit_string s 0 state.buffer ofs length
 
-  let tag = function `Uint8 -> uint8 | `Uint16 -> uint16
+  let tag = function
+    | `Uint8 -> uint8
+    | `Uint16 -> uint16 Encoding.default_endianness
 end
 
 (** Main recursive writing function. *)
@@ -273,16 +243,11 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Bool -> Atom.bool state value
   | Int8 -> Atom.int8 state value
   | Uint8 -> Atom.uint8 state value
-  | Int16 Big_endian -> Atom.int16 state value
-  | Uint16 Big_endian -> Atom.uint16 state value
-  | Int31 Big_endian -> Atom.int31 state value
-  | Int32 Big_endian -> Atom.int32 state value
-  | Int64 Big_endian -> Atom.int64 state value
-  | Int16 Little_endian -> Atom.int16_le state value
-  | Uint16 Little_endian -> Atom.uint16_le state value
-  | Int31 Little_endian -> Atom.int31_le state value
-  | Int32 Little_endian -> Atom.int32_le state value
-  | Int64 Little_endian -> Atom.int64_le state value
+  | Int16 endianness -> Atom.int16 endianness state value
+  | Uint16 endianness -> Atom.uint16 endianness state value
+  | Int31 endianness -> Atom.int31 endianness state value
+  | Int32 endianness -> Atom.int32 endianness state value
+  | Int64 endianness -> Atom.int64 endianness state value
   | N -> Atom.n state value
   | Z -> Atom.z state value
   | Float -> Atom.float state value
@@ -297,10 +262,8 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | Padded (e, n) ->
       write_rec e state value ;
       Atom.fixed_kind_string n state (String.make n '\000')
-  | RangedInt {minimum; endianness = Big_endian; maximum} ->
-      Atom.ranged_int ~minimum ~maximum state value
-  | RangedInt {minimum; endianness = Little_endian; maximum} ->
-      Atom.ranged_int_le ~minimum ~maximum state value
+  | RangedInt {minimum; endianness; maximum} ->
+      Atom.ranged_int ~minimum ~endianness ~maximum state value
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum state value
   | String_enum (tbl, arr) -> Atom.string_enum tbl arr state value
@@ -384,11 +347,12 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
           write_with_limit (Binary_size.max_int `N) e state value
       | #Binary_size.unsigned_integer as kind ->
           (* place holder for [size] *)
-          Atom.int kind state 0 ;
+          Atom.int kind Encoding.default_endianness state 0 ;
           write_with_limit (Binary_size.max_int kind) e state value ;
           (* patch the written [size] *)
           Atom.set_int
             kind
+            Encoding.default_endianness
             state.buffer
             initial_offset
             (state.offset - initial_offset - Binary_size.integer_to_size kind))
