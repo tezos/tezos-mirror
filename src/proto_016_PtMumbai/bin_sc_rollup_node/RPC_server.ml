@@ -44,9 +44,9 @@ let get_finalized store =
 let get_last_cemented (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   protect @@ fun () ->
-  let*! lcc_hash =
+  let* lcc_hash =
     State.hash_of_level
-      node_ctxt.store
+      node_ctxt
       (Alpha_context.Raw_level.to_int32 node_ctxt.lcc.level)
   in
   return lcc_hash
@@ -192,7 +192,7 @@ module Block_directory = Make_directory (struct
       match block with
       | `Head -> get_head node_ctxt.Node_context.store
       | `Hash b -> return b
-      | `Level l -> State.hash_of_level node_ctxt.store l >>= return
+      | `Level l -> State.hash_of_level node_ctxt l
       | `Finalized -> get_finalized node_ctxt.Node_context.store
       | `Cemented -> get_last_cemented node_ctxt
     in
@@ -211,7 +211,7 @@ module Outbox_directory = Make_directory (struct
       match block with
       | `Head -> get_head node_ctxt.Node_context.store
       | `Hash b -> return b
-      | `Level l -> State.hash_of_level node_ctxt.store l >>= return
+      | `Level l -> State.hash_of_level node_ctxt l
       | `Finalized -> get_finalized node_ctxt.Node_context.store
       | `Cemented -> get_last_cemented node_ctxt
     in
@@ -254,7 +254,7 @@ module Common = struct
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.level
-    @@ fun (node_ctxt, block) () () -> State.level_of_hash node_ctxt.store block
+    @@ fun (node_ctxt, block) () () -> State.level_of_hash node_ctxt block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.inbox
@@ -300,7 +300,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
           Some map
       | None -> None
     in
-    let* level = State.level_of_hash node_ctxt.store block in
+    let* level = State.level_of_hash node_ctxt block in
     let* sim =
       Simulation.start_simulation
         node_ctxt
@@ -535,9 +535,9 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                   | None ->
                       return (Sc_rollup_services.Included (info, inbox_info))
                   | Some commitment_level -> (
-                      let*! block =
+                      let* block =
                         State.hash_of_level
-                          node_ctxt.store
+                          node_ctxt
                           (Alpha_context.Raw_level.to_int32 commitment_level)
                       in
                       let*! block =

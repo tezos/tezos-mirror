@@ -75,36 +75,41 @@ module Store = struct
 
         let encoding = Tezos_crypto.Block_hash.encoding
       end)
-
-  (** Table from L1 blocks hashes to levels. *)
-  module Hashes_to_levels =
-    Store.Make_append_only_map
-      (struct
-        let path = ["tezos"; "blocks_hashes"]
-      end)
-      (struct
-        type key = Tezos_crypto.Block_hash.t
-
-        let to_path_representation = Tezos_crypto.Block_hash.to_b58check
-      end)
-      (struct
-        type value = int32
-
-        let name = "level"
-
-        let encoding = Data_encoding.int32
-      end)
 end
 
-let hash_of_level store level = Store.Levels_to_hashes.get store level
-
-let level_of_hash store hash =
-  let open Lwt_result_syntax in
-  let*! level = Store.Hashes_to_levels.find store hash in
-  match level with
+let hash_of_level_opt Node_context.{store; cctxt; _} level =
+  let open Lwt_syntax in
+  let* hash = Store.Levels_to_hashes.find store level in
+  match hash with
+  | Some hash -> return_some hash
   | None ->
-      failwith "No level known for block %a" Tezos_crypto.Block_hash.pp hash
-  | Some l -> return l
+      let+ hash =
+        Tezos_shell_services.Shell_services.Blocks.hash
+          cctxt
+          ~chain:cctxt#chain
+          ~block:(`Level level)
+          ()
+      in
+      Result.to_option hash
+
+let hash_of_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let*! hash = hash_of_level_opt node_ctxt level in
+  match hash with
+  | Some h -> return h
+  | None -> failwith "Cannot retrieve hash of level %ld" level
+
+let level_of_hash {Node_context.l1_ctxt; store; _} hash =
+  let open Lwt_result_syntax in
+  let*! block = Raw_store.L2_blocks.find store hash in
+  match block with
+  | Some {header = {level; _}; _} -> return (Raw_level.to_int32 level)
+  | None ->
+      let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
+      level
+
+let save_level store Layer1.{hash; level} =
+  Store.Levels_to_hashes.add store level hash
 
 let save_l2_block store (head : Sc_rollup_block.t) =
   let open Lwt_syntax in
@@ -118,11 +123,6 @@ let last_processed_head_opt store = Store.L2_head.find store
 let mark_finalized_head store head = Store.Last_finalized_head.set store head
 
 let get_finalized_head_opt store = Store.Last_finalized_head.find store
-
-let set_block_level_and_hash store Layer1.{hash; level} =
-  let open Lwt_syntax in
-  let* () = Store.Hashes_to_levels.add store hash level in
-  Store.Levels_to_hashes.add store level hash
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4532
    Make this logarithmic, by storing pointers to muliple predecessor and
