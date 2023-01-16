@@ -328,6 +328,12 @@ module Admin : sig
   (** Same as [ban_peer], but do not wait for the process to exit. *)
   val spawn_ban_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
 
+  (** Run [octez-admin-client p2p stat]. *)
+  val p2p_stat : ?endpoint:endpoint -> t -> string Lwt.t
+
+  (** Same as [p2p_stat], but do not wait for the process to exit. *)
+  val spawn_p2p_stat : ?endpoint:endpoint -> t -> Process.t
+
   (** Run [octez-admin-client inject protocol <protocol_path>].
 
       Returns the hash of the injected protocol. *)
