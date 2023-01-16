@@ -2075,24 +2075,45 @@ module Sc_rollup = struct
         RPC_path.(
           path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "games")
 
-    let stakers_commitments =
+    let commitments =
       let output =
-        Sc_rollup.(
-          Data_encoding.(
-            list
-              (obj2
-                 (req "staker" Staker.encoding)
-                 (opt "commitment" Commitment.Hash.encoding))))
+        Data_encoding.(option (list Sc_rollup.Commitment.Hash.encoding))
       in
       RPC_service.get_service
         ~description:
-          "List of stakers for a given rollup, associated to the commitment \
-           hash they are staked on. The hash can be absent if the staked \
-           commitment is before the last cemented commitment, and therefore \
-           the hash no longer exists in the context."
+          "List of commitments associated to a rollup for a given inbox level"
         ~query:RPC_query.empty
         ~output
-        RPC_path.(path_sc_rollup / "stakers_commitments")
+        RPC_path.(
+          path_sc_rollup / "inbox_level" /: Raw_level.rpc_arg / "commitments")
+
+    let stakers_ids =
+      let output = Data_encoding.list Sc_rollup.Staker.Index.encoding in
+      RPC_service.get_service
+        ~description:"List of stakers indexes staking on a given commitment"
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(
+          path_sc_rollup / "commitment" /: Sc_rollup.Commitment.Hash.rpc_arg
+          / "stakers_indexes")
+
+    let staker_id =
+      let output = Sc_rollup.Staker.Index.encoding in
+      RPC_service.get_service
+        ~description:
+          "Staker index associated to a public key hash for a given rollup"
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(
+          path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg / "index")
+
+    let stakers =
+      let output = Data_encoding.list Sc_rollup.Staker.encoding in
+      RPC_service.get_service
+        ~description:"List of active stakers' public key hashes of a rollup"
+        ~query:RPC_query.empty
+        ~output
+        RPC_path.(path_sc_rollup / "stakers")
 
     let conflicts =
       let output =
@@ -2246,12 +2267,40 @@ module Sc_rollup = struct
         in
         return game)
 
-  let register_stakers_commitments () =
-    Registration.register1
+  let register_commitments () =
+    Registration.register2
       ~chunked:false
-      S.stakers_commitments
-      (fun context rollup () () ->
-        Sc_rollup.Stake_storage.stakers_commitments_uncarbonated context rollup)
+      S.commitments
+      (fun context rollup inbox_level () () ->
+        Sc_rollup.Stake_storage.commitments_uncarbonated
+          context
+          ~rollup
+          ~inbox_level)
+
+  let register_stakers_ids () =
+    Registration.register2
+      ~chunked:false
+      S.stakers_ids
+      (fun context rollup commitment () () ->
+        Sc_rollup.Stake_storage.stakers_ids_uncarbonated
+          context
+          ~rollup
+          ~commitment)
+
+  let register_staker_id () =
+    Registration.register2
+      ~chunked:false
+      S.staker_id
+      (fun context rollup pkh () () ->
+        Sc_rollup.Stake_storage.staker_id_uncarbonated context ~rollup ~pkh)
+
+  let register_stakers () =
+    Registration.register1 ~chunked:false S.stakers (fun context rollup () () ->
+        let open Lwt_result_syntax in
+        let*! stakers_pkhs =
+          Sc_rollup.Stake_storage.stakers_pkhs_uncarbonated context ~rollup
+        in
+        return stakers_pkhs)
 
   let register_conflicts () =
     Registration.register2
@@ -2312,7 +2361,10 @@ module Sc_rollup = struct
     register_commitment () ;
     register_root () ;
     register_ongoing_refutation_games () ;
-    register_stakers_commitments () ;
+    register_commitments () ;
+    register_stakers_ids () ;
+    register_staker_id () ;
+    register_stakers () ;
     register_conflicts () ;
     register_timeout () ;
     register_timeout_reached () ;
@@ -2365,8 +2417,16 @@ module Sc_rollup = struct
       ()
       ()
 
-  let stakers_commitments ctxt rollup =
-    RPC_context.make_call1 S.stakers_commitments ctxt rollup
+  let commitments ctxt rollup inbox_level =
+    RPC_context.make_call2 S.commitments ctxt rollup inbox_level
+
+  let stakers_ids ctxt rollup commitment =
+    RPC_context.make_call2 S.stakers_ids ctxt rollup commitment
+
+  let staker_id ctxt rollup pkh =
+    RPC_context.make_call2 S.staker_id ctxt rollup pkh
+
+  let stakers ctxt rollup = RPC_context.make_call1 S.stakers ctxt rollup
 
   let conflicts ctxt block sc_rollup_address staker =
     RPC_context.make_call2 S.conflicts ctxt block sc_rollup_address staker () ()

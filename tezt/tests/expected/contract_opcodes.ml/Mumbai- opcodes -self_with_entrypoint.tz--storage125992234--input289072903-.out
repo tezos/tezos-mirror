@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/self_with_entrypoint.tz on storage Unit and input 'Left (Left 0)' --level 1 --trace-stack
+./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/self_with_entrypoint.tz on storage Unit and input 'Left (Left 0)' --level 1 --trace-stack
 storage
   Unit
 emitted operations
@@ -13,12 +13,12 @@ trace
     [  ]
   - location: 14 (just consumed gas: 0.010)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
-  - location: 15 (just consumed gas: 0.516)
+  - location: 15 (just consumed gas: 0.526)
     [ 0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
   - location: 16 (just consumed gas: 0.010)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
       0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
-  - location: 17 (just consumed gas: 0.506)
+  - location: 17 (just consumed gas: 0.516)
     [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
       0x050a00000017011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe60041 ]
   - location: 18 (just consumed gas: 0.010)
@@ -48,7 +48,7 @@ trace
   - location: 32 (just consumed gas: 0.010)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
-  - location: 33 (just consumed gas: 0.506)
+  - location: 33 (just consumed gas: 0.516)
     [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
       0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
   - location: 36 (just consumed gas: 0.035)

@@ -113,16 +113,37 @@ val is_staked_on :
   Sc_rollup_commitment_repr.Hash.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** [stakers_commitments_uncarbonated ctxt rollup] returns the list of
-    active stakers and the hash of the commitment they stake with the
-    maximum inbox level. The commitment associated to a staker can
-    absent if it is no longer in the storage, i.e. cemented. *)
-val stakers_commitments_uncarbonated :
+(** [commitments_uncarbonated ctxt ~rollup ~inbox_level] returns the
+    list of commitments associated to [rollup] at [inbox_level] *)
+val commitments_uncarbonated :
   Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_repr.Staker.t * Sc_rollup_commitment_repr.Hash.t option) list
-  tzresult
-  Lwt.t
+  rollup:Sc_rollup_repr.t ->
+  inbox_level:Raw_level_repr.t ->
+  Sc_rollup_commitment_repr.Hash.t list option tzresult Lwt.t
+
+(** [stakers_ids_uncarbonated ctxt ~rollup ~commitment] returns the
+    list of stakers' indexes associated to [rollup] for a specific
+    [commitment] *)
+val stakers_ids_uncarbonated :
+  Raw_context.t ->
+  rollup:Sc_rollup_repr.t ->
+  commitment:Sc_rollup_commitment_repr.Hash.t ->
+  Sc_rollup_staker_index_repr.t list tzresult Lwt.t
+
+(** [staker_id_uncarbonated ctxt ~rollup ~pkh] returns the staker's
+    index associated to the public key hash [pkh] *)
+val staker_id_uncarbonated :
+  Raw_context.t ->
+  rollup:Sc_rollup_repr.t ->
+  pkh:Signature.public_key_hash ->
+  Sc_rollup_staker_index_repr.t tzresult Lwt.t
+
+(** [stakers_pkhs_uncarbonated ctxt ~rollup] returns the public key hashes 
+    of stakers that are currently actively staking on [rollup] *)
+val stakers_pkhs_uncarbonated :
+  Raw_context.t ->
+  rollup:Sc_rollup_repr.t ->
+  Signature.public_key_hash list Lwt.t
 
 (** [withdraw_stake context rollup staker] removes [staker] and cleans
     its metadata. [staker] is allowed to withdraw if it latest staked

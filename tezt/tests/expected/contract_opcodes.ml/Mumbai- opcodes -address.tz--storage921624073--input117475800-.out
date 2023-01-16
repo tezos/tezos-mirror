@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/address.tz on storage None and input '"tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"' --level 1 --trace-stack
+./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/address.tz on storage None and input '"tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"' --level 1 --trace-stack
 storage
   (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (just consumed gas: 8.761)
+  - location: 9 (just consumed gas: 9.061)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" None) ]
   - location: 9 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]

@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/compare.tz on storage Unit and input Unit --level 1 --trace-stack
+./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_016/opcodes/compare.tz on storage Unit and input Unit --level 1 --trace-stack
 storage
   Unit
 emitted operations
@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (just consumed gas: 198.972)
+  - location: 7 (just consumed gas: 200.472)
     [ (Pair Unit Unit) ]
   - location: 7 (just consumed gas: 0.010)
     [  ]

@@ -137,7 +137,7 @@ Contract memorized as send_tickets_in_big_map.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 30 --storage-limit 1000000 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 100555.299 units (will add 100 for safety)
+Estimated gas: 100565.639 units (will add 100 for safety)
 Estimated storage: 10767 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -148,13 +148,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.010362
+    Fee to the baker: ꜩ0.010363
     Expected counter: 1
-    Gas limit: 100656
+    Gas limit: 100666
     Storage limit: 10787 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.010362
-      payload fees(the block proposer) ....... +ꜩ0.010362
+      [PUBLIC_KEY_HASH] ... -ꜩ0.010363
+      payload fees(the block proposer) ....... +ꜩ0.010363
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -266,7 +266,7 @@ This sequence of operations was run:
         Set temp(1)[40] to (Pair 0x01e09c4d537373c6c8ca48684433c792ceb69c9dd200 (Pair "BLUE" 1))
       Storage size: 320 bytes
       Paid storage size diff: 67 bytes
-      Consumed gas: 50736.525
+      Consumed gas: 50740.845
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.01675
         storage fees ........................... +ꜩ0.01675
@@ -283,7 +283,7 @@ This sequence of operations was run:
             Copy temp(1) to map(5)
           Storage size: 10783 bytes
           Paid storage size diff: 10700 bytes
-          Consumed gas: 49819.806
+          Consumed gas: 49825.826
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ2.675
             storage fees ........................... +ꜩ2.675
