@@ -556,6 +556,8 @@ module Big_endian = struct
   let int32 = make @@ Int32 Big_endian
 
   let ranged_int minimum maximum =
+    (* NOTE: all [ranged_*] combinator, support out-of-order arguments. E.g.,
+       [ranged_int 1000 0] is a valid encoding equivalent to [ranged_int 0 1000] *)
     let minimum = min minimum maximum and maximum = max minimum maximum in
     if
       minimum < Binary_size.min_int `Int31
