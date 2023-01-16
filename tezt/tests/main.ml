@@ -145,7 +145,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Mockup.register ~protocols ;
   Mockup.register_global_constants ~protocols ;
   Monitor_operations.register ~protocols ;
-  Multinode_snapshot.register ~protocols ;
   Multiple_transfers.register ~protocols ;
   Multisig.register ~protocols ;
   Node_cors.register ~protocols ;
@@ -181,6 +180,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols ;
   Storage_reconstruction.register ~protocols ;
+  Storage_snapshots.register ~protocols ;
   Stresstest_command.register ~protocols ;
   Synchronisation_heuristic.register ~protocols ;
   Tenderbake.register ~protocols ;
