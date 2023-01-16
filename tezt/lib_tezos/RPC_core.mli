@@ -56,8 +56,8 @@ type data = Client.data
       If you do not want to define it, use [Fun.id] (to return a [JSON.t])
       or [ignore] (to ignore the response body).
 
-    - [get_host] and [get_port] are callbacks to extract host and port from the
-      endpoint to build the targeted url.
+    - [get_host], [get_port] and [get_scheme] are callbacks to extract host, port and
+      scheme from the endpoint to build the targeted url.
 
     Use one of the [call] functions below to actually call the RPC. *)
 val make :
@@ -65,10 +65,14 @@ val make :
   ?query_string:(string * string) list ->
   get_host:('endpoint -> string) ->
   get_port:('endpoint -> int) ->
+  get_scheme:('endpoint -> string) ->
   verb ->
   string list ->
   (JSON.t -> 'result) ->
   ('endpoint, 'result) t
+
+(** [make_uri endpoint rpc] returns the URI of the RPC [rpc] at [endpoint]. *)
+val make_uri : 'endpoint -> ('endpoint, 'result) t -> Uri.t
 
 (** Parse and decode a response body using the decode function of an RPC description.
 

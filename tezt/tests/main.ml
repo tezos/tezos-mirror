@@ -54,7 +54,8 @@ let register_protocol_independent_tests () =
   Light.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   P2p.register_protocol_independent () ;
-  Proxy.register_protocol_independent ()
+  Proxy.register_protocol_independent () ;
+  Rpc_tls.register_protocol_independent ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =

@@ -213,60 +213,29 @@ let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
   Client.rpc ?endpoint ?hooks GET path client
 
 module Curl = struct
-  let curl_path_cache = ref None
+  let parse url process =
+    let* output = Process.check_and_read_stdout process in
+    return (JSON.parse ~origin:url output)
 
-  let get () =
-    Process.(
-      try
-        let* curl_path =
-          match !curl_path_cache with
-          | Some curl_path -> return curl_path
-          | None ->
-              let* curl_path =
-                run_and_read_stdout "sh" ["-c"; "command -v curl"]
-              in
-              let curl_path = String.trim curl_path in
-              curl_path_cache := Some curl_path ;
-              return curl_path
-        in
-        return
-        @@ Some
-             (fun ~url ->
-               let* output = run_and_read_stdout curl_path ["-s"; url] in
-               return (JSON.parse ~origin:url output))
-      with _ -> return @@ None)
+  let get ?(args = []) url =
+    let process = Process.spawn "curl" (args @ ["-s"; url]) in
+    Runnable.{value = process; run = parse url}
 
-  let post () =
-    Process.(
-      try
-        let* curl_path =
-          match !curl_path_cache with
-          | Some curl_path -> return curl_path
-          | None ->
-              let* curl_path =
-                run_and_read_stdout "sh" ["-c"; "command -v curl"]
-              in
-              let curl_path = String.trim curl_path in
-              curl_path_cache := Some curl_path ;
-              return curl_path
-        in
-        return
-        @@ Some
-             (fun ~url data ->
-               let* output =
-                 run_and_read_stdout
-                   curl_path
-                   [
-                     "-X";
-                     "POST";
-                     "-H";
-                     "Content-Type: application/json";
-                     "-s";
-                     url;
-                     "-d";
-                     JSON.encode data;
-                   ]
-               in
-               return (JSON.parse ~origin:url output))
-      with _ -> return @@ None)
+  let post ?(args = []) url data =
+    let process =
+      Process.spawn
+        "curl"
+        (args
+        @ [
+            "-X";
+            "POST";
+            "-H";
+            "Content-Type: application/json";
+            "-s";
+            url;
+            "-d";
+            JSON.encode data;
+          ])
+    in
+    Runnable.{value = process; run = parse url}
 end

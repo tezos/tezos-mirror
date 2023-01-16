@@ -83,6 +83,11 @@ type argument =
   | Cors_origin of string  (** [--cors-origin] *)
   | Disable_mempool  (** [--disable-mempool] *)
 
+(** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
+
+    Passed to [run] like commands through the [--rpc-tls] argument. *)
+type tls_config = {certificate_path : string; key_path : string}
+
 (** Tezos node states. *)
 type t
 
@@ -129,6 +134,7 @@ val create :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?rpc_tls:tls_config ->
   ?allow_all_rpc:bool ->
   argument list ->
   t
@@ -188,11 +194,22 @@ val net_port : t -> int
 (** Get the network port given as [--advertised-net-port] to a node. *)
 val advertised_net_port : t -> int option
 
+(** Get the RPC scheme of a node.
+
+    Returns [https] if node is started with [--rpc-tls], otherwise [http] *)
+val rpc_scheme : t -> string
+
 (** Get the RPC host given as [--rpc-addr] to a node. *)
 val rpc_host : t -> string
 
-(** Get the RPC port given as [--rpc-addr] to a node. *)
+(** Get the RPC port given as [--rpc-port] to a node. *)
 val rpc_port : t -> int
+
+(** Get the node's RPC endpoint URI.
+
+    These are composed of the node's [--rpc-tls], [--rpc-addr]
+    and [--rpc-port] arguments. *)
+val rpc_endpoint : t -> string
 
 (** Get the data-dir of a node. *)
 val data_dir : t -> string
@@ -475,6 +492,7 @@ val init :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?rpc_tls:tls_config ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?patch_config:(JSON.t -> JSON.t) ->

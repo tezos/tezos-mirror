@@ -51,10 +51,12 @@ type ('endpoint, 'result) t = {
   decode : JSON.t -> 'result;
   get_host : 'endpoint -> string;
   get_port : 'endpoint -> int;
+  get_scheme : 'endpoint -> string;
 }
 
-let make ?data ?(query_string = []) ~get_host ~get_port verb path decode =
-  {verb; path; query_string; data; decode; get_host; get_port}
+let make ?data ?(query_string = []) ~get_host ~get_port ~get_scheme verb path
+    decode =
+  {verb; path; query_string; data; decode; get_host; get_port; get_scheme}
 
 let decode_raw ?(origin = "RPC response") rpc raw =
   rpc.decode (JSON.parse ~origin raw)
@@ -73,7 +75,7 @@ let check_string_response ?(body_rex = "") ~code (response : string response) =
 
 let make_uri endpoint rpc =
   Uri.make
-    ~scheme:"http"
+    ~scheme:(rpc.get_scheme endpoint)
     ~host:(rpc.get_host endpoint)
     ~port:(rpc.get_port endpoint)
     ~path:(String.concat "/" rpc.path)

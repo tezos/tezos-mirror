@@ -176,15 +176,9 @@ let get_sc_rollup_commitment_period_in_blocks client =
   return constants.commitment_period_in_blocks
 
 let sc_rollup_node_rpc sc_node service =
-  let* curl = RPC.Curl.get () in
-  match curl with
-  | None -> return None
-  | Some curl ->
-      let url =
-        Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint sc_node) service
-      in
-      let* response = curl ~url in
-      return (Some response)
+  let url = Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint sc_node) service in
+  let*! response = RPC.Curl.get url in
+  return response
 
 type test = {variant : string option; tags : string list; description : string}
 
@@ -444,13 +438,7 @@ let test_rollup_node_running ~kind =
   let* sc_rollup_from_rpc =
     sc_rollup_node_rpc rollup_node "global/smart_rollup_address"
   in
-  let sc_rollup_from_rpc =
-    match sc_rollup_from_rpc with
-    | None ->
-        (* No curl, no check. *)
-        failwith "Please install curl"
-    | Some sc_rollup_from_rpc -> JSON.as_string sc_rollup_from_rpc
-  in
+  let sc_rollup_from_rpc = JSON.as_string sc_rollup_from_rpc in
   let*! sc_rollup_from_client =
     Sc_rollup_client.sc_rollup_address ~hooks rollup_client
   in
@@ -640,9 +628,7 @@ let get_inbox_from_tezos_node client =
 
 let get_inbox_from_sc_rollup_node sc_rollup_node =
   let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
-  match inbox with
-  | None -> failwith "Unable to retrieve inbox from sc rollup node"
-  | Some inbox -> parse_inbox inbox
+  parse_inbox inbox
 
 let fetch_messages_from_block client =
   let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
