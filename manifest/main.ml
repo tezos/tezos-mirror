@@ -3797,8 +3797,7 @@ end = struct
             (2, "test_sampler", N.(number >= 012));
             (2, "test_script_comparison", true);
             (2, "test_tez_repr", true);
-            (2, "test_tx_rollup_l2_encoding", N.(number >= 013));
-            (2, "test_tx_rollup_l2_withdraw_storage", N.(number <= 010));
+            (2, "test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
             (2, "test_bitset", N.(number >= 013));
             (2, "test_sc_rollup_tick_repr", N.(number >= 013));
             (2, "test_sc_rollup_encoding", N.(number >= 015));

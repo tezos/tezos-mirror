@@ -10,7 +10,6 @@
   test_sampler
   test_script_comparison
   test_tez_repr
-  test_tx_rollup_l2_encoding
   test_bitset
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding
@@ -91,11 +90,6 @@
 (rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
- (action (run %{dep:./test_tx_rollup_l2_encoding.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-alpha-tests)
  (action (run %{dep:./test_bitset.exe})))
 
 (rule
@@ -156,8 +150,6 @@
 (rule (alias runtest2) (action (run %{exe:test_script_comparison.exe})))
 
 (rule (alias runtest2) (action (run %{exe:test_tez_repr.exe})))
-
-(rule (alias runtest2) (action (run %{exe:test_tx_rollup_l2_encoding.exe})))
 
 (rule (alias runtest2) (action (run %{exe:test_bitset.exe})))
 

@@ -44,7 +44,6 @@ type ctxt = {
   block : Block.t;
   bootstraps : public_key_hash list;
   originated_contract : Contract_hash.t option;
-  tx_rollup : Tx_rollup.t option;
   sc_rollup : Sc_rollup.t option;
   zk_rollup : Zk_rollup.t option;
 }
@@ -58,7 +57,6 @@ type accounts = {
   sources : Account.t list;
   dest : Account.t option;
   del : Account.t option;
-  tx : Account.t option;
   sc : Account.t option;
   zk : Account.t option;
 }
@@ -86,15 +84,7 @@ type manager_operation_kind =
   | K_Update_consensus_key
   | K_Increase_paid_storage
   | K_Reveal
-  | K_Tx_rollup_origination
-  | K_Tx_rollup_submit_batch
-  | K_Tx_rollup_commit
-  | K_Tx_rollup_return_bond
-  | K_Tx_rollup_finalize
-  | K_Tx_rollup_remove_commitment
-  | K_Tx_rollup_dispatch_tickets
   | K_Transfer_ticket
-  | K_Tx_rollup_reject
   | K_Sc_rollup_origination
   | K_Sc_rollup_publish
   | K_Sc_rollup_cement
@@ -126,7 +116,6 @@ type ctxt_req = {
   fund_dest : Tez.t option;
   fund_del : Tez.t option;
   reveal_accounts : bool;
-  fund_tx : Tez.t option;
   fund_sc : Tez.t option;
   fund_zk : Tez.t option;
   flags : feature_flags;
@@ -158,7 +147,6 @@ let ctxt_req_default_to_flag flags =
     fund_dest = Some Tez.one;
     fund_del = Some default_fund;
     reveal_accounts = true;
-    fund_tx = Some Tez.one;
     fund_sc = Some Tez.one;
     fund_zk = Some Tez.one;
     flags;
@@ -189,14 +177,6 @@ let kind_to_string = function
   | K_Register_global_constant -> "Register global constant"
   | K_Increase_paid_storage -> "Increase paid storage"
   | K_Reveal -> "Revelation"
-  | K_Tx_rollup_origination -> "Tx_rollup_origination"
-  | K_Tx_rollup_submit_batch -> "Tx_rollup_submit_batch"
-  | K_Tx_rollup_commit -> "Tx_rollup_commit"
-  | K_Tx_rollup_return_bond -> "Tx_rollup_return_bond"
-  | K_Tx_rollup_finalize -> "Tx_rollup_finalize"
-  | K_Tx_rollup_remove_commitment -> "Tx_rollup_remove_commitment"
-  | K_Tx_rollup_dispatch_tickets -> "Tx_rollup_dispatch_tickets"
-  | K_Tx_rollup_reject -> "Tx_rollup_reject"
   | K_Transfer_ticket -> "Transfer_ticket"
   | K_Sc_rollup_origination -> "Sc_rollup_origination"
   | K_Sc_rollup_publish -> "Sc_rollup_publish"
@@ -259,7 +239,6 @@ let pp_ctxt_req pp
       fund_dest;
       fund_del;
       reveal_accounts;
-      fund_tx;
       fund_sc;
       fund_zk;
       flags;
@@ -272,7 +251,6 @@ let pp_ctxt_req pp
      fund_dest: %a tz@,\
      fund_del: %a tz@,\
      reveal_accounts: %b tz@,\
-     fund_tx: %a tz@,\
      fund_sc: %a tz@,\
      fund_zk: %a tz@,\
      dal_flag: %a@,\
@@ -289,8 +267,6 @@ let pp_ctxt_req pp
     (pp_opt Tez.pp)
     fund_del
     reveal_accounts
-    (pp_opt Tez.pp)
-    fund_tx
     (pp_opt Tez.pp)
     fund_sc
     (pp_opt Tez.pp)
@@ -350,17 +326,6 @@ let delegation block source delegate =
   let* del = Assert.get_some ~loc:__LOC__ del_opt_new in
   let* () = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
   return block
-
-let originate_tx_rollup block rollup_account =
-  let open Lwt_result_syntax in
-  let rollup_contract = contract_of rollup_account in
-  let* rollup_origination, tx_rollup =
-    Op.tx_rollup_origination ~force_reveal:true (B block) rollup_contract
-  in
-  let+ block =
-    Block.bake ~allow_manager_failures:true ~operation:rollup_origination block
-  in
-  (block, tx_rollup)
 
 let originate_sc_rollup block rollup_account =
   let open Lwt_result_syntax in
@@ -500,7 +465,6 @@ let init_infos :
     fund_src;
     fund_dest;
     fund_del;
-    fund_tx;
     fund_sc;
     fund_zk;
     flags;
@@ -547,15 +511,6 @@ let init_infos :
   let* block, del, _ =
     create_and_fund block (get_bootstrap bootstraps 2) fund_del
   in
-  let* block, tx, tx_rollup =
-    if flags.toru then
-      create_and_fund
-        ~originate_rollup:originate_tx_rollup
-        block
-        (get_bootstrap bootstraps 3)
-        fund_tx
-    else return (block, None, None)
-  in
   let* block, sc, sc_rollup =
     if flags.scoru then
       create_and_fund
@@ -593,12 +548,11 @@ let init_infos :
       block;
       bootstraps;
       originated_contract = Some originated_contract;
-      tx_rollup;
       sc_rollup;
       zk_rollup;
     }
   in
-  {ctxt; accounts = {sources = [source]; dest; del; tx; sc; zk}; flags}
+  {ctxt; accounts = {sources = [source]; dest; del; sc; zk}; flags}
 
 (** The generic setting for a test is built up according to a context
    requirement. It provides a context and accounts where the accounts
@@ -791,24 +745,6 @@ let mk_reveal (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     pk
 
-let mk_tx_rollup_origination (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let+ op, _rollup =
-    Op.tx_rollup_origination
-      ?fee:oinfos.fee
-      ?gas_limit:oinfos.gas_limit
-      ?counter:oinfos.counter
-      ?storage_limit:oinfos.storage_limit
-      ?force_reveal:oinfos.force_reveal
-      (B infos.ctxt.block)
-      (contract_of (get_source infos))
-  in
-  op
-
-let tx_rollup_of = function
-  | Some tx_rollup -> return tx_rollup
-  | None -> failwith "Tx_rollup not created in this context"
-
 let sc_rollup_of = function
   | Some sc_rollup -> return sc_rollup
   | None -> failwith "Sc_rollup not created in this context"
@@ -816,125 +752,6 @@ let sc_rollup_of = function
 let zk_rollup_of = function
   | Some zk_rollup -> return zk_rollup
   | None -> failwith "Zk_rollup not created in this context"
-
-let mk_tx_rollup_submit_batch (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-
-  Op.tx_rollup_submit_batch
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?counter:oinfos.counter
-    ?storage_limit:oinfos.storage_limit
-    ?force_reveal:oinfos.force_reveal
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    tx_rollup
-    "batch"
-
-let mk_tx_rollup_commit (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-  let commitement : Tx_rollup_commitment.Full.t =
-    {
-      level = Tx_rollup_level.root;
-      messages = [];
-      predecessor = None;
-      inbox_merkle_root = Tx_rollup_inbox.Merkle.merklize_list [];
-    }
-  in
-  Op.tx_rollup_commit
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?counter:oinfos.counter
-    ?storage_limit:oinfos.storage_limit
-    ?force_reveal:oinfos.force_reveal
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    tx_rollup
-    commitement
-
-let mk_tx_rollup_return_bond (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-  Op.tx_rollup_return_bond
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?counter:oinfos.counter
-    ?storage_limit:oinfos.storage_limit
-    ?force_reveal:oinfos.force_reveal
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    tx_rollup
-
-let mk_tx_rollup_finalize (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-  Op.tx_rollup_finalize
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?counter:oinfos.counter
-    ?storage_limit:oinfos.storage_limit
-    ?force_reveal:oinfos.force_reveal
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    tx_rollup
-
-let mk_tx_rollup_remove_commitment (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-  Op.tx_rollup_remove_commitment
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?counter:oinfos.counter
-    ?storage_limit:oinfos.storage_limit
-    ?force_reveal:oinfos.force_reveal
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    tx_rollup
-
-let mk_tx_rollup_reject (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-  let message, _ = Tx_rollup_message.make_batch "" in
-  let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
-  let message_path =
-    match Tx_rollup_inbox.Merkle.compute_path [message_hash] 0 with
-    | Ok message_path -> message_path
-    | _ -> raise (Invalid_argument "Single_message_inbox.message_path")
-  in
-  let proof : Tx_rollup_l2_proof.t =
-    {
-      version = 1;
-      before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-      after = `Value Tezos_crypto.Context_hash.zero;
-      state = Seq.empty;
-    }
-  in
-  let previous_message_result : Tx_rollup_message_result.t =
-    {
-      context_hash = Tx_rollup_message_result.empty_l2_context_hash;
-      withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
-    }
-  in
-  Op.tx_rollup_reject
-    ?fee:oinfos.fee
-    ?gas_limit:oinfos.gas_limit
-    ?counter:oinfos.counter
-    ?storage_limit:oinfos.storage_limit
-    ?force_reveal:oinfos.force_reveal
-    (B infos.ctxt.block)
-    (contract_of (get_source infos))
-    tx_rollup
-    Tx_rollup_level.root
-    message
-    ~message_position:0
-    ~message_path
-    ~message_result_hash:Tx_rollup_message_result_hash.zero
-    ~message_result_path:Tx_rollup_commitment.Merkle.dummy_path
-    ~proof
-    ~previous_message_result
-    ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
 
 let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
   Op.transfer_ticket
@@ -949,7 +766,7 @@ let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
     ~ty:(Script.lazy_expr (Expr.from_string "nat"))
     ~ticketer:
       (contract_of
-         (match infos.accounts.tx with
+         (match infos.accounts.sc with
          | None -> get_source infos
          | Some tx -> tx))
     ~amount:Ticket_amount.one
@@ -959,41 +776,6 @@ let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
          | None -> get_source infos
          | Some dest -> dest))
     ~entrypoint:Entrypoint.default
-
-let mk_tx_rollup_dispacth_ticket (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
-  let reveal =
-    Tx_rollup_reveal.
-      {
-        contents = Script.lazy_expr (Expr.from_string "1");
-        ty = Script.lazy_expr (Expr.from_string "nat");
-        ticketer =
-          contract_of
-            (match infos.accounts.dest with
-            | None -> get_source infos
-            | Some dest -> dest);
-        amount = Tx_rollup_l2_qty.of_int64_exn 10L;
-        claimer =
-          (match infos.accounts.dest with
-          | None -> (get_source infos).pkh
-          | Some dest -> dest.pkh);
-      }
-  in
-  Op.tx_rollup_dispatch_tickets
-    ?fee:oinfos.fee
-    ?force_reveal:oinfos.force_reveal
-    ?counter:oinfos.counter
-    ?gas_limit:oinfos.gas_limit
-    ?storage_limit:oinfos.storage_limit
-    (B infos.ctxt.block)
-    ~source:(contract_of (get_source infos))
-    ~message_index:0
-    ~message_result_path:Tx_rollup_commitment.Merkle.dummy_path
-    tx_rollup
-    Tx_rollup_level.root
-    Tezos_crypto.Context_hash.zero
-    [reveal]
 
 let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -1234,15 +1016,7 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Update_consensus_key -> mk_update_consensus_key
     | K_Increase_paid_storage -> mk_increase_paid_storage
     | K_Reveal -> mk_reveal
-    | K_Tx_rollup_origination -> mk_tx_rollup_origination
-    | K_Tx_rollup_submit_batch -> mk_tx_rollup_submit_batch
-    | K_Tx_rollup_commit -> mk_tx_rollup_commit
-    | K_Tx_rollup_return_bond -> mk_tx_rollup_return_bond
-    | K_Tx_rollup_finalize -> mk_tx_rollup_finalize
-    | K_Tx_rollup_remove_commitment -> mk_tx_rollup_remove_commitment
-    | K_Tx_rollup_reject -> mk_tx_rollup_reject
     | K_Transfer_ticket -> mk_transfer_ticket
-    | K_Tx_rollup_dispatch_tickets -> mk_tx_rollup_dispacth_ticket
     | K_Sc_rollup_origination -> mk_sc_rollup_origination
     | K_Sc_rollup_publish -> mk_sc_rollup_publish
     | K_Sc_rollup_cement -> mk_sc_rollup_cement
@@ -1601,15 +1375,7 @@ let subjects =
     K_Update_consensus_key;
     K_Increase_paid_storage;
     K_Reveal;
-    K_Tx_rollup_origination;
-    K_Tx_rollup_submit_batch;
-    K_Tx_rollup_commit;
-    K_Tx_rollup_return_bond;
-    K_Tx_rollup_finalize;
-    K_Tx_rollup_remove_commitment;
-    K_Tx_rollup_dispatch_tickets;
     K_Transfer_ticket;
-    K_Tx_rollup_reject;
     K_Sc_rollup_origination;
     K_Sc_rollup_publish;
     K_Sc_rollup_cement;
@@ -1627,16 +1393,14 @@ let subjects =
 let is_consumer = function
   | K_Set_deposits_limit | K_Update_consensus_key | K_Increase_paid_storage
   | K_Reveal | K_Self_delegation | K_Delegation | K_Undelegation
-  | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_finalize
-  | K_Tx_rollup_commit | K_Tx_rollup_return_bond | K_Tx_rollup_remove_commitment
-  | K_Tx_rollup_reject | K_Sc_rollup_add_messages | K_Sc_rollup_origination
-  | K_Sc_rollup_refute | K_Sc_rollup_timeout | K_Sc_rollup_cement
-  | K_Sc_rollup_publish | K_Sc_rollup_execute_outbox_message
-  | K_Sc_rollup_recover_bond | K_Dal_publish_slot_header
-  | K_Zk_rollup_origination | K_Zk_rollup_publish | K_Zk_rollup_update ->
+  | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
+  | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
+  | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
+  | K_Dal_publish_slot_header | K_Zk_rollup_origination | K_Zk_rollup_publish
+  | K_Zk_rollup_update ->
       false
   | K_Transaction | K_Origination | K_Register_global_constant
-  | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
+  | K_Transfer_ticket ->
       true
 
 let gas_consumer_in_validate_subjects, not_gas_consumer_in_validate_subjects =
@@ -1651,11 +1415,6 @@ let is_disabled flags = function
   | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal
   | K_Transfer_ticket ->
       false
-  | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_commit
-  | K_Tx_rollup_return_bond | K_Tx_rollup_finalize
-  | K_Tx_rollup_remove_commitment | K_Tx_rollup_dispatch_tickets
-  | K_Tx_rollup_reject ->
-      flags.toru = false
   | K_Sc_rollup_origination | K_Sc_rollup_publish | K_Sc_rollup_cement
   | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->

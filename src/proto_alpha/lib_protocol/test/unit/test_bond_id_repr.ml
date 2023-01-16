@@ -70,33 +70,6 @@ let test_destruct_sc_bond_id_repr () =
     ~pp:Bond_id_repr.pp
     (destruct invalid_sc_rollup_address)
 
-let test_destruct_tx_bond_id_repr () =
-  let tx_rollup_address1 = "txr1UTQm2gtoVJNvJRGfwora8GmM7D5dnEcdb" in
-  let tx_rollup_address2 = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi" in
-  let invalid_tx_rollup_address = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96Ui" in
-  let destruct = Bond_id_repr.Internal_for_test.destruct in
-  let tx_bond id =
-    match Tx_rollup_repr.of_b58check_opt id with
-    | Some id -> Ok (Bond_id_repr.Tx_rollup_bond_id id)
-    | None -> Error "Not a tx address"
-  in
-  let* () =
-    assert_bond_id_result_equal
-      ~loc:__LOC__
-      (destruct tx_rollup_address1)
-      (tx_bond tx_rollup_address1)
-  in
-  let* () =
-    assert_bond_id_result_equal
-      ~loc:__LOC__
-      (destruct tx_rollup_address2)
-      (tx_bond tx_rollup_address2)
-  in
-  Assert.is_error
-    ~loc:__LOC__
-    ~pp:Bond_id_repr.pp
-    (destruct invalid_tx_rollup_address)
-
 let test_destruct_invalid_bond_id_repr () =
   let invalid_address = "asdfasdfasdf" in
   let empty_address = "" in
@@ -120,12 +93,8 @@ let test_roundtrip () =
     let s2 = Bond_id_repr.Internal_for_test.construct r in
     Assert.equal_string ~loc s s2
   in
-  let tx_rollup_address1 = "txr1UTQm2gtoVJNvJRGfwora8GmM7D5dnEcdb" in
-  let tx_rollup_address2 = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi" in
   let sc_rollup_address1 = "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG" in
   let sc_rollup_address2 = "sr1JtMTWShgi1jLrqeHohMwLYiGizpsyWzXJ" in
-  let* () = rountrip_test __LOC__ tx_rollup_address1 in
-  let* () = rountrip_test __LOC__ tx_rollup_address2 in
   let* () = rountrip_test __LOC__ sc_rollup_address1 in
   rountrip_test __LOC__ sc_rollup_address2
 
@@ -135,10 +104,6 @@ let tests =
       "Deserializing sc bond ids succeeds only when id is valid"
       `Quick
       test_destruct_sc_bond_id_repr;
-    Tztest.tztest
-      "Deserializing tx bond ids succeeds only when id is valid"
-      `Quick
-      test_destruct_tx_bond_id_repr;
     Tztest.tztest
       "Deserializing invalid bond ids fails"
       `Quick

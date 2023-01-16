@@ -229,28 +229,6 @@ module Delegate : sig
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
 end
 
-module Tx_rollup : sig
-  val state : t -> Tx_rollup.t -> Tx_rollup_state.t tzresult Lwt.t
-
-  (** [inbox ctxt tx_rollup level] returns the inbox of this
-      transaction rollup at [level]. If the inbox does not exist, the
-      function returns an error. *)
-  val inbox :
-    t ->
-    Tx_rollup.t ->
-    Tx_rollup_level.t ->
-    Tx_rollup_inbox.t option tzresult Lwt.t
-
-  (** [commitment ctxt tx_rollup] returns the commitment of this
-      transaction rollup at [level]. If the commitment does not exist,
-      the function returns an error. *)
-  val commitment :
-    t ->
-    Tx_rollup.t ->
-    Tx_rollup_level.t ->
-    Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
-end
-
 module Sc_rollup : sig
   val inbox : t -> Sc_rollup.Inbox.t tzresult Lwt.t
 
@@ -308,9 +286,6 @@ type 'accounts init :=
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
-  ?tx_rollup_enable:bool ->
-  ?tx_rollup_sunset_level:int32 ->
-  ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
   ?sc_rollup_arith_pvm_enable:bool ->
   ?dal_enable:bool ->
