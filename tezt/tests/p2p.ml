@@ -429,11 +429,64 @@ module Known_Points_GC = struct
     test_non_trusted_removal ()
 end
 
+module Connect_handler = struct
+  let connected_peers_with_different_chain_name_test () =
+    Test.register
+      ~__FILE__
+      ~title:"peers with different chain name"
+      ~tags:["p2p"; "connect_handler"]
+    @@ fun () ->
+    let create_node ?chain_name ?peer_port port =
+      let peer_arg =
+        Option.map
+          (fun p -> Node.Peer ("localhost:" ^ string_of_int p))
+          peer_port
+        |> Option.to_list
+      in
+      let node = Node.create ~net_port:port (Connections 1 :: peer_arg) in
+      let* () = Node.identity_generate node in
+      let* () = Node.config_init node [] in
+      let json_string s = "\"" ^ s ^ "\"" in
+      Option.iter
+        (fun name ->
+          Node.Config_file.update
+            node
+            (JSON.put
+               ("network", JSON.parse ~origin:__LOC__ @@ json_string name)))
+        chain_name ;
+      Lwt.return node
+    in
+    let run_node node = Node.run ~event_level:`Debug node [] in
+    let wait_for_nack node =
+      let open JSON in
+      Node.wait_for node "authenticate_status.v0" (fun json ->
+          let typ = json |-> "type" |> as_string in
+          if typ = "nack" then Some () else None)
+    in
+
+    let port1, port2 = (Port.fresh (), Port.fresh ()) in
+    let* node1 = create_node port1 in
+    let* node2 = create_node ~chain_name:"ghostnet" ~peer_port:port1 port2 in
+
+    let ready1_event = Node.wait_for_ready node1 in
+    let ready2_event = Node.wait_for_ready node2 in
+    let nack_event = wait_for_nack node2 in
+
+    let* () = run_node node1 in
+    let* () = ready1_event in
+    let* () = run_node node2 in
+    let* () = ready2_event in
+    nack_event
+
+  let tests () = connected_peers_with_different_chain_name_test ()
+end
+
 let register_protocol_independent () =
   Maintenance.tests () ;
   ACL.tests () ;
   test_advertised_port () ;
-  Known_Points_GC.tests ()
+  Known_Points_GC.tests () ;
+  Connect_handler.tests ()
 
 let register ~(protocols : Protocol.t list) =
   check_peer_option protocols ;
