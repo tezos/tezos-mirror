@@ -203,40 +203,6 @@ let blockchain_network_limanet =
         "limanet.stakenow.de:9733";
       ]
 
-let blockchain_network_kathmandunet =
-  make_blockchain_network
-    ~alias:"kathmandunet"
-    {
-      time = Time.Protocol.of_notation_exn "2022-07-28T15:00:00Z";
-      block =
-        Tezos_crypto.Block_hash.of_b58check_exn
-          "BLPZJvbTNPG2kgX97n2eCzPAFicqbxZNWSf6BkWsud5uihNua3a";
-      protocol =
-        Tezos_crypto.Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_KATHMANDUNET_2022-07-28T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(8192l, "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg")]
-    ~default_bootstrap_peers:
-      [
-        "kathmandunet.teztnets.xyz";
-        "kathmandunet.boot.ecadinfra.com";
-        "kathmandunet.stakenow.de:9733";
-      ]
-
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -336,7 +302,6 @@ let builtin_blockchain_networks_with_tags =
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (19, blockchain_network_ghostnet);
-    (20, blockchain_network_kathmandunet);
     (21, blockchain_network_limanet);
   ]
   |> List.map (fun (tag, network) ->
