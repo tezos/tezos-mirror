@@ -92,6 +92,26 @@ end
 module type S = sig
   include Generic with type state := pvm_state
 
+  (** [compute_step_many_until max_steps reveal_builtins write_debug should_continue pvm_state]
+      advances forwards the VM in the same manners as [compute_step_many]
+      as long as [should_continue] returns true.
+
+     Returns the new state and number of the executed ticks.
+
+      IS applied on [pvm_state] rather than a tree.
+
+      /!\ as it allows to redefine the stop condition, this function should
+      not be used in unit test: the test could hide regression if the
+      condition change in the code, but not in the test.
+  *)
+  val compute_step_many_until :
+    ?max_steps:int64 ->
+    ?reveal_builtins:Builtins.reveals ->
+    ?write_debug:Builtins.write_debug ->
+    (pvm_state -> bool Lwt.t) ->
+    pvm_state ->
+    (pvm_state * int64) Lwt.t
+
   (** [get_output output buffer] returns the payload associated with the given
       output. The result is meant to be deserialized using
       [Sc_rollup_PVM_sem.output_encoding]. Raises an exception if the output is

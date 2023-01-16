@@ -51,6 +51,14 @@ module type Internal_for_tests = sig
   val get_output_buffer :
     tree -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
 
+  val compute_step_many_until :
+    ?max_steps:int64 ->
+    ?reveal_builtins:Builtins.reveals ->
+    ?write_debug:Builtins.write_debug ->
+    (pvm_state -> bool Lwt.t) ->
+    tree ->
+    (tree * int64) Lwt.t
+
   include Wasm_vm_sig.Internal_for_tests with type state := tree
 end
 
