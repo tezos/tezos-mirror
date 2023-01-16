@@ -199,6 +199,9 @@ module Curl : sig
   *)
   val get : ?args:string list -> string -> JSON.t Runnable.process
 
+  (** Same as [get] but does not parse the returned value *)
+  val get_raw : ?args:string list -> string -> string Runnable.process
+
   (** [post url data] returns a runnable posting [data] to [url] with curl.
 
       The response is parsed and returned as JSON.

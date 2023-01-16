@@ -221,6 +221,10 @@ module Curl = struct
     let process = Process.spawn "curl" (args @ ["-s"; url]) in
     Runnable.{value = process; run = parse url}
 
+  let get_raw ?(args = []) url =
+    let process = Process.spawn "curl" (args @ ["-s"; url]) in
+    Runnable.{value = process; run = Process.check_and_read_stdout}
+
   let post ?(args = []) url data =
     let process =
       Process.spawn
