@@ -148,11 +148,6 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let*! ctxt = PVM.State.set ctxt state in
     let*! initial_tick = PVM.get_tick predecessor_state in
     let*! last_tick = PVM.get_tick state in
-    (* TODO: #2717
-       The number of ticks should not be an arbitrarily-sized integer or
-       the difference between two ticks should be made an arbitrarily-sized
-       integer too.
-    *)
     let num_ticks =
       Sc_rollup.Tick.distance initial_tick last_tick |> Z.to_int64
     in
