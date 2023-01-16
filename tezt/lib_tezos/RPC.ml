@@ -211,6 +211,13 @@ let get_network_points =
 
 let get_network_point point_id = make GET ["network"; "points"; point_id] Fun.id
 
+let patch_network_point point_id data =
+  make
+    PATCH
+    ["network"; "points"; point_id]
+    ~data:(Data (JSON.unannotate data))
+    ignore
+
 let get_network_point_ban point_id =
   make GET ["network"; "points"; point_id; "ban"] Fun.id
 
