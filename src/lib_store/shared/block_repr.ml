@@ -221,6 +221,51 @@ let legacy_encoding =
              (req "legacy_contents" contents_encoding)
              (varopt "legacy_metadata" legacy_metadata_encoding)))
 
+let with_contents
+    {header; operations; block_metadata_hash; operations_metadata_hashes} f =
+  f header operations block_metadata_hash operations_metadata_hashes
+  [@@ocaml.inline]
+
+let with_metadata
+    {
+      message;
+      max_operations_ttl;
+      last_allowed_fork_level;
+      block_metadata;
+      operations_metadata;
+    } f =
+  f
+    message
+    max_operations_ttl
+    last_allowed_fork_level
+    block_metadata
+    operations_metadata
+  [@@ocaml.inline]
+
+let contents_equal c1 c2 =
+  with_contents c1 @@ fun h1 o1 b1 omh1 ->
+  with_contents c2 @@ fun h2 o2 b2 omh2 ->
+  Block_header.equal h1 h2
+  && List.equal (List.equal Operation.equal) o1 o2
+  && Option.equal Block_metadata_hash.equal b1 b2
+  && Option.equal
+       (List.equal (List.equal Operation_metadata_hash.equal))
+       omh1
+       omh2
+
+let metadata_equal m1 m2 =
+  with_metadata m1 @@ fun m1 mot1 lafl1 bm1 om1 ->
+  with_metadata m2 @@ fun m2 mot2 lafl2 bm2 om2 ->
+  Option.equal String.equal m1 m2
+  && Int.equal mot1 mot2 && Int32.equal lafl1 lafl2 && Bytes.equal bm1 bm2
+  && List.equal (List.equal Block_validation.operation_metadata_equal) om1 om2
+
+let equal b1 b2 =
+  let {hash = h1; contents = c1; metadata = m1} = b1 in
+  let {hash = h2; contents = c2; metadata = m2} = b2 in
+  Block_hash.equal h1 h2 && contents_equal c1 c2
+  && Option.equal metadata_equal m1 m2
+
 let pp_json fmt b =
   let json = Data_encoding.Json.construct encoding b in
   Data_encoding.Json.pp fmt json

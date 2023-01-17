@@ -85,6 +85,12 @@ let validation_store_encoding =
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
+let operation_metadata_equal m1 m2 =
+  match (m1, m2) with
+  | Metadata b1, Metadata b2 -> Bytes.equal b1 b2
+  | Too_large_metadata, Too_large_metadata -> true
+  | Metadata _, Too_large_metadata | Too_large_metadata, Metadata _ -> false
+
 let operation_metadata_encoding =
   let open Data_encoding in
   def

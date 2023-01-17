@@ -33,24 +33,29 @@ open Error_monad
 (** A data structure that represents files via their paths and encodings. *)
 type 'a file = private {
   encoding : 'a Data_encoding.t;
+  eq : 'a -> 'a -> bool;
   path : string;
   json : bool;
 }
 
-(** The type for the (persistent) data of a file. *)
+type 'a eq := 'a -> 'a -> bool
 
-(** Note: This store uses the polymorphic equality on values. *)
+(** The type for the (persistent) data of a file. *)
 type 'a t
 
 (** [make_file ?(json=false) ~filepath encoding] represents a file
     located at [filepath]. The content of this value is encoded using
     [encoding]. By default, the content is encoded in binary content
     except if [json=true].
+    [eq] is used internally to test whether the
+    contents of the file should be updated when calling {!write}
+    or {!update_with}.
 
     {b Warning} It is the caller responsability to ensure that the
     base directory of the [filepath] exists; otherwise, reading and
     writing will fail. *)
-val make_file : ?json:bool -> filepath:string -> 'a Data_encoding.t -> 'a file
+val make_file :
+  ?json:bool -> filepath:string -> 'a Data_encoding.t -> 'a eq -> 'a file
 
 (** [get data] accesses the data (cached). *)
 val get : 'a t -> 'a Lwt.t
@@ -80,7 +85,7 @@ val update_with : 'a t -> ('a -> 'a Lwt.t) -> unit tzresult Lwt.t
     [encoded_file]. *)
 val load : 'a file -> 'a t tzresult Lwt.t
 
-(** [init encoded_file ~initial_data] creates or load an on-disk
+(** [init encoded_file eq ~initial_data] creates or load an on-disk
     data. If the file already exists, then the data is read from the
     file. Otherwise, [initial_data] is used. *)
 val init : 'a file -> initial_data:'a -> 'a t tzresult Lwt.t

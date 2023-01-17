@@ -108,6 +108,9 @@ val contents_encoding : contents Data_encoding.t
 (** Encoding for {!metadata}. *)
 val metadata_encoding : metadata Data_encoding.t
 
+(** Equality on {!block} *)
+val equal : t -> t -> bool
+
 (** Encoding for {!t} (and {!block}).
 
     {b Important} An encoded block is prefixed by 4 bytes which stands

@@ -180,13 +180,17 @@ let check_consistency chain_dir genesis =
   let* protocol_levels_data =
     Stored_data.load (Naming.protocol_levels_file chain_dir)
   in
+
   let* _invalid_blocks_data =
     Stored_data.load (Naming.invalid_blocks_file chain_dir)
   in
+
   let* _forked_chains_data =
     Stored_data.load (Naming.forked_chains_file chain_dir)
   in
+
   let* _target_data = Stored_data.load (Naming.target_file chain_dir) in
+
   (* Open the store and try to read the blocks *)
   (* [~readonly:false] to recover from a potential interrupted merge *)
   let* block_store = Block_store.load chain_dir ~genesis_block ~readonly:true in
