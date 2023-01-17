@@ -68,6 +68,13 @@ val compose_parameters :
 (** Map a pure function over the result of a parameter parser. *)
 val map_parameter : f:('a -> 'b) -> ('a, 'ctx) parameter -> ('b, 'ctx) parameter
 
+(** Same as {!map_parameter} but with a function taking the ctxt and returning
+    in the lwt result monad. *)
+val map_es_parameter :
+  f:('ctx -> 'a -> 'b tzresult Lwt.t) ->
+  ('a, 'ctx) parameter ->
+  ('b, 'ctx) parameter
+
 (** {2 Flags and Options } *)
 
 (** The type for optional arguments (and switches).

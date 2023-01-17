@@ -66,6 +66,16 @@ let map_parameter ~f {converter; autocomplete} =
     autocomplete;
   }
 
+let map_es_parameter ~f {converter; autocomplete} =
+  let open Lwt_result_syntax in
+  {
+    converter =
+      (fun ctx s ->
+        let* v = converter ctx s in
+        f ctx v);
+    autocomplete;
+  }
+
 type label = {long : string; short : char option}
 
 type ('a, 'ctx) arg =

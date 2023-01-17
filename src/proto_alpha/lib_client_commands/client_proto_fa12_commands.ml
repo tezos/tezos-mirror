@@ -601,8 +601,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              ~name:"src"
              ~desc:"name or address of the source of the transfers"
         @@ prefix "using"
-        @@ param
-             ~name:"transfers.json"
+        @@ json_encoded_param
+             ~name:"transfers"
              ~desc:
                (Format.sprintf
                   "List of token transfers to inject from the source contract \
@@ -615,7 +615,29 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                    \"storage-limit\". The complete schema can be inspected via \
                    `tezos-codec describe %s.fa1.2.token_transfer json schema`."
                   Protocol.name)
-             json_parameter
+             ~pp_error:(fun json fmt exn ->
+               match (json, exn) with
+               | `A lj, Data_encoding.Json.Cannot_destruct ([`Index n], exn) ->
+                   Format.fprintf
+                     fmt
+                     "Invalid transfer at index %i: %a %a"
+                     n
+                     (fun ppf -> Data_encoding.Json.print_error ppf)
+                     exn
+                     (Format.pp_print_option Data_encoding.Json.pp)
+                     (List.nth_opt lj n)
+               | _, (Data_encoding.Json.Cannot_destruct _ as exn) ->
+                   Format.fprintf
+                     fmt
+                     "Invalid transfer file: %a %a"
+                     (fun ppf -> Data_encoding.Json.print_error ppf)
+                     exn
+                     Data_encoding.Json.pp
+                     json
+               | _, exn -> raise exn
+               (* this case can't happen because only `Cannot_destruct` error are
+                  given to this pp *))
+             (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
         @@ stop)
         (fun ( fee,
                as_address,
@@ -627,15 +649,11 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                no_print_source,
                fee_parameter )
              src
-             operations_json
+             operations
              cctxt ->
           let open Lwt_result_syntax in
           let caller = Option.value ~default:src as_address in
-          match
-            Data_encoding.Json.destruct
-              (Data_encoding.list Client_proto_fa12.token_transfer_encoding)
-              operations_json
-          with
+          match operations with
           | [] -> cctxt#error "Empty operation list"
           | operations ->
               let* source, src_pk, src_sk =
@@ -668,33 +686,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                   cctxt
                   errors
               in
-              return_unit
-          | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
-            -> (
-              match (path, operations_json) with
-              | [`Index n], `A lj -> (
-                  match List.nth_opt lj n with
-                  | Some j ->
-                      failwith
-                        "Invalid transfer at index %i: %a %a"
-                        n
-                        (fun ppf -> Data_encoding.Json.print_error ppf)
-                        exn2
-                        Data_encoding.Json.pp
-                        j
-                  | _ ->
-                      failwith
-                        "Invalid transfer at index %i: %a"
-                        n
-                        (fun ppf -> Data_encoding.Json.print_error ppf)
-                        exn2)
-              | _ ->
-                  failwith
-                    "Invalid transfer file: %a %a"
-                    (fun ppf -> Data_encoding.Json.print_error ppf)
-                    exn
-                    Data_encoding.Json.pp
-                    operations_json));
+              return_unit);
     ]
 
 let commands () = commands_ro () @ commands_rw ()

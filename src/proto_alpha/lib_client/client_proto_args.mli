@@ -138,16 +138,56 @@ val bytes_of_prefixed_string : full -> string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Tezos_clic.parameter
 
+type 'a file_or_text = File of {path : string; content : 'a} | Text of 'a
+
+val content_of_file_or_text : 'a file_or_text -> 'a
+
 val file_or_text :
   from_text:(string -> 'a tzresult Lwt.t) ->
   read_file:(string -> string tzresult Lwt.t) ->
   string ->
-  'a tzresult Lwt.t
+  'a file_or_text tzresult Lwt.t
+
+val file_or_text_with_origin_parameter :
+  from_text:(full -> string -> 'a tzresult Lwt.t) ->
+  unit ->
+  ('a file_or_text, full) Tezos_clic.parameter
 
 val file_or_text_parameter :
   from_text:(full -> string -> 'a tzresult Lwt.t) ->
   unit ->
   ('a, full) Tezos_clic.parameter
+
+val json_with_origin_parameter :
+  (Data_encoding.Json.t file_or_text, full) Tezos_clic.parameter
+
+val safe_decode_json :
+  full ->
+  name:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'a Data_encoding.t ->
+  Data_encoding.json ->
+  'a tzresult Lwt.t
+
+val json_encoded_with_origin_parameter :
+  name:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'a Data_encoding.t ->
+  ('a file_or_text, full) Tezos_clic.parameter
+
+val json_encoded_parameter :
+  name:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'a Data_encoding.t ->
+  ('a, full) Tezos_clic.parameter
+
+val json_encoded_param :
+  name:string ->
+  desc:string ->
+  ?pp_error:(Data_encoding.json -> Format.formatter -> exn -> unit) ->
+  'b Data_encoding.t ->
+  ('a, full) Tezos_clic.params ->
+  ('b -> 'a, full) Tezos_clic.params
 
 val json_parameter : (Data_encoding.Json.t, full) Tezos_clic.parameter
 

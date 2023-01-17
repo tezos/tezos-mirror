@@ -37,19 +37,6 @@ open Client_proto_programs
 open Client_proto_args
 open Client_proto_contracts
 
-let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
-  match Data_encoding.Json.destruct encoding json with
-  | exception Data_encoding.Json.Cannot_destruct (_, exc) ->
-      cctxt#error
-        "could not decode json (%a)"
-        (Data_encoding.Json.print_error ~print_unknown:(fun fmt exc ->
-             Format.fprintf fmt "%s" (Printexc.to_string exc)))
-        exc
-  | exception ((Stack_overflow | Out_of_memory) as exc) -> raise exc
-  | exception exc ->
-      cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
-  | expr -> Lwt_result_syntax.return expr
-
 let commands () =
   let open Tezos_clic in
   let show_types_switch =
@@ -176,16 +163,21 @@ let commands () =
                  "invalid output format, expecting one of \"michelson\", \
                   \"json\", \"binary\" or \"ocaml\"."))
   in
+  let file_or_literal_with_origin_param () =
+    param
+      ~name:"source"
+      ~desc:"literal or a path to a file"
+      (Client_proto_args.file_or_text_with_origin_parameter
+         ~from_text:(fun _cctxt s -> Lwt_result_syntax.return s)
+         ())
+  in
   let file_or_literal_param () =
     param
       ~name:"source"
       ~desc:"literal or a path to a file"
-      (parameter (fun cctxt s ->
-           let open Lwt_result_syntax in
-           let*! r = cctxt#read_file s in
-           match r with
-           | Ok v -> return (Some s, v)
-           | Error _ -> return (None, s)))
+      (Client_proto_args.file_or_text_parameter
+         ~from_text:(fun _cctx s -> Lwt_result_syntax.return s)
+         ())
   in
   let handle_parsing_error label (cctxt : Protocol_client_context.full)
       (emacs_mode, no_print_source) program body =
@@ -528,7 +520,9 @@ let commands () =
          enforce_indentation_flag
          display_names_flag
          (Tezos_clic_unix.Scriptable.clic_arg ()))
-      (prefixes ["hash"; "script"] @@ seq_of_param @@ file_or_literal_param ())
+      (prefixes ["hash"; "script"]
+      @@ seq_of_param
+      @@ file_or_literal_with_origin_param ())
       (fun (check, display_names, scriptable)
            expr_strings
            (cctxt : Protocol_client_context.full) ->
@@ -541,7 +535,10 @@ let commands () =
         else
           let* hash_name_rows =
             List.mapi_ep
-              (fun i (src, expr_string) ->
+              (fun i content_with_origin ->
+                let expr_string =
+                  Client_proto_args.content_of_file_or_text content_with_origin
+                in
                 let program =
                   Michelson_v1_parser.parse_toplevel ~check expr_string
                 in
@@ -559,9 +556,9 @@ let commands () =
                     (Script_expr_hash.hash_bytes [bytes])
                 in
                 let name =
-                  Option.value
-                    src
-                    ~default:("Literal script " ^ string_of_int (i + 1))
+                  match content_with_origin with
+                  | Client_proto_args.File {path; _} -> path
+                  | Text _ -> "Literal script " ^ string_of_int (i + 1)
                 in
                 return (hash, name))
               expr_strings
@@ -859,7 +856,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, legacy, check)
-           (_, expr_string)
+           expr_string
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
@@ -897,8 +894,11 @@ let commands () =
               match Data_encoding.Json.from_string expr_string with
               | Error err -> cctxt#error "%s" err
               | Ok json ->
-                  safe_decode_json cctxt Alpha_context.Script.expr_encoding json
-              )
+                  safe_decode_json
+                    ~name:"script"
+                    cctxt
+                    Alpha_context.Script.expr_encoding
+                    json)
           | `Binary -> (
               let* bytes = bytes_of_prefixed_string cctxt expr_string in
               match
@@ -942,7 +942,7 @@ let commands () =
       @@ file_or_literal_param () @@ prefix "from" @@ convert_input_format_param
       @@ prefix "to" @@ convert_output_format_param @@ stop)
       (fun (zero_loc, data_ty)
-           (_, data_string)
+           data_string
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
@@ -992,6 +992,7 @@ let commands () =
               | Ok json -> (
                   let* expr =
                     safe_decode_json
+                      ~name:"script"
                       cctxt
                       Alpha_context.Script.expr_encoding
                       json
