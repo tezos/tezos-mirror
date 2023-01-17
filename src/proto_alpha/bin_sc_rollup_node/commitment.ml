@@ -178,22 +178,46 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       | None -> node_ctxt.genesis_info.level
       | Some lpc -> lpc.inbox_level
     in
-    let rec gather acc (commitment : Sc_rollup.Commitment.Hash.t) =
-      let* commitment = Store.Commitments.find node_ctxt.store commitment in
+    let* head = State.last_processed_head_opt node_ctxt.store in
+    let next_head_level =
+      Option.map
+        (fun (b : Sc_rollup_block.t) -> Raw_level.succ b.header.level)
+        head
+    in
+    let sc_rollup_challenge_window_int32 =
+      sc_rollup_challenge_window node_ctxt |> Int32.of_int
+    in
+    let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
+      let* commitment =
+        Store.Commitments.find node_ctxt.store commitment_hash
+      in
       match commitment with
       | None -> return acc
       | Some commitment
-        when Raw_level.(
-               commitment.inbox_level <= node_ctxt.lcc.level
-               || commitment.inbox_level <= lpc_level) ->
-          (* If the commitment is before or at the LCC, we have reached the end.
-             If the commitment is before the last published one, we have also
-             reached the end because we only publish commitments that are
-             for the inbox of a finalized L1 block. *)
+        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+          (* Commitment is before or at the LCC, we have reached the end. *)
+          return acc
+      | Some commitment when Raw_level.(commitment.inbox_level <= lpc_level) ->
+          (* Commitment is before the last published one, we have also reached
+             the end because we only publish commitments that are for the inbox
+             of a finalized L1 block. *)
           return acc
       | Some commitment ->
+          let* published_info =
+            Store.Commitments_published_at_level.find
+              node_ctxt.store
+              commitment_hash
+          in
+          let past_curfew =
+            match (published_info, next_head_level) with
+            | None, _ | _, None -> false
+            | Some {first_published_at_level; _}, Some next_head_level ->
+                Raw_level.diff next_head_level first_published_at_level
+                > sc_rollup_challenge_window_int32
+          in
+          let acc = if past_curfew then acc else commitment :: acc in
           (* We keep the commitment and go back to the previous one. *)
-          gather (commitment :: acc) commitment.predecessor
+          gather acc commitment.predecessor
     in
     let* finalized_block = State.get_finalized_head_opt node_ctxt.store in
     match finalized_block with
