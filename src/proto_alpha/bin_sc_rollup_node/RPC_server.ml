@@ -34,9 +34,9 @@ let get_head store =
   | None -> failwith "No head"
   | Some {header = {block_hash; _}; _} -> return block_hash
 
-let get_finalized store =
+let get_finalized node_ctxt =
   let open Lwt_result_syntax in
-  let*! head = Node_context.get_finalized_head_opt store in
+  let*! head = Node_context.get_finalized_head_opt node_ctxt in
   match head with
   | None -> failwith "No finalized head"
   | Some {header = {block_hash; _}; _} -> return block_hash
@@ -51,22 +51,19 @@ let get_last_cemented (node_ctxt : _ Node_context.t) =
   in
   return lcc_hash
 
-let get_head_hash_opt store =
+let get_head_hash_opt node_ctxt =
   let open Lwt_option_syntax in
   let+ {header = {block_hash; _}; _} =
-    Node_context.last_processed_head_opt store
+    Node_context.last_processed_head_opt node_ctxt
   in
   block_hash
 
-let get_head_level_opt store =
+let get_head_level_opt node_ctxt =
   let open Lwt_option_syntax in
-  let+ {header = {level; _}; _} = Node_context.last_processed_head_opt store in
+  let+ {header = {level; _}; _} =
+    Node_context.last_processed_head_opt node_ctxt
+  in
   Alpha_context.Raw_level.to_int32 level
-
-let get_l2_block_exn store block =
-  let open Lwt_result_syntax in
-  let*! b = Store.L2_blocks.get store block in
-  return b
 
 module Slot_pages_map = struct
   open Protocol
@@ -74,12 +71,10 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_confirmed_slot_pages store block =
+let get_dal_confirmed_slot_pages node_ctxt block =
   let open Lwt_result_syntax in
   let*! slot_pages =
-    Store.Dal_slot_pages.list_secondary_keys_with_values
-      store
-      ~primary_key:block
+    Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash:block
   in
   (* Slot pages are sorted in lexicographic order of slot index and page
      number.*)
@@ -98,23 +93,24 @@ let get_dal_confirmed_slot_pages store block =
   in
   return @@ Slot_pages_map.bindings slot_pages_map
 
-let get_dal_slot_page store block slot_index slot_page =
+let get_dal_slot_page node_ctxt block slot_index slot_page =
   let open Lwt_result_syntax in
   let*! processed =
-    Store.Dal_processed_slots.find
-      store
-      ~primary_key:block
-      ~secondary_key:slot_index
+    Node_context.processed_slot
+      node_ctxt
+      ~confirmed_in_block_hash:block
+      slot_index
   in
   match processed with
   | None -> return ("Slot page has not been downloaded", None)
   | Some `Unconfirmed -> return ("Slot was not confirmed", None)
   | Some `Confirmed -> (
       let*! contents_opt =
-        Store.Dal_slot_pages.find
-          store
-          ~primary_key:block
-          ~secondary_key:(slot_index, slot_page)
+        Node_context.find_slot_page
+          node_ctxt
+          ~confirmed_in_block_hash:block
+          ~slot_index
+          ~page_index:slot_page
       in
       match contents_opt with
       | None -> assert false
@@ -192,10 +188,10 @@ module Block_directory = Make_directory (struct
     let open Lwt_result_syntax in
     let+ block =
       match block with
-      | `Head -> get_head node_ctxt.Node_context.store
+      | `Head -> get_head node_ctxt
       | `Hash b -> return b
       | `Level l -> Node_context.hash_of_level node_ctxt l
-      | `Finalized -> get_finalized node_ctxt.Node_context.store
+      | `Finalized -> get_finalized node_ctxt
       | `Cemented -> get_last_cemented node_ctxt
     in
     (Node_context.readonly node_ctxt, block)
@@ -210,10 +206,10 @@ module Outbox_directory = Make_directory (struct
     let open Lwt_result_syntax in
     let+ block =
       match block with
-      | `Head -> get_head node_ctxt.Node_context.store
+      | `Head -> get_head node_ctxt
       | `Hash b -> return b
       | `Level l -> Node_context.hash_of_level node_ctxt l
-      | `Finalized -> get_finalized node_ctxt.Node_context.store
+      | `Finalized -> get_finalized node_ctxt
       | `Cemented -> get_last_cemented node_ctxt
     in
     (Node_context.readonly node_ctxt, block, level)
@@ -231,9 +227,9 @@ module Common = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let* l2_block = get_l2_block_exn node_ctxt.store block in
-    let*! {messages; _} =
-      Store.Messages.get node_ctxt.store l2_block.header.inbox_witness
+    let* l2_block = Node_context.get_l2_block node_ctxt block in
+    let* {messages; _} =
+      Node_context.get_messages node_ctxt l2_block.header.inbox_witness
     in
     return @@ Z.of_int (List.length messages)
 
@@ -243,11 +239,11 @@ module Common = struct
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
-    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt.store >>= return
+    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt >>= return
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.current_tezos_level
-    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt.store >>= return
+    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt >>= return
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.hash
@@ -260,13 +256,14 @@ module Common = struct
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.inbox
-    @@ fun (node_ctxt, block) () () -> Inbox.inbox_of_hash node_ctxt block
+    @@ fun (node_ctxt, block) () () ->
+    Node_context.get_inbox_by_block_hash node_ctxt block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.ticks
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let+ l2_block = get_l2_block_exn node_ctxt.store block in
+    let+ l2_block = Node_context.get_l2_block node_ctxt block in
     Z.of_int64 l2_block.num_ticks
 end
 
@@ -375,12 +372,12 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let open Lwt_result_syntax in
     let*! res =
       let open Lwt_option_syntax in
-      let* head = Node_context.last_processed_head_opt node_ctxt.store in
+      let* head = Node_context.last_processed_head_opt node_ctxt in
       let commitment_hash =
         Sc_rollup_block.most_recent_commitment head.header
       in
       let* commitment =
-        Store.Commitments.find node_ctxt.store commitment_hash
+        Node_context.find_commitment node_ctxt commitment_hash
       in
       return (commitment, commitment_hash)
     in
@@ -400,7 +397,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
          available only when the commitment has been published and included
          in a block. *)
       let*! published_at_level_info =
-        Store.Commitments_published_at_level.find node_ctxt.store hash
+        Node_context.commitment_published_at_level node_ctxt hash
       in
       let first_published, published =
         match published_at_level_info with
@@ -425,7 +422,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
     let*! slots =
-      Store.Dal_slots_headers.list_values node_ctxt.store ~primary_key:block
+      Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
     in
     return slots
 
@@ -433,12 +430,12 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     Block_directory.register0
       Sc_rollup_services.Global.Block.dal_confirmed_slot_pages
     @@ fun (node_ctxt, block) () () ->
-    get_dal_confirmed_slot_pages node_ctxt.store block
+    get_dal_confirmed_slot_pages node_ctxt block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_page
     @@ fun (node_ctxt, block) {index; page} () ->
-    get_dal_slot_page node_ctxt.store block index page
+    get_dal_slot_page node_ctxt block index page
 
   let () =
     Outbox_directory.register0 Sc_rollup_services.Global.Block.Outbox.messages
@@ -501,7 +498,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
     let open Alpha_context in
     let open Lwt_syntax in
-    let+ finalized_head = Node_context.get_finalized_head_opt node_ctxt.store in
+    let+ finalized_head = Node_context.get_finalized_head_opt node_ctxt in
     let finalized =
       match finalized_head with
       | None -> false
@@ -543,13 +540,10 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                   | None ->
                       return (Sc_rollup_services.Included (info, inbox_info))
                   | Some commitment_level -> (
-                      let* block =
-                        Node_context.hash_of_level
+                      let*! block =
+                        Node_context.find_l2_block_by_level
                           node_ctxt
                           (Alpha_context.Raw_level.to_int32 commitment_level)
-                      in
-                      let*! block =
-                        Store.L2_blocks.find node_ctxt.store block
                       in
                       match block with
                       | None ->
@@ -564,8 +558,8 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                           in
                           (* Commitment computed *)
                           let*! published_at =
-                            Store.Commitments_published_at_level.find
-                              node_ctxt.store
+                            Node_context.commitment_published_at_level
+                              node_ctxt
                               commitment_hash
                           in
                           match published_at with
@@ -579,9 +573,9 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                                 published_at_level = Some published_at_level;
                               } ->
                               (* Commitment published *)
-                              let*! commitment =
-                                Store.Commitments.get
-                                  node_ctxt.store
+                              let* commitment =
+                                Node_context.get_commitment
+                                  node_ctxt
                                   commitment_hash
                               in
                               let commitment_info =

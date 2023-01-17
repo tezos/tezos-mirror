@@ -171,7 +171,7 @@ module Make (Interpreter : Interpreter.S) :
     let snapshot_head =
       Layer1.{hash = snapshot_hash; level = snapshot_level_int32}
     in
-    let* snapshot_inbox = Inbox.inbox_of_head node_ctxt snapshot_head in
+    let* snapshot_inbox = Node_context.inbox_of_head node_ctxt snapshot_head in
     let* snapshot_ctxt =
       Node_context.checkout_context node_ctxt snapshot_hash
     in
@@ -225,19 +225,25 @@ module Make (Interpreter : Interpreter.S) :
 
         let get_history inbox_hash =
           let open Lwt_option_syntax in
-          let+ inbox = Store.Inboxes.find node_ctxt.store inbox_hash in
+          let+ inbox = Node_context.find_inbox node_ctxt inbox_hash in
           Sc_rollup.Inbox.take_snapshot inbox
 
         let get_payloads_history witness =
-          let open Lwt_syntax in
-          let+ {predecessor; predecessor_timestamp; messages} =
-            Store.Messages.get node_ctxt.store witness
+          Lwt.map
+            (WithExceptions.Result.to_exn_f
+               ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
+          @@
+          let open Lwt_result_syntax in
+          let* {predecessor; predecessor_timestamp; messages} =
+            Node_context.get_messages node_ctxt witness
           in
-          Inbox.payloads_history_of_messages
-            ~predecessor
-            ~predecessor_timestamp
-            messages
-          |> WithExceptions.Result.get_ok ~loc:__LOC__
+          let*? hist =
+            Inbox.payloads_history_of_messages
+              ~predecessor
+              ~predecessor_timestamp
+              messages
+          in
+          return hist
       end
 
       module Dal_with_history = struct

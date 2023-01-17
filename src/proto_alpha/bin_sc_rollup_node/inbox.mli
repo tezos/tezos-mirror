@@ -50,16 +50,6 @@ val process_head :
   tzresult
   Lwt.t
 
-(** [inbox_of_hash node_ctxt block_hash] returns the rollup inbox at the end of
-    the given validation of [block_hash]. NOTE: It requires the L2 block for
-    [block_hash] to have been saved. *)
-val inbox_of_hash : _ Node_context.t -> Block_hash.t -> Inbox.t tzresult Lwt.t
-
-(** [inbox_of_head node_ctxt block_head] returns the rollup inbox at the end of
-    the given validation of [block_head]. NOTE: It requires the L2 block for
-    [block_hash] to have been saved. *)
-val inbox_of_head : _ Node_context.t -> Layer1.head -> Inbox.t tzresult Lwt.t
-
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
 
@@ -72,7 +62,6 @@ val add_messages :
   Inbox_message.t list ->
   (Inbox_merkelized_payload_hashes.History.t
   * Inbox_merkelized_payload_hashes.Hash.t
-  * Inbox.Hash.t
   * Inbox.t
   * Inbox_message.t list)
   tzresult

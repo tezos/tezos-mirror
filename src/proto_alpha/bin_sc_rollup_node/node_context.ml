@@ -28,6 +28,8 @@ open Alpha_context
 
 type lcc = {commitment : Sc_rollup.Commitment.Hash.t; level : Raw_level.t}
 
+type 'a store = 'a Store.t
+
 type 'a t = {
   cctxt : Protocol_client_context.full;
   dal_cctxt : Dal_node_client.cctxt;
@@ -42,7 +44,7 @@ type 'a t = {
   fee_parameters : Configuration.fee_parameters;
   protocol_constants : Constants.t;
   loser_mode : Loser_mode.t;
-  store : 'a Store.t;
+  store : 'a store;
   context : 'a Context.index;
   mutable lcc : lcc;
   mutable lpc : Sc_rollup.Commitment.t option;
@@ -121,7 +123,7 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
   let open Lwt_result_syntax in
   let*! store = Store.load mode Configuration.(default_storage_dir data_dir) in
   let*! context =
-    Context.load Read_write (Configuration.default_context_dir data_dir)
+    Context.load mode (Configuration.default_context_dir data_dir)
   in
   let* l1_ctxt, kind = Layer1.start configuration cctxt in
   let publisher = Configuration.Operator_purpose_map.find Publish operators in
@@ -152,6 +154,17 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
       store;
       context;
     }
+
+let close {cctxt; store; context; l1_ctxt; _} =
+  let open Lwt_syntax in
+  let message = cctxt#message in
+  let* () = message "Shutting down L1@." in
+  let* () = Layer1.shutdown l1_ctxt in
+  let* () = message "Closing context@." in
+  let* () = Context.close context in
+  let* () = message "Closing store@." in
+  let* () = Store.close store in
+  return_unit
 
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
@@ -189,6 +202,16 @@ type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
 (** Abstraction over store  *)
 
+let trace_lwt_with x =
+  Format.kasprintf
+    (fun s p -> trace (Exn (Failure s)) @@ protect @@ fun () -> p >>= return)
+    x
+
+let trace_lwt_result_with x =
+  Format.kasprintf
+    (fun s p -> trace (Exn (Failure s)) @@ protect @@ fun () -> p)
+    x
+
 let hash_of_level_opt {store; cctxt; _} level =
   let open Lwt_syntax in
   let* hash = Store.Levels_to_hashes.find store level in
@@ -220,41 +243,31 @@ let level_of_hash {l1_ctxt; store; _} hash =
       let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
       level
 
-let get_full_l2_block {store; _} block_hash =
-  let open Lwt_syntax in
-  let* block = Store.L2_blocks.get store block_hash in
-  let* inbox = Store.Inboxes.get store block.header.inbox_hash
-  and* {messages; _} = Store.Messages.get store block.header.inbox_witness
-  and* commitment =
-    Option.map_s (Store.Commitments.get store) block.header.commitment_hash
-  in
-  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
-
-let save_level store Layer1.{hash; level} =
+let save_level {store; _} Layer1.{hash; level} =
   Store.Levels_to_hashes.add store level hash
 
-let save_l2_block store (head : Sc_rollup_block.t) =
+let save_l2_head {store; _} (head : Sc_rollup_block.t) =
   let open Lwt_syntax in
   let* () = Store.L2_blocks.add store head.header.block_hash head in
   Store.L2_head.set store head
 
-let is_processed store head = Store.L2_blocks.mem store head
+let is_processed {store; _} head = Store.L2_blocks.mem store head
 
-let last_processed_head_opt store = Store.L2_head.find store
+let last_processed_head_opt {store; _} = Store.L2_head.find store
 
-let mark_finalized_head store head_hash =
+let mark_finalized_head {store; _} head_hash =
   let open Lwt_syntax in
   let* block = Store.L2_blocks.find store head_hash in
   match block with
   | None -> return_unit
   | Some block -> Store.Last_finalized_head.set store block
 
-let get_finalized_head_opt store = Store.Last_finalized_head.find store
+let get_finalized_head_opt {store; _} = Store.Last_finalized_head.find store
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4532
    Make this logarithmic, by storing pointers to muliple predecessor and
    by dichotomy. *)
-let block_before store tick =
+let block_before {store; _} tick =
   let open Lwt_result_syntax in
   let*! head = Store.L2_head.find store in
   match head with
@@ -270,3 +283,223 @@ let block_before store tick =
             else search block.header.predecessor
       in
       search head.header.block_hash
+
+let get_l2_block {store; _} block_hash =
+  trace_lwt_with "Could not retrieve L2 block for %a" Block_hash.pp block_hash
+  @@ Store.L2_blocks.get store block_hash
+
+let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
+
+let get_l2_block_by_level node_ctxt level =
+  let open Lwt_result_syntax in
+  trace_lwt_result_with "Could not retrieve L2 block at level %ld" level
+  @@ let* block_hash = hash_of_level node_ctxt level in
+     let*! block = Store.L2_blocks.get node_ctxt.store block_hash in
+     return block
+
+let find_l2_block_by_level node_ctxt level =
+  let open Lwt_option_syntax in
+  let* block_hash = hash_of_level_opt node_ctxt level in
+  Store.L2_blocks.find node_ctxt.store block_hash
+
+let get_full_l2_block {store; _} block_hash =
+  let open Lwt_syntax in
+  let* block = Store.L2_blocks.get store block_hash in
+  let* inbox = Store.Inboxes.get store block.header.inbox_hash
+  and* {messages; _} = Store.Messages.get store block.header.inbox_witness
+  and* commitment =
+    Option.map_s (Store.Commitments.get store) block.header.commitment_hash
+  in
+  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
+
+let get_commitment {store; _} commitment_hash =
+  trace_lwt_with
+    "Could not retrieve commitment %a"
+    Sc_rollup.Commitment.Hash.pp
+    commitment_hash
+  @@ Store.Commitments.get store commitment_hash
+
+let find_commitment {store; _} hash = Store.Commitments.find store hash
+
+let commitment_exists {store; _} hash = Store.Commitments.mem store hash
+
+let save_commitment {store; _} commitment =
+  let open Lwt_syntax in
+  let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+  let+ () = Store.Commitments.add store hash commitment in
+  hash
+
+let commitment_published_at_level {store; _} commitment =
+  Store.Commitments_published_at_level.find store commitment
+
+let set_commitment_published_at_level {store; _} =
+  Store.Commitments_published_at_level.add store
+
+type commitment_source = Anyone | Us
+
+let commitment_was_published {store; _} ~source commitment_hash =
+  let open Lwt_syntax in
+  match source with
+  | Anyone -> Store.Commitments_published_at_level.mem store commitment_hash
+  | Us -> (
+      let+ info =
+        Store.Commitments_published_at_level.find store commitment_hash
+      in
+      match info with
+      | Some {published_at_level = Some _; _} -> true
+      | _ -> false)
+
+let get_inbox {store; _} inbox_hash =
+  trace_lwt_with
+    "Could not retrieve inbox %a"
+    Sc_rollup.Inbox.Hash.pp
+    inbox_hash
+  @@ Store.Inboxes.get store inbox_hash
+
+let find_inbox {store; _} hash = Store.Inboxes.find store hash
+
+let save_inbox {store; _} inbox =
+  let open Lwt_syntax in
+  let hash = Sc_rollup.Inbox.hash inbox in
+  let+ () = Store.Inboxes.add store hash inbox in
+  hash
+
+let find_inbox_by_block_hash {store; _} block_hash =
+  let open Lwt_option_syntax in
+  let* l2_block = Store.L2_blocks.find store block_hash in
+  Store.Inboxes.find store l2_block.header.inbox_hash
+
+let genesis_inbox node_ctxt =
+  let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+  Plugin.RPC.Sc_rollup.inbox
+    node_ctxt.cctxt
+    (node_ctxt.cctxt#chain, `Level genesis_level)
+
+let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
+  let open Lwt_result_syntax in
+  let*! possible_inbox = find_inbox_by_block_hash node_ctxt block_hash in
+  (* Pre-condition: forall l. (l > genesis_level) => inbox[l] <> None. *)
+  match possible_inbox with
+  | None ->
+      (* The inbox exists for each tezos block the rollup should care about.
+         That is, every block after the origination level. We then join
+         the bandwagon and build the inbox on top of the protocol's inbox
+         at the end of the origination level. *)
+      let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+      if block_level = genesis_level then genesis_inbox node_ctxt
+      else if block_level > genesis_level then
+        (* Invariant broken, the inbox for this level should exist. *)
+        failwith
+          "The inbox for block hash %a (level = %ld) is missing."
+          Block_hash.pp
+          block_hash
+          block_level
+      else
+        (* The rollup node should not care about levels before the genesis
+           level. *)
+        failwith
+          "Asking for the inbox before the genesis level (i.e. %ld), out of \
+           the scope of the rollup's node"
+          block_level
+  | Some inbox -> return inbox
+
+let get_inbox_by_block_hash node_ctxt hash =
+  let open Lwt_result_syntax in
+  let* level = level_of_hash node_ctxt hash in
+  inbox_of_head node_ctxt {hash; level}
+
+let get_messages {store; _} messages_hash =
+  trace_lwt_with
+    "Could not retrieve messages with payloads merkelized hash %a"
+    Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+    messages_hash
+  @@ Store.Messages.get store messages_hash
+
+let find_messages {store; _} hash = Store.Messages.find store hash
+
+let save_messages {store; _} = Store.Messages.add store
+
+let get_slot_header {store; _} ~published_in_block_hash slot_index =
+  trace_lwt_with
+    "Could not retrieve slot header for slot index %a published in block %a"
+    Dal.Slot_index.pp
+    slot_index
+    Block_hash.pp
+    published_in_block_hash
+  @@ Store.Dal_slots_headers.get
+       store
+       ~primary_key:published_in_block_hash
+       ~secondary_key:slot_index
+
+let get_all_slot_headers {store; _} ~published_in_block_hash =
+  Store.Dal_slots_headers.list_values store ~primary_key:published_in_block_hash
+
+let get_slot_indexes {store; _} ~published_in_block_hash =
+  Store.Dal_slots_headers.list_secondary_keys
+    store
+    ~primary_key:published_in_block_hash
+
+let save_slot_header {store; _} ~published_in_block_hash
+    (slot_header : Dal.Slot.Header.t) =
+  Store.Dal_slots_headers.add
+    store
+    ~primary_key:published_in_block_hash
+    ~secondary_key:slot_header.id.index
+    slot_header
+
+let processed_slot {store; _} ~confirmed_in_block_hash slot_index =
+  Store.Dal_processed_slots.find
+    store
+    ~primary_key:confirmed_in_block_hash
+    ~secondary_key:slot_index
+
+let list_slot_pages {store; _} ~confirmed_in_block_hash =
+  Store.Dal_slot_pages.list_secondary_keys_with_values
+    store
+    ~primary_key:confirmed_in_block_hash
+
+let find_slot_page {store; _} ~confirmed_in_block_hash ~slot_index ~page_index =
+  Store.Dal_slot_pages.find
+    store
+    ~primary_key:confirmed_in_block_hash
+    ~secondary_key:(slot_index, page_index)
+
+let save_unconfirmed_slot {store; _} current_block_hash slot_index =
+  (* No page is actually saved *)
+  Store.Dal_processed_slots.add
+    store
+    ~primary_key:current_block_hash
+    ~secondary_key:slot_index
+    `Unconfirmed
+
+let save_confirmed_slot {store; _} current_block_hash slot_index pages =
+  (* Adding multiple entries with the same primary key amounts to updating the
+     contents of an in-memory map, hence pages must be added sequentially. *)
+  let open Lwt_syntax in
+  let* () =
+    List.iteri_s
+      (fun page_number page ->
+        Store.Dal_slot_pages.add
+          store
+          ~primary_key:current_block_hash
+          ~secondary_key:(slot_index, page_number)
+          page)
+      pages
+  in
+  Store.Dal_processed_slots.add
+    store
+    ~primary_key:current_block_hash
+    ~secondary_key:slot_index
+    `Confirmed
+
+let find_confirmed_slots_history {store; _} =
+  Store.Dal_confirmed_slots_history.find store
+
+let save_confirmed_slots_history {store; _} =
+  Store.Dal_confirmed_slots_history.add store
+
+let find_confirmed_slots_histories {store; _} =
+  Store.Dal_confirmed_slots_histories.find store
+
+let save_confirmed_slots_histories {store; _} =
+  Store.Dal_confirmed_slots_histories.add store
