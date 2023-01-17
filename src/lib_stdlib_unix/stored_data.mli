@@ -30,20 +30,22 @@ open Error_monad
     Every data read/write operation is protected by a mutex preventing
     concurrent data-races. *)
 
-(** The type of an encoded file. *)
+(** A data structure that represents files via their paths and encodings. *)
 type 'a file = private {
   encoding : 'a Data_encoding.t;
   path : string;
   json : bool;
 }
 
-(** The type for the persistent data. *)
+(** The type for the (persistent) data of a file. *)
+
+(** Note: This store uses the polymorphic equality on values. *)
 type 'a t
 
 (** [make_file ?(json=false) ~filepath encoding] represents a file
     located at [filepath]. The content of this value is encoded using
-    [encoding]. By default, the content is binary content except if
-    [json=true].
+    [encoding]. By default, the content is encoded in binary content
+    except if [json=true].
 
     {b Warning} It is the caller responsability to ensure that the
     base directory of the [filepath] exists; otherwise, reading and
@@ -54,7 +56,9 @@ val make_file : ?json:bool -> filepath:string -> 'a Data_encoding.t -> 'a file
 val get : 'a t -> 'a Lwt.t
 
 (** [write data value] overwrites the previous [data] with the new
-    [value]. *)
+    [value]. Note that if the write fails, The cache will have the new
+    value (the one returned by {!val:get}. It is recommended to reload
+    a store in that case and try to write the value again. *)
 val write : 'a t -> 'a -> unit tzresult Lwt.t
 
 (** [write_file encoded_file value] raw writes the [encoded_file] with

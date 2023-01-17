@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4609
+
+   We should not use structural equality in this module and use one
+   which is given in parameter.
+*)
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4611
+
+   By updating the cache without checking the result of the write, we
+   could have a discrepency between the cache and the value in the
+   file. *)
+
 open Error_monad
 
 type error += Missing_stored_data of string
@@ -99,7 +111,6 @@ let write (Stored_data v) data =
 
 let create file data =
   let open Lwt_result_syntax in
-  let file = file in
   let scheduler = Lwt_idle_waiter.create () in
   let* () = write_file file data in
   return (Stored_data {cache = data; file; scheduler})
