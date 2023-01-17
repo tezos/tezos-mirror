@@ -1035,6 +1035,8 @@ val spawn_originate_contract :
 
     Returns a pair [(alias, res)] where [alias] is a value which can be used to
     identify the originated contract, and [res] is the originated contract hash.
+    By default, [alias] is the last component of the scripts name [n], but this
+    can be overriden through the [alias] parameter.
 *)
 val originate_contract_at :
   ?hooks:Process.hooks ->
@@ -1047,6 +1049,7 @@ val originate_contract_at :
   ?dry_run:bool ->
   ?force:bool ->
   ?prefix:string ->
+  ?alias:string ->
   amount:Tez.t ->
   src:string ->
   t ->
@@ -1066,6 +1069,7 @@ val spawn_originate_contract_at :
   ?dry_run:bool ->
   ?force:bool ->
   ?prefix:string ->
+  ?alias:string ->
   amount:Tez.t ->
   src:string ->
   t ->

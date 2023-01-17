@@ -1315,12 +1315,15 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
   | Some hash -> return hash
 
 let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
-    ?burn_cap ?gas_limit ?dry_run ?force ?prefix ~amount ~src client name
+    ?burn_cap ?gas_limit ?dry_run ?force ?prefix ?alias ~amount ~src client name
     protocol =
   let alias =
-    match List.rev name with
-    | [] -> Test.fail "name must not be an empty list"
-    | last :: _ -> last
+    match alias with
+    | Some alias -> alias
+    | None -> (
+        match List.rev name with
+        | [] -> Test.fail "name must not be an empty list"
+        | last :: _ -> last)
   in
   let prg =
     Michelson_script.find ?prefix name protocol |> Michelson_script.path
@@ -1345,11 +1348,15 @@ let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
   (alias, process)
 
 let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
-    ?gas_limit ?dry_run ?force ?prefix ~amount ~src client name protocol =
+    ?gas_limit ?dry_run ?force ?prefix ?alias ~amount ~src client name protocol
+    =
   let alias =
-    match List.rev name with
-    | [] -> Test.fail "name must not be an empty list"
-    | last :: _ -> last
+    match alias with
+    | Some alias -> alias
+    | None -> (
+        match List.rev name with
+        | [] -> Test.fail "name must not be an empty list"
+        | last :: _ -> last)
   in
   let prg =
     Michelson_script.find ?prefix name protocol |> Michelson_script.path
