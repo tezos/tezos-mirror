@@ -27,11 +27,14 @@ open Store_types
 
 (** {1 File convention} *)
 
+(** The 'kind aims to be used to reflect in the type system the
+    directory name to ease the readibility of the
+    code. E.g. [[[`Block]] directory]. *)
 type 'kind directory
 
 type 'kind file
 
-type ('kind, 'data) encoded_file
+type ('kind, 'data) encoded_file = 'data Stored_data.file
 
 val dir_path : 'kind directory -> string
 

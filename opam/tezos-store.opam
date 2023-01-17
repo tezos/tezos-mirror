@@ -9,6 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
+  "tezos-stdlib-unix"
   "tezos-base"
   "tezos-crypto"
   "tezos-shell-services"
@@ -23,7 +24,6 @@ depends: [
   "tezos-context-ops"
   "tezos-shell-context"
   "tezos-protocol-updater"
-  "tezos-stdlib-unix"
   "tezos-stdlib"
   "lwt-watcher" { = "0.2" }
   "camlzip" { >= "1.11" & < "1.12" }

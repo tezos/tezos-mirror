@@ -2237,6 +2237,7 @@ let octez_store_shared =
     ~path:"src/lib_store/shared"
     ~deps:
       [
+        octez_stdlib_unix |> open_;
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_crypto |> open_;
         octez_shell_services |> open_;
@@ -2292,7 +2293,6 @@ let octez_store_unix =
         "floating_block_index";
         "floating_block_store";
         "protocol_store";
-        "stored_data";
         "store_metrics";
         "store";
       ]
