@@ -31,7 +31,11 @@ type error +=
   | Cannot_produce_proof of Sc_rollup.Inbox.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Bad_minimal_fees of string
-  | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
+  | Disagree_with_cemented of {
+      inbox_level : Raw_level.t;
+      ours : Sc_rollup.Commitment.Hash.t option;
+      on_l1 : Sc_rollup.Commitment.Hash.t;
+    }
   | Unreliable_tezos_node_returning_inconsistent_game
   | Inconsistent_inbox of {
       layer1_inbox : Sc_rollup.Inbox.t;
@@ -59,22 +63,34 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"internal.commitment_should_be_next_to_lcc"
-    ~title:
-      "Internal error: The next commitment should have the LCC as predecessor"
+    ~id:"internal.node_disagrees_with_cemented"
+    ~title:"Internal error: The node disagrees with a cemented commitment on L1"
     ~description:
-      "Internal error: The next commitment should have the LCC as predecessor"
-    ~pp:(fun ppf commitment ->
+      "Internal error: The node disagrees with a cemented commitment on L1"
+    ~pp:(fun ppf (inbox_level, ours, on_l1) ->
       Format.fprintf
         ppf
-        "invalid commitment '%a'"
-        Sc_rollup.Commitment.pp
-        commitment)
-    Data_encoding.(obj1 (req "commitment" Sc_rollup.Commitment.encoding))
+        "Internal error: The node has commitment %a for inbox level %a but \
+         this level is cemented on L1 with commitment %a"
+        (Format.pp_print_option
+           ~none:(fun ppf () -> Format.pp_print_string ppf "[None]")
+           Sc_rollup.Commitment.Hash.pp)
+        ours
+        Raw_level.pp
+        inbox_level
+        Sc_rollup.Commitment.Hash.pp
+        on_l1)
+    Data_encoding.(
+      obj3
+        (req "inbox_level" Raw_level.encoding)
+        (req "ours" (option Sc_rollup.Commitment.Hash.encoding))
+        (req "on_l1" Sc_rollup.Commitment.Hash.encoding))
     (function
-      | Commitment_predecessor_should_be_LCC commitment -> Some commitment
+      | Disagree_with_cemented {inbox_level; ours; on_l1} ->
+          Some (inbox_level, ours, on_l1)
       | _ -> None)
-    (fun commitment -> Commitment_predecessor_should_be_LCC commitment) ;
+    (fun (inbox_level, ours, on_l1) ->
+      Disagree_with_cemented {inbox_level; ours; on_l1}) ;
 
   register_error_kind
     `Permanent

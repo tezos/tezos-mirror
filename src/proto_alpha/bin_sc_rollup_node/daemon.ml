@@ -65,6 +65,26 @@ module Make (PVM : Pvm.S) = struct
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
+        let* inbox_block_hash =
+          State.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
+        in
+        let*! inbox_block =
+          Store.L2_blocks.get node_ctxt.store inbox_block_hash
+        in
+        let*? () =
+          (* We stop the node if we disagree with a cemented commitment *)
+          error_unless
+            (Option.equal
+               Sc_rollup.Commitment.Hash.( = )
+               inbox_block.header.commitment_hash
+               (Some commitment))
+            (Sc_rollup_node_errors.Disagree_with_cemented
+               {
+                 inbox_level;
+                 ours = inbox_block.header.commitment_hash;
+                 on_l1 = commitment;
+               })
+        in
         let*! () =
           if Raw_level.(inbox_level > node_ctxt.lcc.level) then (
             node_ctxt.lcc <- {commitment; level = inbox_level} ;
