@@ -62,11 +62,6 @@ let sc_rollup_challenge_window node_ctxt =
   node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
     .challenge_window_in_blocks
 
-let next_lcc_level node_ctxt =
-  add_level
-    node_ctxt.Node_context.lcc.level
-    (sc_rollup_commitment_period node_ctxt)
-
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
 
@@ -214,17 +209,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let publish_commitment (node_ctxt : _ Node_context.t) ~source
       (commitment : Sc_rollup.Commitment.t) =
     let open Lwt_result_syntax in
-    let next_lcc_level = next_lcc_level node_ctxt in
-    (* The predecessor of the commitment right after the LCC level
-       must be the LCC otherwise this commitment is invalid. *)
-    let*? () =
-      error_unless
-        (Raw_level.(commitment.inbox_level <> next_lcc_level)
-        || Sc_rollup.Commitment.Hash.equal
-             node_ctxt.lcc.commitment
-             commitment.predecessor)
-        (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC commitment)
-    in
     let publish_operation =
       Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
     in
