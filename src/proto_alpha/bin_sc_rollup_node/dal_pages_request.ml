@@ -90,7 +90,7 @@ let get_slot_pages =
       Lwt.return
 
 let check_confirmation_status_and_download
-    ({Node_context.store; dal_cctxt; _} as node_ctxt) ~confirmed_in_block_hash
+    ({Node_context.dal_cctxt; _} as node_ctxt) ~confirmed_in_block_hash
     ~published_in_block_hash index =
   let open Lwt_result_syntax in
   let* confirmed_in_block_level =
@@ -103,15 +103,12 @@ let check_confirmation_status_and_download
     Dal_slots_tracker.is_slot_confirmed node_ctxt confirmed_in_head index
   in
   if is_confirmed then
-    let*! {commitment; _} =
-      Store.Dal_slots_headers.get
-        store
-        ~primary_key:published_in_block_hash
-        ~secondary_key:index
+    let* {commitment; _} =
+      Node_context.get_slot_header node_ctxt ~published_in_block_hash index
     in
     let* pages = get_slot_pages dal_cctxt commitment in
     let save_pages node_ctxt =
-      Dal_slots_tracker.save_confirmed_slot
+      Node_context.save_confirmed_slot
         node_ctxt
         confirmed_in_block_hash
         index
@@ -120,14 +117,11 @@ let check_confirmation_status_and_download
     return (Delayed_write_monad.delay_write (Some pages) save_pages)
   else
     let save_slot node_ctxt =
-      Dal_slots_tracker.save_unconfirmed_slot
-        node_ctxt
-        confirmed_in_block_hash
-        index
+      Node_context.save_unconfirmed_slot node_ctxt confirmed_in_block_hash index
     in
     return (Delayed_write_monad.delay_write None save_slot)
 
-let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
+let slot_pages ~dal_attestation_lag node_ctxt
     Dal.Slot.Header.{published_level; index} =
   let open Lwt_result_syntax in
   let* confirmed_in_block_hash =
@@ -137,10 +131,7 @@ let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
       node_ctxt
   in
   let*! processed =
-    Store.Dal_processed_slots.find
-      store
-      ~primary_key:confirmed_in_block_hash
-      ~secondary_key:index
+    Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
   | None ->
@@ -157,9 +148,7 @@ let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
   | Some `Unconfirmed -> return (Delayed_write_monad.no_write None)
   | Some `Confirmed ->
       let*! pages =
-        Store.Dal_slot_pages.list_secondary_keys_with_values
-          store
-          ~primary_key:confirmed_in_block_hash
+        Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash
       in
       let pages =
         List.filter_map
@@ -169,8 +158,7 @@ let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
       in
       return (Delayed_write_monad.no_write (Some pages))
 
-let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
-    page_id =
+let page_content ~dal_attestation_lag node_ctxt page_id =
   let open Lwt_result_syntax in
   let open Delayed_write_monad.Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
@@ -182,10 +170,7 @@ let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
       node_ctxt
   in
   let*! processed =
-    Store.Dal_processed_slots.find
-      store
-      ~primary_key:confirmed_in_block_hash
-      ~secondary_key:index
+    Node_context.processed_slot node_ctxt ~confirmed_in_block_hash index
   in
   match processed with
   | None -> (
@@ -218,18 +203,17 @@ let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
   | Some `Unconfirmed -> return None
   | Some `Confirmed -> (
       let*! page_opt =
-        Store.Dal_slot_pages.find
-          store
-          ~primary_key:confirmed_in_block_hash
-          ~secondary_key:(index, page_index)
+        Node_context.find_slot_page
+          node_ctxt
+          ~confirmed_in_block_hash
+          ~slot_index:index
+          ~page_index
       in
       match page_opt with
       | Some v -> return @@ Some v
       | None ->
           let*! pages =
-            Store.Dal_slot_pages.list_secondary_keys_with_values
-              store
-              ~primary_key:confirmed_in_block_hash
+            Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash
           in
           if page_index < 0 || List.compare_length_with pages page_index <= 0
           then tzfail @@ Dal_invalid_page_for_slot page_id
