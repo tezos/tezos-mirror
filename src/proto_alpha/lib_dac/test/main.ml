@@ -25,7 +25,7 @@
 
 module Unit_test : sig
   (**
-   * Example: [spec "Slot_framing_protocol.ml" Test_dal_slot_frame_encoding.test_cases]
+   * Example: [spec "Dac_pages_encoding.ml" Test_dac_pages_encoding.tests]
    * Unit tests needs tag in log (like "[UNIT] some test description here...")
    * This function handles such meta data *)
   val spec :
@@ -47,9 +47,5 @@ end
 let () =
   Alcotest_lwt.run
     "protocol > unit"
-    [
-      Unit_test.spec
-        "Slot_framing_protocol.ml"
-        Test_dal_slot_frame_encoding.tests;
-    ]
+    [Unit_test.spec "Dac_pages_encoding.ml" Test_dac_pages_encoding.tests]
   |> Lwt_main.run

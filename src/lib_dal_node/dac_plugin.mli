@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,33 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Unit_test : sig
-  (**
-   * Example: [spec "Slot_framing_protocol.ml" Test_dal_slot_frame_encoding.test_cases]
-   * Unit tests needs tag in log (like "[UNIT] some test description here...")
-   * This function handles such meta data *)
-  val spec :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
+module type T = sig
+  module Proto : Registered_protocol.T
 
-  (** Tests with description string without [Unit] are skipped *)
-  val _skip :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
-end = struct
-  let spec unit_name test_cases = ("[Unit] " ^ unit_name, test_cases)
-
-  let _skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
+  module RPC : sig
+    val rpc_services :
+      reveal_data_dir:string ->
+      #Client_context.wallet ->
+      Tezos_crypto.Aggregate_signature.public_key option list ->
+      Client_keys.aggregate_sk_uri option list ->
+      int ->
+      unit Tezos_rpc.Directory.directory
+  end
 end
 
-let () =
-  Alcotest_lwt.run
-    "protocol > unit"
-    [
-      Unit_test.spec
-        "Slot_framing_protocol.ml"
-        Test_dal_slot_frame_encoding.tests;
-    ]
-  |> Lwt_main.run
+val register : (module T) -> unit
+
+val get : Tezos_crypto.Protocol_hash.Table.key -> (module T) option

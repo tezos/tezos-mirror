@@ -24,12 +24,13 @@
 (*****************************************************************************)
 
 (** A [ready_ctx] value contains globally needed informations for a running dal
-    node. It is available when both cryptobox is initialized and dal plugin is
-    loaded. *)
+    node. It is available when both cryptobox is initialized and the plugins
+    for dal and dac have been loaded. *)
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  plugin : (module Dal_plugin.T);
+  dal_plugin : (module Dal_plugin.T);
+  dac_plugin : (module Dac_plugin.T);
 }
 
 (** The status of the dal node *)
@@ -47,14 +48,15 @@ val init : Configuration.t -> Store.node_store -> Client_context.full -> t
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt plugin cryptobox proto_parameters] updates in place the
-    status value to [Ready], and initializes the inner [ready_ctxt] value with
-    the given parameters.
+(** [set_ready ctxt ~dal_plugin ~dac_plugin cryptobox proto_parameters] updates
+    in place the status value to [Ready], and initializes the inner
+    [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  (module Tezos_dal_node_lib.Dal_plugin.T) ->
+  dal_plugin:(module Tezos_dal_node_lib.Dal_plugin.T) ->
+  dac_plugin:(module Tezos_dal_node_lib.Dac_plugin.T) ->
   Cryptobox.t ->
   Dal_plugin.proto_parameters ->
   unit

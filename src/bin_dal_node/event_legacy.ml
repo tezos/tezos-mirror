@@ -122,11 +122,12 @@ let layer1_node_tracking_started =
     ()
 
 let protocol_plugin_resolved =
-  declare_1
+  declare_2
     ~section
     ~name:"dal_node_plugin_resolved"
-    ~msg:"Resolved plugin on protocol {proto_hash}"
+    ~msg:"Resolved plugin for {plugin_name} on protocol {proto_hash}"
     ~level:Notice
+    ("plugin_name", Data_encoding.string)
     ("proto_hash", Data_encoding.string)
 
 let daemon_error =
@@ -173,5 +174,5 @@ let dac_account_cannot_sign =
 let proto_short_hash_string hash =
   Format.asprintf "%a" Tezos_crypto.Protocol_hash.pp_short hash
 
-let emit_protocol_plugin_resolved hash =
-  emit protocol_plugin_resolved (proto_short_hash_string hash)
+let emit_protocol_plugin_resolved ~plugin_name hash =
+  emit protocol_plugin_resolved (plugin_name, proto_short_hash_string hash)

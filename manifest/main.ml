@@ -3421,6 +3421,8 @@ module Protocol : sig
 
   val dal : t -> target option
 
+  val dac : t -> target option
+
   val parameters_exn : t -> target
 
   val benchmarks_proto_exn : t -> target
@@ -3535,6 +3537,7 @@ end = struct
     plugin : target option;
     plugin_registerer : target option;
     dal : target option;
+    dac : target option;
     test_helpers : target option;
     parameters : target option;
     benchmarks_proto : target option;
@@ -3542,7 +3545,7 @@ end = struct
   }
 
   let make ?client ?client_commands ?client_commands_registration
-      ?baking_commands_registration ?plugin ?plugin_registerer ?dal
+      ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
       ?test_helpers ?parameters ?benchmarks_proto ?baking ~status ~name ~main
       ~embedded () =
     {
@@ -3557,6 +3560,7 @@ end = struct
       plugin;
       plugin_registerer;
       dal;
+      dac;
       test_helpers;
       parameters;
       benchmarks_proto;
@@ -3610,6 +3614,8 @@ end = struct
   let plugin_registerer p = p.plugin_registerer
 
   let dal p = p.dal
+
+  let dac p = p.dac
 
   let parameters_exn p = mandatory "parameters" p p.parameters
 
@@ -5053,6 +5059,50 @@ module Protocol = Protocol
             alcotest_lwt;
           ]
     in
+    let dac =
+      (* [~link_all:true] is necessary to ensure that the dac plugin
+         registration happens when running the dal node. Removing this
+         option would cause DAL related tezts to fail because the DAC
+         plugin cannot be resolved. *)
+      only_if (active && N.(number >= 017)) @@ fun () ->
+      public_lib
+        (sf "tezos-dac-%s" name_dash)
+        ~path:(path // "lib_dac")
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library for the Data availability \
+           Committee"
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_protocol_compiler_registerer |> open_;
+            octez_stdlib_unix |> open_;
+            octez_dal_node_lib |> open_;
+            client |> if_some |> open_;
+            embedded |> open_;
+            layer2_utils |> if_some |> open_;
+            main |> open_;
+          ]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
+    let _dac_tests =
+      only_if (active && N.(number >= 017)) @@ fun () ->
+      test
+        "main"
+        ~path:(path // "lib_dac/test")
+        ~opam:(sf "tezos-dac-%s" name_dash)
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            dac |> if_some |> open_;
+            main |> open_;
+            octez_base_test_helpers |> open_;
+            test_helpers |> if_some |> open_;
+            alcotest_lwt;
+          ]
+    in
     let benchmark_type_inference =
       only_if active @@ fun () ->
       public_lib
@@ -5217,6 +5267,7 @@ module Protocol = Protocol
          ?plugin
          ?plugin_registerer
          ?dal
+         ?dac
          ?test_helpers
          ?parameters
          ?benchmarks_proto
@@ -5969,7 +6020,9 @@ let _octez_dal_node =
             (* Other protocols are optional. *)
             true
       in
-      let targets = List.filter_map Fun.id [Protocol.dal protocol] in
+      let targets =
+        List.filter_map Fun.id [Protocol.dal protocol; Protocol.dac protocol]
+      in
       if is_optional then List.map optional targets else targets
     in
     List.map deps_for_protocol Protocol.all |> List.flatten

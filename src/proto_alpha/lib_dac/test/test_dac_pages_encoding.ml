@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Dal_node Slot_frame_encoding
-    Invocation: dune exec src/proto_alpha/lib_dal/test/main.exe \
+    Invocation: dune exec src/proto_alpha/lib_dac/test/main.exe \
       -- test "^\[Unit\] Dac_pages_encoding.ml$"
     Subject:    Tests for the SCORU storage module
 *)
