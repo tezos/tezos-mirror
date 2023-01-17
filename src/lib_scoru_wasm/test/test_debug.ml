@@ -55,7 +55,7 @@ let write_debug ~debug ~init ~values memories =
     ~caller:module_key
     (if debug then
      Host_funcs.all_debug
-       ~write_debug:(Printer (fun str -> Lwt_io.printf "%s" str))
+       ~write_debug:(Printer (fun str -> Lwt.return @@ Format.printf "%s" str))
     else Host_funcs.all)
     ~input
     ~init
