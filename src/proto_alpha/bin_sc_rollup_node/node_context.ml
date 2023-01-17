@@ -225,6 +225,13 @@ let trace_lwt_result_with x =
     (fun s p -> trace (Exn (Failure s)) @@ protect @@ fun () -> p)
     x
 
+module Lwt_result_option_syntax = struct
+  let ( let** ) a f =
+    let open Lwt_result_syntax in
+    let* a = a in
+    match a with None -> return_none | Some a -> f a
+end
+
 let hash_of_level_opt {store; cctxt; _} level =
   let open Lwt_result_syntax in
   let* hash = Store.Levels_to_hashes.find store.levels_to_hashes level in
@@ -321,8 +328,12 @@ let find_l2_block_by_level node_ctxt level =
 let tick_search ~big_step_blocks node_ctxt head tick =
   let open Lwt_result_syntax in
   if Sc_rollup.Tick.(head.Sc_rollup_block.initial_tick <= tick) then
-    (* The starting block has already a tick before the one we want, we are done. *)
-    return head
+    if Sc_rollup.Tick.(Sc_rollup_block.final_tick head < tick) then
+      (* The head block does not contain the tick *)
+      return_none
+    else
+      (* The starting block contains the tick we want, we are done. *)
+      return_some head
   else
     let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
     let rec find_big_step (end_block : Sc_rollup_block.t) =
@@ -350,7 +361,7 @@ let tick_search ~big_step_blocks node_ctxt head tick =
       let end_level = block_level end_block in
       if end_level - start_level <= 1 then
         (* We have found the interval where the tick happened *)
-        return start_block
+        return_some start_block
       else
         let middle_level = start_level + ((end_level - start_level) / 2) in
         let* block_middle =
@@ -365,23 +376,25 @@ let tick_search ~big_step_blocks node_ctxt head tick =
     (* Then do dichotomy on interval [start_block; end_block] *)
     dicho start_block end_block
 
-let block_before ({store; _} as node_ctxt) tick =
+let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
   let open Lwt_result_syntax in
-  let* head = Store.L2_head.read store.l2_head in
-  match head with
-  | None -> failwith "No head to compute block before tick"
-  | Some head ->
-      (* We start by taking big steps of 4096 blocks for the first
-         approximation. This means we need at most 20 big steps to start a
-         dichotomy on a 4096 blocks interval (at most 12 steps). We could take
-         the refutation period as the big_step_blocks to do a dichotomy on the
-         full space but we anticipate refutation to happen most of the time
-         close to the head. *)
-      trace_lwt_result_with
-        "Could not retrieve block before tick %a"
-        Sc_rollup.Tick.pp
-        tick
-      @@ tick_search ~big_step_blocks:4096 node_ctxt head tick
+  let open Lwt_result_option_syntax in
+  trace_lwt_result_with
+    "Could not retrieve block with tick %a"
+    Sc_rollup.Tick.pp
+    tick
+  @@ let** head = Store.L2_head.read store.l2_head in
+     (* We start by taking big steps of 4096 blocks for the first
+        approximation. This means we need at most 20 big steps to start a
+        dichotomy on a 4096 blocks interval (at most 12 steps). We could take
+        the refutation period as the big_step_blocks to do a dichotomy on the
+        full space but we anticipate refutation to happen most of the time close
+        to the head. *)
+     let** head =
+       if Raw_level.(head.header.level <= max_level) then return_some head
+       else find_l2_block_by_level node_ctxt (Raw_level.to_int32 max_level)
+     in
+     tick_search ~big_step_blocks:4096 node_ctxt head tick
 
 let get_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in

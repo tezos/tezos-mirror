@@ -193,9 +193,15 @@ val hash_of_level_opt : _ t -> int32 -> Block_hash.t option tzresult Lwt.t
     if it is known by the Tezos Layer 1 node. *)
 val level_of_hash : _ t -> Block_hash.t -> int32 tzresult Lwt.t
 
-(** [block_before store tick] returns the last layer 2 block whose initial tick
-    is before [tick]. *)
-val block_before : _ t -> Sc_rollup.Tick.t -> Sc_rollup_block.t tzresult Lwt.t
+(** [block_with_tick store ~max_level tick] returns [Some b] where [b] is the
+    last layer 2 block which contains the [tick] before [max_level]. If no such
+    block exists (the tick happened after [max_level], or we are too late), the
+    function returns [None]. *)
+val block_with_tick :
+  _ t ->
+  max_level:Raw_level.t ->
+  Sc_rollup.Tick.t ->
+  Sc_rollup_block.t option tzresult Lwt.t
 
 (** {3 Commitments} *)
 

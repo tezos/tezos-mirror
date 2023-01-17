@@ -223,17 +223,19 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       [None].*)
   let state_of_tick node_ctxt tick level =
     let open Lwt_result_syntax in
-    let* event = Node_context.block_before node_ctxt tick in
-    if Raw_level.(event.header.level > level) then return None
-    else
-      let tick_distance =
-        Sc_rollup.Tick.distance tick event.initial_tick |> Z.to_int64
-      in
-      (* TODO: #3384
-         We should test that we always have enough blocks to find the tick
-         because [state_of_tick] is a critical function. *)
-      let* state = run_for_ticks node_ctxt event tick_distance in
-      let state = Delayed_write_monad.ignore state in
-      let*! hash = PVM.state_hash state in
-      return (Some (state, hash))
+    let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
+    match event with
+    | None -> return_none
+    | Some event ->
+        assert (Raw_level.(event.header.level <= level)) ;
+        let tick_distance =
+          Sc_rollup.Tick.distance tick event.initial_tick |> Z.to_int64
+        in
+        (* TODO: #3384
+           We should test that we always have enough blocks to find the tick
+           because [state_of_tick] is a critical function. *)
+        let* state = run_for_ticks node_ctxt event tick_distance in
+        let state = Delayed_write_monad.ignore state in
+        let*! hash = PVM.state_hash state in
+        return (Some (state, hash))
 end
