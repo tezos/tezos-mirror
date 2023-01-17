@@ -175,6 +175,39 @@ let readonly (node_ctxt : _ t) =
 
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
+(** Abstraction over store  *)
+
+let hash_of_level_opt {store; cctxt; _} level =
+  let open Lwt_syntax in
+  let* hash = Store.Levels_to_hashes.find store level in
+  match hash with
+  | Some hash -> return_some hash
+  | None ->
+      let+ hash =
+        Tezos_shell_services.Shell_services.Blocks.hash
+          cctxt
+          ~chain:cctxt#chain
+          ~block:(`Level level)
+          ()
+      in
+      Result.to_option hash
+
+let hash_of_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let*! hash = hash_of_level_opt node_ctxt level in
+  match hash with
+  | Some h -> return h
+  | None -> failwith "Cannot retrieve hash of level %ld" level
+
+let level_of_hash {l1_ctxt; store; _} hash =
+  let open Lwt_result_syntax in
+  let*! block = Store.L2_blocks.find store hash in
+  match block with
+  | Some {header = {level; _}; _} -> return (Raw_level.to_int32 level)
+  | None ->
+      let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
+      level
+
 let get_full_l2_block {store; _} block_hash =
   let open Lwt_syntax in
   let* block = Store.L2_blocks.get store block_hash in
@@ -184,3 +217,44 @@ let get_full_l2_block {store; _} block_hash =
     Option.map_s (Store.Commitments.get store) block.header.commitment_hash
   in
   return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
+
+let save_level store Layer1.{hash; level} =
+  Store.Levels_to_hashes.add store level hash
+
+let save_l2_block store (head : Sc_rollup_block.t) =
+  let open Lwt_syntax in
+  let* () = Store.L2_blocks.add store head.header.block_hash head in
+  Store.L2_head.set store head
+
+let is_processed store head = Store.L2_blocks.mem store head
+
+let last_processed_head_opt store = Store.L2_head.find store
+
+let mark_finalized_head store head_hash =
+  let open Lwt_syntax in
+  let* block = Store.L2_blocks.find store head_hash in
+  match block with
+  | None -> return_unit
+  | Some block -> Store.Last_finalized_head.set store block
+
+let get_finalized_head_opt store = Store.Last_finalized_head.find store
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4532
+   Make this logarithmic, by storing pointers to muliple predecessor and
+   by dichotomy. *)
+let block_before store tick =
+  let open Lwt_result_syntax in
+  let*! head = Store.L2_head.find store in
+  match head with
+  | None -> return_none
+  | Some head ->
+      let rec search block_hash =
+        let*! block = Store.L2_blocks.find store block_hash in
+        match block with
+        | None -> failwith "Missing block %a" Block_hash.pp block_hash
+        | Some block ->
+            if Sc_rollup.Tick.(block.initial_tick <= tick) then
+              return_some block
+            else search block.header.predecessor
+      in
+      search head.header.block_hash

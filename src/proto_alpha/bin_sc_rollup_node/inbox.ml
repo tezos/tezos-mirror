@@ -44,8 +44,6 @@ module State = struct
 
   let add_inbox = Store.Inboxes.add
 
-  let level_of_hash = State.level_of_hash
-
   (** [inbox_of_head node_ctxt store block] returns the latest inbox at the
       given [block]. This function always returns [Some inbox] for all levels
       at and after the rollup genesis. *)
@@ -253,7 +251,7 @@ let process_head (node_ctxt : _ Node_context.t)
 
 let inbox_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
-  let* level = State.level_of_hash node_ctxt hash in
+  let* level = Node_context.level_of_hash node_ctxt hash in
   State.inbox_of_head node_ctxt {hash; level}
 
 let inbox_of_head = State.inbox_of_head

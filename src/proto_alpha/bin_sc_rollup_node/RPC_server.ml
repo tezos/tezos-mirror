@@ -29,14 +29,14 @@ open Protocol
 
 let get_head store =
   let open Lwt_result_syntax in
-  let*! head = State.last_processed_head_opt store in
+  let*! head = Node_context.last_processed_head_opt store in
   match head with
   | None -> failwith "No head"
   | Some {header = {block_hash; _}; _} -> return block_hash
 
 let get_finalized store =
   let open Lwt_result_syntax in
-  let*! head = State.get_finalized_head_opt store in
+  let*! head = Node_context.get_finalized_head_opt store in
   match head with
   | None -> failwith "No finalized head"
   | Some {header = {block_hash; _}; _} -> return block_hash
@@ -45,7 +45,7 @@ let get_last_cemented (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   protect @@ fun () ->
   let* lcc_hash =
-    State.hash_of_level
+    Node_context.hash_of_level
       node_ctxt
       (Alpha_context.Raw_level.to_int32 node_ctxt.lcc.level)
   in
@@ -53,12 +53,14 @@ let get_last_cemented (node_ctxt : _ Node_context.t) =
 
 let get_head_hash_opt store =
   let open Lwt_option_syntax in
-  let+ {header = {block_hash; _}; _} = State.last_processed_head_opt store in
+  let+ {header = {block_hash; _}; _} =
+    Node_context.last_processed_head_opt store
+  in
   block_hash
 
 let get_head_level_opt store =
   let open Lwt_option_syntax in
-  let+ {header = {level; _}; _} = State.last_processed_head_opt store in
+  let+ {header = {level; _}; _} = Node_context.last_processed_head_opt store in
   Alpha_context.Raw_level.to_int32 level
 
 let get_l2_block_exn store block =
@@ -192,7 +194,7 @@ module Block_directory = Make_directory (struct
       match block with
       | `Head -> get_head node_ctxt.Node_context.store
       | `Hash b -> return b
-      | `Level l -> State.hash_of_level node_ctxt l
+      | `Level l -> Node_context.hash_of_level node_ctxt l
       | `Finalized -> get_finalized node_ctxt.Node_context.store
       | `Cemented -> get_last_cemented node_ctxt
     in
@@ -210,7 +212,7 @@ module Outbox_directory = Make_directory (struct
       match block with
       | `Head -> get_head node_ctxt.Node_context.store
       | `Hash b -> return b
-      | `Level l -> State.hash_of_level node_ctxt l
+      | `Level l -> Node_context.hash_of_level node_ctxt l
       | `Finalized -> get_finalized node_ctxt.Node_context.store
       | `Cemented -> get_last_cemented node_ctxt
     in
@@ -253,7 +255,8 @@ module Common = struct
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.level
-    @@ fun (node_ctxt, block) () () -> State.level_of_hash node_ctxt block
+    @@ fun (node_ctxt, block) () () ->
+    Node_context.level_of_hash node_ctxt block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.inbox
@@ -299,7 +302,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
           Some map
       | None -> None
     in
-    let* level = State.level_of_hash node_ctxt block in
+    let* level = Node_context.level_of_hash node_ctxt block in
     let* sim =
       Simulation.start_simulation
         node_ctxt
@@ -372,7 +375,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let open Lwt_result_syntax in
     let*! res =
       let open Lwt_option_syntax in
-      let* head = State.last_processed_head_opt node_ctxt.store in
+      let* head = Node_context.last_processed_head_opt node_ctxt.store in
       let commitment_hash =
         Sc_rollup_block.most_recent_commitment head.header
       in
@@ -498,7 +501,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
     let open Alpha_context in
     let open Lwt_syntax in
-    let+ finalized_head = State.get_finalized_head_opt node_ctxt.store in
+    let+ finalized_head = Node_context.get_finalized_head_opt node_ctxt.store in
     let finalized =
       match finalized_head with
       | None -> false
@@ -541,7 +544,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                       return (Sc_rollup_services.Included (info, inbox_info))
                   | Some commitment_level -> (
                       let* block =
-                        State.hash_of_level
+                        Node_context.hash_of_level
                           node_ctxt
                           (Alpha_context.Raw_level.to_int32 commitment_level)
                       in

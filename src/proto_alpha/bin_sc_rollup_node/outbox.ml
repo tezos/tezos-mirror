@@ -30,7 +30,9 @@ module Make (PVM : Pvm.S) = struct
   let get_state_of_lcc node_ctxt =
     let open Lwt_result_syntax in
     let* block_hash =
-      State.hash_of_level node_ctxt (Raw_level.to_int32 node_ctxt.lcc.level)
+      Node_context.hash_of_level
+        node_ctxt
+        (Raw_level.to_int32 node_ctxt.lcc.level)
     in
     let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     let*! state = PVM.State.find ctxt in

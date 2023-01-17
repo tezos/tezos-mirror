@@ -94,7 +94,7 @@ module Make (PVM : Pvm.S) = struct
       ->
         (* Cemented commitment ---------------------------------------------- *)
         let* inbox_block_hash =
-          State.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
+          Node_context.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
         in
         let*! inbox_block =
           Store.L2_blocks.get node_ctxt.store inbox_block_hash
@@ -229,7 +229,9 @@ module Make (PVM : Pvm.S) = struct
   let rec processed_finalized_block (node_ctxt : _ Node_context.t)
       Layer1.({hash; level} as block) =
     let open Lwt_result_syntax in
-    let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
+    let*! last_finalized =
+      Node_context.get_finalized_head_opt node_ctxt.store
+    in
     let already_finalized =
       match last_finalized with
       | Some finalized -> level <= Raw_level.to_int32 finalized.header.level
@@ -243,14 +245,14 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let*! () = State.mark_finalized_head node_ctxt.store hash in
+    let*! () = Node_context.mark_finalized_head node_ctxt.store hash in
     return_unit
 
   let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
       =
     let open Lwt_result_syntax in
     let*! () = Daemon_event.head_processing hash level ~finalized:false in
-    let*! () = State.save_level node_ctxt.store head in
+    let*! () = Node_context.save_level node_ctxt.store head in
     let* inbox_hash, inbox, inbox_witness, messages, ctxt =
       Inbox.process_head node_ctxt head
     in
@@ -311,7 +313,7 @@ module Make (PVM : Pvm.S) = struct
         head
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
-    let*! () = State.save_l2_block node_ctxt.store l2_block in
+    let*! () = Node_context.save_l2_block node_ctxt.store l2_block in
     let*! () =
       Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
     in
@@ -340,7 +342,7 @@ module Make (PVM : Pvm.S) = struct
   let on_layer_1_head node_ctxt head =
     let open Lwt_result_syntax in
     let*! old_head =
-      State.last_processed_head_opt node_ctxt.Node_context.store
+      Node_context.last_processed_head_opt node_ctxt.Node_context.store
     in
     let old_head =
       match old_head with

@@ -71,7 +71,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let tick_of_level (node_ctxt : _ Node_context.t) inbox_level =
     let open Lwt_result_syntax in
     let* block_hash =
-      State.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
+      Node_context.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
     in
     let*! block = Store.L2_blocks.get node_ctxt.store block_hash in
     return (Sc_rollup_block.final_tick block)
@@ -178,7 +178,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       | None -> node_ctxt.genesis_info.level
       | Some lpc -> lpc.inbox_level
     in
-    let* head = State.last_processed_head_opt node_ctxt.store in
+    let* head = Node_context.last_processed_head_opt node_ctxt.store in
     let next_head_level =
       Option.map
         (fun (b : Sc_rollup_block.t) -> Raw_level.succ b.header.level)
@@ -219,7 +219,9 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           (* We keep the commitment and go back to the previous one. *)
           gather acc commitment.predecessor
     in
-    let* finalized_block = State.get_finalized_head_opt node_ctxt.store in
+    let* finalized_block =
+      Node_context.get_finalized_head_opt node_ctxt.store
+    in
     match finalized_block with
     | None -> return_nil
     | Some finalized ->
@@ -280,7 +282,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then fail
     else
       let* cementable_bound_block_hash =
-        State.hash_of_level_opt
+        Node_context.hash_of_level_opt
           node_ctxt
           (Raw_level.to_int32 cementable_level_bound)
       in
@@ -300,7 +302,9 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let*! x = x in
       match x with None -> return_nil | Some x -> f x
     in
-    let*& head = State.last_processed_head_opt node_ctxt.Node_context.store in
+    let*& head =
+      Node_context.last_processed_head_opt node_ctxt.Node_context.store
+    in
     let head_level = head.header.level in
     let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
       let open Lwt_syntax in
