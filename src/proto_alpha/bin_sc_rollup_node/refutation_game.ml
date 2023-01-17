@@ -165,7 +165,9 @@ module Make (Interpreter : Interpreter.S) :
     let snapshot_level_int32 =
       Int32.pred Raw_level.(to_int32 game.start_level)
     in
-    let* snapshot_hash = State.hash_of_level node_ctxt snapshot_level_int32 in
+    let* snapshot_hash =
+      Node_context.hash_of_level node_ctxt snapshot_level_int32
+    in
     let snapshot_head =
       Layer1.{hash = snapshot_hash; level = snapshot_level_int32}
     in

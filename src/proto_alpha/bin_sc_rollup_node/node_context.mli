@@ -125,7 +125,52 @@ val readonly : _ t -> ro
 (** Monad for values with delayed write effects in the node context. *)
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 
+(** {2 Abstraction over store} *)
+
+(** [is_processed store hash] returns [true] if the block with [hash] has
+    already been processed by the daemon. *)
+val is_processed : _ Store.t -> Block_hash.t -> bool Lwt.t
+
 (** [get_full_l2_block node_ctxt hash] returns the full L2 block for L1 block
     hash [hash]. The result contains the L2 block and its content (inbox,
     messages, commitment). *)
 val get_full_l2_block : _ t -> Block_hash.t -> Sc_rollup_block.full Lwt.t
+
+(** [save_level store head] registers the correspondences [head.level |->
+    head.hash] in the store. *)
+val save_level : Store.rw -> Layer1.head -> unit Lwt.t
+
+(** [mark_processed_head store head] remembers that the [head] is processed. The
+    system should not have to come back to it. *)
+val save_l2_block : Store.rw -> Sc_rollup_block.t -> unit Lwt.t
+
+(** [last_processed_head_opt store] returns the last processed head if it
+    exists. *)
+val last_processed_head_opt : _ Store.t -> Sc_rollup_block.t option Lwt.t
+
+(** [mark_finalized_head store head] remembers that the [head] is finalized. By
+    construction, every block whose level is smaller than [head]'s is also
+    finalized. *)
+val mark_finalized_head : Store.rw -> Block_hash.t -> unit Lwt.t
+
+(** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
+val get_finalized_head_opt : _ Store.t -> Sc_rollup_block.t option Lwt.t
+
+(** [hash_of_level node_ctxt level] returns the current block hash for a given
+    [level]. *)
+val hash_of_level : _ t -> int32 -> Block_hash.t tzresult Lwt.t
+
+(** [hash_of_level_opt] is like {!hash_of_level} but returns [None] if the
+    [level] is not known. *)
+val hash_of_level_opt : _ t -> int32 -> Block_hash.t option Lwt.t
+
+(** [level_of_hash node_ctxt hash] returns the level for Tezos block hash [hash]
+    if it is known by the Tezos Layer 1 node. *)
+val level_of_hash : _ t -> Block_hash.t -> int32 tzresult Lwt.t
+
+(** [block_before store tick] returns the last layer 2 block whose initial tick
+    is before [tick]. *)
+val block_before :
+  [> `Read] Store.store ->
+  Sc_rollup.Tick.t ->
+  Sc_rollup_block.t option tzresult Lwt.t
