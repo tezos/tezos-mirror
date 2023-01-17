@@ -96,15 +96,11 @@ module Atom = struct
     if v < min || max < v then raise (Invalid_float {min; v; max})
 
   let set_int kind endianness buffer ofs v =
-    match (kind, endianness) with
-    | (`Int31 | `Uint30), Encoding.Big_endian ->
-        TzEndian.set_int32 buffer ofs (Int32.of_int v)
-    | (`Int31 | `Uint30), Encoding.Little_endian ->
-        TzEndian.set_int32_le buffer ofs (Int32.of_int v)
-    | (`Int16 | `Uint16), Encoding.Big_endian -> TzEndian.set_int16 buffer ofs v
-    | (`Int16 | `Uint16), Encoding.Little_endian ->
-        TzEndian.set_int16_le buffer ofs v
-    | (`Int8 | `Uint8), _ -> TzEndian.set_int8 buffer ofs v
+    match kind with
+    | `Int31 | `Uint30 ->
+        TzEndian.set_int32 endianness buffer ofs (Int32.of_int v)
+    | `Int16 | `Uint16 -> TzEndian.set_int16 endianness buffer ofs v
+    | `Int8 | `Uint8 -> TzEndian.set_int8 buffer ofs v
 
   let int kind endianness state v =
     check_int_range (Binary_size.min_int kind) v (Binary_size.max_int kind) ;
@@ -129,16 +125,12 @@ module Atom = struct
   let int32 endianness state v =
     let ofs = state.offset in
     may_resize state Binary_size.int32 ;
-    match endianness with
-    | Encoding.Big_endian -> TzEndian.set_int32 state.buffer ofs v
-    | Encoding.Little_endian -> TzEndian.set_int32_le state.buffer ofs v
+    TzEndian.set_int32 endianness state.buffer ofs v
 
   let int64 endianness state v =
     let ofs = state.offset in
     may_resize state Binary_size.int64 ;
-    match endianness with
-    | Encoding.Big_endian -> TzEndian.set_int64 state.buffer ofs v
-    | Encoding.Little_endian -> TzEndian.set_int64_le state.buffer ofs v
+    TzEndian.set_int64 endianness state.buffer ofs v
 
   let ranged_int ~minimum ~endianness ~maximum state v =
     check_int_range minimum v maximum ;

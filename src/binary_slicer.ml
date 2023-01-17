@@ -90,21 +90,12 @@ module Atom = struct
       st
 
   let uint16 endianness name st =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom
-          ~pp:string_of_int
-          Binary_size.int16
-          TzEndian.get_uint16_string
-          name
-          st
-    | Encoding.Little_endian ->
-        read_atom
-          ~pp:string_of_int
-          Binary_size.int16
-          TzEndian.get_uint16_le_string
-          name
-          st
+    read_atom
+      ~pp:string_of_int
+      Binary_size.uint16
+      (TzEndian.get_uint16_string endianness)
+      name
+      st
 
   let int8 name st =
     read_atom
@@ -115,55 +106,28 @@ module Atom = struct
       st
 
   let int16 endianness name st =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom
-          ~pp:string_of_int
-          Binary_size.int16
-          TzEndian.get_int16_string
-          name
-          st
-    | Encoding.Little_endian ->
-        read_atom
-          ~pp:string_of_int
-          Binary_size.int16
-          TzEndian.get_int16_le_string
-          name
-          st
+    read_atom
+      ~pp:string_of_int
+      Binary_size.int16
+      (TzEndian.get_int16_string endianness)
+      name
+      st
 
   let int32 endianness name st =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom
-          ~pp:Int32.to_string
-          Binary_size.int32
-          TzEndian.get_int32_string
-          name
-          st
-    | Encoding.Little_endian ->
-        read_atom
-          ~pp:Int32.to_string
-          Binary_size.int32
-          TzEndian.get_int32_le_string
-          name
-          st
+    read_atom
+      ~pp:Int32.to_string
+      Binary_size.int32
+      (TzEndian.get_int32_string endianness)
+      name
+      st
 
   let int64 endianness name st =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom
-          ~pp:Int64.to_string
-          Binary_size.int64
-          TzEndian.get_int64_string
-          name
-          st
-    | Encoding.Little_endian ->
-        read_atom
-          ~pp:Int64.to_string
-          Binary_size.int64
-          TzEndian.get_int64_le_string
-          name
-          st
+    read_atom
+      ~pp:Int64.to_string
+      Binary_size.int64
+      (TzEndian.get_int64_string endianness)
+      name
+      st
 
   let float =
     read_atom ~pp:string_of_float Binary_size.float TzEndian.get_double_string
@@ -182,11 +146,7 @@ module Atom = struct
       ~pp:string_of_int
       Binary_size.uint30
       (fun buffer ofs ->
-        let v32 =
-          match endianness with
-          | Encoding.Big_endian -> TzEndian.get_int32_string buffer ofs
-          | Encoding.Little_endian -> TzEndian.get_int32_le_string buffer ofs
-        in
+        let v32 = TzEndian.get_int32_string endianness buffer ofs in
         let v = Int32.to_int v32 in
         if v < 0 then raise (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
         v)
@@ -198,11 +158,7 @@ module Atom = struct
       ~pp:string_of_int
       Binary_size.int31
       (fun buffer ofs ->
-        let v32 =
-          match endianness with
-          | Encoding.Big_endian -> TzEndian.get_int32_string buffer ofs
-          | Encoding.Little_endian -> TzEndian.get_int32_le_string buffer ofs
-        in
+        let v32 = TzEndian.get_int32_string endianness buffer ofs in
         Int32.to_int v32)
       name
       st

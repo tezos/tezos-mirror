@@ -60,34 +60,18 @@ module Atom = struct
   let uint8 = read_atom Binary_size.uint8 TzEndian.get_uint8_string
 
   let uint16 endianness state =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom Binary_size.int16 TzEndian.get_uint16_string state
-    | Encoding.Little_endian ->
-        read_atom Binary_size.int16 TzEndian.get_uint16_le_string state
+    read_atom Binary_size.uint16 (TzEndian.get_uint16_string endianness) state
 
   let int8 = read_atom Binary_size.int8 TzEndian.get_int8_string
 
   let int16 endianness state =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom Binary_size.int16 TzEndian.get_int16_string state
-    | Encoding.Little_endian ->
-        read_atom Binary_size.int16 TzEndian.get_int16_le_string state
+    read_atom Binary_size.int16 (TzEndian.get_int16_string endianness) state
 
   let int32 endianness state =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom Binary_size.int32 TzEndian.get_int32_string state
-    | Encoding.Little_endian ->
-        read_atom Binary_size.int32 TzEndian.get_int32_le_string state
+    read_atom Binary_size.int32 (TzEndian.get_int32_string endianness) state
 
   let int64 endianness state =
-    match endianness with
-    | Encoding.Big_endian ->
-        read_atom Binary_size.int64 TzEndian.get_int64_string state
-    | Encoding.Little_endian ->
-        read_atom Binary_size.int64 TzEndian.get_int64_le_string state
+    read_atom Binary_size.int64 (TzEndian.get_int64_string endianness) state
 
   let float = read_atom Binary_size.float TzEndian.get_double_string
 
@@ -97,11 +81,7 @@ module Atom = struct
     read_atom
       Binary_size.uint30
       (fun buffer ofs ->
-        let v32 =
-          match endianness with
-          | Encoding.Big_endian -> TzEndian.get_int32_string buffer ofs
-          | Encoding.Little_endian -> TzEndian.get_int32_le_string buffer ofs
-        in
+        let v32 = TzEndian.get_int32_string endianness buffer ofs in
         let v = Int32.to_int v32 in
         if v < 0 then
           raise_read_error (Invalid_int {min = 0; v; max = (1 lsl 30) - 1}) ;
@@ -112,11 +92,7 @@ module Atom = struct
     read_atom
       Binary_size.int31
       (fun buffer ofs ->
-        let r32 =
-          match endianness with
-          | Encoding.Big_endian -> TzEndian.get_int32_string buffer ofs
-          | Encoding.Little_endian -> TzEndian.get_int32_le_string buffer ofs
-        in
+        let r32 = TzEndian.get_int32_string endianness buffer ofs in
         let r = Int32.to_int r32 in
         if not (-0x4000_0000l <= r32 && r32 <= 0x3fff_ffffl) then
           raise_read_error
