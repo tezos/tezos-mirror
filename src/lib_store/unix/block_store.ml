@@ -181,43 +181,59 @@ let compute_predecessors block_store block =
     iteratively. *)
 let get_hash block_store (Block (block_hash, offset)) =
   let open Lwt_result_syntax in
+  let closest_power_two n =
+    if n < 0 then assert false
+    else
+      let rec loop cnt n = if n <= 1 then cnt else loop (cnt + 1) (n / 2) in
+      loop 0 n
+  in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
-      let closest_power_two n =
-        if n < 0 then assert false
-        else
-          let rec loop cnt n = if n <= 1 then cnt else loop (cnt + 1) (n / 2) in
-          loop 0 n
-      in
-      (* actual predecessor function *)
       if offset = 0 then return_some block_hash
       else if offset < 0 then tzfail (Wrong_predecessor (block_hash, offset))
       else
-        let rec loop block_hash offset =
-          if offset = 1 then
-            let*! pred = global_predecessor_lookup block_store block_hash 0 in
-            return pred
-          else
-            let power = closest_power_two offset in
-            let power =
-              if power < Floating_block_index.Block_info.max_predecessors then
-                power
-              else
-                let power =
-                  Floating_block_index.Block_info.max_predecessors - 1
+        match
+          Cemented_block_store.get_cemented_block_level
+            block_store.cemented_store
+            block_hash
+        with
+        | Some block_level ->
+            let target = Int32.(sub block_level (of_int offset)) in
+            return
+              (Cemented_block_store.get_cemented_block_hash
+                 block_store.cemented_store
+                 target)
+        | None ->
+            (* actual predecessor function *)
+            let rec loop block_hash offset =
+              if offset = 1 then
+                let*! pred =
+                  global_predecessor_lookup block_store block_hash 0
                 in
-                power
+                return pred
+              else
+                let power = closest_power_two offset in
+                let power =
+                  if power < Floating_block_index.Block_info.max_predecessors
+                  then power
+                  else
+                    let power =
+                      Floating_block_index.Block_info.max_predecessors - 1
+                    in
+                    power
+                in
+                let*! o =
+                  global_predecessor_lookup block_store block_hash power
+                in
+                match o with
+                | None -> return_none
+                | Some pred ->
+                    let rest = offset - (1 lsl power) in
+                    if rest = 0 then return_some pred
+                      (* landed on the requested predecessor *)
+                    else loop pred rest
+              (* need to jump further back *)
             in
-            let*! o = global_predecessor_lookup block_store block_hash power in
-            match o with
-            | None -> return_none
-            | Some pred ->
-                let rest = offset - (1 lsl power) in
-                if rest = 0 then return_some pred
-                  (* landed on the requested predecessor *)
-                else loop pred rest
-          (* need to jump further back *)
-        in
-        loop block_hash offset)
+            loop block_hash offset)
 
 let mem block_store key =
   let open Lwt_result_syntax in
