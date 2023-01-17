@@ -601,7 +601,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let rpc_addr = P2p_addr.of_string_exn rpc_addr in
     let host = Ipaddr.V6.to_string rpc_addr in
     let node = `TCP (`Port rpc_port) in
-    let acl = RPC_server.Acl.default rpc_addr in
+    let acl = RPC_server.Acl.allow_all in
     let dir = register node_ctxt in
     let server =
       RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
