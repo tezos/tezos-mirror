@@ -293,11 +293,11 @@ The operation is signed by the manager key and does not require the consensus pr
 
 However the public key must be known by the client. It can be imported with the command::
 
-   tezos-client import public key consensus unencrypted:edpk...
+   octez-client import public key consensus unencrypted:edpk...
 
 The command to update the consensus key is::
 
-   tezos-client set consensus key for <mgr> to consensus
+   octez-client set consensus key for <mgr> to consensus
 
 The update becomes active after ``PRESERVED_CYCLES + 1`` cycles. We therefore distinguish
 the active consensus key and the pending consensus keys.
@@ -305,7 +305,7 @@ The active consensus key is by default the delegate’s manager key, which canno
 
 However, it is also possible to register as a delegate and immediately set the consensus key::
 
-   tezos-client register key <mgr> as delegate with consensus key <key>
+   octez-client register key <mgr> as delegate with consensus key <key>
 
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
 A subsequent update within the same cycle takes precedences over the initial one.
@@ -315,23 +315,23 @@ Baking With a Consensus Key
 
 In your baker's command, replace the delegate's manager key alias with the consenus key alias::
 
-   tezos-baker-0XX-Psxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
+   octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
 While transitioning from the delegate's manager key, it is possible to pass the alias for both delegate's manager key and consensus key.
 The delegate will seamlessly keep baking when the transition happens::
 
-   tezos-baker-0XX-Psxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+   octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
 
 Draining a Manager's Account With its Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This operation immediately transfers all the spendable balance of the ``baker_pkh``’s implicit account into the ``destination_pkh`` implicit account::
 
-   tezos-client drain delegate <baker_pkh> to <destination_pkh> with <consensus_pkh>
+   octez-client drain delegate <baker_pkh> to <destination_pkh> with <consensus_pkh>
 
 If the destination is the consensus key account, this can be simplified to::
 
-   tezos-client drain delegate <baker_pkh> to <consensus_pkh>
+   octez-client drain delegate <baker_pkh> to <consensus_pkh>
 
 The active consensus key is the signer for this operation, therefore the private key associated to the consensus key must be available
 in the wallet of the client typing the command. The delegate's private key does not need to be present.

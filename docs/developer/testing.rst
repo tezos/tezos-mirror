@@ -1,15 +1,15 @@
-Overview of Testing in Tezos
+Overview of Testing in Octez
 ============================
 
 The goal of this document is to give an overview on how testing is done in
-Tezos, and to help Tezos contributors use the test suite and
+Octez, and to help Octez contributors use the test suite and
 write tests by pointing them towards the most
 appropriate testing framework for their use case. Finally, this guide
-explains how tests can be :ref:`run automatically in the Tezos CI
+explains how tests can be :ref:`run automatically in the Octez CI
 <gitlab_test_ci>` and how to :ref:`measure test coverage
 <measuring-test-coverage>`.
 
-The frameworks used in Tezos can be categorized along two axes: the
+The frameworks used in Octez can be categorized along two axes: the
 type of component they test, and the type of testing they perform. We
 distinguish the following components:
 
@@ -56,7 +56,7 @@ Acceptance testing
    Testing of the software in real conditions. It is usually slower,
    more costly and less amenable to automation than integration or
    system testing. It is often the final step in the testing process,
-   performed before a release. However, in Tezos, acceptance testing
+   performed before a release. However, in Octez, acceptance testing
    is decoupled from releases, and currently consists in manually running
    a net of resilience tests on a regular base. These tests use various
    testing frameworks.
@@ -79,7 +79,7 @@ in more detail.
                        MT: :ref:`Michelson unit tests <michelson_unit_tests>`.
 
 
-.. csv-table:: Testing frameworks and their applications in Tezos. PT:
+.. csv-table:: Testing frameworks and their applications in Octez. PT:
                :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
    :header: "Component","Unit","Property","Integration","System","Regression","Performance"
 
@@ -102,7 +102,7 @@ Alcotest
 
 `Alcotest <https://github.com/mirage/alcotest>`_ is a library for unit
 and integration testing in OCaml. Alcotest is the primary tool in
-Tezos for unit and integration testing of OCaml code.
+Octez for unit and integration testing of OCaml code.
 
 Typical use cases:
  - Verifying simple input-output specifications for functions with a
@@ -112,11 +112,11 @@ Typical use cases:
 Example tests:
  - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
    execute them locally, run ``dune build @src/lib_requester/runtest`` in
-   the Tezos root.
+   the Octez root.
  - Integration tests for the P2P layer in the shell.  For instance
    :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
    processes that exercise large parts of the P2P layer.  To execute
-   it locally, run ``dune build @runtest_p2p_pool`` in the Tezos
+   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
    root.
 
 References:
@@ -139,11 +139,11 @@ Typical use cases:
 Example tests:
  - Unit tests for :src:`src/lib_micheline`, in :src:`src/lib_micheline/test/test_parser.ml`. To
    execute them locally, run ``dune runtest src/lib_micheline/test`` in
-   the Tezos root.
+   the Octez root.
 
 
 References:
- - :doc:`Section in Tezos Developer Documentation on Ppx_expect <ppx_expect>`
+ - :doc:`Section in Octez Developer Documentation on Ppx_expect <ppx_expect>`
  - `Ppx_expect README <https://github.com/janestreet/ppx_expect>`_.
  - `Dune documentation about inline expectation tests <https://dune.readthedocs.io/en/stable/tests.html#inline-expectation-tests>`_.
  - `Ppx_inline_test README <https://github.com/janestreet/ppx_inline_test>`_.
@@ -172,7 +172,7 @@ References:
 Python testing and execution framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
+The Octez project uses `pytest <https://docs.pytest.org/>`_, a Python testing
 framework, combined with :doc:`a Python wrapper <python_testing_framework>`
 around ``octez-node`` and ``octez-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
@@ -197,11 +197,11 @@ Example tests:
    interpreter (in
    :src:`tests_python/tests_alpha/test_contract_opcodes.py`).  To execute it
    locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
-   in the Tezos root.
+   in the Octez root.
  - Setting up networks of nodes and ensuring their connection
    (in :src:`tests_python/tests_alpha/test_p2p.py`).
    To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
-   the Tezos root.
+   the Octez root.
 
 References:
  - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
@@ -215,7 +215,7 @@ References:
 Tezt
 ~~~~
 
-:doc:`Tezt <tezt>` is a system testing framework for Tezos. It is
+:doc:`Tezt <tezt>` is a system testing framework for Octez. It is
 intended as a replacement to `Flextesa <https://tezos.gitlab.io/flextesa/>`_ and as an OCaml-based alternative
 to :ref:`Python testing and execution framework
 <pytest_section>`. Like the latter, Tezt is also capable of regression
@@ -224,8 +224,8 @@ used for some manual tests (see the :src:`tezt/manual_tests`
 folder). Its main strengths are summarized in its :doc:`section in the
 Tezos Developer Documentation <tezt>`. Conceptually Tezt consists of a
 generic framework for writing tests interacting with external
-processes, and a set of Tezos-specific modules for interacting with
-the Tezos binaries: the client, baker, etc.
+processes, and a set of Octez-specific modules for interacting with
+the Octez binaries: the client, baker, etc.
 
 Typical use cases:
  - In terms of use cases, Tezt is similar to the :ref:`Python testing and
@@ -242,7 +242,7 @@ Example tests:
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
- - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
+ - `Octez-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
 .. _long_tezt_section:
 
@@ -534,7 +534,7 @@ for doing this depends on the type of test you've added:
 Python integration and regression tests
   New Pytest tests will be included automatically in the CI.
   To rebalance the Pytest batches based on a previous pipeline,
-  run (from the root of the Tezos repository):
+  run (from the root of the Octez repository):
   ``cd tests_python && poetry run python ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
   setting ``<PROJECT_ID>`` to a GitLab project id (e.g. ``3836952`` or `tezos/tezos <https://gitlab.com/tezos/tezos>`_)
   and ``<PIPELINE_ID>`` to the id of a pipeline in this project for which integration tests have executed
@@ -543,7 +543,7 @@ Python integration and regression tests
 
 Tezt integration and regression tests
   New Tezt tests will be included automatically in the CI.
-  To rebalance the Tezt batches, run (from the root of the Tezos repository):
+  To rebalance the Tezt batches, run (from the root of the Octez repository):
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
@@ -567,7 +567,7 @@ Test coverage in merge requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Build and tests are instrumented with ``bisect_ppx`` in the CI for each merge
-request on Tezos. To measure test coverage in the CI, it launches the job
+request on Octez. To measure test coverage in the CI, it launches the job
 ``unified_job`` in stage ``test_coverage`` which generates the coverage report.
 They are stored as an HTML report that can be downloaded or browsed from the CI page
 upon completion of the job (see the Artifacts produced by the MR pipeline in the GitLab UI).

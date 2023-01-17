@@ -1,6 +1,6 @@
 .. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
-How to run Tezos
+How to run Octez
 ================
 
 In this section, we discuss how to take part in the protocol that runs
@@ -12,7 +12,7 @@ The second way allows to participate more actively in the protocol, by baking bl
 
 To learn more about the protocol refer to :doc:`this page <../active/protocol_overview>`.
 
-No matter how you decide to run Tezos, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
+No matter how you decide to run Octez, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
 This is especially important for bakers, as baking nodes desynchronized from the correct time of day have caused operational problems in the past by "baking in the future".
 
 .. _delegating_coins:

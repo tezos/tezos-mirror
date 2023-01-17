@@ -1,7 +1,7 @@
 JSON/RPC interface
 ==================
 
-The Tezos node provides a JSON/RPC interface. Note that it is an RPC,
+The Octez node provides a JSON/RPC interface. Note that it is an RPC,
 and it is JSON based, but it does not follow the “JSON-RPC” protocol. It
 is not active by default and it must be explicitly activated with the
 ``--rpc-addr`` option. Typically, if you are not trying to run a local
@@ -13,7 +13,7 @@ network and just want to explore the RPC, you would run:
 
 The RPC interface is self-documented and the ``octez-client`` executable
 is able to pretty-print the RPC API. For instance, to see the API
-provided by the Tezos Shell:
+provided by the Octez Shell:
 
 ::
 

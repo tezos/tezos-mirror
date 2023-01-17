@@ -5,7 +5,7 @@ This page documents the changes brought by protocol Alpha with respect
 to Mumbai (see :ref:`naming_convention`).
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
-branch of Tezos.
+branch of Octez.
 
 .. contents::
 

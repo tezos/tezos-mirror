@@ -43,7 +43,7 @@ and predecessor, as well as the resulting chain state. The import
 process does the same checks, recomputing and checking all the hashes
 it encounters in the snapshot.
 
-To bootstrap a Tezos node from a file to an empty Tezos
+To bootstrap an Octez node from a file to an empty Tezos
 node directory (running this command from an already synchronised node
 will not work), run:
 

@@ -28,7 +28,7 @@ A useful command to debug a node that is not syncing is:
 
 .. _tezos_binaries_signals_and_exit_codes:
 
-Tezos binaries: signals and exit codes
+Octez binaries: signals and exit codes
 --------------------------------------
 
 Signals:

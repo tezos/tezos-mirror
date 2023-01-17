@@ -288,7 +288,7 @@ docker images or can be compiled from sources. Please refer to the
 `Mondaynet <https://teztnets.xyz/mondaynet-about>`_ website
 for installation details.
 
-An Octez rollup node needs an Octez tezos node to run. We assume that
+An Octez rollup node needs an Octez node to run. We assume that
 a rollup node has been launched locally, typically by issuing:
 
 .. code:: sh

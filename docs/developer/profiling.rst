@@ -1,4 +1,4 @@
-Profiling the Tezos node
+Profiling the Octez node
 ========================
 
 Memory profiling the OCaml heap
