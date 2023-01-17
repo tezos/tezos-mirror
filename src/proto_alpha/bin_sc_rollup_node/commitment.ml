@@ -213,12 +213,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
     in
     let* _hash = Injector.add_pending_operation ~source publish_operation in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
-       Decouple commitments from head processing
-
-       Move the following, in a part where we know the operation is
-       included. *)
-    node_ctxt.lpc <- Some commitment ;
     return_unit
 
   let publish_commitments (node_ctxt : _ Node_context.t) =
