@@ -260,6 +260,46 @@ module Aux : sig
     S with type memory = Tezos_webassembly_interpreter.Instance.memory_inst
 end
 
+(** Defines the tick consumption of memory access for the host functions. *)
+module Tick_model : sig
+  include module type of Tezos_webassembly_interpreter.Tick_model
+
+  (* [read_key_in_memory length] returns the tick consumption of reading a
+     key of [length] bytes from the memory. *)
+  val read_key_in_memory : int32 -> tick
+
+  (* [value_written_in_memory length] returns the tick consumption of writing a
+     value of [length] bytes to the memory. *)
+  val value_written_in_memory : int32 -> tick
+
+  (* [value_copied_in_memory length] returns the tick consumption of reading a
+     value of [length] bytes from the memory. *)
+  val value_read_from_memory : int32 -> tick
+
+  (* [tree_access] is tick consumption of accessing a tree in the durable
+     storage. *)
+  val tree_access : tick
+
+  (* [tree_move] is tick consumption of moving a tree in the durable storage. *)
+  val tree_move : tick
+
+  (* [tree_copy] is tick consumption of copying a tree in the durable
+     storage. *)
+  val tree_copy : tick
+
+  (* [tree_deletion] is tick consumption of deleting a tree in the durable
+     storage. *)
+  val tree_deletion : tick
+
+  (* [tree_write] is tick consumption of writing a tree in the durable
+     storage. *)
+  val tree_write : tick
+
+  (* [tree_read] is tick consumption of reading a tree in the durable
+     storage. *)
+  val tree_read : tick
+end
+
 module Internal_for_tests : sig
   (** The number of bytes used to store the metadata of a rollup in memory *)
   val metadata_size : int
