@@ -598,28 +598,34 @@ end
 module Tick_model = struct
   include Tezos_webassembly_interpreter.Tick_model
 
+  (* Note that we cannot have negative key length since their unsigned
+     representation is taken into account, and it will result in an error before
+     actually reading the memory. As such, it is safe to use the "unsafe"
+     version here. *)
+
   let read_key_in_memory key_length =
-    Z.of_int32 key_length * ticks_per_byte_read
+    of_int32_exn key_length * ticks_per_byte_read
 
   let value_written_in_memory value_size =
-    Z.of_int32 value_size * ticks_per_byte_written
+    of_int32_exn value_size * ticks_per_byte_written
 
   let value_read_from_memory value_size =
-    Z.of_int32 value_size * ticks_per_byte_read
+    of_int32_exn value_size * ticks_per_byte_read
 
-  let tree_access = Z.one
+  let tree_access = one
 
-  let tree_move = Z.one
+  let tree_move = one
 
-  let tree_copy = Z.one
+  let tree_copy = one
 
-  let tree_deletion = Z.one
+  let tree_deletion = one
 
-  let tree_write = Z.one
+  let tree_write = one
 
-  let tree_read = Z.one
+  let tree_read = one
 
-  let with_error result ticks = if result < 0l then nop else ticks
+  let with_error result compute_ticks =
+    if result < 0l then nop else compute_ticks ()
 end
 
 let value i = Values.(Num (I32 i))
@@ -634,7 +640,8 @@ let read_input_type =
 let read_input_name = "tezos_read_input"
 
 let read_input_ticks input_size =
-  Tick_model.(with_error input_size (value_written_in_memory input_size))
+  Tick_model.(
+    with_error input_size (fun () -> value_written_in_memory input_size) |> to_z)
 
 let read_input =
   Host_funcs.Host_func
@@ -664,7 +671,9 @@ let write_output_type =
   Types.FuncType (input_types, output_types)
 
 let write_output_ticks output_size =
-  Tick_model.(with_error output_size (value_read_from_memory output_size))
+  Tick_model.(
+    with_error output_size (fun () -> value_read_from_memory output_size)
+    |> to_z)
 
 let write_output =
   Host_funcs.Host_func
@@ -704,7 +713,7 @@ let write_debug ~implem =
           let+ () = run ~memory ~src ~num_bytes in
           (* Write_debug is considered a no-op, it shouldn't take more than the
              default ticks. *)
-          (durable, [], Tick_model.nop)
+          (durable, [], Tick_model.(to_z nop))
       | _ -> raise Bad_input)
 
 let store_has_name = "tezos_store_has"
@@ -717,7 +726,9 @@ let store_has_type =
   Types.FuncType (input_types, output_types)
 
 let store_has_ticks key_size result =
-  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
 
 let store_has =
   Host_funcs.Host_func
@@ -746,7 +757,9 @@ let store_delete_type =
   Types.FuncType (input_types, output_types)
 
 let store_delete_ticks key_size result =
-  Tick_model.(with_error result (read_key_in_memory key_size + tree_deletion))
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_deletion)
+    |> to_z)
 
 let store_delete =
   Host_funcs.Host_func
@@ -778,7 +791,9 @@ let store_value_size_type =
   Types.FuncType (input_types, output_types)
 
 let store_value_size_ticks key_size result =
-  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
 
 let store_value_size =
   let open Lwt_syntax in
@@ -809,7 +824,9 @@ let store_list_size_type =
   Types.FuncType (input_types, output_types)
 
 let store_list_size_ticks key_size result =
-  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
 
 let store_list_size =
   Host_funcs.Host_func
@@ -848,7 +865,9 @@ let store_get_nth_key_type =
   Types.FuncType (input_types, output_types)
 
 let store_get_nth_key_ticks key_size result =
-  Tick_model.(with_error result (read_key_in_memory key_size + tree_access))
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + tree_access)
+    |> to_z)
 
 let store_get_nth_key =
   Host_funcs.Host_func
@@ -890,11 +909,11 @@ let store_copy_type =
 
 let store_copy_ticks from_key_size to_key_size result =
   Tick_model.(
-    with_error
-      result
-      (read_key_in_memory from_key_size
-      + read_key_in_memory to_key_size
-      + tree_copy))
+    with_error result (fun () ->
+        read_key_in_memory from_key_size
+        + read_key_in_memory to_key_size
+        + tree_copy)
+    |> to_z)
 
 let store_copy =
   Host_funcs.Host_func
@@ -936,11 +955,11 @@ let store_move_type =
 
 let store_move_ticks from_key_size to_key_size result =
   Tick_model.(
-    with_error
-      result
-      (read_key_in_memory from_key_size
-      + read_key_in_memory to_key_size
-      + tree_move))
+    with_error result (fun () ->
+        read_key_in_memory from_key_size
+        + read_key_in_memory to_key_size
+        + tree_move)
+    |> to_z)
 
 let store_move =
   Host_funcs.Host_func
@@ -988,11 +1007,11 @@ let store_read_type =
 
 let store_read_ticks key_size value_size =
   Tick_model.(
-    with_error
-      value_size
-      (read_key_in_memory key_size
-      + tree_access
-      + value_written_in_memory value_size))
+    with_error value_size (fun () ->
+        read_key_in_memory key_size
+        + tree_access
+        + value_written_in_memory value_size)
+    |> to_z)
 
 let store_read =
   Host_funcs.Host_func
@@ -1088,11 +1107,11 @@ let store_write_type =
 
 let store_write_ticks key_size value_size result =
   Tick_model.(
-    with_error
-      result
-      (read_key_in_memory key_size
-      + tree_access
-      + value_read_from_memory value_size))
+    with_error result (fun () ->
+        read_key_in_memory key_size
+        + tree_access
+        + value_read_from_memory value_size)
+    |> to_z)
 
 let store_write =
   Host_funcs.Host_func

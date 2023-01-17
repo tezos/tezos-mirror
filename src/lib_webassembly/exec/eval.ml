@@ -1607,8 +1607,9 @@ let reveal_step reveal module_reg payload =
       in
       let vs, es = inv.code in
       let vs = Vector.cons (Num (I32 bytes_count)) vs in
+      (* The number of bytes cannot be negative per construction. *)
       let ticks_to_consume =
-        Tick_model.(Z.of_int32 bytes_count * ticks_per_byte_written)
+        Tick_model.(of_int32_exn bytes_count * ticks_per_byte_written)
       in
       {
         config with
@@ -1622,7 +1623,7 @@ let reveal_step reveal module_reg payload =
                     {
                       code = (vs, es);
                       fresh_frame = None;
-                      remaining_ticks = ticks_to_consume;
+                      remaining_ticks = Tick_model.to_z ticks_to_consume;
                     } ) );
       }
   | _ -> raise (Reveal_error Reveal_step)
