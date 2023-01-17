@@ -33,6 +33,8 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type commitment_and_hash = {commitment : commitment; hash : string}
+
 type slot_header = {level : int; commitment : string; index : int}
 
 type simulation_result = {
@@ -173,7 +175,7 @@ val commitment_with_hash_and_levels_from_json :
 (** [last_stored_commitment client] gets the last commitment with its hash
     stored by the rollup node. *)
 val last_stored_commitment :
-  ?hooks:Process.hooks -> t -> (string * commitment) option Runnable.process
+  ?hooks:Process.hooks -> t -> commitment_and_hash option Runnable.process
 
 (** [last_published_commitment client] gets the last commitment published by the
     rollup node, with its hash and level when the commitment was first published

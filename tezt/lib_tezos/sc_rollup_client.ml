@@ -40,6 +40,8 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type commitment_and_hash = {commitment : commitment; hash : string}
+
 type slot_header = {level : int; commitment : string; index : int}
 
 type simulation_result = {
@@ -64,7 +66,7 @@ let commitment_with_hash_from_json json =
     (JSON.get "hash" json, JSON.get "commitment" json)
   in
   Option.map
-    (fun commitment -> (JSON.as_string hash, commitment))
+    (fun commitment -> {hash = JSON.as_string hash; commitment})
     (commitment_from_json commitment_json)
 
 let commitment_with_hash_and_levels_from_json json =
