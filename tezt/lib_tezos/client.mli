@@ -622,6 +622,14 @@ val spawn_add_address :
 val bls_gen_keys :
   ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
 
+(** Run [octez-client activate accoung <alias> with <activation_key>]. *)
+val activate_account :
+  ?wait:string -> t -> alias:string -> activation_key:string -> unit Lwt.t
+
+(** Same as [activate_account] but do not wait for the process to exit. *)
+val spawn_activate_account :
+  ?wait:string -> t -> alias:string -> activation_key:string -> Process.t
+
 (** Run [octez-client bls list keys].
 
     Returns the known BLS aliases associated to their public key hash.
@@ -1068,6 +1076,12 @@ val remember_contract :
 (** Same as [remember_contract], but do not wait for the process to exit. *)
 val spawn_remember_contract :
   ?force:bool -> alias:string -> address:string -> t -> Process.t
+
+(** Run [octez-client remember script <alias> <src>]. *)
+val remember_script : alias:string -> src:string -> t -> unit Lwt.t
+
+(** Same as [remember_script], but do not wait for the process to exit. *)
+val spawn_remember_script : alias:string -> src:string -> t -> Process.t
 
 (** The information that the user has to provide for every smart contract
     they want to call during the stress test. *)

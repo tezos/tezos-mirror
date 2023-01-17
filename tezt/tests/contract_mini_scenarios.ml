@@ -440,6 +440,67 @@ let test_multiple_entrypoints_counter client ~protocol =
   let* () = check_contract_storage ~__LOC__ client contract ~expected:"None" in
   unit
 
+(* Test that the [noop.tz] contract can be originated, typechecks and can
+   receive a transaction. *)
+let test_contract_noop client ~protocol =
+  let burn_cap = Tez.one in
+  let prg = contract_path protocol "opcodes" "noop.tz" in
+  let* () = Client.remember_script client ~alias:"noop" ~src:("file:" ^ prg) in
+  let* () = Client.typecheck_script client ~script:prg in
+  let* _contract =
+    Client.originate_contract
+      ~alias:"noop"
+      ~amount:(Tez.of_int 1000)
+      ~src:"bootstrap1"
+      ~prg
+      ~init:"Unit"
+      ~burn_cap
+      client
+  in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 10)
+      ~giver:"bootstrap1"
+      ~receiver:"noop"
+      ~burn_cap
+      ~arg:"Unit"
+      client
+  in
+  unit
+
+(* Test that [hardlimit.tz] initialized with [3] fails after the
+   third transfer *)
+let test_contract_hardlimit client ~protocol =
+  let burn_cap = Tez.one in
+  let prg = contract_path protocol "mini_scenarios" "hardlimit.tz" in
+  let* _contract =
+    Client.originate_contract
+      ~alias:"hardlimit"
+      ~amount:(Tez.of_int 1000)
+      ~src:"bootstrap1"
+      ~prg
+      ~init:"3"
+      ~burn_cap
+      client
+  in
+  let spawn_transfer () =
+    Client.spawn_transfer
+      ~amount:(Tez.of_int 10)
+      ~giver:"bootstrap1"
+      ~receiver:"hardlimit"
+      ~burn_cap
+      ~arg:"Unit"
+      client
+  in
+  let* () = spawn_transfer () |> Process.check in
+  let* () = spawn_transfer () |> Process.check in
+  let* () = spawn_transfer () |> Process.check in
+  let* () =
+    spawn_transfer ()
+    |> Process.check_error ~msg:(rex "script reached FAILWITH instruction")
+  in
+  unit
+
 let register ~protocols =
   List.iter
     (fun (title, test_function) ->
@@ -458,4 +519,6 @@ let register ~protocols =
       ("test preimage and signature", test_preimage_and_signature);
       ("test vote for delegate", test_vote_for_delegate);
       ("test multiple entrypoints counter", test_multiple_entrypoints_counter);
+      ("test contract noop", test_contract_noop);
+      ("test contract hardlimit", test_contract_hardlimit);
     ]

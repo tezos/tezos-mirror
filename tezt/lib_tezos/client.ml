@@ -749,6 +749,13 @@ let gen_keys ?alias ?sig_alg client =
   let* () = Process.check p in
   return alias
 
+let spawn_activate_account ?(wait = "none") client ~alias ~activation_key =
+  spawn_command client
+  @@ ["--wait"; wait; "activate"; "account"; alias; "with"; activation_key]
+
+let activate_account ?wait client ~alias ~activation_key =
+  spawn_activate_account ?wait client ~alias ~activation_key |> Process.check
+
 let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
 
@@ -1365,6 +1372,12 @@ let spawn_remember_contract ?(force = false) ~alias ~address client =
 
 let remember_contract ?force ~alias ~address client =
   spawn_remember_contract ?force ~alias ~address client |> Process.check
+
+let spawn_remember_script ~alias ~src client =
+  spawn_command client ["remember"; "script"; alias; src]
+
+let remember_script ~alias ~src client =
+  spawn_remember_script ~alias ~src client |> Process.check
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
