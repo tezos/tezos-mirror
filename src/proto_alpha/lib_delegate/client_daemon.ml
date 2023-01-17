@@ -70,7 +70,8 @@ module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
       ?liquidity_baking_toggle_vote ?per_block_vote_file ?extra_operations
-      ?dal_node_endpoint ~chain ~context_path ~keep_alive delegates =
+      ?dal_node_endpoint ?force_apply ~chain ~context_path ~keep_alive delegates
+      =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -83,6 +84,7 @@ module Baker = struct
           ?per_block_vote_file
           ?extra_operations
           ?dal_node_endpoint
+          ?force_apply
           ~context_path
           ~user_activated_upgrades
           ()
