@@ -403,7 +403,7 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
         match published_at_level_info with
         | None -> (None, None)
         | Some {first_published_at_level; published_at_level} ->
-            (Some first_published_at_level, Some published_at_level)
+            (Some first_published_at_level, published_at_level)
       in
       return (commitment, hash, first_published, published)
     in
@@ -566,12 +566,15 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
                               commitment_hash
                           in
                           match published_at with
-                          | None ->
+                          | None | Some {published_at_level = None; _} ->
                               (* Commitment not published yet *)
                               return
                                 (Sc_rollup_services.Included (info, inbox_info))
-                          | Some {first_published_at_level; published_at_level}
-                            ->
+                          | Some
+                              {
+                                first_published_at_level;
+                                published_at_level = Some published_at_level;
+                              } ->
                               (* Commitment published *)
                               let*! commitment =
                                 Store.Commitments.get

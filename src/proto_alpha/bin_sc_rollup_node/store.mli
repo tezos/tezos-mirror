@@ -106,7 +106,7 @@ module Commitments_published_at_level : sig
   type element = {
     first_published_at_level : Raw_level.t;
         (** The level at which this commitment was first published. *)
-    published_at_level : Raw_level.t;
+    published_at_level : Raw_level.t option;
         (** The level at which we published this commitment. If
             [first_published_at_level <> published_at_level] it means that the
             commitment is republished. *)
