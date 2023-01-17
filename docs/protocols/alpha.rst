@@ -30,14 +30,20 @@ Smart Rollups
 
 - Prefer hex over b58check to encode filenames. (MR :gl:`!7181`)
 
+- Code quality improvements. (MR :gl:`!7287`)
+
+- Fix error raised when no commitment can be cemented. (MR :gl:`!7286`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
+
+Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!7342`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!7074`, :gl:`!7102`,
-:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`, :gl:`!7242`)
+:gl:`!7103`, :gl:`!7140`, :gl:`!7182`, :gl:`!7192`, :gl:`!7242`, :gl:`!7315`)
 
 Breaking Changes
 ----------------
@@ -55,6 +61,8 @@ Bug Fixes
 
 Minor Changes
 -------------
+
+- Adapt new mempool with proto add_operation. (MR :gl:`!6749`)
 
 Internal
 --------
