@@ -214,7 +214,7 @@ protocol in an alternative environment possible.
 The Embedded Economic Protocols
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Three kinds of economic protocols are included in the main Tezos repository.
+Three kinds of economic protocols are included in the main Octez repository.
 
   - The genesis protocol. :package:`tezos-protocol-genesis`
     (:package:`tezos-embedded-protocol-genesis`) is the protocol of

@@ -3,7 +3,7 @@ Command Line Interface
 **********************
 
 This document is a prettier output of the documentation produced by
-the command ``man`` of the different Tezos binaries. You can
+the command ``man`` of the different Octez binaries. You can
 obtain similar pages using shell commands such as:
 
 ::
@@ -55,7 +55,7 @@ Codec manual
 Node manual
 ===========
 
-The command line of the Tezos node is not currently documented as an HTML page, but rather in Unix manual format. You can also obtain it by running ``octez-node --help``, which gives the manual below.
+The command line of the Octez node is not currently documented as an HTML page, but rather in Unix manual format. You can also obtain it by running ``octez-node --help``, which gives the manual below.
 This manual briefly shows the available node commands.
 Each command accepts its own set of options and arguments, that you can discover by running ``octez-node <command> --help``.
 For more details on the node invocation and configuration, see see :doc:`../user/node-configuration`.

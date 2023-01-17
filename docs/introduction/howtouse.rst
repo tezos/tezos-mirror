@@ -2,10 +2,10 @@
 
 .. _howtouse:
 
-Getting started with Tezos
+Getting started with Octez
 ==========================
 
-This short tutorial illustrates the use of the various Tezos binaries as well
+This short tutorial illustrates the use of the various Octez binaries as well
 as some concepts about the network.
 
 .. _tezos_binaries:
@@ -15,7 +15,7 @@ The Binaries
 
 After a successful compilation, you should have the following binaries:
 
-- ``octez-node``: the tezos daemon itself (see `Node`_);
+- ``octez-node``: the Octez daemon itself (see `Node`_);
 - ``octez-client``: a command-line client and basic wallet (see `Client`_);
 - ``octez-admin-client``: administration tool for the node (see :ref:`octez-admin-client`);
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
@@ -406,7 +406,7 @@ more costs being added on top of the transfer and the burn: `fees`.
 To encourage a baker to include our operation, and in general
 to pay for the cost of running the blockchain, each operation usually
 includes a fee that goes to the baker.
-Fees are variable over time and depend on many factors but the tezos
+Fees are variable over time and depend on many factors but the Octez
 client selects a default for us.
 
 The last important bit of our receipt is the balance updates that
@@ -647,7 +647,7 @@ In this short tutorial we will not use some other binaries, but let as briefly r
 Codec
 ~~~~~
 
-The Tezos codec (``octez-codec``) is a utility that:
+The Octez codec (``octez-codec``) is a utility that:
 
 - provides documentation for all the encodings used in the ``octez-node`` (and other binaries), and
 - allows to convert from JSON to binary and vice-versa for all these encodings.
@@ -665,15 +665,15 @@ It is meant to be used:
 
 - by developers to compile the protocol under development,
 - by the packaging process to compile protocols that are pre-linked in the binaries,
-- by the Tezos node when there is an on-chain update to a protocol that is not pre-linked with the binary.
+- by the Octez node when there is an on-chain update to a protocol that is not pre-linked with the binary.
 
 Summary
 -------
 
 In this tutorial, you have learned:
 
-- to start a Tezos node and set up its basic configuration;
-- to use the Tezos client to create implicit accounts and do transfers between them;
+- to start an Octez node and set up its basic configuration;
+- to use the Octez client to create implicit accounts and do transfers between them;
 - to deploy and interact with a simple predefined smart contract;
 - to distinguish between the various costs associated to transactions such as burnt tez, fees, storage costs, and gas consumption;
 - some further concepts such as transaction validation and the RPC interface;

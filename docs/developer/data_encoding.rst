@@ -89,7 +89,7 @@ And the encoders for these types as
 Union types
 ~~~~~~~~~~~
 
-The Tezos codebase makes heavy use of variant types. Consider the
+The Octez codebase makes heavy use of variant types. Consider the
 following variant type:
 
 .. code-block:: ocaml

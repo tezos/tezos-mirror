@@ -192,7 +192,7 @@ sure that the URL schemes and JSON formats and consistent between the
 two parties. These two features are extremely useful when refactoring,
 as the OCaml typechecker will help us track the effects of an RPC API
 change on the whole codebase. The third purpose is of course, to make
-automatic documentation generation possible (as in ``tezos client rpc
+automatic documentation generation possible (as in ``octez-client rpc
 list/format``). Each service is also accompanied by a caller function,
 that can be used from the client to perform the calls, and by the
 tests to simulate calls in a fake in-memory context.

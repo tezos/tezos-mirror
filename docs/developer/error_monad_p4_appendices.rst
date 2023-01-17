@@ -489,7 +489,7 @@ following code fragment?
 | Cons: a single kind of errors means it cannot be very informative.
 
 Option is a common enough strategy that the ``Option_syntax`` and
-``Lwt_option_syntax`` modules are available in the Tezos source.
+``Lwt_option_syntax`` modules are available in the Octez source.
 
 **fallback**
 

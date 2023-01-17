@@ -85,12 +85,12 @@ Validation modes
 ================
 
 The Tezos protocol provides different validation modes, intended to be
-used by Tezos *shell* and *baker* software implementations when
+used by the Tezos *shell* and *baker* software implementations when
 needing to apply (or to assert the validity) of blocks and operations
 under different, or specialized, circumstances -- for example, in
 order to *bake* a block. For each of these validation modes, the API
 specified by the protocol environment offers an entry point so that
-protocol-agnostic components, the Octez shell for instance, are able
+protocol-agnostic components, the Tezos shell for instance, are able
 to use these different modes.
 
 .. _full_application_alpha:

@@ -56,7 +56,7 @@ First, make sure that you are proficient enough in OCaml. The community
 website https://ocaml.org gives a few useful pointers for that. In
 particular, we use a lot of functors, and a few GADTs in the codebase,
 so you may want to make sure that you master these advanced concepts.
-For a more specific explanation of GADT usage in Tezos you can check out
+For a more specific explanation of GADT usage in Octez you can check out
 :doc:`gadt`.
 
 Then, if you don’t know much about the Lwt library, that’s what you want
@@ -228,7 +228,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    into account the impact on :ref:`RPC security <rpc_security>`.
 -  If you modify the user API (e.g. add or change a configuration parameter or
    a command-line option), update the corresponding documentation. In
-   particular, for configuration parameters of the Tezos node, update the node
+   particular, for configuration parameters of the Octez node, update the node
    configuration :doc:`documentation <../user/node-configuration>` and the
    documentation of the modified component(s), usually referred by that page.
 -  If your MR introduces new dependencies, follow the
@@ -580,7 +580,7 @@ description what was tested and how so that **reviewers can reproduce it**.
 Code Review
 -----------
 
-At Tezos all the code is peer reviewed before getting committed in the
+All code is peer reviewed before getting committed in the
 master branch by the :doc:`Octez merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.

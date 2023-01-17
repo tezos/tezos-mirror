@@ -12,10 +12,10 @@ paper <https://zerocoin.org/media/pdf/ZerocoinOakland.pdf>`_.
 
 The reference implementation of Sapling,
 `librustzcash <https://github.com/zcash/librustzcash>`_, was
-integrated in the Tezos codebase during 2019. It will be proposed as
+integrated in the Octez codebase during 2019. It will be proposed as
 part of a protocol amendment during 2020.
 
-Librustzcash and the Tezos integration implement the protocol
+Librustzcash and the Octez integration implement the protocol
 described in this `specification
 <https://github.com/zcash/zips/blob/2e26bb072dfd5f842fe9e779bdec8cabeb4fa9bf/protocol/protocol.pdf>`_, version 2020.1.0.
 
@@ -442,7 +442,7 @@ Client
 
 Under `lib_client_sapling` there is the client integration
 with the support for Sapling keys and forging of transactions.
-The main difference from the existing Tezos client is the need for the
+The main difference from the existing Octez client is the need for the
 Sapling client to keep an additional state, for each contract.
 Because Sapling uses a UTXO model it is necessary for a client to
 compute the set of unspent outputs in order to forge new transactions.

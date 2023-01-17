@@ -258,7 +258,7 @@ interaction with the amendment and voting process.
 Show
 ~~~~
 
-Tezos' client provides a command to show the status of a voting period.
+The client provides a command to show the status of a voting period.
 It displays different information for different kind of periods, as
 in the following samples::
 

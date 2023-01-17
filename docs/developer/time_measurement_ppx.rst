@@ -8,7 +8,7 @@ It is able to measure the time spent in the execution of annotated OCaml
 expressions and to log these measurements when desired. Since it uses
 ``Tezos_event_logging`` for the logging part, this PPX can easily be used
 together with ``Tezt`` framework to perform the benchmarking of specific
-parts of Tezos node.
+parts of Octez node.
 
 **This PPX is only intended to be used for tests. As the current runtime
 implementation performs memory allocation, an unwise usage could mess with

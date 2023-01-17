@@ -13,7 +13,7 @@ Tezt is pronounced `/tɛzti/ <http://ipa-reader.xyz/?text=t%C9%9Bzti>`_
 
 The main benefits of using Tezt-Tezos are:
 
-- tests are written in the same language as Tezos itself (OCaml),
+- tests are written in the same language as Octez itself (OCaml),
   which reduces context switch for developers;
 
 - tests do not actively poll the node
@@ -62,7 +62,7 @@ How to Write New Integration Tests
 ----------------------------------
 
 The best way to get started is to have a look at existing tests in directory
-``tezt/tests`` of the Tezos repository.
+``tezt/tests`` of the Octez repository.
 
 Most integration tests are part of the same executable ``tezt/tests/main.exe``.
 The source of this module is :src:`tezt/tests/main.ml`.

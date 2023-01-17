@@ -2,10 +2,10 @@
 Generalized Algebraic Data Types (GADTs)
 ========================================
 
-GADTs are a recent extension of OCaml, which is widely used in the Tezos
+GADTs are a recent extension of OCaml, which is widely used in the Octez
 code-base, especially in the protocol. They serve many important purposes, most
 notably increasing type safety of the Michelson interpreter. This page reviews
-some of the use cases of GADTs in Tezos codebase and explains what role do they
+some of the use cases of GADTs in Octez codebase and explains what role do they
 play in the design.
 
 For an explanation of the GADT concept itself, try one of the links below:
@@ -18,7 +18,7 @@ For an explanation of the GADT concept itself, try one of the links below:
 Ensuring type safety of the Michelson interpreter
 =================================================
 
-One of the most important use cases for GADTs in Tezos is ensuring type safety
+One of the most important use cases for GADTs in Octez is ensuring type safety
 of the Michelson interpreter. Obviously, because Michelson scripts manage
 possibly large amounts of funds, it is extremely important that the interpreter
 is bug-free and reliable. The static type checking of Michelson expressions

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test the different Tezos installation scenarios documented in howtoget.rst.
+# Test the different Octez installation scenarios documented in howtoget.rst.
 #
 # The scenarios are implemented by separate scripts, which are both:
 # - called by this script within the appropriate Docker containers, and

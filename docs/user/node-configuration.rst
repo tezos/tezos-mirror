@@ -1,7 +1,7 @@
 Node Configuration
 ==================
 
-The Tezos node can be configured in flexible ways to control various
+The Octez node can be configured in flexible ways to control various
 aspects of its behavior, such as :ref:`RPC <configure_rpc>`, :ref:`P2P
 <configure_p2p>`, or :ref:`shell <configure_shell>` parameters, the directory
 for storing data, :doc:`logging <./logging>`, and so on. These aspects

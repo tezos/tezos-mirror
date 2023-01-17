@@ -49,7 +49,7 @@ chmod +x rustup-init.sh
 git clone https://gitlab.com/"$REPO".git tezos
 cd tezos
 git checkout $BRANCH
-# [install Tezos dependencies]
+# [install Octez dependencies]
 opam init --bare
 make build-deps
 # [compile sources]

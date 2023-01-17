@@ -48,7 +48,7 @@ suffixed by ``~rc<N>``.
 
 Releases are available in several forms:
 
--  in source form, from the Tezos code repository
+-  in source form, from the Octez code repository
    (https://gitlab.com/tezos/tezos). Tags for each release are available
    prefixed by ``v``, and there is also a ``latest-release`` tag, pointing to
    the latest **stable release** (i.e., excluding release candidates).
@@ -83,5 +83,5 @@ The packaged forms are updated from the source form as follows:
    -  The process is currently performed manually by
       `Serokell <https://serokell.io>`_.
 
-For installing Tezos from these different forms of releases, see
+For installing Octez from these different forms of releases, see
 :doc:`../introduction/howtoget`.
