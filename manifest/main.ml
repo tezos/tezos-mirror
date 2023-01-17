@@ -592,12 +592,12 @@ let _octez_lwt_result_stdlib_tests =
       "test_list_basic";
       "test_list_basic_lwt";
       "test_seq_basic";
-      "test_generic";
-      "test_fuzzing_seq";
-      "test_fuzzing_list";
-      "test_fuzzing_set";
       "test_fuzzing_seq_tiered";
-      "test_fuzzing_option";
+      "test_fuzzing_seq_against_stdlib";
+      "test_fuzzing_list_against_stdlib";
+      "test_fuzzing_option_against_stdlib";
+      "test_fuzzing_set_against_stdlib";
+      "test_fuzzing_map_against_stdlib";
     ]
     ~path:"src/lib_lwt_result_stdlib/test"
     ~opam:"tezos-lwt-result-stdlib"

@@ -97,3 +97,7 @@ module Flat : EXTENDED
 (** [Full] is a trace implementation where a trace carries a structured
     collection of errors. No error is discarded, nor is the structure. *)
 module Full : EXTENDED
+
+(** [Unit] is a trivial implementation where a trace carries no information
+    at all. This is useful for testing. *)
+module Unit : S with type 'a trace = unit
