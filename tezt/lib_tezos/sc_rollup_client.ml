@@ -42,6 +42,12 @@ type commitment = {
 
 type commitment_and_hash = {commitment : commitment; hash : string}
 
+type commitment_info = {
+  commitment_and_hash : commitment_and_hash;
+  first_published_at_level : int option;
+  included_at_level : int option;
+}
+
 type slot_header = {level : int; commitment : string; index : int}
 
 type simulation_result = {
@@ -69,7 +75,7 @@ let commitment_with_hash_from_json json =
     (fun commitment -> {hash = JSON.as_string hash; commitment})
     (commitment_from_json commitment_json)
 
-let commitment_with_hash_and_levels_from_json json =
+let commitment_info_from_json json =
   let hash, commitment_json, first_published_at_level, included_at_level =
     ( JSON.get "hash" json,
       JSON.get "commitment" json,
@@ -78,10 +84,13 @@ let commitment_with_hash_and_levels_from_json json =
   in
   Option.map
     (fun commitment ->
-      ( JSON.as_string hash,
-        commitment,
-        first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int,
-        included_at_level |> JSON.as_opt |> Option.map JSON.as_int ))
+      {
+        commitment_and_hash = {hash = JSON.as_string hash; commitment};
+        first_published_at_level =
+          first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+        included_at_level =
+          included_at_level |> JSON.as_opt |> Option.map JSON.as_int;
+      })
     (commitment_from_json commitment_json)
 
 let next_name = ref 1
@@ -266,7 +275,7 @@ let last_stored_commitment ?hooks sc_client =
 
 let last_published_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["local"; "last_published_commitment"]
-  |> Runnable.map commitment_with_hash_and_levels_from_json
+  |> Runnable.map commitment_info_from_json
 
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
