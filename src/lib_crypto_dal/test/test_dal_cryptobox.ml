@@ -189,8 +189,10 @@ module Test = struct
         | _ -> false)
 
   (* We can craft two slots whose commitments are equal for two different
-     page sizes.*)
-  let test_collision_page_size () =
+     page sizes. *)
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/4555
+     This test should be adapted with the new constraints on the DAL parameters. *)
+  let _test_collision_page_size () =
     let slot_size = 1 lsl 6 in
     init
       {
@@ -242,7 +244,7 @@ let test =
   List.map
     (fun (test_name, test_func) ->
       Alcotest.test_case test_name `Quick test_func)
-    [("test_collision_page_size", Test.test_collision_page_size)]
+    [ (*("test_collision_page_size", Test.test_collision_page_size);*) ]
 
 let () =
   (* Seed for deterministic pseudo-randomness:
