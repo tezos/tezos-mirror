@@ -58,18 +58,46 @@ module type T = sig
       production, and mocked in tests *)
   type chain_store
 
-  (** The type used internally by this module. Created by {!create} and
-      then passed back and possibly updated by {!apply_operation}. *)
+  (** The state used internally by this module. Created by {!create}
+      and then passed back and possibly updated by {!add_operation} and
+      {!remove_operation}.
+
+      This state notably contains a representation of the protocol
+      mempool, as well as the filter state. *)
   type t
 
-  (** Creates a new prevalidation context w.r.t. the protocol associated with
-      the head block. *)
+  (** Create an empty state based on the [head] block.
+
+      Called only once when a prevalidator starts. *)
   val create :
     chain_store ->
     head:Store.Block.t ->
     timestamp:Time.Protocol.t ->
-    unit ->
     t tzresult Lwt.t
+
+  (** Create a new empty state based on the [head] block.
+
+      The previous state must be provided (even when it was based on a
+      different block). Indeed, parts of it are recycled to make this
+      function more efficient than [create]. *)
+  val flush :
+    chain_store ->
+    head:Store.Block.t ->
+    timestamp:Time.Protocol.t ->
+    t ->
+    t tzresult Lwt.t
+
+  (** Light preliminary checks that should be performed on arrival of
+      an operation and after a flush of the prevalidator.
+
+      See [Shell_plugin.FILTER.Mempool.pre_filter]. *)
+  val pre_filter :
+    t ->
+    filter_config ->
+    protocol_operation Shell_operation.operation ->
+    [ `Passed_prefilter of Prevalidator_pending_operations.priority
+    | Prevalidator_classification.error_classification ]
+    Lwt.t
 
   (** If an old operation has been replaced by a newly added
       operation, then this type contains its hash and its new
@@ -81,17 +109,15 @@ module type T = sig
 
   (** Result of {!add_operation}.
 
-      Contain the updated (or unchanged) state {!t} and
-      {!filter_state}, the operation (in which
-      [count_successful_prechecks] has been incremented if
-      appropriate), its classification, and the potential
-      {!replacement}.
+      Contain the updated (or unchanged) state {!t},
+      the operation (in which [count_successful_prechecks]
+      has been incremented if appropriate), its classification,
+      and the potential {!replacement}.
 
       Invariant: [replacement] can only be [Some _] when the
       classification is [`Prechecked]. *)
   type add_result =
     t
-    * filter_state
     * protocol_operation Shell_operation.operation
     * Prevalidator_classification.classification
     * replacement
@@ -106,20 +132,24 @@ module type T = sig
       See {!add_result} for a description of the output. *)
   val add_operation :
     t ->
-    filter_state ->
     filter_config ->
     protocol_operation Shell_operation.operation ->
     add_result Lwt.t
 
-  (** [validation_state t] returns the subset of [t] corresponding
-      to the type {!validation_state} of the protocol. *)
-  val validation_state : t -> validation_state
+  (** Remove an operation from the state.
+
+      The state remains unchanged when the operation was not
+      present. *)
+  val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
 
   module Internal_for_tests : sig
     (** Return the map of operations currently present in the protocol
         representation of the mempool. *)
     val get_valid_operations :
       t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+
+    (** Return the filter_state component of the state. *)
+    val get_filter_state : t -> filter_state
 
     (** Type {!Tezos_protocol_environment.PROTOCOL.Mempool.validation_info}. *)
     type validation_info

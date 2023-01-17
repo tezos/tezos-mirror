@@ -71,7 +71,7 @@ let oph_and_info_gen =
   let+ oph = operation_hash_gen in
   (oph, dummy_manager_op_info)
 
-let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =
+let filter_state_gen : Plugin.Mempool.ops_state QCheck2.Gen.t =
   let open QCheck2.Gen in
   let open Plugin.Mempool in
   let+ ops = small_list oph_and_info_gen in
@@ -92,7 +92,6 @@ let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =
           | Some _ | None -> Some op_weight
         in
         {
-          state with
           prechecked_manager_op_count;
           prechecked_manager_ops =
             Tezos_crypto.Operation_hash.Map.add
@@ -103,13 +102,13 @@ let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =
             ManagerOpWeightSet.add op_weight state.prechecked_op_weights;
           min_prechecked_op_weight;
         })
-    Plugin.Mempool.empty
+    Plugin.Mempool.empty_ops_state
     ops
 
 (** Generate a pair of operation hash and manager_op_info, that has
     even odds of belonging to the given filter_state or being fresh. *)
 let with_filter_state_operation_gen :
-    Plugin.Mempool.state ->
+    Plugin.Mempool.ops_state ->
     (Tezos_crypto.Operation_hash.t * Plugin.Mempool.manager_op_info)
     QCheck2.Gen.t =
  fun state ->
@@ -127,7 +126,7 @@ let with_filter_state_operation_gen :
     manager_op_info. The pair has even odds of belonging to the
     filter_state or being fresh. *)
 let filter_state_with_operation_gen :
-    (Plugin.Mempool.state
+    (Plugin.Mempool.ops_state
     * (Tezos_crypto.Operation_hash.t * Plugin.Mempool.manager_op_info))
     QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -138,7 +137,7 @@ let filter_state_with_operation_gen :
     manager_op_info. The pairs have indepedent, even odds of belonging
     to the filter_state or being fresh. *)
 let filter_state_with_two_operations_gen :
-    (Plugin.Mempool.state
+    (Plugin.Mempool.ops_state
     * (Tezos_crypto.Operation_hash.t * Plugin.Mempool.manager_op_info)
     * (Tezos_crypto.Operation_hash.t * Plugin.Mempool.manager_op_info))
     QCheck2.Gen.t =
