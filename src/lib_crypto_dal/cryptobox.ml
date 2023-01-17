@@ -309,18 +309,17 @@ module Inner = struct
     srs : srs;
   }
 
+  let is_power_of_two n = n <> 0 && n land (n - 1) = 0
+
   let ensure_validity t =
     let open Result_syntax in
     let srs_size = Srs_g1.size t.srs.raw.srs_g1 in
     let srs_size_g2 = Srs_g2.size t.srs.raw.srs_g2 in
-    let is_pow_of_two x =
-      let logx = Z.(log2 (of_int x)) in
-      1 lsl logx = x
-    in
     if
       not
-        (is_pow_of_two t.slot_size && is_pow_of_two t.page_size
-       && is_pow_of_two t.n)
+        (is_power_of_two t.slot_size
+        && is_power_of_two t.page_size
+        && is_power_of_two t.n)
     then
       (* According to the specification the lengths of a slot page are
          in MiB *)
@@ -330,7 +329,7 @@ module Inner = struct
          power of two), the size in bytes of a scalar element, and strictly less
          than [t.slot_size]. *)
       fail (`Fail "Wrong page size")
-    else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
+    else if not (Z.(log2 (of_int t.n)) <= 32 && is_power_of_two t.k && t.n > t.k)
     then
       (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
          multiplicative group of Fr, because the FFTs operate on such groups. *)
@@ -691,10 +690,6 @@ module Inner = struct
     let logx = Z.log2 (Z.of_int x) in
     if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
 
-  let is_pow_of_two x =
-    let logx = Z.log2 (Z.of_int x) in
-    1 lsl logx = x
-
   (* Implementation of fast amortized Kate proofs
      https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf). *)
 
@@ -736,7 +731,7 @@ module Inner = struct
     let open Bls12_381 in
     let n = chunk_len + chunk_count in
     assert (chunk_len < n) ;
-    assert (is_pow_of_two degree) ;
+    assert (is_power_of_two degree) ;
     assert (1 lsl chunk_len < degree) ;
     assert (degree <= 1 lsl n) ;
     let l = 1 lsl chunk_len in
