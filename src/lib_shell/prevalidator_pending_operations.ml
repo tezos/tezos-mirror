@@ -24,16 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
-
-   This file is part of the implementation of the new mempool, which
-   uses features of the protocol that only exist since Lima.
-
-   When you modify this file, consider whether you should also change
-   the files that implement the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
-
 open Shell_operation
 
 (* Ordering is important, as it is used below in map keys comparison *)

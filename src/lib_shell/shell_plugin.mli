@@ -24,10 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of a protocol-specific mempool filter plugin.
-
-    This is compatible with the plugins of protocols Lima and up. For
-    Kathmandu and older protocols, see {!Legacy_mempool_plugin.FILTER}. *)
+(** Type of a protocol-specific mempool filter plugin. *)
 module type FILTER = sig
   module Proto : Registered_protocol.T
 
