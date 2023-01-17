@@ -415,6 +415,23 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
         Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
       in
       (tree, ticks)
+
+    let compute_step_many_until ?max_steps ?reveal_builtins ?write_debug
+        should_compute tree =
+      let open Lwt.Syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state, ticks =
+        Wasm_vm.compute_step_many_until
+          ?max_steps
+          ?reveal_builtins
+          ?write_debug
+          should_compute
+          pvm_state
+      in
+      let+ tree =
+        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      in
+      (tree, ticks)
   end
 end
 

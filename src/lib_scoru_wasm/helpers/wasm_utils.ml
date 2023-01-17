@@ -246,33 +246,6 @@ let rec eval_until_init tree =
       let* tree = Wasm.compute_step tree in
       eval_until_init tree
 
-(* [eval_until_cond should_conpute tree] is exactly `compute_step_many_until`,
-   it can fail if [should_compute] doesn't stop on input ticks. *)
-let eval_to_cond ?write_debug ?reveal_builtins should_compute tree =
-  let open Lwt_syntax in
-  (* Since `compute_step_many_until` is not exported by the PVM but only the VM,
-     we decode and re-encode by hand. *)
-  let* pvm_state =
-    Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-      tree
-  in
-  let* pvm_state, ticks =
-    Tezos_scoru_wasm.Wasm_vm.compute_step_many_until
-      ?reveal_builtins
-      ?write_debug
-      ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
-      should_compute
-      pvm_state
-  in
-  let+ tree =
-    Tree_encoding_runner.encode
-      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-      pvm_state
-      tree
-  in
-  (tree, ticks)
-
 (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
@@ -297,7 +270,15 @@ let eval_to_result ?write_debug ?reveal_builtins tree =
         false
     | No_input_required, _ -> true
   in
-  eval_to_cond ?write_debug ?reveal_builtins should_compute tree
+  let* pvm_state =
+    Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
+  in
+  Wasm.Internal_for_tests.compute_step_many_until
+    ?write_debug
+    ?reveal_builtins
+    ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
+    should_compute
+    tree
 
 let set_input_step message message_counter tree =
   let input_info =
