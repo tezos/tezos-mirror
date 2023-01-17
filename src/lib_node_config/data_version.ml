@@ -100,7 +100,8 @@ end
  *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0)
  *  - 1.0     : context upgrade (upgrade to irmin.3.3)
  *  - 2.0     : introduce context GC (upgrade to irmin.3.4)
- *  - 3.0     : change blocks' context hash semantics *)
+ *  - 3.0     : change blocks' context hash semantics and upgrade to
+                irmin.3.5 *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
