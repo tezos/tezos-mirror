@@ -57,11 +57,39 @@ module Make (PVM : Pvm.S) = struct
             commitment_hash
             {
               first_published_at_level = published_at_level;
-              published_at_level = Raw_level.of_int32_exn head.Layer1.level;
+              published_at_level =
+                Some (Raw_level.of_int32_exn head.Layer1.level);
             }
         in
-
         return_unit
+    | ( Sc_rollup_publish {commitment; _},
+        Sc_rollup_publish_result {published_at_level; _} ) ->
+        (* Commitment published by someone else *)
+        let commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment
+        in
+        let*! known_commitment =
+          Store.Commitments.mem node_ctxt.store commitment_hash
+        in
+        if not known_commitment then return_unit
+        else
+          let*! republication =
+            Store.Commitments_published_at_level.mem
+              node_ctxt.store
+              commitment_hash
+          in
+          if republication then return_unit
+          else
+            let*! () =
+              Store.Commitments_published_at_level.add
+                node_ctxt.store
+                commitment_hash
+                {
+                  first_published_at_level = published_at_level;
+                  published_at_level = None;
+                }
+            in
+            return_unit
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)

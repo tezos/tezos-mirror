@@ -166,7 +166,7 @@ module Last_stored_commitment_level =
 module Commitments_published_at_level = struct
   type element = {
     first_published_at_level : Raw_level.t;
-    published_at_level : Raw_level.t;
+    published_at_level : Raw_level.t option;
   }
 
   let element_encoding =
@@ -178,7 +178,7 @@ module Commitments_published_at_level = struct
         {first_published_at_level; published_at_level})
     @@ obj2
          (req "first_published_at_level" Raw_level.encoding)
-         (req "published_at_level" Raw_level.encoding)
+         (opt "published_at_level" Raw_level.encoding)
 
   include
     Make_updatable_map
