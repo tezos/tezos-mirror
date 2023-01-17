@@ -804,14 +804,10 @@ module Revamped = struct
        operation). Check that it fails and the mempool is unchanged. Indeed, \
        the [force] argument of [inject] defaults to [false] so the faulty \
        injected operation is discarded." ;
-    let error =
-      rex
-        {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
-    in
     let* (`OpHash _) =
       Operation.Manager.(
         inject
-          ~error
+          ~error:Operation.conflict_error
           ~signer
           [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap4 ()]
           client)

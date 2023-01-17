@@ -41,7 +41,7 @@ let check_validate_1m_restriction_node =
     ~tags:["1m"; "manager"; "plugin"; "restriction"]
   @@ fun protocol ->
   let inject_two_manager_operations_and_check_error ~disable_operations_precheck
-      error =
+      =
     Log.info
       "Initialize a client %s operation precheck in the plugin."
       (if disable_operations_precheck then "without" else "with") ;
@@ -63,6 +63,7 @@ let check_validate_1m_restriction_node =
     in
     let* (`OpHash _s) = Operation.Manager.inject [op1] client in
 
+    let error = Operation.conflict_error in
     Log.info
       "Inject a second transfer with the same manager and check that the \
        injection fails with the following message:\n\
@@ -77,17 +78,11 @@ let check_validate_1m_restriction_node =
     unit
   in
 
-  let conflict_rex =
-    rex
-      {|The operation [\w\d]+ cannot be added because the mempool already contains a conflicting operation that should not be replaced \(e\.g\. an operation from the same manager with better fees\)\.|}
-  in
   let* () =
     inject_two_manager_operations_and_check_error
       ~disable_operations_precheck:false
-      conflict_rex
   in
   inject_two_manager_operations_and_check_error
     ~disable_operations_precheck:true
-    conflict_rex
 
 let register ~protocols = check_validate_1m_restriction_node protocols
