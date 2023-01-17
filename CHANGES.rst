@@ -77,8 +77,10 @@ Node
 
 - **Breaking change**: bumped the node's storage version to
   ``3.0``. This new version changes the store's representation
-  required by the new protocol's semantics. Upgrading to this new
-  version is automatic and irreversible. (MR :gl: `!6835`)
+  required by the new protocol's semantics and the context's format to
+  improve the disk usage footprint while running a context
+  pruning. Upgrading to this new version is automatic and
+  irreversible. (MR :gl: `!6835` and :gl: `!6959`)
 
 - **Breaking change**: bumped the snapshot version to ``5``. This
   version changes internal snapshot file representation to include
