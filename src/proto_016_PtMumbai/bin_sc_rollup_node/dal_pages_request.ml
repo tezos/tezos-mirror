@@ -59,9 +59,9 @@ let () =
     (function Dal_invalid_page_for_slot page_id -> Some page_id | _ -> None)
     (fun page_id -> Dal_invalid_page_for_slot page_id)
 
-let store_entry_from_published_level ~dal_attestation_lag ~published_level store
-    =
-  State.hash_of_level store
+let store_entry_from_published_level ~dal_attestation_lag ~published_level
+    node_ctxt =
+  State.hash_of_level node_ctxt
   @@ Int32.(
        add (of_int dal_attestation_lag) (Raw_level.to_int32 published_level))
 
@@ -94,7 +94,7 @@ let check_confirmation_status_and_download
     ~published_in_block_hash index =
   let open Lwt_result_syntax in
   let* confirmed_in_block_level =
-    State.level_of_hash node_ctxt.store confirmed_in_block_hash
+    State.level_of_hash node_ctxt confirmed_in_block_hash
   in
   let confirmed_in_head =
     Layer1.{hash = confirmed_in_block_hash; level = confirmed_in_block_level}
@@ -130,8 +130,11 @@ let check_confirmation_status_and_download
 let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
     Dal.Slot.Header.{published_level; index} =
   let open Lwt_result_syntax in
-  let*! confirmed_in_block_hash =
-    store_entry_from_published_level ~dal_attestation_lag ~published_level store
+  let* confirmed_in_block_hash =
+    store_entry_from_published_level
+      ~dal_attestation_lag
+      ~published_level
+      node_ctxt
   in
   let*! processed =
     Store.Dal_processed_slots.find
@@ -141,8 +144,8 @@ let slot_pages ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
   in
   match processed with
   | None ->
-      let*! published_in_block_hash =
-        State.hash_of_level store (Raw_level.to_int32 published_level)
+      let* published_in_block_hash =
+        State.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
       in
       check_confirmation_status_and_download
         node_ctxt
@@ -170,8 +173,11 @@ let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
   let open Delayed_write_monad.Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
-  let*! confirmed_in_block_hash =
-    store_entry_from_published_level ~dal_attestation_lag ~published_level store
+  let* confirmed_in_block_hash =
+    store_entry_from_published_level
+      ~dal_attestation_lag
+      ~published_level
+      node_ctxt
   in
   let*! processed =
     Store.Dal_processed_slots.find
@@ -189,8 +195,8 @@ let page_content ~dal_attestation_lag ({Node_context.store; _} as node_ctxt)
          having this additional check in place ensures that we do not rely on
          the logic of that function when determining the confirmation status of
          a slot. *)
-      let*! published_in_block_hash =
-        State.hash_of_level store (Raw_level.to_int32 published_level)
+      let* published_in_block_hash =
+        State.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
       in
       let>* pages =
         check_confirmation_status_and_download

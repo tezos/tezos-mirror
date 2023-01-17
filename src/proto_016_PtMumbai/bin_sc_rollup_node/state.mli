@@ -45,19 +45,24 @@ val mark_finalized_head : Store.rw -> Layer1.head -> unit Lwt.t
 (** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
 val get_finalized_head_opt : _ Store.t -> Layer1.head option Lwt.t
 
-(** [hash_of_level store level] returns the current block hash for a
-   given [level]. Raise [Invalid_argument] if [hash] does not belong
-   to [store]. *)
-val hash_of_level : _ Store.t -> int32 -> Tezos_crypto.Block_hash.t Lwt.t
+(** [hash_of_level node_ctxt level] returns the current block hash for a given
+    [level]. *)
+val hash_of_level :
+  _ Node_context.t -> int32 -> Tezos_crypto.Block_hash.t tzresult Lwt.t
 
-(** [level_of_hash store hash] returns the level for Tezos block hash [hash] if
-    it is known by the rollup node. *)
+(** [hash_of_level_opt] is like {!hash_of_level} but returns [None] if the
+    [level] is not known. *)
+val hash_of_level_opt :
+  _ Node_context.t -> int32 -> Tezos_crypto.Block_hash.t option Lwt.t
+
+(** [save_level store head] registers the correspondences [head.level |->
+    head.hash] in the store. *)
+val save_level : Store.rw -> Layer1.head -> unit Lwt.t
+
+(** [level_of_hash node_ctxt hash] returns the level for Tezos block hash [hash]
+    if it is known by the Tezos Layer 1 node. *)
 val level_of_hash :
-  _ Store.t -> Tezos_crypto.Block_hash.t -> int32 tzresult Lwt.t
-
-(** [set_block_level_and_hash store head] registers the correspondences
-    [head.level |-> head.hash] and [head.hash |-> head.level] in the store. *)
-val set_block_level_and_hash : Store.rw -> Layer1.head -> unit Lwt.t
+  _ Node_context.t -> Tezos_crypto.Block_hash.t -> int32 tzresult Lwt.t
 
 (** [block_before store tick] returns the last layer 2 block whose initial tick
     is before [tick]. *)
