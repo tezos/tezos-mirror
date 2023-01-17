@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -26,7 +26,7 @@
 
 (* Testing
    -------
-   Component:    Smart Contract Optimistic Rollups
+   Component:    Smart Optimistic Rollups
    Invocation:   dune exec tezt/tests/main.exe -- --file sc_rollup.ml
 *)
 
