@@ -325,10 +325,10 @@ module Inner = struct
       (* According to the specification the lengths of a slot page are
          in MiB *)
       fail (`Fail "Wrong slot size: expected MiB")
-    else if not (t.page_size >= 32 && t.page_size <= t.slot_size) then
+    else if not (t.page_size >= 32 && t.page_size < t.slot_size) then
       (* The size of a page must be greater than 31 bytes (32 > 31 is the next
-         power of two), the size in bytes of a scalar element, and less than
-         [t.slot_size]. *)
+         power of two), the size in bytes of a scalar element, and strictly less
+         than [t.slot_size]. *)
       fail (`Fail "Wrong page size")
     else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
     then
@@ -351,6 +351,8 @@ module Inner = struct
              "SRS on G2 size is too small. Expected more than %d. Got %d"
              t.k
              srs_size_g2))
+    else if 2 * t.shard_size >= t.k then fail (`Fail "Too few shards")
+    else if t.k <= 1 then fail (`Fail "Slot size too small")
     else return t
 
   let slot_as_polynomial_length ~slot_size =
@@ -391,47 +393,49 @@ module Inner = struct
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
-    let shard_size = n / number_of_shards in
-    let evaluations_log = Z.(log2 (of_int n)) in
-    let evaluations_per_proof_log =
-      evaluations_per_proof_log ~length:k ~redundancy_factor ~number_of_shards
-    in
-    let page_length = page_length ~page_size in
-    let* srs =
-      match !initialisation_parameters with
-      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
-      | Some raw ->
-          return
-            {
-              raw;
-              kate_amortized_srs_g2_shards =
-                Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
-              kate_amortized_srs_g2_pages =
-                Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
-            }
-    in
-    let t =
-      {
-        redundancy_factor;
-        slot_size;
-        page_size;
-        number_of_shards;
-        k;
-        n;
-        domain_k = make_domain k;
-        domain_2k = make_domain (2 * k);
-        domain_n = make_domain n;
-        shard_size;
-        pages_per_slot = pages_per_slot parameters;
-        page_length;
-        remaining_bytes = page_size mod scalar_bytes_amount;
-        evaluations_log;
-        evaluations_per_proof_log;
-        proofs_log = evaluations_log - evaluations_per_proof_log;
-        srs;
-      }
-    in
-    ensure_validity t
+    if number_of_shards >= n then fail (`Fail "Too many shards")
+    else
+      let shard_size = n / number_of_shards in
+      let evaluations_log = Z.(log2 (of_int n)) in
+      let evaluations_per_proof_log =
+        evaluations_per_proof_log ~length:k ~redundancy_factor ~number_of_shards
+      in
+      let page_length = page_length ~page_size in
+      let* srs =
+        match !initialisation_parameters with
+        | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
+        | Some raw ->
+            return
+              {
+                raw;
+                kate_amortized_srs_g2_shards =
+                  Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
+                kate_amortized_srs_g2_pages =
+                  Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
+              }
+      in
+      let t =
+        {
+          redundancy_factor;
+          slot_size;
+          page_size;
+          number_of_shards;
+          k;
+          n;
+          domain_k = make_domain k;
+          domain_2k = make_domain (2 * k);
+          domain_n = make_domain n;
+          shard_size;
+          pages_per_slot = pages_per_slot parameters;
+          page_length;
+          remaining_bytes = page_size mod scalar_bytes_amount;
+          evaluations_log;
+          evaluations_per_proof_log;
+          proofs_log = evaluations_log - evaluations_per_proof_log;
+          srs;
+        }
+      in
+      ensure_validity t
 
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
@@ -728,7 +732,6 @@ module Inner = struct
       ~preprocess:(domain2m, precomputed_srs_part) coefs =
     let open Bls12_381 in
     let n = chunk_len + chunk_count in
-    assert (2 <= chunk_len) ;
     assert (chunk_len < n) ;
     assert (is_pow_of_two degree) ;
     assert (1 lsl chunk_len < degree) ;
