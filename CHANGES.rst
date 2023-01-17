@@ -131,6 +131,8 @@ Node
 - **Breaking Changes:** Removed ``kathmandunet`` from the list of
   known networks (for ``--network`` command-line argument).
 
+- Allowed symbolic links in the datadir (to split data over several places).
+
 Client
 ------
 
