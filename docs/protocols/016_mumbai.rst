@@ -49,7 +49,7 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!7045`, :gl:`!7036`, :gl:`!6987`, :gl:`!7016`, :gl:`!6380`, :gl:`!7109`,
 :gl:`!7114`, :gl:`!6968`, :gl:`!7130`, :gl:`!7054`, :gl:`!7189`, :gl:`!7220`,
 :gl:`!7067`, :gl:`!7213`, :gl:`!7233`, :gl:`!7247`, :gl:`!7248`, :gl:`!7253`,
-:gl:`!7254`, :gl:`!7271`, :gl:`!7161`)
+:gl:`!7254`, :gl:`!7271`, :gl:`!7161`, :gl:`!7320`, :gl:`!7280`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -162,6 +162,8 @@ Minor Changes
 
 - Enable transferring tickets to/from implicit accounts. (MRs :gl:`!6108`,
   :gl:`!6490`, :gl:`!6867`)
+
+- Update gas for Mumbai. (MRs :gl:`!7061`, :gl:`!7299`)
 
 Internal
 --------
