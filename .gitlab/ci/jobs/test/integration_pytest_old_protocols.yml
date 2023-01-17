@@ -3,7 +3,7 @@ include: .gitlab/ci/jobs/test/common.yml
 integration:pytest_old_protocols:
   extends:
     - .pytest_integration
-  parallel: 16
+  parallel: 10
   variables:
     TESTS: "--ignore tests_alpha"
   rules:
