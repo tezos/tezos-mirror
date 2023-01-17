@@ -35,8 +35,7 @@ let parameters =
     }
 
 let initialisation_parameters =
-  Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-    ~slot_size:parameters.slot_size
+  Cryptobox.Internal_for_tests.parameters_initialisation parameters
 
 let () = Cryptobox.Internal_for_tests.load_parameters initialisation_parameters
 

@@ -356,6 +356,11 @@ module Inner = struct
   let slot_as_polynomial_length ~slot_size =
     1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
+  let evaluations_per_proof_log ~length ~redundancy_factor ~number_of_shards =
+    Z.log2 (Z.of_int (length * redundancy_factor / number_of_shards))
+
+  let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
+
   type parameters = {
     redundancy_factor : int;
     page_size : int;
@@ -388,8 +393,10 @@ module Inner = struct
     let n = redundancy_factor * k in
     let shard_size = n / number_of_shards in
     let evaluations_log = Z.(log2 (of_int n)) in
-    let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
-    let page_length = Int.div page_size scalar_bytes_amount + 1 in
+    let evaluations_per_proof_log =
+      evaluations_per_proof_log ~length:k ~redundancy_factor ~number_of_shards
+    in
+    let page_length = page_length ~page_size in
     let* srs =
       match !initialisation_parameters with
       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
@@ -917,43 +924,76 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let initialisation_parameters_from_slot_size ~slot_size =
-    let size = slot_as_polynomial_length ~slot_size in
+  let parameters_initialisation parameters =
+    let length = slot_as_polynomial_length ~slot_size:parameters.slot_size in
     let secret =
       Bls12_381.Fr.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let srs_g1 = Srs_g1.generate_insecure (size + 1) secret in
-    let srs_g2 = Srs_g2.generate_insecure (size + 1) secret in
+    let srs_g1 = Srs_g1.generate_insecure length secret in
+    (* The error is caught during the instantiation through [make]. *)
+    let evaluations_per_proof_log =
+      match
+        evaluations_per_proof_log
+          ~length
+          ~redundancy_factor:parameters.redundancy_factor
+          ~number_of_shards:parameters.number_of_shards
+      with
+      | exception Invalid_argument _ -> 0
+      | x -> x
+    in
+    (* The cryptobox will read at indices `size`, `1 lsl evaluations_per_proof_log`
+       and `page_length` so we take the max + 1. Since `page_length < size`, we
+       can remove the `page_length from the max. *)
+    let srs_g2 =
+      Srs_g2.generate_insecure
+        (max length (1 lsl evaluations_per_proof_log) + 1)
+        secret
+    in
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
 end
 
 module Config = struct
-  type t = {activated : bool; srs_size : int option}
+  type t = {activated : bool; use_mock_srs_for_testing : parameters option}
+
+  let parameters_encoding : parameters Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {slot_size; page_size; redundancy_factor; number_of_shards} ->
+        (slot_size, page_size, redundancy_factor, number_of_shards))
+      (fun (slot_size, page_size, redundancy_factor, number_of_shards) ->
+        {slot_size; page_size; redundancy_factor; number_of_shards})
+      (obj4
+         (req "slot_size" int31)
+         (req "page_size" int31)
+         (req "redundancy_factor" int31)
+         (req "number_of_shards" int31))
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun {activated; srs_size} -> (activated, srs_size))
-      (fun (activated, srs_size) -> {activated; srs_size})
-      (obj2 (req "activated" bool) (req "srs_size" (option int31)))
+      (fun {activated; use_mock_srs_for_testing} ->
+        (activated, use_mock_srs_for_testing))
+      (fun (activated, use_mock_srs_for_testing) ->
+        {activated; use_mock_srs_for_testing})
+      (obj2
+         (req "activated" bool)
+         (req "use_mock_srs_for_testing" (option parameters_encoding)))
 
-  let default = {activated = false; srs_size = None}
+  let default = {activated = false; use_mock_srs_for_testing = None}
 
   let init_dal ~find_srs_files dal_config =
     let open Lwt_result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
-        match dal_config.srs_size with
+        match dal_config.use_mock_srs_for_testing with
+        | Some parameters ->
+            return (Internal_for_tests.parameters_initialisation parameters)
         | None ->
             let*? g1_path, g2_path = find_srs_files () in
             initialisation_parameters_from_files ~g1_path ~g2_path
-        | Some slot_size ->
-            return
-              (Internal_for_tests.initialisation_parameters_from_slot_size
-                 ~slot_size)
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit

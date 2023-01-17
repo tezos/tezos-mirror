@@ -813,8 +813,7 @@ module Dal = struct
         fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
       parameters =
     let initialisation_parameters =
-      Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-        ~slot_size:parameters.Cryptobox.slot_size
+      Cryptobox.Internal_for_tests.parameters_initialisation parameters
     in
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
     match Cryptobox.make parameters with

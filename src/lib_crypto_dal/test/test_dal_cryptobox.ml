@@ -12,12 +12,9 @@ module Test = struct
     indices
 
   (* Initializes the DAL parameters *)
-  let init slot_size =
-    let parameters =
-      Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-        ~slot_size
-    in
-    Cryptobox.Internal_for_tests.load_parameters parameters
+  let init parameters =
+    Cryptobox.Internal_for_tests.parameters_initialisation parameters
+    |> Cryptobox.Internal_for_tests.load_parameters
 
   (* Returns a tuple (slot, msg) where
      - slot of the given [size] padded with null bytes starting
@@ -35,13 +32,6 @@ module Test = struct
     Bytes.blit msg 0 slot 0 padding_threshold ;
     (slot, msg)
 
-  type params = {
-    redundancy_factor : int;
-    number_of_shards : int;
-    slot_size : int;
-    page_size : int;
-  }
-
   let params_gen =
     let open QCheck2.Gen in
     let* redundancy_factor_log2 = int_range 1 4 in
@@ -49,19 +39,21 @@ module Test = struct
     let* page_size_log2 = int_range 5 slot_size_log2 in
     let* number_of_shards_log2 = int_range 0 11 in
     map
-      (fun (redundancy_factor, number_of_shards, slot_size, page_size) ->
-        {redundancy_factor; number_of_shards; slot_size; page_size})
+      (fun (slot_size, page_size, redundancy_factor, number_of_shards) :
+           Cryptobox.parameters ->
+        {slot_size; page_size; redundancy_factor; number_of_shards})
       (tup4
-         (return (1 lsl redundancy_factor_log2))
-         (return (1 lsl number_of_shards_log2))
          (return (1 lsl slot_size_log2))
-         (return (1 lsl page_size_log2)))
+         (return (1 lsl page_size_log2))
+         (return (1 lsl redundancy_factor_log2))
+         (return (1 lsl number_of_shards_log2)))
 
   let print =
     QCheck2.Print.(
       contramap
-        (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
-          (redundancy_factor, number_of_shards, slot_size, page_size))
+        (fun ({slot_size; page_size; redundancy_factor; number_of_shards} :
+               Cryptobox.parameters) ->
+          (slot_size, page_size, redundancy_factor, number_of_shards))
         (tup4 int int int int))
 
   let acceptable_errors =
@@ -79,15 +71,15 @@ module Test = struct
       ~name:"DAL cryptobox: test erasure code"
       ~print
       params_gen
-      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+      (fun
+        ({redundancy_factor; number_of_shards; slot_size; _} as params :
+          Cryptobox.parameters)
+      ->
         let msg_size = slot_size / 16 in
         let slot, msg = make_slot ~size:slot_size ~padding_threshold:msg_size in
-        init slot_size ;
+        init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
-        (let* t =
-           Cryptobox.make
-             {redundancy_factor; slot_size; page_size; number_of_shards}
-         in
+        (let* t = Cryptobox.make params in
          let* p = Cryptobox.polynomial_from_slot t slot in
          let enc_shards = Cryptobox.shards_from_polynomial t p in
          let c_indices =
@@ -119,16 +111,13 @@ module Test = struct
       ~name:"DAL cryptobox: test page proofs"
       ~print
       params_gen
-      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+      (fun ({slot_size; page_size; _} as params : Cryptobox.parameters) ->
         let msg_size = slot_size / 16 in
         let number_of_pages = slot_size / page_size in
         let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-        init slot_size ;
+        init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
-        (let* t =
-           Cryptobox.make
-             {redundancy_factor; slot_size; page_size; number_of_shards}
-         in
+        (let* t = Cryptobox.make params in
          let* p = Cryptobox.polynomial_from_slot t slot in
          let cm = Cryptobox.commit t p in
          let page_index = Random.int number_of_pages in
@@ -149,15 +138,13 @@ module Test = struct
       ~name:"DAL cryptobox: test shard proofs"
       ~print
       params_gen
-      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+      (fun ({number_of_shards; slot_size; _} as params : Cryptobox.parameters)
+      ->
         let msg_size = slot_size / 16 in
         let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-        init slot_size ;
+        init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
-        (let* t =
-           Cryptobox.make
-             {redundancy_factor; slot_size; page_size; number_of_shards}
-         in
+        (let* t = Cryptobox.make params in
          let* p = Cryptobox.polynomial_from_slot t slot in
          let cm = Cryptobox.commit t p in
          let enc_shards = Cryptobox.shards_from_polynomial t p in
@@ -184,15 +171,12 @@ module Test = struct
       ~name:"DAL cryptobox: test commitment proof"
       ~print
       params_gen
-      (fun {redundancy_factor; number_of_shards; slot_size; page_size} ->
+      (fun ({slot_size; _} as params : Cryptobox.parameters) ->
         let msg_size = slot_size / 16 in
         let slot, _ = make_slot ~size:slot_size ~padding_threshold:msg_size in
-        init slot_size ;
+        init params ;
         let open Tezos_error_monad.Error_monad.Result_syntax in
-        (let* t =
-           Cryptobox.make
-             {redundancy_factor; slot_size; page_size; number_of_shards}
-         in
+        (let* t = Cryptobox.make params in
          let* p = Cryptobox.polynomial_from_slot t slot in
          Ok (t, p))
         |> function
@@ -208,7 +192,13 @@ module Test = struct
      page sizes.*)
   let test_collision_page_size () =
     let slot_size = 1 lsl 6 in
-    init slot_size ;
+    init
+      {
+        slot_size;
+        page_size = 2;
+        redundancy_factor = 2;
+        number_of_shards = 1 lsl 6;
+      } ;
     let open Tezos_error_monad.Error_monad.Result_syntax in
     (let* t1 =
        Cryptobox.make

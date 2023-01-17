@@ -79,8 +79,24 @@ let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
           ~origin:"dal_initialisation"
           (`O
             [
-              ( "srs_size",
-                `Float (float_of_int dal_parameters.cryptobox.slot_size) );
+              ( "use_mock_srs_for_testing",
+                `O
+                  [
+                    ( "slot_size",
+                      `Float (float_of_int dal_parameters.cryptobox.slot_size)
+                    );
+                    ( "page_size",
+                      `Float (float_of_int dal_parameters.cryptobox.page_size)
+                    );
+                    ( "redundancy_factor",
+                      `Float
+                        (float_of_int
+                           dal_parameters.cryptobox.redundancy_factor) );
+                    ( "number_of_shards",
+                      `Float
+                        (float_of_int dal_parameters.cryptobox.number_of_shards)
+                    );
+                  ] );
               ("activated", `Bool true);
             ])
       in

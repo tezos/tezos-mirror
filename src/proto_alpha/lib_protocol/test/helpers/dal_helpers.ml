@@ -49,8 +49,7 @@ let () =
 let mk_cryptobox dal_params =
   let open Result_syntax in
   let parameters =
-    Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-      ~slot_size:dal_params.S.slot_size
+    Cryptobox.Internal_for_tests.parameters_initialisation dal_params
   in
   let () = Cryptobox.Internal_for_tests.load_parameters parameters in
   match Cryptobox.make dal_params with

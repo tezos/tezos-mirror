@@ -63,17 +63,15 @@ let () =
     (fun str -> Cryptobox_initialisation_failed str)
 
 let init_cryptobox unsafe_srs (proto_parameters : Dal_plugin.proto_parameters) =
-  let open Cryptobox in
   let open Lwt_result_syntax in
-  let srs_size =
-    if unsafe_srs then Some proto_parameters.cryptobox_parameters.slot_size
-    else None
-  in
   let* () =
+    let use_mock_srs_for_testing : Cryptobox.parameters option =
+      if unsafe_srs then Some proto_parameters.cryptobox_parameters else None
+    in
     let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
     Cryptobox.Config.init_dal
       ~find_srs_files
-      Cryptobox.Config.{activated = true; srs_size}
+      Cryptobox.Config.{activated = true; use_mock_srs_for_testing}
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox -> return cryptobox
