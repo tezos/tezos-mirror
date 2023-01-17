@@ -41,9 +41,10 @@
     reception of [Swap_ack]. B tries to connected to [peer']. If successful,
     it disconnect from [peer]. *)
 
-(* TODO: It would be interesting to measure the effect of the swap request
-         mechanism on an actual network. Is it the added complexity
-         worth it, wouldn't it  be enough to rely on [Advertise]? *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4610
+     It would be interesting to measure the effect of the swap request
+     mechanism on an actual network. Is it the added complexity worth it,
+     wouldn't it  be enough to rely on [Advertise]? *)
 
 type 'msg t =
   | Bootstrap  (** Welcome message sent by a peer upon connection *)
@@ -54,6 +55,6 @@ type 'msg t =
   | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
       (** Response to a swap request and propose peer/point to swap with. *)
   | Message of 'msg  (** Generic upper-layer message *)
-  | Disconnect  (** Ending of connection *)
+  | Disconnect  (** Ending of connection, unused for now *)
 
 val encoding : 'a P2p_params.app_message_encoding list -> 'a t Data_encoding.t
