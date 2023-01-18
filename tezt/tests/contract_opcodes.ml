@@ -43,8 +43,58 @@ let public_key = Account.Bootstrap.keys.(0).public_key
 
 let hex s = s |> Bytes.of_string |> Hex.of_bytes |> Hex.show
 
-let test_contract_opcodes protocols =
-  let parameterization =
+let register_opcode_tests parameterization protocols =
+  Fun.flip List.iter parameterization
+  @@ fun (contract, storage, input, expected) ->
+  let contract_path protocol contract =
+    sf
+      "./tests_python/contracts_%s/opcodes/%s"
+      (match protocol with
+      | Protocol.Alpha -> "alpha"
+      | _ -> sf "%03d" (Protocol.number protocol))
+      contract
+  in
+  let protocols =
+    List.filter
+      (fun protocol -> Sys.file_exists (contract_path protocol contract))
+      protocols
+  in
+  ( Protocol.register_regression_test
+      ~__FILE__
+      ~title:
+        (sf
+           "opcodes [%s--storage%d--input%d]"
+           contract
+           (Hashtbl.hash storage)
+           (Hashtbl.hash input))
+      ~tags:["michelson"]
+  @@ fun protocol ->
+    let client = Client.create_with_mode Mockup in
+    let contract = contract_path protocol contract in
+    let* run_script_res_storage =
+      Client.run_script
+        ~protocol_hash:(Protocol.hash protocol)
+        ~no_base_dir_warnings:true
+        ~trace_stack:true
+        ~hooks
+        ~prg:contract
+        ~storage
+        ~input
+          (* We force the level to 1 to get consistent results from the
+             [LEVEL] instructions *)
+        ~level:1
+        client
+    in
+    let error_msg =
+      "Expected storage %R, got %L when executing"
+      ^ sf " %s with input %s and storage %s" contract input storage
+    in
+    Check.((run_script_res_storage = expected) string ~__LOC__ ~error_msg) ;
+    unit )
+    protocols
+
+let test_contract_opcodes =
+  register_opcode_tests
     [
       ("cons.tz", "{}", "10", "{ 10 }");
       ("cons.tz", "{ 10 }", "-5", "{ -5 ; 10 }");
@@ -1026,54 +1076,5 @@ let test_contract_opcodes protocols =
       ("bytes_of_nat.tz", "Unit", "Unit", "Unit");
       ("bytes_of_int.tz", "Unit", "Unit", "Unit");
     ]
-  in
-  Fun.flip List.iter parameterization
-  @@ fun (contract, storage, input, expected) ->
-  let contract_path protocol contract =
-    sf
-      "./tests_python/contracts_%s/opcodes/%s"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" (Protocol.number protocol))
-      contract
-  in
-  let protocols =
-    List.filter
-      (fun protocol -> Sys.file_exists (contract_path protocol contract))
-      protocols
-  in
-  ( Protocol.register_regression_test
-      ~__FILE__
-      ~title:
-        (sf
-           "opcodes [%s--storage%d--input%d]"
-           contract
-           (Hashtbl.hash storage)
-           (Hashtbl.hash input))
-      ~tags:["michelson"]
-  @@ fun protocol ->
-    let client = Client.create_with_mode Mockup in
-    let contract = contract_path protocol contract in
-    let* run_script_res_storage =
-      Client.run_script
-        ~protocol_hash:(Protocol.hash protocol)
-        ~no_base_dir_warnings:true
-        ~trace_stack:true
-        ~hooks
-        ~prg:contract
-        ~storage
-        ~input
-          (* We force the level to 1 to get consistent results from the
-             [LEVEL] instructions *)
-        ~level:1
-        client
-    in
-    let error_msg =
-      "Expected storage %R, got %L when executing"
-      ^ sf " %s with input %s and storage %s" contract input storage
-    in
-    Check.((run_script_res_storage = expected) string ~__LOC__ ~error_msg) ;
-    unit )
-    protocols
 
 let register ~protocols = test_contract_opcodes protocols
