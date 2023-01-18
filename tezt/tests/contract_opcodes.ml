@@ -43,41 +43,36 @@ let public_key = Account.Bootstrap.keys.(0).public_key
 
 let hex s = s |> Bytes.of_string |> Hex.of_bytes |> Hex.show
 
-let register_opcode_tests parameterization protocols =
+let register_opcode_tests ?supports parameterization protocols =
   Fun.flip List.iter parameterization
-  @@ fun (contract, storage, input, expected) ->
-  let contract_path protocol contract =
-    sf
-      "tests_python/contracts_%s/opcodes/%s.tz"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" (Protocol.number protocol))
-      contract
-  in
-  let protocols =
-    List.filter
-      (fun protocol -> Sys.file_exists (contract_path protocol contract))
-      protocols
-  in
+  @@ fun (script, storage, input, expected) ->
   ( Protocol.register_regression_test
+      ?supports
       ~__FILE__
       ~title:
         (sf
            "opcodes [%s--storage%d--input%d]"
-           contract
+           script
            (Hashtbl.hash storage)
            (Hashtbl.hash input))
       ~tags:["michelson"]
   @@ fun protocol ->
     let client = Client.create_with_mode Mockup in
-    let contract = contract_path protocol contract in
+    let script_path =
+      Michelson_script.(
+        find
+          ~prefix:(Michelson_script.pytest_prefix protocol)
+          ["opcodes"; script]
+          protocol
+        |> path)
+    in
     let* run_script_res_storage =
       Client.run_script
         ~protocol_hash:(Protocol.hash protocol)
         ~no_base_dir_warnings:true
         ~trace_stack:true
         ~hooks
-        ~prg:contract
+        ~prg:script_path
         ~storage
         ~input
           (* We force the level to 1 to get consistent results from the
@@ -87,13 +82,13 @@ let register_opcode_tests parameterization protocols =
     in
     let error_msg =
       "Expected storage %R, got %L when executing"
-      ^ sf " %s with input %s and storage %s" contract input storage
+      ^ sf " %s with input %s and storage %s" script_path input storage
     in
     Check.((run_script_res_storage = expected) string ~__LOC__ ~error_msg) ;
     unit )
     protocols
 
-let test_contract_opcodes =
+let test_protocol_independent =
   register_opcode_tests
     [
       ("cons", "{}", "10", "{ 10 }");
@@ -1050,6 +1045,12 @@ let test_contract_opcodes =
         ^ "0000000" );
       (* Fr -> Mutez *)
       ("bls12_381_fr_to_mutez", "0", "0x10", "16");
+    ]
+
+let test_bitwise =
+  register_opcode_tests
+    ~supports:(Protocol.From_protocol 16)
+    [
       (* Bitwise operations on bytes *)
       ("and_bytes", "Unit", "Unit", "Unit");
       ("or_bytes", "Unit", "Unit", "Unit");
@@ -1062,4 +1063,6 @@ let test_contract_opcodes =
       ("bytes_of_int", "Unit", "Unit", "Unit");
     ]
 
-let register ~protocols = test_contract_opcodes protocols
+let register ~protocols =
+  test_protocol_independent protocols ;
+  test_bitwise protocols
