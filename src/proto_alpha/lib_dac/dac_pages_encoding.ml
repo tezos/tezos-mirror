@@ -219,7 +219,8 @@ module Merkle_tree = struct
         `hashes_version` (for hashes pages). The next four bytes will contain
         the size of the rest of the page; the remainder of the page is either a
         list of raw bytes (in the case of a payload page), or a list of hashes,
-        which occupy 32 bytes each. *)
+        which occupy 33 bytes each. I.e. 32 bytes for the inner hash and 1 byte
+        for the tag identifying the hashing scheme. *)
     let page_encoding =
       Data_encoding.(
         union

@@ -239,53 +239,20 @@ module Merkle_tree = struct
   module V0 = struct
     open Dac_pages_encoding.Merkle_tree.V0
 
-    (* We use 50 bytes as the size of a page. Of these, 5 bytes are used for
-       the preamble, which leaves 45 bytes of space for storing hashes in a
-       page. The size of a hash is 32 bytes, therefore only floor(45/2) = 1
-       hashes can be stored for each page. Because the serialization process
-       requires a page size that can contain at least two hashes, the
-       serialization of any content will fail in this case.
-    *)
-
-    let serialize_one_hash_per_page_fails () =
+    let test_serialization_fails_with ~loc ~max_page_size ~payload ~error =
       let module Backend = Hashes_Map_backend () in
-      let payload =
-        List.repeat 195 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
+      let serialize_payload =
+        serialize_payload
+          ~max_page_size
+          payload
+          ~for_each_page:Backend.save_page
       in
-      assert_fails_with
-        ~loc:__LOC__
-        (serialize_payload
-           ~max_page_size:50
-           payload
-           ~for_each_page:Backend.save_page)
-        Dac_pages_encoding.Merkle_tree_branching_factor_not_high_enough
+      assert_fails_with ~loc serialize_payload error
 
-    let serialize_empty_payload_fails () =
-      let module Backend = Hashes_Map_backend () in
-      (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
-         this value to 80. *)
-      let max_page_size = 80 in
-      let payload = Bytes.empty in
-
-      assert_fails_with
-        ~loc:__LOC__
-        (serialize_payload
-           ~max_page_size
-           payload
-           ~for_each_page:Backend.save_page)
-        Dac_pages_encoding.Payload_cannot_be_empty
-
-    let one_page_roundtrip () =
+    let test_serialization_roundtrip ?expect_num_of_pages ~loc ~max_page_size
+        payload =
       let open Lwt_result_syntax in
       let module Backend = Hashes_Map_backend () in
-      (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
-         this value to 80. *)
-      let max_page_size = 80 in
-      let payload = Bytes.of_string "Hello payload" in
       let* hash =
         lift
         @@ serialize_payload
@@ -297,31 +264,75 @@ module Merkle_tree = struct
         lift
         @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
       in
-      let map_size = Backend.number_of_pages () in
-      let* () = Assert.equal_int ~loc:__LOC__ map_size 1 in
+      let* () =
+        match expect_num_of_pages with
+        | Some expected ->
+            let actual = Backend.number_of_pages () in
+            Assert.equal_int ~loc actual expected
+        | None -> return_unit
+      in
       assert_equal_bytes
-        ~loc:__LOC__
+        ~loc
         "Deserialized payload do not match with original"
         payload
         retrieved_payload
+
+    (* We use 50 bytes as the size of a page. Of these, 5 bytes are used for
+       the preamble, which leaves 45 bytes of space for storing hashes in a
+       page. The overall size of a hash is 33 bytes (32 bytes for the inner hash
+       plus 1 byte for the tag identifying the hashing scheme of the hash),
+       therefore only floor(45/33) = 1 hashes can be stored for each page.
+       Because the serialization process requires a page size that can contain
+       at least two hashes, the serialization of any content will fail in this case.
+    *)
+    let serialize_one_hash_per_page_fails () =
+      let payload =
+        List.repeat 195 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
+      in
+      test_serialization_fails_with
+        ~loc:__LOC__
+        ~max_page_size:50
+        ~payload
+        ~error:Dac_pages_encoding.Merkle_tree_branching_factor_not_high_enough
+
+    let serialize_empty_payload_fails () =
+      (* Limit the number of hashes stored per page to 2. Because hashes
+         have a fixed size of 33 bytes (32 bytes for inner hash and 1 byte for
+         hashing sheme tag of the hash), and 5 bytes are used for the preamble,
+         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
+         this value to 80. *)
+      test_serialization_fails_with
+        ~loc:__LOC__
+        ~max_page_size:80
+        ~payload:Bytes.empty
+        ~error:Dac_pages_encoding.Payload_cannot_be_empty
+
+    let one_page_roundtrip () =
+      (* Limit the number of hashes stored per page to 2. Because hashes
+         have a fixed size of 33 bytes (32 bytes for inner hash and 1 byte for
+         hashing sheme tag of the hash), and 5 bytes are used for the preamble,
+         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
+         this value to 80. *)
+      let max_page_size = 80 in
+      let payload = Bytes.of_string "Hello payload" in
+      test_serialization_roundtrip
+        ~expect_num_of_pages:1
+        ~loc:__LOC__
+        ~max_page_size
+        payload
 
     let multiple_pages_roundtrip_heterogeneous_payload () =
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
          for the page prefix. This leaves 75 bytes to store the payload to be
          serialized in a page. It also means that a `Hashes` page can contain
-         at most 2 hashes of size 33 bytes each. If we try to serialize a
+         at most 2 hashes of size 33 bytes each (32 bytes for inner hash and 1
+         byte for hashing sheme tag of the hash). If we try to serialize a
          payload between 151 and 225 bytes (included), then the serialized
          payload should be spread among a total of 6 pages. Of these,
          225/75 = 3 pages are used to store the payload, ceil(3/2) = 2 pages
          are used for storing the 3 hashes of the 3 payload pages, and
          ceil(2/2) = 1 page is used for storing the 2 hashes of the previous
          pages. *)
-      let open Lwt_result_syntax in
-      let module Backend = Hashes_Map_backend () in
-      (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
-         this value to 80. *)
       let max_page_size = 80 in
       let payload =
         Bytes.of_string
@@ -329,64 +340,33 @@ module Merkle_tree = struct
            eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim \
            ad minim veniam, quis nostrud exercitation ullamco"
       in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      let map_size = Backend.number_of_pages () in
-      let* () = Assert.equal_int ~loc:__LOC__ map_size 6 in
-      assert_equal_bytes
+      test_serialization_roundtrip
+        ~expect_num_of_pages:6
         ~loc:__LOC__
-        "Deserialized payload do not match with original"
+        ~max_page_size
         payload
-        retrieved_payload
 
     let multiple_pages_roundtrip_homogeneous_payload () =
       (* Each page in tests contains at most 80 bytes, of which 5 are reserved
          for the page prefix. This leaves 75 bytes to store the contents to be
          serialized in a page. It also means that a `Hashes` page can contain
-         at most 2 hashes of size 32 bytes each. If we try to serialize a
+         at most 2 hashes of size 33 bytes each (32 bytes for inner hash and 1
+         byte for hashing sheme tag of the hash). If we try to serialize a
          payload of 225 repetitions of the same character, then only one
          payload page will be produced. However, the hash of this page will be
          repeated three times across two pages represent nodes of the Merkle
          tree. Finally, another page will be used for storing the Merkle tree
          root page, which contains the two hashes of the Merkle tree nodes
          above. In total, the serialization should be spread among 4 pages. *)
-      let module Backend = Hashes_Map_backend () in
-      let open Lwt_result_syntax in
-      (* Limit the number of hashes stored per page to 2. Because hashes
-         have a fixed size of 32 bytes, and 5 bytes are used for the preamble,
-         we need 33 * 2 + 5 = 71 bytes to store two hashes in a page. We round
-         this value to 80. *)
       let max_page_size = 80 in
       let payload =
         List.repeat 225 (Bytes.of_string "a") |> Bytes.concat Bytes.empty
       in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      let map_size = Backend.number_of_pages () in
-      let* () = Assert.equal_int ~loc:__LOC__ map_size 4 in
-      assert_equal_bytes
+      test_serialization_roundtrip
+        ~expect_num_of_pages:4
         ~loc:__LOC__
-        "Deserialized payload do not match with original"
+        ~max_page_size
         payload
-        retrieved_payload
 
     let multiple_pages_roundtrip_do_not_exceed_page_size () =
       (* Check that a bug related to the size of hashes has been fixed.
@@ -405,8 +385,6 @@ module Merkle_tree = struct
          3 hashes of 32 bytes each, resulting in a page of `101 bytes` and
          causing the serialization to fail.
       *)
-      let open Lwt_result_syntax in
-      let module Backend = Hashes_Map_backend () in
       let max_page_size = 98 in
       (* 279 bytes of payload *)
       let payload =
@@ -417,51 +395,45 @@ module Merkle_tree = struct
            aliquip ex ea commodo consequat. Duis aute irure dolor in \
            reprehenderit in volup"
       in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      assert_equal_bytes
-        ~loc:__LOC__
-        "Deserialized payload do not match with original"
-        payload
-        retrieved_payload
+      test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
 
     let long_content_roundtrip () =
       (* To ensure that the serialization and deserialization process work as
          expected, we test a roundtrip for a reasonably long text. We also
          increase the page size to allow for more than two hashes in a page. *)
       let module Backend = Hashes_Map_backend () in
-      let open Lwt_result_syntax in
       (* The page size is set to 150. Of these, 5 bytes are used for the page
          preamble, and the reset will contain hashes which are 32 bytes long
          each. The number of hashes that can fit into a page is
          floor((150 - 5)/32) = 4. *)
       let max_page_size = 150 in
       let payload = Bytes.of_string long_payload in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
-      assert_equal_bytes
-        ~loc:__LOC__
-        "Deserialized payload do not match with original"
-        payload
-        retrieved_payload
+      test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4608
+        Define helper function that calculates expected number of pages given the
+        payload and use it for PBT expected number of pages given payload *)
+    module PBT = struct
+      open QCheck2.Gen
+
+      (* Serialization requires [~max_page_size] that guarantees at least two
+         hashes per page. In orher words, we need at least 71 bytes in total since
+         5 bytes is used as a preamble and each hash is 32 bytes long and uses
+         aditional 1 byte for the tag used to identify the version scheme:
+         5 + 2 (32 + 1) = 71 *)
+      let gen_max_page_size = int_range 71 10_000
+
+      let gen_non_empty_payload = bytes_size (int_range 1 10_000)
+
+      let serialization_roundtrip_pbt =
+        let test_serialization_roundtrip (max_page_size, payload) =
+          test_serialization_roundtrip ~loc:__LOC__ ~max_page_size payload
+        in
+        Tztest.tztest_qcheck2
+          ~name:"PBT for merkle_tree_V0 serialization/deserialization roundtrip"
+          (pair gen_max_page_size gen_non_empty_payload)
+          test_serialization_roundtrip
+    end
   end
 end
 
@@ -620,4 +592,5 @@ let tests =
        repeated pages (Hash chain, V0)"
       `Quick
       Hash_chain.V0.test_serialize;
+    Merkle_tree.V0.PBT.serialization_roundtrip_pbt;
   ]
