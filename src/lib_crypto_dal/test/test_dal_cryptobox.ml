@@ -35,9 +35,9 @@ module Test = struct
   let params_gen =
     let open QCheck2.Gen in
     let* redundancy_factor_log2 = int_range 1 4 in
-    let* slot_size_log2 = int_range 5 10 in
-    let* page_size_log2 = int_range 5 slot_size_log2 in
-    let* number_of_shards_log2 = int_range 0 11 in
+    let* slot_size_log2 = int_range 0 11 in
+    let* page_size_log2 = int_range 0 15 in
+    let* number_of_shards_log2 = int_range 0 19 in
     map
       (fun (slot_size, page_size, redundancy_factor, number_of_shards) :
            Cryptobox.parameters ->
