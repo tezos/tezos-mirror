@@ -164,25 +164,24 @@ val encode_batch :
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
 
-(** [commitment_with_hash_and_level_from_json] parses a commitment, its hash
-    and the level when the commitment was first published (if any), from the
-    JSON representation. *)
-val commitment_with_hash_and_level_from_json :
-  JSON.t -> (string * commitment * int option) option
+(** [commitment_with_hash_and_level_from_json] parses a commitment, its hash and
+    the levels when the commitment was first published (if any) and included,
+    from the JSON representation. *)
+val commitment_with_hash_and_levels_from_json :
+  JSON.t -> (string * commitment * int option * int option) option
 
 (** [last_stored_commitment client] gets the last commitment with its hash
     stored by the rollup node. *)
 val last_stored_commitment :
-  ?hooks:Process.hooks ->
-  t ->
-  (string * commitment * int option) option Runnable.process
+  ?hooks:Process.hooks -> t -> (string * commitment) option Runnable.process
 
-(** [last_published_commitment client] gets the last commitment published by the rollup node,
-with its hash and level when the commitment was first published. *)
+(** [last_published_commitment client] gets the last commitment published by the
+    rollup node, with its hash and level when the commitment was first published
+    and the level it was included. *)
 val last_published_commitment :
   ?hooks:Process.hooks ->
   t ->
-  (string * commitment * int option) option Runnable.process
+  (string * commitment * int option * int option) option Runnable.process
 
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)

@@ -49,6 +49,11 @@ let add_level level increment =
   if increment < 0 then invalid_arg "Commitment.add_level negative increment" ;
   Raw_level.Internal_for_tests.add level increment
 
+let sub_level level decrement =
+  (* We only use this function with positive increments so it is safe *)
+  if decrement < 0 then invalid_arg "Commitment.sub_level negative decrement" ;
+  Raw_level.Internal_for_tests.sub level decrement
+
 let sc_rollup_commitment_period node_ctxt =
   node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
     .commitment_period_in_blocks
@@ -56,29 +61,6 @@ let sc_rollup_commitment_period node_ctxt =
 let sc_rollup_challenge_window node_ctxt =
   node_ctxt.Node_context.protocol_constants.parametric.sc_rollup
     .challenge_window_in_blocks
-
-let next_lcc_level node_ctxt =
-  add_level
-    node_ctxt.Node_context.lcc.level
-    (sc_rollup_commitment_period node_ctxt)
-
-(** Returns the next level for which a commitment can be published, i.e. the
-    level that is [commitment_period] blocks after the last published one. It
-    returns [None] if this level is not finalized because we only publish
-    commitments for inbox of finalized L1 blocks. *)
-let next_publishable_level node_ctxt =
-  let open Lwt_option_syntax in
-  let lpc_level =
-    match node_ctxt.Node_context.lpc with
-    | None -> node_ctxt.genesis_info.level
-    | Some lpc -> lpc.inbox_level
-  in
-  let next_level =
-    add_level lpc_level (sc_rollup_commitment_period node_ctxt)
-  in
-  let* finalized_level = State.get_finalized_head_opt node_ctxt.store in
-  if Raw_level.(of_int32_exn finalized_level.level < next_level) then fail
-  else return next_level
 
 let next_commitment_level node_ctxt last_commitment_level =
   add_level last_commitment_level (sc_rollup_commitment_period node_ctxt)
@@ -189,126 +171,197 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         in
         return_some commitment_hash
 
-  let block_of_known_level (node_ctxt : _ Node_context.t) level =
-    let open Lwt_option_syntax in
-    let* head = State.last_processed_head_opt node_ctxt.store in
-    if Raw_level.(head.header.level < level) then
-      (* Level is not known yet  *)
-      fail
-    else
-      let*! block_hash =
-        State.hash_of_level node_ctxt (Raw_level.to_int32 level)
-      in
-      let*? block_hash = Result.to_option block_hash in
-      Store.L2_blocks.find node_ctxt.store block_hash
-
-  let get_commitment_and_publish ~check_lcc_hash node_ctxt next_level_to_publish
-      =
-    let open Lwt_result_syntax in
-    let*! commitment =
-      let open Lwt_option_syntax in
-      let* block = block_of_known_level node_ctxt next_level_to_publish in
-      let*? commitment_hash = block.header.commitment_hash in
-      Store.Commitments.find node_ctxt.store commitment_hash
+  let missing_commitments (node_ctxt : _ Node_context.t) =
+    let open Lwt_syntax in
+    let lpc_level =
+      match node_ctxt.lpc with
+      | None -> node_ctxt.genesis_info.level
+      | Some lpc -> lpc.inbox_level
     in
-    match commitment with
-    | None ->
-        (* Commitment not available *)
-        return_unit
-    | Some commitment -> (
-        let* () =
-          if check_lcc_hash then
-            let open Lwt_result_syntax in
-            if
-              Sc_rollup.Commitment.Hash.equal
-                node_ctxt.lcc.commitment
-                commitment.predecessor
-            then return ()
-            else
-              let*! () =
-                Commitment_event.commitment_parent_is_not_lcc
-                  commitment.inbox_level
-                  commitment.predecessor
-                  node_ctxt.lcc.commitment
-              in
-              tzfail
-                (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
-                   commitment)
-          else return_unit
+    let* head = State.last_processed_head_opt node_ctxt.store in
+    let next_head_level =
+      Option.map
+        (fun (b : Sc_rollup_block.t) -> Raw_level.succ b.header.level)
+        head
+    in
+    let sc_rollup_challenge_window_int32 =
+      sc_rollup_challenge_window node_ctxt |> Int32.of_int
+    in
+    let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
+      let* commitment =
+        Store.Commitments.find node_ctxt.store commitment_hash
+      in
+      match commitment with
+      | None -> return acc
+      | Some commitment
+        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+          (* Commitment is before or at the LCC, we have reached the end. *)
+          return acc
+      | Some commitment when Raw_level.(commitment.inbox_level <= lpc_level) ->
+          (* Commitment is before the last published one, we have also reached
+             the end because we only publish commitments that are for the inbox
+             of a finalized L1 block. *)
+          return acc
+      | Some commitment ->
+          let* published_info =
+            Store.Commitments_published_at_level.find
+              node_ctxt.store
+              commitment_hash
+          in
+          let past_curfew =
+            match (published_info, next_head_level) with
+            | None, _ | _, None -> false
+            | Some {first_published_at_level; _}, Some next_head_level ->
+                Raw_level.diff next_head_level first_published_at_level
+                > sc_rollup_challenge_window_int32
+          in
+          let acc = if past_curfew then acc else commitment :: acc in
+          (* We keep the commitment and go back to the previous one. *)
+          gather acc commitment.predecessor
+    in
+    let* finalized_block = State.get_finalized_head_opt node_ctxt.store in
+    match finalized_block with
+    | None -> return_nil
+    | Some finalized ->
+        (* Start from finalized block's most recent commitment and gather all
+           commitments that are missing. *)
+        let commitment =
+          Sc_rollup_block.most_recent_commitment finalized.header
         in
-        let operator = Node_context.get_operator node_ctxt Publish in
-        match operator with
-        | None ->
-            (* Configured to not publish commitments *)
-            return_unit
-        | Some source ->
-            let publish_operation =
-              Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
-            in
-            let* _hash =
-              Injector.add_pending_operation ~source publish_operation
-            in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
-               Decouple commitments from head processing
+        gather [] commitment
 
-               Move the following, in a part where we know the operation is
-               included. *)
-            node_ctxt.lpc <- Some commitment ;
-            return_unit)
-
-  let publish_commitment node_ctxt =
+  let publish_commitment (node_ctxt : _ Node_context.t) ~source
+      (commitment : Sc_rollup.Commitment.t) =
     let open Lwt_result_syntax in
-    (* Check level of next publishable commitment and avoid publishing if it is
-       on or before the last cemented commitment.
-    *)
-    let next_lcc_level = next_lcc_level node_ctxt in
-    let*! next_publishable_level = next_publishable_level node_ctxt in
-    match next_publishable_level with
-    | None -> return_unit
-    | Some next_publishable_level ->
-        let check_lcc_hash, level_to_publish =
-          if Raw_level.(next_publishable_level < next_lcc_level) then
-            (*
+    let publish_operation =
+      Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
+    in
+    let* _hash = Injector.add_pending_operation ~source publish_operation in
+    return_unit
 
-           This situation can happen if the rollup node has been
-           shutdown and the rollup has been progressing in the
-           meantime. In that case, the rollup node must wait to reach
-           [lcc_level + commitment_frequency] to publish the
-           commitment. ([lcc_level] is a multiple of
-           commitment_frequency.)
+  let publish_commitments (node_ctxt : _ Node_context.t) =
+    let open Lwt_result_syntax in
+    let operator = Node_context.get_operator node_ctxt Publish in
+    match operator with
+    | None ->
+        (* Configured to not publish commitments *)
+        return_unit
+    | Some source ->
+        let*! commitments = missing_commitments node_ctxt in
+        List.iter_es (publish_commitment node_ctxt ~source) commitments
 
-           We need to check that the published commitment comes
-           immediately after the last cemented commitment, otherwise
-           that's an invalid commitment.
-
-        *)
-            (true, next_lcc_level)
-          else (false, next_publishable_level)
-        in
-        get_commitment_and_publish node_ctxt level_to_publish ~check_lcc_hash
-
+  (* Commitments can only be cemented after [sc_rollup_challenge_window] has
+     passed since they were first published. *)
   let earliest_cementing_level node_ctxt commitment_hash =
     let open Lwt_option_syntax in
-    let+ published_at_level =
+    let+ {first_published_at_level; _} =
       Store.Commitments_published_at_level.find
         node_ctxt.Node_context.store
         commitment_hash
     in
-    add_level published_at_level (sc_rollup_challenge_window node_ctxt)
+    add_level first_published_at_level (sc_rollup_challenge_window node_ctxt)
 
-  let can_be_cemented node_ctxt earliest_cementing_level head_level
-      commitment_hash =
-    let {Node_context.cctxt; rollup_address; _} = node_ctxt in
+  (** [latest_cementable_commitment node_ctxt head] is the most recent commitment
+      hash that could be cemented in [head]'s successor if:
+
+      - all its predecessors were cemented
+      - it would have been first published at the same level as its inbox
+
+      It does not need to be exact but it must be an upper bound on which we can
+      start the search for cementable commitments. *)
+  let latest_cementable_commitment (node_ctxt : _ Node_context.t)
+      (head : Sc_rollup_block.t) =
+    let open Lwt_option_syntax in
+    let commitment_hash = Sc_rollup_block.most_recent_commitment head.header in
+    let* commitment = Store.Commitments.find node_ctxt.store commitment_hash in
+    let*? cementable_level_bound =
+      sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
+    in
+    if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then fail
+    else
+      let* cementable_bound_block_hash =
+        State.hash_of_level_opt
+          node_ctxt
+          (Raw_level.to_int32 cementable_level_bound)
+      in
+      let* cementable_bound_block =
+        Store.L2_blocks.find node_ctxt.store cementable_bound_block_hash
+      in
+      let cementable_commitment =
+        Sc_rollup_block.most_recent_commitment cementable_bound_block.header
+      in
+      return cementable_commitment
+
+  let cementable_commitments (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
-    if earliest_cementing_level <= head_level then
-      Plugin.RPC.Sc_rollup.can_be_cemented
-        cctxt
-        (cctxt#chain, cctxt#block)
-        rollup_address
-        commitment_hash
-    else return_false
+    let ( let*& ) x f =
+      (* A small monadic combinator to return an empty list of cementable
+         commitments on None results. *)
+      let*! x = x in
+      match x with None -> return_nil | Some x -> f x
+    in
+    let*& head = State.last_processed_head_opt node_ctxt.Node_context.store in
+    let head_level = head.header.level in
+    let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
+      let open Lwt_syntax in
+      let* commitment =
+        Store.Commitments.find node_ctxt.store commitment_hash
+      in
+      match commitment with
+      | None -> return acc
+      | Some commitment
+        when Raw_level.(commitment.inbox_level <= node_ctxt.lcc.level) ->
+          (* If we have moved backward passed or at the current LCC then we have
+             reached the end. *)
+          return acc
+      | Some commitment ->
+          let* earliest_cementing_level =
+            earliest_cementing_level node_ctxt commitment_hash
+          in
+          let acc =
+            match earliest_cementing_level with
+            | None -> acc
+            | Some earliest_cementing_level ->
+                if Raw_level.(earliest_cementing_level > head_level) then
+                  (* Commitments whose cementing level are after the head's
+                     successor won't be cementable in the next block. *)
+                  acc
+                else commitment_hash :: acc
+          in
+          gather acc commitment.predecessor
+    in
+    (* We start our search from the last possible cementable commitment. This is
+       to avoid iterating over a large number of commitments
+       ([challenge_window_in_blocks / commitment_period_in_blocks], in the order
+       of 10^3 on mainnet). *)
+    let*& latest_cementable_commitment =
+      latest_cementable_commitment node_ctxt head
+    in
+    let*! cementable = gather [] latest_cementable_commitment in
+    match cementable with
+    | [] -> return_nil
+    | first_cementable :: _ ->
+        (* Make sure that the first commitment can be cemented according to the
+           Layer 1 node as a failsafe. *)
+        let* green_light =
+          Plugin.RPC.Sc_rollup.can_be_cemented
+            node_ctxt.cctxt
+            (node_ctxt.cctxt#chain, `Head 0)
+            node_ctxt.rollup_address
+            first_cementable
+        in
+        if green_light then return cementable else return_nil
 
-  let cement_commitment (node_ctxt : _ Node_context.t) commitment_hash =
+  let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment_hash =
+    let open Lwt_result_syntax in
+    let cement_operation =
+      Sc_rollup_cement
+        {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
+    in
+    let* _hash = Injector.add_pending_operation ~source cement_operation in
+    return_unit
+
+  let cement_commitments node_ctxt =
     let open Lwt_result_syntax in
     let operator = Node_context.get_operator node_ctxt Cement in
     match operator with
@@ -316,42 +369,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         (* Configured to not cement commitments *)
         return_unit
     | Some source ->
-        let cement_operation =
-          Sc_rollup_cement
-            {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
-        in
-        let* _hash = Injector.add_pending_operation ~source cement_operation in
-        return_unit
-
-  let cement_commitment_if_possible node_ctxt Layer1.{level = head_level; _} =
-    let open Lwt_result_syntax in
-    let next_level_to_cement = next_lcc_level node_ctxt in
-    let*! block = block_of_known_level node_ctxt next_level_to_cement in
-    match block with
-    | None | Some {header = {commitment_hash = None; _}; _} ->
-        (* Commitment not available *)
-        return_unit
-    | Some {header = {commitment_hash = Some commitment_hash; _}; _} -> (
-        (* If `commitment_hash` is defined, the commitment to be cemented has
-           been stored but not necessarily published by the rollup node. *)
-        let*! earliest_cementing_level =
-          earliest_cementing_level node_ctxt commitment_hash
-        in
-        match earliest_cementing_level with
-        (* If `earliest_cementing_level` is well defined, then the rollup node
-           has previously published `commitment`, which means that the rollup
-           is indirectly staked on it. *)
-        | Some earliest_cementing_level ->
-            let* green_flag =
-              can_be_cemented
-                node_ctxt
-                earliest_cementing_level
-                (Raw_level.of_int32_exn head_level)
-                commitment_hash
-            in
-            if green_flag then cement_commitment node_ctxt commitment_hash
-            else return_unit
-        | None -> return_unit)
+        let* cementable_commitments = cementable_commitments node_ctxt in
+        List.iter_es
+          (cement_commitment node_ctxt ~source)
+          cementable_commitments
 
   let start () = Commitment_event.starting ()
 end
