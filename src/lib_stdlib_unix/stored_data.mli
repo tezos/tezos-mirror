@@ -61,8 +61,8 @@ val make_file :
 val get : 'a t -> 'a Lwt.t
 
 (** [write data value] overwrites the previous [data] with the new
-    [value]. Note that if the write fails, The cache will have the new
-    value (the one returned by {!val:get}. It is recommended to reload
+    [value]. Note that even if the write fails, The cache (as returned by
+    {!val:get}) will have the new value. It is recommended to reload
     a store in that case and try to write the value again. *)
 val write : 'a t -> 'a -> unit tzresult Lwt.t
 
@@ -70,7 +70,7 @@ val write : 'a t -> 'a -> unit tzresult Lwt.t
     the [value].
 
     {b Warning} this function should not be used in a normal context
-    as it aims to overwrite the target without preserving data
+    as it aims to overwrite the target without avoiding data
     races. Favour the usage of [write]. *)
 val write_file : 'a file -> 'a -> unit tzresult Lwt.t
 

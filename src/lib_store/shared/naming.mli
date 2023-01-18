@@ -28,7 +28,7 @@ open Store_types
 (** {1 File convention} *)
 
 (** The 'kind aims to be used to reflect in the type system the
-    directory name to ease the readibility of the
+    directory name to ease the readability of the
     code. E.g. [[[`Block]] directory]. *)
 type 'kind directory
 

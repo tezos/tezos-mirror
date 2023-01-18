@@ -26,7 +26,7 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4611
 
    By updating the cache without checking the result of the write, we
-   could have a discrepency between the cache and the value in the
+   could have a discrepancy between the cache and the value in the
    file. *)
 
 open Error_monad
