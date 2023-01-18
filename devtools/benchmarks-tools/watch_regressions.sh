@@ -52,10 +52,9 @@ then
     exit 0
 fi
 
-# If we're there, this means that last_dir is more recent than last_known_dir,
-# and that the former contains the files of a successful run.
-# Let's update last_known_dir as soon as possible so that concurrent runs of
-# this script are unlikely to step on each other's feet.
+# We update the file content as soon as possible so that concurrent runs of this
+# script are unlikely to step on each other's feet.
+echo "$LAST_DIR" > "$OCTEZ_DIR"/last_known_dir
 
 # Now fetch all the files from the bucket (they are the inputs), and reset the
 # output directory and the file containing the alerts.
