@@ -89,11 +89,46 @@ eval "$(opam env)"
 # This is just to build gas_parameter_diff.
 $DUNE exec gas_parameter_diff -- 2> /dev/null
 
-# For each CSV file in the new directory last_dir:
-# * compare the parameter values in the file on all runs;
-# * compare the parameter values in the file with the first run;
-# * compare the parameter values in the file with the previous run (i.e.
-#   last_known_dir);
+for f in "$INPUT_CSV_DIR/$LAST_DIR"/*
+do
+    b="$(basename "$f")"
+
+    # Comparing all runs
+    $DUNE exec --no-build gas_parameter_diff -- "$INPUT_CSV_DIR"/*/"$b" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+
+    # Comparing with the first run.
+    $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$FIRST_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/first_"$b" 2> tmp
+    # The parameters with "score" in their name indicate how well the models
+    # fits the benchmarks. We care about their values but not much about their
+    # variations so we ignore them when looking for regressions. They are
+    # however part of the all_*.csv tables computed above.
+    grep -v score tmp > tmp2
+    if [ -s tmp2 ]
+    then
+        {
+            echo
+            echo "--------------------------------"
+            echo "Warning while comparing $b between $LAST_DIR and the first version $FIRST_DIR"
+            cat tmp2
+        } >> "$ALERT_FILE"
+    fi
+    rm -f tmp tmp2
+
+    # Comparing with the previous run.
+    $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$LAST_KNOWN_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/previous_"$b" 2> tmp
+    # See the note above about scores.
+    grep -v score tmp > tmp2
+    if [ -s tmp2 ]
+    then
+        {
+            echo
+            echo "--------------------------------"
+            echo "Warning while comparing $b between $LAST_DIR and the previous version $LAST_KNOWN_DIR"
+            cat tmp2
+        } >> "$ALERT_FILE"
+    fi
+    rm -f tmp tmp2
+done
 
 # The steps above will create as many files as there are in last_dir for each
 # comparison (all, first, and previous). Concatenate the results into a single
