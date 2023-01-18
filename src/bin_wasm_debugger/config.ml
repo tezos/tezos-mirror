@@ -31,12 +31,16 @@ let default_source = Tezos_crypto.Signature.Public_key_hash.zero
 
 let default_destination = Protocol.Alpha_context.Sc_rollup.Address.zero
 
+let default_preimage_directory = "preimage"
+
 type config = {
   sender : Protocol.Contract_hash.t;
   source : Tezos_crypto.Signature.public_key_hash;
   destination : Protocol.Alpha_context.Sc_rollup.t;
+  preimage_directory : string;
 }
 
 let config ?(sender = default_sender) ?(source = default_source)
-    ?(destination = default_destination) () =
-  {sender; source; destination}
+    ?(destination = default_destination)
+    ?(preimage_directory = default_preimage_directory) () =
+  {sender; source; destination; preimage_directory}

@@ -121,13 +121,11 @@ let reveal_preimage_manually retries hash =
   in
   input_preimage retries
 
-let reveal_preimage_builtin retries hash =
+let reveal_preimage_builtin config retries hash =
   let (`Hex hex) = Hex.of_string hash in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4545
-     Let the user override this hardcoded value. *)
   Lwt.catch
     (fun () ->
-      let path = "preimages/" ^ hex in
+      let path = Filename.concat config.Config.preimage_directory hex in
       let ch = open_in path in
       let s = really_input_string ch (in_channel_length ch) in
       close_in ch ;
@@ -139,7 +137,7 @@ let reveal_builtins config =
     {
       (* We retry 3 times to reveal the preimage manually, this should be
          configurable at some point. *)
-      reveal_preimage = reveal_preimage_builtin 3;
+      reveal_preimage = reveal_preimage_builtin config 3;
       reveal_metadata = (fun () -> Lwt.return (build_metadata config));
     }
 
@@ -428,10 +426,10 @@ let show_memory tree address length =
             state
       | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
-(* [reveal_preimage hex tree] checks the current state is waiting for a
+(* [reveal_preimage config hex tree] checks the current state is waiting for a
    preimage, parses [hex] as an hexadecimal representation of the data or use
    the builtin if none is given, and does a reveal step. *)
-let reveal_preimage bytes tree =
+let reveal_preimage config bytes tree =
   let open Lwt_syntax in
   let* info = Wasm.get_info tree in
   match
@@ -444,7 +442,7 @@ let reveal_preimage bytes tree =
   | Reveal_required (Reveal_raw_data hash), None ->
       Lwt.catch
         (fun () ->
-          let* preimage = reveal_preimage_builtin 1 hash in
+          let* preimage = reveal_preimage_builtin config 1 hash in
           Wasm.reveal_step (String.to_bytes preimage) tree)
         (fun _ -> return tree)
   | _ ->
@@ -502,7 +500,7 @@ let handle_command c config tree inboxes level =
         let*! () = show_memory tree address length in
         return ()
     | Reveal_preimage bytes ->
-        let*! tree = reveal_preimage bytes tree in
+        let*! tree = reveal_preimage config bytes tree in
         return ~tree ()
     | Reveal_metadata ->
         let*! tree = reveal_metadata config tree in

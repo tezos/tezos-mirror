@@ -92,7 +92,7 @@ let inboxes_encoding default_sender default_source default_destination =
       (list (input_encoding default_sender default_source default_destination)))
 
 (* [parse_inboxes inputs config] parses an inbox from raw string. *)
-let parse_inboxes inputs Config.{sender; source; destination} =
+let parse_inboxes inputs Config.{sender; source; destination; _} =
   let open Lwt_result_syntax in
   match Data_encoding.Json.from_string inputs with
   | Ok json ->

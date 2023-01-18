@@ -109,6 +109,12 @@ let file_parameter =
   Tezos_clic.parameter (fun _ filename ->
       Repl_helpers.(trap_exn (fun () -> read_file filename)))
 
+let dir_parameter =
+  Tezos_clic.parameter (fun _ dirpath ->
+      if Sys.file_exists dirpath && Sys.is_directory dirpath then
+        Lwt.return_ok dirpath
+      else Error_monad.failwith "%s is not a valid directory" dirpath)
+
 let wasm_param =
   let open Lwt_result_syntax in
   Tezos_clic.(
@@ -152,15 +158,29 @@ let rollup_arg =
     ~placeholder:"rollup address"
     rollup_parameter
 
+let preimage_directory_arg =
+  let open Tezos_clic in
+  arg
+    ~doc:
+      (Format.sprintf
+         "Directory where the preimages can be read. If not specified, it \
+          defaults to `%s`."
+         Config.default_preimage_directory)
+    ~long:"preimage-dir"
+    ~placeholder:"preimage-dir"
+    dir_parameter
+
 let main_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the eval loop"
-    (args2 input_arg rollup_arg)
+    (args3 input_arg rollup_arg preimage_directory_arg)
     (wasm_param @@ stop)
-    (fun (inputs, rollup_arg) wasm_file () ->
-      let config = Config.config ?destination:rollup_arg () in
+    (fun (inputs, rollup_arg, preimage_directory) wasm_file () ->
+      let config =
+        Config.config ?destination:rollup_arg ?preimage_directory ()
+      in
       let*? binary =
         if Filename.check_suffix wasm_file ".wasm" then Ok true
         else if Filename.check_suffix wasm_file ".wast" then Ok false
