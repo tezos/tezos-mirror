@@ -23,16 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4609
-
-   We should not use structural equality in this module and use one
-   which is given in parameter.
-*)
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4611
 
    By updating the cache without checking the result of the write, we
-   could have a discrepency between the cache and the value in the
+   could have a discrepancy between the cache and the value in the
    file. *)
 
 open Error_monad
@@ -54,10 +48,15 @@ let () =
     (function Missing_stored_data path -> Some path | _ -> None)
     (fun path -> Missing_stored_data path)
 
-type 'a file = {encoding : 'a Data_encoding.t; path : string; json : bool}
+type 'a file = {
+  encoding : 'a Data_encoding.t;
+  eq : 'a -> 'a -> bool;
+  path : string;
+  json : bool;
+}
 
-let make_file ?(json = false) ~filepath encoding =
-  {encoding; path = filepath; json}
+let make_file ?(json = false) ~filepath encoding eq =
+  {encoding; eq; path = filepath; json}
 
 type _ t =
   | Stored_data : {
@@ -104,7 +103,7 @@ let write_file file data =
 
 let write (Stored_data v) data =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
-      if v.cache = data then Lwt_result_syntax.return_unit
+      if v.file.eq v.cache data then Lwt_result_syntax.return_unit
       else (
         v.cache <- data ;
         write_file v.file data))
@@ -119,7 +118,7 @@ let update_with (Stored_data v) f =
   let open Lwt_syntax in
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
       let* new_data = f v.cache in
-      if v.cache = new_data then return_ok_unit
+      if v.file.eq v.cache new_data then return_ok_unit
       else (
         v.cache <- new_data ;
         write_file v.file new_data))

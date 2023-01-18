@@ -25,6 +25,9 @@
 
 type block_descriptor = Block_hash.t * int32
 
+let block_descriptor_equal (bh1, lvl1) (bh2, lvl2) =
+  Block_hash.equal bh1 bh2 && Int32.equal lvl1 lvl2
+
 let block_descriptor_encoding =
   let open Data_encoding in
   tup2 Block_hash.encoding int32
@@ -37,6 +40,11 @@ type chain_config = {
   genesis : Genesis.t;
   expiration : Time.Protocol.t option;
 }
+
+let chain_config_equal {history_mode = hm1; genesis = g1; expiration = e1}
+    {history_mode = hm2; genesis = g2; expiration = e2} =
+  History_mode.equal hm1 hm2 && Genesis.equal g1 g2
+  && Option.equal Time.Protocol.equal e1 e2
 
 let chain_config_encoding =
   let open Data_encoding in
@@ -51,6 +59,9 @@ let chain_config_encoding =
        (varopt "expiration" Time.Protocol.encoding))
 
 type invalid_block = {level : int32; errors : Error_monad.error list}
+
+let invalid_block_equal {level = l1; errors = e1} {level = l2; errors = e2} =
+  Int32.equal l1 l2 && Stdlib.( = ) e1 e2
 
 let invalid_block_encoding =
   let open Data_encoding in
@@ -87,6 +98,18 @@ module Protocol_levels = struct
          (req "protocol" Protocol_hash.encoding)
          (req "activation_block" block_descriptor_encoding)
          (req "expect_predecessor_context" bool))
+
+  let with_protocol_info
+      {protocol; activation_block; expect_predecessor_context} f =
+    f protocol activation_block expect_predecessor_context
+
+  let equal_protocol_info pi1 pi2 =
+    with_protocol_info pi1 @@ fun p1 (bh1, lvl1) epc1 ->
+    with_protocol_info pi2 @@ fun p2 (bh2, lvl2) epc2 ->
+    Protocol_hash.equal p1 p2 && Block_hash.equal bh1 bh2
+    && Int32.equal lvl1 lvl2 && Bool.equal epc1 epc2
+
+  let equal map1 map2 = equal equal_protocol_info map1 map2
 
   let encoding =
     Data_encoding.conv
@@ -164,6 +187,43 @@ module Protocol_levels = struct
 
       let compare = Compare.Int.compare
     end)
+
+    let with_commit_info
+        {
+          author;
+          message;
+          test_chain_status;
+          predecessor_block_metadata_hash;
+          predecessor_ops_metadata_hash;
+          data_merkle_root;
+          parents_contexts;
+        } f =
+      f
+        author
+        message
+        test_chain_status
+        predecessor_block_metadata_hash
+        predecessor_ops_metadata_hash
+        data_merkle_root
+        parents_contexts
+
+    let commit_info_equal ci1 ci2 =
+      with_commit_info ci1 @@ fun a1 m1 tcs1 pbmh1 pomh1 dmr1 pc1 ->
+      with_commit_info ci2 @@ fun a2 m2 tcs2 pbmh2 pomh2 dmr2 pc2 ->
+      String.equal a1 a2 && String.equal m1 m2
+      && Test_chain_status.equal tcs1 tcs2
+      && Option.equal Block_metadata_hash.equal pbmh1 pbmh2
+      && Option.equal Operation_metadata_list_list_hash.equal pomh1 pomh2
+      && Context_hash.equal dmr1 dmr2
+      && List.equal Context_hash.equal pc1 pc2
+
+    let activation_block_equal {block = b1; protocol = p1; commit_info = ci1}
+        {block = b2; protocol = p2; commit_info = ci2} =
+      block_descriptor_equal b1 b2
+      && Protocol_hash.equal p1 p2
+      && Option.equal commit_info_equal ci1 ci2
+
+    let equal map1 map2 = equal activation_block_equal map1 map2
 
     let legacy_activation_block_encoding =
       let open Data_encoding in

@@ -174,7 +174,7 @@ val with_open_out :
   ('a, [`Open | `Close] io_error) result Lwt.t
 
 (** [with_atomic_open_out ?(overwrite=true) filename ?temp_dir f] is a
-   wrapper around [with_open_out] were it ensures that the data are
+   wrapper around [with_open_out] that ensures that the data are
    written onto [filename] in an atomic way.
 
    This function uses a temporary file stored in the [temp_dir]

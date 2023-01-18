@@ -67,6 +67,8 @@ val init_test_chain :
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
+val operation_metadata_equal : operation_metadata -> operation_metadata -> bool
+
 val operation_metadata_encoding : operation_metadata Data_encoding.t
 
 type ops_metadata =
