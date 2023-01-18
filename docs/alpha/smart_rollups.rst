@@ -1275,21 +1275,10 @@ WASM memory.
 Testing your Kernel
 """""""""""""""""""
 
-.. warning::
+.. note::
 
-   The ``octez-smart-rollup-wasm-debugger`` tool that is described in this
-   section is still under active development. A preliminary version can be found
-   in `the Octez repository <https://gitlab.com/tezos/tezos>`_.
-
-   However, ``octez-smart-rollup-wasm-debugger`` is **not** currently
-   considered a part of Octez, and is only provided for developers
-   interested in testing Tezos smart rollup
-   infrastructure before its release on mainnet.
-
-   To get the ``octez-smart-rollup-wasm-debugger`` executable, the
-   easiest way is to build Octez from source. See the `usual
-   instructions
-   <https://tezos.gitlab.io/introduction/howtoget.html#setting-up-the-development-environment-from-scratch>`_.
+   ``octez-smart-rollup-wasm-debugger`` is available in the Octez
+   distribution starting with :doc:`/releases/version-16`.
 
 Testing a kernel without having to start a rollup node on a test network is very convenient. We provide a
 *read-eval-print-loop* (REPL) as a means to evaluate the WASM PVM
