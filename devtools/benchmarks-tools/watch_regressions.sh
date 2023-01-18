@@ -77,8 +77,17 @@ then
     FIRST_DIR="$(ls "$INPUT_CSV_DIR/" | head -n 1)"
 fi
 
-# Check that gas_parameter_diff compiles. We'll use it to make diffs between the
-# inference results.
+DUNE="/data/redbull/tezos/_opam/bin/dune"
+
+GPD_DIR="$OCTEZ_DIR/devtools/gas_parameter_diff"
+
+cd "$GPD_DIR" || exit 1
+
+# To put dune in PATH.
+eval "$(opam env)"
+
+# This is just to build gas_parameter_diff.
+$DUNE exec gas_parameter_diff -- 2> /dev/null
 
 # For each CSV file in the new directory last_dir:
 # * compare the parameter values in the file on all runs;
