@@ -70,7 +70,7 @@ module Event = struct
   let bye = declare_0 ~section ~name:"bye" ~msg:"Bye." ~level:Info ()
 end
 
-type message = Ping | BigPing of Tezos_crypto.Operation_hash.t list
+type message = Ping | BigPing of Operation_hash.t list
 
 let msg_config : message P2p_params.message_config =
   let open Data_encoding in
@@ -89,7 +89,7 @@ let msg_config : message P2p_params.message_config =
         case
           ~tag:0x11
           ~title:"BigPing"
-          (list Tezos_crypto.Operation_hash.encoding)
+          (list Operation_hash.encoding)
           (function BigPing l -> Some l | _ -> None)
           (fun l -> BigPing l);
       ];

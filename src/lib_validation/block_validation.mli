@@ -73,7 +73,7 @@ type ops_metadata =
   | No_metadata_hash of operation_metadata list list
   | Metadata_hash of (operation_metadata * Operation_metadata_hash.t) list list
 
-module Shell_header_hash : S.HASH
+module Shell_header_hash : Tezos_crypto.Intfs.HASH
 
 type result = {
   shell_header_hash : Shell_header_hash.t;

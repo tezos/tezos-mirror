@@ -48,8 +48,7 @@ let random_amount () =
   | None -> assert false
   | Some x -> x
 
-let nonce =
-  Origination_nonce.Internal_for_tests.initial Tezos_crypto.Operation_hash.zero
+let nonce = Origination_nonce.Internal_for_tests.initial Operation_hash.zero
 
 let sc_rollup () = Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
 
@@ -59,7 +58,7 @@ let test_simple_balances () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let src = `Contract (Contract.Implicit pkh) in
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = `Contract (Contract.Implicit pkh) in
   let amount = Tez.one in
   wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
@@ -79,7 +78,7 @@ let test_simple_balance_updates () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let src = Contract.Implicit pkh in
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.Implicit pkh in
   let amount = Tez.one in
   wrap (Token.transfer ctxt (`Contract src) (`Contract dest) amount)
@@ -129,7 +128,7 @@ let test_allocated () =
   create_context () >>=? fun (ctxt, pkh) ->
   let dest = `Delegate_balance pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun () ->
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = `Contract (Contract.Implicit pkh) in
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun () ->
   let dest = `Collected_commitments Blinded_public_key_hash.zero in
@@ -185,7 +184,7 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
   Assert.proto_error_with_info ~loc:__LOC__ res "Overflowing tez addition"
 
 let test_transferring_to_contract ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.Implicit pkh in
   let amount = random_amount () in
   test_transferring_to_sink
@@ -204,7 +203,7 @@ let test_transferring_to_collected_commitments ctxt =
     [(Commitments bpkh, Credited amount, Block_application)]
 
 let test_transferring_to_delegate_balance ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.Implicit pkh in
   let amount = random_amount () in
   test_transferring_to_sink
@@ -214,7 +213,7 @@ let test_transferring_to_delegate_balance ctxt =
     [(Contract dest, Credited amount, Block_application)]
 
 let test_transferring_to_frozen_deposits ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -257,7 +256,7 @@ let test_transferring_to_burned ctxt =
       ])
     true
   >>=? fun () ->
-  let pkh = Tezos_crypto.Signature.Public_key_hash.zero in
+  let pkh = Signature.Public_key_hash.zero in
   let p, r = (Random.bool (), Random.bool ()) in
   wrap
     (Token.transfer ctxt `Minted (`Lost_endorsing_rewards (pkh, p, r)) amount)
@@ -283,7 +282,7 @@ let test_transferring_to_burned ctxt =
     true
 
 let test_transferring_to_frozen_bonds ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let contract = Contract.Implicit pkh in
   let sc_rollup = sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
@@ -387,7 +386,7 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   Assert.proto_error_with_info ~loc:__LOC__ res error_title
 
 let test_transferring_from_contract ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let src = Contract.Implicit pkh in
   let amount = random_amount () in
   test_transferring_from_bounded_source
@@ -406,7 +405,7 @@ let test_transferring_from_collected_commitments ctxt =
     [(Commitments bpkh, Debited amount, Block_application)]
 
 let test_transferring_from_delegate_balance ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
   let src = Contract.Implicit pkh in
   test_transferring_from_bounded_source
@@ -416,7 +415,7 @@ let test_transferring_from_delegate_balance ctxt =
     [(Contract src, Debited amount, Block_application)]
 
 let test_transferring_from_frozen_deposits ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
   test_transferring_from_bounded_source
     ctxt
@@ -433,7 +432,7 @@ let test_transferring_from_collected_fees ctxt =
     [(Block_fees, Debited amount, Block_application)]
 
 let test_transferring_from_frozen_bonds ctxt =
-  let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+  let pkh, _pk, _sk = Signature.generate_key () in
   let contract = Contract.Implicit pkh in
   let sc_rollup = sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
@@ -505,13 +504,13 @@ let build_test_cases () =
   let open Lwt_result_wrap_syntax in
   create_context () >>=? fun (ctxt, pkh) ->
   let origin = `Contract (Contract.Implicit pkh) in
-  let user1, _, _ = Tezos_crypto.Signature.generate_key () in
+  let user1, _, _ = Signature.generate_key () in
   let user1c = `Contract (Contract.Implicit user1) in
-  let user2, _, _ = Tezos_crypto.Signature.generate_key () in
+  let user2, _, _ = Signature.generate_key () in
   let user2c = `Contract (Contract.Implicit user2) in
-  let baker1, baker1_pk, _ = Tezos_crypto.Signature.generate_key () in
+  let baker1, baker1_pk, _ = Signature.generate_key () in
   let baker1c = `Contract (Contract.Implicit baker1) in
-  let baker2, baker2_pk, _ = Tezos_crypto.Signature.generate_key () in
+  let baker2, baker2_pk, _ = Signature.generate_key () in
   let baker2c = `Contract (Contract.Implicit baker2) in
   (* Allocate contracts for user1, user2, baker1, and baker2. *)
   wrap (Token.transfer ctxt origin user1c (random_amount ()))
@@ -718,13 +717,13 @@ let test_transfer_n_with_non_empty_source () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
   let origin = `Contract (Contract.Implicit pkh) in
-  let user1, _, _ = Tezos_crypto.Signature.generate_key () in
+  let user1, _, _ = Signature.generate_key () in
   let user1c = `Contract (Contract.Implicit user1) in
-  let user2, _, _ = Tezos_crypto.Signature.generate_key () in
+  let user2, _, _ = Signature.generate_key () in
   let user2c = `Contract (Contract.Implicit user2) in
-  let user3, _, _ = Tezos_crypto.Signature.generate_key () in
+  let user3, _, _ = Signature.generate_key () in
   let user3c = `Contract (Contract.Implicit user3) in
-  let user4, _, _ = Tezos_crypto.Signature.generate_key () in
+  let user4, _, _ = Signature.generate_key () in
   let user4c = `Contract (Contract.Implicit user4) in
   (* Allocate contracts for user1, user2, user3, and user4. *)
   let amount =

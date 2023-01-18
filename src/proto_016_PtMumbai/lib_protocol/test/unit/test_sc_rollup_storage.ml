@@ -45,9 +45,7 @@ let new_context_n nb_stakers =
   let+ inc = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt inc in
   (* Necessary to originate rollups. *)
-  let ctxt =
-    Alpha_context.Origination_nonce.init ctxt Tezos_crypto.Operation_hash.zero
-  in
+  let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
   let accounts =
     List.map
@@ -765,7 +763,7 @@ module Stake_storage_tests = struct
         commitment with
         compressed_state =
           Sc_rollup_repr.State_hash.context_hash_to_state_hash
-            (Tezos_crypto.Context_hash.hash_string ["honest"]);
+            (Context_hash.hash_string ["honest"]);
       }
     in
     let* () =
@@ -1136,7 +1134,7 @@ module Stake_storage_tests = struct
     let honest_commitment, honest_commitment_hash =
       let compressed_state =
         Sc_rollup_repr.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string ["honest"])
+          (Context_hash.hash_string ["honest"])
       in
       commitment
         ~predecessor:genesis_hash
@@ -1151,7 +1149,7 @@ module Stake_storage_tests = struct
     let dishonest_commitment, dishonest_commitment_hash =
       let compressed_state =
         Sc_rollup_repr.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string ["dishonest"])
+          (Context_hash.hash_string ["dishonest"])
       in
       commitment
         ~predecessor:genesis_hash
@@ -1319,7 +1317,7 @@ module Stake_storage_tests = struct
         commitment with
         compressed_state =
           Sc_rollup_repr.State_hash.context_hash_to_state_hash
-            (Tezos_crypto.Context_hash.hash_string ["honest"]);
+            (Context_hash.hash_string ["honest"]);
       }
     in
     let* ctxt = lift @@ publish_commitment ctxt rollup staker new_commitment in

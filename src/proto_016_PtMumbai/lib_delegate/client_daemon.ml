@@ -91,7 +91,7 @@ module Baker = struct
         Tezos_version.Version.pp
         Tezos_version.Current_git_info.version
         Tezos_version.Current_git_info.abbreviated_commit_hash
-        Tezos_crypto.Protocol_hash.pp_short
+        Protocol_hash.pp_short
         Protocol.hash
       >>= fun () ->
       let canceler = Lwt_canceler.create () in
@@ -121,7 +121,7 @@ module Accuser = struct
         Tezos_version.Version.pp
         Tezos_version.Current_git_info.version
         Tezos_version.Current_git_info.abbreviated_commit_hash
-        Tezos_crypto.Protocol_hash.pp_short
+        Protocol_hash.pp_short
         Protocol.hash
       >>= fun () ->
       Client_baking_blocks.monitor_valid_blocks
@@ -159,7 +159,7 @@ module VDF = struct
           Tezos_version.Version.pp
           Tezos_version.Current_git_info.version
           Tezos_version.Current_git_info.abbreviated_commit_hash
-          Tezos_crypto.Protocol_hash.pp_short
+          Protocol_hash.pp_short
           Protocol.hash
       in
       let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in

@@ -154,7 +154,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let benchmark rng_state _conf () =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 32; max = 64} in
-    let branch = Tezos_crypto.Block_hash.hash_bytes [bytes] in
+    let branch = Block_hash.hash_bytes [bytes] in
     let op_hash = Operation.hash_raw {shell = {branch}; proto = bytes} in
     let nonce = Origination_nonce.Internal_for_tests.initial op_hash in
     let contract = Contract.Internal_for_tests.originated_contract nonce in
@@ -252,12 +252,7 @@ let () = Registration_helpers.register (module Has_tickets_type_benchmark)
 
 let ticket_sampler rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  let pkh, _, _ =
-    Tezos_crypto.Signature.generate_key
-      ~algo:Tezos_crypto.Signature.Ed25519
-      ~seed
-      ()
-  in
+  let pkh, _, _ = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
   let ticketer = Alpha_context.Contract.Implicit pkh in
   Script_typed_ir.
     {ticketer; contents = Script_int.zero; amount = Ticket_amount.one}

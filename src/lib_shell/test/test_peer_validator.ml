@@ -137,7 +137,7 @@ let test_validate_new_head_on_lower_fitness () =
       Assert.assert_true
         (Format.asprintf
            "The ddb should contain two entries for %a"
-           Tezos_crypto.Block_hash.pp
+           Block_hash.pp
            block_hash)
         (known_0 && known_1) ;
 
@@ -160,7 +160,7 @@ let test_validate_new_head_on_lower_fitness () =
       Assert.assert_false
         (Format.asprintf
            "The ddb should not contain an entry for %a anymore"
-           Tezos_crypto.Block_hash.pp
+           Block_hash.pp
            block_hash)
         (known_0 || known_1) ;
       return_unit)

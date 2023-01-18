@@ -33,34 +33,27 @@ type state = {
   constants : Constants.t;
   config : Baking_configuration.nonce_config;
   nonces_location : [`Nonce] Baking_files.location;
-  mutable last_predecessor : Tezos_crypto.Block_hash.t;
+  mutable last_predecessor : Block_hash.t;
 }
 
 type t = state
 
-type nonces = Nonce.t Tezos_crypto.Block_hash.Map.t
+type nonces = Nonce.t Block_hash.Map.t
 
-let empty = Tezos_crypto.Block_hash.Map.empty
+let empty = Block_hash.Map.empty
 
 let encoding =
   let open Data_encoding in
   def "seed_nonce"
   @@ conv
        (fun m ->
-         Tezos_crypto.Block_hash.Map.fold
-           (fun hash nonce acc -> (hash, nonce) :: acc)
-           m
-           [])
+         Block_hash.Map.fold (fun hash nonce acc -> (hash, nonce) :: acc) m [])
        (fun l ->
          List.fold_left
-           (fun map (hash, nonce) ->
-             Tezos_crypto.Block_hash.Map.add hash nonce map)
-           Tezos_crypto.Block_hash.Map.empty
+           (fun map (hash, nonce) -> Block_hash.Map.add hash nonce map)
+           Block_hash.Map.empty
            l)
-  @@ list
-       (obj2
-          (req "block" Tezos_crypto.Block_hash.encoding)
-          (req "nonce" Nonce.encoding))
+  @@ list (obj2 (req "block" Block_hash.encoding) (req "nonce" Nonce.encoding))
 
 let may_migrate (wallet : Protocol_client_context.full) location =
   let base_dir = wallet#get_base_dir in
@@ -85,16 +78,16 @@ let load (wallet : #Client_context.wallet) location =
 let save (wallet : #Client_context.wallet) location nonces =
   wallet#write (Baking_files.filename location) nonces encoding
 
-let mem nonces hash = Tezos_crypto.Block_hash.Map.mem hash nonces
+let mem nonces hash = Block_hash.Map.mem hash nonces
 
-let find_opt nonces hash = Tezos_crypto.Block_hash.Map.find hash nonces
+let find_opt nonces hash = Block_hash.Map.find hash nonces
 
-let add nonces hash nonce = Tezos_crypto.Block_hash.Map.add hash nonce nonces
+let add nonces hash nonce = Block_hash.Map.add hash nonce nonces
 
-let remove nonces hash = Tezos_crypto.Block_hash.Map.remove hash nonces
+let remove nonces hash = Block_hash.Map.remove hash nonces
 
 let remove_all nonces nonces_to_remove =
-  Tezos_crypto.Block_hash.Map.fold
+  Block_hash.Map.fold
     (fun hash _ acc -> remove acc hash)
     nonces_to_remove
     nonces
@@ -123,7 +116,7 @@ let get_outdated_nonces {cctxt; constants; chain; _} nonces =
         let block_cycle = Int32.(div block_level blocks_per_cycle) in
         Int32.sub current_cycle block_cycle > Int32.of_int preserved_cycles
       in
-      Tezos_crypto.Block_hash.Map.fold
+      Block_hash.Map.fold
         (fun hash nonce acc ->
           acc >>=? fun (orphans, outdated) ->
           get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) >>= function
@@ -138,7 +131,7 @@ let get_outdated_nonces {cctxt; constants; chain; _} nonces =
 let filter_outdated_nonces state nonces =
   get_outdated_nonces state nonces >>=? fun (orphans, outdated_nonces) ->
   when_
-    (Tezos_crypto.Block_hash.Map.cardinal orphans >= 50)
+    (Block_hash.Map.cardinal orphans >= 50)
     (fun () ->
       Events.(
         emit too_many_nonces (Baking_files.filename state.nonces_location ^ "s"))
@@ -246,9 +239,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             ~nonce
             ()
           >>=? fun bytes ->
-          let bytes =
-            Tezos_crypto.Signature.concat bytes Tezos_crypto.Signature.zero
-          in
+          let bytes = Signature.concat bytes Signature.zero in
           Shell_services.Injection.operation ~async:true cctxt ~chain bytes
           >>=? fun oph ->
           Events.(
@@ -263,9 +254,8 @@ let reveal_potential_nonces state new_proposal =
   let {cctxt; chain; nonces_location; last_predecessor; _} = state in
   let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
   if
-    Tezos_crypto.Block_hash.(last_predecessor <> new_predecessor_hash)
-    && Tezos_crypto.Protocol_hash.(
-         new_proposal.predecessor.protocol = Protocol.hash)
+    Block_hash.(last_predecessor <> new_predecessor_hash)
+    && Protocol_hash.(new_proposal.predecessor.protocol = Protocol.hash)
   then (
     (* only try revealing nonces when the proposal's predecessor is a new one *)
     state.last_predecessor <- new_predecessor_hash ;
@@ -316,7 +306,7 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
       constants;
       config;
       nonces_location;
-      last_predecessor = Tezos_crypto.Block_hash.zero;
+      last_predecessor = Block_hash.zero;
     }
   in
   let rec worker_loop () =

@@ -111,8 +111,7 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash
   let op = Single (Endorsement consensus_content) in
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Endorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
        signer
        pred_branch
        op)
@@ -148,8 +147,7 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
   let op = Single (Preendorsement consensus_content) in
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Preendorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
        signer
        pred_branch
        op)
@@ -241,7 +239,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
-        Tezos_crypto.Block_hash.(branch = b))
+        Block_hash.(branch = b))
       packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
@@ -555,7 +553,7 @@ let activation ctxt (pkh : Tezos_crypto.Signature.Public_key_hash.t)
   | _ ->
       failwith
         "Wrong public key hash : %a - Commitments must be activated with an \
-         Tezos_crypto.Ed25519 encrypted public key hash"
+         Ed25519 encrypted public key hash"
         Tezos_crypto.Signature.Public_key_hash.pp
         pkh)
   >|=? fun id ->

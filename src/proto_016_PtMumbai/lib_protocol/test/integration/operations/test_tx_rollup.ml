@@ -329,7 +329,9 @@ let gen_l2_account ?rng_state () =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255))
       rng_state
   in
-  let pkh, public_key, secret_key = Tezos_crypto.Bls.generate_key ?seed () in
+  let pkh, public_key, secret_key =
+    Tezos_crypto.Signature.Bls.generate_key ?seed ()
+  in
   (secret_key, public_key, pkh)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
@@ -413,7 +415,7 @@ let make_deposit b tx_rollup l1_src addr =
 
 (** Create an incomplete (but valid) commitment for a given level. It is
     incomplete in the sense that the Merkle roots for each message are generated
-    with [Tezos_crypto.Context_hash.hash_string message_index]. In the meantime provides the
+    with [Context_hash.hash_string message_index]. In the meantime provides the
     list of withdraw in a association list of [batch_index -> withdraw_list].
     Be careful not to provide a too-big withdraw_list as the construction is
     expensive *)
@@ -424,8 +426,7 @@ let make_incomplete_commitment_for_batch context level tx_rollup withdraw_list =
     Data_encoding.Binary.to_string_exn Tx_rollup_inbox.encoding metadata
   in
   List.init ~when_negative_length:[] metadata.inbox_length (fun i ->
-      Tezos_crypto.Context_hash.hash_string
-        [str_for_context_hash ^ string_of_int i])
+      Context_hash.hash_string [str_for_context_hash ^ string_of_int i])
   >>?= fun batches_result ->
   let messages =
     List.mapi
@@ -1606,7 +1607,7 @@ let test_commitment_duplication () =
   let batches2 : Tx_rollup_message_result_hash.t list =
     [Bytes.make 20 '1'; Bytes.make 20 '2']
     |> List.map (fun hash ->
-           let context_hash = Tezos_crypto.Context_hash.hash_bytes [hash] in
+           let context_hash = Context_hash.hash_bytes [hash] in
            Tx_rollup_message_result_hash.hash_uncarbonated
              {
                context_hash;
@@ -2274,7 +2275,7 @@ module Rejection = struct
             Tx_rollup_message_result_hash.hash_uncarbonated
               {
                 context_hash =
-                  Tezos_crypto.Context_hash.of_b58check_exn
+                  Context_hash.of_b58check_exn
                     "CoUiEnajKeukmYFUgWTJF2z3v24MycpTaomF8a9hRzVy7as9hvgy";
                 withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
               };
@@ -2344,8 +2345,7 @@ module Rejection = struct
     let* store = init_l2_store () in
     let* hash_tree = hash_tree_from_store store in
     assert (
-      Tezos_crypto.Context_hash.(
-        hash_tree = Tx_rollup_message_result.empty_l2_context_hash)) ;
+      Context_hash.(hash_tree = Tx_rollup_message_result.empty_l2_context_hash)) ;
     return_unit
 
   (** [make_proof store msg] applies [msg] on [store] and returns the
@@ -2373,7 +2373,7 @@ module Rejection = struct
     {
       version = 1;
       before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-      after = `Value Tezos_crypto.Context_hash.zero;
+      after = `Value Context_hash.zero;
       state = Seq.empty;
     }
 
@@ -2508,7 +2508,8 @@ module Rejection = struct
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
     let signature =
-      assert_some @@ Tezos_crypto.Bls.aggregate_signature_opt signatures
+      assert_some
+      @@ Tezos_crypto.Signature.Bls.aggregate_signature_opt signatures
     in
     let batch =
       Tx_rollup_l2_batch.V1.
@@ -2751,7 +2752,7 @@ module Rejection = struct
     let level1 = tx_level 1l in
     make_invalid_commitment b level0 l2_context_hash
     >>=? fun (b, commitment0) ->
-    make_invalid_commitment b level1 Tezos_crypto.Context_hash.zero
+    make_invalid_commitment b level1 Context_hash.zero
     >>=? fun (b, commitment1) ->
     Context.get_constants (B b) >>=? fun constants ->
     let bond_cost = constants.parametric.tx_rollup.commitment_bond in
@@ -2987,7 +2988,7 @@ module Rejection = struct
     let previous_message_result : Tx_rollup_message_result.t =
       {
         (* Expected is Tx_rollup_commitment.empty_l2_context_hash *)
-        context_hash = Tezos_crypto.Context_hash.zero;
+        context_hash = Context_hash.zero;
         withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
       }
     in
@@ -3532,7 +3533,7 @@ module Rejection = struct
         l2_accounts
     in
     let time = time () in
-    let* (_ : Tezos_crypto.Context_hash.t) = C.commit ~time store in
+    let* (_ : Context_hash.t) = C.commit ~time store in
     return store
 
   (** Regression test to ensure that we can reject a commitment where the
@@ -4567,7 +4568,7 @@ module Withdraw = struct
       ~message_result_path:Tx_rollup_commitment.Merkle.dummy_path
       tx_rollup
       Tx_rollup_level.root
-      (Tezos_crypto.Context_hash.hash_bytes [Bytes.make 20 'c'])
+      (Context_hash.hash_bytes [Bytes.make 20 'c'])
       (* any context hash will fail *)
       [ticket_info]
     (* any non-empty list will fail *)

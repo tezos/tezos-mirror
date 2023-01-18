@@ -26,7 +26,7 @@
 
 open Data_encoding
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 let chain_arg = Block_services.chain_arg
 
@@ -34,11 +34,7 @@ let to_string = Block_services.chain_to_string
 
 let parse_chain = Block_services.parse_chain
 
-type invalid_block = {
-  hash : Tezos_crypto.Block_hash.t;
-  level : Int32.t;
-  errors : error list;
-}
+type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = Block_services.chain_prefix
 
@@ -52,14 +48,14 @@ let checkpoint_encoding =
     (req "history_mode" History_mode.encoding)
 
 let block_descriptor_encoding =
-  obj2 (req "block_hash" Tezos_crypto.Block_hash.encoding) (req "level" int32)
+  obj2 (req "block_hash" Block_hash.encoding) (req "level" int32)
 
 let invalid_block_encoding =
   conv
     (fun {hash; level; errors} -> (hash, level, errors))
     (fun (hash, level, errors) -> {hash; level; errors})
     (obj3
-       (req "block" Tezos_crypto.Block_hash.encoding)
+       (req "block" Block_hash.encoding)
        (req "level" int32)
        (req "errors" Tezos_rpc.Error.encoding))
 
@@ -75,7 +71,7 @@ module S = struct
     Tezos_rpc.Service.get_service
       ~description:"The chain unique identifier."
       ~query:Tezos_rpc.Query.empty
-      ~output:Tezos_crypto.Chain_id.encoding
+      ~output:Chain_id.encoding
       Tezos_rpc.Path.(path / "chain_id")
 
   (* DEPRECATED: use `chains/<CHAIN_ID>/levels/{checkpoint, savepoint,
@@ -157,7 +153,7 @@ module S = struct
              "An empty argument requests blocks starting with the current \
               head. A non empty list allows to request one or more specific \
               fragments of the chain."
-           Tezos_crypto.Block_hash.rpc_arg
+           Block_hash.rpc_arg
            (fun x -> x#heads)
       |+ opt_field
            "min_date"
@@ -181,7 +177,7 @@ module S = struct
            head of the chain. Optional arguments allow to return the list of \
            predecessors of a given block or of a set of blocks."
         ~query:list_query
-        ~output:(list (list Tezos_crypto.Block_hash.encoding))
+        ~output:(list (list Block_hash.encoding))
         path
   end
 
@@ -202,14 +198,14 @@ module S = struct
         ~description:"The errors that appears during the block (in)validation."
         ~query:Tezos_rpc.Query.empty
         ~output:invalid_block_encoding
-        Tezos_rpc.Path.(path /: Tezos_crypto.Block_hash.rpc_arg)
+        Tezos_rpc.Path.(path /: Block_hash.rpc_arg)
 
     let delete =
       Tezos_rpc.Service.delete_service
         ~description:"Remove an invalid block for the tezos storage"
         ~query:Tezos_rpc.Query.empty
         ~output:Data_encoding.empty
-        Tezos_rpc.Path.(path /: Tezos_crypto.Block_hash.rpc_arg)
+        Tezos_rpc.Path.(path /: Block_hash.rpc_arg)
   end
 end
 
@@ -258,8 +254,8 @@ module Blocks = struct
   include Block_services.Empty
 
   type protocols = Block_services.protocols = {
-    current_protocol : Tezos_crypto.Protocol_hash.t;
-    next_protocol : Tezos_crypto.Protocol_hash.t;
+    current_protocol : Protocol_hash.t;
+    next_protocol : Protocol_hash.t;
   }
 
   let protocols = Block_services.protocols

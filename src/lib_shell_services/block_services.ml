@@ -31,7 +31,7 @@ module Proof = Tezos_context_sigs.Context.Proof_types
 module Merkle_proof_encoding =
   Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 let metadata_rpc_arg =
   let construct = function `Always -> "always" | `Never -> "never" in
@@ -54,13 +54,13 @@ let parse_chain s =
     match s with
     | "main" -> Ok `Main
     | "test" -> Ok `Test
-    | h -> Ok (`Hash (Tezos_crypto.Chain_id.of_b58check_exn h))
+    | h -> Ok (`Hash (Chain_id.of_b58check_exn h))
   with _ -> Error "Cannot parse chain identifier."
 
 let chain_to_string = function
   | `Main -> "main"
   | `Test -> "test"
-  | `Hash h -> Tezos_crypto.Chain_id.to_b58check h
+  | `Hash h -> Chain_id.to_b58check h
 
 let chain_arg =
   let name = "chain_id" in
@@ -76,7 +76,7 @@ type block =
   [ `Genesis
   | `Head of int
   | `Alias of [`Caboose | `Checkpoint | `Savepoint] * int
-  | `Hash of Tezos_crypto.Block_hash.t * int
+  | `Hash of Block_hash.t * int
   | `Level of Int32.t ]
 
 let parse_block s =
@@ -132,17 +132,17 @@ let parse_block s =
         Ok (`Alias (`Caboose, int_of_string n))
     | ["caboose"; n], '+' -> Ok (`Alias (`Caboose, -int_of_string n))
     | [hol], _ -> (
-        match Tezos_crypto.Block_hash.of_b58check_opt hol with
+        match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, 0))
         | None -> to_level (to_valid_level_id s))
     | [hol; n], '~' | [hol; n], '-' -> (
-        match Tezos_crypto.Block_hash.of_b58check_opt hol with
+        match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, int_of_string n))
         | None ->
             let offset = to_valid_level_id n in
             to_level ~offset (to_valid_level_id hol))
     | [hol; n], '+' -> (
-        match Tezos_crypto.Block_hash.of_b58check_opt hol with
+        match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, -int_of_string n))
         | None ->
             let offset = Int32.neg (to_valid_level_id n) in
@@ -189,11 +189,10 @@ let to_string = function
   | `Head 0 -> "head"
   | `Head n when n < 0 -> Printf.sprintf "head+%d" (-n)
   | `Head n -> Printf.sprintf "head~%d" n
-  | `Hash (h, 0) -> Tezos_crypto.Block_hash.to_b58check h
+  | `Hash (h, 0) -> Block_hash.to_b58check h
   | `Hash (h, n) when n < 0 ->
-      Printf.sprintf "%s+%d" (Tezos_crypto.Block_hash.to_b58check h) (-n)
-  | `Hash (h, n) ->
-      Printf.sprintf "%s~%d" (Tezos_crypto.Block_hash.to_b58check h) n
+      Printf.sprintf "%s+%d" (Block_hash.to_b58check h) (-n)
+  | `Hash (h, n) -> Printf.sprintf "%s~%d" (Block_hash.to_b58check h) n
   | `Level i -> Printf.sprintf "%d" (Int32.to_int i)
 
 let blocks_arg =
@@ -336,7 +335,7 @@ let merkle_tree_encoding : Proof.merkle_tree Data_encoding.t =
            ]))
 
 module type PROTO = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   type block_header_data
 
@@ -364,8 +363,8 @@ module type PROTO = sig
 end
 
 type protocols = {
-  current_protocol : Tezos_crypto.Protocol_hash.t;
-  next_protocol : Tezos_crypto.Protocol_hash.t;
+  current_protocol : Protocol_hash.t;
+  next_protocol : Protocol_hash.t;
 }
 
 let raw_protocol_encoding =
@@ -373,14 +372,13 @@ let raw_protocol_encoding =
     (fun {current_protocol; next_protocol} -> (current_protocol, next_protocol))
     (fun (current_protocol, next_protocol) -> {current_protocol; next_protocol})
     (obj2
-       (req "protocol" Tezos_crypto.Protocol_hash.encoding)
-       (req "next_protocol" Tezos_crypto.Protocol_hash.encoding))
+       (req "protocol" Protocol_hash.encoding)
+       (req "next_protocol" Protocol_hash.encoding))
 
 module Make (Proto : PROTO) (Next_proto : PROTO) = struct
-  let protocol_hash = Tezos_crypto.Protocol_hash.to_b58check Proto.hash
+  let protocol_hash = Protocol_hash.to_b58check Proto.hash
 
-  let next_protocol_hash =
-    Tezos_crypto.Protocol_hash.to_b58check Next_proto.hash
+  let next_protocol_hash = Protocol_hash.to_b58check Next_proto.hash
 
   type raw_block_header = {
     shell : Block_header.shell_header;
@@ -397,8 +395,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             Proto.block_header_data_encoding)
 
   type block_header = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    hash : Tezos_crypto.Block_hash.t;
+    chain_id : Chain_id.t;
+    hash : Block_hash.t;
     shell : Block_header.shell_header;
     protocol_data : Proto.block_header_data;
   }
@@ -413,8 +411,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
          (merge_objs
             (obj3
                (req "protocol" (constant protocol_hash))
-               (req "chain_id" Tezos_crypto.Chain_id.encoding)
-               (req "hash" Tezos_crypto.Block_hash.encoding))
+               (req "chain_id" Chain_id.encoding)
+               (req "hash" Block_hash.encoding))
             raw_block_header_encoding)
 
   type block_metadata = {
@@ -493,8 +491,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     | Receipt of Proto.operation_receipt
 
   type operation = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    hash : Tezos_crypto.Operation_hash.t;
+    chain_id : Chain_id.t;
+    hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
     receipt : operation_receipt;
@@ -543,15 +541,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       (merge_objs
          (obj3
             (req "protocol" (constant protocol_hash))
-            (req "chain_id" Tezos_crypto.Chain_id.encoding)
-            (req "hash" Tezos_crypto.Operation_hash.encoding))
+            (req "chain_id" Chain_id.encoding)
+            (req "hash" Operation_hash.encoding))
          (merge_objs
             (dynamic_size Operation.shell_header_encoding)
             (dynamic_size operation_data_encoding)))
 
   type block_info = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    hash : Tezos_crypto.Block_hash.t;
+    chain_id : Chain_id.t;
+    hash : Block_hash.t;
     header : raw_block_header;
     metadata : block_metadata option;
     operations : operation list list;
@@ -565,8 +563,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         {chain_id; hash; header; metadata; operations})
       (obj6
          (req "protocol" (constant protocol_hash))
-         (req "chain_id" Tezos_crypto.Chain_id.encoding)
-         (req "hash" Tezos_crypto.Block_hash.encoding)
+         (req "chain_id" Chain_id.encoding)
+         (req "hash" Block_hash.encoding)
          (req "header" (dynamic_size raw_block_header_encoding))
          (opt "metadata" (dynamic_size block_metadata_encoding))
          (req "operations" (list (dynamic_size (list operation_encoding)))))
@@ -578,7 +576,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       Tezos_rpc.Service.get_service
         ~description:"The block's hash, its unique identifier."
         ~query:Tezos_rpc.Query.empty
-        ~output:Tezos_crypto.Block_hash.encoding
+        ~output:Block_hash.encoding
         Tezos_rpc.Path.(path / "hash")
 
     let header =
@@ -608,7 +606,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           "Hash of the metadata associated to the block. This is only set on \
            blocks starting from environment V1."
         ~query:Tezos_rpc.Query.empty
-        ~output:Tezos_crypto.Block_metadata_hash.encoding
+        ~output:Block_metadata_hash.encoding
         Tezos_rpc.Path.(path / "metadata_hash")
 
     let protocols =
@@ -622,7 +620,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       Tezos_rpc.Service.get_service
         ~description:"Context hash resulting of the block application."
         ~query:Tezos_rpc.Query.empty
-        ~output:Tezos_crypto.Context_hash.encoding
+        ~output:Context_hash.encoding
         Tezos_rpc.Path.(path / "resulting_context_hash")
 
     module Header = struct
@@ -740,7 +738,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         Tezos_rpc.Service.get_service
           ~description:"The hashes of all the operations included in the block."
           ~query:Tezos_rpc.Query.empty
-          ~output:(list (list Tezos_crypto.Operation_hash.encoding))
+          ~output:(list (list Operation_hash.encoding))
           path
 
       let operation_hashes_in_pass =
@@ -749,7 +747,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "All the operations included in `n-th` validation pass of the \
              block."
           ~query:Tezos_rpc.Query.empty
-          ~output:(list Tezos_crypto.Operation_hash.encoding)
+          ~output:(list Operation_hash.encoding)
           Tezos_rpc.Path.(path /: Operations.list_arg)
 
       let operation_hash =
@@ -758,7 +756,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "The hash of then `m-th` operation in the `n-th` validation pass \
              of the block."
           ~query:Tezos_rpc.Query.empty
-          ~output:Tezos_crypto.Operation_hash.encoding
+          ~output:Operation_hash.encoding
           Tezos_rpc.Path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 
@@ -769,7 +767,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "The root hash of the operations metadata from the block. This is \
              only set on blocks starting from environment V1."
           ~query:Tezos_rpc.Query.empty
-          ~output:Tezos_crypto.Operation_metadata_list_list_hash.encoding
+          ~output:Operation_metadata_list_list_hash.encoding
           Tezos_rpc.Path.(path / "operations_metadata_hash")
 
       let path = Tezos_rpc.Path.(path / "operation_metadata_hashes")
@@ -780,7 +778,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "The hashes of all the operation metadata included in the block. \
              This is only set on blocks starting from environment V1."
           ~query:Tezos_rpc.Query.empty
-          ~output:(list (list Tezos_crypto.Operation_metadata_hash.encoding))
+          ~output:(list (list Operation_metadata_hash.encoding))
           path
 
       let operation_metadata_hashes_in_pass =
@@ -790,7 +788,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              the block. This is only set on blocks starting from environment \
              V1."
           ~query:Tezos_rpc.Query.empty
-          ~output:(list Tezos_crypto.Operation_metadata_hash.encoding)
+          ~output:(list Operation_metadata_hash.encoding)
           Tezos_rpc.Path.(path /: Operations.list_arg)
 
       let operation_metadata_hash =
@@ -800,7 +798,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              validation pass of the block. This is only set on blocks starting \
              from environment V1."
           ~query:Tezos_rpc.Query.empty
-          ~output:Tezos_crypto.Operation_metadata_hash.encoding
+          ~output:Operation_metadata_hash.encoding
           Tezos_rpc.Path.(path /: Operations.list_arg /: Operations.offset_arg)
     end
 
@@ -983,16 +981,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     module Mempool = struct
       type t = {
-        applied : (Tezos_crypto.Operation_hash.t * Next_proto.operation) list;
-        refused :
-          (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-        outdated :
-          (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
+        applied : (Operation_hash.t * Next_proto.operation) list;
+        refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+        outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
         branch_refused :
-          (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
+          (Next_proto.operation * error list) Operation_hash.Map.t;
         branch_delayed :
-          (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-        unprocessed : Next_proto.operation Tezos_crypto.Operation_hash.Map.t;
+          (Next_proto.operation * error list) Operation_hash.Map.t;
+        unprocessed : Next_proto.operation Operation_hash.Map.t;
       }
 
       let version_0_encoding =
@@ -1036,37 +1032,36 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                         (hash, {shell; protocol_data}))
                       (merge_objs
                          (merge_objs
-                            (obj1
-                               (req "hash" Tezos_crypto.Operation_hash.encoding))
+                            (obj1 (req "hash" Operation_hash.encoding))
                             (dynamic_size Operation.shell_header_encoding))
                          (dynamic_size Next_proto.operation_data_encoding)))))
              (req
                 "refused"
-                (Tezos_crypto.Operation_hash.Map.encoding
+                (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
                       (obj1 (req "error" Tezos_rpc.Error.encoding)))))
              (req
                 "outdated"
-                (Tezos_crypto.Operation_hash.Map.encoding
+                (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
                       (obj1 (req "error" Tezos_rpc.Error.encoding)))))
              (req
                 "branch_refused"
-                (Tezos_crypto.Operation_hash.Map.encoding
+                (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
                       (obj1 (req "error" Tezos_rpc.Error.encoding)))))
              (req
                 "branch_delayed"
-                (Tezos_crypto.Operation_hash.Map.encoding
+                (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
                       (obj1 (req "error" Tezos_rpc.Error.encoding)))))
              (req
                 "unprocessed"
-                (Tezos_crypto.Operation_hash.Map.encoding
+                (Operation_hash.Map.encoding
                    (dynamic_size next_operation_encoding))))
 
       let version_1_encoding =
@@ -1074,12 +1069,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           req
             kind
             (conv
-               (fun map -> Tezos_crypto.Operation_hash.Map.bindings map)
-               (fun list ->
-                 list |> List.to_seq |> Tezos_crypto.Operation_hash.Map.of_seq)
+               (fun map -> Operation_hash.Map.bindings map)
+               (fun list -> list |> List.to_seq |> Operation_hash.Map.of_seq)
                (list
                   (merge_objs
-                     (obj1 (req "hash" Tezos_crypto.Operation_hash.encoding))
+                     (obj1 (req "hash" Operation_hash.encoding))
                      (merge_objs
                         next_operation_encoding
                         (obj1 (req "error" Tezos_rpc.Error.encoding))))))
@@ -1124,8 +1118,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                         (hash, {shell; protocol_data}))
                       (merge_objs
                          (merge_objs
-                            (obj1
-                               (req "hash" Tezos_crypto.Operation_hash.encoding))
+                            (obj1 (req "hash" Operation_hash.encoding))
                             Operation.shell_header_encoding)
                          (dynamic_size Next_proto.operation_data_encoding)))))
              (operations_with_error_encoding "refused")
@@ -1135,14 +1128,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (req
                 "unprocessed"
                 (conv
-                   (fun map -> Tezos_crypto.Operation_hash.Map.bindings map)
+                   (fun map -> Operation_hash.Map.bindings map)
                    (fun list ->
-                     list |> List.to_seq
-                     |> Tezos_crypto.Operation_hash.Map.of_seq)
+                     list |> List.to_seq |> Operation_hash.Map.of_seq)
                    (list
                       (merge_objs
-                         (obj1
-                            (req "hash" Tezos_crypto.Operation_hash.encoding))
+                         (obj1 (req "hash" Operation_hash.encoding))
                          next_operation_encoding)))))
 
       (* This encoding should be always the one by default. *)
@@ -1275,7 +1266,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              future. Note: If the baker has already received the operation, \
              then it's necessary to restart it to flush the operation from it."
           ~query:Tezos_rpc.Query.empty
-          ~input:Tezos_crypto.Operation_hash.encoding
+          ~input:Operation_hash.encoding
           ~output:unit
           Tezos_rpc.Path.(path / "ban_operation")
 
@@ -1285,7 +1276,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             "Remove an operation from the set of banned operations (nothing \
              happens if it was not banned)."
           ~query:Tezos_rpc.Query.empty
-          ~input:Tezos_crypto.Operation_hash.encoding
+          ~input:Operation_hash.encoding
           ~output:unit
           Tezos_rpc.Path.(path / "unban_operation")
 
@@ -1364,7 +1355,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let processed_operation_encoding =
         merge_objs
           (merge_objs
-             (obj1 (req "hash" Tezos_crypto.Operation_hash.encoding))
+             (obj1 (req "hash" Operation_hash.encoding))
              next_operation_encoding)
           (obj1 (dft "error" Tezos_rpc.Error.opt_encoding None))
 
@@ -1433,7 +1424,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
            branch in an operation header, are recent enough for that operation \
            to be included in the current block."
         ~query:Tezos_rpc.Query.empty
-        ~output:Tezos_crypto.Block_hash.Set.encoding
+        ~output:Block_hash.Set.encoding
         Tezos_rpc.Path.(live_blocks_path open_root)
   end
 
@@ -1667,16 +1658,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
   module Mempool = struct
     type t = S.Mempool.t = {
-      applied : (Tezos_crypto.Operation_hash.t * Next_proto.operation) list;
-      refused :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      outdated :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      branch_refused :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      branch_delayed :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      unprocessed : Next_proto.operation Tezos_crypto.Operation_hash.Map.t;
+      applied : (Operation_hash.t * Next_proto.operation) list;
+      refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
+      unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
     type t_with_version = S.Mempool.t_with_version =
@@ -1770,7 +1757,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 end
 
 module Fake_protocol = struct
-  let hash = Tezos_crypto.Protocol_hash.zero
+  let hash = Protocol_hash.zero
 
   type block_header_data = unit
 

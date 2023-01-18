@@ -32,9 +32,9 @@ module High_watermark = struct
     in
     conv
       (List.map (fun (chain_id, marks) ->
-           (Tezos_crypto.Chain_id.to_b58check chain_id, marks)))
+           (Chain_id.to_b58check chain_id, marks)))
       (List.map (fun (chain_id, marks) ->
-           (Tezos_crypto.Chain_id.of_b58check_exn chain_id, marks)))
+           (Chain_id.of_b58check_exn chain_id, marks)))
     @@ assoc
     @@ conv
          (List.map (fun (pkh, mark) ->
@@ -164,14 +164,12 @@ module High_watermark = struct
         failwith "byte sequence too short to be %s %s" art name
       else
         let hash = Tezos_crypto.Blake2B.hash_bytes [bytes] in
-        let chain_id =
-          Tezos_crypto.Chain_id.of_bytes_exn (Bytes.sub bytes 1 4)
-        in
+        let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
         let* level, round_opt = get_level_and_round () in
         let* o =
           match
             Option.bind
-              (List.assoc_opt ~equal:Tezos_crypto.Chain_id.equal chain_id all)
+              (List.assoc_opt ~equal:Chain_id.equal chain_id all)
               (List.assoc_opt
                  ~equal:Tezos_crypto.Signature.Public_key_hash.equal
                  pkh)

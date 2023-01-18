@@ -34,7 +34,7 @@ type error += Oversized_operation of {size : int; max : int}
 
 type error +=
   | Future_block_header of {
-      block : Tezos_crypto.Block_hash.t;
+      block : Block_hash.t;
       block_time : Time.Protocol.t;
       time : Time.System.t;
     }
@@ -87,7 +87,7 @@ let () =
       Format.fprintf
         ppf
         "Future block header (block: %a, block_time: %a, time: %a)"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block
         Time.System.pp_hum
         (Time.System.of_protocol_exn block_time)
@@ -95,7 +95,7 @@ let () =
         time)
     Data_encoding.(
       obj3
-        (req "block" Tezos_crypto.Block_hash.encoding)
+        (req "block" Block_hash.encoding)
         (req "block_time" Time.Protocol.encoding)
         (req "time" Time.System.encoding))
     (function
@@ -117,11 +117,11 @@ let () =
 
 (************************* State errors ***********************************)
 
-type error += Unknown_chain of Tezos_crypto.Chain_id.t
+type error += Unknown_chain of Chain_id.t
 
 type error += Bad_data_dir
 
-type error += Block_not_invalid of Tezos_crypto.Block_hash.t
+type error += Block_not_invalid of Block_hash.t
 
 let () =
   (* Unknown network *)
@@ -131,9 +131,8 @@ let () =
     ~title:"Unknown chain"
     ~description:
       "The chain identifier could not be found in the chain identifiers table."
-    ~pp:(fun ppf id ->
-      Format.fprintf ppf "Unknown chain %a" Tezos_crypto.Chain_id.pp id)
-    Data_encoding.(obj1 (req "chain" Tezos_crypto.Chain_id.encoding))
+    ~pp:(fun ppf id -> Format.fprintf ppf "Unknown chain %a" Chain_id.pp id)
+    Data_encoding.(obj1 (req "chain" Chain_id.encoding))
     (function Unknown_chain x -> Some x | _ -> None)
     (fun x -> Unknown_chain x) ;
   register_error_kind
@@ -158,21 +157,19 @@ let () =
       Format.fprintf
         ppf
         "Block %a was expected to be invalid, but was not actually invalid."
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block)
-    Data_encoding.(obj1 (req "block" Tezos_crypto.Block_hash.encoding))
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
     (function Block_not_invalid block -> Some block | _ -> None)
     (fun block -> Block_not_invalid block)
 
 (* Block database error *)
 
-type error +=
-  | Inconsistent_hash of
-      Tezos_crypto.Context_hash.t * Tezos_crypto.Context_hash.t
+type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
-type error += Missing_block_metadata_hash of Tezos_crypto.Block_hash.t
+type error += Missing_block_metadata_hash of Block_hash.t
 
-type error += Missing_operation_metadata_hashes of Tezos_crypto.Block_hash.t
+type error += Missing_operation_metadata_hashes of Block_hash.t
 
 let () =
   (* Inconsistent hash *)
@@ -187,14 +184,14 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Inconsistent hash:@ got: %a@ expected: %a"
-        Tezos_crypto.Context_hash.pp
+        Context_hash.pp
         got
-        Tezos_crypto.Context_hash.pp
+        Context_hash.pp
         exp)
     Data_encoding.(
       obj2
-        (req "wrong_context_hash" Tezos_crypto.Context_hash.encoding)
-        (req "expected_context_hash" Tezos_crypto.Context_hash.encoding))
+        (req "wrong_context_hash" Context_hash.encoding)
+        (req "expected_context_hash" Context_hash.encoding))
     (function Inconsistent_hash (got, exp) -> Some (got, exp) | _ -> None)
     (fun (got, exp) -> Inconsistent_hash (got, exp)) ;
   register_error_kind
@@ -208,9 +205,9 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Missing block metadata hash at block: %a"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block)
-    Data_encoding.(obj1 (req "block" Tezos_crypto.Block_hash.encoding))
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
     (function Missing_block_metadata_hash block -> Some block | _ -> None)
     (fun block -> Missing_block_metadata_hash block) ;
   register_error_kind
@@ -224,9 +221,9 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Missing operation metadata hashes at block: %a"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block)
-    Data_encoding.(obj1 (req "block" Tezos_crypto.Block_hash.encoding))
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
     (function
       | Missing_operation_metadata_hashes block -> Some block | _ -> None)
     (fun block -> Missing_operation_metadata_hashes block)
@@ -284,10 +281,7 @@ let () =
 type protocol_error = Compilation_failed | Dynlinking_failed
 
 type error +=
-  | Invalid_protocol of {
-      hash : Tezos_crypto.Protocol_hash.t;
-      error : protocol_error;
-    }
+  | Invalid_protocol of {hash : Protocol_hash.t; error : protocol_error}
 
 let protocol_error_encoding =
   let open Data_encoding in
@@ -322,19 +316,19 @@ let () =
       Format.fprintf
         ppf
         "@[<v 2>Invalid protocol %a@ %a@]"
-        Tezos_crypto.Protocol_hash.pp_short
+        Protocol_hash.pp_short
         protocol
         pp_protocol_error
         error)
     Data_encoding.(
       merge_objs
-        (obj1 (req "invalid_protocol" Tezos_crypto.Protocol_hash.encoding))
+        (obj1 (req "invalid_protocol" Protocol_hash.encoding))
         protocol_error_encoding)
     (function
       | Invalid_protocol {hash; error} -> Some (hash, error) | _ -> None)
     (fun (hash, error) -> Invalid_protocol {hash; error})
 
-type error += Cannot_load_protocol of Tezos_crypto.Protocol_hash.t
+type error += Cannot_load_protocol of Protocol_hash.t
 
 let () =
   register_error_kind
@@ -347,9 +341,9 @@ let () =
         ppf
         "Failed to load the protocol %a from disk: the corresponding files \
          might be missing or corrupted."
-        Tezos_crypto.Protocol_hash.pp
+        Protocol_hash.pp
         protocol)
-    Data_encoding.(obj1 (req "protocol" Tezos_crypto.Protocol_hash.encoding))
+    Data_encoding.(obj1 (req "protocol" Protocol_hash.encoding))
     (function Cannot_load_protocol protocol -> Some protocol | _ -> None)
     (fun protocol -> Cannot_load_protocol protocol)
 
@@ -381,10 +375,9 @@ let () =
 
 (************************ Validator errors ********************************)
 
-type error += Inactive_chain of Tezos_crypto.Chain_id.t
+type error += Inactive_chain of Chain_id.t
 
-type error +=
-  | Checkpoint_error of Tezos_crypto.Block_hash.t * P2p_peer.Id.t option
+type error += Checkpoint_error of Block_hash.t * P2p_peer.Id.t option
 
 let () =
   (* Inactive network *)
@@ -398,9 +391,9 @@ let () =
         ppf
         "Tried to validate a block from chain %a, that is not currently \
          considered active."
-        Tezos_crypto.Chain_id.pp
+        Chain_id.pp
         chain)
-    Data_encoding.(obj1 (req "inactive_chain" Tezos_crypto.Chain_id.encoding))
+    Data_encoding.(obj1 (req "inactive_chain" Chain_id.encoding))
     (function Inactive_chain chain -> Some chain | _ -> None)
     (fun chain -> Inactive_chain chain) ;
   register_error_kind
@@ -416,7 +409,7 @@ let () =
           Format.fprintf
             ppf
             "The block %a is incompatible with the current checkpoint."
-            Tezos_crypto.Block_hash.pp_short
+            Block_hash.pp_short
             block
       | Some peer ->
           Format.fprintf
@@ -425,12 +418,10 @@ let () =
              checkpoint (%a)."
             P2p_peer.Id.pp
             peer
-            Tezos_crypto.Block_hash.pp_short
+            Block_hash.pp_short
             block)
     Data_encoding.(
-      obj2
-        (req "block" Tezos_crypto.Block_hash.encoding)
-        (opt "peer" P2p_peer.Id.encoding))
+      obj2 (req "block" Block_hash.encoding) (opt "peer" P2p_peer.Id.encoding))
     (function
       | Checkpoint_error (block, peer) -> Some (block, peer) | _ -> None)
     (fun (block, peer) -> Checkpoint_error (block, peer))

@@ -82,7 +82,7 @@ let sources_config_to_sources rpc_context_builder {min_agreement; uris} =
   {min_agreement; endpoints}
 
 let hash_of_block (block : Tezos_shell_services.Block_services.block) :
-    Tezos_crypto.Block_hash.t option =
+    Block_hash.t option =
   match block with
   | `Hash (h, 0) -> Some h
   | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) -> None

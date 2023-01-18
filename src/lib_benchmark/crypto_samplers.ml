@@ -50,7 +50,7 @@ module type P_Finite_key_pool_S = sig
 end
 
 module type Signature_S = sig
-  include Tezos_crypto.S.SIGNATURE
+  include Tezos_crypto.Intfs.SIGNATURE
 
   type algo
 

@@ -98,7 +98,7 @@ let gen_inbox level =
     let* witness =
       Sc_rollup_inbox_repr.add_info_per_level_no_history
         ~predecessor_timestamp:Time.Protocol.epoch
-        ~predecessor:Tezos_crypto.Block_hash.zero
+        ~predecessor:Block_hash.zero
         witness
     in
     let* input_messages =
@@ -232,7 +232,7 @@ let gen_inbox_message =
     (* We won't test the encoding of these values. It's out of scope. *)
     let payload = Script_repr.unit in
     let sender = Contract_hash.zero in
-    let source = Tezos_crypto.Signature.Public_key_hash.zero in
+    let source = Signature.Public_key_hash.zero in
     (* But the encoding of the rollup's address is our problem. *)
     let+ destination = gen_rollup in
     Internal (Transfer {payload; sender; source; destination})

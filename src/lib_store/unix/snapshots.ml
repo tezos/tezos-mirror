@@ -1515,7 +1515,7 @@ module type EXPORTER = sig
     unit Lwt.t
 
   val export_context :
-    t -> Context.index -> Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t
+    t -> Context.index -> Context_hash.t -> unit tzresult Lwt.t
 
   val copy_cemented_block :
     t -> file:string -> start_level:int32 -> end_level:int32 -> unit Lwt.t

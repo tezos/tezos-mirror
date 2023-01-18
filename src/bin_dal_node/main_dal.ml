@@ -128,7 +128,7 @@ module Dac_client = struct
   let tz4_address_parameter () =
     Tezos_clic.parameter (fun _cctxt s ->
         let open Lwt_result_syntax in
-        let*? bls_pkh = Tezos_crypto.Bls.Public_key_hash.of_b58check s in
+        let*? bls_pkh = Signature.Bls.Public_key_hash.of_b58check s in
         let pkh : Tezos_crypto.Aggregate_signature.public_key_hash =
           Tezos_crypto.Aggregate_signature.Bls12_381 bls_pkh
         in

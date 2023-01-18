@@ -43,7 +43,7 @@
 
 open Qcheck2_helpers
 open Shell_operation
-module Op_map = Tezos_crypto.Operation_hash.Map
+module Op_map = Operation_hash.Map
 module Classification = Prevalidator_classification
 module Tree = Generators_tree.Tree
 module List_extra = Generators_tree.List_extra
@@ -64,31 +64,25 @@ let values_from_to ~(equal : 'a -> 'a -> bool) (tree : 'a Tree.tree)
   |> force_opt ~loc:__LOC__
   |> fun preds -> start :: preds
 
-(** Pretty print values of type [Tezos_crypto.Operation_hash.Set.t] *)
+(** Pretty print values of type [Operation_hash.Set.t] *)
 let op_set_pp fmt x =
-  let set_to_list m = Tezos_crypto.Operation_hash.Set.to_seq m |> List.of_seq in
+  let set_to_list m = Operation_hash.Set.to_seq m |> List.of_seq in
   Format.fprintf
     fmt
     "%a"
-    (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
+    (Format.pp_print_list Operation_hash.pp)
     (set_to_list x)
 
-(** Pretty print values of type [Operation.t Tezos_crypto.Operation_hash.Map] *)
+(** Pretty print values of type [Operation.t Operation_hash.Map] *)
 let op_map_pp fmt x =
   let pp_pair fmt (hash, op) =
-    Format.fprintf
-      fmt
-      "%a:%a"
-      Tezos_crypto.Operation_hash.pp
-      hash
-      Operation.pp
-      op.raw
+    Format.fprintf fmt "%a:%a" Operation_hash.pp hash Operation.pp op.raw
   in
   Format.fprintf
     fmt
     "%a"
     (Format.pp_print_list pp_pair)
-    (Tezos_crypto.Operation_hash.Map.bindings x)
+    (Operation_hash.Map.bindings x)
 
 let qcheck_cond ?pp ~cond e1 e2 () =
   if cond e1 e2 then true
@@ -110,22 +104,21 @@ let qcheck_cond ?pp ~cond e1 e2 () =
           pp
           e2
 
-let blocks_to_oph_set (blocks : Tezos_crypto.Operation_hash.t list list list) :
-    Tezos_crypto.Operation_hash.Set.t =
-  List.concat blocks |> List.concat |> Tezos_crypto.Operation_hash.Set.of_list
+let blocks_to_oph_set (blocks : Operation_hash.t list list list) :
+    Operation_hash.Set.t =
+  List.concat blocks |> List.concat |> Operation_hash.Set.of_list
 
 (** [is_subset m1 m2] returns whether all bindings of [m1] are in [m2].
     In other words, it returns whether [m2] is a superset of [m1]. *)
 let is_subset (m1 : unit operation Op_map.t) (m2 : unit operation Op_map.t) =
-  let rec go (m1_seq : (Tezos_crypto.Operation_hash.t * unit operation) Seq.t) =
+  let rec go (m1_seq : (Operation_hash.t * unit operation) Seq.t) =
     match m1_seq () with
     | Seq.Nil -> true
     | Seq.Cons ((m1_key, m1_value), m1_rest) -> (
         match Op_map.find m1_key m2 with
         | None -> (* A key in [m1] that is not in [m2] *) false
         | Some m2_value ->
-            Tezos_crypto.Operation_hash.equal m1_value.hash m2_value.hash
-            && go m1_rest)
+            Operation_hash.equal m1_value.hash m2_value.hash && go m1_rest)
   in
   go (Op_map.to_seq m1)
 
@@ -154,10 +147,7 @@ module Handle_operations = struct
         List.map (fun (blk : Block.t) -> blk.bhash) live_blocks
       in
       return
-        ( tree,
-          pair_blocks_opt,
-          old_mempool,
-          Tezos_crypto.Block_hash.Set.of_list live_blocks )
+        (tree, pair_blocks_opt, old_mempool, Block_hash.Set.of_list live_blocks)
     in
     QCheck2.Test.make
       ~name:"[handle_live_operations] is a subset of alive blocks"
@@ -172,7 +162,7 @@ module Handle_operations = struct
       (* Keep only the ones in live_blocks *)
       |> List.to_seq
       |> Seq.filter (fun (blk : Block.t) ->
-             Tezos_crypto.Block_hash.Set.mem blk.bhash live_blocks)
+             Block_hash.Set.mem blk.bhash live_blocks)
       (* Then extract (oph, op) pairs from them *)
       |> Seq.flat_map (fun (blk : Block.t) -> List.to_seq blk.operations)
       |> Seq.flat_map List.to_seq
@@ -187,7 +177,7 @@ module Handle_operations = struct
         ~from_branch
         ~to_branch
         ~is_branch_alive:(fun blk_hash ->
-          Tezos_crypto.Block_hash.Set.mem blk_hash live_blocks)
+          Block_hash.Set.mem blk_hash live_blocks)
         ~parse
         old_mempool
       |> Lwt_main.run
@@ -224,9 +214,7 @@ module Handle_operations = struct
     (* Expected operations are the ones from [ancestor] to [from_branch],
        minus the ones from ancestor to [to_branch]. *)
     let expected =
-      Tezos_crypto.Operation_hash.Set.diff
-        expected_superset
-        from_ancestor_to_to_branch
+      Operation_hash.Set.diff expected_superset from_ancestor_to_to_branch
     in
     let actual =
       Classification.Internal_for_tests.handle_live_operations
@@ -237,16 +225,11 @@ module Handle_operations = struct
         ~to_branch
         ~is_branch_alive:(Fun.const true)
         ~parse
-        Tezos_crypto.Operation_hash.Map.empty
+        Operation_hash.Map.empty
       |> Lwt_main.run |> Op_map.bindings |> List.map fst
-      |> Tezos_crypto.Operation_hash.Set.of_list
+      |> Operation_hash.Set.of_list
     in
-    qcheck_eq'
-      ~pp:op_set_pp
-      ~eq:Tezos_crypto.Operation_hash.Set.equal
-      ~expected
-      ~actual
-      ()
+    qcheck_eq' ~pp:op_set_pp ~eq:Operation_hash.Set.equal ~expected ~actual ()
 
   (** Test that operations cleared by [handle_live_operations]
       are operations on the path from [ancestor] to [to_branch] (when all
@@ -259,10 +242,8 @@ module Handle_operations = struct
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let cleared = ref Tezos_crypto.Operation_hash.Set.empty in
-    let clearer oph =
-      cleared := Tezos_crypto.Operation_hash.Set.add oph !cleared
-    in
+    let cleared = ref Operation_hash.Set.empty in
+    let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
     let chain = {chain with clear_or_cancel = clearer} in
     let equal = Block.equal in
     let ancestor : Block.t =
@@ -287,7 +268,7 @@ module Handle_operations = struct
     |> Lwt_main.run |> ignore ;
     qcheck_cond
       ~pp:op_set_pp
-      ~cond:Tezos_crypto.Operation_hash.Set.subset
+      ~cond:Operation_hash.Set.subset
       !cleared
       expected_superset
       ()
@@ -302,9 +283,9 @@ module Handle_operations = struct
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let from_branch, to_branch = force_opt ~loc:__LOC__ pair_blocks_opt in
     let chain = Generators_tree.classification_chain_tools tree in
-    let injected = ref Tezos_crypto.Operation_hash.Set.empty in
+    let injected = ref Operation_hash.Set.empty in
     let inject_operation oph _op =
-      injected := Tezos_crypto.Operation_hash.Set.add oph !injected ;
+      injected := Operation_hash.Set.add oph !injected ;
       Lwt.return_unit
     in
     let chain = {chain with inject_operation} in
@@ -331,7 +312,7 @@ module Handle_operations = struct
     |> Lwt_main.run |> ignore ;
     qcheck_cond
       ~pp:op_set_pp
-      ~cond:Tezos_crypto.Operation_hash.Set.subset
+      ~cond:Operation_hash.Set.subset
       !injected
       expected_superset
       ()
@@ -350,7 +331,7 @@ module Recyle_operations = struct
   let classification_of_ops_gen (ops : unit operation Op_map.t) :
       unit Classification.t QCheck2.Gen.t =
     let open QCheck2.Gen in
-    let ops = Tezos_crypto.Operation_hash.Map.bindings ops |> List.map snd in
+    let ops = Operation_hash.Map.bindings ops |> List.map snd in
     let length = List.length ops in
     let* empty_space = 0 -- 100 in
     (* To avoid throwing part of [ops], we want the capacity of the classification
@@ -450,7 +431,7 @@ module Recyle_operations = struct
         ~chain
         ~from_branch
         ~to_branch
-        ~live_blocks:Tezos_crypto.Block_hash.Set.empty
+        ~live_blocks:Block_hash.Set.empty
         ~classes
         ~pending
         ~handle_branch_refused
@@ -477,21 +458,19 @@ module Recyle_operations = struct
       Tree.find_ancestor ~equal tree from_branch to_branch
       |> force_opt ~loc:__LOC__
     in
-    let live_blocks : Tezos_crypto.Block_hash.Set.t =
-      Tree.values tree |> List.map Block.to_hash
-      |> Tezos_crypto.Block_hash.Set.of_list
+    let live_blocks : Block_hash.Set.t =
+      Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
     (* This is inherited from the behavior of [handle_live_operations] *)
-    let expected_from_tree : Tezos_crypto.Operation_hash.Set.t =
+    let expected_from_tree : Operation_hash.Set.t =
       List.map
         Block.tools.all_operation_hashes
         (values_from_to ~equal tree from_branch ancestor)
       |> blocks_to_oph_set
     in
     (* This is coming from [recycle_operations] itself *)
-    let op_map_to_hash_list (m : 'a Tezos_crypto.Operation_hash.Map.t) =
-      Op_map.bindings m |> List.map fst
-      |> Tezos_crypto.Operation_hash.Set.of_list
+    let op_map_to_hash_list (m : 'a Operation_hash.Map.t) =
+      Op_map.bindings m |> List.map fst |> Operation_hash.Set.of_list
     in
     let expected_from_classification =
       Classification.Internal_for_tests.to_map
@@ -505,15 +484,15 @@ module Recyle_operations = struct
       |> op_map_to_hash_list
     in
     let expected_from_pending = op_map_to_hash_list pending in
-    let expected_superset : Tezos_crypto.Operation_hash.Set.t =
-      Tezos_crypto.Operation_hash.Set.union
-        (Tezos_crypto.Operation_hash.Set.union
+    let expected_superset : Operation_hash.Set.t =
+      Operation_hash.Set.union
+        (Operation_hash.Set.union
            expected_from_tree
            expected_from_classification)
         expected_from_pending
     in
     let parse raw hash = Some (make_operation hash raw ()) in
-    let actual : Tezos_crypto.Operation_hash.Set.t =
+    let actual : Operation_hash.Set.t =
       Classification.recycle_operations
         ~block_store:Block.tools
         ~chain
@@ -525,11 +504,11 @@ module Recyle_operations = struct
         ~handle_branch_refused
         ~parse
       |> Lwt_main.run |> Op_map.bindings |> List.map fst
-      |> Tezos_crypto.Operation_hash.Set.of_list
+      |> Operation_hash.Set.of_list
     in
     qcheck_cond
       ~pp:op_set_pp
-      ~cond:Tezos_crypto.Operation_hash.Set.subset
+      ~cond:Operation_hash.Set.subset
       actual
       expected_superset
       ()
@@ -542,9 +521,8 @@ module Recyle_operations = struct
       QCheck2.Gen.(pair gen bool)
     @@ fun ((tree, pair_blocks_opt, classes, pending), handle_branch_refused) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
-    let live_blocks : Tezos_crypto.Block_hash.Set.t =
-      Tree.values tree |> List.map Block.to_hash
-      |> Tezos_crypto.Block_hash.Set.of_list
+    let live_blocks : Block_hash.Set.t =
+      Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
     let expected : unit operation Op_map.t =
       Classification.Internal_for_tests.to_map

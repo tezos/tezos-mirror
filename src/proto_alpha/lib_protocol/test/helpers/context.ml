@@ -140,8 +140,7 @@ let get_endorser_slot ctxt pkh =
   List.find_map
     (function
       | {Plugin.RPC.Validators.consensus_key; slots; _} ->
-          if Tezos_crypto.Signature.Public_key_hash.(consensus_key = pkh) then
-            Some slots
+          if Signature.Public_key_hash.(consensus_key = pkh) then Some slots
           else None)
     endorsers
 
@@ -157,7 +156,7 @@ let get_endorsing_power_for_delegate ctxt ?levels pkh =
   let rec find_slots_for_delegate = function
     | [] -> return 0
     | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
-        if Tezos_crypto.Signature.Public_key_hash.equal delegate pkh then
+        if Signature.Public_key_hash.equal delegate pkh then
           return (List.length slots)
         else find_slots_for_delegate t
   in
@@ -180,8 +179,7 @@ let get_baker ctxt ~round =
 let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
-       (fun baker' ->
-         Tezos_crypto.Signature.Public_key_hash.( <> ) baker baker')
+       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
        bakers
 
 let get_first_different_bakers ctxt =
@@ -276,7 +274,7 @@ module Vote = struct
   type delegate_info = Alpha_context.Vote.delegate_info = {
     voting_power : Int64.t option;
     current_ballot : Alpha_context.Vote.ballot option;
-    current_proposals : Tezos_crypto.Protocol_hash.t list;
+    current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
 
@@ -355,9 +353,8 @@ module Delegate = struct
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Alpha_context.Vote.delegate_info;
-    active_consensus_key : Tezos_crypto.Signature.Public_key_hash.t;
-    pending_consensus_keys :
-      (Cycle.t * Tezos_crypto.Signature.Public_key_hash.t) list;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
@@ -585,10 +582,10 @@ let default_raw_context () =
   >>= fun context ->
   let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
   Init_storage.prepare_first_block
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     context
     ~level:0l
     ~timestamp:(Time.Protocol.of_seconds 1643125688L)
-    ~predecessor:Tezos_crypto.Block_hash.zero
+    ~predecessor:Block_hash.zero
     ~typecheck
   >>= fun e -> Lwt.return @@ Environment.wrap_tzresult e

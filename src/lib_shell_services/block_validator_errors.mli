@@ -25,31 +25,27 @@
 (*****************************************************************************)
 
 type block_error =
-  | Cannot_parse_operation of Tezos_crypto.Operation_hash.t
+  | Cannot_parse_operation of Operation_hash.t
   | Invalid_fitness of {expected : Fitness.t; found : Fitness.t}
   | Non_increasing_timestamp
   | Non_increasing_fitness
   | Invalid_level of {expected : Int32.t; found : Int32.t}
   | Invalid_proto_level of {expected : int; found : int}
-  | Replayed_operation of Tezos_crypto.Operation_hash.t
+  | Replayed_operation of Operation_hash.t
   | Outdated_operation of {
-      operation : Tezos_crypto.Operation_hash.t;
-      originating_block : Tezos_crypto.Block_hash.t;
+      operation : Operation_hash.t;
+      originating_block : Block_hash.t;
     }
   | Expired_chain of {
-      chain_id : Tezos_crypto.Chain_id.t;
+      chain_id : Chain_id.t;
       expiration : Time.Protocol.t;
       timestamp : Time.Protocol.t;
     }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of {pass : int; found : int; max : int}
-  | Oversized_operation of {
-      operation : Tezos_crypto.Operation_hash.t;
-      size : int;
-      max : int;
-    }
+  | Oversized_operation of {operation : Operation_hash.t; size : int; max : int}
   | Unallowed_pass of {
-      operation : Tezos_crypto.Operation_hash.t;
+      operation : Operation_hash.t;
       pass : int;
       allowed_pass : int option;
     }
@@ -67,21 +63,18 @@ type validation_process_error =
   | Cannot_run_external_validator of string
 
 type error +=
-  | Invalid_block of {block : Tezos_crypto.Block_hash.t; error : block_error}
-  | Unavailable_protocol of {
-      block : Tezos_crypto.Block_hash.t;
-      protocol : Tezos_crypto.Protocol_hash.t;
-    }
+  | Invalid_block of {block : Block_hash.t; error : block_error}
+  | Unavailable_protocol of {block : Block_hash.t; protocol : Protocol_hash.t}
   | Inconsistent_operations_hash of {
-      block : Tezos_crypto.Block_hash.t;
-      expected : Tezos_crypto.Operation_list_list_hash.t;
-      found : Tezos_crypto.Operation_list_list_hash.t;
+      block : Block_hash.t;
+      expected : Operation_list_list_hash.t;
+      found : Operation_list_list_hash.t;
     }
-  | Applying_non_prechecked_block of Tezos_crypto.Block_hash.t
-  | Failed_to_checkout_context of Tezos_crypto.Context_hash.t
+  | Applying_non_prechecked_block of Block_hash.t
+  | Failed_to_checkout_context of Context_hash.t
   | System_error of {errno : string; fn : string; msg : string}
-  | Missing_test_protocol of Tezos_crypto.Protocol_hash.t
+  | Missing_test_protocol of Protocol_hash.t
   | Validation_process_failed of validation_process_error
   | Cannot_validate_while_shutting_down
 
-val invalid_block : Tezos_crypto.Block_hash.t -> block_error -> error
+val invalid_block : Block_hash.t -> block_error -> error

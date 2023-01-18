@@ -385,13 +385,16 @@ module Context = struct
 
   type cache_key = Environment_cache.key
 
-  type block_cache = {context_hash : Tezos_crypto.Context_hash.t; cache : cache}
+  type block_cache = {
+    context_hash : Tezos_crypto.Hashed.Context_hash.t;
+    cache : cache;
+  }
 
   type source_of_cache =
     [ `Force_load
     | `Load
     | `Lazy
-    | `Inherited of block_cache * Tezos_crypto.Context_hash.t ]
+    | `Inherited of block_cache * Tezos_crypto.Hashed.Context_hash.t ]
 
   type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
@@ -657,7 +660,10 @@ module Context = struct
     let open Lwt_syntax in
     match mode with
     | `Inherited ({context_hash; cache}, predecessor_context_hash) ->
-        if Tezos_crypto.Context_hash.equal context_hash predecessor_context_hash
+        if
+          Tezos_crypto.Hashed.Context_hash.equal
+            context_hash
+            predecessor_context_hash
         then
           (*
 
@@ -702,13 +708,7 @@ module Context = struct
 
   *)
   module Cache_cache =
-  Aches_lwt.Lache.Make_result (Aches.Rache.SingletonTransferMap (struct
-    type t = Tezos_crypto.Block_hash.t
-
-    let equal = Tezos_crypto.Block_hash.equal
-
-    let hash = Tezos_crypto.Block_hash.hash
-  end))
+    Aches_lwt.Lache.Make_result (Aches.Rache.SingletonTransferMap (Block_hash))
 
   let cache_cache : (cache, error trace) Cache_cache.t =
     (* The cache is a singleton cache, this is set during the instantiation of
@@ -780,7 +780,7 @@ type validation_result = {
 type quota = {max_size : int; max_op : int option}
 
 type rpc_context = {
-  block_hash : Tezos_crypto.Block_hash.t;
+  block_hash : Tezos_crypto.Hashed.Block_hash.t;
   block_header : Block_header.shell_header;
   context : Context.t;
 }

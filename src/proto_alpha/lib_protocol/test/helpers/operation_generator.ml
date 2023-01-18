@@ -126,14 +126,14 @@ end
 (** {3 Selection in hashes list} *)
 
 let gen_block_hash =
-  let module G = Gen_hash (Tezos_crypto.Block_hash) in
+  let module G = Gen_hash (Block_hash) in
   G.gen
 
 let random_payload_hash =
   let module G = Gen_hash (Block_payload_hash) in
   G.gen
 
-let gen_algo = QCheck2.Gen.oneofl Tezos_crypto.Signature.algos
+let gen_algo = QCheck2.Gen.oneofl Signature.algos
 
 let random_seed =
   let open QCheck2.Gen in
@@ -144,29 +144,29 @@ let random_keys =
   let open QCheck2.Gen in
   let* algo = gen_algo in
   let+ seed = random_seed in
-  Tezos_crypto.Signature.generate_key ~algo ~seed ()
+  Signature.generate_key ~algo ~seed ()
 
 let random_tz1 =
   let open QCheck2.Gen in
-  let+ str = string_size (pure Tezos_crypto.Ed25519.Public_key_hash.size) in
-  (Ed25519 (Tezos_crypto.Ed25519.Public_key_hash.of_string_exn str)
+  let+ str = string_size (pure Signature.Ed25519.Public_key_hash.size) in
+  (Ed25519 (Signature.Ed25519.Public_key_hash.of_string_exn str)
     : public_key_hash)
 
 let random_tz2 =
   let open QCheck2.Gen in
-  let+ str = string_size (pure Tezos_crypto.Secp256k1.Public_key_hash.size) in
-  (Secp256k1 (Tezos_crypto.Secp256k1.Public_key_hash.of_string_exn str)
+  let+ str = string_size (pure Signature.Secp256k1.Public_key_hash.size) in
+  (Secp256k1 (Signature.Secp256k1.Public_key_hash.of_string_exn str)
     : public_key_hash)
 
 let random_tz3 =
   let open QCheck2.Gen in
-  let+ str = string_size (pure Tezos_crypto.P256.Public_key_hash.size) in
-  (P256 (Tezos_crypto.P256.Public_key_hash.of_string_exn str) : public_key_hash)
+  let+ str = string_size (pure Signature.P256.Public_key_hash.size) in
+  (P256 (Signature.P256.Public_key_hash.of_string_exn str) : public_key_hash)
 
 let random_tz4 =
   let open QCheck2.Gen in
-  let+ str = string_size (pure Tezos_crypto.Bls.Public_key_hash.size) in
-  (Bls (Tezos_crypto.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
+  let+ str = string_size (pure Signature.Bls.Public_key_hash.size) in
+  (Bls (Signature.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
 
 let random_pkh =
   let open QCheck2.Gen in
@@ -187,34 +187,32 @@ let random_signature =
   let* algo = option ~ratio:0.8 gen_algo in
   match algo with
   | None ->
-      let+ str = string_size (pure Tezos_crypto.Ed25519.size) in
-      (Unknown (Bytes.unsafe_of_string str) : Tezos_crypto.Signature.t)
+      let+ str = string_size (pure Signature.Ed25519.size) in
+      (Unknown (Bytes.unsafe_of_string str) : Signature.t)
   | Some Ed25519 ->
-      let+ str = string_size (pure Tezos_crypto.Ed25519.size) in
-      (Ed25519 (Tezos_crypto.Ed25519.of_string_exn str)
-        : Tezos_crypto.Signature.t)
+      let+ str = string_size (pure Signature.Ed25519.size) in
+      (Ed25519 (Signature.Ed25519.of_string_exn str) : Signature.t)
   | Some Secp256k1 ->
-      let+ str = string_size (pure Tezos_crypto.Secp256k1.size) in
-      (Secp256k1 (Tezos_crypto.Secp256k1.of_string_exn str)
-        : Tezos_crypto.Signature.t)
+      let+ str = string_size (pure Signature.Secp256k1.size) in
+      (Secp256k1 (Signature.Secp256k1.of_string_exn str) : Signature.t)
   | Some P256 ->
-      let+ str = string_size (pure Tezos_crypto.P256.size) in
-      (P256 (Tezos_crypto.P256.of_string_exn str) : Tezos_crypto.Signature.t)
+      let+ str = string_size (pure Signature.P256.size) in
+      (P256 (Signature.P256.of_string_exn str) : Signature.t)
   | Some Bls ->
       let+ seed = random_seed in
-      let _, _, sk = Tezos_crypto.Signature.generate_key ~algo:Bls ~seed () in
-      Tezos_crypto.Signature.sign sk Bytes.empty
+      let _, _, sk = Signature.generate_key ~algo:Bls ~seed () in
+      Signature.sign sk Bytes.empty
 
 let random_signature =
   let open QCheck2.Gen in
   graft_corners
     random_signature
-    Tezos_crypto.Signature.
+    Signature.
       [
-        of_ed25519 Tezos_crypto.Ed25519.zero;
-        of_secp256k1 Tezos_crypto.Secp256k1.zero;
-        of_p256 Tezos_crypto.P256.zero;
-        of_bls Tezos_crypto.Bls.zero;
+        of_ed25519 Signature.Ed25519.zero;
+        of_secp256k1 Signature.Secp256k1.zero;
+        of_p256 Signature.P256.zero;
+        of_bls Signature.Bls.zero;
         Unknown (Bytes.make 64 '\000');
       ]
     ()
@@ -248,12 +246,12 @@ let random_sc_rollup =
   G.gen
 
 let random_proto =
-  let module G = Gen_hash (Tezos_crypto.Protocol_hash) in
+  let module G = Gen_hash (Protocol_hash) in
   G.gen
 
 let random_code =
   let open QCheck2.Gen in
-  let+ str = string_size (pure Tezos_crypto.Ed25519.Public_key_hash.size) in
+  let+ str = string_size (pure Signature.Ed25519.Public_key_hash.size) in
   let (`Hex hex) = Hex.of_string str in
   Blinded_public_key_hash.activation_code_of_hex hex
   |> WithExceptions.Option.get ~loc:__LOC__
@@ -428,11 +426,7 @@ let generate_activate_account =
   let open QCheck2.Gen in
   let* activation_code = random_code in
   let+ id = random_tz1 in
-  let id =
-    match id with
-    | Tezos_crypto.Signature.Ed25519 pkh -> pkh
-    | _ -> assert false
-  in
+  let id = match id with Signature.Ed25519 pkh -> pkh | _ -> assert false in
   Activate_account {id; activation_code}
 
 let random_period =

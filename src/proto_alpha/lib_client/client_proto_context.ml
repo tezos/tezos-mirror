@@ -324,7 +324,7 @@ let build_update_consensus_key ?fee ?gas_limit ?storage_limit consensus_pk =
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_pk src_pk =
-  let source = Tezos_crypto.Signature.Public_key.hash src_pk in
+  let source = Signature.Public_key.hash src_pk in
   let delegate_op = build_delegate_operation ?fee (Some source) in
   match consensus_pk with
   | None -> (
@@ -385,7 +385,7 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
 let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ~consensus_pk ~manager_sk ~fee_parameter
     src_pk =
-  let source = Tezos_crypto.Signature.Public_key.hash src_pk in
+  let source = Signature.Public_key.hash src_pk in
   let operation = build_update_consensus_key ?fee consensus_pk in
   let operation = Annotated_manager_operation.Single_manager operation in
   Injection.inject_manager_operation
@@ -624,7 +624,7 @@ let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
       return (oph, op, result)
 
 type activation_key = {
-  pkh : Tezos_crypto.Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -635,7 +635,7 @@ type activation_key = {
 let raw_activation_key_encoding =
   let open Data_encoding in
   obj6
-    (req "pkh" Tezos_crypto.Ed25519.Public_key_hash.encoding)
+    (req "pkh" Signature.Ed25519.Public_key_hash.encoding)
     (req "amount" Tez.encoding)
     (req "activation_code" Blinded_public_key_hash.activation_code_encoding)
     (req "mnemonic" (list string))
@@ -665,7 +665,7 @@ let activation_key_encoding =
                 ~title:"Deprecated_activation"
                 Json_only
                 (obj6
-                   (req "pkh" Tezos_crypto.Ed25519.Public_key_hash.encoding)
+                   (req "pkh" Signature.Ed25519.Public_key_hash.encoding)
                    (req "amount" Tez.encoding)
                    (req
                       "secret"
@@ -713,14 +713,14 @@ let read_key key =
       in
       let sk = Bip39.to_seed ~passphrase t in
       let sk = Bytes.sub sk 0 32 in
-      let sk : Tezos_crypto.Signature.Secret_key.t =
+      let sk : Signature.Secret_key.t =
         Ed25519
           (Data_encoding.Binary.of_bytes_exn
-             Tezos_crypto.Ed25519.Secret_key.encoding
+             Signature.Ed25519.Secret_key.encoding
              sk)
       in
-      let pk = Tezos_crypto.Signature.Secret_key.to_public_key sk in
-      let pkh = Tezos_crypto.Signature.Public_key.hash pk in
+      let pk = Signature.Secret_key.to_public_key sk in
+      let pkh = Signature.Public_key.hash pk in
       return (pkh, pk, sk)
 
 let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
@@ -745,7 +745,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
       cctxt#message
         "Account %s (%a) activated with %s%a."
         alias
-        Tezos_crypto.Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         pkh
         Operation_result.tez_sym
         Tez.pp
@@ -760,17 +760,17 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?(encrypted = false) ?force key name =
   read_key key >>=? fun (pkh, pk, sk) ->
   fail_unless
-    (Tezos_crypto.Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
+    (Signature.Public_key_hash.equal pkh (Ed25519 key.pkh))
     (error_of_fmt
        "@[<v 2>Inconsistent activation key:@ Computed pkh: %a@ Embedded pkh: \
         %a @]"
-       Tezos_crypto.Signature.Public_key_hash.pp
+       Signature.Public_key_hash.pp
        pkh
-       Tezos_crypto.Ed25519.Public_key_hash.pp
+       Signature.Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
-  let pk = Tezos_crypto.Signature.Of_V1.public_key pk in
-  let sk = Tezos_crypto.Signature.Of_V1.secret_key sk in
+  let pk = Signature.Of_V1.public_key pk in
+  let sk = Signature.Of_V1.secret_key sk in
   Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
    Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -808,7 +808,7 @@ type period_info = {
   current_period_kind : Voting_period.kind;
   position : Int32.t;
   remaining : Int32.t;
-  current_proposal : Tezos_crypto.Protocol_hash.t option;
+  current_proposal : Protocol_hash.t option;
 }
 
 type ballots_info = {
@@ -916,7 +916,7 @@ let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash
   | Some (block, i, j) ->
       cctxt#message
         "Operation found in block: %a (pass: %d, offset: %d)"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block
         i
         j

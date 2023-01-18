@@ -216,9 +216,9 @@ end)
 let chain_id_encoding =
   make_encode_fixed_size
     ~name:"ENCODING_CHAIN_ID"
-    ~encoding:Tezos_crypto.Chain_id.encoding
+    ~encoding:Chain_id.encoding
     ~generator:(fun rng_state ->
-      Tezos_crypto.Chain_id.hash_bytes
+      Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
@@ -227,9 +227,9 @@ let () = Registration.register chain_id_encoding
 let chain_id_decoding =
   make_encode_fixed_size
     ~name:"DECODING_CHAIN_ID"
-    ~encoding:Tezos_crypto.Chain_id.encoding
+    ~encoding:Chain_id.encoding
     ~generator:(fun rng_state ->
-      Tezos_crypto.Chain_id.hash_bytes
+      Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
@@ -238,9 +238,9 @@ let () = Registration.register chain_id_decoding
 let chain_id_readable_encoding =
   make_encode_fixed_size_to_string
     ~name:"B58CHECK_ENCODING_CHAIN_ID"
-    ~to_string:Tezos_crypto.Chain_id.to_b58check
+    ~to_string:Chain_id.to_b58check
     ~generator:(fun rng_state ->
-      Tezos_crypto.Chain_id.hash_bytes
+      Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 
@@ -249,10 +249,10 @@ let () = Registration.register chain_id_readable_encoding
 let chain_id_readable_decoding =
   make_decode_fixed_size_from_string
     ~name:"B58CHECK_DECODING_CHAIN_ID"
-    ~to_string:Tezos_crypto.Chain_id.to_b58check
-    ~from_string:Tezos_crypto.Chain_id.of_b58check_exn
+    ~to_string:Chain_id.to_b58check
+    ~from_string:Chain_id.of_b58check_exn
     ~generator:(fun rng_state ->
-      Tezos_crypto.Chain_id.hash_bytes
+      Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
     ()
 

@@ -39,8 +39,8 @@ module Make_in_memory_context (Context : sig
     Tezos_context_sigs.Context.TEZOS_CONTEXT
       with type memory_context_tree := tree
        and type tree := tree
-       and type value_key = Tezos_crypto.Context_hash.t
-       and type node_key = Tezos_crypto.Context_hash.t
+       and type value_key = Context_hash.t
+       and type node_key = Context_hash.t
 end) =
 struct
   module Tree = struct
@@ -280,7 +280,7 @@ type message = {
   input : Sc_rollup.input;
   message :
     [ `SOL
-    | `Info_per_level of Timestamp.t * Tezos_crypto.Block_hash.t
+    | `Info_per_level of Timestamp.t * Block_hash.t
     | `Message of string
     | `EOL ];
 }
@@ -299,8 +299,7 @@ type payloads_per_level = {
       (** List of external serialized messages. *)
   predecessor_timestamp : Time.Protocol.t;
       (** predecessor timestamp of the [Info_per_level]. *)
-  predecessor : Tezos_crypto.Block_hash.t;
-      (** Predecessor of the [Info_per_level]. *)
+  predecessor : Block_hash.t;  (** Predecessor of the [Info_per_level]. *)
   level : Raw_level.t;
   inputs : Sc_rollup.input list;
       (** List of all inputs for the level, to be read by a PVM. *)
@@ -329,7 +328,7 @@ let pp_message fmt {input; message} =
         Format.asprintf
           "Info_per_level (%s, %a)"
           (Timestamp.to_notation predecessor_timestamp)
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           block_hash
     | `Message msg -> msg
     | `EOL -> "EOL")
@@ -372,8 +371,7 @@ let make_inputs predecessor_timestamp predecessor messages inbox_level =
 (** Wrap messages, predecessor_timestamp and predecessor of a level into a
     [payloads_per_level] .*)
 let wrap_messages ?(predecessor_timestamp = Timestamp.of_seconds 0L)
-    ?(predecessor = Tezos_crypto.Block_hash.zero) level messages :
-    payloads_per_level =
+    ?(predecessor = Block_hash.zero) level messages : payloads_per_level =
   let payloads = List.map make_external_inbox_message messages in
   let inputs = make_inputs predecessor_timestamp predecessor messages level in
   {payloads; predecessor_timestamp; predecessor; messages; level; inputs}
@@ -596,7 +594,7 @@ let fill_inbox ~inbox history payloads_histories payloads_per_levels =
 
 let construct_inbox ?(inbox_creation_level = Raw_level.(root))
     ?(with_histories = true) ?(predecessor_timestamp = Time.Protocol.epoch)
-    ?(predecessor = Tezos_crypto.Block_hash.zero) payloads_per_levels =
+    ?(predecessor = Block_hash.zero) payloads_per_levels =
   let inbox =
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Environment.wrap_tzresult
@@ -653,12 +651,12 @@ let dumb_init level =
   WithExceptions.Result.get_ok ~loc:__LOC__
   @@ Sc_rollup.Inbox.genesis
        ~predecessor_timestamp:Time.Protocol.epoch
-       ~predecessor:Tezos_crypto.Block_hash.zero
+       ~predecessor:Block_hash.zero
        level
 
 let dumb_init_repr level =
   WithExceptions.Result.get_ok ~loc:__LOC__
   @@ Sc_rollup_inbox_repr.genesis
        ~predecessor_timestamp:Time.Protocol.epoch
-       ~predecessor:Tezos_crypto.Block_hash.zero
+       ~predecessor:Block_hash.zero
        level

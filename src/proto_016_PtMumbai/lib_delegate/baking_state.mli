@@ -56,18 +56,18 @@ type prequorum = {
 }
 
 type block_info = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Tezos_crypto.Context_hash.t;
+  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Tezos_crypto.Protocol_hash.t;
-  next_protocol : Tezos_crypto.Protocol_hash.t;
+  protocol : Protocol_hash.t;
+  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Tezos_crypto.Block_hash.Set.t;
+  live_blocks : Block_hash.Set.t;
       (** Set of live blocks for this block that is used to filter
           old or too recent operations. *)
 }
@@ -81,7 +81,7 @@ type cache = {
 
 type global_state = {
   cctxt : Protocol_client_context.full;
-  chain_id : Tezos_crypto.Chain_id.t;
+  chain_id : Chain_id.t;
   config : Baking_configuration.t;
   constants : Constants.t;
   round_durations : Round.round_durations;

@@ -32,7 +32,7 @@ let test_size () =
   let expected =
     (* add 1 for the tag of union encoding *)
     (WithExceptions.Option.get ~loc:__LOC__
-    @@ Data_encoding.Binary.fixed_length Ed25519.Public_key.encoding)
+    @@ Data_encoding.Binary.fixed_length Signature.Ed25519.Public_key.encoding)
     + 1
   in
   assert (Compare.Int.(expected = length)) ;
@@ -43,7 +43,7 @@ let test_size () =
   let expected =
     (* add 1 for the tag of union encoding *)
     (WithExceptions.Option.get ~loc:__LOC__
-    @@ Data_encoding.Binary.fixed_length P256.Public_key.encoding)
+    @@ Data_encoding.Binary.fixed_length Signature.P256.Public_key.encoding)
     + 1
   in
   assert (Compare.Int.(expected = length)) ;
@@ -54,7 +54,8 @@ let test_size () =
   let expected =
     (* add 1 for the tag of union encoding *)
     (WithExceptions.Option.get ~loc:__LOC__
-    @@ Data_encoding.Binary.fixed_length Secp256k1.Public_key.encoding)
+    @@ Data_encoding.Binary.fixed_length Signature.Secp256k1.Public_key.encoding
+    )
     + 1
   in
   assert (Compare.Int.(expected = length)) ;

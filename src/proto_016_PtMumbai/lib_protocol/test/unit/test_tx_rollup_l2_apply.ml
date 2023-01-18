@@ -84,7 +84,7 @@ let expect_error_status ~msg error status cont =
 
 let aggregate_signature_exn : signature list -> signature =
  fun signatures ->
-  match Tezos_crypto.Bls.aggregate_signature_opt signatures with
+  match Tezos_crypto.Signature.Bls.aggregate_signature_opt signatures with
   | Some res -> res
   | None -> raise (Invalid_argument "aggregate_signature_exn")
 
@@ -127,7 +127,7 @@ let pp_metadata fmt Tx_rollup_l2_context_sig.{counter; public_key} =
     fmt
     "{counter=%d; public_key=%a}"
     counter
-    Tezos_crypto.Bls.Public_key.pp
+    Tezos_crypto.Signature.Bls.Public_key.pp
     public_key
 
 let eq_metadata = Alcotest.of_pp pp_metadata
@@ -280,7 +280,9 @@ let batch_from_transfers inputs =
       (fun all_sks input ->
         List.fold_left
           (fun acc (sk, _, _, _, _, _) ->
-            if List.mem ~equal:Tezos_crypto.Bls.Secret_key.equal sk acc then acc
+            if
+              List.mem ~equal:Tezos_crypto.Signature.Bls.Secret_key.equal sk acc
+            then acc
             else sk :: acc)
           []
           input

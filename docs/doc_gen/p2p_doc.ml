@@ -56,7 +56,7 @@ let main () =
     (Data_encoding.Binary.describe Operation.encoding) ;
   List.iter
     (fun (_name, hash) ->
-      let hash = Tezos_crypto.Protocol_hash.of_b58check_exn hash in
+      let hash = Protocol_hash.of_b58check_exn hash in
       let (module Proto) =
         match Registered_protocol.get hash with
         | None -> assert false

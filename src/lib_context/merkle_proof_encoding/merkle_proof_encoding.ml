@@ -48,7 +48,7 @@ struct
       Bytes.unsafe_to_string
       (Bounded.bytes 255 (* 1 byte for the length *))
 
-  let hash_encoding = Tezos_crypto.Context_hash.encoding
+  let hash_encoding = Context_hash.encoding
 
   let index_encoding = uint8
 

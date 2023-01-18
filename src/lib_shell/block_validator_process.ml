@@ -68,18 +68,17 @@ module type S = sig
 
   val preapply_block :
     t ->
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Chain_id.t ->
     timestamp:Time.Protocol.t ->
     protocol_data:bytes ->
-    live_blocks:Tezos_crypto.Block_hash.Set.t ->
-    live_operations:Tezos_crypto.Operation_hash.Set.t ->
+    live_blocks:Block_hash.Set.t ->
+    live_operations:Operation_hash.Set.t ->
     predecessor_shell_header:Block_header.shell_header ->
-    predecessor_hash:Tezos_crypto.Block_hash.t ->
+    predecessor_hash:Block_hash.t ->
     predecessor_max_operations_ttl:int ->
-    predecessor_block_metadata_hash:Tezos_crypto.Block_metadata_hash.t option ->
-    predecessor_ops_metadata_hash:
-      Tezos_crypto.Operation_metadata_list_list_hash.t option ->
-    predecessor_resulting_context_hash:Tezos_crypto.Context_hash.t ->
+    predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+    predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+    predecessor_resulting_context_hash:Context_hash.t ->
     Operation.t list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
@@ -88,30 +87,24 @@ module type S = sig
     Store.chain_store ->
     predecessor:Store.Block.t ->
     Block_header.t ->
-    Tezos_crypto.Block_hash.t ->
+    Block_hash.t ->
     Operation.t trace trace ->
     unit tzresult Lwt.t
 
   val context_garbage_collection :
     t ->
     Context_ops.index ->
-    Tezos_crypto.Context_hash.t ->
+    Context_hash.t ->
     gc_lockfile_path:string ->
     unit tzresult Lwt.t
 
   val context_split : t -> Context_ops.index -> unit tzresult Lwt.t
 
-  val commit_genesis :
-    t ->
-    chain_id:Tezos_crypto.Chain_id.t ->
-    Tezos_crypto.Context_hash.t tzresult Lwt.t
+  val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
   val init_test_chain :
-    t ->
-    Tezos_crypto.Chain_id.t ->
-    Store.Block.t ->
-    Block_header.t tzresult Lwt.t
+    t -> Chain_id.t -> Store.Block.t -> Block_header.t tzresult Lwt.t
 
   val reconfigure_event_logging :
     t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
@@ -146,10 +139,10 @@ module Internal_validator_process = struct
         ~level:Debug
         ~name:"seq_validation_request"
         ~msg:"requesting validation of {block} for chain {chain}"
-        ~pp1:Tezos_crypto.Block_hash.pp
-        ("block", Tezos_crypto.Block_hash.encoding)
-        ~pp2:Tezos_crypto.Chain_id.pp
-        ("chain", Tezos_crypto.Chain_id.encoding)
+        ~pp1:Block_hash.pp
+        ("block", Block_hash.encoding)
+        ~pp2:Chain_id.pp
+        ("chain", Chain_id.encoding)
 
     let validation_success =
       declare_2
@@ -157,8 +150,8 @@ module Internal_validator_process = struct
         ~level:Debug
         ~name:"seq_validation_success"
         ~msg:"block {block} successfully validated in {timespan}"
-        ~pp1:Tezos_crypto.Block_hash.pp
-        ("block", Tezos_crypto.Block_hash.encoding)
+        ~pp1:Block_hash.pp
+        ("block", Block_hash.encoding)
         ~pp2:Time.System.Span.pp_hum
         ("timespan", Time.System.Span.encoding)
 
@@ -898,7 +891,7 @@ module External_validator_process = struct
 
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
-    send_request validator request Tezos_crypto.Context_hash.encoding
+    send_request validator request Context_hash.encoding
 
   let init_test_chain validator chain_id forking_block =
     let forked_header = Store.Block.header forking_block in

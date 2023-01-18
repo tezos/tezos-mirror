@@ -40,8 +40,6 @@
     Subject:      Unit tests for {!Prevalidation.T}
 *)
 
-open Tezos_crypto
-
 module Init = struct
   let chain_id = Shell_test_helpers.chain_id
 

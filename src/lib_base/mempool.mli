@@ -26,9 +26,9 @@
 (** Tezos Shell Module - Mempool, a.k.a. the operations safe to be broadcast. *)
 
 type t = {
-  known_valid : Tezos_crypto.Operation_hash.t list;
+  known_valid : Tezos_crypto.Hashed.Operation_hash.t list;
       (** A valid sequence of operations on top of the current head. *)
-  pending : Tezos_crypto.Operation_hash.Set.t;
+  pending : Tezos_crypto.Hashed.Operation_hash.Set.t;
       (** Set of known not-invalid operation. *)
 }
 
@@ -45,7 +45,7 @@ val empty : mempool
 val is_empty : mempool -> bool
 
 (** [cons_valid oph t] prepends [oph] to the [known_valid] field of [t]. *)
-val cons_valid : Tezos_crypto.Operation_hash.t -> mempool -> mempool
+val cons_valid : Tezos_crypto.Hashed.Operation_hash.t -> mempool -> mempool
 
 (** Remove an operation from all the fields of a mempool. *)
-val remove : Tezos_crypto.Operation_hash.t -> mempool -> mempool
+val remove : Tezos_crypto.Hashed.Operation_hash.t -> mempool -> mempool

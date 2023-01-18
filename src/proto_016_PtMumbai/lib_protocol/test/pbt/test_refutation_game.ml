@@ -1195,7 +1195,7 @@ module Player_client = struct
     | Info_hater ->
         let* corrupt_at_l = 0 -- List.length payloads_per_levels in
         let dumb_timestamp = Timestamp.of_seconds 42L in
-        let dumb_predecessor = Tezos_crypto.Block_hash.zero in
+        let dumb_predecessor = Block_hash.zero in
 
         let new_payloads_per_levels =
           List.mapi

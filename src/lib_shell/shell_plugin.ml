@@ -44,7 +44,7 @@ module type FILTER = sig
     val flush :
       state -> head:Tezos_base.Block_header.shell_header -> state tzresult Lwt.t
 
-    val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
+    val remove : filter_state:state -> Operation_hash.t -> state
 
     val pre_filter :
       config ->
@@ -55,15 +55,15 @@ module type FILTER = sig
       Lwt.t
 
     val add_operation_and_enforce_mempool_bound :
-      ?replace:Tezos_crypto.Operation_hash.t ->
+      ?replace:Operation_hash.t ->
       config ->
       state ->
-      Tezos_crypto.Operation_hash.t * Proto.operation ->
+      Operation_hash.t * Proto.operation ->
       ( state
         * [ `No_replace
           | `Replace of
-            Tezos_crypto.Operation_hash.t
-            * Prevalidator_classification.error_classification ],
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ],
         Prevalidator_classification.error_classification )
       result
       Lwt.t
@@ -112,7 +112,7 @@ module No_filter (Proto : Registered_protocol.T) :
 end
 
 module type METRICS = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   val update_metrics :
     protocol_metadata:bytes ->
@@ -122,7 +122,7 @@ module type METRICS = sig
 end
 
 module Undefined_metrics_plugin (Proto : sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 end) =
 struct
   let hash = Proto.hash
@@ -130,25 +130,22 @@ struct
   let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
 end
 
-let rpc_table : (module RPC) Tezos_crypto.Protocol_hash.Table.t =
-  Tezos_crypto.Protocol_hash.Table.create 5
+let rpc_table : (module RPC) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
 
-let metrics_table : (module METRICS) Tezos_crypto.Protocol_hash.Table.t =
-  Tezos_crypto.Protocol_hash.Table.create 5
+let metrics_table : (module METRICS) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
 
 let register_rpc (module Rpc : RPC) =
-  assert (not (Tezos_crypto.Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
-  Tezos_crypto.Protocol_hash.Table.add rpc_table Rpc.Proto.hash (module Rpc)
+  assert (not (Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
+  Protocol_hash.Table.add rpc_table Rpc.Proto.hash (module Rpc)
 
 let register_metrics (module Metrics : METRICS) =
-  Tezos_crypto.Protocol_hash.Table.replace
-    metrics_table
-    Metrics.hash
-    (module Metrics)
+  Protocol_hash.Table.replace metrics_table Metrics.hash (module Metrics)
 
-let find_rpc = Tezos_crypto.Protocol_hash.Table.find rpc_table
+let find_rpc = Protocol_hash.Table.find rpc_table
 
-let find_metrics = Tezos_crypto.Protocol_hash.Table.find metrics_table
+let find_metrics = Protocol_hash.Table.find metrics_table
 
 let safe_find_metrics hash =
   match find_metrics hash with
@@ -170,12 +167,11 @@ let no_filter (module Proto : Registered_protocol.T) =
   if is_recent_proto (module Proto) then Recent (module No_filter (Proto))
   else Legacy (module Legacy_mempool_plugin.No_filter (Proto))
 
-let filter_table : filter_t Tezos_crypto.Protocol_hash.Table.t =
-  Tezos_crypto.Protocol_hash.Table.create 5
+let filter_table : filter_t Protocol_hash.Table.t = Protocol_hash.Table.create 5
 
 let add_to_filter_table proto_hash (filter : filter_t) =
-  assert (not (Tezos_crypto.Protocol_hash.Table.mem filter_table proto_hash)) ;
-  Tezos_crypto.Protocol_hash.Table.add filter_table proto_hash filter
+  assert (not (Protocol_hash.Table.mem filter_table proto_hash)) ;
+  Protocol_hash.Table.add filter_table proto_hash filter
 
 let register_filter (module Filter : FILTER) =
   add_to_filter_table Filter.Proto.hash (Recent (module Filter))
@@ -183,4 +179,4 @@ let register_filter (module Filter : FILTER) =
 let register_legacy_filter (module Filter : Legacy_mempool_plugin.FILTER) =
   add_to_filter_table Filter.Proto.hash (Legacy (module Filter))
 
-let find_filter = Tezos_crypto.Protocol_hash.Table.find filter_table
+let find_filter = Protocol_hash.Table.find filter_table

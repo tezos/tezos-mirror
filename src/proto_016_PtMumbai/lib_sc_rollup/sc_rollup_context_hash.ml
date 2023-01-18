@@ -23,11 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto
-
 include
-  Blake2B.Make
-    (Base58)
+  Tezos_crypto.Blake2B.Make
+    (Tezos_crypto.Base58)
     (struct
       let name = "Smart_rollup_context_hash"
 
@@ -38,4 +36,4 @@ include
       let size = None
     end)
 
-let () = Base58.check_encoded_prefix b58check_encoding "SRCo" 54
+let () = Tezos_crypto.Base58.check_encoded_prefix b58check_encoding "SRCo" 54

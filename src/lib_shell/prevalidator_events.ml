@@ -62,8 +62,8 @@ let unparsable_operation =
     ~name:"unparsable_operation"
     ~msg:"unparsable operation {oph}"
     ~level:Debug
-    ~pp1:Tezos_crypto.Operation_hash.pp
-    ("oph", Tezos_crypto.Operation_hash.encoding)
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
 
 let processing_operations =
   declare_0
@@ -79,8 +79,8 @@ let fetching_operation =
     ~name:"fetching_operation"
     ~msg:"fetching operation {oph}"
     ~level:Debug
-    ~pp1:Tezos_crypto.Operation_hash.pp
-    ("oph", Tezos_crypto.Operation_hash.encoding)
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
 
 let operation_included =
   declare_1
@@ -88,8 +88,8 @@ let operation_included =
     ~name:"operation_included"
     ~msg:"operation {oph} included before being prevalidated"
     ~level:Debug
-    ~pp1:Tezos_crypto.Operation_hash.pp
-    ("oph", Tezos_crypto.Operation_hash.encoding)
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
 
 let operations_to_reclassify =
   declare_1
@@ -106,8 +106,8 @@ let operation_reclassified =
     ~name:"operation_reclassified"
     ~msg:"operation {oph} reclassified"
     ~level:Debug
-    ~pp1:Tezos_crypto.Operation_hash.pp
-    ("oph", Tezos_crypto.Operation_hash.encoding)
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
 
 let request_completed_notice =
   declare_2
@@ -184,9 +184,9 @@ let ban_operation_encountered =
     ~msg:"{origin}: banned {oph} encountered"
     ~level:Notice
     ~pp1:pp_origin
-    ~pp2:Tezos_crypto.Operation_hash.pp
+    ~pp2:Operation_hash.pp
     ("origin", origin_encoding)
-    ("oph", Tezos_crypto.Operation_hash.encoding)
+    ("oph", Operation_hash.encoding)
 
 let operation_not_fetched =
   declare_1
@@ -194,5 +194,5 @@ let operation_not_fetched =
     ~name:"operation_not_fetched"
     ~msg:"Operation {oph} was not fetched"
     ~level:Debug
-    ~pp1:Tezos_crypto.Operation_hash.pp
-    ("oph", Tezos_crypto.Operation_hash.encoding)
+    ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)

@@ -31,10 +31,10 @@ module Events = Delegate_events.Denunciator
 module B_Events = Delegate_events.Baking_scheduling
 
 module HLevel = Hashtbl.Make (struct
-  type t = Tezos_crypto.Chain_id.t * Raw_level.t * Round.t
+  type t = Chain_id.t * Raw_level.t * Round.t
 
   let equal (c, l, r) (c', l', r') =
-    Tezos_crypto.Chain_id.equal c c' && Raw_level.equal l l' && Round.equal r r'
+    Chain_id.equal c c' && Raw_level.equal l l' && Round.equal r r'
 
   let hash (c, lvl, r) = Hashtbl.hash (c, lvl, r)
 end)
@@ -49,8 +49,7 @@ module Slot_Map = Slot.Map
 
 (* type of operations stream, as returned by monitor_operations RPC *)
 type ops_stream =
-  ((Tezos_crypto.Operation_hash.t * packed_operation) * error trace option) list
-  Lwt_stream.t
+  ((Operation_hash.t * packed_operation) * error trace option) list Lwt_stream.t
 
 type 'a state = {
   (* Endorsements seen so far *)
@@ -58,7 +57,7 @@ type 'a state = {
   (* Preendorsements seen so far *)
   preendorsements_table : Kind.preendorsement operation Slot_Map.t HLevel.t;
   (* Blocks received so far *)
-  blocks_table : Tezos_crypto.Block_hash.t Delegate_Map.t HLevel.t;
+  blocks_table : Block_hash.t Delegate_Map.t HLevel.t;
   (* Maximum delta of level to register *)
   preserved_levels : int;
   (* Highest level seen in a block *)
@@ -127,7 +126,7 @@ let double_consensus_op_evidence (type kind) :
     kind consensus_operation_type ->
     #Protocol_client_context.full ->
     'a ->
-    branch:Tezos_crypto.Block_hash.t ->
+    branch:Block_hash.t ->
     op1:kind Alpha_context.operation ->
     op2:kind Alpha_context.operation ->
     unit ->
@@ -160,7 +159,7 @@ let process_consensus_op (type kind) cctxt
         (Operation.hash new_op, Operation.hash existing_op)
       in
       let op1, op2 =
-        if Tezos_crypto.Operation_hash.(new_op_hash < existing_op_hash) then
+        if Operation_hash.(new_op_hash < existing_op_hash) then
           (new_op, existing_op)
         else (existing_op, new_op)
       in
@@ -274,8 +273,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
                state.blocks_table
                (chain_id, level, round)
                (Delegate_Map.add baker.delegate new_hash map)
-      | Some existing_hash
-        when Tezos_crypto.Block_hash.(existing_hash = new_hash) ->
+      | Some existing_hash when Block_hash.(existing_hash = new_hash) ->
           (* This case should never happen *)
           Events.(emit double_baking_but_not) () >>= fun () ->
           return
@@ -291,8 +289,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           let hash1 = Block_header.hash bh1 in
           let hash2 = Block_header.hash bh2 in
           let bh1, bh2 =
-            if Tezos_crypto.Block_hash.(hash1 < hash2) then (bh1, bh2)
-            else (bh2, bh1)
+            if Block_hash.(hash1 < hash2) then (bh1, bh2) else (bh2, bh1)
           in
           (* If the blocks are on different chains then skip it *)
           get_block_offset level >>= fun block ->
@@ -353,7 +350,7 @@ let cleanup_old_operations state =
 *)
 let process_new_block (cctxt : #Protocol_client_context.full) state
     {hash; chain_id; level; protocol; next_protocol; _} =
-  if Tezos_crypto.Protocol_hash.(protocol <> next_protocol) then
+  if Protocol_hash.(protocol <> next_protocol) then
     Events.(emit protocol_change_detected) () >>= fun () -> return_unit
   else
     Events.(emit accuser_saw_block) (level, hash) >>= fun () ->

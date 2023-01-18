@@ -39,8 +39,7 @@ let builtin_commands =
       (fun () (cctxt : #Client_context.full) ->
         let* () =
           Seq.iter_s
-            (fun (ver, _) ->
-              cctxt#message "%a" Tezos_crypto.Protocol_hash.pp_short ver)
+            (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
             (Client_commands.get_versions ())
         in
         return_ok_unit);

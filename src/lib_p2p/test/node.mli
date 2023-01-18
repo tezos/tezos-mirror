@@ -37,7 +37,7 @@
     - [BigPing] is used to add arbitrary long data (similar to
     mempools sent in the actual network) to test bandwidth and chunks
     splitting.*)
-type message = Ping | BigPing of Tezos_crypto.Operation_hash.t list
+type message = Ping | BigPing of Operation_hash.t list
 
 type metadata = Metadata
 

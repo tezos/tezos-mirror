@@ -32,35 +32,31 @@ type state = {
   constants : Constants.t;
   config : Baking_configuration.nonce_config;
   nonces_location : [`Nonce] Baking_files.location;
-  mutable last_predecessor : Tezos_crypto.Block_hash.t;
+  mutable last_predecessor : Block_hash.t;
 }
 
 type t = state
 
-type nonces = Nonce.t Tezos_crypto.Block_hash.Map.t
+type nonces = Nonce.t Block_hash.Map.t
 
-val empty : Nonce.t Tezos_crypto.Block_hash.Map.t
+val empty : Nonce.t Block_hash.Map.t
 
-val encoding : Nonce.t Tezos_crypto.Block_hash.Map.t Data_encoding.t
+val encoding : Nonce.t Block_hash.Map.t Data_encoding.t
 
 val load :
   #Client_context.wallet ->
   [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
-  Nonce.t Tezos_crypto.Block_hash.Map.t tzresult Lwt.t
+  Nonce.t Block_hash.Map.t tzresult Lwt.t
 
 val save :
   #Client_context.wallet ->
   [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
-  Nonce.t Tezos_crypto.Block_hash.Map.t ->
+  Nonce.t Block_hash.Map.t ->
   unit tzresult Lwt.t
 
-val mem :
-  Nonce.t Tezos_crypto.Block_hash.Map.t -> Tezos_crypto.Block_hash.t -> bool
+val mem : Nonce.t Block_hash.Map.t -> Block_hash.t -> bool
 
-val find_opt :
-  Nonce.t Tezos_crypto.Block_hash.Map.t ->
-  Tezos_crypto.Block_hash.t ->
-  Nonce.t option
+val find_opt : Nonce.t Block_hash.Map.t -> Block_hash.t -> Nonce.t option
 
 val get_block_level_opt :
   #Tezos_rpc.Context.simple ->
@@ -70,28 +66,21 @@ val get_block_level_opt :
 
 val get_outdated_nonces :
   t ->
-  Nonce.t Tezos_crypto.Block_hash.Map.t ->
-  (Nonce.t Tezos_crypto.Block_hash.Map.t
-  * Nonce.t Tezos_crypto.Block_hash.Map.t)
-  tzresult
-  Lwt.t
+  Nonce.t Block_hash.Map.t ->
+  (Nonce.t Block_hash.Map.t * Nonce.t Block_hash.Map.t) tzresult Lwt.t
 
 val filter_outdated_nonces :
-  t ->
-  Nonce.t Tezos_crypto.Block_hash.Map.t ->
-  Nonce.t Tezos_crypto.Block_hash.Map.t tzresult Lwt.t
+  t -> Nonce.t Block_hash.Map.t -> Nonce.t Block_hash.Map.t tzresult Lwt.t
 
 val blocks_from_current_cycle :
   t ->
   Block_services.block ->
   ?offset:int32 ->
   unit ->
-  Tezos_crypto.Block_hash.t list tzresult Lwt.t
+  Block_hash.t list tzresult Lwt.t
 
 val get_unrevealed_nonces :
-  t ->
-  Nonce.t Tezos_crypto.Block_hash.Map.t ->
-  (Raw_level.t * Nonce.t) list tzresult Lwt.t
+  t -> Nonce.t Block_hash.Map.t -> (Raw_level.t * Nonce.t) list tzresult Lwt.t
 
 val generate_seed_nonce :
   Baking_configuration.nonce_config ->
@@ -101,8 +90,8 @@ val generate_seed_nonce :
 
 val register_nonce :
   #Protocol_client_context.full ->
-  chain_id:Tezos_crypto.Chain_id.t ->
-  Tezos_crypto.Block_hash.t ->
+  chain_id:Chain_id.t ->
+  Block_hash.t ->
   Nonce.t ->
   unit tzresult Lwt.t
 
@@ -110,7 +99,7 @@ val inject_seed_nonce_revelation :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
   block:Block_services.block ->
-  branch:Tezos_crypto.Block_hash.t ->
+  branch:Block_hash.t ->
   (Raw_level.t * Nonce.t) list ->
   unit tzresult Lwt.t
 
@@ -119,7 +108,7 @@ val reveal_potential_nonces : t -> Baking_state.proposal -> unit tzresult Lwt.t
 val start_revelation_worker :
   Protocol_client_context.full ->
   Baking_configuration.nonce_config ->
-  Tezos_crypto.Chain_id.t ->
+  Chain_id.t ->
   Constants.t ->
   Baking_state.proposal Lwt_stream.t ->
   Lwt_canceler.t Lwt.t

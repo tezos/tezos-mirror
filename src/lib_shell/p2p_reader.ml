@@ -35,18 +35,12 @@ type connection =
 type callback = {
   notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
   notify_head :
-    P2p_peer.Id.t ->
-    Tezos_crypto.Block_hash.t ->
-    Block_header.t ->
-    Mempool.t ->
-    unit;
+    P2p_peer.Id.t -> Block_hash.t -> Block_header.t -> Mempool.t -> unit;
   disconnection : P2p_peer.Id.t -> unit;
 }
 
-module Block_hash_cache :
-  Aches.Vache.MAP with type key = Tezos_crypto.Block_hash.t =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (Tezos_crypto.Block_hash)
+module Block_hash_cache : Aches.Vache.MAP with type key = Block_hash.t =
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Block_hash)
 
 type chain_db = {
   chain_store : Store.Chain.t;
@@ -62,12 +56,12 @@ type t = {
   p2p : p2p;
   gid : P2p_peer.Id.t;  (** remote peer id *)
   conn : connection;
-  peer_active_chains : chain_db Tezos_crypto.Chain_id.Table.t;
+  peer_active_chains : chain_db Chain_id.Table.t;
   disk : Store.t;
   canceler : Lwt_canceler.t;
   mutable worker : unit Lwt.t;
   protocol_db : Distributed_db_requester.Raw_protocol.t;
-  active_chains : chain_db Tezos_crypto.Chain_id.Table.t;
+  active_chains : chain_db Chain_id.Table.t;
       (** All chains managed by this peer **)
   unregister : unit -> unit;
 }
@@ -76,7 +70,7 @@ type t = {
    and [chain_db] is the chain_db corresponding to this chain id, otherwise
    does nothing (simply update peer metadata). *)
 let may_handle state chain_id f =
-  match Tezos_crypto.Chain_id.Table.find state.peer_active_chains chain_id with
+  match Chain_id.Table.find state.peer_active_chains chain_id with
   | None ->
       let meta = P2p.get_peer_metadata state.p2p state.gid in
       Peer_metadata.incr meta Inactive_chain ;
@@ -86,12 +80,12 @@ let may_handle state chain_id f =
 (* performs [f chain_db] if [chain_id] is active and [chain_db] is the
    chain_db corresponding to this chain id. *)
 let may_handle_global state chain_id f =
-  match Tezos_crypto.Chain_id.Table.find state.active_chains chain_id with
+  match Chain_id.Table.find state.active_chains chain_id with
   | None -> Lwt.return_unit
   | Some chain_db -> f chain_db
 
 let find_pending_operations {peer_active_chains; _} h i =
-  Tezos_crypto.Chain_id.Table.to_seq_values peer_active_chains
+  Chain_id.Table.to_seq_values peer_active_chains
   |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_operations.pending
            chain_db.operations_db
@@ -99,7 +93,7 @@ let find_pending_operations {peer_active_chains; _} h i =
   |> Seq.first
 
 let find_pending_operation {peer_active_chains; _} h =
-  Tezos_crypto.Chain_id.Table.to_seq_values peer_active_chains
+  Chain_id.Table.to_seq_values peer_active_chains
   |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_operation.pending chain_db.operation_db h)
   |> Seq.first
@@ -108,7 +102,7 @@ let read_operation state h =
   (* Remember that seqs are lazy. The table is only traversed until a match is
      found, the rest is not explored. *)
   let open Lwt_syntax in
-  Seq_s.of_seq (Tezos_crypto.Chain_id.Table.to_seq state.active_chains)
+  Seq_s.of_seq (Chain_id.Table.to_seq state.active_chains)
   |> Seq_s.filter_map_s (fun (chain_id, chain_db) ->
          let+ v =
            Distributed_db_requester.Raw_operation.read_opt
@@ -154,7 +148,7 @@ let read_predecessor_header {disk; _} h offset =
         chain_stores)
 
 let find_pending_block_header {peer_active_chains; _} h =
-  Tezos_crypto.Chain_id.Table.to_seq_values peer_active_chains
+  Chain_id.Table.to_seq_values peer_active_chains
   |> Seq.filter (fun chain_db ->
          Distributed_db_requester.Raw_block_header.pending
            chain_db.block_header_db
@@ -168,13 +162,13 @@ let deactivate gid chain_db =
 
 (* Active the chain_id for the remote peer. Is a nop if it is already activated. *)
 let activate state chain_id chain_db =
-  match Tezos_crypto.Chain_id.Table.find state.peer_active_chains chain_id with
+  match Chain_id.Table.find state.peer_active_chains chain_id with
   | Some _ -> ()
   | None ->
       chain_db.active_peers :=
         P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
       P2p_peer.Table.add chain_db.active_connections state.gid state.conn ;
-      Tezos_crypto.Chain_id.Table.add state.peer_active_chains chain_id chain_db
+      Chain_id.Table.add state.peer_active_chains chain_id chain_db
 
 let my_peer_id state = P2p.peer_id state.p2p
 
@@ -228,7 +222,7 @@ let handle_msg state msg =
   | Deactivate chain_id ->
       may_handle state chain_id @@ fun chain_db ->
       deactivate state.gid chain_db ;
-      Tezos_crypto.Chain_id.Table.remove state.peer_active_chains chain_id ;
+      Chain_id.Table.remove state.peer_active_chains chain_id ;
       Lwt.return_unit
   | Get_current_head chain_id ->
       may_handle state chain_id @@ fun chain_db ->
@@ -469,7 +463,7 @@ let rec worker_loop state =
       let* () = handle_msg state msg in
       worker_loop state
   | Error _ ->
-      Tezos_crypto.Chain_id.Table.iter
+      Chain_id.Table.iter
         (fun _ -> deactivate state.gid)
         state.peer_active_chains ;
       state.unregister () ;
@@ -486,12 +480,12 @@ let run ~register ~unregister p2p disk protocol_db active_chains gid conn =
       conn;
       gid;
       canceler;
-      peer_active_chains = Tezos_crypto.Chain_id.Table.create 17;
+      peer_active_chains = Chain_id.Table.create 17;
       worker = Lwt.return_unit;
       unregister;
     }
   in
-  Tezos_crypto.Chain_id.Table.iter
+  Chain_id.Table.iter
     (fun chain_id _chain_db ->
       Error_monad.dont_wait
         (fun () ->

@@ -31,7 +31,7 @@ open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
 type t = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
@@ -185,7 +185,7 @@ module Forge = struct
         (* We don't care of the following values, only the shell validates them. *)
         proto_level = 0;
         validation_passes = 0;
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
 
   let set_seed_nonce_hash seed_nonce_hash
@@ -204,8 +204,7 @@ module Forge = struct
     in
     let signature =
       Tezos_crypto.Signature.V0.sign
-        ~watermark:
-          Block_header.(to_watermark (Block_header Tezos_crypto.Chain_id.zero))
+        ~watermark:Block_header.(to_watermark (Block_header Chain_id.zero))
         signer_account.sk
         unsigned_bytes
     in
@@ -247,8 +246,7 @@ module Forge = struct
     >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
-      Tezos_crypto.Operation_list_list_hash.compute
-        [Tezos_crypto.Operation_list_hash.compute hashes]
+      Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
     in
     let shell =
       make_shell
@@ -263,9 +261,7 @@ module Forge = struct
       List.concat (match List.tl operations with None -> [] | Some l -> l)
     in
     let hashes = List.map Operation.hash_packed non_consensus_operations in
-    let non_consensus_operations_hash =
-      Tezos_crypto.Operation_list_hash.compute hashes
-    in
+    let non_consensus_operations_hash = Operation_list_hash.compute hashes in
     let payload_round =
       match payload_round with None -> round | Some r -> r
     in
@@ -407,13 +403,13 @@ let initial_alpha_context ?(commitments = []) constants
     ~typecheck
     ~level
     ~timestamp
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     ctxt
   >|= Environment.wrap_tzresult
 
 let genesis_with_parameters parameters =
   let hash =
-    Tezos_crypto.Block_hash.of_b58check_exn
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let fitness =
@@ -429,7 +425,7 @@ let genesis_with_parameters parameters =
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   let contents =
     Forge.make_contents
@@ -448,7 +444,7 @@ let genesis_with_parameters parameters =
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  let chain_id = Tezos_crypto.Chain_id.of_block_hash hash in
+  let chain_id = Chain_id.of_block_hash hash in
   Main.init chain_id ctxt shell >|= Environment.wrap_tzresult
   >|=? fun {context; _} ->
   {
@@ -620,7 +616,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
   let hash =
-    Tezos_crypto.Block_hash.of_b58check_exn
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let level = Option.value ~default:0l level in
@@ -637,7 +633,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   validate_initial_accounts initial_accounts constants.minimal_stake
   (* Perhaps this could return a new type  signifying its name *)
@@ -682,7 +678,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   initial_context
     ?commitments
     ?bootstrap_contracts
-    (Tezos_crypto.Chain_id.of_block_hash hash)
+    (Chain_id.of_block_hash hash)
     constants
     shell
     initial_accounts
@@ -727,7 +723,7 @@ let get_application_vstate (pred : t) (operations : Protocol.operation trace) =
   let open Environment.Error_monad in
   begin_validation_and_application
     pred.context
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     (Application header)
     ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
@@ -749,7 +745,7 @@ let get_construction_vstate ?(policy = By_round 0) ?timestamp
   in
   begin_validation_and_application
     pred.context
-    Tezos_crypto.Chain_id.zero
+    Chain_id.zero
     mode
     ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
@@ -774,7 +770,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     | Application ->
         begin_validation_and_application
           pred.context
-          Tezos_crypto.Chain_id.zero
+          Chain_id.zero
           (Application header)
           ~predecessor:pred.header.shell
         >|= Environment.wrap_tzresult

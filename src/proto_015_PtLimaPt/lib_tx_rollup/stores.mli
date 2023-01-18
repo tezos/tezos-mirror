@@ -124,13 +124,10 @@ module Tezos_block_store : sig
   type value = {
     l2_block : L2block.hash option;
     level : int32;
-    predecessor : Tezos_crypto.Block_hash.t;
+    predecessor : Block_hash.t;
   }
 
-  include
-    INDEXABLE_STORE
-      with type key := Tezos_crypto.Block_hash.t
-       and type value := value
+  include INDEXABLE_STORE with type key := Block_hash.t and type value := value
 end
 
 (** An index store to map L2 block level to L2 block hashes. It is composed
@@ -143,9 +140,9 @@ module Level_store :
 (** An index store to map commitment hashes to their inclusion information. *)
 module Commitment_store : sig
   type value = {
-    block : Tezos_crypto.Block_hash.t;
+    block : Block_hash.t;
         (** Tezos block in which the commitment is included. *)
-    operation : Tezos_crypto.Operation_hash.t;
+    operation : Operation_hash.t;
         (** Operation of the block in which the commitment is included. *)
   }
 
@@ -161,8 +158,7 @@ end
 module Head_store : SINGLETON_STORE with type value := L2block.hash
 
 (** A store composed of a single file on disk to store the current Tezos head *)
-module Tezos_head_store :
-  SINGLETON_STORE with type value := Tezos_crypto.Block_hash.t
+module Tezos_head_store : SINGLETON_STORE with type value := Block_hash.t
 
 (** Type for on disk information about a rollup *)
 type rollup_info = {

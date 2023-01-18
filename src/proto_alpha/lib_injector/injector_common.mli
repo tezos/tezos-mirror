@@ -28,8 +28,8 @@ open Protocol_client_context
 (** The type of signers for operations injected by the injector *)
 type signer = {
   alias : string;
-  pkh : Tezos_crypto.Signature.public_key_hash;
-  pk : Tezos_crypto.Signature.public_key;
+  pkh : Signature.public_key_hash;
+  pk : Signature.public_key;
   sk : Client_keys.sk_uri;
 }
 
@@ -44,9 +44,7 @@ type 'block reorg = {
 
 (** Retrieve a signer from the client wallet. *)
 val get_signer :
-  #Client_context.wallet ->
-  Tezos_crypto.Signature.public_key_hash ->
-  signer tzresult Lwt.t
+  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
 
 val no_reorg : 'a reorg
 
@@ -63,11 +61,11 @@ type shell_header := Block_header.shell_header
     {!Aches_lwt.Lache.MAP_RESULT}. *)
 val fetch_tezos_shell_header :
   find_in_cache:
-    (Tezos_crypto.Block_hash.t ->
-    (Tezos_crypto.Block_hash.t -> shell_header option Lwt.t) ->
+    (Block_hash.t ->
+    (Block_hash.t -> shell_header option Lwt.t) ->
     shell_header option Lwt.t) ->
   #full ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   shell_header tzresult Lwt.t
 
 (** [fetch_tezos_block ~find_in_cache cctxt hash] returns [Some block_info]
@@ -77,18 +75,18 @@ val fetch_tezos_shell_header :
     {!Aches_lwt.Lache.MAP_RESULT}. *)
 val fetch_tezos_block :
   find_in_cache:
-    (Tezos_crypto.Block_hash.t ->
-    (Tezos_crypto.Block_hash.t -> block_info option Lwt.t) ->
+    (Block_hash.t ->
+    (Block_hash.t -> block_info option Lwt.t) ->
     block_info option Lwt.t) ->
   #full ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   block_info tzresult Lwt.t
 
 (** [tezos_reorg fetch ~old_head_hash ~new_head_hash] computes the
     reorganization of L1 blocks from the chain whose head is [old_head_hash] and
     the chain whose head [new_head_hash]. *)
 val tezos_reorg :
-  (Tezos_crypto.Block_hash.t -> block_info tzresult Lwt.t) ->
-  old_head_hash:Tezos_crypto.Block_hash.t ->
-  new_head_hash:Tezos_crypto.Block_hash.t ->
+  (Block_hash.t -> block_info tzresult Lwt.t) ->
+  old_head_hash:Block_hash.t ->
+  new_head_hash:Block_hash.t ->
   block_info reorg tzresult Lwt.t

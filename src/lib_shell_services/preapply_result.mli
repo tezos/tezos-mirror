@@ -25,16 +25,14 @@
 
 (** A container for classified operations *)
 type 'error t = {
-  applied : (Tezos_crypto.Operation_hash.t * Operation.t) list;
-      (** Applied operations *)
-  refused : (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
+  applied : (Operation_hash.t * Operation.t) list;  (** Applied operations *)
+  refused : (Operation.t * 'error list) Operation_hash.Map.t;
       (** Refused operations, for example because of an invalid signature *)
-  outdated : (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
+  outdated : (Operation.t * 'error list) Operation_hash.Map.t;
       (** Outdated operations, for example a late endorsement *)
-  branch_refused :
-    (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
+  branch_refused : (Operation.t * 'error list) Operation_hash.Map.t;
       (** Branch refused operations, for example because of insufficient balance *)
-  branch_delayed : (Operation.t * 'error list) Tezos_crypto.Operation_hash.Map.t;
+  branch_delayed : (Operation.t * 'error list) Operation_hash.Map.t;
       (** Branch delayed operations, for example because of a timestamp in the future *)
 }
 

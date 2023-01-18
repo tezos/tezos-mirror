@@ -186,8 +186,8 @@ let write file identity =
     let dummy_genesis =
       {
         Genesis.time = Time.Protocol.epoch;
-        block = Tezos_crypto.Block_hash.zero;
-        protocol = Tezos_crypto.Protocol_hash.zero;
+        block = Block_hash.zero;
+        protocol = Protocol_hash.zero;
       }
     in
     let* () =

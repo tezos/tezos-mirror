@@ -34,7 +34,7 @@ let list_mockup_command_handler _ _ =
   List.iter
     (fun (mockup : (module Registration.MOCKUP)) ->
       let module Mockup = (val mockup) in
-      Format.printf "%a@." Tezos_crypto.Protocol_hash.pp Mockup.protocol_hash)
+      Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
     available ;
   Lwt_result_syntax.return_unit
 
@@ -50,7 +50,7 @@ let list_mockup_command :
 
 let migrate_mockup_command_handler () next_protococol_hash
     (cctxt : Tezos_client_base.Client_context.full) =
-  match Tezos_crypto.Protocol_hash.of_b58check next_protococol_hash with
+  match Protocol_hash.of_b58check next_protococol_hash with
   | Error _ as result -> Lwt.return result
   | Ok next_protocol_hash ->
       Migration.migrate_mockup ~cctxt ~protocol_hash:None ~next_protocol_hash

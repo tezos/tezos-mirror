@@ -28,11 +28,11 @@ include Prevalidator_internal_common
 open Prevalidator_worker_state
 
 module ChainProto_registry = Map.Make (struct
-  type t = Tezos_crypto.Chain_id.t * Tezos_crypto.Protocol_hash.t
+  type t = Chain_id.t * Protocol_hash.t
 
   let compare (c1, p1) (c2, p2) =
-    let pc = Tezos_crypto.Protocol_hash.compare p1 p2 in
-    if pc = 0 then Tezos_crypto.Chain_id.compare c1 c2 else pc
+    let pc = Protocol_hash.compare p1 p2 in
+    if pc = 0 then Chain_id.compare c1 c2 else pc
 end)
 
 let chain_proto_registry : t ChainProto_registry.t ref =
@@ -156,11 +156,11 @@ let empty_rpc_directory : unit Tezos_rpc.Directory.t =
       let pending_operations =
         {
           Block_services.Empty.Mempool.applied = [];
-          refused = Tezos_crypto.Operation_hash.Map.empty;
-          outdated = Tezos_crypto.Operation_hash.Map.empty;
-          branch_refused = Tezos_crypto.Operation_hash.Map.empty;
-          branch_delayed = Tezos_crypto.Operation_hash.Map.empty;
-          unprocessed = Tezos_crypto.Operation_hash.Map.empty;
+          refused = Operation_hash.Map.empty;
+          outdated = Operation_hash.Map.empty;
+          branch_refused = Operation_hash.Map.empty;
+          branch_delayed = Operation_hash.Map.empty;
+          unprocessed = Operation_hash.Map.empty;
         }
       in
       Block_services.Empty.Mempool.pending_operations_version_dispatcher

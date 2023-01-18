@@ -95,22 +95,20 @@ type transfer = {
 }
 
 type state = {
-  current_head_on_start : Tezos_crypto.Block_hash.t;
+  current_head_on_start : Block_hash.t;
   counters :
-    (Tezos_crypto.Block_hash.t * Z.t)
-    Tezos_crypto.Signature.V0.Public_key_hash.Table.t;
+    (Block_hash.t * Z.t) Tezos_crypto.Signature.V0.Public_key_hash.Table.t;
   mutable pool : source_origin list;
   mutable pool_size : int;
       (** [Some l] if [single_op_per_pkh_per_block] is true *)
   mutable shuffled_pool : source list option;
   mutable revealed : Tezos_crypto.Signature.V0.Public_key_hash.Set.t;
-  mutable last_block : Tezos_crypto.Block_hash.t;
+  mutable last_block : Block_hash.t;
   mutable last_level : int;
-  mutable target_block : Tezos_crypto.Block_hash.t;
+  mutable target_block : Block_hash.t;
       (** The block on top of which we are injecting transactions (HEAD~2). *)
   new_block_condition : unit Lwt_condition.t;
-  injected_operations :
-    Tezos_crypto.Operation_hash.t list Tezos_crypto.Block_hash.Table.t;
+  injected_operations : Operation_hash.t list Block_hash.Table.t;
 }
 
 (** Cost estimations for every kind of transaction used in the stress test.
@@ -182,8 +180,8 @@ let injected_operations_encoding =
   let open Data_encoding in
   list
     (obj2
-       (req "block_hash_when_injected" Tezos_crypto.Block_hash.encoding)
-       (req "operation_hashes" (list Tezos_crypto.Operation_hash.encoding)))
+       (req "block_hash_when_injected" Block_hash.encoding)
+       (req "operation_hashes" (list Operation_hash.encoding)))
 
 let transaction_costs_encoding =
   let open Data_encoding in
@@ -328,13 +326,13 @@ let rec sample_source_from_pool state rng (cctxt : Protocol_client_context.full)
           cctxt#message
             "sample_transfer: %d unused sources for the block next to %a"
             (List.length l)
-            Tezos_crypto.Block_hash.pp
+            Block_hash.pp
             state.last_block)
       >>= fun () -> Lwt.return source
   | Some [] ->
       cctxt#message
         "all available sources have been used for block next to %a"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         state.last_block
       >>= fun () ->
       Lwt_condition.wait state.new_block_condition >>= fun () ->
@@ -477,7 +475,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
   >>=? fun pcounter ->
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun branch ->
   (* If there is a new block refresh the fresh_pool *)
-  if not (Tezos_crypto.Block_hash.equal branch state.last_block) then (
+  if not (Block_hash.equal branch state.last_block) then (
     state.last_block <- branch ;
     (* Because of how Tenderbake works the target block should stay 2
        blocks in the past because this guarantees that we are targeting a
@@ -505,7 +503,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
              by the RPC _must_ be the freshest one. *)
           pcounter
       | Some (previous_branch, previous_counter) ->
-          if Tezos_crypto.Block_hash.equal branch previous_branch then
+          if Block_hash.equal branch previous_branch then
             (* We already injected an operation on top of this block: the one stored
                locally is the freshest one. *)
             previous_counter
@@ -609,17 +607,15 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
         debug_msg (fun () ->
             cctxt#message
               "inject_transfer: op injected %a"
-              Tezos_crypto.Operation_hash.pp
+              Operation_hash.pp
               op_hash)
         >>= fun () ->
         let ops =
           Option.value
             ~default:[]
-            (Tezos_crypto.Block_hash.Table.find
-               state.injected_operations
-               branch)
+            (Block_hash.Table.find state.injected_operations branch)
         in
-        Tezos_crypto.Block_hash.Table.replace
+        Block_hash.Table.replace
           state.injected_operations
           branch
           (op_hash :: ops) ;
@@ -636,7 +632,7 @@ let save_injected_operations (cctxt : Protocol_client_context.full) state =
   let json =
     Data_encoding.Json.construct
       injected_operations_encoding
-      (Tezos_crypto.Block_hash.Table.fold
+      (Block_hash.Table.fold
          (fun k v acc -> (k, v) :: acc)
          state.injected_operations
          [])
@@ -657,10 +653,10 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
   let ratio_injected_included_op () =
     Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_exit ->
     let inter_cardinal s1 s2 =
-      Tezos_crypto.Operation_hash.Set.cardinal
-        (Tezos_crypto.Operation_hash.Set.inter
-           (Tezos_crypto.Operation_hash.Set.of_list s1)
-           (Tezos_crypto.Operation_hash.Set.of_list s2))
+      Operation_hash.Set.cardinal
+        (Operation_hash.Set.inter
+           (Operation_hash.Set.of_list s1)
+           (Operation_hash.Set.of_list s2))
     in
     let get_included_ops older_block =
       let rec get_included_ops block acc_included_ops =
@@ -688,7 +684,7 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
       get_included_ops current_head_on_exit []
     in
     let injected_ops =
-      Tezos_crypto.Block_hash.Table.fold
+      Block_hash.Table.fold
         (fun k l acc ->
           (* The operations injected during the last block are ignored because
              they should not be currently included. *)
@@ -701,9 +697,9 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
     debug_msg (fun () ->
         cctxt#message
           "injected : %a\nincluded: %a"
-          (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
+          (Format.pp_print_list Operation_hash.pp)
           injected_ops
-          (Format.pp_print_list Tezos_crypto.Operation_hash.pp)
+          (Format.pp_print_list Operation_hash.pp)
           included_ops)
     >>= fun () ->
     let injected_ops_count = List.length injected_ops in
@@ -793,7 +789,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
     dont_wait
       (fun () ->
         on_new_head cctxt (fun (block, new_block_header) ->
-            if not (Tezos_crypto.Block_hash.equal block state.last_block) then (
+            if not (Block_hash.equal block state.last_block) then (
               state.last_block <- block ;
               state.last_level <- Int32.to_int new_block_header.shell.level ;
               state.shuffled_pool <-
@@ -1158,7 +1154,7 @@ let generate_random_transactions =
               last_level = Int32.to_int header_on_start.level;
               target_block = current_target_block;
               new_block_condition = Lwt_condition.create ();
-              injected_operations = Tezos_crypto.Block_hash.Table.create 1023;
+              injected_operations = Block_hash.Table.create 1023;
             }
           in
           let exit_callback_id =
@@ -1229,7 +1225,7 @@ let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
           last_level = Int32.to_int header_on_start.shell.level;
           target_block = current_target_block;
           new_block_condition = Lwt_condition.create ();
-          injected_operations = Tezos_crypto.Block_hash.Table.create 1023;
+          injected_operations = Block_hash.Table.create 1023;
         }
       in
       let rng = Random.State.make [|parameters.seed|] in

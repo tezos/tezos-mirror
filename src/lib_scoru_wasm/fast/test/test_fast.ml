@@ -125,7 +125,7 @@ let test_against_both ?images ~from_binary ~kernel ~messages () =
   let* fast_hashes = run_with (apply_fast ?images) in
   let* slow_hashes = run_with (fun _ -> apply_slow ?images) in
 
-  assert (List.equal Tezos_crypto.Context_hash.equal slow_hashes fast_hashes) ;
+  assert (List.equal Context_hash.equal slow_hashes fast_hashes) ;
 
   Lwt_result_syntax.return_unit
 
@@ -430,7 +430,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set =
       in
       let hash_fast = Tezos_context_memory.Context_binary.Tree.hash fast_tree in
       let hash_slow = Tezos_context_memory.Context_binary.Tree.hash slow_tree in
-      assert (Tezos_crypto.Context_hash.equal hash_fast hash_slow) ;
+      assert (Context_hash.equal hash_fast hash_slow) ;
       return ())
 
 let tests =

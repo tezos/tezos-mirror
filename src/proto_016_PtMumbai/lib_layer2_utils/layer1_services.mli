@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 open Protocol_client_context.Alpha_block_services
 
-type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
+type error += Cannot_read_block_metadata of Block_hash.t
 
 type 'accu successful_operation_processor = {
   apply :

@@ -103,9 +103,7 @@ module type T = sig
       operation, then this type contains its hash and its new
       classification. If there is no replaced operation, this is [None]. *)
   type replacement =
-    (Tezos_crypto.Operation_hash.t
-    * Prevalidator_classification.error_classification)
-    option
+    (Operation_hash.t * Prevalidator_classification.error_classification) option
 
   (** Result of {!add_operation}.
 
@@ -140,13 +138,12 @@ module type T = sig
 
       The state remains unchanged when the operation was not
       present. *)
-  val remove_operation : t -> Tezos_crypto.Operation_hash.t -> t
+  val remove_operation : t -> Operation_hash.t -> t
 
   module Internal_for_tests : sig
     (** Return the map of operations currently present in the protocol
         representation of the mempool. *)
-    val get_valid_operations :
-      t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
+    val get_valid_operations : t -> protocol_operation Operation_hash.Map.t
 
     (** Return the filter_state component of the state. *)
     val get_filter_state : t -> filter_state
@@ -183,9 +180,9 @@ module Internal_for_tests : sig
       Store.Block.t ->
       Tezos_protocol_environment.Context.t tzresult Lwt.t
 
-    (** [chain_id store] returns the {!Tezos_crypto.Chain_id.t} to which [store]
+    (** [chain_id store] returns the {!Chain_id.t} to which [store]
         corresponds *)
-    val chain_id : chain_store -> Tezos_crypto.Chain_id.t
+    val chain_id : chain_store -> Chain_id.t
   end
 
   (** A variant of [Make] above that is parameterized by {!CHAIN_STORE},

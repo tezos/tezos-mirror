@@ -67,7 +67,7 @@ module Make (Simulation : Simulation.S) : S = struct
 
   type state = {
     node_ctxt : Node_context.ro;
-    signer : Tezos_crypto.Signature.public_key_hash;
+    signer : Signature.public_key_hash;
     conf : Configuration.batcher;
     messages : Message_queue.t;
     batched : Batched_messages.t;
@@ -260,7 +260,7 @@ module Make (Simulation : Simulation.S) : S = struct
 
     type parameters = {
       node_ctxt : Node_context.ro;
-      signer : Tezos_crypto.Signature.public_key_hash;
+      signer : Signature.public_key_hash;
       conf : Configuration.batcher;
     }
   end

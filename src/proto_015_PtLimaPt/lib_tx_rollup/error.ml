@@ -217,8 +217,8 @@ let () =
 
 type error +=
   | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis of {
-      disk_rollup_origination : Tezos_crypto.Block_hash.t;
-      given_rollup_genesis : Tezos_crypto.Block_hash.t;
+      disk_rollup_origination : Block_hash.t;
+      given_rollup_genesis : Block_hash.t;
     }
 
 let () =
@@ -233,15 +233,15 @@ let () =
         ppf
         "Rollup origination on disk (%a) is different from the provided rollup \
          genesis (%a)"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         disk_rollup
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         given_rollup)
     `Permanent
     Data_encoding.(
       obj2
-        (req "disk_rollup" Tezos_crypto.Block_hash.encoding)
-        (req "given_rollup" Tezos_crypto.Block_hash.encoding))
+        (req "disk_rollup" Block_hash.encoding)
+        (req "given_rollup" Block_hash.encoding))
     (function
       | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
           {disk_rollup_origination; given_rollup_genesis} ->
@@ -251,7 +251,7 @@ let () =
       Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
         {disk_rollup_origination; given_rollup_genesis})
 
-type error += Tx_rollup_no_operation_metadata of Tezos_crypto.Operation_hash.t
+type error += Tx_rollup_no_operation_metadata of Operation_hash.t
 
 let () =
   register_error_kind
@@ -264,10 +264,10 @@ let () =
         "The operation receipt of %a is unavailable. Please make sure that the \
          history mode of the Tezos node you are connecting to matches the \
          requirements."
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         op)
     `Permanent
-    Data_encoding.(obj1 (req "context" Tezos_crypto.Operation_hash.encoding))
+    Data_encoding.(obj1 (req "context" Operation_hash.encoding))
     (function Tx_rollup_no_operation_metadata o -> Some o | _ -> None)
     (fun o -> Tx_rollup_no_operation_metadata o)
 
@@ -287,7 +287,7 @@ let () =
     (function Tx_rollup_mismatch -> Some () | _ -> None)
     (fun () -> Tx_rollup_mismatch)
 
-type error += Tx_rollup_cannot_fetch_tezos_block of Tezos_crypto.Block_hash.t
+type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t
 
 let () =
   register_error_kind
@@ -298,10 +298,10 @@ let () =
       Format.fprintf
         ppf
         "The Tezos block %a cannot be fetched from the node."
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         b)
     `Permanent
-    Data_encoding.(obj1 (req "block" Tezos_crypto.Block_hash.encoding))
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
     (function Tx_rollup_cannot_fetch_tezos_block b -> Some b | _ -> None)
     (fun b -> Tx_rollup_cannot_fetch_tezos_block b)
 
@@ -396,7 +396,7 @@ let () =
 
 type error +=
   | Tx_rollup_no_proto_inbox of
-      Protocol.Alpha_context.Tx_rollup_level.t * Tezos_crypto.Block_hash.t
+      Protocol.Alpha_context.Tx_rollup_level.t * Block_hash.t
 
 let () =
   register_error_kind
@@ -409,13 +409,13 @@ let () =
         "No inbox on L1 for rollup level %a at block %a"
         Protocol.Alpha_context.Tx_rollup_level.pp
         l
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         b)
     `Permanent
     Data_encoding.(
       obj2
         (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding)
-        (req "block" Tezos_crypto.Block_hash.encoding))
+        (req "block" Block_hash.encoding))
     (function Tx_rollup_no_proto_inbox (l, b) -> Some (l, b) | _ -> None)
     (fun (l, b) -> Tx_rollup_no_proto_inbox (l, b))
 
@@ -543,7 +543,7 @@ let () =
     (function Tx_rollup_deposit_not_allowed -> Some () | _ -> None)
     (fun () -> Tx_rollup_deposit_not_allowed)
 
-type error += Tx_rollup_deposit_slashed of Tezos_crypto.Operation_hash.t
+type error += Tx_rollup_deposit_slashed of Operation_hash.t
 
 let () =
   register_error_kind
@@ -555,10 +555,10 @@ let () =
         ppf
         "The deposit for our operator was slashed in operation %a. Aborting to \
          investigate."
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         op)
     `Permanent
-    Data_encoding.(obj1 (req "operation" Tezos_crypto.Operation_hash.encoding))
+    Data_encoding.(obj1 (req "operation" Operation_hash.encoding))
     (function Tx_rollup_deposit_slashed o -> Some o | _ -> None)
     (fun o -> Tx_rollup_deposit_slashed o)
 

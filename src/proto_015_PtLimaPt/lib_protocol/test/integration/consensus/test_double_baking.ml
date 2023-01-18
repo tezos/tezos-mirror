@@ -52,7 +52,7 @@ let block_fork ?policy (contract_a, contract_b) b =
 let order_block_hashes ~correct_order bh1 bh2 =
   let hash1 = Block_header.hash bh1 in
   let hash2 = Block_header.hash bh2 in
-  let c = Tezos_crypto.Block_hash.compare hash1 hash2 in
+  let c = Block_hash.compare hash1 hash2 in
   if correct_order then if c < 0 then (bh1, bh2) else (bh2, bh1)
   else if c < 0 then (bh2, bh1)
   else (bh1, bh2)
@@ -95,7 +95,7 @@ let test_valid_double_baking_evidence () =
 let order_endorsements ~correct_order op1 op2 =
   let oph1 = Operation.hash op1 in
   let oph2 = Operation.hash op2 in
-  let c = Tezos_crypto.Operation_hash.compare oph1 oph2 in
+  let c = Operation_hash.compare oph1 oph2 in
   if correct_order then if c < 0 then (op1, op2) else (op2, op1)
   else if c < 0 then (op2, op1)
   else (op1, op2)

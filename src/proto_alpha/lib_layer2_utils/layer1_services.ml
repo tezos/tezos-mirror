@@ -29,7 +29,7 @@ open Apply_results
 open Protocol_client_context
 open Alpha_block_services
 
-type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
+type error += Cannot_read_block_metadata of Block_hash.t
 
 let () =
   register_error_kind
@@ -40,10 +40,10 @@ let () =
       Format.fprintf
         ppf
         "Could not read block receipt for block with hash %a."
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         hash)
     `Temporary
-    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
     (function Cannot_read_block_metadata hash -> Some hash | _ -> None)
     (fun hash -> Cannot_read_block_metadata hash)
 

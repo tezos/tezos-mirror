@@ -79,7 +79,7 @@ module type PROTOCOL = sig
       context -> Signature.public_key_hash -> bool tzresult Lwt.t
   end
 
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   val prepare_context :
     Tezos_protocol_environment.Context.t ->

@@ -40,12 +40,11 @@ type validation_result =
 
 type new_block = {
   block : Store.Block.t;
-  resulting_context_hash : Tezos_crypto.Context_hash.t;
+  resulting_context_hash : Context_hash.t;
 }
 
 module Block_hash_ring =
-  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
-    (Tezos_crypto.Block_hash)
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Block_hash)
 
 module Name = struct
   type t = unit
@@ -83,7 +82,7 @@ module Request = struct
     notify_new_block : new_block -> unit;
     canceler : Lwt_canceler.t option;
     peer : P2p_peer.Id.t option;
-    hash : Tezos_crypto.Block_hash.t;
+    hash : Block_hash.t;
     header : Block_header.t;
     operations : Operation.t list list;
     precheck_and_notify : bool;
@@ -475,12 +474,12 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
         let open Lwt_result_syntax in
         let hashes = List.map (List.map Operation.hash) operations in
         let computed_hash =
-          Tezos_crypto.Operation_list_list_hash.compute
-            (List.map Tezos_crypto.Operation_list_hash.compute hashes)
+          Operation_list_list_hash.compute
+            (List.map Operation_list_hash.compute hashes)
         in
         let* () =
           fail_when
-            (Tezos_crypto.Operation_list_list_hash.compare
+            (Operation_list_list_hash.compare
                computed_hash
                header.shell.operations_hash
             <> 0)

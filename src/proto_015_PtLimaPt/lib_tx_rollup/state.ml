@@ -30,7 +30,7 @@ open Protocol_client_context
 open Injector_common
 module Tezos_blocks_cache =
   Aches_lwt.Lache.Make_option
-    (Aches.Rache.Transfer (Aches.Rache.LRU) (Tezos_crypto.Block_hash))
+    (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
 type rollup_info = Stores.rollup_info = {
   rollup_id : Tx_rollup.t;

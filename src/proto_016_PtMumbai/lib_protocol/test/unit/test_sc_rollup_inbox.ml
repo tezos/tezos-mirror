@@ -135,7 +135,7 @@ let gen_payloads_for_level ?(inbox_creation_level = 0) () =
     let+ seconds = 0 -- 1_000_000 in
     Time.Protocol.of_seconds (Int64.of_int seconds)
   in
-  let predecessor = Tezos_crypto.Block_hash.zero in
+  let predecessor = Block_hash.zero in
   Sc_rollup_helpers.wrap_messages
     ~predecessor_timestamp
     ~predecessor

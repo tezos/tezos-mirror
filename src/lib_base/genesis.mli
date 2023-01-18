@@ -1,8 +1,8 @@
 (** The chain starts from a genesis block associated to a seed protocol *)
 type t = {
   time : Time.Protocol.t;
-  block : Tezos_crypto.Block_hash.t;
-  protocol : Tezos_crypto.Protocol_hash.t;
+  block : Tezos_crypto.Hashed.Block_hash.t;
+  protocol : Tezos_crypto.Hashed.Protocol_hash.t;
 }
 
 val encoding : t Data_encoding.t

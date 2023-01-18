@@ -72,7 +72,7 @@ val get_commitment_slot :
     baked at level [block_level]. *)
 val store_slot_headers :
   block_level:int32 ->
-  block_hash:Tezos_crypto.Block_hash.t ->
+  block_hash:Block_hash.t ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
   unit Lwt.t

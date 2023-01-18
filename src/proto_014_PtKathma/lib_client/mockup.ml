@@ -109,7 +109,7 @@ module Protocol_constants_overrides = struct
     dal : Constants.Parametric.dal option;
     sc_rollup : sc_rollup;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
-    chain_id : Tezos_crypto.Chain_id.t option;
+    chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
     initial_seed : State_hash.t option option;
   }
@@ -412,7 +412,7 @@ module Protocol_constants_overrides = struct
                         "testnet_dictator"
                         (option
                            Tezos_crypto.Signature.V0.Public_key_hash.encoding))
-                     (opt "chain_id" Tezos_crypto.Chain_id.encoding)
+                     (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
                      (opt "initial_seed" (option State_hash.encoding)))
                   (merge_objs
@@ -860,12 +860,7 @@ module Protocol_constants_overrides = struct
             override_value = o.sc_rollup.challenge_window_in_blocks;
             pp = pp_print_int;
           };
-        O
-          {
-            name = "chain_id";
-            override_value = o.chain_id;
-            pp = Tezos_crypto.Chain_id.pp;
-          };
+        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
             name = "timestamp";
@@ -1372,7 +1367,7 @@ let lib_parameters_json_encoding =
 (* Blocks *)
 
 type block = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Environment.Context.t;
@@ -1392,14 +1387,14 @@ module Forge = struct
         operations_hash;
         proto_level = 0;
         validation_passes = 0;
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
 end
 
 (* ------------------------------------------------------------------------- *)
 (* RPC context *)
 let genesis_block_hash =
-  Tezos_crypto.Block_hash.of_b58check_exn
+  Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
 
 let endorsement_branch_data_encoding =
@@ -1408,7 +1403,7 @@ let endorsement_branch_data_encoding =
     (fun (block_hash, block_payload_hash) -> (block_hash, block_payload_hash))
     (fun (block_hash, block_payload_hash) -> (block_hash, block_payload_hash))
     (obj2
-       (req "block_hash" Tezos_crypto.Block_hash.encoding)
+       (req "block_hash" Block_hash.encoding)
        (req "block_payload_hash" Protocol.Block_payload_hash.encoding))
 
 let initial_context chain_id (header : Block_header.shell_header)
@@ -1517,7 +1512,7 @@ let mem_init :
       ~predecessor:hash
       ~timestamp
       ~fitness
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   Protocol_constants_overrides.apply_overrides
     (cctxt :> Tezos_client_base.Client_context.printer)
@@ -1574,10 +1569,7 @@ let mem_init :
   let protocol_data =
     let payload_hash =
       Protocol.Block_payload_hash.hash_bytes
-        [
-          Tezos_crypto.Block_hash.to_bytes hash;
-          Tezos_crypto.Operation_list_hash.(to_bytes @@ compute []);
-        ]
+        [Block_hash.to_bytes hash; Operation_list_hash.(to_bytes @@ compute [])]
     in
     let open Protocol.Alpha_context.Block_header in
     let _, _, sk = Tezos_crypto.Signature.V0.generate_key () in

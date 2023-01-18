@@ -85,20 +85,19 @@ module Tools = struct
     fetch :
       ?peer:P2p_peer.Id.t ->
       ?timeout:Time.System.Span.t ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       Operation.t tzresult Lwt.t;
         (** [fetch ?peer ?timeout oph] returns the value when it is known.
             It can fail with [Requester.Timeout] if [timeout] is provided and the value
             isn't known before the timeout expires. It can fail with [Requester.Cancel] if
             the request is canceled. *)
-    read_block : Tezos_crypto.Block_hash.t -> Store.Block.t tzresult Lwt.t;
+    read_block : Block_hash.t -> Store.Block.t tzresult Lwt.t;
         (** [read_block bh] tries to read the block [bh] from the chain store. *)
     send_get_current_head : ?peer:P2p_peer_id.t -> unit -> unit;
         (** [send_get_current_head ?peer ()] sends a [Get_Current_head]
             to a given peer, or to all known active peers for the chain considered.
             Expected answer is a [Get_current_head] message *)
-    set_mempool :
-      head:Tezos_crypto.Block_hash.t -> Mempool.t -> unit tzresult Lwt.t;
+    set_mempool : head:Block_hash.t -> Mempool.t -> unit tzresult Lwt.t;
         (** [set_mempool ~head mempool] sets the [mempool] of
             the [chain_store] of the chain considered. Does nothing if [head] differs
             from current_head which might happen when a new head concurrently arrives just
@@ -131,13 +130,13 @@ type ('protocol_data, 'a) types_state_shell = {
   parameters : 'a parameters;
   mutable predecessor : Store.Block.t;
   mutable timestamp : Time.System.t;
-  mutable live_blocks : Tezos_crypto.Block_hash.Set.t;
-  mutable live_operations : Tezos_crypto.Operation_hash.Set.t;
-  mutable fetching : Tezos_crypto.Operation_hash.Set.t;
+  mutable live_blocks : Block_hash.Set.t;
+  mutable live_operations : Operation_hash.Set.t;
+  mutable fetching : Operation_hash.Set.t;
   mutable pending : 'protocol_data Pending_ops.t;
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
-  mutable banned_operations : Tezos_crypto.Operation_hash.Set.t;
+  mutable banned_operations : Operation_hash.Set.t;
   worker : Tools.worker_tools;
 }
 
@@ -215,7 +214,7 @@ module type S = sig
   val may_fetch_operation :
     (protocol_operation, prevalidation_t) types_state_shell ->
     P2p_peer_id.t option ->
-    Tezos_crypto.Operation_hash.t ->
+    Operation_hash.t ->
     unit Lwt.t
 
   (** The function called after every call to a function of {!API}. *)
@@ -233,19 +232,18 @@ module type S = sig
 
     val on_arrived :
       types_state ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       Operation.t ->
       (unit, Empty.t) result Lwt.t
 
-    val on_ban :
-      types_state -> Tezos_crypto.Operation_hash.t -> unit tzresult Lwt.t
+    val on_ban : types_state -> Operation_hash.t -> unit tzresult Lwt.t
 
     val on_flush :
       handle_branch_refused:bool ->
       types_state ->
       Store.Block.t ->
-      Tezos_crypto.Block_hash.Set.t ->
-      Tezos_crypto.Operation_hash.Set.t ->
+      Block_hash.Set.t ->
+      Operation_hash.Set.t ->
       unit tzresult Lwt.t
 
     val on_inject :
@@ -296,14 +294,14 @@ module Make_s
   (* This function is in [Lwt] only for logging. *)
   let already_handled ~origin shell oph =
     let open Lwt_syntax in
-    if Tezos_crypto.Operation_hash.Set.mem oph shell.banned_operations then
+    if Operation_hash.Set.mem oph shell.banned_operations then
       let+ () = Events.(emit ban_operation_encountered) (origin, oph) in
       true
     else
       Lwt.return
         (Pending_ops.mem oph shell.pending
-        || Tezos_crypto.Operation_hash.Set.mem oph shell.fetching
-        || Tezos_crypto.Operation_hash.Set.mem oph shell.live_operations
+        || Operation_hash.Set.mem oph shell.fetching
+        || Operation_hash.Set.mem oph shell.live_operations
         || Classification.is_in_mempool oph shell.classification <> None
         || Classification.is_known_unparsable oph shell.classification)
 
@@ -315,8 +313,7 @@ module Make_s
           `Pending
             {
               known_valid = known_valid @ mempool.Mempool.known_valid;
-              pending =
-                Tezos_crypto.Operation_hash.Set.union pending mempool.pending;
+              pending = Operation_hash.Set.union pending mempool.pending;
             }
     | `None ->
         shell.advertisement <- `Pending mempool ;
@@ -571,12 +568,10 @@ module Make_s
       ignore
         (Lwt.finalize
            (fun () ->
-             shell.fetching <-
-               Tezos_crypto.Operation_hash.Set.add oph shell.fetching ;
+             shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
              fetch_operation shell ?peer oph)
            (fun () ->
-             shell.fetching <-
-               Tezos_crypto.Operation_hash.Set.remove oph shell.fetching ;
+             shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
              Lwt.return_unit)) ;
     Lwt.return_unit
 
@@ -612,7 +607,7 @@ module Make_s
             | (`High | `Medium | `Low _) as prio ->
                 if
                   not
-                    (Tezos_crypto.Block_hash.Set.mem
+                    (Block_hash.Set.mem
                        op.Operation.shell.branch
                        pv.shell.live_blocks)
                 then (
@@ -646,7 +641,7 @@ module Make_s
         | Error err ->
             failwith
               "Invalid operation %a: %a."
-              Tezos_crypto.Operation_hash.pp
+              Operation_hash.pp
               oph
               Error_monad.pp_print_trace
               err
@@ -660,15 +655,15 @@ module Make_s
               return_unit)
             else if
               not
-                (Tezos_crypto.Block_hash.Set.mem
+                (Block_hash.Set.mem
                    op.Operation.shell.branch
                    pv.shell.live_blocks)
             then
               failwith
                 "Operation %a is branched on a block %a which is too old"
-                Tezos_crypto.Operation_hash.pp
+                Operation_hash.pp
                 oph
-                Tezos_crypto.Block_hash.pp
+                Block_hash.pp
                 op.Operation.shell.branch
             else
               let notifier = mk_notifier pv.operation_stream in
@@ -688,7 +683,7 @@ module Make_s
                 List.find_opt
                   (function
                     | ({hash; _} : protocol_operation operation), _ ->
-                        Tezos_crypto.Operation_hash.equal hash oph)
+                        Operation_hash.equal hash oph)
                   to_handle
               in
               match op_status with
@@ -720,7 +715,7 @@ module Make_s
                   Lwt.return
                   @@ error_with
                        "Error while applying operation %a:@ %a"
-                       Tezos_crypto.Operation_hash.pp
+                       Operation_hash.pp
                        oph
                        pp_print_trace
                        e
@@ -729,7 +724,7 @@ module Make_s
                   failwith
                     "Unexpected error while injecting operation %a. Operation \
                      not found after classifying it."
-                    Tezos_crypto.Operation_hash.pp
+                    Operation_hash.pp
                     oph)
 
     let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
@@ -739,7 +734,7 @@ module Make_s
       let* () = List.iter_s may_fetch_operation mempool.Mempool.known_valid in
       Seq.iter_s
         may_fetch_operation
-        (Tezos_crypto.Operation_hash.Set.to_seq mempool.Mempool.pending)
+        (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
     let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
         new_live_operations =
@@ -772,10 +767,10 @@ module Make_s
           ~chain:pv.shell.parameters.tools.chain_tools
           ~handle_branch_refused
       in
-      (* Could be implemented as Tezos_crypto.Operation_hash.Map.filter_s which
+      (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
       let*! new_pending_operations, nb_pending =
-        Tezos_crypto.Operation_hash.Map.fold_s
+        Operation_hash.Map.fold_s
           (fun _oph op (pending, nb_pending) ->
             let*! v =
               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
@@ -818,12 +813,11 @@ module Make_s
       pv.shell.advertisement <-
         remove_from_advertisement oph pv.shell.advertisement ;
       pv.shell.banned_operations <-
-        Tezos_crypto.Operation_hash.Set.add oph pv.shell.banned_operations ;
+        Operation_hash.Set.add oph pv.shell.banned_operations ;
       match Classification.remove oph pv.shell.classification with
       | None ->
           pv.shell.pending <- Pending_ops.remove oph pv.shell.pending ;
-          pv.shell.fetching <-
-            Tezos_crypto.Operation_hash.Set.remove oph pv.shell.fetching ;
+          pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
           return_unit
       | Some (_op, classification) -> (
           match (classification, flush_if_prechecked) with
@@ -854,9 +848,7 @@ module Make_s
 
     let on_ban pv oph_to_ban =
       pv.shell.banned_operations <-
-        Tezos_crypto.Operation_hash.Set.add
-          oph_to_ban
-          pv.shell.banned_operations ;
+        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       remove ~flush_if_prechecked:true pv oph_to_ban
   end
 end
@@ -866,7 +858,7 @@ module type ARG = sig
 
   val chain_db : Distributed_db.chain_db
 
-  val chain_id : Tezos_crypto.Chain_id.t
+  val chain_id : Chain_id.t
 end
 
 module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
@@ -1001,9 +993,7 @@ module Make
           (Proto_services.S.Mempool.unban_operation Tezos_rpc.Path.open_root)
           (fun pv () oph ->
             pv.shell.banned_operations <-
-              Tezos_crypto.Operation_hash.Set.remove
-                oph
-                pv.shell.banned_operations ;
+              Operation_hash.Set.remove oph pv.shell.banned_operations ;
             return_unit) ;
       (* Unban all operations: clear the set pv.banned_operations. *)
       dir :=
@@ -1012,7 +1002,7 @@ module Make
           (Proto_services.S.Mempool.unban_all_operations
              Tezos_rpc.Path.open_root)
           (fun pv () () ->
-            pv.shell.banned_operations <- Tezos_crypto.Operation_hash.Set.empty ;
+            pv.shell.banned_operations <- Operation_hash.Set.empty ;
             return_unit) ;
       dir :=
         Tezos_rpc.Directory.gen_register
@@ -1034,8 +1024,7 @@ module Make
                 in
                 Classification.Sized_map.to_map
                   pv.shell.classification.prechecked
-                |> Tezos_crypto.Operation_hash.Map.to_seq
-                |> Seq.append applied_seq
+                |> Operation_hash.Map.to_seq |> Seq.append applied_seq
                 |> Seq.filter_map (fun (oph, op) ->
                        if
                          filter_validation_passes
@@ -1047,7 +1036,7 @@ module Make
               else []
             in
             let process_map map =
-              let open Tezos_crypto.Operation_hash in
+              let open Operation_hash in
               Map.filter_map
                 (fun _oph (op, error) ->
                   if
@@ -1061,28 +1050,28 @@ module Make
             let refused =
               if params#refused then
                 process_map (Classification.map pv.shell.classification.refused)
-              else Tezos_crypto.Operation_hash.Map.empty
+              else Operation_hash.Map.empty
             in
             let outdated =
               if params#outdated then
                 process_map
                   (Classification.map pv.shell.classification.outdated)
-              else Tezos_crypto.Operation_hash.Map.empty
+              else Operation_hash.Map.empty
             in
             let branch_refused =
               if params#branch_refused then
                 process_map
                   (Classification.map pv.shell.classification.branch_refused)
-              else Tezos_crypto.Operation_hash.Map.empty
+              else Operation_hash.Map.empty
             in
             let branch_delayed =
               if params#branch_delayed then
                 process_map
                   (Classification.map pv.shell.classification.branch_delayed)
-              else Tezos_crypto.Operation_hash.Map.empty
+              else Operation_hash.Map.empty
             in
             let unprocessed =
-              Tezos_crypto.Operation_hash.Map.filter_map
+              Operation_hash.Map.filter_map
                 (fun _ {protocol; _} ->
                   if filter_validation_passes params#validation_passes protocol
                   then Some protocol
@@ -1133,13 +1122,13 @@ module Make
               if params#applied then
                 Classification.Sized_map.to_map
                   pv.shell.classification.prechecked
-                |> Tezos_crypto.Operation_hash.Map.to_seq
+                |> Operation_hash.Map.to_seq
                 |> Seq.map (fun (hash, {protocol; _}) ->
                        ((hash, protocol), None))
               else Seq.empty
             in
             let process_error_map map =
-              let open Tezos_crypto.Operation_hash in
+              let open Operation_hash in
               map |> Map.to_seq
               |> Seq.map (fun (hash, (op, error)) ->
                      ((hash, op.protocol), Some error))
@@ -1271,7 +1260,7 @@ module Make
     let on_close w =
       let pv = Worker.state w in
       Lwt_watcher.shutdown_input pv.operation_stream ;
-      Tezos_crypto.Operation_hash.Set.iter
+      Operation_hash.Set.iter
         pv.shell.parameters.tools.chain_tools.clear_or_cancel
         pv.shell.fetching ;
       Lwt.return_unit
@@ -1331,8 +1320,8 @@ module Make
       in
       let fetching =
         List.fold_left
-          (fun s h -> Tezos_crypto.Operation_hash.Set.add h s)
-          Tezos_crypto.Operation_hash.Set.empty
+          (fun s h -> Operation_hash.Set.add h s)
+          Operation_hash.Set.empty
           mempool.known_valid
       in
       let classification_parameters =
@@ -1357,7 +1346,7 @@ module Make
           fetching;
           pending = Pending_ops.empty;
           advertisement = `None;
-          banned_operations = Tezos_crypto.Operation_hash.Set.empty;
+          banned_operations = Operation_hash.Set.empty;
           worker = mk_worker_tools w;
         }
       in
@@ -1400,7 +1389,7 @@ module Make
       let*! () =
         Seq.iter_s
           (may_fetch_operation pv.shell None)
-          (Tezos_crypto.Operation_hash.Set.to_seq fetching)
+          (Operation_hash.Set.to_seq fetching)
       in
       return pv
 

@@ -230,7 +230,7 @@ module Make (PVM : Pvm.S) = struct
         | None ->
             failwith
               "Missing L2 predecessor %a for previous commitment"
-              Tezos_crypto.Block_hash.pp
+              Block_hash.pp
               predecessor
         | Some pred ->
             return (Sc_rollup_block.most_recent_commitment pred.header)
@@ -440,18 +440,13 @@ module Make (PVM : Pvm.S) = struct
         |> List.fold_left
              (fun acc (purpose, operator) ->
                let purposes =
-                 match
-                   Tezos_crypto.Signature.Public_key_hash.Map.find operator acc
-                 with
+                 match Signature.Public_key_hash.Map.find operator acc with
                  | None -> [purpose]
                  | Some ps -> purpose :: ps
                in
-               Tezos_crypto.Signature.Public_key_hash.Map.add
-                 operator
-                 purposes
-                 acc)
-             Tezos_crypto.Signature.Public_key_hash.Map.empty
-        |> Tezos_crypto.Signature.Public_key_hash.Map.bindings
+               Signature.Public_key_hash.Map.add operator purposes acc)
+             Signature.Public_key_hash.Map.empty
+        |> Signature.Public_key_hash.Map.bindings
         |> List.map (fun (operator, purposes) ->
                let strategy =
                  match purposes with

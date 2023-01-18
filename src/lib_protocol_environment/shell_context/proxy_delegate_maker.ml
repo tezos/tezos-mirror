@@ -65,7 +65,7 @@ let make_index ~(context_path : string) : Tezos_context.Context.index Lwt.t =
   Tezos_context.Context.init ~readonly:true context_path
 
 let of_index ~(index : Tezos_context.Context.index)
-    (hash : Tezos_crypto.Context_hash.t) :
+    (hash : Tezos_crypto.Hashed.Context_hash.t) :
     Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t =
   let open Lwt_syntax in
   let* ctxt = Tezos_context.Context.checkout index hash in
@@ -73,7 +73,7 @@ let of_index ~(index : Tezos_context.Context.index)
   | None ->
       failwith
         "Couldn't check out the hash %s"
-        (Tezos_crypto.Context_hash.to_string hash)
+        (Tezos_crypto.Hashed.Context_hash.to_string hash)
   | Some ctxt ->
       let proxy_data_dir : Tezos_protocol_environment.Proxy_delegate.t =
         (module struct

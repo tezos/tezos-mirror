@@ -49,12 +49,12 @@ end
 module type EXTENDED_REQUESTER_2 = sig
   include EXTENDED_REQUESTER
 
-  val clear_all : t -> Tezos_crypto.Block_hash.t -> int -> unit
+  val clear_all : t -> Block_hash.t -> int -> unit
 end
 
 module Raw_protocol :
   EXTENDED_REQUESTER
-    with type key = Tezos_crypto.Protocol_hash.t
+    with type key = Protocol_hash.t
      and type param = unit
      and type request_param = unit request_param
      and type store = Store.t
@@ -63,7 +63,7 @@ module Raw_protocol :
 
 module Raw_operation :
   EXTENDED_REQUESTER
-    with type key = Tezos_crypto.Operation_hash.t
+    with type key = Operation_hash.t
      and type param = unit
      and type request_param = unit request_param
      and type store = Store.chain_store
@@ -72,7 +72,7 @@ module Raw_operation :
 
 module Raw_block_header :
   EXTENDED_REQUESTER
-    with type key = Tezos_crypto.Block_hash.t
+    with type key = Block_hash.t
      and type param = unit
      and type request_param = unit request_param
      and type store = Store.chain_store
@@ -81,14 +81,13 @@ module Raw_block_header :
 
 module Raw_operations :
   EXTENDED_REQUESTER_2
-    with type key = Tezos_crypto.Block_hash.t * int
+    with type key = Block_hash.t * int
      and type request_param = unit request_param
     (* root of merkle tree for this block, used to check the notified
         value. *)
-     and type param = Tezos_crypto.Operation_list_list_hash.t
+     and type param = Operation_list_list_hash.t
      and type store = Store.chain_store
      and type value = Operation.t list
     (* notified value contain the queried value, plus the merkle tree hashes
           needed to recompute the merkle tree root. *)
-     and type notified_value =
-      Operation.t list * Tezos_crypto.Operation_list_list_hash.path
+     and type notified_value = Operation.t list * Operation_list_list_hash.path

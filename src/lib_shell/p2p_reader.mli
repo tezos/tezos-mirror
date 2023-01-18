@@ -141,8 +141,7 @@ type t
 
 module Message = Distributed_db_message
 
-module Block_hash_cache :
-  Aches.Vache.MAP with type key = Tezos_crypto.Block_hash.t
+module Block_hash_cache : Aches.Vache.MAP with type key = Block_hash.t
 
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
@@ -153,11 +152,7 @@ type callback = {
   notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
       (** callback function called on reception of a [Current_branch] message *)
   notify_head :
-    P2p_peer.Id.t ->
-    Tezos_crypto.Block_hash.t ->
-    Block_header.t ->
-    Mempool.t ->
-    unit;
+    P2p_peer.Id.t -> Block_hash.t -> Block_header.t -> Mempool.t -> unit;
       (** callback function called on reception of a [Current_head] message *)
   disconnection : P2p_peer.Id.t -> unit;
 }
@@ -175,9 +170,7 @@ type chain_db = {
 
 (** Lookup for block header in any active chains *)
 val read_block_header :
-  t ->
-  Tezos_crypto.Block_hash.t ->
-  (Tezos_crypto.Chain_id.t * Block_header.t) option Lwt.t
+  t -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
 (** [run ~register ~unregister p2p state protocol_db active_chains peer_id conn]
     runs an answering worker on a p2p connection [connection]. [peer_id] is
@@ -192,7 +185,7 @@ val run :
   p2p ->
   Store.t ->
   Distributed_db_requester.Raw_protocol.t ->
-  chain_db Tezos_crypto.Chain_id.Table.t ->
+  chain_db Chain_id.Table.t ->
   P2p_peer.Id.t ->
   connection ->
   unit

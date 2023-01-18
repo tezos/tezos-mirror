@@ -184,7 +184,7 @@ end)
 module Block_directory = Make_directory (struct
   include Sc_rollup_services.Global.Block
 
-  type context = Node_context.ro * Tezos_crypto.Block_hash.t
+  type context = Node_context.ro * Block_hash.t
 
   let context_of_prefix node_ctxt (((), block) : prefix) =
     let open Lwt_result_syntax in
@@ -202,8 +202,7 @@ end)
 module Outbox_directory = Make_directory (struct
   include Sc_rollup_services.Global.Block.Outbox
 
-  type context =
-    Node_context.ro * Tezos_crypto.Block_hash.t * Alpha_context.Raw_level.t
+  type context = Node_context.ro * Block_hash.t * Alpha_context.Raw_level.t
 
   let context_of_prefix node_ctxt (((), block), level) =
     let open Lwt_result_syntax in

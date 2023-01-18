@@ -34,7 +34,7 @@ module Prevalidators = struct
         ~output:
           (list
              (obj4
-                (req "chain_id" Tezos_crypto.Chain_id.encoding)
+                (req "chain_id" Chain_id.encoding)
                 (req
                    "status"
                    (Worker_types.worker_status_encoding
@@ -137,7 +137,7 @@ module Chain_validators = struct
         ~output:
           (list
              (obj4
-                (req "chain_id" Tezos_crypto.Chain_id.encoding)
+                (req "chain_id" Chain_id.encoding)
                 (req
                    "status"
                    (Worker_types.worker_status_encoding

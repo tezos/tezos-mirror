@@ -628,7 +628,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
               let target =
                 match l with
                 | [block_hash; level] ->
-                    ( Tezos_crypto.Block_hash.of_b58check_exn block_hash,
+                    ( Block_hash.of_b58check_exn block_hash,
                       Int32.of_string level )
                 | _ -> assert false
               in

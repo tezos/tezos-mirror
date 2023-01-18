@@ -49,7 +49,7 @@ module type S = sig
       the hash of to be included in the commitment.  *)
   val process_head :
     Node_context.rw ->
-    predecessor:Tezos_crypto.Block_hash.t ->
+    predecessor:Block_hash.t ->
     Layer1.head ->
     Context.rw ->
     Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t option tzresult Lwt.t

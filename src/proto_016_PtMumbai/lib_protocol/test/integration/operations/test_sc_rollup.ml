@@ -303,7 +303,7 @@ let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
     Option.map
       (fun s ->
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string [s]))
+          (Context_hash.hash_string [s]))
       compressed_state
   in
   let* commitment =
@@ -1976,7 +1976,7 @@ let test_timeout () =
       number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string ["first"]);
+          (Context_hash.hash_string ["first"]);
     }
   in
   let commitment2 =
@@ -1985,7 +1985,7 @@ let test_timeout () =
       number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Tezos_crypto.Context_hash.hash_string ["second"]);
+          (Context_hash.hash_string ["second"]);
     }
   in
 
@@ -2092,14 +2092,14 @@ let init_with_conflict () =
   let* block, rollup = sc_originate block account1 "unit" in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Tezos_crypto.Context_hash.hash_string ["first"])
+      (Context_hash.hash_string ["first"])
   in
   let* commitment1 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
   in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Tezos_crypto.Context_hash.hash_string ["second"])
+      (Context_hash.hash_string ["second"])
   in
   let* commitment2 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
@@ -2496,7 +2496,7 @@ let test_automatically_added_internal_messages () =
 
   let level_zero_info =
     ( Time.Protocol.epoch,
-      Tezos_crypto.Block_hash.of_b58check_exn
+      Block_hash.of_b58check_exn
         "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU" )
   in
 
@@ -2759,7 +2759,7 @@ let test_offline_staker_does_not_prevent_cementation () =
 let init_with_4_conflicts () =
   let dumb_compressed_state s =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Tezos_crypto.Context_hash.hash_string [s])
+      (Context_hash.hash_string [s])
   in
   let* block, players = context_init (Context.TList 4) in
   let pA, pB, pC, pD =
@@ -2995,7 +2995,7 @@ let test_conflict_point_on_a_branch () =
         commitment with
         compressed_state =
           Sc_rollup.State_hash.context_hash_to_state_hash
-            (Tezos_crypto.Context_hash.hash_string ["foo"]);
+            (Context_hash.hash_string ["foo"]);
       } )
   in
   let* block = publish_commitments block pB rollup [pB_commitment] in

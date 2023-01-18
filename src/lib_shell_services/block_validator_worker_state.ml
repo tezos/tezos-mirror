@@ -25,8 +25,8 @@
 
 module Request = struct
   type validation_view = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    block : Tezos_crypto.Block_hash.t;
+    chain_id : Chain_id.t;
+    block : Block_hash.t;
     peer : P2p_peer.Id.t option;
   }
 
@@ -36,18 +36,18 @@ module Request = struct
       (fun {block; chain_id; peer} -> (block, chain_id, peer))
       (fun (block, chain_id, peer) -> {block; chain_id; peer})
       (obj3
-         (req "block" Tezos_crypto.Block_hash.encoding)
-         (req "chain_id" Tezos_crypto.Chain_id.encoding)
+         (req "block" Block_hash.encoding)
+         (req "chain_id" Chain_id.encoding)
          (opt "peer" P2p_peer.Id.encoding))
 
-  type preapplication_view = {chain_id : Tezos_crypto.Chain_id.t; level : int32}
+  type preapplication_view = {chain_id : Chain_id.t; level : int32}
 
   let preapplication_view_encoding =
     let open Data_encoding in
     conv
       (fun {chain_id; level} -> (chain_id, level))
       (fun (chain_id, level) -> {chain_id; level})
-      (obj2 (req "chain_id" Tezos_crypto.Chain_id.encoding) (req "level" int32))
+      (obj2 (req "chain_id" Chain_id.encoding) (req "level" int32))
 
   type view =
     | Validation of validation_view
@@ -80,9 +80,9 @@ module Request = struct
         Format.fprintf
           ppf
           "Validation of %a (chain: %a)"
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           block
-          Tezos_crypto.Chain_id.pp_short
+          Chain_id.pp_short
           chain_id ;
         match peer with
         | None -> ()
@@ -93,6 +93,6 @@ module Request = struct
           ppf
           "Pre-application at level %ld (chain: %a)"
           level
-          Tezos_crypto.Chain_id.pp_short
+          Chain_id.pp_short
           chain_id
 end

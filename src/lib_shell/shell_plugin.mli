@@ -59,7 +59,7 @@ module type FILTER = sig
 
     (** [remove ~filter_state oph] removes the operation manager linked to
         [oph] from the state of the filter *)
-    val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
+    val remove : filter_state:state -> Operation_hash.t -> state
 
     (** [pre_filter config ~filter_state operation_data]
         is called on arrival of an operation and after a flush of
@@ -100,15 +100,15 @@ module type FILTER = sig
         can no longer be full, so this function will succeed and return
         [`No_replace]). *)
     val add_operation_and_enforce_mempool_bound :
-      ?replace:Tezos_crypto.Operation_hash.t ->
+      ?replace:Operation_hash.t ->
       config ->
       state ->
-      Tezos_crypto.Operation_hash.t * Proto.operation ->
+      Operation_hash.t * Proto.operation ->
       ( state
         * [ `No_replace
           | `Replace of
-            Tezos_crypto.Operation_hash.t
-            * Prevalidator_classification.error_classification ],
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ],
         Prevalidator_classification.error_classification )
       result
       Lwt.t
@@ -138,7 +138,7 @@ module No_filter (Proto : Registered_protocol.T) :
    * allows to decode protocol data payload and provide back basic
    * types that can be used as metrics. *)
 module type METRICS = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   val update_metrics :
     protocol_metadata:bytes ->
@@ -149,7 +149,7 @@ end
 
 (** Emtpy metrics module. All metrics are -1. *)
 module Undefined_metrics_plugin (P : sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 end) : METRICS
 
 (** Juggling between recent filter version {!FILTER}, designed for
@@ -179,13 +179,13 @@ val register_rpc : (module RPC) -> unit
 val register_metrics : (module METRICS) -> unit
 
 (** Looks for a mempool filter plug-in for a specific protocol. *)
-val find_filter : Tezos_crypto.Protocol_hash.t -> filter_t option
+val find_filter : Protocol_hash.t -> filter_t option
 
 (** Looks for an rpc plug-in for a specific protocol. *)
-val find_rpc : Tezos_crypto.Protocol_hash.t -> (module RPC) option
+val find_rpc : Protocol_hash.t -> (module RPC) option
 
 (** Looks for a metrics plugin module for a specific protocol *)
-val find_metrics : Tezos_crypto.Protocol_hash.t -> (module METRICS) option
+val find_metrics : Protocol_hash.t -> (module METRICS) option
 
 (** Same as [find_metrics] but returns [Undefined_metrics_plugin] if not found *)
-val safe_find_metrics : Tezos_crypto.Protocol_hash.t -> (module METRICS) Lwt.t
+val safe_find_metrics : Protocol_hash.t -> (module METRICS) Lwt.t

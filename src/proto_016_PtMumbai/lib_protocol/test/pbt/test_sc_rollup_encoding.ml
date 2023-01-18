@@ -100,7 +100,7 @@ let gen_inbox level =
     let* witness =
       Sc_rollup_inbox_repr.add_info_per_level_no_history
         ~predecessor_timestamp:Time.Protocol.epoch
-        ~predecessor:Tezos_crypto.Block_hash.zero
+        ~predecessor:Block_hash.zero
         witness
     in
     let* input_messages =

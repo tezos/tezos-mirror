@@ -75,13 +75,11 @@ type ro = [`Read] t
     who has purpose [purpose], if any.
 *)
 val get_operator :
-  _ t ->
-  Configuration.purpose ->
-  Tezos_crypto.Signature.Public_key_hash.t option
+  _ t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
 (** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
     operator for the node (for any purpose). *)
-val is_operator : _ t -> Tezos_crypto.Signature.Public_key_hash.t -> bool
+val is_operator : _ t -> Signature.Public_key_hash.t -> bool
 
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
@@ -111,8 +109,7 @@ val init :
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
-val checkout_context :
-  'a t -> Tezos_crypto.Block_hash.t -> 'a Context.t tzresult Lwt.t
+val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
 
 (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
     stored in [node_ctxt]. *)
@@ -131,5 +128,4 @@ type 'a delayed_write = ('a, rw) Delayed_write_monad.t
 (** [get_full_l2_block node_ctxt hash] returns the full L2 block for L1 block
     hash [hash]. The result contains the L2 block and its content (inbox,
     messages, commitment). *)
-val get_full_l2_block :
-  _ t -> Tezos_crypto.Block_hash.t -> Sc_rollup_block.full Lwt.t
+val get_full_l2_block : _ t -> Block_hash.t -> Sc_rollup_block.full Lwt.t

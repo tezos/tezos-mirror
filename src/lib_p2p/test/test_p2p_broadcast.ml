@@ -120,7 +120,7 @@ module Simple = struct
     List.map
       (fun _ ->
         List.map
-          (fun _ -> Tezos_crypto.Operation_hash.of_bytes_exn (Bytes.create 32))
+          (fun _ -> Operation_hash.of_bytes_exn (Bytes.create 32))
           (1 -- !nb_oph))
       (if !no_check then 0 -- 1 else 0 -- !repeat)
 
@@ -130,10 +130,8 @@ module Simple = struct
     else
       List.fold_left2_e
         ~when_different_lengths:(Error_monad.TzTrace.make Wrong_message_count)
-        (fun ()
-             (m1 : Tezos_crypto.Operation_hash.t)
-             (m2 : Tezos_crypto.Operation_hash.t) ->
-          if Tezos_crypto.Operation_hash.equal m1 m2 then Ok ()
+        (fun () (m1 : Operation_hash.t) (m2 : Operation_hash.t) ->
+          if Operation_hash.equal m1 m2 then Ok ()
           else tzfail Wrong_message_received)
         ()
         m1

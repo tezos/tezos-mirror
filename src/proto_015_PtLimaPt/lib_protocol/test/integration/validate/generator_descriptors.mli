@@ -57,7 +57,7 @@ type state = {
   voters : Contract.t list;
   seed_nonce_to_reveal : (Raw_level.t * Nonce_hash.t) list;
   commitments : secret_account list;
-  protocol_hashes : Tezos_crypto.Protocol_hash.t list;
+  protocol_hashes : Protocol_hash.t list;
   slashable_bakes : (block_header * block_header) list;
   vdf : bool;
   dbl_endorsement : dbl_endorsement_state;

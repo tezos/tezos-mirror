@@ -32,4 +32,4 @@ val stopping : unit -> unit Lwt.t
 
 (** [switched_new_head hash level] emits the event that the layer 1 has notified
     a new head with [hash] at some given [level]. *)
-val switched_new_head : Tezos_crypto.Block_hash.t -> int32 -> unit Lwt.t
+val switched_new_head : Block_hash.t -> int32 -> unit Lwt.t

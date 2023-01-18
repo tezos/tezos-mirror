@@ -42,7 +42,7 @@ type state = {
   voters : Contract.t list;
   seed_nonce_to_reveal : (Raw_level.t * Nonce_hash.t) list;
   commitments : secret_account list;
-  protocol_hashes : Tezos_crypto.Protocol_hash.t list;
+  protocol_hashes : Protocol_hash.t list;
   slashable_bakes : (block_header * block_header) list;
   vdf : bool;
   dbl_endorsement : dbl_endorsement_state;
@@ -129,10 +129,7 @@ let ballot_exploration_prelude state =
         let* props =
           List.map_es
             (fun voter ->
-              Op.proposals
-                (B state.block)
-                voter
-                [Tezos_crypto.Protocol_hash.zero])
+              Op.proposals (B state.block) voter [Protocol_hash.zero])
             voters
         in
         return (prop :: props, state)
@@ -183,11 +180,7 @@ let ballot_exploration_descriptor =
           in
           assert (voting_period_info.voting_period.kind = Exploration) ;
           let ballot = pick_one ballots in
-          Op.ballot
-            (B state.block)
-            contract
-            Tezos_crypto.Protocol_hash.zero
-            ballot
+          Op.ballot (B state.block) contract Protocol_hash.zero ballot
         in
         List.map_es gen state.voters);
   }
@@ -208,10 +201,7 @@ let proposal_descriptor =
             Context.Vote.get_current_period (B state.block)
           in
           assert (voting_period_info.voting_period.kind = Proposal) ;
-          Op.proposals
-            (B state.block)
-            contract
-            [Tezos_crypto.Protocol_hash.zero]
+          Op.proposals (B state.block) contract [Protocol_hash.zero]
         in
         List.map_es gen state.voters);
   }
@@ -256,11 +246,7 @@ let ballot_promotion_descriptor =
               let* ops =
                 List.map_es
                   (fun voter ->
-                    Op.ballot
-                      (B state.block)
-                      voter
-                      Tezos_crypto.Protocol_hash.zero
-                      Vote.Yay)
+                    Op.ballot (B state.block) voter Protocol_hash.zero Vote.Yay)
                   state.voters
               in
               return (ops, state)
@@ -274,11 +260,7 @@ let ballot_promotion_descriptor =
           in
           assert (voting_period_info.voting_period.kind = Promotion) ;
           let ballot = Stdlib.List.hd ballots in
-          Op.ballot
-            (B state.block)
-            contract
-            Tezos_crypto.Protocol_hash.zero
-            ballot
+          Op.ballot (B state.block) contract Protocol_hash.zero ballot
         in
         List.map_es gen state.voters);
   }
@@ -366,9 +348,7 @@ let dbl_endorsement_prelude state =
       let* op2 = Op.raw_preendorsement ~delegate:delegate1 b2 in
       let op1, op2 =
         let comp =
-          Tezos_crypto.Operation_hash.compare
-            (Operation.hash op1)
-            (Operation.hash op2)
+          Operation_hash.compare (Operation.hash op1) (Operation.hash op2)
         in
         assert (comp <> 0) ;
         if comp < 0 then (op1, op2) else (op2, op1)
@@ -380,9 +360,7 @@ let dbl_endorsement_prelude state =
       let* op4 = Op.raw_endorsement ~delegate:delegate2 b2 in
       let op3, op4 =
         let comp =
-          Tezos_crypto.Operation_hash.compare
-            (Operation.hash op3)
-            (Operation.hash op4)
+          Operation_hash.compare (Operation.hash op3) (Operation.hash op4)
         in
         assert (comp <> 0) ;
         if comp < 0 then (op3, op4) else (op4, op3)
@@ -430,7 +408,7 @@ let double_baking_descriptor =
           let order_block_header bh1 bh2 =
             let hash1 = Block_header.hash bh1 in
             let hash2 = Block_header.hash bh2 in
-            let c = Tezos_crypto.Block_hash.compare hash1 hash2 in
+            let c = Block_hash.compare hash1 hash2 in
             if c < 0 then (bh1, bh2) else (bh2, bh1)
           in
           let* ctxt = Context.to_alpha_ctxt (B state.block) in

@@ -63,7 +63,7 @@ module Protocol_constants_overrides = struct
     liquidity_baking_sunset_level : int32 option;
     liquidity_baking_escape_ema_threshold : int32 option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
-    chain_id : Tezos_crypto.Chain_id.t option;
+    chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
   }
 
@@ -197,7 +197,7 @@ module Protocol_constants_overrides = struct
                   (opt "liquidity_baking_sunset_level" int32)
                   (opt "liquidity_baking_escape_ema_threshold" int32))
                (obj2
-                  (opt "chain_id" Tezos_crypto.Chain_id.encoding)
+                  (opt "chain_id" Chain_id.encoding)
                   (opt "initial_timestamp" Time.Protocol.encoding)))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
@@ -477,12 +477,7 @@ module Protocol_constants_overrides = struct
             override_value = o.liquidity_baking_escape_ema_threshold;
             pp = pp_print_int32;
           };
-        O
-          {
-            name = "chain_id";
-            override_value = o.chain_id;
-            pp = Tezos_crypto.Chain_id.pp;
-          };
+        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
             name = "timestamp";
@@ -772,7 +767,7 @@ let lib_parameters_json_encoding =
 (* Blocks *)
 
 type block = {
-  hash : Tezos_crypto.Block_hash.t;
+  hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Environment.Context.t;
@@ -792,7 +787,7 @@ module Forge = struct
         operations_hash;
         proto_level = 0;
         validation_passes = 0;
-        context = Tezos_crypto.Context_hash.zero;
+        context = Context_hash.zero;
       }
 end
 
@@ -871,7 +866,7 @@ let mem_init :
     Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
  fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
-    Tezos_crypto.Block_hash.of_b58check_exn
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   (* Need to read this Json file before since timestamp modification may be in
@@ -899,7 +894,7 @@ let mem_init :
       ~predecessor:hash
       ~timestamp
       ~fitness:(Fitness.from_int64 0L)
-      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
+      ~operations_hash:Operation_list_list_hash.zero
   in
   Protocol_constants_overrides.apply_overrides
     cctxt

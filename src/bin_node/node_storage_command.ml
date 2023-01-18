@@ -42,11 +42,11 @@ module Event = struct
         "running integrity check on inodes for block {block_hash} (level \
          {block_level}) with context hash {context_hash}"
       ~level:Notice
-      ~pp1:Tezos_crypto.Block_hash.pp
-      ("block_hash", Tezos_crypto.Block_hash.encoding)
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
       ("block_level", Data_encoding.int32)
-      ~pp3:Tezos_crypto.Context_hash.pp
-      ("context_hash", Tezos_crypto.Context_hash.encoding)
+      ~pp3:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
 end
 
 let () =
@@ -193,7 +193,7 @@ module Term = struct
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.block in
+      let chain_id = Chain_id.of_block_hash genesis.block in
       let data_dir =
         (* The --data-dir argument overrides the potentially given
            configuration file. *)
@@ -211,9 +211,7 @@ module Term = struct
       let* block = resolve_block chain_store block in
       let*! () = Store.close_store store in
       let context_hash = Store.Block.context_hash block in
-      let context_hash_str =
-        Tezos_crypto.Context_hash.to_b58check context_hash
-      in
+      let context_hash_str = Context_hash.to_b58check context_hash in
       let*! () =
         Event.(
           emit
@@ -255,7 +253,7 @@ module Term = struct
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis.block in
+      let chain_id = Chain_id.of_block_hash genesis.block in
       let data_dir =
         (* The --data-dir argument overrides the potentially given
            configuration file. *)
@@ -276,9 +274,7 @@ module Term = struct
       (* This output isn't particularly useful for most users,
           it will typically be used to inspect context
           directories using Irmin tooling *)
-      let () =
-        Format.printf "%a@." Tezos_crypto.Context_hash.pp head_context_hash
-      in
+      let () = Format.printf "%a@." Context_hash.pp head_context_hash in
       return_unit)
 
   let auto_repair =

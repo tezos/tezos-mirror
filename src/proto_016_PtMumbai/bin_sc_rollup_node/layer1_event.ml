@@ -50,7 +50,7 @@ module Simple = struct
       ~name:"sc_rollup_node_layer_1_new_head"
       ~msg:"Layer 1 node has switched to head {hash} at level {level}"
       ~level:Notice
-      ("hash", Tezos_crypto.Block_hash.encoding)
+      ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 end
 

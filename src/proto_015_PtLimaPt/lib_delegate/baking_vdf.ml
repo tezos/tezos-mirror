@@ -184,7 +184,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
   let* level_info = get_level_info cctxt level in
   let level_str = Int32.to_string (Raw_level.to_int32 level) in
   let* () = check_new_cycle state level_info in
-  if Tezos_crypto.Protocol_hash.(protocol <> next_protocol) then
+  if Protocol_hash.(protocol <> next_protocol) then
     let*! () = D_Events.(emit protocol_change_detected) () in
     return_unit
   else

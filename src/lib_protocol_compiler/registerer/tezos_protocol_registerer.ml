@@ -63,7 +63,7 @@ module type PROTOCOL_V9 = functor
   (Env : Tezos_protocol_environment_sigs.V9.T)
   -> Env.Updater.PROTOCOL
 
-module VersionTable = Tezos_crypto.Protocol_hash.Table
+module VersionTable = Protocol_hash.Table
 
 type proto_env =
   | V0 of (module PROTOCOL_V0)
@@ -80,7 +80,7 @@ type proto_env =
 let versions : proto_env VersionTable.t = VersionTable.create 20
 
 let register hash proto =
-  let hash = Tezos_crypto.Protocol_hash.of_b58check_exn hash in
+  let hash = Protocol_hash.of_b58check_exn hash in
   VersionTable.add versions hash proto
 
 let mem hash = VersionTable.mem versions hash

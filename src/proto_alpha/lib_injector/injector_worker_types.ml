@@ -84,7 +84,7 @@ module Request = struct
         Format.fprintf
           ppf
           "switching to new Tezos head %a"
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           b.Alpha_block_services.hash ;
         if r.old_chain <> [] || r.new_chain <> [] then
           Format.fprintf
@@ -98,11 +98,11 @@ end
 module Name = struct
   type t = public_key_hash
 
-  let encoding = Tezos_crypto.Signature.Public_key_hash.encoding
+  let encoding = Signature.Public_key_hash.encoding
 
   let base = ["tx_rollup_injector"]
 
-  let pp = Tezos_crypto.Signature.Public_key_hash.pp_short
+  let pp = Signature.Public_key_hash.pp_short
 
-  let equal = Tezos_crypto.Signature.Public_key_hash.equal
+  let equal = Signature.Public_key_hash.equal
 end

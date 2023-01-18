@@ -28,7 +28,7 @@ open Alpha_context
 open Apply_results
 
 type 'kind preapply_result =
-  Tezos_crypto.Operation_hash.t * 'kind operation * 'kind operation_metadata
+  Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type fee_parameter = {
   minimal_fees : Tez.t;
@@ -63,9 +63,7 @@ val simulate :
   'kind preapply_result tzresult Lwt.t
 
 type 'kind result_list =
-  Tezos_crypto.Operation_hash.t
-  * 'kind contents_list
-  * 'kind contents_result_list
+  Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 
 (** /!\ [inject_operation] does not perform automatic patching of
     gas, storage and fees; use [inject_manager_operation] to inject
@@ -85,8 +83,7 @@ val inject_operation :
   'kind contents_list ->
   'kind result_list tzresult Lwt.t
 
-type 'kind result =
-  Tezos_crypto.Operation_hash.t * 'kind contents * 'kind contents_result
+type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
 val prepare_manager_operation :
   fee:Tez.t Limit.t ->
@@ -116,7 +113,7 @@ val inject_manager_operation :
   ?replace_by_fees:bool ->
   fee_parameter:fee_parameter ->
   'kind Annotated_manager_operation.annotated_list ->
-  (Tezos_crypto.Operation_hash.t
+  (Operation_hash.t
   * packed_operation
   * 'kind Kind.manager contents_list
   * 'kind Kind.manager contents_result_list)

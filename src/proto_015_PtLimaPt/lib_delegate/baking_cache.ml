@@ -30,8 +30,7 @@ open Protocol.Alpha_context
 type round = Round.t
 
 module Block_cache =
-  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-    (Tezos_crypto.Block_hash)
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Block_hash)
 
 (** The [Timestamp_of_round_tbl] module allows to create memoization tables
     to store function calls of [Round.timestamp_of_round]. *)

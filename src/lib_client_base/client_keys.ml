@@ -413,7 +413,7 @@ module type AGGREGATE_SIGNER = sig
 end
 
 module Make_common_type (S : sig
-  include Tezos_crypto.S.COMMON_SIGNATURE
+  include Tezos_crypto.Intfs.COMMON_SIGNATURE
 
   type pk_uri
 
@@ -443,7 +443,7 @@ end)
 
 module type Signature_S = sig
   include
-    Tezos_crypto.S.SIGNATURE
+    Tezos_crypto.Intfs.SIGNATURE
       with type watermark = Tezos_crypto.Signature.watermark
 
   val concat : Bytes.t -> t -> Bytes.t

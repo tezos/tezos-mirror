@@ -80,7 +80,7 @@ module type T = sig
   type validation_state
 
   val begin_partial_application :
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     ancestor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_fitness:Fitness.t ->
@@ -88,7 +88,7 @@ module type T = sig
     validation_state tzresult Lwt.t
 
   val begin_application :
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     predecessor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_fitness:Fitness.t ->
@@ -96,12 +96,12 @@ module type T = sig
     validation_state tzresult Lwt.t
 
   val begin_construction :
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     predecessor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
     predecessor_fitness:Fitness.t ->
-    predecessor:Tezos_crypto.Block_hash.t ->
+    predecessor:Tezos_crypto.Hashed.Block_hash.t ->
     timestamp:Time.Protocol.t ->
     ?protocol_data:block_header_data ->
     unit ->
@@ -127,12 +127,12 @@ module type T = sig
   type cache_key
 
   val value_of_key :
-    chain_id:Tezos_crypto.Chain_id.t ->
+    chain_id:Tezos_crypto.Hashed.Chain_id.t ->
     predecessor_context:context ->
     predecessor_timestamp:Time.Protocol.t ->
     predecessor_level:Int32.t ->
     predecessor_fitness:Fitness.t ->
-    predecessor:Tezos_crypto.Block_hash.t ->
+    predecessor:Tezos_crypto.Hashed.Block_hash.t ->
     timestamp:Time.Protocol.t ->
     (cache_key -> cache_value tzresult Lwt.t) tzresult Lwt.t
 end

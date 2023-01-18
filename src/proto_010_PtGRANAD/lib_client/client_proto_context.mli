@@ -205,7 +205,7 @@ val reveal :
   Kind.reveal Kind.manager Injection.result tzresult Lwt.t
 
 type activation_key = {
-  pkh : Tezos_crypto.Ed25519.Public_key_hash.t;
+  pkh : Signature.Ed25519.Public_key_hash.t;
   amount : Tez.t;
   activation_code : Blinded_public_key_hash.activation_code;
   mnemonic : string list;
@@ -253,7 +253,7 @@ type period_info = {
   current_period_kind : Voting_period.kind;
   position : Int32.t;
   remaining : Int32.t;
-  current_proposal : Tezos_crypto.Protocol_hash.t option;
+  current_proposal : Protocol_hash.t option;
 }
 
 type ballots_info = {
@@ -291,7 +291,7 @@ val submit_proposals :
   ?confirmations:int ->
   src_sk:Client_keys_v0.sk_uri ->
   public_key_hash ->
-  Tezos_crypto.Protocol_hash.t list ->
+  Protocol_hash.t list ->
   Kind.proposals Injection.result_list tzresult Lwt.t
 
 val submit_ballot :
@@ -303,7 +303,7 @@ val submit_ballot :
   ?confirmations:int ->
   src_sk:Client_keys_v0.sk_uri ->
   public_key_hash ->
-  Tezos_crypto.Protocol_hash.t ->
+  Protocol_hash.t ->
   Vote.ballot ->
   Kind.ballot Injection.result_list tzresult Lwt.t
 
@@ -313,5 +313,5 @@ val display_receipt_for_operation :
   #Protocol_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->
-  Tezos_crypto.Operation_list_hash.elt ->
+  Operation_list_hash.elt ->
   unit tzresult Lwt.t

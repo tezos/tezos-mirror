@@ -34,7 +34,7 @@ type t = {
 }
 
 (** Hash with b58check encoding txL2(54), for hashes of L2 transactions *)
-module Hash : Tezos_crypto.S.HASH
+module Hash : Tezos_crypto.Intfs.HASH
 
 (** Alias for transaction hash *)
 type hash = Hash.t

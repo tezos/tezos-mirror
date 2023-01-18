@@ -93,15 +93,11 @@ module Test_operation_repr = struct
     | Error _ -> return_unit
 
   let zero_bls =
-    match
-      Tezos_crypto.Signature.(split_signature (Bls Tezos_crypto.Bls.zero))
-    with
+    match Signature.(split_signature (Bls Signature.Bls.zero)) with
     | {prefix = None; _} -> assert false
     | {prefix = Some prefix; suffix} ->
         let prefix =
-          Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Signature.prefix_encoding
-            prefix
+          Data_encoding.Binary.to_bytes_exn Signature.prefix_encoding prefix
         in
         (Bytes.cat (Bytes.of_string "\255") prefix, suffix)
 

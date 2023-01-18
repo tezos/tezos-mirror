@@ -316,7 +316,7 @@ val proposals_contents :
   Context.t ->
   Contract.t ->
   ?period:int32 ->
-  Tezos_crypto.Protocol_hash.t list ->
+  Protocol_hash.t list ->
   Kind.proposals contents_list tzresult Lwt.t
 
 (** Craft a Proposals operation.
@@ -329,7 +329,7 @@ val proposals :
   Context.t ->
   Contract.t ->
   ?period:int32 ->
-  Tezos_crypto.Protocol_hash.t list ->
+  Protocol_hash.t list ->
   Operation.packed tzresult Lwt.t
 
 (** Craft the [contents_list] for a Ballot operation.
@@ -342,7 +342,7 @@ val ballot_contents :
   Context.t ->
   Contract.t ->
   ?period:int32 ->
-  Tezos_crypto.Protocol_hash.t ->
+  Protocol_hash.t ->
   Vote.ballot ->
   Kind.ballot contents_list tzresult Lwt.t
 
@@ -356,7 +356,7 @@ val ballot :
   Context.t ->
   Contract.t ->
   ?period:int32 ->
-  Tezos_crypto.Protocol_hash.t ->
+  Protocol_hash.t ->
   Vote.ballot ->
   Operation.packed tzresult Lwt.t
 
@@ -496,7 +496,7 @@ val tx_rollup_dispatch_tickets :
   message_result_path:Tx_rollup_commitment.Merkle.path ->
   Tx_rollup.t ->
   Tx_rollup_level.t ->
-  Tezos_crypto.Context_hash.t ->
+  Context_hash.t ->
   Tx_rollup_reveal.t list ->
   (packed_operation, tztrace) result Lwt.t
 

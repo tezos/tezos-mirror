@@ -35,7 +35,7 @@ let activate_chain =
     ~name:"activate_chain"
     ~msg:"activate chain {chain}"
     ~level:Notice
-    ("chain", Tezos_crypto.Chain_id.encoding)
+    ("chain", Chain_id.encoding)
 
 let shutdown_block_validator =
   declare_0
@@ -51,4 +51,4 @@ let shutdown_chain_validator =
     ~name:"shutdown_chain_validator"
     ~msg:"shutting down the chain validator {chain}"
     ~level:Notice
-    ("chain", Tezos_crypto.Chain_id.encoding)
+    ("chain", Chain_id.encoding)

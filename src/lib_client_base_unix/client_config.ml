@@ -32,7 +32,7 @@ type cli_args = {
   confirmations : int option;
   sources : Tezos_proxy.Light.sources_config option;
   password_filename : string option;
-  protocol : Tezos_crypto.Protocol_hash.t option;
+  protocol : Protocol_hash.t option;
   print_timings : bool;
   log_requests : bool;
   better_errors : bool;
@@ -407,9 +407,7 @@ let protocol_parameter () =
       match
         Seq.filter
           (fun (hash, _commands) ->
-            String.has_prefix
-              ~prefix:arg
-              (Tezos_crypto.Protocol_hash.to_b58check hash))
+            String.has_prefix ~prefix:arg (Protocol_hash.to_b58check hash))
           (Client_commands.get_versions ())
         @@ ()
       with
@@ -688,8 +686,7 @@ let config_show_client (cctxt : #Client_context.full) (config_file : string) cfg
 
 (* The implementation of ["config"; "show"] when --mode is "mockup" *)
 let config_show_mockup (cctxt : #Client_context.full)
-    (protocol_hash_opt : Tezos_crypto.Protocol_hash.t option)
-    (base_dir : string) =
+    (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
   let open Lwt_result_syntax in
   let* () = fail_on_non_mockup_dir cctxt in
   let* mockup, _ =
@@ -781,8 +778,7 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
   return_unit
 
 let commands config_file cfg (client_mode : client_mode)
-    (protocol_hash_opt : Tezos_crypto.Protocol_hash.t option)
-    (base_dir : string) =
+    (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
   let open Tezos_clic in
   let group =
     {
@@ -1243,7 +1239,7 @@ type t =
   * Shell_services.chain
   * Shell_services.block
   * int option option
-  * Tezos_crypto.Protocol_hash.t option option
+  * Protocol_hash.t option option
   * bool
   * bool
   * string option

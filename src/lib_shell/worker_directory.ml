@@ -58,9 +58,7 @@ let build_rpc_directory state =
          * register multiple Prevalidator for a single chain (using distinct
          * protocols). However, this is never done. *)
         WithExceptions.Option.to_exn ~none:Not_found
-        @@ List.find
-             (fun (c, _, _) -> Tezos_crypto.Chain_id.equal c chain_id)
-             workers
+        @@ List.find (fun (c, _, _) -> Chain_id.equal c chain_id) workers
       in
       let status = Prevalidator.status t in
       let pending_requests = Prevalidator.pending_requests t in
@@ -81,7 +79,7 @@ let build_rpc_directory state =
       return_ok
         (List.filter_map
            (fun ((id, peer_id), w) ->
-             if Tezos_crypto.Chain_id.equal id chain_id then
+             if Chain_id.equal id chain_id then
                Some
                  ( peer_id,
                    Peer_validator.status w,
@@ -92,7 +90,7 @@ let build_rpc_directory state =
   register2 Worker_services.Peer_validators.S.state (fun chain peer_id () () ->
       let* chain_id = Chain_directory.get_chain_id state chain in
       let equal (acid, apid) (bcid, bpid) =
-        Tezos_crypto.Chain_id.equal acid bcid && P2p_peer.Id.equal apid bpid
+        Chain_id.equal acid bcid && P2p_peer.Id.equal apid bpid
       in
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
@@ -122,7 +120,7 @@ let build_rpc_directory state =
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
         @@ List.assoc
-             ~equal:Tezos_crypto.Chain_id.equal
+             ~equal:Chain_id.equal
              chain_id
              (Chain_validator.running_workers ())
       in
@@ -138,7 +136,7 @@ let build_rpc_directory state =
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
         @@ List.assoc
-             ~equal:Tezos_crypto.Chain_id.equal
+             ~equal:Chain_id.equal
              chain_id
              (Chain_validator.running_workers ())
       in

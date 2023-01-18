@@ -84,16 +84,14 @@ let assert_operation_present_in_mempool ~__LOC__ mempool ophl =
   let resulting_mempool_operations =
     Environment.Operation_hash.Map.bindings operations
     |> List.map fst
-    |> List.sort Tezos_crypto.Operation_hash.compare
+    |> List.sort Operation_hash.compare
   in
-  let expected_operations =
-    List.sort Tezos_crypto.Operation_hash.compare ophl
-  in
+  let expected_operations = List.sort Operation_hash.compare ophl in
   Assert.assert_equal_list
     ~loc:__LOC__
-    Tezos_crypto.Operation_hash.equal
+    Operation_hash.equal
     "operations present in mempool"
-    Tezos_crypto.Operation_hash.pp
+    Operation_hash.pp
     resulting_mempool_operations
     expected_operations
 
@@ -108,7 +106,7 @@ let test_simple () =
   let vs, mempool =
     Mempool.init
       ctxt
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
@@ -140,7 +138,7 @@ let test_imcompatible_mempool () =
   let (_vs : Mempool.validation_info), mempool1 =
     Mempool.init
       ctxt
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
@@ -156,7 +154,7 @@ let test_imcompatible_mempool () =
   let (_vs : Mempool.validation_info), mempool2 =
     Mempool.init
       ctxt2
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash:predecessor_hash2
@@ -185,7 +183,7 @@ let test_merge () =
   let vs, mempool_i =
     Mempool.init
       ctxt
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
@@ -277,7 +275,7 @@ let test_add_invalid_operation () =
   let vs, mempool_i =
     Mempool.init
       ctxt
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
@@ -302,7 +300,7 @@ let test_add_and_replace () =
   let info, mempool_i =
     Mempool.init
       ctxt
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
@@ -354,7 +352,7 @@ let test_remove_operation () =
   let info, mempool_i =
     Mempool.init
       ctxt
-      Tezos_crypto.Chain_id.zero
+      Chain_id.zero
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash

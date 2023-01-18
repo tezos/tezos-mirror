@@ -81,19 +81,19 @@ end) : S = struct
     let i = Random.State.int rng_state 4 in
     match i with
     | 0 -> (
-        let open Tezos_crypto.Ed25519 in
+        let open Tezos_crypto.Signature.Ed25519 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
         | Some s -> Tezos_crypto.Signature.V0.of_ed25519 s)
     | 1 -> (
-        let open Tezos_crypto.Secp256k1 in
+        let open Tezos_crypto.Signature.Secp256k1 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false
         | Some s -> Tezos_crypto.Signature.V0.of_secp256k1 s)
     | 2 -> (
-        let open Tezos_crypto.P256 in
+        let open Tezos_crypto.Signature.P256 in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
         match of_bytes_opt bytes with
         | None -> assert false

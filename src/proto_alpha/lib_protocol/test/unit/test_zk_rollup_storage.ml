@@ -45,9 +45,9 @@ let batch_size = 10
 module ZKRU = struct
   include Alpha_context.Zk_rollup
 
-  type pkh = Tezos_crypto.Signature.Public_key_hash.t
+  type pkh = Signature.Public_key_hash.t
 
-  let pkh_encoding = Tezos_crypto.Signature.Public_key_hash.encoding
+  let pkh_encoding = Signature.Public_key_hash.encoding
 
   type ticket_hash = Alpha_context.Ticket_hash.t
 
@@ -103,7 +103,7 @@ module Raw_context_tests = struct
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
     in
-    let nonce = Tezos_crypto.Operation_hash.hash_string ["nonce_hash"] in
+    let nonce = Operation_hash.hash_string ["nonce_hash"] in
     return (Raw_context.init_origination_nonce ctx nonce, contract)
 
   (* Context with an originated ZKRU *)
@@ -139,7 +139,7 @@ module Raw_context_tests = struct
   let pending_list_append () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Tezos_crypto.Signature.generate_key () in
+    let pkh, _, _ = Signature.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -168,7 +168,7 @@ module Raw_context_tests = struct
   let pending_list_append_errors () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _, _ = Tezos_crypto.Signature.generate_key () in
+    let pkh, _, _ = Signature.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -216,7 +216,7 @@ module Raw_context_tests = struct
   let pending_list_get () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+    let pkh, _pk, _sk = Signature.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.
@@ -237,7 +237,7 @@ module Raw_context_tests = struct
   let pending_list_errors () =
     let open Lwt_result_syntax in
     let* ctx, rollup, _contract = originate_ctx () in
-    let pkh, _pk, _sk = Tezos_crypto.Signature.generate_key () in
+    let pkh, _pk, _sk = Signature.generate_key () in
     let op =
       no_ticket
         Zk_rollup_operation_repr.

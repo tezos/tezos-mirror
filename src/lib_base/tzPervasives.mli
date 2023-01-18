@@ -92,6 +92,20 @@ module P2p_version = P2p_version
 module P2p_rejection = P2p_rejection
 module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
+module Block_hash = Tezos_crypto.Hashed.Block_hash
+module Block_metadata_hash = Tezos_crypto.Hashed.Block_metadata_hash
+module Chain_id = Tezos_crypto.Hashed.Chain_id
+module Context_hash = Tezos_crypto.Hashed.Context_hash
+module Operation_hash = Tezos_crypto.Hashed.Operation_hash
+module Operation_list_hash = Tezos_crypto.Hashed.Operation_list_hash
+module Operation_list_list_hash = Tezos_crypto.Hashed.Operation_list_list_hash
+module Operation_metadata_hash = Tezos_crypto.Hashed.Operation_metadata_hash
+module Operation_metadata_list_hash =
+  Tezos_crypto.Hashed.Operation_metadata_list_hash
+module Operation_metadata_list_list_hash =
+  Tezos_crypto.Hashed.Operation_metadata_list_list_hash
+module Protocol_hash = Tezos_crypto.Hashed.Protocol_hash
+module Signature = Tezos_crypto.Signature
 
 include module type of Utils.Infix
 

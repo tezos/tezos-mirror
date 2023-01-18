@@ -383,17 +383,14 @@ let make_index node required_version =
   let protocol_dirs =
     List.map
       (fun (version, name, intro, hash) ->
-        let hash = Tezos_crypto.Protocol_hash.of_b58check_exn hash in
+        let hash = Protocol_hash.of_b58check_exn hash in
         let (module Proto) =
           match Registered_protocol.get hash with
           | None ->
               (* This is probably an indication that a line for the
                  requested protocol is missing in the dune file of
                  this repository *)
-              Format.eprintf
-                "Hash not found: %a"
-                Tezos_crypto.Protocol_hash.pp
-                hash ;
+              Format.eprintf "Hash not found: %a" Protocol_hash.pp hash ;
               assert false
           | Some proto -> proto
         in

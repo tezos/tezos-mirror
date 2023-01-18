@@ -34,7 +34,7 @@ module type MAIN = sig
 end
 
 module type PROTOCOL = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   module Context : sig
     type t

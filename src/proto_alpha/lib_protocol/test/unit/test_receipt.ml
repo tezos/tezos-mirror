@@ -68,7 +68,7 @@ let test_encodings balance =
 
 let test_encodings () =
   let open Receipt in
-  let pkh = Tezos_crypto.Signature.Public_key_hash.zero in
+  let pkh = Signature.Public_key_hash.zero in
   test_encodings (Contract (Contract.Implicit pkh)) >>=? fun () ->
   test_encodings Block_fees >>=? fun () ->
   test_encodings (Deposits pkh) >>=? fun () ->

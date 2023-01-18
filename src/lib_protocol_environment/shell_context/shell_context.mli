@@ -47,7 +47,6 @@
     making them less amenable to testing for example. *)
 
 open Tezos_protocol_environment
-open Tezos_crypto
 
 (** The additional kind identifying {!Shell_context} values. Used to
     detect at runtime when a shell context is expected, to disambiguate

@@ -119,7 +119,7 @@ val produce_proof :
   (tree -> 'a produce_proof_result Lwt.t) ->
   (Protocol.Tx_rollup_l2_proof.t * 'a produce_proof_result) tzresult Lwt.t
 
-val hash_tree : tree -> Tezos_crypto.Context_hash.t
+val hash_tree : tree -> Context_hash.t
 
 (** [add_tree ctxt tree] adds [tree] in the [ctxt]. In order to perform
     actions on the tree (e.g. proof production), it needs to be persistent. Thus,
@@ -133,7 +133,7 @@ val hash_tree : tree -> Tezos_crypto.Context_hash.t
 val add_tree :
   context -> tree -> (context * Protocol.Tx_rollup_l2_context_hash.t) Lwt.t
 
-val tree_hash_of_context : context -> Tezos_crypto.Context_hash.t tzresult Lwt.t
+val tree_hash_of_context : context -> Context_hash.t tzresult Lwt.t
 
 (** {2 Sub-context for tickets } *)
 

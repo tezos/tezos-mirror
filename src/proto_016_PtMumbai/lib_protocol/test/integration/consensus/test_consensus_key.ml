@@ -193,7 +193,7 @@ let test_tz4_consensus_key () =
         Environment.Ecoproto_error
           (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
       ]
-      when Tezos_crypto.Bls.Public_key.(pk = tz4_pk) ->
+      when Tezos_crypto.Signature.Bls.Public_key.(pk = tz4_pk) ->
         return_unit
     | err ->
         failwith

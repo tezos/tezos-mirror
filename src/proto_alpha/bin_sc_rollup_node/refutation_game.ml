@@ -430,7 +430,7 @@ module Make (Interpreter : Interpreter.S) :
     let open Sc_rollup.Game in
     match game_result with
     | Some (Loser {loser; _}) ->
-        let is_it_me = Tezos_crypto.Signature.Public_key_hash.(self = loser) in
+        let is_it_me = Signature.Public_key_hash.(self = loser) in
         return (not is_it_me)
     | _ -> return_false
 

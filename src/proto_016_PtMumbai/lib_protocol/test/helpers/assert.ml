@@ -174,23 +174,21 @@ let not_equal_pkh ~loc (a : Tezos_crypto.Signature.Public_key_hash.t)
   not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
 
 (* protocol hash *)
-let equal_protocol_hash ~loc (a : Tezos_crypto.Protocol_hash.t)
-    (b : Tezos_crypto.Protocol_hash.t) =
+let equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
   equal
     ~loc
-    Tezos_crypto.Protocol_hash.equal
+    Protocol_hash.equal
     "Protocol hashes aren't equal"
-    Tezos_crypto.Protocol_hash.pp
+    Protocol_hash.pp
     a
     b
 
-let not_equal_protocol_hash ~loc (a : Tezos_crypto.Protocol_hash.t)
-    (b : Tezos_crypto.Protocol_hash.t) =
+let not_equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
   not_equal
     ~loc
-    Tezos_crypto.Protocol_hash.equal
+    Protocol_hash.equal
     "Protocol hashes are equal"
-    Tezos_crypto.Protocol_hash.pp
+    Protocol_hash.pp
     a
     b
 

@@ -148,8 +148,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let* last_commitment_hash =
         let*! pred = Store.L2_blocks.find node_ctxt.store predecessor in
         match pred with
-        | None ->
-            failwith "Missing block %a" Tezos_crypto.Block_hash.pp predecessor
+        | None -> failwith "Missing block %a" Block_hash.pp predecessor
         | Some pred ->
             return (Sc_rollup_block.most_recent_commitment pred.header)
       in

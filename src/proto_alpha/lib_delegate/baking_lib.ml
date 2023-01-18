@@ -251,7 +251,7 @@ let propose_at_next_level ~minimal_timestamp state =
         "Proposed block at round %a on top of %a "
         Round.pp
         block_to_bake.round
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         block_to_bake.predecessor.hash
     in
     return state
@@ -394,7 +394,7 @@ let bake_using_automaton config state block_stream =
       let*! () =
         cctxt#message
           "Block %a (%ld) injected"
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           proposal.block.hash
           proposal.block.shell.level
       in

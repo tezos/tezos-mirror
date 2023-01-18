@@ -33,7 +33,7 @@ open Injector_common
     data. *)
 
 module Tezos_blocks_cache :
-  Aches_lwt.Lache.MAP_OPTION with type key = Tezos_crypto.Block_hash.t
+  Aches_lwt.Lache.MAP_OPTION with type key = Block_hash.t
 
 (** Information about the rollup that is kept in the state. *)
 type rollup_info = Stores.rollup_info = {
@@ -102,12 +102,10 @@ val get_header : t -> L2block.hash -> L2block.header option Lwt.t
     there is no inbox for an L1 block, we associate to it the L2 block of its
     predecessor. So [get_tezos_l2_block_hash state h] returns L2 block hash at
     which the rollup was when the Tezos node was at block [h]. *)
-val get_tezos_l2_block_hash :
-  t -> Tezos_crypto.Block_hash.t -> L2block.hash option Lwt.t
+val get_tezos_l2_block_hash : t -> Block_hash.t -> L2block.hash option Lwt.t
 
 (** Same as {!get_tezos_block} but retrieves the associated L2 block at the same time. *)
-val get_tezos_l2_block :
-  t -> Tezos_crypto.Block_hash.t -> L2block.t option Lwt.t
+val get_tezos_l2_block : t -> Block_hash.t -> L2block.t option Lwt.t
 
 (** Same as {!get_level} but retrieves the associated header at the same time. *)
 val get_level_l2_block_header :
@@ -121,9 +119,7 @@ val get_level_l2_block : t -> L2block.level -> L2block.t option Lwt.t
     block for the Tezos block, or [None] otherwise. It returns [`Unknown] when
     the Tezos block has never been processed. *)
 val tezos_block_already_processed :
-  t ->
-  Tezos_crypto.Block_hash.t ->
-  [> `Known of L2block.t option | `Unknown] Lwt.t
+  t -> Block_hash.t -> [> `Known of L2block.t option | `Unknown] Lwt.t
 
 (** Returns the inclusion info for a commitment. *)
 val get_included_commitment :
@@ -149,9 +145,7 @@ val set_head : t -> L2block.t -> L2block.t reorg tzresult Lwt.t
 
 (** Set the Tezos head and returns the reorganization of L1 blocks. *)
 val set_tezos_head :
-  t ->
-  Tezos_crypto.Block_hash.t ->
-  Alpha_block_services.block_info reorg tzresult Lwt.t
+  t -> Block_hash.t -> Alpha_block_services.block_info reorg tzresult Lwt.t
 
 (** Save an L2 block to disk:
     - Save both the header and the inbox
@@ -167,18 +161,18 @@ val save_level : t -> L2block.level -> L2block.hash -> unit Lwt.t
     predecessor as well. *)
 val save_tezos_block_info :
   t ->
-  Tezos_crypto.Block_hash.t ->
+  Block_hash.t ->
   L2block.hash option ->
   level:int32 ->
-  predecessor:Tezos_crypto.Block_hash.t ->
+  predecessor:Block_hash.t ->
   unit Lwt.t
 
 (** Register a commitment as included on L1. *)
 val set_commitment_included :
   t ->
   Tx_rollup_commitment_hash.t ->
-  Tezos_crypto.Block_hash.t ->
-  Tezos_crypto.Operation_hash.t ->
+  Block_hash.t ->
+  Operation_hash.t ->
   unit Lwt.t
 
 (** Register a commitment as not included on L1. *)
@@ -203,9 +197,7 @@ val rollup_operation_index : int
 
 (** Fetch a Tezos block from the cache or the node *)
 val fetch_tezos_block :
-  t ->
-  Tezos_crypto.Block_hash.t ->
-  Alpha_block_services.block_info tzresult Lwt.t
+  t -> Block_hash.t -> Alpha_block_services.block_info tzresult Lwt.t
 
 (** Compute the reorganization of L2 blocks from the chain whose head is
     [old_head_hash] and the chain whose head [new_head_hash]. *)

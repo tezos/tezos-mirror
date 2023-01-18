@@ -53,9 +53,7 @@ let mk_block_payload_hash pred_hash payload_round (b : Block.t) =
     List.concat (match List.tl ops with None -> [] | Some l -> l)
   in
   let hashes = List.map Operation.hash_packed non_consensus_operations in
-  let non_consensus_operations_hash =
-    Tezos_crypto.Operation_list_hash.compute hashes
-  in
+  let non_consensus_operations_hash = Operation_list_hash.compute hashes in
   Block_payload.hash
     ~predecessor:pred_hash
     payload_round
@@ -90,8 +88,7 @@ let endorsement ?delegate ?slot ?level ?round ?block_payload_hash
   Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Endorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
        delegate.sk
        signing_context
        op)
@@ -124,8 +121,7 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
   Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
-       ~watermark:
-         Operation.(to_watermark (Preendorsement Tezos_crypto.Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
        delegate.sk
        signing_context
        op)
@@ -201,7 +197,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
-        Tezos_crypto.Block_hash.(branch = b))
+        Block_hash.(branch = b))
       packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
@@ -519,7 +515,7 @@ let activation ctxt (pkh : Tezos_crypto.Signature.V0.Public_key_hash.t)
   | _ ->
       failwith
         "Wrong public key hash : %a - Commitments must be activated with an \
-         Tezos_crypto.Ed25519 encrypted public key hash"
+         Ed25519 encrypted public key hash"
         Tezos_crypto.Signature.V0.Public_key_hash.pp
         pkh)
   >|=? fun id ->

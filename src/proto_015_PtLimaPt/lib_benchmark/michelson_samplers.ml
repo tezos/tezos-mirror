@@ -608,7 +608,7 @@ end)
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
       in
-      let pkh, _pk, _sk = Tezos_crypto.Bls.generate_key ~seed () in
+      let pkh, _pk, _sk = Tezos_crypto.Signature.Bls.generate_key ~seed () in
       Tx_rollup_l2_address.Indexable.value pkh
 
     let chain_id rng_state =

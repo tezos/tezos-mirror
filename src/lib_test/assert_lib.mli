@@ -38,23 +38,23 @@ module Crypto : sig
   (** [equal_block_set msg bs0 bs1] checks that the block sets [bs0] and [bs1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_set :
-    Tezos_crypto.Block_hash.Set.t Tezos_test_helpers.Assert.check2
+    Tezos_crypto.Hashed.Block_hash.Set.t Tezos_test_helpers.Assert.check2
 
   (** [equal_block_map msg bm0 bm1] checks that the block maps [bm0] and [bm1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_map :
     eq:('a -> 'a -> bool) ->
-    'a Tezos_crypto.Block_hash.Map.t Tezos_test_helpers.Assert.check2
+    'a Tezos_crypto.Hashed.Block_hash.Map.t Tezos_test_helpers.Assert.check2
 
   (** [equal_block_hash_list msg bhl0 bhl1] checks that the block hashes list [bhl0] and [bhl1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_hash_list :
-    Tezos_crypto.Block_hash.t list Tezos_test_helpers.Assert.check2
+    Tezos_crypto.Hashed.Block_hash.t list Tezos_test_helpers.Assert.check2
 
   (** [equal_block_descriptor msg bd0 bd1] checks that the block descriptors [bd0] and [bd1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_descriptor :
-    (int32 * Tezos_crypto.Block_hash.t) Tezos_test_helpers.Assert.check2
+    (int32 * Tezos_crypto.Hashed.Block_hash.t) Tezos_test_helpers.Assert.check2
 end
 
 (** Module concerning assertions about raw trees i.e. values of type

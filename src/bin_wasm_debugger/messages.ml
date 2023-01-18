@@ -134,7 +134,7 @@ let pp_input ppf bytes =
           "Info_per_level {predecessor_timestamp = %a; predecessor = %a}"
           Timestamp.pp
           predecessor_timestamp
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           predecessor
     | External msg -> Format.fprintf ppf "%a" Hex.pp (Hex.of_string msg)
   in

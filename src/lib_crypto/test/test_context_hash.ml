@@ -36,7 +36,7 @@
 let test_version_of_int_validation () =
   let expect_invalid_argument i =
     try
-      let _ = Context_hash.Version.of_int i in
+      let _ = Hashed.Context_hash.Version.of_int i in
       Alcotest.failf "%d can't be a hash version." i
     with Invalid_argument _ -> ()
   in

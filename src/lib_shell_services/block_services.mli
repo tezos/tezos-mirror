@@ -26,7 +26,7 @@
 
 module Proof = Tezos_context_sigs.Context.Proof_types
 
-type chain = [`Main | `Test | `Hash of Tezos_crypto.Chain_id.t]
+type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 type chain_prefix = unit * chain
 
@@ -51,7 +51,7 @@ type block =
     (** The [n]th predecessor of the [caboose], the [checkpoint]
       or the [savepoint] if [n > 0]. If [n = 0], represents the block itself.
       If [n < 0], represents the [n]th successor.  *)
-  | `Hash of Tezos_crypto.Block_hash.t * int
+  | `Hash of Block_hash.t * int
     (** The [n]th predecessor of the block of given [hash] if [n > 0].
       If [n = 0], represents the block itself.
       Otherwise, if [n < 0], represents the [n]th successor.*)
@@ -91,7 +91,7 @@ val raw_context_insert :
   string list * Proof.raw_context -> Proof.raw_context -> Proof.raw_context
 
 module type PROTO = sig
-  val hash : Tezos_crypto.Protocol_hash.t
+  val hash : Protocol_hash.t
 
   type block_header_data
 
@@ -119,8 +119,8 @@ module type PROTO = sig
 end
 
 type protocols = {
-  current_protocol : Tezos_crypto.Protocol_hash.t;
-  next_protocol : Tezos_crypto.Protocol_hash.t;
+  current_protocol : Protocol_hash.t;
+  next_protocol : Protocol_hash.t;
 }
 
 val protocols :
@@ -139,8 +139,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   }
 
   type block_header = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    hash : Tezos_crypto.Block_hash.t;
+    chain_id : Chain_id.t;
+    hash : Block_hash.t;
     shell : Block_header.shell_header;
     protocol_data : Proto.block_header_data;
   }
@@ -160,16 +160,16 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     | Receipt of Proto.operation_receipt
 
   type operation = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    hash : Tezos_crypto.Operation_hash.t;
+    chain_id : Chain_id.t;
+    hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
     receipt : operation_receipt;
   }
 
   type block_info = {
-    chain_id : Tezos_crypto.Chain_id.t;
-    hash : Tezos_crypto.Block_hash.t;
+    chain_id : Chain_id.t;
+    hash : Block_hash.t;
     header : raw_block_header;
     metadata : block_metadata option;
     operations : operation list list;
@@ -193,7 +193,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     ?chain:chain ->
     ?block:block ->
     unit ->
-    Tezos_crypto.Block_hash.t tzresult Lwt.t
+    Block_hash.t tzresult Lwt.t
 
   val raw_header :
     #simple -> ?chain:chain -> ?block:block -> unit -> Bytes.t tzresult Lwt.t
@@ -217,14 +217,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     ?chain:chain ->
     ?block:block ->
     unit ->
-    Tezos_crypto.Block_metadata_hash.t tzresult Lwt.t
+    Block_metadata_hash.t tzresult Lwt.t
 
   val resulting_context_hash :
     #simple ->
     ?chain:chain ->
     ?block:block ->
     unit ->
-    Tezos_crypto.Context_hash.t tzresult Lwt.t
+    Context_hash.t tzresult Lwt.t
 
   module Header : sig
     val shell_header :
@@ -281,14 +281,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?chain:chain ->
       ?block:block ->
       unit ->
-      Tezos_crypto.Operation_hash.t list list tzresult Lwt.t
+      Operation_hash.t list list tzresult Lwt.t
 
     val operation_hashes_in_pass :
       #simple ->
       ?chain:chain ->
       ?block:block ->
       int ->
-      Tezos_crypto.Operation_hash.t list tzresult Lwt.t
+      Operation_hash.t list tzresult Lwt.t
 
     val operation_hash :
       #simple ->
@@ -296,7 +296,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?block:block ->
       int ->
       int ->
-      Tezos_crypto.Operation_hash.t tzresult Lwt.t
+      Operation_hash.t tzresult Lwt.t
   end
 
   module Operation_metadata_hashes : sig
@@ -305,21 +305,21 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?chain:chain ->
       ?block:block ->
       unit ->
-      Tezos_crypto.Operation_metadata_list_list_hash.t tzresult Lwt.t
+      Operation_metadata_list_list_hash.t tzresult Lwt.t
 
     val operation_metadata_hashes :
       #simple ->
       ?chain:chain ->
       ?block:block ->
       unit ->
-      Tezos_crypto.Operation_metadata_hash.t list list tzresult Lwt.t
+      Operation_metadata_hash.t list list tzresult Lwt.t
 
     val operation_metadata_hashes_in_pass :
       #simple ->
       ?chain:chain ->
       ?block:block ->
       int ->
-      Tezos_crypto.Operation_metadata_hash.t list tzresult Lwt.t
+      Operation_metadata_hash.t list tzresult Lwt.t
 
     val operation_metadata_hash :
       #simple ->
@@ -327,7 +327,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?block:block ->
       int ->
       int ->
-      Tezos_crypto.Operation_metadata_hash.t tzresult Lwt.t
+      Operation_metadata_hash.t tzresult Lwt.t
   end
 
   module Context : sig
@@ -389,16 +389,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
   module Mempool : sig
     type t = {
-      applied : (Tezos_crypto.Operation_hash.t * Next_proto.operation) list;
-      refused :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      outdated :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      branch_refused :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      branch_delayed :
-        (Next_proto.operation * error list) Tezos_crypto.Operation_hash.Map.t;
-      unprocessed : Next_proto.operation Tezos_crypto.Operation_hash.Map.t;
+      applied : (Operation_hash.t * Next_proto.operation) list;
+      refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
+      unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
     type t_with_version
@@ -432,14 +428,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val ban_operation :
       #simple ->
       ?chain:chain ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       unit Tezos_error_monad.Error_monad.tzresult Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/unban_operation *)
     val unban_operation :
       #simple ->
       ?chain:chain ->
-      Tezos_crypto.Operation_hash.t ->
+      Operation_hash.t ->
       unit Tezos_error_monad.Error_monad.tzresult Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/unban_all_operations *)
@@ -460,9 +456,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?outdated:bool ->
       ?validation_passes:int list ->
       unit ->
-      (((Tezos_crypto.Operation_hash.t * Next_proto.operation)
-       * error trace option)
-       list
+      (((Operation_hash.t * Next_proto.operation) * error trace option) list
        Lwt_stream.t
       * stopper)
       tzresult
@@ -482,17 +476,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     ?chain:chain ->
     ?block:block ->
     unit ->
-    Tezos_crypto.Block_hash.Set.t tzresult Lwt.t
+    Block_hash.Set.t tzresult Lwt.t
 
   module S : sig
     val hash :
-      ( [`GET],
-        prefix,
-        prefix,
-        unit,
-        unit,
-        Tezos_crypto.Block_hash.t )
-      Tezos_rpc.Service.t
+      ([`GET], prefix, prefix, unit, unit, Block_hash.t) Tezos_rpc.Service.t
 
     val info :
       ( [`GET],
@@ -518,20 +506,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         prefix,
         unit,
         unit,
-        Tezos_crypto.Block_metadata_hash.t )
+        Block_metadata_hash.t )
       Tezos_rpc.Service.t
 
     val protocols :
       ([`GET], prefix, prefix, unit, unit, protocols) Tezos_rpc.Service.t
 
     val resulting_context_hash :
-      ( [`GET],
-        prefix,
-        prefix,
-        unit,
-        unit,
-        Tezos_crypto.Context_hash.t )
-      Tezos_rpc.Service.t
+      ([`GET], prefix, prefix, unit, unit, Context_hash.t) Tezos_rpc.Service.t
 
     module Header : sig
       val shell_header :
@@ -592,7 +574,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix,
           unit,
           unit,
-          Tezos_crypto.Operation_hash.t list list )
+          Operation_hash.t list list )
         Tezos_rpc.Service.t
 
       val operation_hashes_in_pass :
@@ -601,7 +583,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix * int,
           unit,
           unit,
-          Tezos_crypto.Operation_hash.t list )
+          Operation_hash.t list )
         Tezos_rpc.Service.t
 
       val operation_hash :
@@ -610,7 +592,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           (prefix * int) * int,
           unit,
           unit,
-          Tezos_crypto.Operation_hash.t )
+          Operation_hash.t )
         Tezos_rpc.Service.t
     end
 
@@ -621,7 +603,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix,
           unit,
           unit,
-          Tezos_crypto.Operation_metadata_list_list_hash.t )
+          Operation_metadata_list_list_hash.t )
         Tezos_rpc.Service.t
 
       val operation_metadata_hashes :
@@ -630,7 +612,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix,
           unit,
           unit,
-          Tezos_crypto.Operation_metadata_hash.t list list )
+          Operation_metadata_hash.t list list )
         Tezos_rpc.Service.t
 
       val operation_metadata_hashes_in_pass :
@@ -639,7 +621,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix * int,
           unit,
           unit,
-          Tezos_crypto.Operation_metadata_hash.t list )
+          Operation_metadata_hash.t list )
         Tezos_rpc.Service.t
 
       val operation_metadata_hash :
@@ -648,7 +630,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           (prefix * int) * int,
           unit,
           unit,
-          Tezos_crypto.Operation_metadata_hash.t )
+          Operation_metadata_hash.t )
         Tezos_rpc.Service.t
     end
 
@@ -751,24 +733,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
       val ban_operation :
         ('a, 'b) Tezos_rpc.Path.t ->
-        ( [`POST],
-          'a,
-          'b,
-          unit,
-          Tezos_crypto.Operation_hash.t,
-          unit )
-        Tezos_rpc.Service.t
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/unban_operation *)
       val unban_operation :
         ('a, 'b) Tezos_rpc.Path.t ->
-        ( [`POST],
-          'a,
-          'b,
-          unit,
-          Tezos_crypto.Operation_hash.t,
-          unit )
-        Tezos_rpc.Service.t
+        ([`POST], 'a, 'b, unit, Operation_hash.t, unit) Tezos_rpc.Service.t
 
       (** Define RPC POST /chains/[chain]/mempool/unban_all_operations *)
       val unban_all_operations :
@@ -788,9 +758,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           ; outdated : bool
           ; validation_passes : int list >,
           unit,
-          ((Tezos_crypto.Operation_hash.t * Next_proto.operation)
-          * error trace option)
-          list )
+          ((Operation_hash.t * Next_proto.operation) * error trace option) list
+        )
         Tezos_rpc.Service.t
 
       (** Define RPC GET /chains/[chain]/mempool/filter *)
@@ -828,13 +797,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     end
 
     val live_blocks :
-      ( [`GET],
-        prefix,
-        prefix,
-        unit,
-        unit,
-        Tezos_crypto.Block_hash.Set.t )
-      Tezos_rpc.Service.t
+      ([`GET], prefix, prefix, unit, unit, Block_hash.Set.t) Tezos_rpc.Service.t
   end
 end
 

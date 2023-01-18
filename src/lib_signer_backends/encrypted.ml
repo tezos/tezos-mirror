@@ -34,13 +34,11 @@ type Tezos_crypto.Base58.data += Encrypted_secp256k1_element of Bytes.t
 
 type Tezos_crypto.Base58.data += Encrypted_bls12_381 of Bytes.t
 
-type encrypted_sk =
-  | Encrypted_aggregate_sk
-  | Encrypted_sk of Tezos_crypto.Signature.algo
+type encrypted_sk = Encrypted_aggregate_sk | Encrypted_sk of Signature.algo
 
 type decrypted_sk =
   | Decrypted_aggregate_sk of Tezos_crypto.Aggregate_signature.Secret_key.t
-  | Decrypted_sk of Tezos_crypto.Signature.Secret_key.t
+  | Decrypted_sk of Signature.Secret_key.t
 
 open Client_keys
 
@@ -71,20 +69,18 @@ module Raw = struct
       match (sk : decrypted_sk) with
       | Decrypted_sk (Ed25519 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Ed25519.Secret_key.encoding
+            Signature.Ed25519.Secret_key.encoding
             sk
       | Decrypted_sk (Secp256k1 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Secp256k1.Secret_key.encoding
+            Signature.Secp256k1.Secret_key.encoding
             sk
       | Decrypted_sk (P256 sk) ->
           Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.P256.Secret_key.encoding
+            Signature.P256.Secret_key.encoding
             sk
       | Decrypted_sk (Bls sk) | Decrypted_aggregate_sk (Bls12_381 sk) ->
-          Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Bls.Secret_key.encoding
-            sk
+          Data_encoding.Binary.to_bytes_exn Signature.Bls.Secret_key.encoding sk
     in
     Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -100,51 +96,45 @@ module Raw = struct
         algo )
     with
     | None, _ -> return_none
-    | Some bytes, Encrypted_sk Tezos_crypto.Signature.Ed25519 -> (
+    | Some bytes, Encrypted_sk Signature.Ed25519 -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.Ed25519.Secret_key.encoding
+            Signature.Ed25519.Secret_key.encoding
             bytes
         with
         | Some sk ->
-            return_some
-              (Decrypted_sk (Ed25519 sk : Tezos_crypto.Signature.Secret_key.t))
+            return_some (Decrypted_sk (Ed25519 sk : Signature.Secret_key.t))
         | None ->
             failwith
-              "Corrupted wallet, deciphered key is not a valid \
-               Tezos_crypto.Ed25519 secret key")
-    | Some bytes, Encrypted_sk Tezos_crypto.Signature.Secp256k1 -> (
+              "Corrupted wallet, deciphered key is not a valid Ed25519 secret \
+               key")
+    | Some bytes, Encrypted_sk Signature.Secp256k1 -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.Secp256k1.Secret_key.encoding
+            Signature.Secp256k1.Secret_key.encoding
             bytes
         with
         | Some sk ->
-            return_some
-              (Decrypted_sk (Secp256k1 sk : Tezos_crypto.Signature.Secret_key.t))
+            return_some (Decrypted_sk (Secp256k1 sk : Signature.Secret_key.t))
         | None ->
             failwith
-              "Corrupted wallet, deciphered key is not a valid \
-               Tezos_crypto.Secp256k1 secret key")
-    | Some bytes, Encrypted_sk Tezos_crypto.Signature.P256 -> (
+              "Corrupted wallet, deciphered key is not a valid Secp256k1 \
+               secret key")
+    | Some bytes, Encrypted_sk Signature.P256 -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.P256.Secret_key.encoding
+            Signature.P256.Secret_key.encoding
             bytes
         with
         | Some sk ->
-            return_some
-              (Decrypted_sk (P256 sk : Tezos_crypto.Signature.Secret_key.t))
+            return_some (Decrypted_sk (P256 sk : Signature.Secret_key.t))
         | None ->
             failwith
-              "Corrupted wallet, deciphered key is not a valid \
-               Tezos_crypto.P256 secret key")
-    | ( Some bytes,
-        (Encrypted_aggregate_sk | Encrypted_sk Tezos_crypto.Signature.Bls) )
-      -> (
+              "Corrupted wallet, deciphered key is not a valid P256 secret key")
+    | Some bytes, (Encrypted_aggregate_sk | Encrypted_sk Signature.Bls) -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Tezos_crypto.Bls.Secret_key.encoding
+            Signature.Bls.Secret_key.encoding
             bytes
         with
         | Some sk ->
@@ -304,11 +294,11 @@ let decrypt_payload cctxt ?name encrypted_sk =
   let* algo, encrypted_sk =
     match Tezos_crypto.Base58.decode encrypted_sk with
     | Some (Encrypted_ed25519 encrypted_sk) ->
-        return (Encrypted_sk Tezos_crypto.Signature.Ed25519, encrypted_sk)
+        return (Encrypted_sk Signature.Ed25519, encrypted_sk)
     | Some (Encrypted_secp256k1 encrypted_sk) ->
-        return (Encrypted_sk Tezos_crypto.Signature.Secp256k1, encrypted_sk)
+        return (Encrypted_sk Signature.Secp256k1, encrypted_sk)
     | Some (Encrypted_p256 encrypted_sk) ->
-        return (Encrypted_sk Tezos_crypto.Signature.P256, encrypted_sk)
+        return (Encrypted_sk Signature.P256, encrypted_sk)
     | Some (Encrypted_bls12_381 encrypted_sk) ->
         return (Encrypted_aggregate_sk, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
@@ -548,25 +538,23 @@ struct
   let neuterize sk_uri =
     let open Lwt_result_syntax in
     let* sk = decrypt C.cctxt sk_uri in
-    let*? v =
-      Unencrypted.make_pk (Tezos_crypto.Signature.Secret_key.to_public_key sk)
-    in
+    let*? v = Unencrypted.make_pk (Signature.Secret_key.to_public_key sk) in
     return v
 
   let sign ?watermark sk_uri buf =
     let open Lwt_result_syntax in
     let* sk = decrypt C.cctxt sk_uri in
-    return (Tezos_crypto.Signature.sign ?watermark sk buf)
+    return (Signature.sign ?watermark sk buf)
 
   let deterministic_nonce sk_uri buf =
     let open Lwt_result_syntax in
     let* sk = decrypt C.cctxt sk_uri in
-    return (Tezos_crypto.Signature.deterministic_nonce sk buf)
+    return (Signature.deterministic_nonce sk buf)
 
   let deterministic_nonce_hash sk_uri buf =
     let open Lwt_result_syntax in
     let* sk = decrypt C.cctxt sk_uri in
-    return (Tezos_crypto.Signature.deterministic_nonce_hash sk buf)
+    return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
 end

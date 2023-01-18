@@ -210,7 +210,7 @@ module Block = struct
   (** The block-like interface that suffices to test
       [Prevalidator.Internal_for_tests.handle_live_operations] *)
   type t = {
-    hash : Tezos_crypto.Block_hash.t;
+    hash : Block_hash.t;
     operations : unit Prevalidation.operation list list;
   }
 
@@ -218,11 +218,9 @@ module Block = struct
      that for any pair of generated blocks [(b1, b2)], [b1.hash <> b2.hash]
      implies [b1 <> b2] where [<>] is polymorphic inequality. Said
      differently, hashes should not be faked. *)
-  let equal : t -> t -> bool =
-   fun t1 t2 -> Tezos_crypto.Block_hash.equal t1.hash t2.hash
+  let equal : t -> t -> bool = fun t1 t2 -> Block_hash.equal t1.hash t2.hash
 
-  let compare (t1 : t) (t2 : t) =
-    Tezos_crypto.Block_hash.compare t1.hash t2.hash
+  let compare (t1 : t) (t2 : t) = Block_hash.compare t1.hash t2.hash
 
   (** [hash_of_blocks ops] is used to compute the hash of a block whose
       [operations] field contains [ops].
@@ -234,15 +232,15 @@ module Block = struct
       is why we hash the hashes of operations. *)
   let hash_of_block ops =
     let hash =
-      Tezos_crypto.Operation_list_hash.compute
+      Operation_list_hash.compute
         (List.map (fun op -> op.Prevalidation.hash) @@ List.concat ops)
     in
     (* We forge a fake [block_header] hash by first hashing the operations
        and change the [b58] signature into a signature that looks like
        the one of a block header by prefixing it with the letter [B]. *)
-    let hash_string = Tezos_crypto.Operation_list_hash.to_b58check hash in
+    let hash_string = Operation_list_hash.to_b58check hash in
     let suffix = String.sub hash_string 2 31 in
-    match Tezos_crypto.Block_hash.of_string @@ "B" ^ suffix with
+    match Block_hash.of_string @@ "B" ^ suffix with
     | Error err ->
         Format.printf "Unexpected error: %a" Error_monad.pp_print_trace err ;
         assert false
@@ -265,7 +263,7 @@ module Block = struct
       String.concat
         "|"
         (List.map
-           Tezos_crypto.Operation_hash.to_short_b58check
+           Operation_hash.to_short_b58check
            (List.map (fun op -> op.Prevalidation.hash) ops))
     in
     let ops_string =
@@ -274,7 +272,7 @@ module Block = struct
         ""
         t.operations
     in
-    Format.asprintf "%a:[%s]" Tezos_crypto.Block_hash.pp t.hash ops_string
+    Format.asprintf "%a:[%s]" Block_hash.pp t.hash ops_string
 
   (* [pp_list] is unused but useful when debugging, renaming it to [_pp_list] to keep it around  *)
 
@@ -402,8 +400,7 @@ let tree_gen ?blocks () =
 (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
 let old_mempool_gen (tree : Block.t Tree.tree) :
-    unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t
-    =
+    unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
   let blocks = Tree.values tree in
   let pairs = List.concat_map Block.tools.operations blocks |> List.concat in
   let elements =
@@ -413,14 +410,14 @@ let old_mempool_gen (tree : Block.t Tree.tree) :
         Prevalidation.Internal_for_tests.make_operation op hash ())
       pairs
   in
-  if elements = [] then QCheck2.Gen.return Tezos_crypto.Operation_hash.Map.empty
+  if elements = [] then QCheck2.Gen.return Operation_hash.Map.empty
   else
     let list_gen = QCheck2.Gen.(oneofl elements |> list) in
     QCheck2.Gen.map
       (fun l ->
         List.to_seq l
         |> Seq.map (fun op -> (op.Prevalidation.hash, op))
-        |> Tezos_crypto.Operation_hash.Map.of_seq)
+        |> Operation_hash.Map.of_seq)
       list_gen
 
 (** Function to implement
@@ -502,7 +499,7 @@ let classification_chain_tools (tree : Block.t Tree.tree) :
 let tree_gen ?blocks () :
     (Block.t Tree.tree
     * (Block.t * Block.t) option
-    * unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t)
+    * unit Prevalidation.operation Operation_hash.Map.t)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* tree = tree_gen ?blocks () in

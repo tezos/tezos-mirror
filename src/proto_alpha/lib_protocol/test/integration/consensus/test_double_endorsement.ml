@@ -52,7 +52,7 @@ let block_fork b =
 let order_endorsements ~correct_order op1 op2 =
   let oph1 = Operation.hash op1 in
   let oph2 = Operation.hash op2 in
-  let c = Tezos_crypto.Operation_hash.compare oph1 oph2 in
+  let c = Operation_hash.compare oph1 oph2 in
   if correct_order then if c < 0 then (op1, op2) else (op2, op1)
   else if c < 0 then (op2, op1)
   else (op1, op2)
@@ -254,11 +254,8 @@ let test_different_delegates () =
   Context.get_first_different_endorsers (B blk_b)
   >>=? fun (endorser_b1c, endorser_b2c) ->
   let endorser_b =
-    if
-      Tezos_crypto.Signature.Public_key_hash.( = )
-        endorser_a
-        endorser_b1c.delegate
-    then endorser_b2c.delegate
+    if Signature.Public_key_hash.( = ) endorser_a endorser_b1c.delegate then
+      endorser_b2c.delegate
     else endorser_b1c.delegate
   in
   Op.raw_endorsement ~delegate:endorser_a blk_a >>=? fun e_a ->
@@ -284,8 +281,7 @@ let test_wrong_delegate () =
   Context.get_endorser_n (B blk_b) 0 >>=? fun (endorser0, _slots0) ->
   Context.get_endorser_n (B blk_b) 1 >>=? fun (endorser1, _slots1) ->
   let endorser_b =
-    if Tezos_crypto.Signature.Public_key_hash.equal endorser_a endorser0 then
-      endorser1
+    if Signature.Public_key_hash.equal endorser_a endorser0 then endorser1
     else endorser0
   in
   Op.raw_endorsement ~delegate:endorser_b blk_b >>=? fun endorsement_b ->
@@ -303,11 +299,8 @@ let test_freeze_more_with_low_balance =
     Context.get_endorsers ctxt >>=? function
     | [d1; d2] ->
         return
-          (if Tezos_crypto.Signature.Public_key_hash.equal account d1.delegate
-          then d1
-          else if
-          Tezos_crypto.Signature.Public_key_hash.equal account d2.delegate
-         then d2
+          (if Signature.Public_key_hash.equal account d1.delegate then d1
+          else if Signature.Public_key_hash.equal account d2.delegate then d2
           else assert false)
             .slots
     | _ -> assert false
@@ -334,8 +327,7 @@ let test_freeze_more_with_low_balance =
   in
   let check_unique_endorser b account2 =
     Context.get_endorsers (B b) >>=? function
-    | [{delegate; _}]
-      when Tezos_crypto.Signature.Public_key_hash.equal account2 delegate ->
+    | [{delegate; _}] when Signature.Public_key_hash.equal account2 delegate ->
         return_unit
     | _ -> failwith "We are supposed to only have account2 as endorser."
   in

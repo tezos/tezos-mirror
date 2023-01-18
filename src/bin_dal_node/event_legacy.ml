@@ -110,7 +110,7 @@ let layer1_node_new_head =
     ~name:"dal_node_layer_1_new_head"
     ~msg:"Head of layer 1's node updated to {hash} at level {level}"
     ~level:Notice
-    ("hash", Tezos_crypto.Block_hash.encoding)
+    ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
 
 let layer1_node_tracking_started =
@@ -172,7 +172,7 @@ let dac_account_cannot_sign =
     ("tz4_account", Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
 
 let proto_short_hash_string hash =
-  Format.asprintf "%a" Tezos_crypto.Protocol_hash.pp_short hash
+  Format.asprintf "%a" Protocol_hash.pp_short hash
 
 let emit_protocol_plugin_resolved ~plugin_name hash =
   emit protocol_plugin_resolved (plugin_name, proto_short_hash_string hash)

@@ -70,9 +70,7 @@ let raw_info cctxt ~chain ~block_hash shell resulting_context_hash payload_hash
   >>= fun () ->
   let open Protocol_client_context in
   let block = `Hash (block_hash, 0) in
-  let is_in_protocol =
-    Tezos_crypto.Protocol_hash.(current_protocol = Protocol.hash)
-  in
+  let is_in_protocol = Protocol_hash.(current_protocol = Protocol.hash) in
   (if is_in_protocol then
    Alpha_block_services.Operations.operations cctxt ~chain ~block ()
    >>=? fun operations ->
@@ -126,7 +124,7 @@ let info cctxt ~chain ~block () =
   >>=? fun {current_protocol; next_protocol} ->
   Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
   >>=? fun resulting_context_hash ->
-  (if Tezos_crypto.Protocol_hash.(current_protocol <> Protocol.hash) then
+  (if Protocol_hash.(current_protocol <> Protocol.hash) then
    Block_services.Header.shell_header cctxt ~chain ~block () >>=? fun shell ->
    Chain_services.Blocks.Header.raw_protocol_data cctxt ~chain ~block ()
    >>=? fun protocol_data ->
@@ -161,7 +159,7 @@ let info cctxt ~chain ~block () =
   (Chain_services.Blocks.live_blocks cctxt ~chain ~block () >>= function
    | Error _ ->
        (* The RPC might fail when a block's metadata is not available *)
-       Lwt.return Tezos_crypto.Block_hash.Set.empty
+       Lwt.return Block_hash.Set.empty
    | Ok live_blocks -> Lwt.return live_blocks)
   >>= fun live_blocks ->
   raw_info

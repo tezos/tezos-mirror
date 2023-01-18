@@ -29,10 +29,7 @@ type t
 val create : Distributed_db.t -> t
 
 val validate :
-  t ->
-  Tezos_crypto.Protocol_hash.t ->
-  Protocol.t ->
-  Registered_protocol.t tzresult Lwt.t
+  t -> Protocol_hash.t -> Protocol.t -> Registered_protocol.t tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 
@@ -40,7 +37,7 @@ val fetch_and_compile_protocol :
   t ->
   ?peer:P2p_peer.Id.t ->
   ?timeout:Ptime.Span.t ->
-  Tezos_crypto.Protocol_hash.t ->
+  Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
 val fetch_and_compile_protocols :

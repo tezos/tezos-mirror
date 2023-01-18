@@ -180,7 +180,7 @@ module Scripts = struct
            (req "input" Script.expr_encoding)
            (req "amount" Tez.encoding)
            (opt "balance" Tez.encoding)
-           (req "chain_id" Tezos_crypto.Chain_id.encoding)
+           (req "chain_id" Chain_id.encoding)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
@@ -233,7 +233,7 @@ module Scripts = struct
         (req "contract" Contract.originated_encoding)
         (req "entrypoint" Entrypoint.simple_encoding)
         (req "input" Script.expr_encoding)
-        (req "chain_id" Tezos_crypto.Chain_id.encoding)
+        (req "chain_id" Chain_id.encoding)
         (opt "source" Contract.encoding)
         (opt "payer" Contract.implicit_encoding)
         (opt "gas" Gas.Arith.z_integral_encoding)
@@ -249,7 +249,7 @@ module Scripts = struct
            (req "view" (string Plain))
            (req "input" Script.expr_encoding)
            (dft "unlimited_gas" bool false)
-           (req "chain_id" Tezos_crypto.Chain_id.encoding)
+           (req "chain_id" Chain_id.encoding)
            (opt "source" Contract.encoding)
            (opt "payer" Contract.implicit_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
@@ -398,7 +398,7 @@ module Scripts = struct
         ~input:
           (obj2
              (req "operation" Operation.encoding)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding))
+             (req "chain_id" Chain_id.encoding))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "run_operation")
 
@@ -431,7 +431,7 @@ module Scripts = struct
           (obj4
              (opt "blocks_before_activation" int32)
              (req "operation" Operation.encoding)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "simulate_operation")
@@ -444,7 +444,7 @@ module Scripts = struct
           (obj4
              (opt "blocks_before_activation" int32)
              (req "operation" Operation.encoding)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (dft "latency" int16 default_operation_inclusion_latency))
         ~output:Apply_results.operation_data_and_metadata_encoding
         RPC_path.(path / "simulate_tx_rollup_operation")
@@ -949,7 +949,7 @@ module Scripts = struct
 
   let register () =
     let originate_dummy_contract ctxt script balance =
-      let ctxt = Origination_nonce.init ctxt Tezos_crypto.Operation_hash.zero in
+      let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, dummy_contract_hash) ->
       let dummy_contract = Contract.Originated dummy_contract_hash in

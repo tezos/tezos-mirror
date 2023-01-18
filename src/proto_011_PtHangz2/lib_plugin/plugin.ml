@@ -335,7 +335,7 @@ module RPC = struct
              (req "input" Script.expr_encoding)
              (req "amount" Tez.encoding)
              (req "balance" Tez.encoding)
-             (req "chain_id" Tezos_crypto.Chain_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
@@ -396,7 +396,7 @@ module RPC = struct
           (req "contract" Contract.encoding)
           (req "entrypoint" string)
           (req "input" Script.expr_encoding)
-          (req "chain_id" Tezos_crypto.Chain_id.encoding)
+          (req "chain_id" Chain_id.encoding)
           (opt "source" Contract.encoding)
           (opt "payer" Contract.encoding)
           (opt "gas" Gas.Arith.z_integral_encoding)
@@ -529,7 +529,7 @@ module RPC = struct
           ~input:
             (obj2
                (req "operation" Operation.encoding)
-               (req "chain_id" Tezos_crypto.Chain_id.encoding))
+               (req "chain_id" Chain_id.encoding))
           ~output:Apply_results.operation_data_and_metadata_encoding
           RPC_path.(path / "run_operation")
 
@@ -540,7 +540,7 @@ module RPC = struct
           ~input:
             (obj3
                (req "operation" Operation.encoding)
-               (req "chain_id" Tezos_crypto.Chain_id.encoding)
+               (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
           ~output:Apply_results.operation_data_and_metadata_encoding
           RPC_path.(path / "simulate_operation")
@@ -950,9 +950,7 @@ module RPC = struct
 
     let register () =
       let originate_dummy_contract ctxt script balance =
-        let ctxt =
-          Contract.init_origination_nonce ctxt Tezos_crypto.Operation_hash.zero
-        in
+        let ctxt = Contract.init_origination_nonce ctxt Operation_hash.zero in
         Lwt.return (Contract.fresh_contract_from_current_nonce ctxt)
         >>=? fun (ctxt, dummy_contract) ->
         Contract.originate

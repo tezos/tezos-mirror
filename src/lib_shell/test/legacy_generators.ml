@@ -53,12 +53,12 @@ let operation_mock_proto_gen =
   let* len_gen = frequencya [|(9, return 0); (1, 0 -- 31)|] in
   string_size ?gen:None len_gen
 
-let block_hash_gen : Tezos_crypto.Block_hash.t QCheck2.Gen.t =
+let block_hash_gen : Block_hash.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let string_gen = QCheck2.Gen.small_string ?gen:None in
   let+ key = opt (string_size (0 -- 64))
   and+ path = list_size (0 -- 10) string_gen in
-  Tezos_crypto.Block_hash.hash_string ?key path
+  Block_hash.hash_string ?key path
 
 (** A generator of operations.
     - [proto_gen] is the generator for protocol bytes. By default, it is
@@ -82,7 +82,7 @@ let operation_gen ?(proto_gen = operation_proto_gen) ?block_hash_t () :
 
 (** Like {!operation_gen} with a hash. *)
 let raw_operation_with_hash_gen ?proto_gen ?block_hash_t () :
-    (Tezos_crypto.Operation_hash.t * Operation.t) QCheck2.Gen.t =
+    (Operation_hash.t * Operation.t) QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ op = operation_gen ?proto_gen ?block_hash_t () in
   let hash = Operation.hash op in
@@ -136,12 +136,12 @@ let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :
   return (op, priority)
 
 let raw_op_map_gen ?proto_gen ?block_hash_t () :
-    Operation.t Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t =
+    Operation.t Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ ops =
     small_list (raw_operation_with_hash_gen ?proto_gen ?block_hash_t ())
   in
-  List.to_seq ops |> Tezos_crypto.Operation_hash.Map.of_seq
+  List.to_seq ops |> Operation_hash.Map.of_seq
 
 (** A generator of maps of operations and their hashes. Parameters are:
     - [?proto_gen] is an optional generator for the protocol bytes.
@@ -151,13 +151,12 @@ let raw_op_map_gen ?proto_gen ?block_hash_t () :
     this generator guarantees that all returned operations are distinct
     (because their hashes differ). *)
 let op_map_gen ?proto_gen ?block_hash_t () :
-    unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t
-    =
+    unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ ops = small_list (operation_with_hash_gen ?proto_gen ?block_hash_t ()) in
   List.to_seq ops
   |> Seq.map (fun op -> (op.Prevalidation.hash, op))
-  |> Tezos_crypto.Operation_hash.Map.of_seq
+  |> Operation_hash.Map.of_seq
 
 (** A generator like {!raw_op_map_gen} but which guarantees the size
     of the returned maps: they are exactly of size [n]. We need
@@ -165,23 +164,23 @@ let op_map_gen ?proto_gen ?block_hash_t () :
     of fixed lengths) because we *need* to return maps, because we need
     the properties that all operations hashes are different. *)
 let raw_op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
-    Operation.t Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t =
+    Operation.t Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let map_take_n n m =
-    Tezos_crypto.Operation_hash.Map.bindings m
-    |> List.take_n n |> List.to_seq |> Tezos_crypto.Operation_hash.Map.of_seq
+    Operation_hash.Map.bindings m
+    |> List.take_n n |> List.to_seq |> Operation_hash.Map.of_seq
   in
   let merge _oph old _new = Some old in
-  let rec go (ops : Operation.t Tezos_crypto.Operation_hash.Map.t) =
-    if Tezos_crypto.Operation_hash.Map.cardinal ops >= n then
+  let rec go (ops : Operation.t Operation_hash.Map.t) =
+    if Operation_hash.Map.cardinal ops >= n then
       (* Done *)
       return (map_take_n n ops)
     else
       (* Not enough operations yet, generate more *)
       let* new_ops = raw_op_map_gen ?proto_gen ?block_hash_t () in
-      go (Tezos_crypto.Operation_hash.Map.union merge ops new_ops)
+      go (Operation_hash.Map.union merge ops new_ops)
   in
-  go Tezos_crypto.Operation_hash.Map.empty
+  go Operation_hash.Map.empty
 
 (** A generator like {!op_map_gen} but which guarantees the size
     of the returned maps: they are exactly of size [n]. We need
@@ -189,25 +188,23 @@ let raw_op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
     of fixed lengths) because we *need* to return maps, because we need
     the properties that all operations hashes are different. *)
 let op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
-    unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t
-    =
+    unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let map_take_n n m =
-    Tezos_crypto.Operation_hash.Map.bindings m
-    |> List.take_n n |> List.to_seq |> Tezos_crypto.Operation_hash.Map.of_seq
+    Operation_hash.Map.bindings m
+    |> List.take_n n |> List.to_seq |> Operation_hash.Map.of_seq
   in
   let merge _oph old _new = Some old in
-  let rec go
-      (ops : unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t) =
-    if Tezos_crypto.Operation_hash.Map.cardinal ops >= n then
+  let rec go (ops : unit Prevalidation.operation Operation_hash.Map.t) =
+    if Operation_hash.Map.cardinal ops >= n then
       (* Done *)
       return (map_take_n n ops)
     else
       (* Not enough operations yet, generate more *)
       let* new_ops = op_map_gen ?proto_gen ?block_hash_t () in
-      go (Tezos_crypto.Operation_hash.Map.union merge ops new_ops)
+      go (Operation_hash.Map.union merge ops new_ops)
   in
-  go Tezos_crypto.Operation_hash.Map.empty
+  go Operation_hash.Map.empty
 
 (** Do we need richer errors? If so, how to generate those? *)
 let classification_gen : classification QCheck2.Gen.t =
@@ -255,13 +252,10 @@ let with_t_operation_gen : unit t -> unit Prevalidation.operation QCheck2.Gen.t
   let open QCheck2 in
   fun t ->
     let to_ops map =
-      Tezos_crypto.Operation_hash.Map.bindings map
-      |> List.map (fun (_oph, (op, _)) -> op)
+      Operation_hash.Map.bindings map |> List.map (fun (_oph, (op, _)) -> op)
     in
     (* If map is empty, it cannot be used as a generator *)
-    let freq_of_map map =
-      if Tezos_crypto.Operation_hash.Map.is_empty map then 0 else 1
-    in
+    let freq_of_map map = if Operation_hash.Map.is_empty map then 0 else 1 in
     (* If list is empty, it cannot be used as a generator *)
     let freq_of_list = function [] -> 0 | _ -> 1 in
     (* If map is not empty, take one of its elements *)

@@ -72,11 +72,9 @@ let commands () =
            ~desc:"the block hash from which to compute the chain id"
       @@ stop)
       (fun () block_hash_str (cctxt : #Client_context.full) ->
-        let* block_hash =
-          Lwt.return (Tezos_crypto.Block_hash.of_b58check block_hash_str)
-        in
-        let chain_id = Tezos_crypto.Chain_id.of_block_hash block_hash in
-        let*! () = cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id in
+        let* block_hash = Lwt.return (Block_hash.of_b58check block_hash_str) in
+        let chain_id = Chain_id.of_block_hash block_hash in
+        let*! () = cctxt#message "%a" Chain_id.pp chain_id in
         return_unit);
     command
       ~desc:"Computes a chain id from a seed"
@@ -87,7 +85,7 @@ let commands () =
            ~desc:"the seed from which to compute the chain id"
       @@ stop)
       (fun () seed_str (cctxt : #Client_context.full) ->
-        let chain_id = Tezos_crypto.Chain_id.hash_string [seed_str] in
-        let*! () = cctxt#message "%a" Tezos_crypto.Chain_id.pp chain_id in
+        let chain_id = Chain_id.hash_string [seed_str] in
+        let*! () = cctxt#message "%a" Chain_id.pp chain_id in
         return_unit);
   ]

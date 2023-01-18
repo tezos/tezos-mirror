@@ -30,15 +30,14 @@ let in_block operation_hash operations =
       (fun i ops ->
         List.iteri
           (fun j op ->
-            if Tezos_crypto.Operation_hash.equal operation_hash op then
-              raise (Found (i, j)))
+            if Operation_hash.equal operation_hash op then raise (Found (i, j)))
           ops)
       operations ;
     None
   with Found (i, j) -> Some (i, j)
 
 type operation_status =
-  | Confirmed of (Tezos_crypto.Block_hash.t * int * int)
+  | Confirmed of (Block_hash.t * int * int)
   | Pending
   | Still_not_found
 
@@ -46,22 +45,20 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     ?(predecessors = 10) ?(confirmations = 1) ?branch operation_hash =
   let open Lwt_result_syntax in
   let exception WrapError of error list in
-  let exception Outdated of Tezos_crypto.Operation_hash.t in
+  let exception Outdated of Operation_hash.t in
   (* Table of known blocks:
      - None: if neither the block or its predecessors contains the operation
      - (Some ((hash, i, j), n)):
           if the `hash` contains the operation in list `i` at position `j`
           and if `hash` denotes the `n-th` predecessors of the block. *)
-  let blocks :
-      ((Tezos_crypto.Block_hash.t * int * int) * int) option
-      Tezos_crypto.Block_hash.Table.t =
-    Tezos_crypto.Block_hash.Table.create ~random:true confirmations
+  let blocks : ((Block_hash.t * int * int) * int) option Block_hash.Table.t =
+    Block_hash.Table.create ~random:true confirmations
   in
   (* Fetch _all_ the 'unknown' predecessors af a block. *)
   let fetch_predecessors (hash, header) =
     let rec loop acc (_hash, header) =
       let predecessor = header.Block_header.predecessor in
-      if Tezos_crypto.Block_hash.Table.mem blocks predecessor then return acc
+      if Block_hash.Table.mem blocks predecessor then return acc
       else
         let* shell =
           Chain_services.Blocks.Header.shell_header
@@ -93,7 +90,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     let predecessor = header.Tezos_base.Block_header.predecessor in
     let pred_block =
       WithExceptions.Option.to_exn ~none:Not_found
-      @@ Tezos_crypto.Block_hash.Table.find blocks predecessor
+      @@ Block_hash.Table.find blocks predecessor
     in
     match pred_block with
     | Some (block_with_op, n) ->
@@ -101,13 +98,10 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           ctxt#answer
             "Operation received %d confirmations as of block: %a"
             (n + 1)
-            Tezos_crypto.Block_hash.pp
+            Block_hash.pp
             hash
         in
-        Tezos_crypto.Block_hash.Table.add
-          blocks
-          hash
-          (Some (block_with_op, n + 1)) ;
+        Block_hash.Table.add blocks hash (Some (block_with_op, n + 1)) ;
         if n + 1 < confirmations then return Pending
         else return (Confirmed block_with_op)
     | None -> (
@@ -120,21 +114,18 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
         in
         match in_block operation_hash operations with
         | None ->
-            Tezos_crypto.Block_hash.Table.add blocks hash None ;
+            Block_hash.Table.add blocks hash None ;
             return Still_not_found
         | Some (i, j) ->
             let*! () =
               ctxt#answer
                 "Operation found in block: %a (pass: %d, offset: %d)"
-                Tezos_crypto.Block_hash.pp
+                Block_hash.pp
                 hash
                 i
                 j
             in
-            Tezos_crypto.Block_hash.Table.add
-              blocks
-              hash
-              (Some ((hash, i, j), 0)) ;
+            Block_hash.Table.add blocks hash (Some ((hash, i, j), 0)) ;
             if confirmations <= 0 then return (Confirmed (hash, i, j))
             else return Pending)
   in
@@ -147,15 +138,14 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
         in
         match r with
         | Ok live_blocks ->
-            if Tezos_crypto.Block_hash.Set.mem branch_hash live_blocks then
-              Lwt.return_unit
+            if Block_hash.Set.mem branch_hash live_blocks then Lwt.return_unit
             else
               let*! () =
                 ctxt#error
                   "The operation %a is outdated and may never be included in \
                    the chain.@,\
                    We recommend to use an external block explorer."
-                  Tezos_crypto.Operation_hash.pp
+                  Operation_hash.pp
                   operation_hash
               in
               Lwt.fail (Outdated operation_hash)
@@ -208,7 +198,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           | None -> failwith "..."
           | Some (hash, _) -> (
               stop () ;
-              match Tezos_crypto.Block_hash.Table.find blocks hash with
+              match Block_hash.Table.find blocks hash with
               | None | Some None -> assert false
               | Some (Some (hash, _)) -> return hash)
       in
@@ -249,7 +239,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
           ~block:(`Hash (head, block_hook + 1))
           ()
       in
-      Tezos_crypto.Block_hash.Table.add blocks oldest None ;
+      Block_hash.Table.add blocks oldest None ;
       loop block_hook
 
 let lookup_operation_in_previous_block ctxt chain operation_hash i =
@@ -306,7 +296,7 @@ let wait_for_bootstrapped ?(retry = fun f x -> f x)
         if !display then
           ctxt#message
             "Current head: %a (timestamp: %a, validation: %a)"
-            Tezos_crypto.Block_hash.pp_short
+            Block_hash.pp_short
             hash
             Time.System.pp_hum
             (Time.System.of_protocol_exn time)

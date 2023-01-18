@@ -27,7 +27,7 @@ module Wasmer = Tezos_wasmer
 module Lazy_containers = Tezos_lazy_containers
 
 module Kernel_cache = Cache.Make (struct
-  module Key = Tezos_crypto.Context_hash
+  module Key = Context_hash
 
   type value = Wasmer.Module.t
 

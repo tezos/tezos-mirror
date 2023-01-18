@@ -84,7 +84,7 @@ module Request = struct
         Format.fprintf
           ppf
           "switching to new Tezos head %a"
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           b.Alpha_block_services.hash ;
         if r.old_chain <> [] || r.new_chain <> [] then
           Format.fprintf

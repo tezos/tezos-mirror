@@ -113,7 +113,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~name:"new_tezos_head"
       ~msg:"processing new Tezos head {head}"
       ~level:Debug
-      ("head", Tezos_crypto.Block_hash.encoding)
+      ("head", Block_hash.encoding)
 
   let injecting_pending =
     declare_1
@@ -169,7 +169,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~msg:"Injected {nb} operations in {oph}"
       ~level:Notice
       ("nb", Data_encoding.int31)
-      ("oph", Tezos_crypto.Operation_hash.encoding)
+      ("oph", Operation_hash.encoding)
 
   let add_pending =
     declare_1
@@ -192,7 +192,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~name:"included"
       ~msg:"Included operations of {block} at level {level}: {operations}"
       ~level:Notice
-      ("block", Tezos_crypto.Block_hash.encoding)
+      ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp3:pp_operations_hash_list

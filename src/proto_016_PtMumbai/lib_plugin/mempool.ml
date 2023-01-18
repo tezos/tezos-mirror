@@ -187,10 +187,7 @@ type manager_op_info = {
           in [state] when appropriate. *)
 }
 
-type manager_op_weight = {
-  operation_hash : Tezos_crypto.Operation_hash.t;
-  weight : Q.t;
-}
+type manager_op_weight = {operation_hash : Operation_hash.t; weight : Q.t}
 
 (** Build a {!manager_op_weight} from operation hash and {!manager_op_info}. *)
 let mk_op_weight oph (info : manager_op_info) =
@@ -199,7 +196,7 @@ let mk_op_weight oph (info : manager_op_info) =
 let compare_manager_op_weight op1 op2 =
   let c = Q.compare op1.weight op2.weight in
   if c <> 0 then c
-  else Tezos_crypto.Operation_hash.compare op1.operation_hash op2.operation_hash
+  else Operation_hash.compare op1.operation_hash op2.operation_hash
 
 module ManagerOpWeightSet = Set.Make (struct
   type t = manager_op_weight
@@ -224,10 +221,10 @@ type ops_state = {
       (** Number of prechecked manager operations.
           Invariants:
           - [prechecked_manager_op_count
-               = Tezos_crypto.Operation_hash.Map.cardinal prechecked_manager_ops
+               = Operation_hash.Map.cardinal prechecked_manager_ops
                = ManagerOpWeightSet.cardinal prechecked_op_weights]
           - [prechecked_manager_op_count <= max_prechecked_manager_operations] *)
-  prechecked_manager_ops : manager_op_info Tezos_crypto.Operation_hash.Map.t;
+  prechecked_manager_ops : manager_op_info Operation_hash.Map.t;
       (** All prechecked manager operations. See {!manager_op_info}. *)
   prechecked_op_weights : ManagerOpWeightSet.t;
       (** The {!manager_op_weight} of all prechecked manager operations. *)
@@ -243,7 +240,7 @@ type state = {state_info : state_info; ops_state : ops_state}
 let empty_ops_state =
   {
     prechecked_manager_op_count = 0;
-    prechecked_manager_ops = Tezos_crypto.Operation_hash.Map.empty;
+    prechecked_manager_ops = Operation_hash.Map.empty;
     prechecked_op_weights = ManagerOpWeightSet.empty;
     min_prechecked_op_weight = None;
   }
@@ -352,7 +349,7 @@ let () =
     (fun () -> Fees_too_low)
 
 type Environment.Error_monad.error +=
-  | Manager_restriction of {oph : Tezos_crypto.Operation_hash.t; fee : Tez.t}
+  | Manager_restriction of {oph : Operation_hash.t; fee : Tez.t}
 
 let () =
   Environment.Error_monad.register_error_kind
@@ -366,21 +363,21 @@ let () =
         "Only one manager operation per manager per block allowed (found %a \
          with %atez fee. You may want to use --replace to provide adequate fee \
          and replace it)."
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         oph
         Tez.pp
         fee)
     Data_encoding.(
       obj2
-        (req "operation_hash" Tezos_crypto.Operation_hash.encoding)
+        (req "operation_hash" Operation_hash.encoding)
         (req "operation_fee" Tez.encoding))
     (function Manager_restriction {oph; fee} -> Some (oph, fee) | _ -> None)
     (fun (oph, fee) -> Manager_restriction {oph; fee})
 
 type Environment.Error_monad.error +=
   | Manager_operation_replaced of {
-      old_hash : Tezos_crypto.Operation_hash.t;
-      new_hash : Tezos_crypto.Operation_hash.t;
+      old_hash : Operation_hash.t;
+      new_hash : Operation_hash.t;
     }
 
 let () =
@@ -393,13 +390,13 @@ let () =
       Format.fprintf
         ppf
         "The manager operation %a has been replaced with %a"
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         old_hash
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         new_hash)
     (Data_encoding.obj2
-       (Data_encoding.req "old_hash" Tezos_crypto.Operation_hash.encoding)
-       (Data_encoding.req "new_hash" Tezos_crypto.Operation_hash.encoding))
+       (Data_encoding.req "old_hash" Operation_hash.encoding)
+       (Data_encoding.req "new_hash" Operation_hash.encoding))
     (function
       | Manager_operation_replaced {old_hash; new_hash} ->
           Some (old_hash, new_hash)
@@ -827,17 +824,13 @@ let pre_filter config ~filter_state
 (** Remove a manager operation hash from the ops_state.
     Do nothing if the operation was not in the state. *)
 let remove_operation ops_state oph =
-  match
-    Tezos_crypto.Operation_hash.Map.find oph ops_state.prechecked_manager_ops
-  with
+  match Operation_hash.Map.find oph ops_state.prechecked_manager_ops with
   | None ->
       (* Not present in the ops_state: nothing to do. *)
       ops_state
   | Some info ->
       let prechecked_manager_ops =
-        Tezos_crypto.Operation_hash.Map.remove
-          oph
-          ops_state.prechecked_manager_ops
+        Operation_hash.Map.remove oph ops_state.prechecked_manager_ops
       in
       let prechecked_manager_op_count =
         ops_state.prechecked_manager_op_count - 1
@@ -851,9 +844,8 @@ let remove_operation ops_state oph =
         match ops_state.min_prechecked_op_weight with
         | None -> None
         | Some min_op_weight ->
-            if
-              Tezos_crypto.Operation_hash.equal min_op_weight.operation_hash oph
-            then ManagerOpWeightSet.min_elt prechecked_op_weights
+            if Operation_hash.equal min_op_weight.operation_hash oph then
+              ManagerOpWeightSet.min_elt prechecked_op_weights
             else Some min_op_weight
       in
       {
@@ -876,18 +868,15 @@ let add_manager_op ops_state oph info replacement =
     | `No_replace -> ops_state
     | `Replace (oph, _classification) -> remove_operation ops_state oph
   in
-  if Tezos_crypto.Operation_hash.Map.mem oph ops_state.prechecked_manager_ops
-  then (* Already present in the ops_state: nothing to do. *)
+  if Operation_hash.Map.mem oph ops_state.prechecked_manager_ops then
+    (* Already present in the ops_state: nothing to do. *)
     ops_state
   else
     let prechecked_manager_op_count =
       ops_state.prechecked_manager_op_count + 1
     in
     let prechecked_manager_ops =
-      Tezos_crypto.Operation_hash.Map.add
-        oph
-        info
-        ops_state.prechecked_manager_ops
+      Operation_hash.Map.add oph info ops_state.prechecked_manager_ops
     in
     let op_weight = mk_op_weight oph info in
     let prechecked_op_weights =
@@ -1011,8 +1000,8 @@ let is_manager_operation op =
     of the call to {!Operation.compare}). *)
 let conflict_handler config : Mempool.conflict_handler =
  fun ~existing_operation ~new_operation ->
-  let (_ : Tezos_crypto.Operation_hash.t), old_op = existing_operation in
-  let (_ : Tezos_crypto.Operation_hash.t), new_op = new_operation in
+  let (_ : Operation_hash.t), old_op = existing_operation in
+  let (_ : Operation_hash.t), new_op = new_operation in
   if is_manager_operation old_op && is_manager_operation new_op then
     let new_op_is_better =
       let open Result_syntax in

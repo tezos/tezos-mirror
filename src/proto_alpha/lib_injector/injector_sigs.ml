@@ -68,7 +68,7 @@ type retry_action =
     node. *)
 type injected_info = {
   op : L1_operation.t;  (** The L1 manager operation. *)
-  oph : Tezos_crypto.Operation_hash.t;
+  oph : Operation_hash.t;
       (** The hash of the operation which contains [op] (this can be an L1 batch
           of several manager operations). *)
 }
@@ -77,10 +77,10 @@ type injected_info = {
     block. *)
 type included_info = {
   op : L1_operation.t;  (** The L1 manager operation. *)
-  oph : Tezos_crypto.Operation_hash.t;
+  oph : Operation_hash.t;
       (** The hash of the operation which contains [op] (this can be an L1 batch
           of several manager operations). *)
-  l1_block : Tezos_crypto.Block_hash.t;
+  l1_block : Block_hash.t;
       (** The hash of the L1 block in which the operation was included. *)
   l1_level : int32;  (** The level of [l1_block]. *)
 }
@@ -101,9 +101,7 @@ let injected_info_encoding =
   @@ merge_objs
        L1_operation.encoding
        (obj1
-          (req
-             "layer1"
-             (obj1 (req "operation_hash" Tezos_crypto.Operation_hash.encoding))))
+          (req "layer1" (obj1 (req "operation_hash" Operation_hash.encoding))))
 
 let included_info_encoding =
   let open Data_encoding in
@@ -116,8 +114,8 @@ let included_info_encoding =
           (req
              "layer1"
              (obj3
-                (req "operation_hash" Tezos_crypto.Operation_hash.encoding)
-                (req "block_hash" Tezos_crypto.Block_hash.encoding)
+                (req "operation_hash" Operation_hash.encoding)
+                (req "block_hash" Block_hash.encoding)
                 (req "level" int32))))
 
 (** Signature for tags used in injector  *)

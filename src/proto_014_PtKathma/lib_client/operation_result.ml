@@ -96,14 +96,13 @@ let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
           Format.fprintf
             ppf
             "@,Delegate: %a"
-            Tezos_crypto.Signature.V0.Public_key_hash.pp
+            Signature.V0.Public_key_hash.pp
             delegate)
   | Delegation delegate_opt -> (
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate ->
-          Tezos_crypto.Signature.V0.Public_key_hash.pp ppf delegate)
+      | Some delegate -> Signature.V0.Public_key_hash.pp ppf delegate)
   | Event {ty; tag; payload} ->
       Format.fprintf
         ppf
@@ -170,7 +169,7 @@ let pp_manager_operation_content (type kind) source ppf
           Format.fprintf
             ppf
             "@,Delegate: %a"
-            Tezos_crypto.Signature.V0.Public_key_hash.pp
+            Signature.V0.Public_key_hash.pp
             delegate)
   | Reveal key ->
       Format.fprintf
@@ -178,14 +177,13 @@ let pp_manager_operation_content (type kind) source ppf
         "Revelation of manager public key:@,Contract: %a@,Key: %a"
         Contract.pp
         source
-        Tezos_crypto.Signature.V0.Public_key.pp
+        Signature.V0.Public_key.pp
         key
   | Delegation delegate_opt -> (
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate ->
-          Tezos_crypto.Signature.V0.Public_key_hash.pp ppf delegate)
+      | Some delegate -> Signature.V0.Public_key_hash.pp ppf delegate)
   | Register_global_constant {value} ->
       Format.fprintf
         ppf
@@ -385,11 +383,9 @@ let pp_balance_updates ppf balance_updates =
      key hash, we want to make the result more informative. *)
   let pp_baker ppf baker =
     if
-      Tezos_crypto.Signature.V0.Public_key_hash.equal
-        baker
-        Tezos_crypto.Signature.V0.Public_key_hash.zero
+      Signature.V0.Public_key_hash.equal baker Signature.V0.Public_key_hash.zero
     then Format.fprintf ppf "the baker who will include this operation"
-    else Tezos_crypto.Signature.V0.Public_key_hash.pp ppf baker
+    else Signature.V0.Public_key_hash.pp ppf baker
   in
   let balance_updates =
     List.map
@@ -871,11 +867,7 @@ let pp_manager_operation_result ppf
       Manager_operation_result
         {balance_updates; operation_result; internal_operation_results} ) =
   Format.fprintf ppf "@[<v 2>Manager signed operations:" ;
-  Format.fprintf
-    ppf
-    "@,From: %a"
-    Tezos_crypto.Signature.V0.Public_key_hash.pp
-    source ;
+  Format.fprintf ppf "@,From: %a" Signature.V0.Public_key_hash.pp source ;
   Format.fprintf ppf "@,Fee to the baker: %s%a" tez_sym Tez.pp fee ;
   Format.fprintf ppf "@,Expected counter: %a" Z.pp_print counter ;
   Format.fprintf ppf "@,Gas limit: %a" Gas.Arith.pp_integral gas_limit ;
@@ -926,9 +918,9 @@ let pp_contents_and_result :
          Exhibit B: %a@,\
          Balance updates:@,\
          %a@]"
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         (Block_header.hash bh1)
-        Tezos_crypto.Block_hash.pp
+        Block_hash.pp
         (Block_header.hash bh2)
         pp_balance_updates
         bus
@@ -946,7 +938,7 @@ let pp_contents_and_result :
         level
         pp_balance_updates
         balance_updates
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         preendorsement_power
   | ( Endorsement {level; _},
@@ -962,14 +954,14 @@ let pp_contents_and_result :
         level
         pp_balance_updates
         balance_updates
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
         endorsement_power
   | Dal_slot_availability _, Dal_slot_availability_result {delegate} ->
       Format.fprintf
         ppf
         "@[<v 2>Slot availability:@,Delegate: %a@]"
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         delegate
   | ( Double_endorsement_evidence {op1; op2},
       Double_endorsement_evidence_result bus ) ->
@@ -980,9 +972,9 @@ let pp_contents_and_result :
          Exhibit B: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         (Operation.hash op1)
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         (Operation.hash op2)
         pp_balance_updates
         bus
@@ -995,9 +987,9 @@ let pp_contents_and_result :
          Exhibit B: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         (Operation.hash op1)
-        Tezos_crypto.Operation_hash.pp
+        Operation_hash.pp
         (Operation.hash op2)
         pp_balance_updates
         bus
@@ -1008,7 +1000,7 @@ let pp_contents_and_result :
          Account: %a@,\
          Balance updates:@,\
         \  %a@]"
-        Tezos_crypto.Ed25519.Public_key_hash.pp
+        Signature.Ed25519.Public_key_hash.pp
         id
         pp_balance_updates
         bus
@@ -1016,19 +1008,19 @@ let pp_contents_and_result :
       Format.fprintf
         ppf
         "@[<v 2>Proposals:@,From: %a@,Period: %ld@,Protocols:@,  @[<v 0>%a@]@]"
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         source
         period
-        (Format.pp_print_list Tezos_crypto.Protocol_hash.pp)
+        (Format.pp_print_list Protocol_hash.pp)
         proposals
   | Ballot {source; period; proposal; ballot}, Ballot_result ->
       Format.fprintf
         ppf
         "@[<v 2>Ballot:@,From: %a@,Period: %ld@,Protocol: %a@,Vote: %a@]"
-        Tezos_crypto.Signature.V0.Public_key_hash.pp
+        Signature.V0.Public_key_hash.pp
         source
         period
-        Tezos_crypto.Protocol_hash.pp
+        Protocol_hash.pp
         proposal
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Vote.ballot_encoding ballot)

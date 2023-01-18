@@ -81,7 +81,7 @@ module Arith_Context = struct
     (* FIXME: With on-disk context, we cannot commit the empty
        context. Is it also true in our case? *)
     let* context = Context_binary.add_tree context [] tree in
-    let* (_hash : Tezos_crypto.Context_hash.t) =
+    let* (_hash : Context_hash.t) =
       Context_binary.commit ~time:Time.Protocol.epoch context
     in
     let index = Context_binary.index context in

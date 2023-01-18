@@ -104,9 +104,8 @@ module Plugin = struct
       Plugin.RPC.Dal.dal_shards cpctxt (cpctxt#chain, cpctxt#block) ~level ()
     in
     List.fold_left
-      (fun acc (pkh, s) ->
-        Tezos_crypto.Signature.Public_key_hash.Map.add pkh s acc)
-      Tezos_crypto.Signature.Public_key_hash.Map.empty
+      (fun acc (pkh, s) -> Signature.Public_key_hash.Map.add pkh s acc)
+      Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
   let attested_slot_headers hash (block : block_info) ~number_of_slots =

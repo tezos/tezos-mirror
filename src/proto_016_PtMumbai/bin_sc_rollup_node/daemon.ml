@@ -230,7 +230,7 @@ module Make (PVM : Pvm.S) = struct
         | None ->
             failwith
               "Missing L2 predecessor %a for previous commitment"
-              Tezos_crypto.Block_hash.pp
+              Block_hash.pp
               predecessor
         | Some pred ->
             return (Sc_rollup_block.most_recent_commitment pred.header)

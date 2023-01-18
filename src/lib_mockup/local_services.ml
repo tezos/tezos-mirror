@@ -79,7 +79,7 @@ let () =
 module type MENV = sig
   include Registration.MOCKUP
 
-  val chain_id : Tezos_crypto.Chain_id.t
+  val chain_id : Chain_id.t
 
   val rpc_context : Tezos_protocol_environment.rpc_context
 
@@ -139,7 +139,7 @@ module Make (E : MENV) = struct
     Directory.register Directory.empty service (fun _prefix () () ->
         let current_protocol =
           if Compare.Int32.(E.rpc_context.block_header.level = 0l) then
-            Tezos_crypto.Protocol_hash.zero
+            Protocol_hash.zero
           else protocol_hash
         in
         Lwt.return
@@ -155,13 +155,13 @@ module Make (E : MENV) = struct
         Tezos_rpc.Answer.return (block_hash, block_header.timestamp))
 
   let chain_chain_id = function
-    | `Main -> Tezos_crypto.Chain_id.hash_string ["main"]
-    | `Test -> Tezos_crypto.Chain_id.hash_string ["test"]
+    | `Main -> Chain_id.hash_string ["main"]
+    | `Test -> Chain_id.hash_string ["test"]
     | `Hash cid -> cid
 
   let check_chain ?caller_name (chain : Block_services.chain) =
     unless
-      (Tezos_crypto.Chain_id.equal E.chain_id (chain_chain_id chain))
+      (Chain_id.equal E.chain_id (chain_chain_id chain))
       (fun () ->
         let msg =
           let open Format in
@@ -175,17 +175,17 @@ module Make (E : MENV) = struct
                   fprintf
                     ppf
                     "main (%a)"
-                    Tezos_crypto.Chain_id.pp
-                    (Tezos_crypto.Chain_id.hash_string ["main"])
+                    Chain_id.pp
+                    (Chain_id.hash_string ["main"])
               | `Test ->
                   fprintf
                     ppf
                     "test (%a)"
-                    Tezos_crypto.Chain_id.pp
-                    (Tezos_crypto.Chain_id.hash_string ["test"])
-              | `Hash chain_id -> Tezos_crypto.Chain_id.pp ppf chain_id)
+                    Chain_id.pp
+                    (Chain_id.hash_string ["test"])
+              | `Hash chain_id -> Chain_id.pp ppf chain_id)
             chain
-            Tezos_crypto.Chain_id.pp
+            Chain_id.pp
             E.chain_id
         in
         Lwt.fail_with msg)
@@ -370,11 +370,11 @@ module Make (E : MENV) = struct
           let pending_operations =
             {
               E.Block_services.Mempool.applied;
-              refused = Tezos_crypto.Operation_hash.Map.empty;
-              outdated = Tezos_crypto.Operation_hash.Map.empty;
-              branch_refused = Tezos_crypto.Operation_hash.Map.empty;
-              branch_delayed = Tezos_crypto.Operation_hash.Map.empty;
-              unprocessed = Tezos_crypto.Operation_hash.Map.empty;
+              refused = Operation_hash.Map.empty;
+              outdated = Operation_hash.Map.empty;
+              branch_refused = Operation_hash.Map.empty;
+              branch_delayed = Operation_hash.Map.empty;
+              unprocessed = Operation_hash.Map.empty;
             }
           in
           return pending_operations
@@ -421,9 +421,7 @@ module Make (E : MENV) = struct
          E.Block_services.S.live_blocks
          (fun (((), chain), _block) () () ->
            with_chain ~caller_name:"live blocks" chain (fun () ->
-               let set =
-                 Tezos_crypto.Block_hash.Set.singleton E.rpc_context.block_hash
-               in
+               let set = Block_hash.Set.singleton E.rpc_context.block_hash in
                Tezos_rpc.Answer.return set))
 
   let simulate_operation (state, preapply_result) op =
@@ -446,7 +444,7 @@ module Make (E : MENV) = struct
                 {
                   preapply_result with
                   refused =
-                    Tezos_crypto.Operation_hash.Map.add
+                    Operation_hash.Map.add
                       hash
                       (op_t, e)
                       preapply_result.refused;
@@ -511,11 +509,10 @@ module Make (E : MENV) = struct
                  (* Similar to lib_shell.Prevalidation.preapply *)
                  let operations_hash =
                    let open Preapply_result in
-                   Tezos_crypto.Operation_list_list_hash.compute
+                   Operation_list_list_hash.compute
                    @@ List.rev_map
                         (fun x ->
-                          Tezos_crypto.Operation_list_hash.compute
-                          @@ List.map fst x.applied)
+                          Operation_list_hash.compute @@ List.map fst x.applied)
                         preapply_results
                  in
                  let timestamp =
@@ -537,9 +534,7 @@ module Make (E : MENV) = struct
                      operations_hash;
                      validation_passes;
                      fitness = validation_result.fitness;
-                     context =
-                       Tezos_crypto.Context_hash.zero
-                       (* TODO: is that correct ? *);
+                     context = Context_hash.zero (* TODO: is that correct ? *);
                    }
                  in
                  return (shell_header, List.rev preapply_results)
@@ -607,7 +602,7 @@ module Make (E : MENV) = struct
 
   let equal_op (a_shell_header, a_operation_data)
       (b_shell_header, b_operation_data) =
-    Tezos_crypto.Block_hash.equal
+    Block_hash.equal
       a_shell_header.Operation.branch
       b_shell_header.Operation.branch
     && (* FIXME: the protocol should export equality/comparison functions for
@@ -630,7 +625,7 @@ module Make (E : MENV) = struct
           (proto_state, Preapply_result.empty)
           operations
       in
-      if Tezos_crypto.Operation_hash.Map.is_empty preapply_result.refused then
+      if Operation_hash.Map.is_empty preapply_result.refused then
         let* _ = finalize_validation_and_application proto_state None in
         return `Applicable
       else return `Refused
@@ -770,7 +765,7 @@ module Make (E : MENV) = struct
       (* See injection_directory.ml for vanilla implementation *)
       (fun () _ (bytes, operations) ->
         (* assert (Files.Mempool.exists ~dirname:E.base_dir) ; *)
-        let block_hash = Tezos_crypto.Block_hash.hash_bytes [bytes] in
+        let block_hash = Block_hash.hash_bytes [bytes] in
         match Block_header.of_bytes bytes with
         | None -> Tezos_rpc.Answer.fail [Cannot_parse_op]
         | Some block_header -> (
@@ -814,28 +809,21 @@ module Make (E : MENV) = struct
                   let h =
                     Operation.hash {Operation.shell = shell_header; proto}
                   in
-                  return @@ Tezos_crypto.Operation_hash.Map.add h v map)
-            Tezos_crypto.Operation_hash.Map.empty
+                  return @@ Operation_hash.Map.add h v map)
+            Operation_hash.Map.empty
             mempool_operations
         in
         let refused_map =
           List.fold_left
             (List.fold_left (fun mempool op ->
-                 Tezos_crypto.Operation_hash.Map.remove
-                   (Operation.hash op)
-                   mempool))
+                 Operation_hash.Map.remove (Operation.hash op) mempool))
             mempool_map
             operations
         in
         let* () =
-          unless
-            (Tezos_crypto.Operation_hash.Map.is_empty refused_map)
-            (fun () ->
+          unless (Operation_hash.Map.is_empty refused_map) (fun () ->
               let refused_ops =
-                Tezos_crypto.Operation_hash.Map.fold
-                  (fun _k v l -> v :: l)
-                  refused_map
-                  []
+                Operation_hash.Map.fold (fun _k v l -> v :: l) refused_map []
               in
               let*! () = L.(S.emit warn_trashpool_append) refused_ops in
               Trashpool.append refused_ops)
@@ -1009,8 +997,7 @@ let build_shell_directory (base_dir : string)
     [rpc_context] is data used when honoring an RPC.
  *)
 let build_directory (base_dir : string) (mem_only : bool)
-    (mockup_env : Registration.mockup_environment)
-    (chain_id : Tezos_crypto.Chain_id.t)
+    (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) protocol_data :
     unit Tezos_rpc.Directory.t =
   let write_context rpc_context protocol_data =

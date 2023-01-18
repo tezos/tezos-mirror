@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_crypto.S.HASH
+include Tezos_crypto.Intfs.HASH

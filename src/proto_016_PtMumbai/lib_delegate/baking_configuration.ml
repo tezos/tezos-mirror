@@ -81,7 +81,7 @@ type t = {
   nonce : nonce_config;
   validation : validation_config;
   retries_on_failure : int;
-  user_activated_upgrades : (int32 * Tezos_crypto.Protocol_hash.t) list;
+  user_activated_upgrades : (int32 * Protocol_hash.t) list;
   liquidity_baking_toggle_vote :
     Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote;
   per_block_vote_file : string option;
@@ -221,7 +221,7 @@ let retries_on_failure_config_encoding = Data_encoding.int31
 
 let user_activate_upgrades_config_encoding =
   let open Data_encoding in
-  list (tup2 int32 Tezos_crypto.Protocol_hash.encoding)
+  list (tup2 int32 Protocol_hash.encoding)
 
 let liquidity_baking_toggle_vote_config_encoding =
   Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote_encoding

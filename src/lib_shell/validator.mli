@@ -49,24 +49,23 @@ val activate :
   Store.chain_store ->
   Chain_validator.t tzresult Lwt.t
 
-val get : t -> Tezos_crypto.Chain_id.t -> Chain_validator.t tzresult
+val get : t -> Chain_id.t -> Chain_validator.t tzresult
 
-val get_active_chains : t -> Tezos_crypto.Chain_id.t list
+val get_active_chains : t -> Chain_id.t list
 
 (** Force the validation of a block. *)
 val validate_block :
   t ->
   ?force:bool ->
-  ?chain_id:Tezos_crypto.Chain_id.t ->
+  ?chain_id:Chain_id.t ->
   Bytes.t ->
   Operation.t list list ->
-  (Tezos_crypto.Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
+  (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
 
 (** Monitor all the valid block (for all activate chains). *)
 val watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
-val chains_watcher :
-  t -> (Tezos_crypto.Chain_id.t * bool) Lwt_stream.t * Lwt_watcher.stopper
+val chains_watcher : t -> (Chain_id.t * bool) Lwt_stream.t * Lwt_watcher.stopper
 
 (** [inject_operation t ?chain_id ~force op] notifies the prevalidator worker
     associated with the [chain_id] of a new injected operation.
@@ -76,10 +75,6 @@ val chains_watcher :
     in the operation data. Fails if no chain_id can be recovered unless [force] is set.
     If force is set, notify all the known prevalidator workers. *)
 val inject_operation :
-  t ->
-  ?chain_id:Tezos_crypto.Chain_id.t ->
-  force:bool ->
-  Operation.t ->
-  unit tzresult Lwt.t
+  t -> ?chain_id:Chain_id.t -> force:bool -> Operation.t -> unit tzresult Lwt.t
 
 val distributed_db : t -> Distributed_db.t

@@ -79,7 +79,7 @@ let populate_inboxes level history inbox inboxes list_of_messages =
           Environment.wrap_tzresult
           @@ add_all_messages
                ~predecessor_timestamp:Time.Protocol.epoch
-               ~predecessor:Tezos_crypto.Block_hash.zero
+               ~predecessor:Block_hash.zero
                history
                inbox
                messages
@@ -150,7 +150,7 @@ let setup_node_inbox_with_messages list_of_messages f =
           Environment.wrap_tzresult
           @@ add_all_messages
                ~predecessor_timestamp:Time.Protocol.epoch
-               ~predecessor:Tezos_crypto.Block_hash.zero
+               ~predecessor:Block_hash.zero
                history
                inbox
                messages

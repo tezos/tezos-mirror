@@ -33,7 +33,7 @@ let missing_pruned_contents =
     ~name:"missing_pruned_contents"
     ~msg:"cannot find pruned contents of block {block_hash}"
     ~level:Error
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let pop_block =
   declare_1
@@ -41,7 +41,7 @@ let pop_block =
     ~name:"pop_block"
     ~msg:"pop_block {block_hash}"
     ~level:Debug
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let push_block =
   declare_1
@@ -49,7 +49,7 @@ let push_block =
     ~name:"push_block"
     ~msg:"push_block {block_hash}"
     ~level:Debug
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let destroy_state =
   declare_1
@@ -57,4 +57,4 @@ let destroy_state =
     ~name:"destroy_state"
     ~msg:"destroy {chain_id}"
     ~level:Debug
-    ("chain_id", Tezos_crypto.Chain_id.encoding)
+    ("chain_id", Chain_id.encoding)

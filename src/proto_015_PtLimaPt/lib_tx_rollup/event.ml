@@ -101,7 +101,7 @@ let new_block =
     ~name:"tx_rollup_node_new_block"
     ~msg:"new block with hash: {block_hash}"
     ~level:Notice
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let processing_block =
   declare_2
@@ -109,8 +109,8 @@ let processing_block =
     ~name:"tx_rollup_node_processing_block"
     ~msg:"processing block: {block_hash} (pred: {predecessor_hash})"
     ~level:Debug
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
-    ("predecessor_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
+    ("predecessor_hash", Block_hash.encoding)
 
 let missing_blocks =
   declare_1
@@ -126,7 +126,7 @@ let look_for_origination =
     ~name:"tx_rollup_node_look_for_origination"
     ~msg:"Looking for rollup origination in block {block} level {level}"
     ~level:Notice
-    ("block", Tezos_crypto.Block_hash.encoding)
+    ("block", Block_hash.encoding)
     ("level", Data_encoding.int32)
 
 let detected_origination =
@@ -136,7 +136,7 @@ let detected_origination =
     ~msg:"Detected rollup {rollup} origination in {block}"
     ~level:Notice
     ("rollup", Protocol.Alpha_context.Tx_rollup.encoding)
-    ("block", Tezos_crypto.Block_hash.encoding)
+    ("block", Block_hash.encoding)
 
 let tezos_block_processed =
   declare_2
@@ -144,7 +144,7 @@ let tezos_block_processed =
     ~name:"tx_rollup_node_tezos_block_processed"
     ~msg:"tezos block {block_hash} at level {level} was sucessfully processed"
     ~level:Notice
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
 
 let block_already_processed =
@@ -155,7 +155,7 @@ let block_already_processed =
       "the block {block_hash} has already been processed, nothing more to be \
        done"
     ~level:Debug
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
 
 let processing_block_predecessor =
   declare_2
@@ -165,7 +165,7 @@ let processing_block_predecessor =
       "processing block predecessor {predecessor_hash} at level \
        {predecessor_level}"
     ~level:Debug
-    ("predecessor_hash", Tezos_crypto.Block_hash.encoding)
+    ("predecessor_hash", Block_hash.encoding)
     ("predecessor_level", Data_encoding.int32)
 
 let messages_application =
@@ -184,7 +184,7 @@ let rollup_block =
     ~level:Notice
     ("level", L2block.level_encoding)
     ("hash", L2block.Hash.encoding)
-    ("tezos_hash", Tezos_crypto.Block_hash.encoding)
+    ("tezos_hash", Block_hash.encoding)
 
 let inbox_stored =
   declare_4
@@ -194,7 +194,7 @@ let inbox_stored =
       "an inbox with size {cumulated_size} and resulting context hash \
        {context_hash} has been stored for {block_hash}: {messages}"
     ~level:Notice
-    ("block_hash", Tezos_crypto.Block_hash.encoding)
+    ("block_hash", Block_hash.encoding)
     ("messages", Data_encoding.list Inbox.message_encoding)
     ("cumulated_size", Data_encoding.int31)
     ("context_hash", Protocol.Tx_rollup_l2_context_hash.encoding)
@@ -213,7 +213,7 @@ let new_tezos_head =
     ~name:"tx_rollup_node_new_tezos_head"
     ~msg:"a new tezos head ({tezos_head}) is stored"
     ~level:Notice
-    ("tezos_head", Tezos_crypto.Block_hash.encoding)
+    ("tezos_head", Block_hash.encoding)
 
 let inject_wait =
   declare_1

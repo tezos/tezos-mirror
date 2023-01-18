@@ -201,8 +201,8 @@ module Types = struct
       conv
         (fun pkhu -> pkhu)
         (fun w -> w)
-        (encoding_to_scalar Tezos_crypto.Signature.Public_key_hash.encoding)
-        (encoding_of_scalar Tezos_crypto.Signature.Public_key_hash.encoding)
+        (encoding_to_scalar Signature.Public_key_hash.encoding)
+        (encoding_of_scalar Signature.Public_key_hash.encoding)
         scalar_encoding
 
     let amount_encoding ~safety = Bounded_e.encoding ~safety Bound.bound_amount
@@ -596,7 +596,7 @@ end = struct
              {id; amount = Z.zero});
           l1_dst =
             Data_encoding.Binary.of_bytes_exn
-              Tezos_crypto.Signature.Public_key_hash.encoding
+              Signature.Public_key_hash.encoding
               dummy_l1_dst;
           rollup_id =
             Data_encoding.Binary.of_bytes_exn

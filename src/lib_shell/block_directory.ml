@@ -62,8 +62,7 @@ let read_partial_context =
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
   let open Lwt_result_syntax in
   let dir :
-      (Store.chain_store * Tezos_crypto.Block_hash.t * Block_header.t)
-      Tezos_rpc.Directory.t
+      (Store.chain_store * Block_hash.t * Block_header.t) Tezos_rpc.Directory.t
       ref =
     ref Tezos_rpc.Directory.empty
   in

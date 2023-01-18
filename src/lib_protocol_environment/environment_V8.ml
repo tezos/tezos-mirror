@@ -43,46 +43,46 @@ module type T = sig
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
-       and type Chain_id.t = Tezos_crypto.Chain_id.t
-       and type Block_hash.t = Tezos_crypto.Block_hash.t
-       and type Operation_hash.t = Tezos_crypto.Operation_hash.t
-       and type Operation_list_hash.t = Tezos_crypto.Operation_list_hash.t
+       and type Chain_id.t = Tezos_crypto.Hashed.Chain_id.t
+       and type Block_hash.t = Tezos_crypto.Hashed.Block_hash.t
+       and type Operation_hash.t = Tezos_crypto.Hashed.Operation_hash.t
+       and type Operation_list_hash.t =
+        Tezos_crypto.Hashed.Operation_list_hash.t
        and type Operation_list_list_hash.t =
-        Tezos_crypto.Operation_list_list_hash.t
+        Tezos_crypto.Hashed.Operation_list_list_hash.t
        and type Context.t = Context.t
        and type Context.cache_key = Environment_context.Context.cache_key
        and type Context.cache_value = Environment_context.Context.cache_value
-       and type Context_hash.t = Tezos_crypto.Context_hash.t
-       and type Context_hash.Version.t = Tezos_crypto.Context_hash.Version.t
+       and type Context_hash.t = Tezos_crypto.Hashed.Context_hash.t
+       and type Context_hash.Version.t =
+        Tezos_crypto.Hashed.Context_hash.Version.t
        and type Context.config = Tezos_context_sigs.Config.t
        and module Context.Proof = Environment_context.Context.Proof
-       and type Protocol_hash.t = Tezos_crypto.Protocol_hash.t
+       and type Protocol_hash.t = Tezos_crypto.Hashed.Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
        and type Block_header.t = Block_header.t
        and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
-       and type Ed25519.Public_key_hash.t =
-        Tezos_crypto.Ed25519.Public_key_hash.t
-       and type Ed25519.Public_key.t = Tezos_crypto.Ed25519.Public_key.t
-       and type Ed25519.t = Tezos_crypto.Ed25519.t
+       and type Ed25519.Public_key_hash.t = Signature.Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t = Signature.Ed25519.Public_key.t
+       and type Ed25519.t = Signature.Ed25519.t
        and type Secp256k1.Public_key_hash.t =
-        Tezos_crypto.Secp256k1.Public_key_hash.t
-       and type Secp256k1.Public_key.t = Tezos_crypto.Secp256k1.Public_key.t
-       and type Secp256k1.t = Tezos_crypto.Secp256k1.t
-       and type P256.Public_key_hash.t = Tezos_crypto.P256.Public_key_hash.t
-       and type P256.Public_key.t = Tezos_crypto.P256.Public_key.t
-       and type P256.t = Tezos_crypto.P256.t
-       and type Bls.Public_key_hash.t = Tezos_crypto.Bls.Public_key_hash.t
-       and type Bls.Public_key.t = Tezos_crypto.Bls.Public_key.t
-       and type Bls.t = Tezos_crypto.Bls.t
-       and type Signature.public_key_hash =
-        Tezos_crypto.Signature.V1.public_key_hash
-       and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
-       and type Signature.signature = Tezos_crypto.Signature.V1.signature
-       and type Signature.t = Tezos_crypto.Signature.V1.t
-       and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
+        Signature.Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Signature.Secp256k1.Public_key.t
+       and type Secp256k1.t = Signature.Secp256k1.t
+       and type P256.Public_key_hash.t = Signature.P256.Public_key_hash.t
+       and type P256.Public_key.t = Signature.P256.Public_key.t
+       and type P256.t = Signature.P256.t
+       and type Bls.Public_key_hash.t = Signature.Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Signature.Bls.Public_key.t
+       and type Bls.t = Signature.Bls.t
+       and type Signature.public_key_hash = Signature.V1.public_key_hash
+       and type Signature.public_key = Signature.V1.public_key
+       and type Signature.signature = Signature.V1.signature
+       and type Signature.t = Signature.V1.t
+       and type Signature.watermark = Signature.V1.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
@@ -299,11 +299,11 @@ struct
   end
 
   module Time = Time.Protocol
-  module Ed25519 = Tezos_crypto.Ed25519
-  module Secp256k1 = Tezos_crypto.Secp256k1
-  module P256 = Tezos_crypto.P256
-  module Bls = Tezos_crypto.Bls
-  module Signature = Tezos_crypto.Signature.V1
+  module Ed25519 = Signature.Ed25519
+  module Secp256k1 = Signature.Secp256k1
+  module P256 = Signature.P256
+  module Bls = Signature.Bls
+  module Signature = Signature.V1
   module Timelock = Tezos_crypto.Timelock
   module Vdf = Class_group_vdf.Vdf_self_contained
 
@@ -312,7 +312,7 @@ struct
 
     module type HASHABLE = Tezos_base.S.HASHABLE
 
-    module type MINIMAL_HASH = Tezos_crypto.S.MINIMAL_HASH
+    module type MINIMAL_HASH = Tezos_crypto.Intfs.MINIMAL_HASH
 
     module type B58_DATA = sig
       type t
@@ -736,13 +736,13 @@ struct
 
   let wrap_tzresult r = Result.map_error wrap_tztrace r
 
-  module Chain_id = Tezos_crypto.Chain_id
-  module Block_hash = Tezos_crypto.Block_hash
-  module Operation_hash = Tezos_crypto.Operation_hash
-  module Operation_list_hash = Tezos_crypto.Operation_list_hash
-  module Operation_list_list_hash = Tezos_crypto.Operation_list_list_hash
-  module Context_hash = Tezos_crypto.Context_hash
-  module Protocol_hash = Tezos_crypto.Protocol_hash
+  module Chain_id = Tezos_crypto.Hashed.Chain_id
+  module Block_hash = Tezos_crypto.Hashed.Block_hash
+  module Operation_hash = Tezos_crypto.Hashed.Operation_hash
+  module Operation_list_hash = Tezos_crypto.Hashed.Operation_list_hash
+  module Operation_list_list_hash = Tezos_crypto.Hashed.Operation_list_list_hash
+  module Context_hash = Tezos_crypto.Hashed.Context_hash
+  module Protocol_hash = Tezos_crypto.Hashed.Protocol_hash
   module Blake2B = Tezos_crypto.Blake2B
   module Fitness = Fitness
   module Operation = Operation

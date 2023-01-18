@@ -53,7 +53,7 @@ let assert_fails_with_f ~__LOC__ k f =
 let tick_of_int_exn n =
   match Tick.of_int n with None -> assert false | Some t -> t
 
-let context_hash_of_string s = Tezos_crypto.Context_hash.hash_string [s]
+let context_hash_of_string s = Context_hash.hash_string [s]
 
 let hash_string s =
   Sc_rollup_repr.State_hash.context_hash_to_state_hash

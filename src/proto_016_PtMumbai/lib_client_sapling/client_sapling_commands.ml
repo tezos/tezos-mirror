@@ -61,7 +61,7 @@ let anti_replay cctxt contract =
   Tezos_shell_services.Chain_services.chain_id cctxt ~chain:cctxt#chain ()
   >>=? fun chain_id ->
   let address = Protocol.Contract_hash.to_b58check contract in
-  let chain_id = Tezos_crypto.Chain_id.to_b58check chain_id in
+  let chain_id = Chain_id.to_b58check chain_id in
   return (address ^ chain_id)
 
 (** The shielded tez contract expects the recipient pkh encoded in Micheline

@@ -34,8 +34,7 @@
    - creates a 'yes-wallet' directory to be passed to tezos-client -d option
  *)
 
-let pp_protocol ppf (module P : Sigs.PROTOCOL) =
-  Tezos_crypto.Protocol_hash.pp ppf P.hash
+let pp_protocol ppf (module P : Sigs.PROTOCOL) = Protocol_hash.pp ppf P.hash
 
 let pkh_json (alias, pkh, _pk) =
   Ezjsonm.(dict [("name", string alias); ("value", string pkh)])
@@ -230,8 +229,7 @@ let get_delegates (module P : Sigs.PROTOCOL) context
 
 let protocol_of_hash protocol_hash =
   List.find
-    (fun (module P : Sigs.PROTOCOL) ->
-      Tezos_crypto.Protocol_hash.equal P.hash protocol_hash)
+    (fun (module P : Sigs.PROTOCOL) -> Protocol_hash.equal P.hash protocol_hash)
     (Known_protocols.get_all ())
 
 (** [load_mainnet_bakers_public_keys base_dir active_backers_only] checkouts
@@ -251,10 +249,10 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
     {
       Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
       block =
-        Tezos_crypto.Block_hash.of_b58check_exn
+        Block_hash.of_b58check_exn
           "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
       protocol =
-        Tezos_crypto.Protocol_hash.of_b58check_exn
+        Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
   in
@@ -270,7 +268,7 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
   let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
   Format.printf
     "@[<h>Head block:@;<17 0>%a@]@."
-    Tezos_crypto.Block_hash.pp
+    Block_hash.pp
     (Tezos_store.Store.Block.hash block) ;
   let header = Store.Block.header block in
   let*! context =
@@ -284,12 +282,12 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
     | None ->
         Error_monad.failwith
           "Unknown protocol hash: %a.@;Known protocols are: %a"
-          Tezos_crypto.Protocol_hash.pp
+          Protocol_hash.pp
           protocol_hash
           Format.(
             pp_print_list
               ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-              Tezos_crypto.Protocol_hash.pp)
+              Protocol_hash.pp)
           (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
           @@ Known_protocols.get_all ())
     | Some protocol ->

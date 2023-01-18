@@ -27,7 +27,7 @@ open Protocol
 open Protocol_client_context
 
 let protocol =
-  Tezos_crypto.Protocol_hash.of_b58check_exn
+  Protocol_hash.of_b58check_exn
     "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
 
 let bake cctxt ?timestamp block command sk =
@@ -96,7 +96,7 @@ let proto_param ~name ~desc t =
     ~name
     ~desc
     (Tezos_clic.parameter (fun _ str ->
-         Lwt.return (Tezos_crypto.Protocol_hash.of_b58check str)))
+         Lwt.return (Protocol_hash.of_b58check str)))
     t
 
 let commands () =
@@ -142,8 +142,8 @@ let commands () =
           (Activate {protocol = hash; fitness; protocol_parameters})
           sk
         >>=? fun hash ->
-        cctxt#answer "Injected %a" Tezos_crypto.Block_hash.pp_short hash
-        >>= fun () -> return_unit);
+        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        return_unit);
     command
       ~desc:"Fork a test protocol"
       (args2 timestamp_arg test_delay_arg)
@@ -162,8 +162,8 @@ let commands () =
           (Activate_testchain {protocol = hash; delay})
           sk
         >>=? fun hash ->
-        cctxt#answer "Injected %a" Tezos_crypto.Block_hash.pp_short hash
-        >>= fun () -> return_unit);
+        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        return_unit);
   ]
 
 let () = Client_commands.register protocol @@ fun _network -> commands ()

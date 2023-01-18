@@ -32,7 +32,7 @@
 
 (** Deterministic nonce generation using HMAC-SHA256 *)
 
-let test_hash_matches (module X : S.SIGNATURE) () =
+let test_hash_matches (module X : Intfs.SIGNATURE) () =
   let _, _, sk = X.generate_key () in
   let data = Bytes.of_string "ce input sa pun eu aici oare?" in
   let nonce = X.deterministic_nonce sk data in
@@ -42,11 +42,11 @@ let test_hash_matches (module X : S.SIGNATURE) () =
     Alcotest.failf
       "the hash of deterministic_nonce is NOT deterministic_nonce_hash"
 
-let ed25519 = (module Ed25519 : S.SIGNATURE)
+let ed25519 = (module Signature.Ed25519 : Intfs.SIGNATURE)
 
-let p256 = (module P256 : S.SIGNATURE)
+let p256 = (module Signature.P256 : Intfs.SIGNATURE)
 
-let secp256k1 = (module Secp256k1 : S.SIGNATURE)
+let secp256k1 = (module Signature.Secp256k1 : Intfs.SIGNATURE)
 
 let tests =
   [

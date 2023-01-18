@@ -70,7 +70,7 @@ module Request = struct
         Format.fprintf
           ppf
           "switching to new L1 head %a at level %ld"
-          Tezos_crypto.Block_hash.pp
+          Block_hash.pp
           hash
           level
     | Batch -> Format.pp_print_string ppf "batch"

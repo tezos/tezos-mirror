@@ -26,7 +26,7 @@
 (*****************************************************************************)
 
 type 'protocol_operation operation = {
-  hash : Tezos_crypto.Operation_hash.t;
+  hash : Operation_hash.t;
   raw : Operation.t;
   protocol : 'protocol_operation;
   count_successful_prechecks : int;
@@ -54,9 +54,7 @@ module type PARSER = sig
   type protocol_operation
 
   val parse :
-    Tezos_crypto.Operation_hash.t ->
-    Operation.t ->
-    protocol_operation operation tzresult
+    Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
 end
 
 module MakeParser (Proto : Tezos_protocol_environment.PROTOCOL) :

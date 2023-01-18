@@ -37,7 +37,7 @@ open Alpha_context
 
 type init_env = {
   block : Block.t;
-  baker : Tezos_crypto.Signature.public_key_hash;
+  baker : Signature.public_key_hash;
   contract : Contract.t;
 }
 

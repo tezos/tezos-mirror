@@ -36,12 +36,9 @@ let build_rpc_directory block_validator store =
   gen_register0 Protocol_services.S.list (fun () () ->
       let set = Store.Protocol.all store in
       let protocols =
-        Tezos_crypto.Protocol_hash.Set.add_seq
-          (Registered_protocol.seq_embedded ())
-          set
+        Protocol_hash.Set.add_seq (Registered_protocol.seq_embedded ()) set
       in
-      Tezos_rpc.Answer.return
-        (Tezos_crypto.Protocol_hash.Set.elements protocols)) ;
+      Tezos_rpc.Answer.return (Protocol_hash.Set.elements protocols)) ;
   register1 Protocol_services.S.contents (fun hash () () ->
       match Registered_protocol.get_embedded_sources hash with
       | Some p -> return p

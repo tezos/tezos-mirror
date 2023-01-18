@@ -85,7 +85,7 @@ module WASM_P :
   let produce_proof context tree step =
     let open Lwt_syntax in
     let* context = Context_binary.add_tree context [] tree in
-    let* (_hash : Tezos_crypto.Context_hash.t) =
+    let* (_hash : Context_hash.t) =
       Context_binary.commit ~time:Time.Protocol.epoch context
     in
     let index = Context_binary.index context in

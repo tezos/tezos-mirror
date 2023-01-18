@@ -175,7 +175,7 @@ module Tx_rollup : sig
     ?name:string ->
     usage:string ->
     ('a, full) Tezos_clic.params ->
-    (Tezos_crypto.Context_hash.t -> 'a, full) Tezos_clic.params
+    (Context_hash.t -> 'a, full) Tezos_clic.params
 
   val message_result_path_param :
     ?name:string ->
