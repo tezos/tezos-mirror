@@ -305,45 +305,19 @@ let to_transaction_operation ctxt rollup
         {source = Destination.Sc_rollup rollup; operation; nonce},
       ctxt )
 
-(* Transfer some ticket-tokens from [source_destination] to [target_destination].
-   This operation fails in case the [source_destination]'s balance is lower than
-   amount. *)
-let transfer_ticket_token ctxt ~source_destination ~target_destination ~amount
-    ticket_token =
-  let open Lwt_result_syntax in
-  let* source_key_hash, ctxt =
-    Ticket_balance_key.of_ex_token ctxt ~owner:source_destination ticket_token
-  in
-  let* target_key_hash, ctxt =
-    Ticket_balance_key.of_ex_token ctxt ~owner:target_destination ticket_token
-  in
-  let* source_storage_diff, ctxt =
-    Ticket_balance.adjust_balance ctxt source_key_hash ~delta:(Z.neg amount)
-  in
-  let* target_storage_diff, ctxt =
-    Ticket_balance.adjust_balance ctxt target_key_hash ~delta:amount
-  in
-  (* Adjust the recorded paid-for storage space for the ticket-table. *)
-  let* storage_diff_to_pay, ctxt =
-    Ticket_balance.adjust_storage_space
-      ctxt
-      ~storage_diff:(Z.add source_storage_diff target_storage_diff)
-  in
-  return (storage_diff_to_pay, ctxt)
-
 let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
     {Ticket_operations_diff.ticket_token; total_amount = _; destinations} =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun (acc_storage_diff, ctxt)
          (target_destination, (amount : Script_typed_ir.ticket_amount)) ->
-      let* storage_diff, ctxt =
-        transfer_ticket_token
+      let* ctxt, storage_diff =
+        Ticket_transfer.transfer_ticket
           ctxt
-          ~source_destination
-          ~target_destination
-          ~amount:Script_int.(to_zint (amount :> n num))
+          ~src:source_destination
+          ~dst:target_destination
           ticket_token
+          Ticket_amount.((amount :> t))
       in
       return (Z.(add acc_storage_diff storage_diff), ctxt))
     (acc_storage_diff, ctxt)
