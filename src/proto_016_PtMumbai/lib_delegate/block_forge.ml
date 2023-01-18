@@ -40,6 +40,11 @@ type simulation_kind =
 
 type simulation_mode = Local of Context.index | Node
 
+(* [forge_faked_protocol_data ?payload_hash ~payload_round ~seed_nonce_hash
+   ~liquidity_baking_toggle_vote] forges a fake [block_header_data] with
+   [payload_hash] ([zero] by default), [payload_round], [seed_nonce_hash],
+   [liquidity_baking_toggle_vote] and with an empty [proof_of_work_nonce] and a
+   dummy [signature]. *)
 let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
     ~payload_round ~seed_nonce_hash ~liquidity_baking_toggle_vote () =
   Block_header.
@@ -64,7 +69,6 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
         op.protocol_data;
   }
 
-(* Build the block header : mimics node prevalidation *)
 let finalize_block_header shell_header timestamp validation_result
     operations_hash predecessor_block_metadata_hash
     predecessor_ops_metadata_hash predecessor_resulting_context =
@@ -125,6 +129,21 @@ let retain_live_operations_only ~live_blocks operation_pool =
       Block_hash.Set.mem shell.branch live_blocks)
     operation_pool
 
+let check_protocol_changed ~user_activated_upgrades ~level
+    ~(validation_result : Tezos_protocol_environment.validation_result) =
+  let open Lwt_result_syntax in
+  let*! next_protocol = Context_ops.get_protocol validation_result.context in
+  let next_protocol =
+    match
+      Tezos_base.Block_header.get_forced_protocol_upgrade
+        ~user_activated_upgrades
+        ~level
+    with
+    | None -> next_protocol
+    | Some hash -> hash
+  in
+  return Protocol_hash.(Protocol.hash <> next_protocol)
+
 let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     ~timestamp ~liquidity_baking_toggle_vote ~user_activated_upgrades
     fees_config ~seed_nonce_hash ~payload_round simulation_mode simulation_kind
@@ -135,20 +154,6 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     constants.Constants.Parametric.hard_gas_limit_per_block
   in
   let chain = `Hash chain_id in
-  let check_protocol_changed
-      ~(validation_result : Tezos_protocol_environment.validation_result) =
-    let*! next_protocol = Context_ops.get_protocol validation_result.context in
-    let next_protocol =
-      match
-        Tezos_base.Block_header.get_forced_protocol_upgrade
-          ~user_activated_upgrades
-          ~level:(Int32.succ predecessor_block.shell.level)
-      with
-      | None -> next_protocol
-      | Some hash -> hash
-    in
-    return Protocol_hash.(Protocol.hash <> next_protocol)
-  in
   let filter_via_node ~operation_pool =
     let filtered_operations =
       Operation_selection.filter_operations_without_simulation
@@ -204,7 +209,6 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         predecessor_block
         chain_id
     in
-
     let* {Operation_selection.operations; validation_result; operations_hash; _}
         =
       Operation_selection.filter_operations_with_simulation
@@ -213,7 +217,12 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         ~hard_gas_limit_per_block
         operation_pool
     in
-    let* changed = check_protocol_changed ~validation_result in
+    let* changed =
+      check_protocol_changed
+        ~level:(Int32.succ predecessor_block.shell.level)
+        ~user_activated_upgrades
+        ~validation_result
+    in
     if changed then
       (* Fallback to processing via node, which knows both old and new protocol. *)
       filter_via_node ~operation_pool
@@ -330,7 +339,12 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     let* validation_result, _ =
       Baking_simulator.finalize_construction incremental
     in
-    let* changed = check_protocol_changed ~validation_result in
+    let* changed =
+      check_protocol_changed
+        ~level:(Int32.succ predecessor_block.shell.level)
+        ~user_activated_upgrades
+        ~validation_result
+    in
     if changed then
       (* Fallback to processing via node, which knows both old and new protocol. *)
       apply_via_node ~ordered_pool ~payload_hash
