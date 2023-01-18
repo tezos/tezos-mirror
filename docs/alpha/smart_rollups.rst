@@ -1338,9 +1338,13 @@ two messages:
     ]
   ]
 
-Note that the `sender`, `source` and `destination` fields are optional
-and will be given default values by the debugger. If no input file is
-given, the inbox will be assumed empty.
+Note that the ``sender``, ``source`` and ``destination`` fields are optional
+and will be given default values by the debugger, respectively
+``KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT``,
+``tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU`` and
+``sr163Lv22CdE8QagCwf48PWDTquk6isQwv57``. If no input file is given, the
+inbox will be assumed empty. If the option ``--rollup`` is given, it
+replaces the default value for the rollup address.
 
 ``octez-smart-rollup-wasm-debugger`` is a debugger, as such it waits for user
 inputs to continue its execution. Its initial state is exactly the same as right
