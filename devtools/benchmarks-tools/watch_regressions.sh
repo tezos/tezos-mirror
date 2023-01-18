@@ -74,7 +74,12 @@ rm -f "$ALERT_FILE"
 export FIRST_DIR
 if [ "$FIRST_DIR" = "" ]
 then
-    FIRST_DIR="$(ls "$INPUT_CSV_DIR/" | head -n 1)"
+    # -maxdepth 1 not to apply the find recursively.
+    # -mindepth 1 not to output the base directory $INPUT_CSV_DIR (that comes
+    # first in the result).
+    # basename to remove the path.
+    # xargs because basename expects one input, but head returns a list.
+    FIRST_DIR="$(find "$INPUT_CSV_DIR/" -maxdepth 1 -mindepth 1 | sort | head -n 1 | xargs basename)"
 fi
 
 DUNE="/data/redbull/tezos/_opam/bin/dune"
