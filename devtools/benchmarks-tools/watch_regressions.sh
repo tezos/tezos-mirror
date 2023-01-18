@@ -130,6 +130,6 @@ do
     rm -f tmp tmp2
 done
 
-# The steps above will create as many files as there are in last_dir for each
-# comparison (all, first, and previous). Concatenate the results into a single
-# file per comparison.
+cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
+cat "$OUTPUT_CSV_DIR"/first_*.csv > "$OUTPUT_CSV_DIR"/first.csv
+cat "$OUTPUT_CSV_DIR"/previous_*.csv > "$OUTPUT_CSV_DIR"/previous.csv
