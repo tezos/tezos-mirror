@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
 
 (** Testing
     -------
@@ -38,6 +37,7 @@ open Lwt_result_syntax
 
 (** Parse a Michelson contract from string. *)
 let originate_contract file storage src b =
+  let open Lwt_result_syntax in
   let load_file f =
     let ic = open_in f in
     let res = really_input_string ic (in_channel_length ic) in
@@ -60,6 +60,7 @@ let originate_contract file storage src b =
 
 (** Run emit.tz and assert that both the order of events and data content are correct *)
 let contract_test () =
+  let open Lwt_result_syntax in
   let* b, src = Context.init1 ~consensus_threshold:0 () in
   let* dst, b = originate_contract "contracts/emit.tz" "Unit" src b in
   let fee = Test_tez.of_int 10 in

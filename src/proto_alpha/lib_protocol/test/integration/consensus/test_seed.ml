@@ -35,12 +35,12 @@
 *)
 
 open Protocol
-open Lwt_result_syntax
 
 (** Checking that, in the absence of nonce revelations and VDF computation,
     the seed of each cycle is correctly computed based on the seed of
     the previous cycle. *)
 let test_seed_no_commitment () =
+  let open Lwt_result_syntax in
   let n_cycles = 15 in
   let (Hash initial_seed) =
     let empty_bytes = Bytes.(copy empty) in
@@ -98,6 +98,7 @@ let test_seed_no_commitment () =
 (** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]
     commitment fails with an "Invalid commitment in block header" error. *)
 let test_no_commitment () =
+  let open Lwt_result_syntax in
   let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
   let* {parametric = {blocks_per_commitment; _}; _} =
     Context.get_constants (B b)
@@ -123,6 +124,7 @@ let test_no_commitment () =
     - when another baker reveals correctly, it receives the tip
     - revealing twice produces an error *)
 let test_revelation_early_wrong_right_twice () =
+  let open Lwt_result_syntax in
   let open Assert in
   let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
   let* csts = Context.get_constants (B b) in
@@ -230,6 +232,7 @@ let test_revelation_early_wrong_right_twice () =
 (** Test that revealing too late produces an error. Note that a
     committer who doesn't reveal at cycle 1 is not punished.*)
 let test_revelation_missing_and_late () =
+  let open Lwt_result_syntax in
   let open Context in
   let open Assert in
   let* b, _contracts = Context.init_n ~consensus_threshold:0 5 () in
@@ -281,6 +284,7 @@ let test_revelation_missing_and_late () =
 (** Test that we do not distribute endorsing rewards if the nonce was
     not revealed. *)
 let test_unrevealed () =
+  let open Lwt_result_syntax in
   let open Alpha_context in
   let constants =
     {
@@ -332,6 +336,7 @@ let test_unrevealed () =
   return_unit
 
 let test_vdf_status () =
+  let open Lwt_result_syntax in
   let* b, _ = Context.init3 ~consensus_threshold:0 () in
   let* b = Block.bake b in
   let* status = Context.get_seed_computation (B b) in
@@ -359,6 +364,7 @@ let test_vdf_status () =
     - the seed is updated with the vdf solution
   - another vdf revelation produces an error *)
 let test_early_incorrect_unverified_correct_already_vdf () =
+  let open Lwt_result_syntax in
   let open Assert in
   let* b, _ = Context.init3 ~consensus_threshold:0 () in
   let* csts = Context.get_constants (B b) in

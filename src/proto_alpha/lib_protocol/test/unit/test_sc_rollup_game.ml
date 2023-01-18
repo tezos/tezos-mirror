@@ -33,7 +33,6 @@
 *)
 
 open Protocol
-open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 module T = Test_sc_rollup_storage
 module R = Sc_rollup_refutation_storage
@@ -43,10 +42,12 @@ module Tick = Sc_rollup_tick_repr
 
 (** Assert that the computation fails with the given error. *)
 let assert_fails_with ~__LOC__ k expected_err =
+  let open Lwt_result_syntax in
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res (( = ) expected_err)
 
 let assert_fails_with_f ~__LOC__ k f =
+  let open Lwt_result_syntax in
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res f
 

@@ -34,7 +34,6 @@
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
 open Error_monad_operators
 
 exception Zk_rollup_test_error of string
@@ -78,6 +77,7 @@ let check_proto_error e t = check_proto_error_f (( = ) e) t
 
 (* Check that originating a ZKRU fails when the feature flag is disabled. *)
 let test_disable_feature_flag () =
+  let open Lwt_result_syntax in
   let* b, contract =
     Context.init_with_constants1
       {
@@ -118,6 +118,7 @@ let context_init =
 
 (* Check that the expected origination fees are paid. *)
 let test_origination_fees () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts = context_init 1 in
   let* constants = Context.get_constants (B ctxt) in
   let contract = Stdlib.List.hd contracts in
@@ -170,6 +171,7 @@ let test_origination_fees () =
     expected_fees
 
 let test_origination_negative_nb_ops () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts = context_init 1 in
   let contract = Stdlib.List.hd contracts in
   let* operation, _rollup =
@@ -193,6 +195,7 @@ let test_origination_negative_nb_ops () =
 
 (** Initializes the context and originates a ZKRU. *)
 let init_and_originate n =
+  let open Lwt_result_syntax in
   let* ctxt, contracts = context_init n in
   let contract = Stdlib.List.hd contracts in
   let* operation, rollup =
@@ -212,6 +215,7 @@ let no_ticket op = (op, None)
 (* Checks that originating two ZK rollups leads to different
    rollup addresses. *)
 let test_originate_two_rollups () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, zk_rollup1 = init_and_originate 1 in
   let contract = Stdlib.List.hd contracts in
   let* operation, zk_rollup2 =
@@ -230,6 +234,7 @@ let test_originate_two_rollups () =
 (* Initializes the context and originates a ZKRU with [n_pending]
    operations. *)
 let init_with_pending ?(n_pending = 1) n =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, zk_rollup = init_and_originate n in
   let contract = Stdlib.List.hd contracts in
   let pkh = match contract with Implicit pkh -> pkh | _ -> assert false in
@@ -252,6 +257,7 @@ let init_with_pending ?(n_pending = 1) n =
    The operation being appended has an invalid op code.
 *)
 let test_append_out_of_range_op_code () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, zk_rollup = init_and_originate 1 in
   let contract = Stdlib.List.hd contracts in
   let pkh = match contract with Implicit pkh -> pkh | _ -> assert false in
@@ -277,6 +283,7 @@ let test_append_out_of_range_op_code () =
    The operation being appended through an external op has positive price.
 *)
 let test_append_external_deposit () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, zk_rollup = init_and_originate 1 in
   let contract = Stdlib.List.hd contracts in
   let pkh = match contract with Implicit pkh -> pkh | _ -> assert false in
@@ -462,6 +469,7 @@ module String_ticket = Make_ticket (struct
 end)
 
 let test_append_errors () =
+  let open Lwt_result_syntax in
   let open Zk_rollup.Operation in
   (* Create two accounts and 1 zk rollup *)
   let* block, contracts, zk_rollup = init_and_originate 2 in
@@ -552,6 +560,7 @@ let assert_ticket_balance ~loc incr token owner expected =
   | None, None -> return ()
 
 let test_invalid_deposit () =
+  let open Lwt_result_syntax in
   (* Create 2 accounts and one zk rollups *)
   let* block, contracts, zk_rollup = init_and_originate 5 in
   let contract0 = Stdlib.List.nth contracts 0 in
@@ -746,6 +755,7 @@ let test_invalid_deposit () =
    1 operation ("false").
 *)
 let test_update () =
+  let open Lwt_result_syntax in
   let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
   let contract = Stdlib.List.hd contracts in
   let* i = Incremental.begin_construction b in
@@ -773,6 +783,7 @@ let test_update () =
    The public operation proved is different from the one in the pending list.
 *)
 let test_update_false_proof () =
+  let open Lwt_result_syntax in
   let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
   let contract = Stdlib.List.hd contracts in
   let* i = Incremental.begin_construction b in
@@ -811,6 +822,7 @@ let test_update_false_proof () =
    inputs for private batches.
 *)
 let test_update_public_in_private () =
+  let open Lwt_result_syntax in
   let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
   let contract = Stdlib.List.hd contracts in
   let* i = Incremental.begin_construction b in
@@ -846,6 +858,7 @@ let test_update_public_in_private () =
    the Protocol uses the actual [op] from the pending list as input.
 *)
 let test_update_for_another_rollup () =
+  let open Lwt_result_syntax in
   let* b, contracts, zk_rollup1, pkh = init_with_pending 3 in
   let contract0 = Stdlib.List.hd contracts in
   let contract1 = Stdlib.List.nth contracts 1 in
@@ -897,6 +910,7 @@ let test_update_for_another_rollup () =
    those in the pending list.
 *)
 let test_update_more_public_than_pending () =
+  let open Lwt_result_syntax in
   (* test with number of pending operations < min_pending_to_process. *)
   let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
   let contract = Stdlib.List.hd contracts in
@@ -950,6 +964,7 @@ let test_update_more_public_than_pending () =
    the [new_state] is larger than the ZKRU's [state_length].
 *)
 let test_update_inconsistent_state () =
+  let open Lwt_result_syntax in
   let* b, contracts, zk_rollup, pkh = init_with_pending 1 in
   let contract = Stdlib.List.hd contracts in
   let* i = Incremental.begin_construction b in
@@ -987,6 +1002,7 @@ let test_update_inconsistent_state () =
    The pending list has a length of 2, while only 1 is processed.
 *)
 let test_update_not_enough_pending () =
+  let open Lwt_result_syntax in
   let* b, contracts, zk_rollup, pkh = init_with_pending ~n_pending:2 1 in
   let contract = Stdlib.List.hd contracts in
   let* i = Incremental.begin_construction b in
@@ -1007,6 +1023,7 @@ let test_update_not_enough_pending () =
    of the minimum length allowed.
 *)
 let test_update_valid_prefix () =
+  let open Lwt_result_syntax in
   (* Checking when pending list has more than min_pending_to_process *)
   let min_pending_to_process =
     Context.default_test_constants.zk_rollup.min_pending_to_process
@@ -1043,6 +1060,7 @@ let test_update_valid_prefix () =
   return_unit
 
 let test_valid_deposit_and_withdrawal () =
+  let open Lwt_result_syntax in
   (* Create 2 accounts and one zk rollups *)
   let* block, contracts, zk_rollup = init_and_originate 2 in
   let contract0 = Stdlib.List.nth contracts 0 in
@@ -1110,6 +1128,7 @@ let test_valid_deposit_and_withdrawal () =
   return_unit
 
 let test_valid_deposit_and_external_withdrawal () =
+  let open Lwt_result_syntax in
   (* Create 2 accounts and one zk rollups *)
   let* block, contracts, zk_rollup = init_and_originate 4 in
   let contract0 = Stdlib.List.nth contracts 0 in
