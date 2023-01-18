@@ -368,7 +368,16 @@ let sc_rollup_commands () =
     (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
     [config_init_command; run_command; dump_metrics]
 
+let mainnet_disclaimer () =
+  Format.eprintf
+    "@[<v 2>@{<warning>@{<title>Disclaimer@}@}@,\
+     This rollup node is not suitable to use on@,\
+     mainnet. Consider using a version from a more@,\
+     recent release of Octez.@]@\n\
+     @."
+
 let select_commands _ _ =
+  mainnet_disclaimer () ;
   return (sc_rollup_commands () @ Client_helpers_commands.commands ())
 
 let () = Client_main_run.run (module Daemon_config) ~select_commands
