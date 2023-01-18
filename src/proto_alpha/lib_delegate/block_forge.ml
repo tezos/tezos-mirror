@@ -68,33 +68,38 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
 let finalize_block_header shell_header timestamp validation_result
     operations_hash predecessor_block_metadata_hash
     predecessor_ops_metadata_hash predecessor_resulting_context =
+  let open Lwt_result_syntax in
   let {Tezos_protocol_environment.context; fitness; message; _} =
     validation_result
   in
   let validation_passes = List.length Main.validation_passes in
-  (Context_ops.get_test_chain context >>= function
-   | Not_running -> return context
-   | Running {expiration; _} ->
-       if Time.Protocol.(expiration <= timestamp) then
-         Context_ops.add_test_chain context Not_running >>= fun context ->
-         return context
-       else return context
-   | Forking _ -> assert false)
-  >>=? fun context ->
-  (match predecessor_block_metadata_hash with
-  | Some predecessor_block_metadata_hash ->
-      Context_ops.add_predecessor_block_metadata_hash
-        context
-        predecessor_block_metadata_hash
-  | None -> Lwt.return context)
-  >>= fun context ->
-  (match predecessor_ops_metadata_hash with
-  | Some predecessor_ops_metadata_hash ->
-      Context_ops.add_predecessor_ops_metadata_hash
-        context
-        predecessor_ops_metadata_hash
-  | None -> Lwt.return context)
-  >>= fun context ->
+  let*! test_chain = Context_ops.get_test_chain context in
+  let* context =
+    match test_chain with
+    | Not_running -> return context
+    | Running {expiration; _} ->
+        if Time.Protocol.(expiration <= timestamp) then
+          let*! context = Context_ops.add_test_chain context Not_running in
+          return context
+        else return context
+    | Forking _ -> assert false
+  in
+  let*! context =
+    match predecessor_block_metadata_hash with
+    | Some predecessor_block_metadata_hash ->
+        Context_ops.add_predecessor_block_metadata_hash
+          context
+          predecessor_block_metadata_hash
+    | None -> Lwt.return context
+  in
+  let*! context =
+    match predecessor_ops_metadata_hash with
+    | Some predecessor_ops_metadata_hash ->
+        Context_ops.add_predecessor_ops_metadata_hash
+          context
+          predecessor_ops_metadata_hash
+    | None -> Lwt.return context
+  in
   let context = Context_ops.hash ~time:timestamp ?message context in
   (* For the time being, we still fully build the block while we build
      confidence to fully unplug the baker validation. The resulting
@@ -124,6 +129,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     ~timestamp ~liquidity_baking_toggle_vote ~user_activated_upgrades
     fees_config ~seed_nonce_hash ~payload_round simulation_mode simulation_kind
     constants =
+  let open Lwt_result_syntax in
   let predecessor_block = (pred_info : Baking_state.block_info) in
   let hard_gas_limit_per_block =
     constants.Constants.Parametric.hard_gas_limit_per_block
@@ -131,7 +137,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
   let chain = `Hash chain_id in
   let check_protocol_changed
       ~(validation_result : Tezos_protocol_environment.validation_result) =
-    Context_ops.get_protocol validation_result.context >>= fun next_protocol ->
+    let*! next_protocol = Context_ops.get_protocol validation_result.context in
     let next_protocol =
       match
         Tezos_base.Block_header.get_forced_protocol_upgrade
@@ -157,14 +163,15 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         ~liquidity_baking_toggle_vote
         ()
     in
-    Node_rpc.preapply_block
-      cctxt
-      ~chain
-      ~head:predecessor_block.hash
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      filtered_operations
-    >>=? fun (shell_header, preapply_result) ->
+    let* shell_header, preapply_result =
+      Node_rpc.preapply_block
+        cctxt
+        ~chain
+        ~head:predecessor_block.hash
+        ~timestamp
+        ~protocol_data:faked_protocol_data
+        filtered_operations
+    in
     (* only retain valid operations *)
     let operations =
       List.map (fun l -> List.map snd l.Preapply_result.applied) preapply_result
@@ -189,59 +196,64 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         ~liquidity_baking_toggle_vote
         ()
     in
-    Baking_simulator.begin_construction
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      context_index
-      predecessor_block
-      chain_id
-    >>=? fun incremental ->
-    Operation_selection.filter_operations_with_simulation
-      incremental
-      fees_config
-      ~hard_gas_limit_per_block
-      operation_pool
-    >>=? fun {
-               Operation_selection.operations;
-               validation_result;
-               operations_hash;
-               _;
-             } ->
-    check_protocol_changed ~validation_result >>=? fun changed ->
+    let* incremental =
+      Baking_simulator.begin_construction
+        ~timestamp
+        ~protocol_data:faked_protocol_data
+        context_index
+        predecessor_block
+        chain_id
+    in
+
+    let* {Operation_selection.operations; validation_result; operations_hash; _}
+        =
+      Operation_selection.filter_operations_with_simulation
+        incremental
+        fees_config
+        ~hard_gas_limit_per_block
+        operation_pool
+    in
+    let* changed = check_protocol_changed ~validation_result in
     if changed then
       (* Fallback to processing via node, which knows both old and new protocol. *)
       filter_via_node ~operation_pool
     else
-      protect
-        ~on_error:(fun _ -> return_none)
-        (fun () ->
-          Shell_services.Blocks.metadata_hash
-            cctxt
-            ~block:(`Hash (predecessor_block.hash, 0))
-            ~chain
-            ()
-          >>=? fun pred_block_metadata_hash ->
-          return (Some pred_block_metadata_hash))
-      >>=? fun pred_block_metadata_hash ->
-      protect
-        ~on_error:(fun _ -> return_none)
-        (fun () ->
-          Shell_services.Blocks.Operation_metadata_hashes.root
-            cctxt
-            ~block:(`Hash (predecessor_block.hash, 0))
-            ~chain
-            ()
-          >>=? fun pred_op_metadata_hash -> return (Some pred_op_metadata_hash))
-      >>=? fun pred_op_metadata_hash ->
-      finalize_block_header
-        incremental.header
-        timestamp
-        validation_result
-        operations_hash
-        pred_block_metadata_hash
-        pred_op_metadata_hash
-        predecessor_block.resulting_context_hash
-      >>=? fun shell_header ->
+      let* pred_block_metadata_hash =
+        protect
+          ~on_error:(fun _ -> return_none)
+          (fun () ->
+            let+ pred_block_metadata_hash =
+              Shell_services.Blocks.metadata_hash
+                cctxt
+                ~block:(`Hash (predecessor_block.hash, 0))
+                ~chain
+                ()
+            in
+            Some pred_block_metadata_hash)
+      in
+      let* pred_op_metadata_hash =
+        protect
+          ~on_error:(fun _ -> return_none)
+          (fun () ->
+            let+ pred_op_metadata_hash =
+              Shell_services.Blocks.Operation_metadata_hashes.root
+                cctxt
+                ~block:(`Hash (predecessor_block.hash, 0))
+                ~chain
+                ()
+            in
+            Some pred_op_metadata_hash)
+      in
+      let* shell_header =
+        finalize_block_header
+          incremental.header
+          timestamp
+          validation_result
+          operations_hash
+          pred_block_metadata_hash
+          pred_op_metadata_hash
+          predecessor_block.resulting_context_hash
+      in
       let operations = List.map (List.map convert_operation) operations in
       let payload_hash =
         let operation_hashes =
@@ -265,14 +277,15 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         ~payload_round
         ()
     in
-    Node_rpc.preapply_block
-      cctxt
-      ~chain
-      ~head:predecessor_block.hash
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      operations
-    >>=? fun (shell_header, _preapply_result) ->
+    let* shell_header, _preapply_result =
+      Node_rpc.preapply_block
+        cctxt
+        ~chain
+        ~head:predecessor_block.hash
+        ~timestamp
+        ~protocol_data:faked_protocol_data
+        operations
+    in
     let operations = List.map (List.map convert_operation) operations in
     return (shell_header, operations, payload_hash)
   in
@@ -285,20 +298,22 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         ~payload_round
         ()
     in
-    Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
-    Baking_simulator.begin_construction
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      context_index
-      predecessor_block
-      chain_id
-    >>=? fun incremental ->
+    let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+    let* incremental =
+      Baking_simulator.begin_construction
+        ~timestamp
+        ~protocol_data:faked_protocol_data
+        context_index
+        predecessor_block
+        chain_id
+    in
     (* We still need to filter endorsements. Two endorsements could be
        referring to the same slot. *)
-    Operation_selection.filter_consensus_operations_only
-      incremental
-      ordered_pool
-    >>=? fun (incremental, ordered_pool) ->
+    let* incremental, ordered_pool =
+      Operation_selection.filter_consensus_operations_only
+        incremental
+        ordered_pool
+    in
     let operations = Operation_pool.ordered_to_list_list ordered_pool in
     let operations_hash =
       Operation_list_list_hash.compute
@@ -312,43 +327,50 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     let incremental =
       {incremental with header = {incremental.header with operations_hash}}
     in
-    Baking_simulator.finalize_construction incremental
-    >>=? fun (validation_result, _) ->
-    check_protocol_changed ~validation_result >>=? fun changed ->
+    let* validation_result, _ =
+      Baking_simulator.finalize_construction incremental
+    in
+    let* changed = check_protocol_changed ~validation_result in
     if changed then
       (* Fallback to processing via node, which knows both old and new protocol. *)
       apply_via_node ~ordered_pool ~payload_hash
     else
-      protect
-        ~on_error:(fun _ -> return_none)
-        (fun () ->
-          Shell_services.Blocks.metadata_hash
-            cctxt
-            ~block:(`Hash (predecessor_block.hash, 0))
-            ~chain
-            ()
-          >>=? fun pred_block_metadata_hash ->
-          return (Some pred_block_metadata_hash))
-      >>=? fun pred_block_metadata_hash ->
-      protect
-        ~on_error:(fun _ -> return_none)
-        (fun () ->
-          Shell_services.Blocks.Operation_metadata_hashes.root
-            cctxt
-            ~block:(`Hash (predecessor_block.hash, 0))
-            ~chain
-            ()
-          >>=? fun pred_op_metadata_hash -> return (Some pred_op_metadata_hash))
-      >>=? fun pred_op_metadata_hash ->
-      finalize_block_header
-        incremental.header
-        timestamp
-        validation_result
-        operations_hash
-        pred_block_metadata_hash
-        pred_op_metadata_hash
-        predecessor_block.resulting_context_hash
-      >>=? fun shell_header ->
+      let* pred_block_metadata_hash =
+        protect
+          ~on_error:(fun _ -> return_none)
+          (fun () ->
+            let+ pred_block_metadata_hash =
+              Shell_services.Blocks.metadata_hash
+                cctxt
+                ~block:(`Hash (predecessor_block.hash, 0))
+                ~chain
+                ()
+            in
+            Some pred_block_metadata_hash)
+      in
+      let* pred_op_metadata_hash =
+        protect
+          ~on_error:(fun _ -> return_none)
+          (fun () ->
+            let+ pred_op_metadata_hash =
+              Shell_services.Blocks.Operation_metadata_hashes.root
+                cctxt
+                ~block:(`Hash (predecessor_block.hash, 0))
+                ~chain
+                ()
+            in
+            Some pred_op_metadata_hash)
+      in
+      let* shell_header =
+        finalize_block_header
+          incremental.header
+          timestamp
+          validation_result
+          operations_hash
+          pred_block_metadata_hash
+          pred_op_metadata_hash
+          predecessor_block.resulting_context_hash
+      in
       let operations = List.map (List.map convert_operation) operations in
       return (shell_header, operations, payload_hash)
   in
@@ -365,27 +387,30 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         Filter filtered_pool
     | Apply _ as x -> x
   in
-  (match (simulation_mode, simulation_kind) with
-  | Baking_state.Node, Filter operation_pool -> filter_via_node ~operation_pool
-  | Node, Apply {ordered_pool; payload_hash} ->
-      apply_via_node ~ordered_pool ~payload_hash
-  | Local context_index, Filter operation_pool ->
-      filter_with_context ~context_index ~operation_pool
-  | Local context_index, Apply {ordered_pool; payload_hash} ->
-      apply_with_context ~context_index ~ordered_pool ~payload_hash)
-  >>=? fun (shell_header, operations, payload_hash) ->
-  Baking_pow.mine
-    ~proof_of_work_threshold:constants.proof_of_work_threshold
-    shell_header
-    (fun proof_of_work_nonce ->
-      {
-        Block_header.payload_hash;
-        payload_round;
-        seed_nonce_hash;
-        proof_of_work_nonce;
-        liquidity_baking_toggle_vote;
-      })
-  >>=? fun contents ->
+  let* shell_header, operations, payload_hash =
+    match (simulation_mode, simulation_kind) with
+    | Baking_state.Node, Filter operation_pool ->
+        filter_via_node ~operation_pool
+    | Node, Apply {ordered_pool; payload_hash} ->
+        apply_via_node ~ordered_pool ~payload_hash
+    | Local context_index, Filter operation_pool ->
+        filter_with_context ~context_index ~operation_pool
+    | Local context_index, Apply {ordered_pool; payload_hash} ->
+        apply_with_context ~context_index ~ordered_pool ~payload_hash
+  in
+  let* contents =
+    Baking_pow.mine
+      ~proof_of_work_threshold:constants.proof_of_work_threshold
+      shell_header
+      (fun proof_of_work_nonce ->
+        {
+          Block_header.payload_hash;
+          payload_round;
+          seed_nonce_hash;
+          proof_of_work_nonce;
+          liquidity_baking_toggle_vote;
+        })
+  in
   let unsigned_block_header =
     {
       Block_header.shell = shell_header;
