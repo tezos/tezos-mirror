@@ -1536,6 +1536,13 @@ val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
     and do not process stdout. *)
 val spawn_list_protocols : [< `Light | `Mockup | `Proxy] -> t -> Process.t
 
+(** Run [octez-client list understood protocols]. *)
+val list_understood_protocols : ?config_file:string -> t -> string list Lwt.t
+
+(** Same as [list_understood_protocols], but do not wait for the process to exit
+    and do not process stdout. *)
+val spawn_list_understood_protocols : ?config_file:string -> t -> Process.t
+
 (** Run [octez-client migrate mockup to]. *)
 val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
@@ -2333,6 +2340,7 @@ val spawn_command :
   ?hooks:Process.hooks ->
   ?admin:bool ->
   ?protocol_hash:string ->
+  ?config_file:string ->
   t ->
   string list ->
   Process.t
@@ -2410,24 +2418,30 @@ val convert_data_to_json :
 val bootstrapped : t -> unit Lwt.t
 
 (** Run [tezos-client config show]. *)
-val config_show : ?protocol:Protocol.t -> t -> string Lwt.t
+val config_show :
+  ?config_file:string -> ?protocol:Protocol.t -> t -> string Lwt.t
 
 (** Same as [config_show], but do not wait for the process to exit. *)
-val spawn_config_show : ?protocol:Protocol.t -> t -> Process.t
+val spawn_config_show :
+  ?config_file:string -> ?protocol:Protocol.t -> t -> Process.t
 
 (** Run [tezos-client config show]. *)
 val config_init :
+  ?config_file:string ->
   ?protocol:Protocol.t ->
   ?bootstrap_accounts:string ->
   ?protocol_constants:string ->
+  ?output:string ->
   t ->
   unit Lwt.t
 
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init :
+  ?config_file:string ->
   ?protocol:Protocol.t ->
   ?bootstrap_accounts:string ->
   ?protocol_constants:string ->
+  ?output:string ->
   t ->
   Process.t
 
