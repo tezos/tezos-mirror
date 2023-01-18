@@ -263,6 +263,7 @@ Core developers are also provided reference materials for internal APIs of Octez
 
    releases/releases
    releases/version-15
+   releases/version-16
    releases/history
 
 .. toctree::
