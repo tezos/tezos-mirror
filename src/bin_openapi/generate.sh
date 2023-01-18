@@ -17,9 +17,9 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW
-protocol_parameters=src/proto_015_PtLimaPt/parameters/sandbox-parameters.json
-protocol_name=lima
+protocol_hash=PtMumbaiP9THCizHVy23Zu3xCjTpNLWirfXY3kitfyd2nkvTbCj
+protocol_parameters=src/proto_016_PtMumbai/parameters/sandbox-parameters.json
+protocol_name=mumbai
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -36,7 +36,7 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi.json
+openapi_json=docs/api/rpc-openapi-rc.json
 proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
