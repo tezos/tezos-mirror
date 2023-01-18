@@ -70,7 +70,12 @@ ALERT_FILE="$OCTEZ_DIR/alerts"
 
 rm -f "$ALERT_FILE"
 
-# Fetch the first directory that we'll use as a reference.
+# The first directory serves as reference point.
+export FIRST_DIR
+if [ "$FIRST_DIR" = "" ]
+then
+    FIRST_DIR="$(ls "$INPUT_CSV_DIR/" | head -n 1)"
+fi
 
 # Check that gas_parameter_diff compiles. We'll use it to make diffs between the
 # inference results.
