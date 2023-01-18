@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -196,6 +196,12 @@ let set_info_per_level_input level tree =
          anyway *)
       Stdlib.failwith "Info_per_level encoding has failed, this is impossible"
 
+(* Puts a message into the inbox, where the message already includes
+   Internal vs External etc. information in the payload.
+*)
+let set_raw_message level counter message tree =
+  Wasm.set_input_step (input_info level counter) message tree
+
 let set_internal_message level counter message tree =
   let encoded_message =
     Pvm_input_kind.(
@@ -232,6 +238,8 @@ let set_full_input_step_gen set_internal_message messages level tree =
   eval_to_snapshot ~max_steps:Int64.max_int tree
 
 let set_full_input_step = set_full_input_step_gen set_internal_message
+
+let set_full_raw_input_step = set_full_input_step_gen set_raw_message
 
 let set_empty_inbox_step level tree = set_full_input_step [] level tree
 

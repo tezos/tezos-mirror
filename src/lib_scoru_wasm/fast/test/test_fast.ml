@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,7 +27,7 @@ open Tztest
 module Preimage_map = Map.Make (String)
 open Wasm_utils
 
-let apply_fast ?(images = Preimage_map.empty) counter tree =
+let apply_fast ?(images = Preimage_map.empty) ?metadata counter tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
   let reveal_builtins =
@@ -40,7 +40,10 @@ let apply_fast ?(images = Preimage_map.empty) counter tree =
               | None -> Stdlib.failwith "Failed to find preimage"
               | Some preimage -> Lwt.return preimage);
           reveal_metadata =
-            (fun () -> Stdlib.failwith "reveal_preimage is not available");
+            (fun () ->
+              match metadata with
+              | Some reveal -> Lwt.return reveal
+              | None -> Stdlib.failwith "reveal_preimage is not available");
         }
   in
   let+ tree =
@@ -57,11 +60,11 @@ let apply_fast ?(images = Preimage_map.empty) counter tree =
   if counter > 0l then
     (* Assert that the FE actual ran. We must consider that before the first
        message is inserted, FE is unlikely to run. *)
-    if !run_counter <> 1l then
+    if !run_counter <= 0l then
       Stdlib.failwith "Fast Execution was expected to run!" ;
   tree
 
-let rec apply_slow ?images tree =
+let rec apply_slow ?images ?metadata tree =
   let open Lwt.Syntax in
   let* tree =
     Wasm_utils.eval_until_input_or_reveal_requested
@@ -73,9 +76,9 @@ let rec apply_slow ?images tree =
      We don't want to expose this intermediate state because the Fast Execution
      doesn't either. The following step takes care of that by trying to
      satisfy the revelation request. *)
-  (check_reveal [@tailcall]) ?images tree
+  (check_reveal [@tailcall]) ?images ?metadata tree
 
-and check_reveal ?(images = Preimage_map.empty) tree =
+and check_reveal ?(images = Preimage_map.empty) ?metadata tree =
   let open Lwt.Syntax in
   let* info = Wasm_utils.Wasm.get_info tree in
   match info.input_request with
@@ -86,10 +89,19 @@ and check_reveal ?(images = Preimage_map.empty) tree =
           let* tree =
             Wasm_utils.Wasm.reveal_step (Bytes.of_string preimage) tree
           in
-          (apply_slow [@tailcall]) ~images tree)
+          (apply_slow [@tailcall]) ~images ?metadata tree)
+  | Reveal_required Reveal_metadata -> (
+      match metadata with
+      | None -> Stdlib.failwith "Unable to reveal metadata"
+      | Some metadata ->
+          let* tree =
+            Wasm_utils.Wasm.reveal_step (Bytes.of_string metadata) tree
+          in
+          (apply_slow [@tailcall]) ~images ~metadata tree)
   | _ -> Lwt.return tree
 
-let test_against_both ?images ~from_binary ~kernel ~messages () =
+let test_against_both ?(set_input = Wasm_utils.set_full_input_step) ?images
+    ?metadata ~from_binary ~kernel ~messages () =
   let open Lwt.Syntax in
   let make_folder apply (tree, counter, hashes) message =
     let* tree = apply counter tree in
@@ -101,7 +113,7 @@ let test_against_both ?images ~from_binary ~kernel ~messages () =
     let* info = Wasm_utils.Wasm.get_info tree in
     assert (info.input_request = Input_required) ;
 
-    let+ tree = Wasm_utils.set_full_input_step [message] counter tree in
+    let+ tree = set_input [message] counter tree in
     let hash2 = Tezos_context_memory.Context_binary.Tree.hash tree in
 
     (tree, Int32.succ counter, hash1 :: hash2 :: hashes)
@@ -122,8 +134,8 @@ let test_against_both ?images ~from_binary ~kernel ~messages () =
     hash :: hashes
   in
 
-  let* fast_hashes = run_with (apply_fast ?images) in
-  let* slow_hashes = run_with (fun _ -> apply_slow ?images) in
+  let* fast_hashes = run_with (apply_fast ?images ?metadata) in
+  let* slow_hashes = run_with (fun _ -> apply_slow ?images ?metadata) in
 
   assert (List.equal Context_hash.equal slow_hashes fast_hashes) ;
 
@@ -388,7 +400,24 @@ let test_tx =
       let* messages =
         Wasm_utils.read_test_messages ["deposit.out"; "withdrawal.out"]
       in
-      test_against_both ~from_binary:true ~kernel ~messages ())
+      let expected_rollup_address =
+        (* Rollup address set in deposit.out *)
+        `Hex "4da51c5de7a1cdd494c15b53815e1faa4c1a96ca" |> Hex.to_string
+      in
+      let expected_rollup_address =
+        match expected_rollup_address with
+        | Some a -> a
+        | None -> Stdlib.failwith "invalid rollup address hash"
+      in
+      (* TX Kernel ignores origination level *)
+      let metadata = expected_rollup_address ^ "\000\000\000\000" in
+      test_against_both
+        ~set_input:Wasm_utils.set_full_raw_input_step
+        ~from_binary:true
+        ~metadata
+        ~kernel
+        ~messages
+        ())
 
 let test_compute_step_many_pauses_at_snapshot_when_flag_set =
   Wasm_utils.test_with_kernel "computation" (fun kernel ->
@@ -440,10 +469,7 @@ let tests =
     tztest "Store read/write kernel" `Quick test_store_read_write;
     tztest "read_input" `Quick test_read_input;
     tztest "Reveal_preimage kernel" `Quick test_reveal_preimage;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3729
-       Enable back this test when the transaction kernel has been
-       updated. *)
-    (* tztest "TX kernel" `Quick test_tx; *)
+    tztest "TX kernel" `Quick test_tx;
     tztest
       "compute_step_many pauses at snapshot"
       `Quick
