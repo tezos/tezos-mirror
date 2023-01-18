@@ -41,10 +41,16 @@ then
     exit 0
 fi
 
-# If we're there, this means that there is a directory on the bucket more recent
-# than the last one we treated. Let's call it last_dir.
-# Check that all the files in last_dir have been uploaded and that the run was
-# successful. Otherwise, exit.
+# Check that the SUCCESS file is present. This file is the very last uploaded by
+# the reference machine on successful runs. If the new directory is on the
+# bucket but the SUCCESS file is not, it means that the upload is in progress so
+# we stop immediately to avoid analysing incomplete data and we don't update the
+# `last_known_dir` file so that the next run of this script can retry.
+if [ "$(aws s3 ls s3://snoop-playground/mclaren/complete_results/snoop_results/"$LAST_DIR"/SUCCESS | wc -l)" = 0 ]
+then
+    echo "SUCCESS file not found. The benchmarks failed, or the benchmark machine has not finished uploading. Exiting"
+    exit 0
+fi
 
 # If we're there, this means that last_dir is more recent than last_known_dir,
 # and that the former contains the files of a successful run.
