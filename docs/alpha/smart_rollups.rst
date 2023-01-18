@@ -1461,6 +1461,37 @@ outbox at level 0``)
     entrypoint: ..; }
   ..
 
+The reveal channel described previously is available in the
+debugger, either automatically or through specific commands. The
+debugger can fill automatically preimages from files in a specific
+directory on the disk, by default in the ``preimage`` subdirectory of the
+working directory. It can be configured with the option
+``--preimage-dir <directory>``. In case there is no corresponding file
+found for the requested preimage, the debugger will ask for the
+hexadecimal value of the preimage:
+
+.. code::
+
+  > step inbox
+  Preimage for hash 0000[..] not found.
+  > 48656c6c6f207468657265210a
+  Hello there!
+  ...
+
+Metadata are automatically filled with level ``0`` as origination level
+and the configured smart rollup address (or the default one).
+
+Note that when stepping tick per tick (using the ``step tick`` command), it is
+possible to end up in a situation were the evaluation stops on ``Waiting for
+reveal``. If the expected value is a metadata, the command ``reveal metadata``
+will give the default metadata to the kernel. If the value expected is the
+preimage of a given hash, there are two possible solutions:
+
+* ``reveal preimage`` to read the value from the disk. In that case, the
+  debugger will look for a file of the same name as the expected hash in the
+  ``preimage`` subdirectory.
+* ``reveal preimage of <hex encoded value>`` can be used to feed a custom
+  preimage hash.
 
 Glossary
 --------
