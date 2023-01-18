@@ -33,11 +33,11 @@
 *)
 
 open Protocol
-open Lwt_result_syntax
 module Commitment_repr = Sc_rollup_commitment_repr
 
 (** [new_context_n n] creates a context with [n] accounts. *)
 let new_context_n nb_stakers =
+  let open Lwt_result_syntax in
   let* b, contracts = Context.init_n nb_stakers () in
   let+ inc = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt inc in
@@ -53,15 +53,18 @@ let new_context_n nb_stakers =
   (ctxt, accounts)
 
 let new_context () =
+  let open Lwt_result_syntax in
   (* A context needs at least one account to bake. *)
   let* ctxt, _accounts = new_context_n 1 in
   return ctxt
 
 let new_context_1 () =
+  let open Lwt_result_syntax in
   let* ctxt, accounts = new_context_n 1 in
   match accounts with [account] -> return (ctxt, account) | _ -> assert false
 
 let new_context_2 () =
+  let open Lwt_result_syntax in
   let* ctxt, accounts = new_context_n 2 in
   match accounts with
   | [account1; account2] -> return (ctxt, account1, account2)
@@ -89,11 +92,13 @@ let new_sc_rollup ctxt =
   return (rollup, genesis_hash, ctxt)
 
 let new_context_with_stakers_and_rollup nb_stakers =
+  let open Lwt_result_syntax in
   let* ctxt, stakers = new_context_n nb_stakers in
   let+ rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
   (ctxt, rollup, genesis_hash, stakers)
 
 let new_context_with_rollup () =
+  let open Lwt_result_syntax in
   let* ctxt = new_context () in
   let+ rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
   (ctxt, rollup, genesis_hash)
@@ -102,6 +107,7 @@ let equal_tez ~loc =
   Assert.equal ~loc Tez_repr.( = ) "Tez aren't equal" Tez_repr.pp
 
 let assert_not_exist ~loc ~pp comp_lwt =
+  let open Lwt_result_syntax in
   let* _ctxt, res_opt = comp_lwt in
   Assert.is_none ~loc ~pp res_opt
 
@@ -172,6 +178,7 @@ let deposit_stake_and_check_balances ctxt rollup staker =
 (** Originate a rollup with [nb_stakers] stakers and make a deposit to the
     initial LCC. *)
 let originate_rollup_and_deposit_with_n_stakers nb_stakers =
+  let open Lwt_result_syntax in
   let* ctxt, rollup, genesis_hash, stakers =
     new_context_with_stakers_and_rollup nb_stakers
   in
@@ -183,6 +190,7 @@ let originate_rollup_and_deposit_with_n_stakers nb_stakers =
 
 (** Originate a rollup with one staker and make a deposit to the initial LCC. *)
 let originate_rollup_and_deposit_with_one_staker () =
+  let open Lwt_result_syntax in
   let* ctxt, staker = new_context_1 () in
   let* rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
   let+ ctxt = deposit_stake_and_check_balances ctxt rollup staker in
@@ -191,6 +199,7 @@ let originate_rollup_and_deposit_with_one_staker () =
 (** Originate a rollup with two stakers and make a deposit to the initial LCC.
 *)
 let originate_rollup_and_deposit_with_two_stakers () =
+  let open Lwt_result_syntax in
   let* ctxt, staker1, staker2 = new_context_2 () in
   let* rollup, genesis_hash, ctxt = new_sc_rollup ctxt in
   let* ctxt = deposit_stake_and_check_balances ctxt rollup staker1 in
@@ -200,6 +209,7 @@ let originate_rollup_and_deposit_with_two_stakers () =
 (** Originate a rollup with three stakers and make a deposit to the initial LCC.
 *)
 let originate_rollup_and_deposit_with_three_stakers () =
+  let open Lwt_result_syntax in
   let+ ctxt, rollup, genesis_hash, stakers =
     originate_rollup_and_deposit_with_n_stakers 3
   in
@@ -236,6 +246,7 @@ let assert_fails ~loc k =
 
 (** Assert operation fails because of missing rollup *)
 let assert_fails_with_missing_rollup ~loc op =
+  let open Lwt_result_syntax in
   let* ctxt = new_context () in
   assert_fails_with
     ~loc
@@ -315,6 +326,7 @@ let advance_level_for_commitment ctxt (commitment : Commitment_repr.t) =
     Raw_context.Internal_for_tests.add_level ctxt (Int32.to_int offset)
 
 let advance_level_for_cement ctxt rollup (commitment : Commitment_repr.t) =
+  let open Lwt_result_syntax in
   let* ctxt, commitment_added =
     Storage.Sc_rollup.Commitment_added.get
       (ctxt, rollup)
@@ -352,6 +364,7 @@ let valid_inbox_level ctxt =
     as it requires more information than {!valid_inbox_level} and is in
     the lwt tzresult monad. *)
 let proper_valid_inbox_level (ctxt, rollup) i =
+  let open Lwt_result_syntax in
   let+ _, {level = genesis_level; _} =
     Sc_rollup_storage.genesis_info ctxt rollup
   in
@@ -394,6 +407,7 @@ let commitments ~predecessor ?(start_at = 1l) ctxt n =
   List.rev (go predecessor [] start_at)
 
 let publish_commitment ctxt rollup staker commitment =
+  let open Lwt_result_syntax in
   let ctxt = advance_level_for_commitment ctxt commitment in
   let* _hash, _publication_level, ctxt, _balance_updates =
     Sc_rollup_stake_storage.publish_commitment ctxt rollup staker commitment
@@ -407,6 +421,7 @@ let publish_commitments ctxt rollup staker commitments =
     commitments
 
 let cement_commitment ctxt rollup commitment hash =
+  let open Lwt_result_syntax in
   let* ctxt = advance_level_for_cement ctxt rollup commitment in
   let* ctxt, _commitment =
     Sc_rollup_stake_storage.cement_commitment ctxt rollup hash
@@ -422,6 +437,7 @@ let cement_commitments ctxt rollup commitments =
     commitments
 
 let publish_and_cement_commitment ctxt rollup staker commitment =
+  let open Lwt_result_syntax in
   let hash = Commitment_repr.hash_uncarbonated commitment in
   let* ctxt = publish_commitment ctxt rollup staker commitment in
   cement_commitment ctxt rollup commitment hash
@@ -434,6 +450,7 @@ let publish_and_cement_commitments ctxt rollup staker commitments =
     commitments
 
 let withdraw ctxt rollup staker =
+  let open Lwt_result_syntax in
   let* ctxt, _balance_updates =
     Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker
   in
@@ -797,6 +814,7 @@ module Stake_storage_tests = struct
 
   (** Test that publish to a wrong inbox level is forbidden. *)
   let test_publish_wrong_inbox_level () =
+    let open Lwt_result_syntax in
     let* ctxt, rollup, genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -966,6 +984,7 @@ module Stake_storage_tests = struct
 
   (** Test that a commitment needs to have a predecessor. *)
   let test_publish_without_predecessor_fails () =
+    let open Lwt_result_syntax in
     let* ctxt, rollup, _genesis_hash, staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -1241,6 +1260,7 @@ module Stake_storage_tests = struct
 
   (* Test that withdraw fail if the account has not deposited. *)
   let test_withdraw_when_not_staked () =
+    let open Lwt_result_syntax in
     let* ctxt, account = new_context_1 () in
     let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
     assert_fails_with
@@ -1390,6 +1410,7 @@ module Stake_storage_tests = struct
 
   let produce_and_refine ctxt ~number_of_commitments ?(start_at_level = 1)
       ~predecessor staker rollup =
+    let open Lwt_result_syntax in
     let inbox_level = proper_valid_inbox_level (ctxt, rollup) in
     let rec aux ctxt n l predecessor result =
       if n = 0 then return @@ (List.rev result, ctxt)
@@ -1412,6 +1433,7 @@ module Stake_storage_tests = struct
     aux ctxt number_of_commitments start_at_level predecessor []
 
   let rec cement_commitments ctxt commitments rollup =
+    let open Lwt_result_syntax in
     match commitments with
     | [] -> return ctxt
     | c :: commitments ->
@@ -1421,6 +1443,7 @@ module Stake_storage_tests = struct
         cement_commitments ctxt commitments rollup
 
   let test_cement_unknown_commitment_fails () =
+    let open Lwt_result_syntax in
     let* ctxt, rollup, _genesis_hash, _staker =
       originate_rollup_and_deposit_with_one_staker ()
     in
@@ -2091,6 +2114,7 @@ module Stake_storage_tests = struct
       Sc_rollup_errors.Sc_rollup_no_conflict
 
   let test_no_conflict_point_both_stakers_at_lcc_preboot () =
+    let open Lwt_result_syntax in
     let* ctxt, rollup, _genesis_hash, staker1, staker2 =
       originate_rollup_and_deposit_with_two_stakers ()
     in
@@ -2208,6 +2232,7 @@ module Stake_storage_tests = struct
           Commitment_repr.Hash.zero)
 
   let test_get_missing_commitment () =
+    let open Lwt_result_syntax in
     let* ctxt = new_context () in
     let* rollup, _genesis_hash, ctxt = new_sc_rollup ctxt in
     let commitment_hash = Commitment_repr.Hash.zero in

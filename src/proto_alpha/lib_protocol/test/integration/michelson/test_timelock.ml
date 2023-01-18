@@ -32,7 +32,6 @@
 *)
 
 open Protocol
-open Lwt_result_syntax
 
 let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
@@ -68,6 +67,7 @@ let timelock_path =
   "../../../../../../michelson_test_scripts/ill_typed/timelock.tz"
 
 let deprecated_chest_open () =
+  let open Lwt_result_syntax in
   (* Verify contract fails origination as OPEN_CHEST is marked as legacy (deprecated )*)
   let* block, baker, source_contract, _src2 = Contract_helpers.init () in
   let storage = "0xdeadbeef" in
@@ -94,6 +94,7 @@ let deprecated_chest_open () =
    DISABLED as open_chest is deprecated, but is expected to return.
 *)
 let contract_test () =
+  let open Lwt_result_syntax in
   let* block, baker, source_contract, _src2 = Contract_helpers.init () in
   let storage = "0xdeadbeef" in
   let script = Contract_helpers.read_file timelock_path in

@@ -33,7 +33,6 @@
 *)
 
 open Protocol
-open Lwt_result_syntax
 
 let assert_bond_id_result_equal ~loc =
   Assert.equal_result
@@ -44,6 +43,7 @@ let assert_bond_id_result_equal ~loc =
     ( = )
 
 let test_destruct_sc_bond_id_repr () =
+  let open Lwt_result_syntax in
   let sc_rollup_address1 = "sr1JPVatbbPoGp4vb6VfQ1jzEPMrYFcKq6VG" in
   let sc_rollup_address2 = "sr1JtMTWShgi1jLrqeHohMwLYiGizpsyWzXJ" in
   let invalid_sc_rollup_address = "sr1RWAV26caoU7oVMvetUPMt8CqvGmKtA8BO" in
@@ -71,6 +71,7 @@ let test_destruct_sc_bond_id_repr () =
     (destruct invalid_sc_rollup_address)
 
 let test_destruct_invalid_bond_id_repr () =
+  let open Lwt_result_syntax in
   let invalid_address = "asdfasdfasdf" in
   let empty_address = "" in
   let destruct = Bond_id_repr.Internal_for_test.destruct in
@@ -80,6 +81,7 @@ let test_destruct_invalid_bond_id_repr () =
   Assert.is_error ~loc:__LOC__ ~pp:Bond_id_repr.pp (destruct empty_address)
 
 let test_roundtrip () =
+  let open Lwt_result_syntax in
   let destruct_for_rountrip v =
     let r =
       match Bond_id_repr.Internal_for_test.destruct v with

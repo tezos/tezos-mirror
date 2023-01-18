@@ -35,7 +35,6 @@
 
 open Protocol
 open Alpha_context
-open Lwt_result_syntax
 
 exception Sc_rollup_test_error of string
 
@@ -132,6 +131,7 @@ let assert_timeout_result ?game_status incr =
   assert_equal_game_status ?game_status actual_game_status
 
 let bake_timeout_period ?timeout_period_in_blocks block =
+  let open Lwt_result_syntax in
   let* timeout_period_in_blocks =
     match timeout_period_in_blocks with
     | Some v -> return v
@@ -176,6 +176,7 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
     rollup when the feature flag is deactivated and checks that it
     fails. *)
 let test_disable_feature_flag () =
+  let open Lwt_result_syntax in
   let* b, contract = Context.init1 ~sc_rollup_enable:false () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
@@ -198,6 +199,7 @@ let test_disable_feature_flag () =
     rollup when the Arith PVM feature flag is deactivated and checks that it
     fails. *)
 let test_disable_arith_pvm_feature_flag () =
+  let open Lwt_result_syntax in
   let* b, contract = Context.init1 ~sc_rollup_arith_pvm_enable:false () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
@@ -219,6 +221,7 @@ let test_disable_arith_pvm_feature_flag () =
 (** Initializes the context and originates a SCORU. *)
 let sc_originate ?(boot_sector = "") ?origination_proof block contract
     parameters_ty =
+  let open Lwt_result_syntax in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
     Op.sc_rollup_origination
@@ -237,6 +240,7 @@ let sc_originate ?(boot_sector = "") ?origination_proof block contract
 (** Initializes the context and originates a SCORU. *)
 let init_and_originate ?boot_sector ?origination_proof
     ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
+  let open Lwt_result_syntax in
   let* block, contracts =
     context_init ?sc_rollup_challenge_window_in_blocks tup
   in
@@ -252,6 +256,7 @@ let number_of_ticks_exn n =
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
 let next_inbox_level ?predecessor ctxt rollup =
+  let open Lwt_result_syntax in
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let+ constants = Context.get_constants ctxt in
   let commitment_freq =
@@ -267,6 +272,7 @@ let next_inbox_level ?predecessor ctxt rollup =
 
 let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
     ?inbox_level ctxt rollup =
+  let open Lwt_result_syntax in
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let predecessor_hash =
     match predecessor with
@@ -298,6 +304,7 @@ let dummy_commitment ?predecessor ?compressed_state ?(number_of_ticks = 3000L)
 
 (* Bakes blocks to satisfy requirement of next_commitment.inbox_level <= current_level *)
 let bake_blocks_until_next_inbox_level ?predecessor block rollup =
+  let open Lwt_result_syntax in
   let* next_level = next_inbox_level ?predecessor (B block) rollup in
   Block.bake_until_level next_level block
 
@@ -306,6 +313,7 @@ let bake_blocks_until_inbox_level block commitment =
 
 let publish_op_and_dummy_commitment ~src ?compressed_state ?predecessor rollup
     block =
+  let open Lwt_result_syntax in
   let compressed_state =
     Option.map
       (fun s ->
@@ -499,6 +507,7 @@ let string_ticket_token ticketer content =
        {ticketer; contents_type = Script_typed_ir.string_t; contents})
 
 let originate_contract incr ~script ~baker ~storage ~source_contract =
+  let open Lwt_result_syntax in
   let* block = Incremental.finalize_block incr in
   let* contract, _, block =
     Contract_helpers.originate_contract_from_string_hash
@@ -520,6 +529,7 @@ let hash_commitment incr commitment =
   (Incremental.set_alpha_ctxt incr ctxt, hash)
 
 let publish_commitment incr staker rollup commitment =
+  let open Lwt_result_syntax in
   let* incr =
     if
       (Incremental.header incr).Block_header.shell.level
@@ -537,12 +547,14 @@ let publish_commitment incr staker rollup commitment =
 let publish_commitments block staker rollup commitments =
   List.fold_left_es
     (fun block commitment ->
+      let open Lwt_result_syntax in
       let* incr = Incremental.begin_construction block in
       publish_commitment incr staker rollup commitment)
     block
     commitments
 
 let cement_commitment ?challenge_window_in_blocks block rollup staker hash =
+  let open Lwt_result_syntax in
   let* challenge_window_in_blocks =
     match challenge_window_in_blocks with
     | Some x -> return x
@@ -562,6 +574,7 @@ let cement_commitments ?challenge_window_in_blocks block rollup staker hashes =
     hashes
 
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
+  let open Lwt_result_syntax in
   let* block = publish_commitment incr originator rollup commitment in
   let* constants = Context.get_constants (B block) in
   let* block =
@@ -580,6 +593,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   return (hash, incr)
 
 let publish_and_cement_commitments incr ~baker ~originator rollup commitments =
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun incr commitment ->
       let* _hash, incr =
@@ -590,6 +604,7 @@ let publish_and_cement_commitments incr ~baker ~originator rollup commitments =
     commitments
 
 let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
+  let open Lwt_result_syntax in
   let* commitment = dummy_commitment (I incr) rollup in
   publish_and_cement_commitment incr ~baker ~originator rollup commitment
 
@@ -599,6 +614,7 @@ let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
 let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
   let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
+    let open Lwt_result_syntax in
     let level = Raw_level.to_int32 inbox_level in
     if level >= Int32.of_int min_inbox_level then return (hash, incr)
     else
@@ -613,6 +629,7 @@ let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
   aux incr cemented_commitment_hash cemented_commitment
 
 let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
+  let open Lwt_result_syntax in
   let* incr =
     Context.(
       match ctxt with
@@ -649,6 +666,7 @@ let execute_outbox_message_without_proof_validation incr rollup
 
 let execute_outbox_message incr ~originator rollup ~output_proof
     ~commitment_hash =
+  let open Lwt_result_syntax in
   let* batch_op =
     Op.sc_rollup_execute_outbox_message
       (I incr)
@@ -679,12 +697,14 @@ let assert_ticket_token_balance ~loc incr token owner expected =
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~__LOC__ k expected_err =
+  let open Lwt_result_syntax in
   let*! res = k in
   Assert.proto_error ~loc:__LOC__ res (( = ) expected_err)
 
 type balances = {liquid : Tez.t; frozen : Tez.t}
 
 let balances ctxt contract =
+  let open Lwt_result_syntax in
   let* liquid = Context.Contract.balance ctxt contract in
   let* frozen = Context.Contract.frozen_bonds ctxt contract in
   return {liquid; frozen}
@@ -709,6 +729,7 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
 
 (* Generates a list of cemented dummy commitments. *)
 let gen_commitments incr rollup ~predecessor ~num_commitments =
+  let open Lwt_result_syntax in
   let* constants = Context.get_constants (I incr) in
   let delta = constants.parametric.sc_rollup.commitment_period_in_blocks in
   let rec aux predecessor n acc =
@@ -733,6 +754,7 @@ let gen_commitments incr rollup ~predecessor ~num_commitments =
   aux predecessor num_commitments []
 
 let attempt_to_recover_bond i contract ?staker rollup =
+  let open Lwt_result_syntax in
   (* Recover its own bond by default. *)
   let staker =
     match staker with
@@ -762,6 +784,7 @@ let recover_bond_not_staked i contract rollup =
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let recover_bond_with_success i contract rollup =
+  let open Lwt_result_syntax in
   let* bal_before = balances (I i) contract in
   let* b = attempt_to_recover_bond i contract rollup in
   let* bal_after = balances (B b) contract in
@@ -780,6 +803,7 @@ let recover_bond_with_success i contract rollup =
     The comitter tries to withdraw stake before and after cementing. Only the
     second attempt is expected to succeed. *)
 let test_publish_cement_and_recover_bond () =
+  let open Lwt_result_syntax in
   let* block, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* block = bake_blocks_until_next_inbox_level block rollup in
@@ -820,6 +844,7 @@ let test_publish_cement_and_recover_bond () =
     publishes two different commitments with the same staker. We check
     that the second publish fails. *)
 let test_publish_fails_on_double_stake () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract = contracts in
@@ -851,6 +876,7 @@ let test_publish_fails_on_double_stake () =
     cement one of the commitments; it checks that this fails because the
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract1, contract2 = contracts in
@@ -889,6 +915,7 @@ let test_cement_fails_on_conflict () =
 
 let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     =
+  let open Lwt_result_syntax in
   let* block = bake_blocks_until_next_inbox_level block rollup in
   let* i = Incremental.begin_construction block in
   let* commitment = dummy_commitment (I i) rollup in
@@ -910,6 +937,7 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     succeeds when the period is over. *)
 let test_challenge_window_period_boundaries () =
   let sc_rollup_challenge_window_in_blocks = 10 in
+  let open Lwt_result_syntax in
   let* ctxt, contract, rollup =
     init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1 "unit"
   in
@@ -945,6 +973,7 @@ let test_challenge_window_period_boundaries () =
 
 (** Test originating with bad type. *)
 let test_originating_with_invalid_types () =
+  let open Lwt_result_syntax in
   let* block, (contract, _, _) = context_init Context.T3 in
   let assert_fails_for_type parameters_type =
     assert_fails
@@ -969,6 +998,7 @@ let test_originating_with_invalid_types () =
   assert_fails ~loc:__LOC__ (sc_originate block contract "operation")
 
 let test_originating_with_invalid_boot_sector_proof () =
+  let open Lwt_result_syntax in
   let*! origination_proof =
     Sc_rollup_helpers.origination_proof
       ~boot_sector:"a boot sector"
@@ -990,6 +1020,7 @@ let test_originating_with_invalid_boot_sector_proof () =
   | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let test_originating_with_invalid_kind_proof () =
+  let open Lwt_result_syntax in
   let*! origination_proof =
     Sc_rollup_helpers.origination_proof
       ~boot_sector:"a boot sector"
@@ -1011,6 +1042,7 @@ let test_originating_with_invalid_kind_proof () =
   | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let test_originating_with_random_proof () =
+  let open Lwt_result_syntax in
   let origination_proof =
     Data_encoding.Binary.(
       of_string_exn Sc_rollup.Proof.serialized_encoding
@@ -1136,6 +1168,7 @@ let mutez_receiver =
   |}
 
 let test_single_transaction_batch () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1206,6 +1239,7 @@ let test_single_transaction_batch () =
 (** Test that checks that an outbox message can be executed against all stored
     cemented commitments but not against an outdated one. *)
 let test_older_cemented_commitment () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1318,6 +1352,7 @@ let test_older_cemented_commitment () =
   | _ -> failwith "Expected non-empty list of commitment hashes."
 
 let test_multi_transaction_batch () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1410,6 +1445,7 @@ let test_multi_transaction_batch () =
 (** Test that executing an L2 to L1 transaction that involves an invalid
     parameter (mutez) fails. *)
 let test_transaction_with_invalid_type () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   let* block, rollup = sc_originate block originator "list (ticket string)" in
@@ -1440,6 +1476,7 @@ let test_transaction_with_invalid_type () =
 
 (** Test that executing the same outbox message for the same twice fails. *)
 let test_execute_message_twice () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1491,6 +1528,7 @@ let test_execute_message_twice () =
 (** Verifies that it is not possible to execute the same message twice from
     different commitments. *)
 let test_execute_message_twice_different_cemented_commitments () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1547,6 +1585,7 @@ let test_execute_message_twice_different_cemented_commitments () =
        output)
 
 let test_zero_amount_ticket () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1599,6 +1638,7 @@ let test_zero_amount_ticket () =
 (* Check that executing an outbox message fails when the inclusion proof in
    invalid. *)
 let test_invalid_output_proof () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1619,6 +1659,7 @@ let test_invalid_output_proof () =
        ~commitment_hash:cemented_commitment)
 
 let test_execute_message_override_applied_messages_slot () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1753,6 +1794,7 @@ let test_execute_message_override_applied_messages_slot () =
 (** Test that a transaction fails if it attempts to transfer more tickets than
     allowed. *)
 let test_insufficient_ticket_balances () =
+  let open Lwt_result_syntax in
   let* block, (baker, originator) = context_init Context.T2 in
   let baker = Context.Contract.pkh baker in
   (* Originate a rollup that accepts a list of string tickets as input. *)
@@ -1826,6 +1868,7 @@ let test_insufficient_ticket_balances () =
        output)
 
 let test_inbox_max_number_of_messages_per_level () =
+  let open Lwt_result_syntax in
   let* block, (account1, account2) =
     (* set sort of unlimited gas or we are going to hit gas exhaustion. *)
     context_init
@@ -1866,11 +1909,13 @@ let test_inbox_max_number_of_messages_per_level () =
   return_unit
 
 let add_op block op =
+  let open Lwt_result_syntax in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr op in
   Incremental.finalize_block incr
 
 let add_publish ~rollup block account commitment =
+  let open Lwt_result_syntax in
   let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
   let* block = bake_blocks_until_inbox_level block commitment in
   add_op block publish
@@ -1878,6 +1923,7 @@ let add_publish ~rollup block account commitment =
 (** [test_number_of_parallel_games_bounded] checks that one cannot
     play an arbitrary number of games. *)
 let test_number_of_parallel_games_bounded () =
+  let open Lwt_result_syntax in
   let max_number_of_parallel_games =
     Context.default_test_constants.sc_rollup.max_number_of_parallel_games
   in
@@ -1973,6 +2019,7 @@ let test_number_of_parallel_games_bounded () =
 - Test another account can timeout a late player.
 *)
 let test_timeout () =
+  let open Lwt_result_syntax in
   let* block, (account1, account2, account3) = context_init Context.T3 in
   let pkh1 = Account.pkh_of_contract_exn account1 in
   let pkh2 = Account.pkh_of_contract_exn account2 in
@@ -2169,6 +2216,7 @@ let dumb_proof ~choice =
 (** Test that two invalid proofs from the two players lead to a draw
     in the refutation game. *)
 let test_draw_with_two_invalid_moves () =
+  let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
 
   (* Player1 will play an invalid final move. *)
@@ -2228,6 +2276,7 @@ let test_draw_with_two_invalid_moves () =
 (** Test that timeout a player during the final move ends the game if
     the other player played. *)
 let test_timeout_during_final_move () =
+  let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
 
   (* Player1 will play an invalid final move. *)
@@ -2259,6 +2308,7 @@ let test_timeout_during_final_move () =
 
 (** Test that playing a dissection during a final move is rejected. *)
 let test_dissection_during_final_move () =
+  let open Lwt_result_syntax in
   let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
 
   (* Player1 will play an invalid final move. *)
@@ -2469,6 +2519,7 @@ let test_refute_set_input
   assert_refute_result ~game_status:expected_game_status incr
 
 let test_refute_invalid_metadata () =
+  let open Lwt_result_syntax in
   let p1_info rollup (genesis_info : Sc_rollup.Commitment.genesis_info) =
     let metadata =
       Sc_rollup.Metadata.
@@ -2498,6 +2549,7 @@ let test_refute_invalid_metadata () =
     [Needs_reveal] state through an external message annoucing the [hash].
 *)
 let arith_state_before_reveal metadata hash =
+  let open Lwt_result_syntax in
   let*! context, state, _, _, _ = make_arith_state metadata in
   let input =
     Sc_rollup_helpers.make_external_input
@@ -2560,6 +2612,7 @@ let full_history_inbox (predecessor_timestamp, predecessor)
     payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
+  let open Lwt_result_syntax in
   let open Sc_rollup_helpers in
   let payloads_histories, history, inbox = full_history_inbox in
   let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
@@ -2584,6 +2637,7 @@ let input_included ~snapshot ~full_history_inbox (l, n) =
 (** Test that the protocol adds a [SOL], [Info_per_level] and [EOL] for each
     Tezos level, even if no messages are added to the inbox. *)
 let test_automatically_added_internal_messages () =
+  let open Lwt_result_syntax in
   let assert_input_included ~snapshot ~full_history_inbox (l, n) input =
     let* input_verified = input_included ~snapshot ~full_history_inbox (l, n) in
     Assert.equal
@@ -2693,6 +2747,7 @@ let test_automatically_added_internal_messages () =
 (** With [Start_of_level] and [End_of_level] inbox messages in each inbox level,
     it's impossible to give a valid commitment with 0 ticks. *)
 let test_zero_tick_commitment_fails () =
+  let open Lwt_result_syntax in
   let* ctxt, contract, rollup = init_and_originate Context.T1 "unit" in
   let* incr = Incremental.begin_construction ctxt in
   let* commitment = dummy_commitment (I incr) rollup in
@@ -2832,6 +2887,7 @@ let test_curfew_period_is_started_only_after_first_publication () =
   return_unit
 
 let test_offline_staker_does_not_prevent_cementation () =
+  let open Lwt_result_syntax in
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let contract1, contract2 = contracts in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
@@ -2868,6 +2924,7 @@ let test_offline_staker_does_not_prevent_cementation () =
   return_unit
 
 let init_with_4_conflicts () =
+  let open Lwt_result_syntax in
   let dumb_compressed_state s =
     Sc_rollup.State_hash.context_hash_to_state_hash
       (Context_hash.hash_string [s])
@@ -2928,6 +2985,7 @@ let init_with_4_conflicts () =
   return (block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh))
 
 let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
+  let open Lwt_result_syntax in
   let* ctxt = Block.to_alpha_ctxt block in
   let* (p1_point, p2_point), _ctxt =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
@@ -2949,6 +3007,7 @@ let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
 (** Test that when A plays against B, C, D and if A losts the game against
     one of them, the others can win against A for free. *)
 let test_winner_by_forfeit () =
+  let open Lwt_result_syntax in
   let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh) =
     init_with_4_conflicts ()
   in
@@ -3004,6 +3063,7 @@ let test_winner_by_forfeit () =
 (** Test the same property as in {!test_winner_by_forfeit} but where two
     players slashed eachother with a draw. *)
 let test_winner_by_forfeit_with_draw () =
+  let open Lwt_result_syntax in
   let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (_pD, _pD_pkh) =
     init_with_4_conflicts ()
   in
@@ -3079,6 +3139,7 @@ let test_winner_by_forfeit_with_draw () =
   return_unit
 
 let test_conflict_point_on_a_branch () =
+  let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
     init_and_originate
       ~sc_rollup_challenge_window_in_blocks:1000
@@ -3130,6 +3191,7 @@ let test_conflict_point_on_a_branch () =
   Assert.equal_bool ~loc:__LOC__ true expected_conflict
 
 let test_agreeing_stakers_cannot_play () =
+  let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
     init_and_originate
       ~sc_rollup_challenge_window_in_blocks:1000
@@ -3173,6 +3235,7 @@ let test_agreeing_stakers_cannot_play () =
   return_unit
 
 let test_start_game_on_cemented_commitment () =
+  let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
     init_and_originate
       ~sc_rollup_challenge_window_in_blocks:1000
