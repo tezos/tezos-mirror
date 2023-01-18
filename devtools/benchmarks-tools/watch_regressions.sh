@@ -56,8 +56,19 @@ fi
 # script are unlikely to step on each other's feet.
 echo "$LAST_DIR" > "$OCTEZ_DIR"/last_known_dir
 
-# Now fetch all the files from the bucket (they are the inputs), and reset the
-# output directory and the file containing the alerts.
+INPUT_CSV_DIR="$OCTEZ_DIR/input_csvs"
+OUTPUT_CSV_DIR="$OCTEZ_DIR/output_csvs"
+
+rm -rf "$INPUT_CSV_DIR"
+mkdir -p "$INPUT_CSV_DIR"
+aws s3 sync s3://snoop-playground/mclaren/inference_csvs/snoop_results/ "$INPUT_CSV_DIR"/
+
+rm -rf "$OUTPUT_CSV_DIR"
+mkdir -p "$OUTPUT_CSV_DIR"
+
+ALERT_FILE="$OCTEZ_DIR/alerts"
+
+rm -f "$ALERT_FILE"
 
 # Fetch the first directory that we'll use as a reference.
 
