@@ -121,15 +121,46 @@ let input_arg =
   let open Tezos_clic in
   arg ~doc:"input file" ~long:"inputs" ~placeholder:"inputs.json" file_parameter
 
+let rollup_parameter =
+  let open Lwt_result_syntax in
+  Tezos_clic.(
+    parameter (fun _ hash ->
+        let hash_opt =
+          Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Address
+          .of_b58check_opt
+            hash
+        in
+        match hash_opt with
+        | Some hash -> return hash
+        | None ->
+            failwith
+              "Parameter '%s' is an invalid smart rollup address encoded in a \
+               base58 string."
+              hash))
+
+let rollup_arg =
+  let open Tezos_clic in
+  arg
+    ~doc:
+      (Format.asprintf
+         "The rollup address representing the current kernel. It is used on \
+          the reveal metadata channel and as the default destination for \
+          internal messages. If absent, it defaults to `%a`."
+         Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Address.pp
+         Config.default_destination)
+    ~long:"rollup"
+    ~placeholder:"rollup address"
+    rollup_parameter
+
 let main_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the eval loop"
-    (args1 input_arg)
+    (args2 input_arg rollup_arg)
     (wasm_param @@ stop)
-    (fun inputs wasm_file () ->
-      let config = Config.config () in
+    (fun (inputs, rollup_arg) wasm_file () ->
+      let config = Config.config ?destination:rollup_arg () in
       let*? binary =
         if Filename.check_suffix wasm_file ".wasm" then Ok true
         else if Filename.check_suffix wasm_file ".wast" then Ok false
