@@ -164,7 +164,7 @@ let mode_arg client =
 
 let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
-    ?config_file ?(no_base_dir_warnings = false) client command =
+    ?config_file ?(no_base_dir_warnings = false) ?block client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -177,6 +177,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
   let no_base_dir_warnings_arg =
     optional_switch "no-base-dir-warnings" no_base_dir_warnings
   in
+  let block_arg = Cli_arg.optional_arg "block" Fun.id block in
   Process.spawn
     ?runner:client.runner
     ~name:client.name
@@ -189,7 +190,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
   @ protocol_arg @ media_type_arg client.mode @ mode_arg client
-  @ base_dir_arg client @ config_file_arg @ no_base_dir_warnings_arg @ command
+  @ base_dir_arg client @ config_file_arg @ no_base_dir_warnings_arg @ block_arg
+  @ command
 
 let spawn_command_with_stdin ?log_command ?log_status_on_exit ?log_output
     ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
@@ -570,24 +572,24 @@ let spawn_activate_protocol ?endpoint ?block ?protocol ?protocol_hash
   in
   spawn_command
     ?endpoint
+    ?block
     client
-    (optional_arg "block" Fun.id block
-    @ [
-        "activate";
-        "protocol";
-        protocol_hash;
-        "with";
-        "fitness";
-        string_of_int fitness;
-        "and";
-        "key";
-        key;
-        "and";
-        "parameters";
-        parameter_file;
-        "--timestamp";
-        Time.to_notation timestamp;
-      ])
+    [
+      "activate";
+      "protocol";
+      protocol_hash;
+      "with";
+      "fitness";
+      string_of_int fitness;
+      "and";
+      "key";
+      key;
+      "and";
+      "parameters";
+      parameter_file;
+      "--timestamp";
+      Time.to_notation timestamp;
+    ]
 
 let activate_protocol ?endpoint ?block ?protocol ?protocol_hash ?fitness ?key
     ?timestamp ?parameter_file client =
@@ -3959,3 +3961,15 @@ let expand_macros ?endpoint ?hooks ?protocol_hash ?no_base_dir_warnings client
     client
     path
   |> Process.check_and_read_stdout
+
+let spawn_get_timestamp ?endpoint ?block ?(seconds = false) client =
+  spawn_command ?endpoint ?block client
+  @@ ["get"; "timestamp"]
+  @ optional_switch "seconds" seconds
+
+let get_timestamp ?endpoint ?block ?seconds client =
+  let* output =
+    spawn_get_timestamp ?endpoint ?block ?seconds client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim output)
