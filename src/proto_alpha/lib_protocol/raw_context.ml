@@ -875,82 +875,6 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> Lwt.return constants)
 
-let update_block_time_related_constants (c : Constants_parametric_repr.t) =
-  let divide_period p =
-    Period_repr.of_seconds_exn
-      Int64.(div (add (Period_repr.to_seconds p) 1L) 2L)
-  in
-  let minimal_block_delay = divide_period c.minimal_block_delay in
-  let delay_increment_per_round = divide_period c.delay_increment_per_round in
-  let hard_gas_limit_per_block =
-    let two = Z.(succ one) in
-    Gas_limit_repr.Arith.(
-      integral_exn (Z.div (integral_to_z c.hard_gas_limit_per_block) two))
-  in
-  let Constants_repr.Generated.
-        {
-          consensus_threshold = _;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          liquidity_baking_subsidy;
-        } =
-    Constants_repr.Generated.generate
-      ~consensus_committee_size:
-        c.Constants_parametric_repr.consensus_committee_size
-      ~blocks_per_minute:
-        {
-          numerator = 60;
-          denominator =
-            minimal_block_delay |> Period_repr.to_seconds |> Int64.to_int;
-        }
-  in
-  let double = Int32.mul 2l in
-  let blocks_per_cycle = double c.blocks_per_cycle in
-  let blocks_per_commitment = double c.blocks_per_commitment in
-  let nonce_revelation_threshold = double c.nonce_revelation_threshold in
-  let blocks_per_stake_snapshot = double c.blocks_per_stake_snapshot in
-  let max_operations_time_to_live = 2 * c.max_operations_time_to_live in
-  {
-    c with
-    blocks_per_cycle;
-    blocks_per_commitment;
-    nonce_revelation_threshold;
-    blocks_per_stake_snapshot;
-    max_operations_time_to_live;
-    minimal_block_delay;
-    delay_increment_per_round;
-    hard_gas_limit_per_block;
-    baking_reward_fixed_portion;
-    baking_reward_bonus_per_slot;
-    endorsing_reward_per_slot;
-    liquidity_baking_subsidy;
-  }
-
-let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~blocks_per_cycle
-    ~blocks_per_commitment =
-  get_cycle_eras ctxt >>=? fun cycle_eras ->
-  let current_era = Level_repr.current_era cycle_eras in
-  let current_cycle =
-    let level_position =
-      Int32.sub level (Raw_level_repr.to_int32 current_era.first_level)
-    in
-    Cycle_repr.add
-      current_era.first_cycle
-      (Int32.to_int (Int32.div level_position prev_blocks_per_cycle))
-  in
-  let new_cycle_era =
-    Level_repr.
-      {
-        first_level = Raw_level_repr.of_int32_exn (Int32.succ level);
-        first_cycle = Cycle_repr.succ current_cycle;
-        blocks_per_cycle;
-        blocks_per_commitment;
-      }
-  in
-  Level_repr.add_cycle_era new_cycle_era cycle_eras >>?= fun new_cycle_eras ->
-  set_cycle_eras ctxt new_cycle_eras
-
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
    constants is modified, is changed from the previous protocol, then
@@ -1003,10 +927,10 @@ let prepare_first_block ~level ~timestamp ctxt =
       in
       let cryptobox_parameters =
         {
-          Dal.page_size = 4096;
-          number_of_shards = 2048;
-          slot_size = 1 lsl 20;
-          redundancy_factor = 16;
+          Dal.page_size = c.dal.cryptobox_parameters.page_size;
+          number_of_shards = c.dal.cryptobox_parameters.number_of_shards;
+          slot_size = c.dal.cryptobox_parameters.slot_size;
+          redundancy_factor = c.dal.cryptobox_parameters.redundancy_factor;
         }
       in
       let dal =
@@ -1014,7 +938,7 @@ let prepare_first_block ~level ~timestamp ctxt =
           {
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
-            attestation_lag = c.dal.endorsement_lag;
+            attestation_lag = c.dal.attestation_lag;
             attestation_threshold = c.dal.availability_threshold;
             blocks_per_epoch = 32l;
             cryptobox_parameters;
@@ -1026,19 +950,21 @@ let prepare_first_block ~level ~timestamp ctxt =
             enable = true;
             arith_pvm_enable = false;
             origination_size = c.sc_rollup.origination_size;
-            challenge_window_in_blocks = 80_640;
+            challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
             stake_amount = c.sc_rollup.stake_amount;
-            commitment_period_in_blocks = 60;
-            max_lookahead_in_blocks = 172_800l;
-            max_active_outbox_levels = 80_640l;
+            commitment_period_in_blocks =
+              c.sc_rollup.commitment_period_in_blocks;
+            max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
+            max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
             max_outbox_messages_per_level =
               c.sc_rollup.max_outbox_messages_per_level;
             number_of_sections_in_dissection =
               c.sc_rollup.number_of_sections_in_dissection;
-            timeout_period_in_blocks = 40_320;
+            timeout_period_in_blocks = c.sc_rollup.timeout_period_in_blocks;
             max_number_of_stored_cemented_commitments =
               c.sc_rollup.max_number_of_stored_cemented_commitments;
-            max_number_of_parallel_games = 32;
+            max_number_of_parallel_games =
+              c.sc_rollup.max_number_of_parallel_games;
           }
       in
       let zk_rollup =
@@ -1100,20 +1026,6 @@ let prepare_first_block ~level ~timestamp ctxt =
             zk_rollup;
           }
       in
-      let block_time_is_at_least_15s =
-        Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay >= 15L)
-      in
-      (if block_time_is_at_least_15s then
-       let new_constants = update_block_time_related_constants constants in
-       update_cycle_eras
-         ctxt
-         level
-         ~prev_blocks_per_cycle:constants.blocks_per_cycle
-         ~blocks_per_cycle:new_constants.blocks_per_cycle
-         ~blocks_per_commitment:new_constants.blocks_per_commitment
-       >>=? fun ctxt -> return (ctxt, new_constants)
-      else return (ctxt, constants))
-      >>=? fun (ctxt, constants) ->
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
   >>=? fun ctxt ->
   prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp
