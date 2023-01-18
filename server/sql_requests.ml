@@ -32,19 +32,19 @@ open Teztale_lib
 let bool_to_int b = if b then 1 else 0
 
 let create_delegates =
-  "  CREATE TABLE delegates(\n\
+  "  CREATE TABLE IF NOT EXISTS delegates(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     address BLOB UNIQUE NOT NULL,\n\
   \     alias TEXT)"
 
 let create_nodes =
-  "   CREATE TABLE nodes(\n\
+  "   CREATE TABLE IF NOT EXISTS nodes(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     name TEXT UNIQUE NOT NULL,\n\
   \     comment TEXT)"
 
 let create_blocks =
-  "   CREATE TABLE blocks(\n\
+  "   CREATE TABLE IF NOT EXISTS blocks(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     timestamp INTEGER NOT NULL, -- Unix time\n\
   \     hash BLOB UNIQUE NOT NULL,\n\
@@ -54,7 +54,7 @@ let create_blocks =
   \     FOREIGN KEY (baker) REFERENCES delegates(id))"
 
 let create_blocks_reception =
-  "   CREATE TABLE blocks_reception(\n\
+  "   CREATE TABLE IF NOT EXISTS blocks_reception(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     timestamp TEXT NOT NULL, -- ISO8601 string\n\
   \     block INTEGER NOT NULL,\n\
@@ -64,7 +64,7 @@ let create_blocks_reception =
   \     UNIQUE (block, source))"
 
 let create_operations =
-  "   CREATE TABLE operations(\n\
+  "   CREATE TABLE IF NOT EXISTS operations(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     hash BLOB UNIQUE NOT NULL,\n\
   \     endorsement INTEGER NOT NULL,\n\
@@ -74,7 +74,7 @@ let create_operations =
   \     FOREIGN KEY (endorser) REFERENCES delegates(id))"
 
 let create_operations_reception =
-  "   CREATE TABLE operations_reception(\n\
+  "   CREATE TABLE IF NOT EXISTS operations_reception(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     timestamp TEXT NOT NULL, -- ISO8601 string\n\
   \     operation INTEGER NOT NULL,\n\
@@ -85,7 +85,7 @@ let create_operations_reception =
   \     UNIQUE (operation,source))"
 
 let create_operations_inclusion =
-  "   CREATE TABLE operations_inclusion(\n\
+  "   CREATE TABLE IF NOT EXISTS operations_inclusion(\n\
   \      id INTEGER PRIMARY KEY,\n\
   \      block INTEGER NOT NULL,\n\
   \      operation INTEGER NOT NULL,\n\
@@ -94,7 +94,7 @@ let create_operations_inclusion =
   \      UNIQUE (block, operation))"
 
 let create_endorsing_rights =
-  "   CREATE TABLE endorsing_rights(\n\
+  "   CREATE TABLE IF NOT EXISTS endorsing_rights(\n\
   \      id INTEGER PRIMARY KEY,\n\
   \      level INTEGER NOT NULL,\n\
   \      delegate INTEGER NOT NULL,\n\
@@ -104,17 +104,22 @@ let create_endorsing_rights =
   \      UNIQUE (level, delegate))"
 
 let create_endorsing_rights_level_idx =
-  "   CREATE INDEX endorsing_rights_level_idx ON endorsing_rights(level)"
+  "   CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
+   endorsing_rights(level)"
 
 let create_operations_level_idx =
-  "   CREATE INDEX operations_level_idx ON operations(level)"
+  "   CREATE INDEX IF NOT EXISTS operations_level_idx ON operations(level)"
+
+let create_blocks_reception_block_idx =
+  "   CREATE INDEX IF NOT EXISTS blocks_reception_block_idx ON \
+   blocks_reception(block)"
 
 let create_operations_reception_operation_idx =
-  "   CREATE INDEX operations_reception_operation_idx ON \
+  "   CREATE INDEX IF NOT EXISTS operations_reception_operation_idx ON \
    operations_reception(operation)"
 
 let create_operations_inclusion_operation_idx =
-  "   CREATE INDEX operations_inclusion_operation_idx ON \
+  "   CREATE INDEX IF NOT EXISTS operations_inclusion_operation_idx ON \
    operations_inclusion(operation)"
 
 let create_tables =
@@ -129,18 +134,48 @@ let create_tables =
     create_endorsing_rights;
     create_endorsing_rights_level_idx;
     create_operations_level_idx;
+    create_blocks_reception_block_idx;
     create_operations_reception_operation_idx;
     create_operations_inclusion_operation_idx;
   ]
 
 let db_schema = String.concat "; " create_tables
 
-let maybe_insert_source source =
-  "INSERT OR IGNORE INTO nodes (name) VALUES (\'" ^ source ^ "\')"
+module Type = struct
+  let decode_error x =
+    Result.map_error
+      (fun e ->
+        Format.asprintf "%a@." Tezos_error_monad.Error_monad.pp_print_trace e)
+      x
+
+  let time_protocol =
+    Caqti_type.custom
+      ~encode:(fun t -> Result.Ok (Tezos_base.Time.Protocol.to_seconds t))
+      ~decode:(fun i -> Result.Ok (Tezos_base.Time.Protocol.of_seconds i))
+      Caqti_type.int64
+
+  let block_hash =
+    Caqti_type.custom
+      ~encode:(fun t -> Result.Ok (Tezos_crypto.Block_hash.to_string t))
+      ~decode:(fun s -> decode_error (Tezos_crypto.Block_hash.of_string s))
+      Caqti_type.octets
+
+  let public_key_hash =
+    Caqti_type.custom
+      ~encode:(fun t ->
+        Result.Ok (Tezos_crypto.Signature.Public_key_hash.to_string t))
+      ~decode:(fun s ->
+        decode_error (Tezos_crypto.Signature.Public_key_hash.of_string s))
+      Caqti_type.octets
+end
+
+let maybe_insert_source =
+  Caqti_request.Infix.(Caqti_type.(string ->. unit))
+    "INSERT INTO nodes (name) VALUES (?) ON CONFLICT DO NOTHING"
 
 let maybe_insert_delegates_from_rights rights =
   Format.asprintf
-    "INSERT OR IGNORE INTO delegates (address) VALUES %a"
+    "INSERT INTO delegates (address) VALUES %a ON CONFLICT DO NOTHING"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f r ->
@@ -153,9 +188,10 @@ let maybe_insert_delegates_from_rights rights =
 
 let maybe_insert_endorsing_rights ~level rights =
   Format.asprintf
-    "INSERT OR IGNORE INTO endorsing_rights (level, delegate, first_slot, \
+    "INSERT INTO endorsing_rights (level, delegate, first_slot, \
      endorsing_power) SELECT column1, delegates.id, column3, column4 FROM \
-     delegates JOIN (VALUES %a) ON delegates.address = column2"
+     delegates JOIN (VALUES %a) ON delegates.address = column2 ON CONFLICT DO \
+     NOTHING"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f Teztale_lib.Consensus_ops.{address; first_slot; power} ->
@@ -219,7 +255,7 @@ let maybe_insert_operations_from_received ~level operations =
 
 let maybe_insert_delegates_from_received operations =
   Format.asprintf
-    "INSERT OR IGNORE INTO delegates (address) VALUES %a"
+    "INSERT INTO delegates (address) VALUES %a ON CONFLICT DO NOTHING"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f (address, _) ->
@@ -230,29 +266,30 @@ let maybe_insert_delegates_from_received operations =
            (Signature.Public_key_hash.to_hex address)))
     operations
 
-let maybe_insert_block hash ~level ~round timestamp delegate =
-  Format.asprintf
-    "INSERT OR IGNORE INTO blocks (timestamp, hash, level, round, baker) \
-     SELECT column1, column2, %ld, column4, delegates.id FROM delegates JOIN \
-     (VALUES ('%a', x'%a', x'%a', %ld)) ON delegates.address = column3"
-    level
-    Tezos_base.Time.Protocol.pp
-    timestamp
-    Hex.pp
-    (Block_hash.to_hex hash)
-    Hex.pp
-    (Signature.Public_key_hash.to_hex delegate)
-    round
+let maybe_insert_block =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      tup2
+        (tup3 int32 Type.time_protocol Type.block_hash)
+        (tup2 Type.public_key_hash int32)
+      ->. unit))
+    "INSERT INTO blocks (timestamp, hash, level, round, baker) SELECT column1, \
+     column2, ?, column4, delegates.id FROM delegates JOIN (VALUES (?, ?, ?, \
+     ?)) ON delegates.address = column3 ON CONFLICT (hash) DO UPDATE SET \
+     (timestamp, level, round, baker) = (EXCLUDED.timestamp, EXCLUDED.level, \
+     EXCLUDED.round, EXCLUDED.baker) WHERE True"
 
 let insert_received_operations ~source ~level operations =
   let operations = List.filter (fun (_, l) -> l <> []) operations in
   Format.asprintf
-    "INSERT OR IGNORE INTO operations_reception (timestamp, operation, source, \
-     errors) SELECT column1, operations.id, nodes.id, column2 FROM operations, \
+    "INSERT INTO operations_reception (timestamp, operation, source, errors) \
+     SELECT column1, operations.id, nodes.id, column2 FROM operations, \
      delegates, nodes, (VALUES %a) ON delegates.address = column3 AND \
      operations.endorser = delegates.id AND operations.endorsement = column4 \
      AND ((operations.round IS NULL AND column5 IS NULL) OR operations.round = \
-     column5) WHERE nodes.name = '%s' AND operations.level = %ld"
+     column5) WHERE nodes.name = '%s' AND operations.level = %ld AND \
+     (operations.id, nodes.id) NOT IN (SELECT operation,source FROM \
+     operations_reception)"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f (endorser, l) ->
@@ -293,12 +330,12 @@ let insert_received_operations ~source ~level operations =
 
 let insert_included_operations block_hash ~level operations =
   Format.asprintf
-    "INSERT OR IGNORE INTO operations_inclusion (block, operation) SELECT \
-     blocks.id, operations.id FROM operations, delegates, blocks, (VALUES %a) \
-     ON delegates.address = column1 AND operations.endorser = delegates.id AND \
+    "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
+     operations.id FROM operations, delegates, blocks, (VALUES %a) ON \
+     delegates.address = column1 AND operations.endorser = delegates.id AND \
      operations.endorsement = column2 AND ((operations.round IS NULL AND \
      column3 IS NULL) OR operations.round = column3) WHERE blocks.hash = x'%a' \
-     AND operations.level = %ld"
+     AND operations.level = %ld ON CONFLICT DO NOTHING"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f (op : Consensus_ops.block_op) ->
@@ -317,13 +354,8 @@ let insert_included_operations block_hash ~level operations =
     (Block_hash.to_hex block_hash)
     level
 
-let insert_received_block ~source hash reception_time =
-  Format.asprintf
-    "INSERT OR IGNORE INTO blocks_reception (timestamp, block, source) SELECT \
-     '%a', blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = x'%a' AND \
-     nodes.name = '%s'"
-    Tezos_base.Time.System.pp_hum
-    reception_time
-    Hex.pp
-    (Block_hash.to_hex hash)
-    source
+let insert_received_block =
+  Caqti_request.Infix.(Caqti_type.(tup3 ptime Type.block_hash string ->. unit))
+    "INSERT INTO blocks_reception (timestamp, block, source) SELECT ?, \
+     blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = ? AND \
+     nodes.name = ? ON CONFLICT DO NOTHING"

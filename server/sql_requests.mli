@@ -29,7 +29,7 @@ val create_tables : string list
 
 val db_schema : string
 
-val maybe_insert_source : string -> string
+val maybe_insert_source : (string, unit, [`Zero]) Caqti_request.t
 
 val maybe_insert_delegates_from_rights :
   Teztale_lib.Consensus_ops.rights -> string
@@ -47,12 +47,11 @@ val maybe_insert_operations_from_received :
   level:Int32.t -> Teztale_lib.Consensus_ops.delegate_ops -> string
 
 val maybe_insert_block :
-  Tezos_crypto.Block_hash.t ->
-  level:Int32.t ->
-  round:Int32.t ->
-  Tezos_base.Time.Protocol.t ->
-  Tezos_crypto.Signature.public_key_hash ->
-  string
+  ( (int32 (* level *) * Tezos_base.Time.Protocol.t * Tezos_crypto.Block_hash.t)
+    * (Tezos_crypto.Signature.public_key_hash * int32 (* round *)),
+    unit,
+    [`Zero] )
+  Caqti_request.t
 
 val insert_received_operations :
   source:string ->
@@ -69,4 +68,4 @@ val insert_included_operations :
   string
 
 val insert_received_block :
-  source:string -> Tezos_crypto.Block_hash.t -> Ptime.t -> string
+  (Ptime.t * Tezos_crypto.Block_hash.t * string, unit, [`Zero]) Caqti_request.t

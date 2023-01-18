@@ -201,24 +201,13 @@ let get_head db_pool =
       reply_public_json Data_encoding.(obj1 (req "level" int32)) head_level)
 
 let maybe_create_tables db_pool =
-  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Db.with_transaction (fun () ->
-          let* nb_tables =
-            Db.find
-              (Caqti_request.Infix.(Caqti_type.(unit ->! int))
-                 "SELECT COUNT (name) FROM sqlite_master")
-              ()
-          in
-          if nb_tables = 0 then
-            Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-              (fun req ->
-                Db.exec
-                  (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
-                  ())
-              Sql_requests.create_tables
-          else return_unit))
+          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+            (fun req ->
+              Db.exec (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req) ())
+            Sql_requests.create_tables))
     db_pool
 
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
@@ -277,37 +266,20 @@ let block_callback db_pool g source
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         Db.with_transaction (fun () ->
-            let* () =
-              Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Teztale_lib.Sql_requests.maybe_insert_source source))
-                ()
-            in
+            let* () = Db.exec Sql_requests.maybe_insert_source source in
             let level = Int32.of_string (Re.Group.get g 1) in
             let* () =
               Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Teztale_lib.Sql_requests.maybe_insert_block
-                      hash
-                      ~level
-                      ~round
-                      timestamp
-                      delegate))
-                ()
+                Sql_requests.maybe_insert_block
+                ((level, timestamp, hash), (delegate, round))
             in
+
             let* () =
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.Option.iter_es
                 (fun reception_time ->
                   Db.exec
-                    (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                       ~oneshot:true
-                       (Teztale_lib.Sql_requests.insert_received_block
-                          ~source
-                          hash
-                          reception_time))
-                    ())
+                    Sql_requests.insert_received_block
+                    (reception_time, hash, source))
                 reception_time
             in
             let* () =
@@ -335,13 +307,7 @@ let operations_callback db_pool g source operations =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         Db.with_transaction (fun () ->
-            let* () =
-              Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Sql_requests.maybe_insert_source source))
-                ()
-            in
+            let* () = Db.exec Sql_requests.maybe_insert_source source in
             let* () =
               Db.exec
                 (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
