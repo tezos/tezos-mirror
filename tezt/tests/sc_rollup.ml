@@ -81,10 +81,30 @@ let read_kernel name : string =
 let block_finality_time = 2
 
 let reveal_hash_hex data =
-  let (`Hex hash) =
-    Hex.of_string Tezos_crypto.Blake2B.(hash_string [data] |> to_string)
+  let hash =
+    Tezos_crypto.Blake2B.(hash_string [data] |> to_string) |> hex_encode
   in
   "00" ^ hash
+
+let reveal_hash_b58_mumbai_arith data =
+  Tezos_protocol_016_PtMumbai.Protocol.Sc_rollup_reveal_hash.(
+    hash_string ~scheme:Blake2B [data] |> to_b58check)
+
+type reveal_hash = {message : string; filename : string}
+
+let reveal_hash ~protocol ~kind data =
+  let hex_hash = reveal_hash_hex data in
+  match (protocol, kind) with
+  | Protocol.Mumbai, "arith" ->
+      (* Only for arith PVM, the message should have the form "hash:scrrh1..."  *)
+      {
+        message = "hash:" ^ reveal_hash_b58_mumbai_arith data;
+        filename = hex_hash;
+      }
+  | _, "arith" -> {message = "hash:" ^ hex_hash; filename = hex_hash}
+  | _, _ ->
+      (* Not used for wasm yet. *)
+      assert false
 
 type sc_rollup_constants = {
   origination_size : int;
@@ -2364,12 +2384,10 @@ let test_reveals_fails_on_wrong_hash =
       variant = None;
       description = "reveal data fails with wrong hash";
     }
-  @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
-  let hash = reveal_hash_hex "Some data" in
-  let pvm_dir =
-    Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind
-  in
-  let filename = Filename.concat pvm_dir hash in
+  @@ fun protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
+  let hash = reveal_hash ~protocol ~kind "Some data" in
+  let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
+  let filename = Filename.concat pvm_dir hash.filename in
   let () = Sys.mkdir pvm_dir 0o700 in
   let cout = open_out filename in
   let () = output_string cout "Some data that is not related to the hash" in
@@ -2390,7 +2408,7 @@ let test_reveals_fails_on_wrong_hash =
             expected")
       node_process
   in
-  let* () = send_text_messages client ["hash:" ^ hash] in
+  let* () = send_text_messages client [hash.message] in
   let should_not_sync =
     let* _level =
       Sc_rollup_node.wait_for_level
@@ -2412,11 +2430,11 @@ let test_reveals_4k =
       variant = None;
       description = "reveal 4kB of data";
     }
-  @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
+  @@ fun protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
   let data = String.make 4096 'z' in
-  let hash_hex = reveal_hash_hex data in
+  let hash = reveal_hash ~protocol ~kind data in
   let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
-  let filename = Filename.concat pvm_dir hash_hex in
+  let filename = Filename.concat pvm_dir hash.filename in
   let () = Sys.mkdir pvm_dir 0o700 in
   let () = with_open_out filename @@ fun cout -> output_string cout data in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
@@ -2426,7 +2444,7 @@ let test_reveals_4k =
     in
     Test.fail "Node terminated before reveal"
   in
-  let* () = send_text_messages client ["hash:" ^ hash_hex] in
+  let* () = send_text_messages client [hash.message] in
   let sync =
     let* _level =
       Sc_rollup_node.wait_for_level
@@ -2448,11 +2466,11 @@ let test_reveals_above_4k =
       variant = None;
       description = "reveal more than 4kB of data";
     }
-  @@ fun _protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
+  @@ fun protocol sc_rollup_node _sc_rollup_client _sc_rollup node client ->
   let data = String.make 4097 'z' in
-  let hash = reveal_hash_hex data in
+  let hash = reveal_hash ~protocol ~kind data in
   let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
-  let filename = Filename.concat pvm_dir hash in
+  let filename = Filename.concat pvm_dir hash.filename in
   let () = Sys.mkdir pvm_dir 0o700 in
   let cout = open_out filename in
   let () = output_string cout data in
@@ -2468,7 +2486,7 @@ let test_reveals_above_4k =
             encoding")
       node_process
   in
-  let* () = send_text_messages client ["hash:" ^ hash] in
+  let* () = send_text_messages client [hash.message] in
   let should_not_sync =
     let* _level =
       Sc_rollup_node.wait_for_level
