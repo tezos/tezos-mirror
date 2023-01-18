@@ -25,10 +25,38 @@
 
 (** Extends the {!Lwt_result_syntax} with additional utilities for wrapping
     results produced by the protocol, i.e. [Environment.Error_monad.tzresult],
-    to [tzresult Lwt.t] values used in the tests. *)
+    to [tzresult Lwt.t] values used in the tests.
+
+    The added utilities are binding operators. They use the same symbols as
+    the ones from {!Lwt_result_syntax} with an added [@] character. This
+    character symbolizes the {!e wrapping} of the internal error monad type in a
+    shell error.  *)
 
 include module type of Tezos_base.TzPervasives.Lwt_result_syntax
 
 (** [wrap res] maps the result type contained in [res] to a tzresult
     value. *)
 val wrap : 'a Environment.Error_monad.tzresult Lwt.t -> 'a tzresult Lwt.t
+
+(** [let*@ x = m in f x] is equivalent to [let* x = wrap m in f x].
+
+    Mnemonic: [@] "wraps" a protocol error in a shell error. *)
+val ( let*@ ) :
+  'a Environment.Error_monad.tzresult Lwt.t ->
+  ('a -> 'b tzresult Lwt.t) ->
+  'b tzresult Lwt.t
+
+(** [let*?@ x = m in f x] is equivalent to [let*? x = Environment.wrap_tzresult
+      m in f x].
+
+      Mnemonic: [@] "wraps" a protocol error in a shell error. *)
+val ( let*?@ ) :
+  'a Environment.Error_monad.tzresult ->
+  ('a -> 'b tzresult Lwt.t) ->
+  'b tzresult Lwt.t
+
+(** [let+@ x = m in f x] is equivalent to [let+ x = wrap m in f x].
+
+      Mnemonic: [@] "wraps" a protocol error in a shell error. *)
+val ( let+@ ) :
+  'a Environment.Error_monad.tzresult Lwt.t -> ('a -> 'b) -> 'b tzresult Lwt.t
