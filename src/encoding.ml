@@ -456,11 +456,11 @@ module Fixed = struct
 
   let bytes n = bytes' Hex n
 
-  let bigstring json_repr n =
+  let bigstring ?(string_json_repr = Hex) n =
     if n <= 0 then
       invalid_arg
         "Cannot create a bigstring encoding of negative or null fixed length." ;
-    make @@ Bigstring (`Fixed n, json_repr)
+    make @@ Bigstring (`Fixed n, string_json_repr)
 
   let add_padding e n =
     if n <= 0 then
@@ -495,7 +495,8 @@ module Variable = struct
 
   let bytes = bytes' Hex
 
-  let bigstring json_repr = make @@ Bigstring (`Variable, json_repr)
+  let bigstring ?(string_json_repr = Hex) () =
+    make @@ Bigstring (`Variable, string_json_repr)
 
   let array ?max_length e =
     check_not_variable "an array" e ;
@@ -619,8 +620,11 @@ let bytes' ?length_kind json_repr =
 
 let bytes = bytes' Hex
 
-let bigstring ?length_kind json_repr =
-  dynamic_size ?kind:length_kind (Variable.bigstring json_repr)
+type bigstring =
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
+let bigstring ?length_kind ?(string_json_repr = Hex) () =
+  dynamic_size ?kind:length_kind (Variable.bigstring ~string_json_repr ())
 
 let array ?max_length e = dynamic_size (Variable.array ?max_length e)
 

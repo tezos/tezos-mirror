@@ -38,7 +38,7 @@ let pp encoding s =
 
 let%expect_test _ =
   let e = Data_encoding.string' Hex in
-  let eb = Data_encoding.bigstring Hex in
+  let eb = Data_encoding.bigstring () in
   pp e "" ;
   pp eb (Bigstringaf.of_string ~off:0 ~len:0 "") ;
   [%expect
@@ -55,7 +55,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   let e = Data_encoding.string' ~length_kind:`Uint8 Hex in
-  let eb = Data_encoding.bigstring ~length_kind:`Uint8 Hex in
+  let eb = Data_encoding.bigstring ~length_kind:`Uint8 () in
   pp e "" ;
   pp eb (Bigstringaf.of_string ~off:0 ~len:0 "") ;
   [%expect {|
@@ -71,7 +71,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   let e = Data_encoding.string' ~length_kind:`N Hex in
-  let eb = Data_encoding.bigstring ~length_kind:`N Hex in
+  let eb = Data_encoding.bigstring ~length_kind:`N () in
   pp e "" ;
   pp eb (Bigstringaf.of_string ~off:0 ~len:0 "") ;
   [%expect {|
@@ -87,7 +87,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   let e n = Data_encoding.Fixed.string' Hex n in
-  let eb n = Data_encoding.Fixed.bigstring Hex n in
+  let eb n = Data_encoding.Fixed.bigstring n in
   pp (e 2) "\xde\xad" ;
   pp (eb 2) (Bigstringaf.of_string ~off:0 ~len:2 "\xde\xad") ;
   [%expect

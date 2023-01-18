@@ -302,11 +302,15 @@ module Encoding : sig
   (** same as [bytes' Hex] *)
   val bytes : Bytes.t encoding
 
+  type bigstring =
+    (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
   (** same as [string'] but for bigstring. *)
   val bigstring :
     ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
-    string_json_repr ->
-    Bigstringaf.t encoding
+    ?string_json_repr:string_json_repr ->
+    unit ->
+    bigstring encoding
 
   (** {3 Descriptor combinators} *)
 
@@ -1026,7 +1030,8 @@ let encoding_t =
     val bytes : int -> Bytes.t encoding
 
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
-    val bigstring : string_json_repr -> int -> Bigstringaf.t encoding
+    val bigstring :
+      ?string_json_repr:string_json_repr -> int -> bigstring encoding
 
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val bytes' : string_json_repr -> int -> Bytes.t encoding
@@ -1117,7 +1122,8 @@ let expr_encoding =
 
     val bytes' : string_json_repr -> Bytes.t encoding
 
-    val bigstring : string_json_repr -> Bigstringaf.t encoding
+    val bigstring :
+      ?string_json_repr:string_json_repr -> unit -> bigstring encoding
 
     (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
@@ -1167,9 +1173,9 @@ let expr_encoding =
 
     val bigstring :
       ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
-      string_json_repr ->
+      ?string_json_repr:string_json_repr ->
       int ->
-      Bigstringaf.t encoding
+      bigstring encoding
   end
 
   (** Mark an encoding as being of dynamic size.

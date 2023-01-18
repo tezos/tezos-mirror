@@ -797,7 +797,7 @@ let full_bigstring : Bigstringaf.t full =
       Crowbar.map [string] (fun s ->
           Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
 
-    let encoding = Data_encoding.bigstring Hex
+    let encoding = Data_encoding.bigstring ()
   end)
 
 let full_fixed_bigstring n : Bigstringaf.t full =
@@ -818,7 +818,7 @@ let full_fixed_bigstring n : Bigstringaf.t full =
         [Crowbar.bytes_fixed n]
         (fun s -> Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
 
-    let encoding = Data_encoding.Fixed.bigstring Hex n
+    let encoding = Data_encoding.Fixed.bigstring n
   end)
 
 let full_option : type a. a full -> a option full =

@@ -142,7 +142,7 @@ module Encoding = struct
 
     let bytes length = bytes' Hex length
 
-    let bigstring ?length_kind json_repr length =
+    let bigstring ?length_kind ?(string_json_repr = Hex) length =
       let max_length =
         match length_kind with
         | None -> Binary_size.max_int `Uint30 (* biggest that's allowed *)
@@ -162,7 +162,7 @@ module Encoding = struct
                    :> Binary_size.length)
              | Some kind -> kind
            in
-           dynamic_size ~kind (check_size length (Variable.bigstring Hex)))
+           dynamic_size ~kind (check_size length (Variable.bigstring ())))
         ~json:
           (let open Json_encoding in
           conv
@@ -175,7 +175,7 @@ module Encoding = struct
                 raise
                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               Bigstringaf.of_string ~off:0 ~len:(String.length s) s)
-            (Json.string json_repr))
+            (Json.string string_json_repr))
   end
 
   type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a

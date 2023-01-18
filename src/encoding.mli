@@ -283,8 +283,14 @@ val bytes : Bytes.t encoding
 val bytes' :
   ?length_kind:Binary_size.length -> string_json_repr -> Bytes.t encoding
 
+type bigstring =
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+
 val bigstring :
-  ?length_kind:Binary_size.length -> string_json_repr -> Bigstringaf.t encoding
+  ?length_kind:Binary_size.length ->
+  ?string_json_repr:string_json_repr ->
+  unit ->
+  bigstring encoding
 
 val float : float encoding
 
@@ -307,7 +313,8 @@ module Fixed : sig
 
   val bytes' : string_json_repr -> int -> Bytes.t encoding
 
-  val bigstring : string_json_repr -> int -> Bigstringaf.t encoding
+  val bigstring :
+    ?string_json_repr:string_json_repr -> int -> bigstring encoding
 
   val add_padding : 'a encoding -> int -> 'a encoding
 
@@ -325,7 +332,8 @@ module Variable : sig
 
   val bytes' : string_json_repr -> Bytes.t encoding
 
-  val bigstring : string_json_repr -> Bigstringaf.t encoding
+  val bigstring :
+    ?string_json_repr:string_json_repr -> unit -> bigstring encoding
 
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
