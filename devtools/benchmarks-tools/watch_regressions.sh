@@ -25,10 +25,21 @@
 #                                                                           #
 #############################################################################
 
+OCTEZ_DIR="/data/redbull/tezos"
+
 # Check if a directory more recent than the last known one exists on the bucket.
 # If not, we have nothing to do so we stop immediately.
-# Will use a local file to store the last known directory. Let's call it
-# last_known_dir.
+LAST_KNOWN_DIR="$(cat "$OCTEZ_DIR"/last_known_dir)"
+echo "Last known dir: $LAST_KNOWN_DIR"
+
+LAST_DIR="$(aws s3 ls s3://snoop-playground/mclaren/inference_csvs/snoop_results/ | grep PRE | tail -n 1 | sed 's/ *PRE //' | sed 's,/$,,')"
+echo "Last dir: $LAST_DIR"
+
+if [ "$LAST_DIR" = "$LAST_KNOWN_DIR" ]
+then
+    echo "No new results to analyse, exiting"
+    exit 0
+fi
 
 # If we're there, this means that there is a directory on the bucket more recent
 # than the last one we treated. Let's call it last_dir.
