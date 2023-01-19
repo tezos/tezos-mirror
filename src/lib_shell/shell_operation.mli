@@ -47,6 +47,7 @@ type 'protocol_operation operation = private {
           validation context, it notably means that the signature is
           correct. Therefore, when this field is [true], we can tell the
           protocol to skip signature checks. *)
+  size : int;  (** Size of the operation in bytes. *)
 }
 
 (** Return the operation with the {!signature_checked} field set to [true]. *)
@@ -85,8 +86,11 @@ module Internal_for_tests : sig
   val hash_of : _ operation -> Operation_hash.t
 
   (** A constructor for the [operation] datatype. It by-passes the
-      checks done by the [parse] function. *)
-  val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
+      checks done by the [parse] function.
+
+      [size] defaults to [0] for tests that don't care about it. *)
+  val make_operation :
+    ?size:int -> Operation.t -> Operation_hash.t -> 'a -> 'a operation
 
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
       Any error happening during parsing becomes {!Parse_error}.
