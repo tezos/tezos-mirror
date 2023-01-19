@@ -764,7 +764,7 @@ module Inner = struct
             if i <= quotient + (padding / 2) then Scalar.(copy zero)
             else Scalar.copy coefs.(rest + ((i - (quotient + padding)) * l)))
       in
-      if j <> 0 then points.(0) <- Scalar.copy coefs.(degree - j) ;
+      points.(0) <- Scalar.copy coefs.(degree - j) ;
       Scalar.fft_inplace ~domain:domain2m ~points ;
       Array.map2 G1.mul precomputed_srs_part.(j) points
     in
@@ -841,12 +841,16 @@ module Inner = struct
 
   let prove_shards t p =
     let preprocess = precompute_shards_proofs t in
+    let p' = Array.init (t.k + 1) (fun _ -> Scalar.(copy zero)) in
+    let p_length = Polynomials.degree p + 1 in
+    let p = Polynomials.to_dense_coefficients p in
+    Array.blit p 0 p' 0 p_length ;
     multiple_multi_reveals
       ~chunk_len:t.evaluations_per_proof_log
       ~chunk_count:t.proofs_log
       ~degree:t.k
       ~preprocess
-      (Polynomials.to_dense_coefficients p)
+      p'
 
   let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
     let d_n = Domains.build_power_of_two t.evaluations_log in
