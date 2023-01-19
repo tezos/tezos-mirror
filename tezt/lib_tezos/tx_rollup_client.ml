@@ -45,9 +45,7 @@ let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
 let create ~protocol ?name ?base_dir ?wallet_dir ?(color = Log.Color.FG.green)
     tx_node =
-  let path =
-    String.concat "-" [Constant.tx_rollup_client; Protocol.daemon_name protocol]
-  in
+  let path = Protocol.tx_rollup_client protocol in
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir

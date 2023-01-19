@@ -123,12 +123,14 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
   let* () = Client.bake_for_and_wait client in
   return sc_rollup
 
-let with_fresh_rollup ?kind ~boot_sector f tezos_node tezos_client operator =
+let with_fresh_rollup ~protocol ?kind ~boot_sector f tezos_node tezos_client
+    operator =
   let* sc_rollup =
     originate_sc_rollup ?kind ~boot_sector ~src:operator tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
+      ~protocol
       Operator
       tezos_node
       tezos_client
@@ -154,7 +156,7 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
 
 let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     ~internal ~kind =
-  let go ~internal client sc_rollup sc_rollup_node =
+  let go ~protocol ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -163,7 +165,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
     let* () = Sc_rollup_node.run sc_rollup_node [] in
-    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+    let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
 
     let* level =
       Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
@@ -280,10 +282,11 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
+          ~protocol
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
-            go ~internal:false client sc_rollup_address sc_rollup_node)
+            go ~protocol ~internal:false client sc_rollup_address sc_rollup_node)
           node
           client)
       protocols
@@ -295,10 +298,11 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
+          ~protocol
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
-            go ~internal:true client sc_rollup_address sc_rollup_node)
+            go ~protocol ~internal:true client sc_rollup_address sc_rollup_node)
           node
           client)
       protocols

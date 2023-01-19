@@ -246,7 +246,7 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
+let create ~protocol ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
     ?(dal_node : Dal_node.t option) mode (node : Node.t) (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
@@ -256,6 +256,7 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
+  let path = Protocol.sc_rollup_node protocol in
   let sc_node =
     create
       ~path

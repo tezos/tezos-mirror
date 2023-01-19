@@ -102,11 +102,9 @@ let fresh_name () =
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) sc_node =
+let create ~protocol ?name ?base_dir ?(color = Log.Color.FG.green) sc_node =
   let name = match name with None -> fresh_name () | Some name -> name in
-  let path =
-    match path with None -> Constant.sc_rollup_client | Some p -> p
-  in
+  let path = Protocol.sc_rollup_client protocol in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
   in

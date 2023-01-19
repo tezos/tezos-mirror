@@ -2423,30 +2423,6 @@ let test_withdrawals =
     ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
     ()
 
-let test_withdrawals_tz4 =
-  let before_init client =
-    let* () = Client.import_secret_key client Constant.tz4_account in
-    let* () =
-      Client.transfer
-        ~amount:(Tez.of_int 1_000)
-        ~giver:Constant.bootstrap1.public_key_hash
-        ~receiver:Constant.tz4_account.alias
-        ~burn_cap:Tez.one
-        client
-    in
-    Client.bake_for_and_wait client
-  in
-  test_round_trip
-    ~title:"TX_rollup: dispatch withdrawals to tz4 account"
-    ~originator:Constant.bootstrap2.public_key_hash
-    ~operator:Constant.bootstrap1.public_key_hash
-    ~batch_signer:Constant.bootstrap5.public_key_hash
-    ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
-    ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
-    ~before_init
-    ~withdraw_dest:Constant.tz4_account.public_key_hash
-    ()
-
 let test_single_signer =
   let operator = Constant.bootstrap1.public_key_hash in
   test_round_trip
@@ -2984,9 +2960,6 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
-  (match List.filter Protocol.(fun proto -> proto = Alpha) protocols with
-  | [] -> ()
-  | protocols -> test_withdrawals_tz4 protocols) ;
   test_single_signer protocols ;
   test_signer_reveals protocols ;
   test_accuser protocols ;

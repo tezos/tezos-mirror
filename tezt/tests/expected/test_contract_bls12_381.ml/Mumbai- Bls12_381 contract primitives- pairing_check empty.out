@@ -1,0 +1,9 @@
+
+./octez-client --mode mockup run script file:./tests_python/contracts_016/opcodes/pairing_check.tz on storage None and input '{}'
+storage
+  (Some True)
+emitted operations
+  
+big_map diff
+  
+

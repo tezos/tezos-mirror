@@ -137,8 +137,8 @@ let with_layer1 ?additional_bootstrap_accounts ?(attestation_lag = 1)
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
-let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
-    bootstrap1_key =
+let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
+    tezos_client bootstrap1_key =
   let* rollup_address =
     Client.Sc_rollup.originate
       ~hooks
@@ -151,6 +151,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
+      ~protocol
       ?dal_node
       Operator
       tezos_node
@@ -232,7 +233,7 @@ let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
       with_layer1 ?commitment_period ?challenge_window ~protocol ~dal_enable
       @@ fun _parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
-      ( with_fresh_rollup ~pvm_name ~dal_node
+      ( with_fresh_rollup ~protocol ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node _filename ->
         scenario
           protocol
@@ -1435,7 +1436,7 @@ let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
 
 let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
-let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
+let rollup_node_stores_dal_slots ?expand_test protocol dal_node sc_rollup_node
     sc_rollup_address node client _pvm_name =
   (* Check that the rollup node stores the slots published in a block, along with slot headers:
      0. Run dal node
@@ -1473,7 +1474,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
   let* () = Sc_rollup_node.run sc_rollup_node [] in
-  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
 
   Check.(level = init_level)
@@ -1613,16 +1614,16 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     [0] ;
   match expand_test with
   | None -> return ()
-  | Some f -> f client sc_rollup_address sc_rollup_node
+  | Some f -> f ~protocol client sc_rollup_address sc_rollup_node
 
-let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
+let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* genesis_info =
     RPC.Client.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let* level =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
   in
@@ -1905,7 +1906,7 @@ let test_dal_node_handles_dac_store_preimage_hash_chain_V0 _protocol dal_node
   check_preimage payload recovered_preimage ;
   unit
 
-let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
+let test_rollup_arith_uses_reveals protocol dal_node sc_rollup_node
     sc_rollup_address _node client _pvm_name =
   let* genesis_info =
     RPC.Client.call ~hooks client
@@ -1952,7 +1953,7 @@ let test_rollup_arith_uses_reveals _protocol dal_node sc_rollup_node
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 2)
   in
-  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let*! encoded_value =
     Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
   in
