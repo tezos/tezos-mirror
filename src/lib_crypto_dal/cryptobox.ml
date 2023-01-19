@@ -315,8 +315,13 @@ module Inner = struct
     1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
 
   let evaluations_per_proof_log ~n ~number_of_shards =
-    Z.log2 (Z.of_int (n / number_of_shards))
+    (* It is expected that n / number_of_shard is an integer, but we add an
+       extra evaluation if it happens to be a float. *)
+    let rem = if n mod number_of_shards = 0 then 0 else 1 in
+    Z.log2up (Z.of_int ((n / number_of_shards) + rem))
 
+  (* The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
+     hence the + 1 to account for the remainder of the division. *)
   let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
 
   let ensure_validity ~slot_size ~page_size ~n ~k ~number_of_shards ~shard_size
