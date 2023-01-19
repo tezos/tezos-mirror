@@ -44,10 +44,10 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     ~current_proposal
     delegates
 
-let get_current_proposal cctxt =
+let get_current_proposal cctxt ?cache () =
   let open Lwt_result_syntax in
   let* block_stream, _block_stream_stopper =
-    Node_rpc.monitor_proposals cctxt ~chain:cctxt#chain ()
+    Node_rpc.monitor_heads cctxt ?cache ~chain:cctxt#chain ()
   in
   Lwt_stream.peek block_stream >>= function
   | Some current_head -> return (block_stream, current_head)
@@ -59,7 +59,8 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
   let open State_transitions in
   let open Lwt_result_syntax in
-  let* _, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
   let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
@@ -91,7 +92,8 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
 let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
   let open Lwt_result_syntax in
-  let* _, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
@@ -283,7 +285,8 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
     ?(minimal_timestamp = false) ?extra_operations ?context_path delegates =
   let open Lwt_result_syntax in
-  let* _block_stream, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
   let config =
     Baking_configuration.make
       ?minimal_fees
@@ -507,7 +510,8 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?extra_operations
       ()
   in
-  let* block_stream, current_proposal = get_current_proposal cctxt in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* block_stream, current_proposal = get_current_proposal cctxt ~cache () in
   let* state =
     create_state
       cctxt

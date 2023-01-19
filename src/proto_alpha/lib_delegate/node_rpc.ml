@@ -25,6 +25,8 @@
 
 open Protocol
 open Alpha_context
+open Baking_cache
+open Baking_state
 module Block_services = Block_services.Make (Protocol) (Protocol)
 module Events = Baking_events.Node_rpc
 
@@ -50,164 +52,219 @@ let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
 
 let extract_prequorum preendorsements =
   match preendorsements with
-  | h :: _ as l ->
+  | h :: _ ->
       let ({protocol_data = {contents = Single (Preendorsement content); _}; _})
           =
         (h : Kind.preendorsement Operation.t)
       in
       Some
         {
-          Baking_state.level = Raw_level.to_int32 content.level;
+          level = Raw_level.to_int32 content.level;
           round = content.round;
           block_payload_hash = content.block_payload_hash;
-          preendorsements = l;
+          preendorsements;
         }
   | _ -> None
 
-let raw_info cctxt ~chain ~block_hash shell resulting_context_hash payload_hash
-    payload_round current_protocol next_protocol live_blocks =
-  Events.(emit raw_info (block_hash, shell.Tezos_base.Block_header.level))
-  >>= fun () ->
-  let open Protocol_client_context in
-  let block = `Hash (block_hash, 0) in
-  let is_in_protocol = Protocol_hash.(current_protocol = Protocol.hash) in
-  (if is_in_protocol then
-   Alpha_block_services.Operations.operations cctxt ~chain ~block ()
-   >>=? fun operations ->
-   let operations =
-     List.map
-       (fun l ->
-         List.map
-           (fun {Alpha_block_services.shell; protocol_data; _} ->
-             {Alpha_context.shell; protocol_data})
-           l)
-       operations
-   in
-   match Operation_pool.extract_operations_of_list_list operations with
-   | None -> failwith "Unexpected operation list size"
-   | Some operations -> return operations
-  else
-    (* If we are not in the current protocol, do no consider operations *)
-    return (None, [], Operation_pool.empty_payload))
-  >>=? fun (preendorsements, quorum, payload) ->
-  (match Baking_state.round_of_shell_header shell with
-  | Ok round -> ok round
-  | _ ->
-      (* this can occur if the protocol has just changed and the
-         previous protocol does not have a concept of round
-         (e.g. Genesis) *)
-      ok Round.zero)
-  >>?= fun round ->
-  let prequorum = Option.bind preendorsements extract_prequorum in
+let info_of_header_and_ops ~in_protocol block_hash block_header operations =
+  let open Result_syntax in
+  let shell = block_header.Tezos_base.Block_header.shell in
+  let dummy_payload_hash = Block_payload_hash.zero in
+  let* round =
+    Environment.wrap_tzresult @@ Fitness.round_from_raw shell.fitness
+  in
+  let payload_hash, payload_round, prequorum, quorum, payload =
+    if not in_protocol then
+      (* The first block in the protocol is baked using the previous
+         protocol, the encodings might change. The baker's logic is to
+         consider final the first block of a new protocol and not
+         endorse it. Therefore, we do not need to have the correct
+         values here. *)
+      (dummy_payload_hash, Round.zero, None, [], Operation_pool.empty_payload)
+    else
+      let payload_hash, payload_round =
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Protocol.block_header_data_encoding
+            block_header.protocol_data
+        with
+        | Some {contents = {payload_hash; payload_round; _}; _} ->
+            (payload_hash, payload_round)
+        | None -> assert false
+      in
+      let preendorsements, quorum, payload =
+        WithExceptions.Option.get
+          ~loc:__LOC__
+          (Operation_pool.extract_operations_of_list_list operations)
+      in
+      let prequorum = Option.bind preendorsements extract_prequorum in
+      (payload_hash, payload_round, prequorum, quorum, payload)
+  in
   return
     {
-      Baking_state.hash = block_hash;
+      hash = block_hash;
       shell;
-      resulting_context_hash;
       payload_hash;
       payload_round;
       round;
-      protocol = current_protocol;
-      next_protocol;
       prequorum;
       quorum;
       payload;
-      live_blocks;
     }
 
-let dummy_payload_hash = Block_payload_hash.zero
+let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
+    block_header =
+  let open Lwt_result_syntax in
+  let* operations =
+    match operations with
+    | None when not in_protocol -> return_nil
+    | None ->
+        let open Protocol_client_context in
+        let* operations =
+          Alpha_block_services.Operations.operations
+            cctxt
+            ~chain
+            ~block:(`Hash (block_hash, 0))
+            ()
+        in
+        let packed_operations =
+          List.map
+            (fun l ->
+              List.map
+                (fun {Alpha_block_services.shell; protocol_data; _} ->
+                  {Alpha_context.shell; protocol_data})
+                l)
+            operations
+        in
+        return packed_operations
+    | Some operations ->
+        let parse_op (raw_op : Tezos_base.Operation.t) =
+          let protocol_data =
+            Data_encoding.Binary.of_bytes_exn
+              Operation.protocol_data_encoding
+              raw_op.proto
+          in
+          {shell = raw_op.shell; protocol_data}
+        in
+        protect @@ fun () -> return (List.map (List.map parse_op) operations)
+  in
+  let*? block_info =
+    info_of_header_and_ops ~in_protocol block_hash block_header operations
+  in
+  return block_info
 
-let info cctxt ~chain ~block () =
-  let open Protocol_client_context in
-  (* Fails if the block's protocol is not the current one *)
-  Shell_services.Blocks.protocols cctxt ~chain ~block ()
-  >>=? fun {current_protocol; next_protocol} ->
-  Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
-  >>=? fun resulting_context_hash ->
-  (if Protocol_hash.(current_protocol <> Protocol.hash) then
-   Block_services.Header.shell_header cctxt ~chain ~block () >>=? fun shell ->
-   Chain_services.Blocks.Header.raw_protocol_data cctxt ~chain ~block ()
-   >>=? fun protocol_data ->
-   let hash =
-     Tezos_base.Block_header.hash {Tezos_base.Block_header.shell; protocol_data}
-   in
-   (* /!\ We decode [protocol_data] with the current protocol's
-      encoding, while we should use the previous protocol's
-      [protocol_data] encoding. For now, this works because the
-      encoding has not changed. *)
-   let payload_hash, payload_round =
-     match
-       Data_encoding.Binary.of_bytes_opt
-         Protocol.block_header_data_encoding
-         protocol_data
-     with
-     | Some {contents = {payload_hash; payload_round; _}; _} ->
-         (payload_hash, payload_round)
-     | None -> (dummy_payload_hash, Round.zero)
-   in
-   return (hash, shell, resulting_context_hash, payload_hash, payload_round)
-  else
-    Alpha_block_services.header cctxt ~chain ~block ()
-    >>=? fun {hash; shell; protocol_data; _} ->
-    return
-      ( hash,
-        shell,
-        resulting_context_hash,
-        protocol_data.contents.payload_hash,
-        protocol_data.contents.payload_round ))
-  >>=? fun (hash, shell, resulting_context_hash, payload_hash, payload_round) ->
-  (Chain_services.Blocks.live_blocks cctxt ~chain ~block () >>= function
-   | Error _ ->
-       (* The RPC might fail when a block's metadata is not available *)
-       Lwt.return Block_hash.Set.empty
-   | Ok live_blocks -> Lwt.return live_blocks)
-  >>= fun live_blocks ->
-  raw_info
-    cctxt
-    ~chain
-    ~block_hash:hash
-    shell
-    resulting_context_hash
-    payload_hash
-    payload_round
-    current_protocol
-    next_protocol
-    live_blocks
+let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
+    block_hash (block_header : Tezos_base.Block_header.t) =
+  let open Lwt_result_syntax in
+  let predecessor_hash = block_header.shell.predecessor in
+  let pred_block = `Hash (predecessor_hash, 0) in
+  let predecessor_opt =
+    Option.bind cache (fun cache -> Block_cache.find_opt cache predecessor_hash)
+  in
+  let* is_proposal_in_protocol, predecessor =
+    match predecessor_opt with
+    | Some predecessor ->
+        return
+          ( predecessor.shell.proto_level = block_header.shell.proto_level,
+            predecessor )
+    | None ->
+        let* {
+               current_protocol = pred_current_protocol;
+               next_protocol = pred_next_protocol;
+             } =
+          Shell_services.Blocks.protocols cctxt ~chain ~block:pred_block ()
+        in
+        let is_proposal_in_protocol =
+          Protocol_hash.(pred_next_protocol = Protocol.hash)
+        in
+        let* predecessor =
+          let in_protocol =
+            Protocol_hash.(pred_current_protocol = Protocol.hash)
+          in
+          let* raw_header_b =
+            Shell_services.Blocks.raw_header cctxt ~chain ~block:pred_block ()
+          in
+          let predecessor_header =
+            Data_encoding.Binary.of_bytes_exn
+              Tezos_base.Block_header.encoding
+              raw_header_b
+          in
+          compute_block_info
+            cctxt
+            ~in_protocol
+            ~chain
+            predecessor_hash
+            predecessor_header
+        in
+        Option.iter
+          (fun cache -> Block_cache.replace cache predecessor_hash predecessor)
+          cache ;
+        return (is_proposal_in_protocol, predecessor)
+  in
+  let block_opt =
+    Option.bind cache (fun cache -> Block_cache.find_opt cache block_hash)
+  in
+  let* block =
+    match block_opt with
+    | Some pi -> return pi
+    | None ->
+        let* pi =
+          compute_block_info
+            cctxt
+            ~in_protocol:is_proposal_in_protocol
+            ?operations
+            ~chain
+            block_hash
+            block_header
+        in
+        Option.iter (fun cache -> Block_cache.replace cache block_hash pi) cache ;
+        return pi
+  in
+  return {block; predecessor}
 
-let find_in_cache_or_fetch cctxt ?cache ~chain block_hash =
-  let open Baking_cache in
-  let fetch () = info cctxt ~chain ~block:(`Hash (block_hash, 0)) () in
-  match cache with
-  | None -> fetch ()
-  | Some block_cache -> (
-      match Block_cache.find_opt block_cache block_hash with
-      | Some block_info -> return block_info
-      | None ->
-          fetch () >>=? fun block_info ->
-          Block_cache.replace block_cache block_hash block_info ;
-          return block_info)
+let proposal cctxt ?cache ?operations ~chain block_hash block_header =
+  protect @@ fun () ->
+  proposal cctxt ?cache ?operations ~chain block_hash block_header
 
-let proposal cctxt ?cache ~chain block_hash =
-  find_in_cache_or_fetch cctxt ~chain ?cache block_hash >>=? fun block ->
-  let predecessor_hash = block.shell.predecessor in
-  find_in_cache_or_fetch cctxt ~chain ?cache predecessor_hash
-  >>=? fun predecessor -> return {Baking_state.block; predecessor}
+let monitor_valid_proposals cctxt ~chain ?cache () =
+  let open Lwt_result_syntax in
+  let next_protocols = [Protocol.hash] in
+  let* block_stream, stopper =
+    Monitor_services.validated_blocks cctxt ~chains:[chain] ~next_protocols ()
+  in
+  let stream =
+    let map (_chain_id, block_hash, block_header, operations) =
+      let*! map_result =
+        proposal cctxt ?cache ~operations ~chain block_hash block_header
+      in
+      match map_result with
+      | Ok proposal -> Lwt.return_some proposal
+      | Error err ->
+          let*! () = Events.(emit error_while_monitoring_valid_proposals err) in
+          Lwt.return_none
+    in
+    Lwt_stream.filter_map_s map block_stream
+  in
+  return (stream, stopper)
 
-let monitor_proposals cctxt ~chain () =
-  let cache = Baking_cache.Block_cache.create 100 in
-  Monitor_services.heads cctxt ~next_protocols:[Protocol.hash] chain
-  >>=? fun (block_stream, stopper) ->
-  return
-    ( Lwt_stream.filter_map_s
-        (fun (block_hash, _) ->
-          protect (fun () -> proposal cctxt ~cache ~chain block_hash)
-          >>= function
-          | Ok proposal -> Lwt.return_some proposal
-          | Error err ->
-              Events.(emit error_while_monitoring_heads err) >>= fun () ->
-              Lwt.return_none)
-        block_stream,
-      stopper )
+let monitor_heads cctxt ~chain ?cache () =
+  let open Lwt_result_syntax in
+  let next_protocols = [Protocol.hash] in
+  let* block_stream, stopper =
+    Monitor_services.heads cctxt ~next_protocols chain
+  in
+  let stream, stopper =
+    let map (block_hash, block_header) =
+      let*! map_result = proposal cctxt ?cache ~chain block_hash block_header in
+      match map_result with
+      | Ok proposal -> Lwt.return_some proposal
+      | Error err ->
+          let*! () = Events.(emit error_while_monitoring_heads err) in
+          Lwt.return_none
+    in
+    (Lwt_stream.filter_map_s map block_stream, stopper)
+  in
+  return (stream, stopper)
 
 let await_protocol_activation cctxt ~chain () =
   Monitor_services.heads cctxt ~next_protocols:[Protocol.hash] chain

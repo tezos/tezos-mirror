@@ -103,16 +103,12 @@ type prequorum = {
 type block_info = {
   hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
 }
 
 type cache = {
@@ -167,68 +163,48 @@ let block_info_encoding =
     (fun {
            hash;
            shell;
-           resulting_context_hash;
            payload_hash;
            payload_round;
            round;
-           protocol;
-           next_protocol;
            prequorum;
            quorum;
            payload;
-           live_blocks;
          } ->
-      ( ( hash,
-          shell,
-          resulting_context_hash,
-          payload_hash,
-          payload_round,
-          round,
-          protocol,
-          next_protocol,
-          prequorum,
-          List.map Operation.pack quorum ),
-        (payload, live_blocks) ))
-    (fun ( ( hash,
-             shell,
-             resulting_context_hash,
-             payload_hash,
-             payload_round,
-             round,
-             protocol,
-             next_protocol,
-             prequorum,
-             quorum ),
-           (payload, live_blocks) ) ->
+      ( hash,
+        shell,
+        payload_hash,
+        payload_round,
+        round,
+        prequorum,
+        List.map Operation.pack quorum,
+        payload ))
+    (fun ( hash,
+           shell,
+           payload_hash,
+           payload_round,
+           round,
+           prequorum,
+           quorum,
+           payload ) ->
       {
         hash;
         shell;
-        resulting_context_hash;
         payload_hash;
         payload_round;
         round;
-        protocol;
-        next_protocol;
         prequorum;
         quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
         payload;
-        live_blocks;
       })
-    (merge_objs
-       (obj10
-          (req "hash" Block_hash.encoding)
-          (req "shell" Block_header.shell_header_encoding)
-          (req "resulting_context_hash" Context_hash.encoding)
-          (req "payload_hash" Block_payload_hash.encoding)
-          (req "payload_round" Round.encoding)
-          (req "round" Round.encoding)
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding)
-          (req "prequorum" (option prequorum_encoding))
-          (req "quorum" (list (dynamic_size Operation.encoding))))
-       (obj2
-          (req "payload" Operation_pool.payload_encoding)
-          (req "live_blocks" Block_hash.Set.encoding)))
+    (obj8
+       (req "hash" Block_hash.encoding)
+       (req "shell" Block_header.shell_header_encoding)
+       (req "payload_hash" Block_payload_hash.encoding)
+       (req "payload_round" Round.encoding)
+       (req "round" Round.encoding)
+       (req "prequorum" (option prequorum_encoding))
+       (req "quorum" (list (dynamic_size Operation.encoding)))
+       (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult
@@ -265,6 +241,9 @@ let proposal_encoding =
     (obj2
        (req "block" block_info_encoding)
        (req "predecessor" block_info_encoding))
+
+let is_first_block_in_protocol {block; predecessor; _} =
+  Compare.Int.(block.shell.proto_level <> predecessor.shell.proto_level)
 
 type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
 
@@ -721,18 +700,15 @@ let pp_block_info fmt
       shell;
       payload_hash;
       round;
-      protocol;
-      next_protocol;
       prequorum;
       quorum;
       payload;
-      _;
+      payload_round;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
-     protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d endorsements@ \
-     payload: %a@]"
+     prequorum: %a@ quorum: %d endorsements@ payload: %a@ payload round: %a@]"
     Block_hash.pp
     hash
     Block_payload_hash.pp_short
@@ -740,15 +716,13 @@ let pp_block_info fmt
     shell.level
     Round.pp
     round
-    Protocol_hash.pp_short
-    protocol
-    Protocol_hash.pp_short
-    next_protocol
     (pp_option pp_prequorum)
     prequorum
     (List.length quorum)
     Operation_pool.pp_payload
     payload
+    Round.pp
+    payload_round
 
 let pp_proposal fmt {block; _} = pp_block_info fmt block
 

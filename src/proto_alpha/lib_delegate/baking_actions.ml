@@ -215,6 +215,7 @@ let sign_block_header state proposer unsigned_block_header =
       return {Block_header.shell; protocol_data = {contents; signature}}
 
 let inject_block ~state_recorder state block_to_bake ~updated_state =
+  let open Lwt_result_syntax in
   let {
     predecessor;
     round;
@@ -308,10 +309,24 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   in
   Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
   >>= fun () ->
+  let chain = `Hash state.global_state.chain_id in
+  let pred_block = `Hash (predecessor.hash, 0) in
+  let* pred_resulting_context_hash =
+    Shell_services.Blocks.resulting_context_hash
+      cctxt
+      ~chain
+      ~block:pred_block
+      ()
+  in
+  let* pred_live_blocks =
+    Chain_services.Blocks.live_blocks cctxt ~chain ~block:pred_block ()
+  in
   Block_forge.forge
     cctxt
     ~chain_id
     ~pred_info:predecessor
+    ~pred_live_blocks
+    ~pred_resulting_context_hash
     ~timestamp
     ~round
     ~seed_nonce_hash

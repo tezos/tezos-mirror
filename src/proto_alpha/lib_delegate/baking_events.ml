@@ -315,16 +315,14 @@ module Node_rpc = struct
       ~pp1:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let raw_info =
-    declare_2
+  let error_while_monitoring_valid_proposals =
+    declare_1
       ~section
-      ~name:"raw_info"
-      ~level:Debug
-      ~msg:"raw info for {block_hash} at level {level}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
+      ~name:"error_while_monitoring_valid_proposals"
+      ~level:Error
+      ~msg:"error while monitoring valid proposals {trace}"
+      ~pp1:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
 end
 
 module Scheduling = struct

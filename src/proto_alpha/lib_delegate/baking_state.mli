@@ -57,18 +57,12 @@ type prequorum = {
 type block_info = {
   hash : Block_hash.t;
   shell : Block_header.shell_header;
-  resulting_context_hash : Context_hash.t;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
-      (** Set of live blocks for this block that is used to filter
-          old or too recent operations. *)
 }
 
 type cache = {
@@ -107,6 +101,15 @@ type delegate_slots = {
 type proposal = {block : block_info; predecessor : block_info}
 
 val proposal_encoding : proposal Data_encoding.t
+
+(** Identify the first block of the protocol, ie. the block that
+    activates the current protocol.
+
+    This block should be baked by the baker of the previous protocol
+    (that's why this same block is also referred to as the last block
+    of the previous protocol). It is always considered final and
+    therefore is not endorsed.*)
+val is_first_block_in_protocol : proposal -> bool
 
 type locked_round = {payload_hash : Block_payload_hash.t; round : Round.t}
 
