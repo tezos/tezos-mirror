@@ -207,8 +207,7 @@ let compute_next_round_time state =
     | None -> state.level_state.latest_proposal
     | Some {proposal; _} -> proposal
   in
-  if Protocol_hash.(proposal.predecessor.next_protocol <> Protocol.hash) then
-    None
+  if Baking_state.is_first_block_in_protocol proposal then None
   else
     match state.level_state.next_level_proposed_round with
     | Some _proposed_round ->
@@ -625,11 +624,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     ~chain
   >>=? fun next_level_delegate_slots ->
   let elected_block =
-    if
-      Protocol_hash.(
-        current_proposal.block.protocol <> Protocol.hash
-        && current_proposal.block.next_protocol = Protocol.hash)
-    then
+    if Baking_state.is_first_block_in_protocol current_proposal then
       (* If the last block is a protocol transition, we admit it as a
          final block *)
       Some {proposal = current_proposal; endorsement_qc = []}
@@ -731,7 +726,8 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> return_unit) ~chain config delegates =
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   perform_sanity_check cctxt ~chain_id >>=? fun () ->
-  Node_rpc.monitor_proposals cctxt ~chain ()
+  let cache = Baking_cache.Block_cache.create 10 in
+  Node_rpc.monitor_heads cctxt ~cache ~chain ()
   >>=? fun (block_stream, _block_stream_stopper) ->
   (Lwt_stream.get block_stream >>= function
    | Some current_head -> return current_head

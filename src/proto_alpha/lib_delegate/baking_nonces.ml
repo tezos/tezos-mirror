@@ -255,7 +255,7 @@ let reveal_potential_nonces state new_proposal =
   let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
   if
     Block_hash.(last_predecessor <> new_predecessor_hash)
-    && Protocol_hash.(new_proposal.predecessor.protocol = Protocol.hash)
+    && not (Baking_state.is_first_block_in_protocol new_proposal)
   then (
     (* only try revealing nonces when the proposal's predecessor is a new one *)
     state.last_predecessor <- new_predecessor_hash ;

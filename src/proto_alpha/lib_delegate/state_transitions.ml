@@ -111,8 +111,7 @@ let may_update_proposal state (proposal : proposal) =
   else Lwt.return state
 
 let preendorse state proposal =
-  if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
-  then
+  if Baking_state.is_first_block_in_protocol proposal then
     (* We do not preendorse the first transition block *)
     let new_state = update_current_phase state Idle in
     Lwt.return (new_state, Do_nothing)
@@ -537,8 +536,8 @@ let end_of_round state current_round =
       let new_state = update_current_phase new_state Idle in
       do_nothing new_state
   | Some (delegate, _) ->
-      let last_proposal = state.level_state.latest_proposal.block in
-      if Protocol_hash.(last_proposal.protocol <> Protocol.hash) then
+      let latest_proposal = state.level_state.latest_proposal in
+      if Baking_state.is_first_block_in_protocol latest_proposal then
         (* Do not inject a block for the previous protocol! (Let the
            baker of the previous protocol do it.) *)
         do_nothing new_state
