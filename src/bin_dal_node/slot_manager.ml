@@ -73,18 +73,10 @@ let add_commitment node_store slot cryptobox =
   let*! exists =
     Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
   in
-  let* () =
-    if exists then return_unit
+  let*! () =
+    if exists then Lwt.return_unit
     else
-      let*! () =
-        Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
-      in
-      (* TMP *)
-      Slot_manager_legacy.save_shards_of_slot
-        node_store
-        cryptobox
-        slot
-        commitment
+      Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
   in
   return commitment
 
@@ -104,6 +96,15 @@ let get_commitment_slot node_store cryptobox commitment =
   match slot_opt with
   | None -> fail `Not_found
   | Some slot_content -> return slot_content
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+   handle with_proof flag. *)
+let add_commitment_shards node_store cryptobox commitment _with_proof =
+  let open Lwt_result_syntax in
+  let* slot = get_commitment_slot node_store cryptobox commitment in
+  let*? polynomial = polynomial_from_slot cryptobox slot in
+  let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  Store.Legacy.save_shards node_store commitment shards
 
 let store_slot_headers ~block_level ~block_hash slot_headers node_store =
   Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store

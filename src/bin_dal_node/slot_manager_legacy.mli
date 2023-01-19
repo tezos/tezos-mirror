@@ -36,13 +36,6 @@
 
 type slot = bytes
 
-val save_shards_of_slot :
-  Store.node_store ->
-  Cryptobox.t ->
-  slot ->
-  Cryptobox.commitment ->
-  unit tzresult Lwt.t
-
 (** [get_shard dal_constants store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id]. *)
 val get_shard :
@@ -77,8 +70,7 @@ val get_slot_pages :
 (** [save_shards store slot_header shards] stores [shards] onto the [store]
     associated to the given [slot_header] *)
 val save_shards :
-  Shard_store.t ->
-  Cryptobox.commitment Lwt_watcher.input ->
+  Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   Cryptobox.shard Seq.t ->

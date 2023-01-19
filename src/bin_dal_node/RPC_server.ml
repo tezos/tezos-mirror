@@ -79,6 +79,11 @@ module Slots_handlers = struct
             | Ok polynomial ->
                 return_some (Cryptobox.prove_commitment cryptobox polynomial)))
 
+  let put_commitment_shards ctxt commitment () with_proof =
+    call_handler2 ctxt (fun store {cryptobox; _} ->
+        Slot_manager.add_commitment_shards store cryptobox commitment with_proof
+        |> Errors.to_option_tzresult)
+
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
     call_handler1 ctxt (fun store ->
         Slot_manager.get_commitment_by_published_level_and_index
@@ -151,6 +156,10 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.get_commitment_proof
        (Slots_handlers.get_commitment_proof ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register1
+       Services.put_commitment_shards
+       (Slots_handlers.put_commitment_shards ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
        Services.get_commitment_by_published_level_and_index

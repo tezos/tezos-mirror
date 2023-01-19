@@ -205,8 +205,7 @@ module Handler = struct
       let shards = List.to_seq shards in
       let* () =
         Slot_manager.save_shards
-          (Node_context.get_store ctxt).shard_store
-          (Node_context.get_store ctxt).slots_watcher
+          (Node_context.get_store ctxt)
           cryptobox
           slot_header
           shards

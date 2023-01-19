@@ -70,6 +70,18 @@ val get_commitment_slot :
   Cryptobox.commitment ->
   (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
 
+(** [add_commitment_shards node_store cryptobox commitment ~with_proof]
+    registers the shards of the slot whose commitment is given.
+
+    In addition to decoding errors, the function returns [`Not_found]
+    if there is no slot content for [commitment] in [node_store]. *)
+val add_commitment_shards :
+  Store.node_store ->
+  Cryptobox.t ->
+  Cryptobox.commitment ->
+  Services.Types.with_proof ->
+  (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
+
 (** [store_slot_headers ~block_level ~block_hash slot_headers node_store] stores
     [slot_headers] onto the [node_store] associated to the given [block_hash]
     baked at level [block_level].
