@@ -304,6 +304,13 @@ module Dal : sig
         content associated with the given commitment. *)
     val get_commitment_slot : commitment -> (Dal_node.t, slot) RPC_core.t
 
+    (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
+        shards of the slot whose commitment is given, using the current DAL
+        parameters. Note that [with_proof], whose default value is [false], is
+        provided as input to the RPC. *)
+    val put_commitment_shards :
+      ?with_proof:bool -> commitment -> (Dal_node.t, unit) RPC_core.t
+
     type commitment_proof = string
 
     (** Call RPC "GET /commitments/<commitment>/proof" to get the proof

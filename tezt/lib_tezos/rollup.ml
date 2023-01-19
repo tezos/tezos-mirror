@@ -710,6 +710,15 @@ module Dal = struct
         ["commitments"; commitment; "slot"]
         get_bytes_from_json_string_node
 
+    let put_commitment_shards ?(with_proof = false) commitment =
+      let data = Client.Data (`Bool with_proof) in
+      (* make is not perfect, some methods do require data, but data is always optional. *)
+      make
+        ~data
+        PUT
+        ["commitments"; commitment; "shards"]
+        as_empty_object_or_fail
+
     type commitment_proof = string
 
     let get_commitment_proof commitment =
