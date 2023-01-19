@@ -28,7 +28,7 @@ and ``--rpc-addr``:
 An important option is ``--data-dir``:
 
 * ``--data-dir`` specifies the directory of the node from
-  which to obtain data directly (without RPCs). This option can only be used when the proxy server
+  which to obtain data directly (without RPCs). Of course, this option can only be used when the proxy server
   has access to the node's data directory.
   In this case, the proxy server will reduce the number of RPC calls to the
   node, thereby reducing its I/O consumption.
@@ -43,17 +43,7 @@ Examples with the sandbox
 In this section, we show examples of using a proxy server in
 the :doc:`sandboxed node<sandbox>`. For convenience, we repeat
 instructions for the sandboxed mode here, but refer the reader to the
-sandboxed mode page for further details. First, edit
-``src/proto_alpha/parameters/sandbox-parameters.json``
-to set the first value of ``time_between_blocks`` to ``15`` seconds (it's
-the time between two blocks in the chains):
-
-::
-
-    { ...,
-      "time_between_blocks": [ "15", "0" ],
-      ...
-    }
+sandboxed mode page for further details.
 
 In a first terminal, start a sandboxed node:
 
@@ -125,15 +115,7 @@ In the proxy server's terminal, you should see this output (tree sizes may vary)
 Lines of the form ``proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/...``
 show requests that the proxy server sends to the node to obtain data.
 
-``15`` seconds after the previous command, the proxy server should clear
-the data it obtained, because ``time_between_blocks`` was set to ``15``
-seconds at the beginning of this scenario:
-
-::
-
-    Apr 21 11:10:22.478 - proxy_services: clearing data for chain main and block head
-
-Now, in the third terminal, retrieve the contracts again, but twice in a row:
+Now, in the third terminal, retrieve the contracts again:
 
 ::
 
@@ -150,31 +132,16 @@ In the meantime, in the proxy server's terminal, you should see:
 
 ::
 
-    Apr 21 11:14:04.262 - proxy_rpc: chains/<main>/blocks/<head>/header
-    Apr 21 11:14:04.263 - proxy_rpc: proxy cache created for chain main and block head
-    Apr 21 11:14:04.266 - proxy_getter: Cache miss: (v1/constants)
-    Apr 21 11:14:04.266 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
-    Apr 21 11:14:04.266 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
-    Apr 21 11:14:04.266 - proxy_rpc: received tree of size 2
-    Apr 21 11:14:04.267 - proxy_getter: Cache hit: (v1/cycle_eras)
-    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_balance_updates)
-    Apr 21 11:14:04.267 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
-    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_operation_results)
-    Apr 21 11:14:04.267 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
-    Apr 21 11:14:04.267 - proxy_getter: Cache miss: (contracts/index)
-    Apr 21 11:14:04.268 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
-    Apr 21 11:14:04.269 - proxy_rpc: received tree of size 115
     Apr 21 11:14:06.511 - proxy_getter: Cache hit: (v1/constants)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_balance_updates)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_operation_results)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (contracts/index)
 
-The last four lines show that the proxy server is answering the request
+This show that the proxy server is answering the request
 without delegating anything to the node: there is no ``proxy_rpc`` line.
 The proxy server is reusing the data it obtained for ``<head>`` from
-the first request, because less than ``time_between_block`` (``15`` seconds)
-have passed.
+the first request.
 
 Reducing RPC calls: ``--data-dir``
 """"""""""""""""""""""""""""""""""
@@ -208,7 +175,6 @@ Now the output in the proxy server terminal should be:
 
     Apr 21 11:22:44.359 - proxy_rpc: chains/<main>/blocks/<head>/header
     Apr 21 11:22:44.360 - proxy_rpc: proxy cache created for chain main and block head
-    Apr 21 11:22:59.362 - proxy_services: clearing data for chain main and block head
 
 There are far fewer ``proxy_rpc`` lines! That is because the proxy
 server obtained its data by reading the node's data-dir, instead of performing RPC calls.
@@ -273,7 +239,7 @@ but not all of them: since the proxy server is a readonly frontend for the
 underlying node, it only serves the readonly requests (``GET`` requests, as
 well as a subset of the ``POST`` requests).
 
-Because computations done by the proxy server are protocol dependent, the proxy mode must choose a specific protocol: the same as the underlying node.
+Because computations done by the proxy server are protocol-dependent, the proxy mode must choose a specific protocol: the same as the underlying node.
 However, the proxy mode does not support all protocols.
 Execute ``octez-client list proxy protocols`` to see the supported protocols.
 It is expected that, at any
