@@ -341,7 +341,7 @@ module Encoding : sig
   (** Array combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
-       prefixed its size in bytes
+       prefixed by its size in bytes
 
       @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
@@ -373,7 +373,7 @@ module Encoding : sig
   (** List combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
-        prefixed its size in bytes
+        prefixed by its size in bytes
 
       @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
@@ -1150,6 +1150,8 @@ let expr_encoding =
         the specified bound. E.g.,
         [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
 
+        @raise Invalid_argument if specified bound is negative or null.
+
         @raise Invalid_argument if [length_kind] is unset and the specified
         bound is larger than 2^30. *)
     val string' :
@@ -1171,6 +1173,15 @@ let expr_encoding =
     (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding
 
+    (** Same as [string] but for {!type-bigstring}.
+
+        @param [?string_json_repr] defaults to [Hex].
+
+        @raise Invalid_argument if [length_kind] is set but it cannot accommodate
+        the specified bound. E.g.,
+        [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
+
+        @raise Invalid_argument if specified bound is negative or null. *)
     val bigstring :
       ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
       ?string_json_repr:string_json_repr ->

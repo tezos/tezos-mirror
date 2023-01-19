@@ -81,6 +81,10 @@ module Encoding = struct
           (Invalid_argument
              "Data_encoding.Encoding.Bounded.string': length bound is greater \
               than maximum length allowed in size header.") ;
+      if length <= 0 then
+        raise
+          (Invalid_argument
+             "Data_encoding.Encoding.Bounded.string': negative length.") ;
       raw_splitted
         ~binary:
           (let kind =
@@ -117,6 +121,10 @@ module Encoding = struct
           (Invalid_argument
              "Data_encoding.Encoding.Bounded.string': length bound is greater \
               than maximum length allowed in size header.") ;
+      if length <= 0 then
+        raise
+          (Invalid_argument
+             "Data_encoding.Encoding.Bounded.string': negative length.") ;
       raw_splitted
         ~binary:
           (let kind =
@@ -153,6 +161,10 @@ module Encoding = struct
           (Invalid_argument
              "Data_encoding.Encoding.Bounded.bigstring': length bound is \
               greater than maximum length allowed in size header.") ;
+      if length <= 0 then
+        raise
+          (Invalid_argument
+             "Data_encoding.Encoding.Bounded.bigstring: negative length.") ;
       raw_splitted
         ~binary:
           (let kind =
