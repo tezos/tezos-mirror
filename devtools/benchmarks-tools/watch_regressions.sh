@@ -154,6 +154,14 @@ do
     fi
 done
 
+# REF_DIR is some reference directory that we want the current run to be
+# compared to.
+export REF_DIR
+if [ "$REF_DIR" = "" ]
+then
+    REF_DIR="$FIRST_DIR"
+fi
+
 DUNE="/data/redbull/tezos/_opam/bin/dune"
 
 GPD_DIR="$OCTEZ_DIR/devtools/gas_parameter_diff"
@@ -177,18 +185,18 @@ do
     # Comparing all runs from FIRST_DIR.
     $DUNE exec --no-build gas_parameter_diff -- "$files" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
 
-    # Comparing with the first and previous runs.
-    for reference in first previous
+    # Comparing with the reference and previous runs.
+    for current in reference previous
     do
-        REFERENCE_DIR=""
-        if [ "$reference" = "first" ]
+        CURRENT_DIR=""
+        if [ "$current" = "reference" ]
         then
-            REFERENCE_DIR="$FIRST_DIR"
+            CURRENT_DIR="$REF_DIR"
         else
-            REFERENCE_DIR="$PREV_DIR"
+            CURRENT_DIR="$PREV_DIR"
         fi
 
-        $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$REFERENCE_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$reference"_"$b" 2> tmp
+        $DUNE exec --no-build --no-print-directory gas_parameter_diff -- "$INPUT_CSV_DIR"/"$CURRENT_DIR"/"$b" "$INPUT_CSV_DIR"/"$LAST_DIR"/"$b" > "$OUTPUT_CSV_DIR"/"$current"_"$b" 2> tmp
         # The parameters with "score" in their name indicate how well the models
         # fits the benchmarks. We care about their values but not much about
         # their variations so we ignore them when looking for regressions. They
@@ -199,7 +207,7 @@ do
             {
                 echo
                 echo "--------------------------------"
-                echo "Warning while comparing $b between $LAST_DIR and the $reference version $REFERENCE_DIR"
+                echo "Warning while comparing $b between $LAST_DIR and the $current version $CURRENT_DIR"
                 cat tmp2
             } >> "$ALERT_FILE"
         fi
@@ -208,7 +216,7 @@ do
 done
 
 cat "$OUTPUT_CSV_DIR"/all_*.csv > "$OUTPUT_CSV_DIR"/all.csv
-cat "$OUTPUT_CSV_DIR"/first_*.csv > "$OUTPUT_CSV_DIR"/first.csv
+cat "$OUTPUT_CSV_DIR"/reference_*.csv > "$OUTPUT_CSV_DIR"/reference.csv
 cat "$OUTPUT_CSV_DIR"/previous_*.csv > "$OUTPUT_CSV_DIR"/previous.csv
 
 if [ -s "$ALERT_FILE" ]
@@ -219,5 +227,5 @@ else
 fi
 
 slack_send_file "$OUTPUT_CSV_DIR/all.csv" "CSV comparing all runs"
-slack_send_file "$OUTPUT_CSV_DIR/first.csv" "CSV comparing first and last runs"
+slack_send_file "$OUTPUT_CSV_DIR/reference.csv" "CSV comparing reference and last runs"
 slack_send_file "$OUTPUT_CSV_DIR/previous.csv" "CSV comparing previous and last runs"
