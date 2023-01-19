@@ -26,12 +26,19 @@
 
 (* TODO: validator *)
 
-open Json_query
-
 (* The currently handled version *)
 let version = "http://json-schema.org/draft-04/schema#"
 
 (*-- types -----------------------------------------------------------------*)
+
+module Def_map = Map.Make (struct
+  type t = Json_query.path
+
+  let compare = compare
+end)
+
+module Id_map = Map.Make (String)
+module Id_set = Set.Make (String)
 
 (* The root of a schema with the named definitions,
    a precomputed ID-element map and a cache for external documents. *)
@@ -39,8 +46,8 @@ type schema = {
   root : element;
   source : Uri.t;
   (* whose fragment should be empty *)
-  definitions : (path * element) list;
-  ids : (string * element) list;
+  definitions : element Def_map.t;
+  ids : element Id_map.t;
   world : schema list;
 }
 
@@ -59,7 +66,7 @@ and element_kind =
   | Array of element list * array_specs
   | Monomorphic_array of element * array_specs
   | Combine of combinator * element list
-  | Def_ref of path
+  | Def_ref of Json_query.path
   | Id_ref of string
   | Ext_ref of Uri.t
   | String of string_specs
@@ -484,8 +491,8 @@ and pp_object_contents ppf
 let pp ppf schema =
   Format.fprintf ppf "@[<v 0>" ;
   pp_element ppf schema.root ;
-  List.iter
-    (fun (path, elt) ->
+  Def_map.iter
+    (fun path elt ->
       match pp_desc elt with
       | None ->
           Format.fprintf ppf "@,@[<hv 2>$%a:@ %a@]" pp_path path pp_element elt
@@ -501,8 +508,8 @@ let pp ppf schema =
             pp_element
             stripped)
     schema.definitions ;
-  List.iter
-    (fun (id, elt) ->
+  Id_map.iter
+    (fun id elt ->
       match pp_desc elt with
       | None ->
           Format.fprintf
@@ -528,7 +535,7 @@ let pp ppf schema =
 
 (*-- errors ----------------------------------------------------------------*)
 
-exception Cannot_parse of path * exn
+exception Cannot_parse of Json_query.path * exn
 
 exception Dangling_reference of Uri.t
 
@@ -536,7 +543,7 @@ exception Bad_reference of string
 
 exception Unexpected of string * string
 
-exception Duplicate_definition of path * element * element
+exception Duplicate_definition of Json_query.path * element * element
 
 let rec print_error ?print_unknown ppf = function
   | Cannot_parse (path, exn) ->
@@ -570,21 +577,21 @@ let rec print_error ?print_unknown ppf = function
 
 (*-- internal definition table handling ------------------------------------*)
 
-let find_definition name defs = List.assoc name defs
+let find_definition name defs = Def_map.find name defs
 
-let definition_exists name defs = List.mem_assoc name defs
+let definition_exists name defs = Def_map.mem name defs
 
-let insert_definition name elt defs =
-  let rec insert = function
-    | [] -> [(name, elt)]
-    | ((defname, _) as def) :: rem when defname <> name -> def :: insert rem
-    | (_, {kind = Dummy}) :: rem -> (name, elt) :: rem
-    | (_, defelt) :: rem ->
-        if not (eq_element elt defelt) then
-          raise (Duplicate_definition (name, elt, defelt)) ;
-        (name, elt) :: rem
-  in
-  insert defs
+let insert_definition name elt (defs : element Def_map.t) : element Def_map.t =
+  Def_map.update
+    name
+    (function
+      | None -> Some elt
+      | Some {kind = Dummy} -> Some elt
+      | Some defelt ->
+          if not (eq_element elt defelt) then
+            raise (Duplicate_definition (name, elt, defelt)) ;
+          Some elt)
+    defs
 
 module Make (Repr : Json_repr.Repr) = struct
   module Query = Json_query.Make (Repr)
@@ -707,7 +714,9 @@ module Make (Repr : Json_repr.Repr) = struct
                  (`A (List.map (fun elt -> obj (format_element elt)) elts))
                @@ rest
            | Def_ref path ->
-               set_always "$ref" (`String ("#" ^ json_pointer_of_path path))
+               set_always
+                 "$ref"
+                 (`String ("#" ^ Json_query.json_pointer_of_path path))
                @@ rest
            | Id_ref name -> set_always "$ref" (`String ("#" ^ name)) @@ rest
            | Ext_ref uri ->
@@ -779,11 +788,11 @@ module Make (Repr : Json_repr.Repr) = struct
       @@ set_if_some "format" format (fun s -> `String s)
       @@ []
     in
-    List.fold_left
-      (fun acc (n, elt) -> insert n (obj (format_element elt)) acc)
+    Def_map.fold
+      (fun n elt acc -> insert n (obj (format_element elt)) acc)
+      schema.definitions
       (obj
          (set_always "$schema" (`String version) @@ format_element schema.root))
-      schema.definitions
 
   let unexpected kind expected =
     let kind =
@@ -878,9 +887,9 @@ module Make (Repr : Json_repr.Repr) = struct
       | Some uri -> Uri.with_fragment uri None
       | None -> Uri.empty
     in
-    let collected_definitions = ref [] in
-    let collected_id_defs = ref [] in
-    let collected_id_refs = ref [] in
+    let collected_definitions : element Def_map.t ref = ref Def_map.empty in
+    let collected_id_defs = ref Id_map.empty in
+    let collected_id_refs = ref Id_set.empty in
     let rec collect_definition : Uri.t -> element_kind =
      fun uri ->
       match (Uri.host uri, Uri.fragment uri) with
@@ -891,11 +900,11 @@ module Make (Repr : Json_repr.Repr) = struct
             (Cannot_parse
                ([], Bad_reference (Uri.to_string uri ^ " has no fragment")))
       | None, Some fragment when not (String.contains fragment '/') ->
-          collected_id_refs := fragment :: !collected_id_refs ;
+          collected_id_refs := Id_set.add fragment !collected_id_refs ;
           Id_ref fragment
       | None, Some fragment -> (
           let path =
-            try path_of_json_pointer ~wildcards:false fragment
+            try Json_query.path_of_json_pointer ~wildcards:false fragment
             with err -> raise (Cannot_parse ([], err))
           in
           try
@@ -1293,9 +1302,9 @@ module Make (Repr : Json_repr.Repr) = struct
     | _ -> ()
     | exception Not_found -> ()) ;
     (* check the domain of IDs *)
-    List.iter
+    Id_set.iter
       (fun id ->
-        if not (List.mem_assoc id !collected_id_defs) then
+        if not (Id_map.mem id !collected_id_defs) then
           raise
             (Cannot_parse
                ([], Dangling_reference Uri.(with_fragment empty (Some id)))))
@@ -1310,12 +1319,12 @@ module Make (Repr : Json_repr.Repr) = struct
 
   (* Checks that all local refs and ids are defined *)
   let check_definitions root definitions =
-    let collected_id_defs = ref [] in
-    let collected_id_refs = ref [] in
+    let collected_id_defs = ref Id_map.empty in
+    let collected_id_refs = ref Id_set.empty in
     let rec check ({kind; id} as elt) =
       (match id with
       | None -> ()
-      | Some id -> collected_id_defs := (id, elt) :: !collected_id_defs) ;
+      | Some id -> collected_id_defs := Id_map.add id elt !collected_id_defs) ;
       match kind with
       | Object
           {
@@ -1337,27 +1346,27 @@ module Make (Repr : Json_repr.Repr) = struct
       | Combine (_, es) -> List.iter check es
       | Def_ref path ->
           if not (definition_exists path definitions) then
-            let path = json_pointer_of_path path in
+            let path = Json_query.json_pointer_of_path path in
             raise (Dangling_reference (Uri.(with_fragment empty) (Some path)))
-      | Id_ref id -> collected_id_refs := id :: !collected_id_refs
+      | Id_ref id -> collected_id_refs := Id_set.add id !collected_id_refs
       | Ext_ref _ | String _ | Integer _ | Number _ | Boolean | Null | Any
       | Dummy ->
           ()
     in
     (* check the root and definitions *)
     check root ;
-    List.iter (fun (_, root) -> check root) definitions ;
+    Def_map.iter (fun _ root -> check root) definitions ;
     (* check the domain of IDs *)
-    List.iter
+    Id_set.iter
       (fun id ->
-        if not (List.mem_assoc id !collected_id_defs) then
+        if not (Id_map.mem id !collected_id_defs) then
           raise (Dangling_reference Uri.(with_fragment empty (Some id))))
       !collected_id_refs ;
     !collected_id_defs
 
   let create root =
-    let ids = check_definitions root [] in
-    {root; definitions = []; world = []; ids; source = Uri.empty}
+    let ids = check_definitions root Def_map.empty in
+    {root; definitions = Def_map.empty; world = []; ids; source = Uri.empty}
 
   let root {root} = root
 
@@ -1370,15 +1379,15 @@ module Make (Repr : Json_repr.Repr) = struct
   let self =
     {
       root = element (Ext_ref (Uri.of_string version));
-      definitions = [];
-      ids = [];
+      definitions = Def_map.empty;
+      ids = Id_map.empty;
       world = [];
       source = Uri.empty;
     }
 
   (* remove unused definitions from the schema *)
   let simplify schema =
-    let res = ref [] (* collected definitions *) in
+    let res = ref Def_map.empty (* collected definitions *) in
     let rec collect {kind} =
       match kind with
       | Object
@@ -1410,7 +1419,7 @@ module Make (Repr : Json_repr.Repr) = struct
     {schema with definitions = !res}
 
   let definition_path_of_name ?(definitions_path = "/definitions/") name =
-    path_of_json_pointer ~wildcards:false
+    Json_query.path_of_json_pointer ~wildcards:false
     @@
     match name.[0] with
     | exception _ -> raise (Bad_reference name)
@@ -1436,17 +1445,18 @@ module Make (Repr : Json_repr.Repr) = struct
     ({schema with definitions}, element (Def_ref path))
 
   let merge_definitions (sa, sb) =
-    let rec sorted_merge = function
-      | ((na, da) as a) :: ((nb, db) as b) :: tl ->
-          if na = nb then
-            if da.kind = Dummy || db.kind = Dummy || eq_element da db then
-              (na, da) :: sorted_merge tl
-            else raise (Duplicate_definition (na, da, db))
-          else a :: sorted_merge (b :: tl)
-      | ([] | [_]) as rem -> rem
-    in
     let definitions =
-      sorted_merge (List.sort compare (sa.definitions @ sb.definitions))
+      Def_map.merge
+        (fun name x y ->
+          match (x, y) with
+          | None, None -> None
+          | Some x, None | None, Some x -> Some x
+          | Some da, Some db ->
+              if da.kind = Dummy || db.kind = Dummy || eq_element da db then
+                Some da
+              else raise (Duplicate_definition (name, da, db)))
+        sa.definitions
+        sb.definitions
     in
     ({sa with definitions}, {sb with definitions})
 
@@ -1469,8 +1479,8 @@ module Make (Repr : Json_repr.Repr) = struct
       | Combine (Not, [elt]) -> not (nullable elt)
       | Combine (All_of, elts) -> List.for_all nullable elts
       | Combine ((Any_of | One_of), elts) -> List.exists nullable elts
-      | Def_ref path -> nullable (List.assoc path definitions)
-      | Id_ref id -> nullable (List.assoc id ids)
+      | Def_ref path -> nullable (Def_map.find path definitions)
+      | Id_ref id -> nullable (Id_map.find id ids)
       | Combine (Not, _) | Dummy -> assert false
     in
     nullable root
