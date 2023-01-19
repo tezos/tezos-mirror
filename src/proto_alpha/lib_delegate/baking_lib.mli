@@ -37,6 +37,7 @@ val bake :
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?monitor_node_mempool:bool ->
   ?context_path:string ->
+  ?dal_node_endpoint:Uri.t ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 

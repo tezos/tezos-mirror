@@ -63,6 +63,7 @@ type t = {
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
+  dal_node_endpoint : Uri.t option;
 }
 
 val default_fees_config : fees_config
@@ -102,6 +103,7 @@ val make :
   ?force:bool ->
   ?state_recorder:state_recorder_config ->
   ?extra_operations:Operations_source.t ->
+  ?dal_node_endpoint:Uri.t ->
   unit ->
   t
 

@@ -88,6 +88,7 @@ type t = {
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
+  dal_node_endpoint : Uri.t option;
 }
 
 let default_fees_config =
@@ -131,6 +132,7 @@ let default_config =
     state_recorder = default_state_recorder_config;
     extra_operations = default_extra_operations;
     per_block_vote_file = None;
+    dal_node_endpoint = None;
   }
 
 let make ?(minimal_fees = default_fees_config.minimal_fees)
@@ -142,7 +144,8 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(user_activated_upgrades = default_user_activated_upgrades)
     ?(liquidity_baking_toggle_vote = default_liquidity_baking_toggle_vote)
     ?per_block_vote_file ?(force = default_force)
-    ?(state_recorder = default_state_recorder_config) ?extra_operations () =
+    ?(state_recorder = default_state_recorder_config) ?extra_operations
+    ?dal_node_endpoint () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
@@ -162,6 +165,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     force;
     state_recorder;
     extra_operations;
+    dal_node_endpoint;
   }
 
 let fees_config_encoding : fees_config Data_encoding.t =
@@ -265,27 +269,30 @@ let encoding : t Data_encoding.t =
               force;
               state_recorder;
               extra_operations;
+              dal_node_endpoint;
             } ->
-         ( fees,
-           validation,
-           nonce,
-           retries_on_failure,
-           user_activated_upgrades,
-           liquidity_baking_toggle_vote,
-           per_block_vote_file,
-           force,
-           state_recorder,
-           extra_operations ))
-       (fun ( fees,
-              validation,
-              nonce,
-              retries_on_failure,
-              user_activated_upgrades,
-              liquidity_baking_toggle_vote,
-              per_block_vote_file,
-              force,
-              state_recorder,
-              extra_operations ) ->
+         ( ( fees,
+             validation,
+             nonce,
+             retries_on_failure,
+             user_activated_upgrades,
+             liquidity_baking_toggle_vote,
+             per_block_vote_file,
+             force,
+             state_recorder,
+             extra_operations ),
+           dal_node_endpoint ))
+       (fun ( ( fees,
+                validation,
+                nonce,
+                retries_on_failure,
+                user_activated_upgrades,
+                liquidity_baking_toggle_vote,
+                per_block_vote_file,
+                force,
+                state_recorder,
+                extra_operations ),
+              dal_node_endpoint ) ->
          {
            fees;
            validation;
@@ -297,20 +304,25 @@ let encoding : t Data_encoding.t =
            force;
            state_recorder;
            extra_operations;
+           dal_node_endpoint;
          })
-       (obj10
-          (req "fees" fees_config_encoding)
-          (req "validation" validation_config_encoding)
-          (req "nonce" nonce_config_encoding)
-          (req "retries_on_failure" retries_on_failure_config_encoding)
-          (req "user_activated_upgrades" user_activate_upgrades_config_encoding)
-          (req
-             "liquidity_baking_toggle_vote"
-             liquidity_baking_toggle_vote_config_encoding)
-          (opt "per_block_vote_file" Data_encoding.string)
-          (req "force" force_config_encoding)
-          (req "state_recorder" state_recorder_config_encoding)
-          (opt "extra_operations" Operations_source.encoding))
+       (merge_objs
+          (obj10
+             (req "fees" fees_config_encoding)
+             (req "validation" validation_config_encoding)
+             (req "nonce" nonce_config_encoding)
+             (req "retries_on_failure" retries_on_failure_config_encoding)
+             (req
+                "user_activated_upgrades"
+                user_activate_upgrades_config_encoding)
+             (req
+                "liquidity_baking_toggle_vote"
+                liquidity_baking_toggle_vote_config_encoding)
+             (opt "per_block_vote_file" Data_encoding.string)
+             (req "force" force_config_encoding)
+             (req "state_recorder" state_recorder_config_encoding)
+             (opt "extra_operations" Operations_source.encoding))
+          (obj1 (opt "dal_node_endpoint" Tezos_rpc.Encoding.uri_encoding)))
 
 let pp fmt t =
   let json = Data_encoding.Json.construct encoding t in

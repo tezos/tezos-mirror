@@ -492,7 +492,7 @@ let baking_minimal_timestamp state =
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?(minimal_timestamp = false) ?extra_operations
-    ?(monitor_node_mempool = true) ?context_path delegates =
+    ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint delegates =
   let open Lwt_result_syntax in
   let config =
     Baking_configuration.make
@@ -502,6 +502,7 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?context_path
       ?force
       ?extra_operations
+      ?dal_node_endpoint
       ()
   in
   let* block_stream, current_proposal = get_current_proposal cctxt in
