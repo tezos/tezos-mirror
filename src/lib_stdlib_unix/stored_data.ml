@@ -23,12 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4611
-
-   By updating the cache without checking the result of the write, we
-   could have a discrepancy between the cache and the value in the
-   file. *)
-
 open Error_monad
 
 type error += Missing_stored_data of string
@@ -104,9 +98,12 @@ let write_file file data =
 let write (Stored_data v) data =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
       if v.file.eq v.cache data then Lwt_result_syntax.return_unit
-      else (
-        v.cache <- data ;
-        write_file v.file data))
+      else
+        (* Note: in order to avoid inconsistent states,
+           we update the cache {e after} writing to the file succeeds *)
+        let open Lwt_result_syntax in
+        let+ () = write_file v.file data in
+        v.cache <- data)
 
 let create file data =
   let open Lwt_result_syntax in
@@ -119,9 +116,12 @@ let update_with (Stored_data v) f =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
       let* new_data = f v.cache in
       if v.file.eq v.cache new_data then return_ok_unit
-      else (
-        v.cache <- new_data ;
-        write_file v.file new_data))
+      else
+        (* Note: in order to avoid inconsistent states,
+           we update the cache {e after} writing to the file succeeds *)
+        let open Lwt_result_syntax in
+        let+ () = write_file v.file new_data in
+        v.cache <- new_data)
 
 let load file =
   let open Lwt_result_syntax in

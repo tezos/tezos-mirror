@@ -61,9 +61,8 @@ val make_file :
 val get : 'a t -> 'a Lwt.t
 
 (** [write data value] overwrites the previous [data] with the new
-    [value]. Note that even if the write fails, The cache (as returned by
-    {!val:get}) will have the new value. It is recommended to reload
-    a store in that case and try to write the value again. *)
+    [value]. The cache is only updated if the write succeeds. If
+    the write fails, it is up to the user to retry. *)
 val write : 'a t -> 'a -> unit tzresult Lwt.t
 
 (** [write_file encoded_file value] raw writes the [encoded_file] with
@@ -77,6 +76,9 @@ val write_file : 'a file -> 'a -> unit tzresult Lwt.t
 (** [update_with data f] {b atomically} updates [data] with the result
     of the application of [f]. Concurrent accesses to the data will
     block until the value is updated.
+
+    The cache is only updated if the write succeeds. If
+    the write fails, it is up to the user to retry.
 
     {b Warning} Calling read/write in [f] will result in a deadlock. *)
 val update_with : 'a t -> ('a -> 'a Lwt.t) -> unit tzresult Lwt.t
