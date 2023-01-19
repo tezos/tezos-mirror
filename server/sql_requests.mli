@@ -31,34 +31,42 @@ val db_schema : string
 
 val maybe_insert_source : string -> string
 
-val maybe_insert_delegates_from_rights : Consensus_ops.rights -> string
+val maybe_insert_delegates_from_rights :
+  Teztale_lib.Consensus_ops.rights -> string
 
-val maybe_insert_delegates_from_received : Consensus_ops.delegate_ops -> string
+val maybe_insert_delegates_from_received :
+  Teztale_lib.Consensus_ops.delegate_ops -> string
 
 val maybe_insert_endorsing_rights :
-  level:Int32.t -> Consensus_ops.rights -> string
+  level:Int32.t -> Teztale_lib.Consensus_ops.rights -> string
 
 val maybe_insert_operations_from_block :
-  level:Int32.t -> Consensus_ops.block_op list -> string
+  level:Int32.t -> Teztale_lib.Consensus_ops.block_op list -> string
 
 val maybe_insert_operations_from_received :
-  level:Int32.t -> Consensus_ops.delegate_ops -> string
+  level:Int32.t -> Teztale_lib.Consensus_ops.delegate_ops -> string
 
 val maybe_insert_block :
-  Block_hash.t ->
+  Tezos_crypto.Block_hash.t ->
   level:Int32.t ->
   round:Int32.t ->
-  Time.Protocol.t ->
-  Signature.public_key_hash ->
+  Tezos_base.Time.Protocol.t ->
+  Tezos_crypto.Signature.public_key_hash ->
   string
 
 val insert_received_operations :
   source:string ->
   level:Int32.t ->
-  (Signature.public_key_hash * Consensus_ops.received_operation list) list ->
+  (Tezos_crypto.Signature.public_key_hash
+  * Teztale_lib.Consensus_ops.received_operation list)
+  list ->
   string
 
 val insert_included_operations :
-  Block_hash.t -> level:Int32.t -> Consensus_ops.block_op trace -> string
+  Tezos_crypto.Block_hash.t ->
+  level:Int32.t ->
+  Teztale_lib.Consensus_ops.block_op list ->
+  string
 
-val insert_received_block : source:string -> Block_hash.t -> Ptime.t -> string
+val insert_received_block :
+  source:string -> Tezos_crypto.Block_hash.t -> Ptime.t -> string

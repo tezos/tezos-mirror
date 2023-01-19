@@ -217,7 +217,7 @@ let maybe_create_tables db_pool =
                 Db.exec
                   (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
                   ())
-              Teztale_lib.Sql_requests.create_tables
+              Sql_requests.create_tables
           else return_unit))
     db_pool
 
@@ -229,18 +229,13 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
       Db.exec
         (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
            ~oneshot:true
-           (Teztale_lib.Sql_requests.maybe_insert_operations_from_block
-              ~level
-              operations))
+           (Sql_requests.maybe_insert_operations_from_block ~level operations))
         ()
     in
     Db.exec
       (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
          ~oneshot:true
-         (Teztale_lib.Sql_requests.insert_included_operations
-            block_hash
-            ~level
-            operations))
+         (Sql_requests.insert_included_operations block_hash ~level operations))
       ()
   else return_unit
 
@@ -255,16 +250,13 @@ let endorsing_rights_callback db_pool g rights =
               Db.exec
                 (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                    ~oneshot:true
-                   (Teztale_lib.Sql_requests.maybe_insert_delegates_from_rights
-                      rights))
+                   (Sql_requests.maybe_insert_delegates_from_rights rights))
                 ()
             in
             Db.exec
               (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                  ~oneshot:true
-                 (Teztale_lib.Sql_requests.maybe_insert_endorsing_rights
-                    ~level
-                    rights))
+                 (Sql_requests.maybe_insert_endorsing_rights ~level rights))
               ()))
       db_pool
   in
@@ -347,15 +339,14 @@ let operations_callback db_pool g source operations =
               Db.exec
                 (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                    ~oneshot:true
-                   (Teztale_lib.Sql_requests.maybe_insert_source source))
+                   (Sql_requests.maybe_insert_source source))
                 ()
             in
             let* () =
               Db.exec
                 (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                    ~oneshot:true
-                   (Teztale_lib.Sql_requests
-                    .maybe_insert_delegates_from_received
+                   (Sql_requests.maybe_insert_delegates_from_received
                       operations))
                 ()
             in
@@ -363,8 +354,7 @@ let operations_callback db_pool g source operations =
               Db.exec
                 (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                    ~oneshot:true
-                   (Teztale_lib.Sql_requests
-                    .maybe_insert_operations_from_received
+                   (Sql_requests.maybe_insert_operations_from_received
                       ~level
                       operations))
                 ()
@@ -372,7 +362,7 @@ let operations_callback db_pool g source operations =
             Db.exec
               (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                  ~oneshot:true
-                 (Teztale_lib.Sql_requests.insert_received_operations
+                 (Sql_requests.insert_received_operations
                     ~source
                     ~level
                     operations))

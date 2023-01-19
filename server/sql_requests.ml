@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_crypto
+open Teztale_lib
+
 (* TRUE/FALSE literals were introduced in Sqlite 3.23 (and are represented as
    the integers 1 and 0. To support older versions, we convert booleans to
    integers. *)
@@ -155,7 +158,7 @@ let maybe_insert_endorsing_rights ~level rights =
      delegates JOIN (VALUES %a) ON delegates.address = column2"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f Consensus_ops.{address; first_slot; power} ->
+       (fun f Teztale_lib.Consensus_ops.{address; first_slot; power} ->
          Format.fprintf
            f
            "(%ld, x'%a', %d, %d)"
@@ -233,7 +236,7 @@ let maybe_insert_block hash ~level ~round timestamp delegate =
      SELECT column1, column2, %ld, column4, delegates.id FROM delegates JOIN \
      (VALUES ('%a', x'%a', x'%a', %ld)) ON delegates.address = column3"
     level
-    Time.Protocol.pp
+    Tezos_base.Time.Protocol.pp
     timestamp
     Hex.pp
     (Block_hash.to_hex hash)
@@ -259,7 +262,7 @@ let insert_received_operations ~source ~level operations =
               Format.fprintf
                 f
                 "('%a', %a, x'%a', %d, %a)"
-                Time.System.pp_hum
+                Tezos_base.Time.System.pp_hum
                 op.reception_time
                 (Format.pp_print_option
                    ~none:(fun f () -> Format.pp_print_string f "NULL")
@@ -270,7 +273,8 @@ let insert_received_operations ~source ~level operations =
                        Hex.pp
                        (Hex.of_bytes
                           (Data_encoding.Binary.to_bytes_exn
-                             (Data_encoding.list Error_monad.error_encoding)
+                             (Data_encoding.list
+                                Tezos_error_monad.Error_monad.error_encoding)
                              errors))))
                 op.errors
                 Hex.pp
@@ -318,7 +322,7 @@ let insert_received_block ~source hash reception_time =
     "INSERT OR IGNORE INTO blocks_reception (timestamp, block, source) SELECT \
      '%a', blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = x'%a' AND \
      nodes.name = '%s'"
-    Time.System.pp_hum
+    Tezos_base.Time.System.pp_hum
     reception_time
     Hex.pp
     (Block_hash.to_hex hash)
