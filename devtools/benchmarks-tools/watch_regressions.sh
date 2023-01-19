@@ -127,7 +127,7 @@ ALERT_FILE="$OCTEZ_DIR/alerts"
 
 rm -f "$ALERT_FILE"
 
-# The first directory serves as reference point.
+# All the directories before FIRST_DIR will be ignored.
 export FIRST_DIR
 if [ "$FIRST_DIR" = "" ]
 then
@@ -138,6 +138,21 @@ then
     # xargs because basename expects one input, but head returns a list.
     FIRST_DIR="$(find "$INPUT_CSV_DIR/" -maxdepth 1 -mindepth 1 | sort | head -n 1 | xargs basename)"
 fi
+
+# The directories after FIRST_DIR.
+DIRS=""
+for d in "$INPUT_CSV_DIR"/*
+do
+    if [[ "$d" > "$FIRST_DIR" || "$d" == "$FIRST_DIR" ]]
+    then
+        if [ -z "$DIRS" ]
+        then
+            DIRS="$d"
+        else
+            DIRS="$DIRS $d"
+        fi
+    fi
+done
 
 DUNE="/data/redbull/tezos/_opam/bin/dune"
 
@@ -157,8 +172,10 @@ for f in "$INPUT_CSV_DIR/$LAST_DIR"/*
 do
     b="$(basename "$f")"
 
-    # Comparing all runs
-    $DUNE exec --no-build gas_parameter_diff -- "$INPUT_CSV_DIR"/*/"$b" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
+    files=$(for d in $DIRS; do echo "$INPUT_CSV_DIR/$d/$b"; done)
+
+    # Comparing all runs from FIRST_DIR.
+    $DUNE exec --no-build gas_parameter_diff -- "$files" > "$OUTPUT_CSV_DIR"/all_"$b" 2> /dev/null
 
     # Comparing with the first and previous runs.
     for reference in first previous
