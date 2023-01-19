@@ -100,9 +100,9 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           metadata.protocol_data.dal_attestation
       in
       let*! published_slots_indexes =
-        Store.Dal_slots_headers.list_secondary_keys
-          node_ctxt.store
-          ~primary_key:published_block_hash
+        Node_context.get_slot_indexes
+          node_ctxt
+          ~published_in_block_hash:published_block_hash
       in
       let confirmed_slots_indexes_list =
         List.filter
@@ -146,38 +146,8 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
    Use a shared storage between dal and rollup node to store slots data.
 *)
 
-let save_unconfirmed_slot {Node_context.store; _} current_block_hash slot_index
-    =
-  (* No page is actually saved *)
-  Store.Dal_processed_slots.add
-    store
-    ~primary_key:current_block_hash
-    ~secondary_key:slot_index
-    `Unconfirmed
-
-let save_confirmed_slot {Node_context.store; _} current_block_hash slot_index
-    pages =
-  (* Adding multiple entries with the same primary key amounts to updating the
-     contents of an in-memory map, hence pages must be added sequentially. *)
-  let open Lwt_syntax in
-  let* () =
-    List.iteri_s
-      (fun page_number page ->
-        Store.Dal_slot_pages.add
-          store
-          ~primary_key:current_block_hash
-          ~secondary_key:(slot_index, page_number)
-          page)
-      pages
-  in
-  Store.Dal_processed_slots.add
-    store
-    ~primary_key:current_block_hash
-    ~secondary_key:slot_index
-    `Confirmed
-
 let download_and_save_slots
-    ({Node_context.store; dal_cctxt; protocol_constants; _} as node_context)
+    ({Node_context.dal_cctxt; protocol_constants; _} as node_context)
     ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
@@ -203,43 +173,41 @@ let download_and_save_slots
   let*! () =
     List.iter_p
       (fun s_slot ->
-        save_unconfirmed_slot node_context current_block_hash s_slot)
+        Node_context.save_unconfirmed_slot
+          node_context
+          current_block_hash
+          s_slot)
       not_confirmed
   in
   let* () =
     [] (* Preparing for the pre-fetching logic. *)
     |> List.iter_ep (fun s_slot ->
-           (* slot_header is missing but the slot with index s_slot has been
+           (* fails if slot_header is missing but the slot with index s_slot has been
                 confirmed. This scenario should not be possible. *)
-           let*! slot_header_is_stored =
-             Store.Dal_slots_headers.mem
-               store
-               ~primary_key:published_block_hash
-               ~secondary_key:s_slot
+           let* {commitment; _} =
+             Node_context.get_slot_header
+               node_context
+               ~published_in_block_hash:published_block_hash
+               s_slot
            in
-           if not slot_header_is_stored then
-             failwith "Slot header was not found in store"
-           else
-             let*! {commitment; _} =
-               Store.Dal_slots_headers.get
-                 store
-                 ~primary_key:published_block_hash
-                 ~secondary_key:s_slot
-             in
-             (* The slot with index s_slot is confirmed. We can
-                proceed retrieving it from the dal node and save it
-                in the store. *)
-             let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
-             let*! () =
-               save_confirmed_slot node_context current_block_hash s_slot pages
-             in
-             let*! () =
-               Dal_slots_tracker_event.slot_has_been_confirmed
-                 s_slot
-                 published_block_hash
-                 current_block_hash
-             in
-             return_unit)
+           (* The slot with index s_slot is confirmed. We can
+              proceed retrieving it from the dal node and save it
+              in the store. *)
+           let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
+           let*! () =
+             Node_context.save_confirmed_slot
+               node_context
+               current_block_hash
+               s_slot
+               pages
+           in
+           let*! () =
+             Dal_slots_tracker_event.slot_has_been_confirmed
+               s_slot
+               published_block_hash
+               current_block_hash
+           in
+           return_unit)
   in
   return_unit
 
@@ -256,16 +224,13 @@ module Confirmed_slots_history = struct
            node_ctxt.Node_context.protocol_constants.parametric
            confirmed_slots_indexes
     in
-    let*! confirmed_slots_indexes_with_header =
-      List.map_p
-        (fun slot_index ->
-          Store.Dal_slots_headers.get
-            node_ctxt.Node_context.store
-            ~primary_key:published_block_hash
-            ~secondary_key:slot_index)
-        relevant_slots_indexes
-    in
-    return confirmed_slots_indexes_with_header
+    List.map_ep
+      (fun slot_index ->
+        Node_context.get_slot_header
+          node_ctxt
+          ~published_in_block_hash:published_block_hash
+          slot_index)
+      relevant_slots_indexes
 
   let read_slots_history_from_l1 {Node_context.l1_ctxt = {cctxt; _}; _} block =
     let open Lwt_result_syntax in
@@ -294,8 +259,7 @@ module Confirmed_slots_history = struct
       Layer1.{hash = block_hash; level = block_level} ~entry_kind ~find ~default
       =
     let open Lwt_result_syntax in
-    let open Node_context in
-    let*! confirmed_slots_history_opt = find node_ctxt.store block_hash in
+    let*! confirmed_slots_history_opt = find node_ctxt block_hash in
     let block_level = Raw_level.of_int32_exn block_level in
     let should_process_dal_slots =
       should_process_dal_slots node_ctxt block_level
@@ -327,7 +291,7 @@ module Confirmed_slots_history = struct
       node_ctxt
       block
       ~entry_kind:"slots history"
-      ~find:Store.Dal_confirmed_slots_history.find
+      ~find:Node_context.find_confirmed_slots_history
       ~default:read_slots_history_from_l1
 
   let slots_history_cache_of_hash node_ctxt block =
@@ -335,7 +299,7 @@ module Confirmed_slots_history = struct
       node_ctxt
       block
       ~entry_kind:"slots history cache"
-      ~find:Store.Dal_confirmed_slots_histories.find
+      ~find:Node_context.find_confirmed_slots_histories
       ~default:(fun node_ctxt _block ->
         let num_slots =
           node_ctxt.Node_context.protocol_constants.parametric.dal
@@ -354,7 +318,7 @@ module Confirmed_slots_history = struct
         @@ Dal.Slots_history.History_cache.empty
              ~capacity:(Int64.of_int @@ (num_slots * 60000)))
 
-  let update (Node_context.{store; l1_ctxt; _} as node_ctxt)
+  let update (Node_context.{l1_ctxt; _} as node_ctxt)
       Layer1.({hash = head_hash; _} as head) confirmation_info =
     let open Lwt_result_syntax in
     let* slots_to_save =
@@ -384,10 +348,16 @@ module Confirmed_slots_history = struct
     (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3856
        Attempt to improve this process. *)
     let*! () =
-      Store.Dal_confirmed_slots_history.add store head_hash slots_history
+      Node_context.save_confirmed_slots_history
+        node_ctxt
+        head_hash
+        slots_history
     in
     let*! () =
-      Store.Dal_confirmed_slots_histories.add store head_hash slots_cache
+      Node_context.save_confirmed_slots_histories
+        node_ctxt
+        head_hash
+        slots_cache
     in
     return ()
 end

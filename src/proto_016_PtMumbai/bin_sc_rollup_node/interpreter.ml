@@ -199,9 +199,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         ctxt
         Layer1.{hash = block.header.predecessor; level = pred_level}
     in
-    let*! inbox = Store.Inboxes.get node_ctxt.store block.header.inbox_hash in
-    let*! {predecessor; predecessor_timestamp; messages} =
-      Store.Messages.get node_ctxt.store block.header.inbox_witness
+    let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
+    let* {predecessor; predecessor_timestamp; messages} =
+      Node_context.get_messages node_ctxt block.header.inbox_witness
     in
     let messages =
       Sc_rollup.Inbox_message.Internal Start_of_level
@@ -223,7 +223,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       [None].*)
   let state_of_tick node_ctxt tick level =
     let open Lwt_result_syntax in
-    let* closest_block = State.block_before node_ctxt.Node_context.store tick in
+    let* closest_block = Node_context.block_before node_ctxt tick in
     match closest_block with
     | None -> return None
     | Some event ->
