@@ -267,7 +267,7 @@ and the command line should specify the endpoint to use and the RPC address to s
 Supported RPCs
 ~~~~~~~~~~~~~~
 
-The proxy server itself serves protocol-specific RPCs (listed
+The proxy server itself only serves protocol-specific RPCs (listed
 `here <https://tezos.gitlab.io/alpha/rpc.html#protocol-alpha>`_ for protocol Alpha),
 but not all of them: since the proxy server is a readonly frontend for the
 underlying node, it only serves the readonly requests (``GET`` requests, as
@@ -315,9 +315,15 @@ Deployment
 As a proxy server is a readonly frontend to a node, you can spawn multiple
 proxy servers in front of a single node.
 
-Because the proxy server is protocol-dependent, if the node it talks to
-changes protocol; the proxy server will start failing for RPCs
-concerning blocks of the new protocol. We hereby recommend to automatically
+As described above, the proxy server configures himself to the same protocol as the underlying node. As a consequence,
+when the underlying node changes protocol, the proxy server will also switch to the new protocol, **unless** the proxy server executable does not contain the new protocol.
+This may happen, for instance, if the executable was compiled before this protocol was even injected.
+As there is no dynamic linking of new protocols in the proxy server, it will
+start failing for RPCs
+concerning blocks of the new protocol.
+The solution in this case is to restart the proxy server using a more recent executable.
+
+More generally, we recommend to automatically
 restart proxy servers that have a high ratio of failures.
 Restarting a proxy server is always fine; they can be thrown away at any
 moment.
