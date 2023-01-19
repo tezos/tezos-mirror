@@ -32,13 +32,15 @@
 # the script does nothing. So it is safe to run this script quite often in a
 # Cron job.
 
-# If the bucket contains new results, they are compared to two reference points:
-# the first run (declared in the FIRST_DIR environment variable; defaulting to
-# the oldest run if the variable is empty or not set) and the previous run (as
-# read in the last_known_dir file).
+# If the bucket contains new results, then the script compares each CSV in the
+# directory of the last run with CSVs of the same name in all other directories.
+# Old directories can be filtered out by setting the FIRST_DIR environment
+# variable, which defaults to the oldest directory.
 
-# The script compares each CSV in the directory of the last run with CSVs of the
-# same name in the two reference directories.
+# The results of the last run are also compared to two reference points:
+# * a reference run (declared in the REF_DIR environment variable; defaulting to
+#   FIRST_DIR if the variable is empty or not set);
+# * and the previous run (as read in the last_known_dir file).
 
 # The comparison is done using the gas_parameter_diff OCaml script from the
 # Tezos codebase.
@@ -47,8 +49,8 @@
 # channel.
 
 # The results of all comparisons are 3 CSV tables:
-# - all.csv comparing all the runs
-# - first.csv comparing the first and last runs
+# - all.csv comparing all the runs since FIRST_DIR (included)
+# - reference.csv comparing the reference and last runs
 # - prev.csv comparing the previous and last runs.
 # These tables are also sent to the Slack channel
 
