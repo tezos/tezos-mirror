@@ -14,7 +14,7 @@ depends: [
   "tezos-lwt-result-stdlib"
   "lwt" { >= "5.6.0" }
   "tezos-hacl"
-  "secp256k1-internal" { >= "0.3.0" }
+  "secp256k1-internal" { >= "0.4.0" }
   "tezos-error-monad"
   "tezos-rpc"
   "aches" { >= "1.0.0" }
