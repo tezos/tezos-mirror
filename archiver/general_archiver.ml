@@ -419,6 +419,5 @@ module Loops (Archiver : Archiver.S) = struct
         Lwt.return_unit
 end
 
-module Db_loops = Loops (Db_archiver)
 module Json_loops = Loops (Json_archiver)
 module Server_loops = Loops (Server_archiver)

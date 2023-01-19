@@ -4,9 +4,7 @@
  (public_name teztale-archiver)
  (promote (until-clean))
  (libraries
-  sqlite3
   tezos-client-base-unix
-  tezos-client-base
   teztale.lib
   (select
    PtCJ7pwo_machine.ml

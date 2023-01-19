@@ -60,39 +60,11 @@ let endpoint_param =
     ~desc:"Teztale server to feed"
     (Clic.parameter (fun _ p -> return (Uri.of_string p)))
 
-let new_file_parameter =
-  Clic.parameter (fun _ p ->
-      if Sys.file_exists p then failwith "File already exist: '%s'" p
-      else return p)
-
-let path_parameter =
-  Clic.parameter (fun _ p ->
-      if not (Sys.file_exists p) then failwith "File does not exist: '%s'" p
-      else return p)
-
 let directory_parameter =
   Clic.parameter (fun _ p ->
       if not (Sys.file_exists p && Sys.is_directory p) then
         failwith "Directory doesn't exist: '%s'" p
       else return p)
-
-let main_db cctxt db_path source =
-  let* () = Client_confirmations.wait_for_bootstrapped cctxt in
-  (* let* () = await_protocol_activation cctxt Loops.protocol_hash in *)
-  let db = Sqlite3.db_open db_path in
-  let () = Db.set_pragma_use_foreign_keys db in
-  let dumper = Db_archiver.launch db source in
-  let main =
-    let*! () =
-      Lwt.Infix.(
-        General_archiver.Db_loops.blocks_loop cctxt
-        <&> General_archiver.Db_loops.endorsements_loop cctxt)
-    in
-    let () = Db_archiver.stop () in
-    Lwt.return_unit
-  in
-  let*! out = Lwt.join [dumper; main] in
-  return out
 
 let main_json cctxt prefix =
   let* () = Client_confirmations.wait_for_bootstrapped cctxt in
@@ -129,35 +101,6 @@ let main_server state cctxt =
 let select_commands _ctxt Client_config.{chain; _} =
   return
     [
-      Clic.command
-        ~group
-        ~desc:"create empty Sqlite3 database"
-        Clic.no_options
-        (Clic.prefixes ["create"; "database"; "in"]
-        @@ Clic.param
-             ~name:"db_path"
-             ~desc:"path to file in which to store the Sqlite3 database"
-             new_file_parameter
-        @@ Clic.stop)
-        (fun () db_path _cctxt ->
-          Db.create_db db_path ;
-          return_unit);
-      Clic.command
-        ~group
-        ~desc:"run the db archiver"
-        Clic.no_options
-        (Clic.prefixes ["run"; "db-archiver"; "on"]
-        @@ Clic.param
-             ~name:"db_path"
-             ~desc:"path to Sqlite3 database file where to store the data"
-             path_parameter
-        @@ Clic.prefix "for"
-        @@ Clic.param
-             ~name:"source"
-             ~desc:"name of the data source (i.e. of the node)"
-             (Clic.parameter (fun _ p -> return p))
-        @@ Clic.stop)
-        (fun () db_path source cctxt -> main_db cctxt db_path source);
       Clic.command
         ~group
         ~desc:"run the json archiver"
