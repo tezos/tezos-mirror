@@ -52,6 +52,13 @@ module Types : sig
   (** An ID associated to a slot or to its commitment. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
+     Use a bitset instead, when available in the standard library. *)
+
+  (** A set of slots, represented by a list of 0s and 1s. It is used for
+      instance to record which slots are deemed available by an attestor. *)
+  type slot_set = bool list
+
   (** An index of a DAL shard *)
   type shard_index = int
 
@@ -194,6 +201,19 @@ val get_assigned_shard_indices :
   < meth : [`GET]
   ; input : unit
   ; output : Types.shard_index list
+  ; prefix : unit
+  ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+  ; query : unit >
+  service
+
+(** Return the set of currently attestable slots. A slot is attestable at level
+    [l] if it is published at level [l - attestation_lag] and *all* the shards
+    assigned at level [l] to the given public key hash are available in the DAL
+    node's store. *)
+val get_attestable_slots :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.slot_set
   ; prefix : unit
   ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
   ; query : unit >

@@ -45,6 +45,11 @@ module Types = struct
   (* Declaration of types used as inputs and/or outputs. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
+  (** A set of slots, represented by a list of booleans (false for not in the
+      set). It is used for instance to record which slots are deemed available
+      by an attestor. *)
+  type slot_set = bool list
+
   type header_status =
     [`Waiting_attestation | `Attested | `Unattested | `Not_selected | `Unseen]
 
@@ -324,4 +329,25 @@ let get_assigned_shard_indices :
     ~output:Data_encoding.(list int16)
     Tezos_rpc.Path.(
       open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
-      /: Tezos_rpc.Arg.int32 / "assigned-shard-indices")
+      / "attested_levels" /: Tezos_rpc.Arg.int32 / "assigned_shard_indices")
+
+let get_attestable_slots :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.slot_set
+    ; prefix : unit
+    ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Return the currently attestable slots at the given attested level by \
+       the given public key hash. A slot is attestable at level [l] if it is \
+       published at level [l - attestation_lag] and *all* the shards assigned \
+       at level [l] to the given public key hash are available in the DAL \
+       node's store."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.(list bool)
+    Tezos_rpc.Path.(
+      open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
+      / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")

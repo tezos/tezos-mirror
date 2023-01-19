@@ -354,8 +354,10 @@ module Dal : sig
       commitment ->
       (Dal_node.t, slot_header list) RPC_core.t
 
-    (** Call RPC "GET /profile/<public_key_hash>/<level>/assigned-shard-indices" to
-        get shard ids assigned to the given public key hash at the given level. *)
+    (** Call RPC "GET
+        /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
+        to get shard ids assigned to the given public key hash at the given
+        level. *)
     val get_assigned_shard_indices :
       level:int -> pkh:string -> (Dal_node.t, int list) RPC_core.t
 
@@ -363,6 +365,18 @@ module Dal : sig
         headers with the given published level. *)
     val get_published_level_headers :
       ?status:string -> int -> (Dal_node.t, slot_header list) RPC_core.t
+
+    (** Call RPC "GET
+        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots" to
+        get the slots currently attestable by the given public key hash at the
+        given attested level. The result is as a boolean list of length
+        [num_slots]. A slot is attestable if it is published at level [level -
+        attestation_lag]) and all the shards assigned to the given attestor at
+        level [level] are available in the DAL node's store. *)
+    val get_attestable_slots :
+      attestor:Account.key ->
+      attested_level:int ->
+      (Dal_node.t, bool list) RPC_core.t
   end
 
   val make :

@@ -50,7 +50,7 @@ val write_shards :
 
 (** [read_shards ~share_size dal_constants store commitment] fetches the set of
     shards associated with [commitment] in [store]. The expected size of shards
-    is given by [dal_constants]. In case of IO error, [Io_error] is returned. *)
+    is given by [dal_constants]. In case of IO error, [Resource_not_found] is returned. *)
 val read_shards :
   share_size:int ->
   t ->
@@ -59,7 +59,7 @@ val read_shards :
 
 (** [read_shard ~share_size store commitment shard_id] fetches the shard
     associated to [commitment] in [store] with id [shard_id]. In case of IO
-    error, [Io_error] is returned.*)
+    error, [Resource_not_found] is returned. *)
 val read_shard :
   share_size:int ->
   t ->
@@ -68,10 +68,20 @@ val read_shard :
   Cryptobox.shard tzresult Lwt.t
 
 (** [read_shards_subset] has the same behavior as [read_shard] but fetches multiple
-    shard. *)
+    shards. *)
 val read_shards_subset :
   share_size:int ->
   t ->
   Cryptobox.Commitment.t ->
   int list ->
   Cryptobox.shard list tzresult Lwt.t
+
+(** [are_shards_available ~share_size store commitment shard_indexes] returns
+    [true] if and only if all shards with indexes in [shard_indexes] are present
+    in the node's store. *)
+val are_shards_available :
+  share_size:int ->
+  t ->
+  Cryptobox.Commitment.t ->
+  int list ->
+  bool tzresult Lwt.t
