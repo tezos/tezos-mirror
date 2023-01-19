@@ -273,7 +273,7 @@ and classify_desc : type a. a desc -> Kind.t =
       assert (
         match classify_desc elts.encoding with
         | `Fixed _ | `Dynamic -> true
-        | `Variable -> assert false) ;
+        | `Variable -> false) ;
       `Dynamic
   | Array {length_limit = Exactly l; length_encoding = None; elts} -> (
       match classify_desc elts.encoding with
@@ -288,7 +288,7 @@ and classify_desc : type a. a desc -> Kind.t =
       assert (
         match classify_desc elts.encoding with
         | `Fixed _ | `Dynamic -> true
-        | `Variable -> assert false) ;
+        | `Variable -> false) ;
       `Dynamic
   | List {length_limit = Exactly l; length_encoding = None; elts} -> (
       match classify_desc elts.encoding with
