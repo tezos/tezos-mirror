@@ -237,7 +237,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
   let proto_add_operation ~conflict_handler state op :
       (Proto.Mempool.t * Proto.Mempool.add_result) tzresult Lwt.t =
     Proto.Mempool.add_operation
-      ~check_signature:Compare.Int.(op.count_successful_prechecks <= 0)
+      ~check_signature:(not op.signature_checked)
       ~conflict_handler
       state.validation_info
       state.mempool
@@ -324,10 +324,9 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
        full and the operation does not have enough fees. Nevertheless,
        the successful call to [Proto.Mempool.add_operation] guarantees
        that the operation is individually valid, in particular its
-       signature is correct. Therefore we increment its successful
-       precheck counter, so that any future signature check can be
-       skipped. *)
-    let op = increment_successful_precheck op in
+       signature is correct. We record this so that any future
+       signature check can be skipped. *)
+    let op = record_successful_signature_check op in
     let*! res =
       enforce_mempool_bound_and_update_states
         state
