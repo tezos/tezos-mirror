@@ -70,10 +70,8 @@ let originate = Contract_helpers.originate_contract_from_string
 
 let get_balance ctxt ~token ~owner =
   let open Lwt_result_wrap_syntax in
-  let* key_hash, ctxt =
-    wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
-  in
-  wrap (Ticket_balance.get_balance ctxt key_hash)
+  let* key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
+  Ticket_balance.get_balance ctxt key_hash
 
 let get_used_ticket_storage block =
   let open Lwt_result_wrap_syntax in
@@ -152,7 +150,7 @@ let assert_token_balance ~loc block token owner expected =
   let open Lwt_result_wrap_syntax in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* balance, _ =
+  let*@ balance, _ =
     get_balance ctxt ~token ~owner:(Destination.Contract owner)
   in
   match (balance, expected) with

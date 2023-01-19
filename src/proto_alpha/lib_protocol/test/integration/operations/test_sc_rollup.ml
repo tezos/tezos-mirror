@@ -332,30 +332,28 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
   let open Lwt_result_wrap_syntax in
   let show exp = Expr.to_string @@ exp in
   let unparse ctxt parameters =
-    wrap
-      (Script_ir_translator.unparse_data
-         ctxt
-         Script_ir_unparser.Optimized
-         parameters_ty
-         parameters)
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Optimized
+      parameters_ty
+      parameters
   in
-  let* unparsed_parameters, ctxt =
+  let*@ unparsed_parameters, ctxt =
     (* Make sure we can parse the unparsed-parameters with the given parameters
        type. *)
     let* parsed_unparsed_parameters, ctxt =
-      wrap
-        (Script_ir_translator.parse_data
-           ctxt
-           ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
-           ~allow_forged:true
-           parameters_ty
-           (Environment.Micheline.root unparsed_parameters))
+      Script_ir_translator.parse_data
+        ctxt
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
+        ~allow_forged:true
+        parameters_ty
+        (Environment.Micheline.root unparsed_parameters)
     in
     (* Un-parse again to get back to Micheline. *)
     unparse ctxt parsed_unparsed_parameters
   in
   (* Un-parse the parsed parameters. *)
-  let* expected_unparsed_parameters, _ctxt = unparse ctxt parameters in
+  let*@ expected_unparsed_parameters, _ctxt = unparse ctxt parameters in
   (* Verify that both version match. *)
   Assert.equal_string
     ~loc:__LOC__
@@ -402,9 +400,7 @@ let verify_execute_outbox_message_operations incr rollup ~loc ~operations
         (* Load the arg-type and entrypoints of the destination script. *)
         let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
                ctxt ) =
-          let* ctxt, _cache_key, cached =
-            wrap @@ Script_cache.find ctxt destination
-          in
+          let*@ ctxt, _cache_key, cached = Script_cache.find ctxt destination in
           match cached with
           | Some (_script, ex_script) -> return (ex_script, ctxt)
           | None -> failwith "Could not load script at %s" loc
@@ -521,11 +517,9 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
   return (contract, incr)
 
 let hash_commitment incr commitment =
-  let open Lwt_result_wrap_syntax in
+  let open Result_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  let+ ctxt, hash =
-    wrap @@ Lwt.return (Sc_rollup.Commitment.hash ctxt commitment)
-  in
+  let+ ctxt, hash = Sc_rollup.Commitment.hash ctxt commitment in
   (Incremental.set_alpha_ctxt incr ctxt, hash)
 
 let publish_commitment incr staker rollup commitment =
@@ -574,7 +568,7 @@ let cement_commitments ?challenge_window_in_blocks block rollup staker hashes =
     hashes
 
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block = publish_commitment incr originator rollup commitment in
   let* constants = Context.get_constants (B block) in
   let* block =
@@ -583,7 +577,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
-  let* incr, hash = hash_commitment incr commitment in
+  let*?@ incr, hash = hash_commitment incr commitment in
   let* cement_op = Op.sc_rollup_cement (I incr) originator rollup hash in
   let* incr = Incremental.add_operation incr cement_op in
   let* block = Incremental.finalize_block incr in
@@ -651,16 +645,15 @@ let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
 let execute_outbox_message_without_proof_validation incr rollup
     ~cemented_commitment outbox_message =
   let open Lwt_result_wrap_syntax in
-  let* res, ctxt =
-    wrap
-      (Sc_rollup_operations.Internal_for_tests.execute_outbox_message
-         (Incremental.alpha_ctxt incr)
-         ~validate_and_decode_output_proof:
-           (fun ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
-           return (outbox_message, ctxt))
-         rollup
-         ~cemented_commitment
-         ~output_proof:"Not used")
+  let*@ res, ctxt =
+    Sc_rollup_operations.Internal_for_tests.execute_outbox_message
+      (Incremental.alpha_ctxt incr)
+      ~validate_and_decode_output_proof:
+        (fun ctxt ~cemented_commitment:_ _rollup ~output_proof:_ ->
+        return (outbox_message, ctxt))
+      rollup
+      ~cemented_commitment
+      ~output_proof:"Not used"
   in
   return (res, Incremental.set_alpha_ctxt incr ctxt)
 
@@ -682,11 +675,9 @@ let execute_outbox_message incr ~originator rollup ~output_proof
 let assert_ticket_token_balance ~loc incr token owner expected =
   let open Lwt_result_wrap_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* balance, _ =
-    let* key_hash, ctxt =
-      wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
-    in
-    wrap (Ticket_balance.get_balance ctxt key_hash)
+  let*@ balance, _ =
+    let* key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
+    Ticket_balance.get_balance ctxt key_hash
   in
   match (balance, expected) with
   | Some b, Some e -> Assert.equal_int ~loc (Z.to_int b) e
@@ -711,16 +702,15 @@ let balances ctxt contract =
 
 let check_balances_evolution bal_before {liquid; frozen} ~action =
   let open Lwt_result_wrap_syntax in
-  let wret x = wrap @@ Lwt.return x in
   let* {liquid = expected_liquid; frozen = expected_frozen} =
     match action with
     | `Freeze amount ->
-        let* liquid = wret @@ Tez.( -? ) bal_before.liquid amount in
-        let* frozen = wret @@ Tez.( +? ) bal_before.frozen amount in
+        let*?@ liquid = Tez.( -? ) bal_before.liquid amount in
+        let*?@ frozen = Tez.( +? ) bal_before.frozen amount in
         return {liquid; frozen}
     | `Unfreeze amount ->
-        let* liquid = wret @@ Tez.( +? ) bal_before.liquid amount in
-        let* frozen = wret @@ Tez.( -? ) bal_before.frozen amount in
+        let*?@ liquid = Tez.( +? ) bal_before.liquid amount in
+        let*?@ frozen = Tez.( -? ) bal_before.frozen amount in
         return {liquid; frozen}
   in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_liquid liquid in
@@ -803,7 +793,7 @@ let recover_bond_with_success i contract rollup =
     The comitter tries to withdraw stake before and after cementing. Only the
     second attempt is expected to succeed. *)
 let test_publish_cement_and_recover_bond () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* block = bake_blocks_until_next_inbox_level block rollup in
@@ -819,7 +809,7 @@ let test_publish_cement_and_recover_bond () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let* i, hash = hash_commitment i c in
+  let*?@ i, hash = hash_commitment i c in
   (* stake not on LCC *)
   let* () = recover_bond_not_lcc i contract rollup in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
@@ -876,7 +866,7 @@ let test_publish_fails_on_double_stake () =
     cement one of the commitments; it checks that this fails because the
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
   let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
   let _, contract1, contract2 = contracts in
@@ -899,7 +889,7 @@ let test_cement_fails_on_conflict () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let* i, hash = hash_commitment i commitment1 in
+  let*?@ i, hash = hash_commitment i commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
@@ -915,7 +905,7 @@ let test_cement_fails_on_conflict () =
 
 let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block = bake_blocks_until_next_inbox_level block rollup in
   let* i = Incremental.begin_construction block in
   let* commitment = dummy_commitment (I i) rollup in
@@ -925,7 +915,7 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
   (* This pattern would add an additional block, so we decrement [n] by one. *)
   let* b = Block.bake_n (n - 1) b in
   let* i = Incremental.begin_construction b in
-  let* i, hash = hash_commitment i commitment in
+  let*?@ i, hash = hash_commitment i commitment in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* (_ : Incremental.t) =
     Incremental.add_operation ?expect_apply_failure i cement_op
@@ -1097,7 +1087,7 @@ let test_originating_with_valid_type () =
     let* block, rollup = sc_originate block contract parameters_ty in
     let* incr = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt incr in
-    let* expr, _ctxt = wrap @@ Sc_rollup.parameters_type ctxt rollup in
+    let*@ expr, _ctxt = Sc_rollup.parameters_type ctxt rollup in
     let expr = WithExceptions.Option.get ~loc:__LOC__ expr in
     let*? expr, _ctxt =
       Environment.wrap_tzresult

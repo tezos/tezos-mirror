@@ -80,7 +80,7 @@ let pp_int_map fmt map =
   Lwt_main.run
     (let open Lwt_result_syntax in
     let* ctxt = new_ctxt () in
-    let* kvs, _ = wrap @@ Lwt.return @@ CM.to_list ctxt map in
+    let*?@ kvs, _ = CM.to_list ctxt map in
     return kvs)
   |> Result.value_f ~default:(fun () -> assert false)
   |> Format.fprintf fmt "%a" pp
