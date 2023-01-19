@@ -53,7 +53,7 @@ depends: [
   "lwt-exit"
   "lwt-watcher" { = "0.2" }
   "lwt_log"
-  "mtime" { >= "1.4.0" }
+  "mtime" { >= "1.4.0" & < "2.0.0" }
   "num"
   "ocaml-migrate-parsetree"
   "ocamlformat" { = "0.21.0" }
