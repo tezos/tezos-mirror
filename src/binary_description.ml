@@ -259,7 +259,7 @@ let describe (type x) (encoding : x Encoding.t) =
           `Fixed (Binary_size.tag_size size),
           Int
             ( (size :> Binary_schema.integer_extended),
-              Encoding.default_endianness ) )
+              TzEndian.default_endianness ) )
     in
     let cases, references =
       List.fold_right
@@ -474,8 +474,8 @@ let describe (type x) (encoding : x Encoding.t) =
     | Ignore -> (Zero_width, references)
     | Constant _ -> (Zero_width, references)
     | Bool -> (Bool, references)
-    | Int8 -> (Int (`Int8, Encoding.default_endianness), references)
-    | Uint8 -> (Int (`Uint8, Encoding.default_endianness), references)
+    | Int8 -> (Int (`Int8, TzEndian.default_endianness), references)
+    | Uint8 -> (Int (`Uint8, TzEndian.default_endianness), references)
     | Int16 endianness -> (Int (`Int16, endianness), references)
     | Uint16 endianness -> (Int (`Uint16, endianness), references)
     | Int31 endianness ->

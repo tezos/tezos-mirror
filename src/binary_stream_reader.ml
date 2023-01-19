@@ -267,8 +267,8 @@ module Atom = struct
     let read_index =
       match Binary_size.enum_size arr with
       | `Uint8 -> uint8
-      | `Uint16 -> uint16 Encoding.default_endianness
-      | `Uint30 -> uint30 Encoding.default_endianness
+      | `Uint16 -> uint16 TzEndian.default_endianness
+      | `Uint30 -> uint30 TzEndian.default_endianness
     in
     read_index resume state @@ fun (index, state) ->
     if index >= Array.length arr then Error No_case_matched
@@ -282,7 +282,7 @@ module Atom = struct
 
   let tag = function
     | `Uint8 -> uint8
-    | `Uint16 -> uint16 Encoding.default_endianness
+    | `Uint16 -> uint16 TzEndian.default_endianness
 end
 
 let rec skip n state k =
@@ -436,7 +436,7 @@ let rec read_rec :
       (match kind with
       | `N -> Atom.uint30_like_n resume state
       | #Binary_size.unsigned_integer as kind ->
-          Atom.int kind Encoding.default_endianness resume state)
+          Atom.int kind TzEndian.default_endianness resume state)
       @@ fun (sz, state) ->
       let remaining = check_remaining_bytes state sz in
       let state = {state with remaining_bytes = Some sz} in

@@ -91,8 +91,6 @@ let get_tag = Uint_option.get
 
 type string_json_repr = Hex | Plain
 
-type endianness = Big_endian | Little_endian [@@deriving hash]
-
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -101,16 +99,16 @@ type 'a desc =
   | Bool : bool desc
   | Int8 : int desc
   | Uint8 : int desc
-  | Int16 : endianness -> int desc
-  | Uint16 : endianness -> int desc
-  | Int31 : endianness -> int desc
-  | Int32 : endianness -> Int32.t desc
-  | Int64 : endianness -> Int64.t desc
+  | Int16 : TzEndian.endianness -> int desc
+  | Uint16 : TzEndian.endianness -> int desc
+  | Int31 : TzEndian.endianness -> int desc
+  | Int32 : TzEndian.endianness -> Int32.t desc
+  | Int64 : TzEndian.endianness -> Int64.t desc
   | N : Z.t desc
   | Z : Z.t desc
   | RangedInt : {
       minimum : int;
-      endianness : endianness;
+      endianness : TzEndian.endianness;
       maximum : int;
     }
       -> int desc
@@ -547,13 +545,13 @@ let int8 = make @@ Int8
 let uint8 = make @@ Uint8
 
 module Big_endian = struct
-  let int16 = make @@ Int16 Big_endian
+  let int16 = make @@ Int16 TzEndian.Big_endian
 
-  let uint16 = make @@ Uint16 Big_endian
+  let uint16 = make @@ Uint16 TzEndian.Big_endian
 
-  let int31 = make @@ Int31 Big_endian
+  let int31 = make @@ Int31 TzEndian.Big_endian
 
-  let int32 = make @@ Int32 Big_endian
+  let int32 = make @@ Int32 TzEndian.Big_endian
 
   let ranged_int minimum maximum =
     (* NOTE: all [ranged_*] combinator, support out-of-order arguments. E.g.,
@@ -563,12 +561,10 @@ module Big_endian = struct
       minimum < Binary_size.min_int `Int31
       || Binary_size.max_int `Int31 < maximum
     then invalid_arg "Data_encoding.ranged_int" ;
-    make @@ RangedInt {minimum; endianness = Big_endian; maximum}
+    make @@ RangedInt {minimum; endianness = TzEndian.Big_endian; maximum}
 
-  let int64 = make @@ Int64 Big_endian
+  let int64 = make @@ Int64 TzEndian.Big_endian
 end
-
-let default_endianness = Big_endian
 
 include Big_endian
 
@@ -577,13 +573,13 @@ let ranged_float minimum maximum =
   make @@ RangedFloat {minimum; maximum}
 
 module Little_endian = struct
-  let int16 = make @@ Int16 Little_endian
+  let int16 = make @@ Int16 TzEndian.Little_endian
 
-  let uint16 = make @@ Uint16 Little_endian
+  let uint16 = make @@ Uint16 TzEndian.Little_endian
 
-  let int31 = make @@ Int31 Little_endian
+  let int31 = make @@ Int31 TzEndian.Little_endian
 
-  let int32 = make @@ Int32 Little_endian
+  let int32 = make @@ Int32 TzEndian.Little_endian
 
   let ranged_int minimum maximum =
     let minimum = min minimum maximum and maximum = max minimum maximum in
@@ -591,9 +587,9 @@ module Little_endian = struct
       minimum < Binary_size.min_int `Int31
       || Binary_size.max_int `Int31 < maximum
     then invalid_arg "Data_encoding.ranged_int" ;
-    make @@ RangedInt {minimum; endianness = Little_endian; maximum}
+    make @@ RangedInt {minimum; endianness = TzEndian.Little_endian; maximum}
 
-  let int64 = make @@ Int64 Little_endian
+  let int64 = make @@ Int64 TzEndian.Little_endian
 end
 
 let n = make @@ N

@@ -108,9 +108,9 @@ module Atom = struct
     may_resize state (Binary_size.integer_to_size kind) ;
     set_int kind endianness state.buffer ofs v
 
-  let int8 = int `Int8 Encoding.default_endianness
+  let int8 = int `Int8 TzEndian.default_endianness
 
-  let uint8 = int `Uint8 Encoding.default_endianness
+  let uint8 = int `Uint8 TzEndian.default_endianness
 
   let int16 endianness = int `Int16 endianness
 
@@ -200,8 +200,8 @@ module Atom = struct
       try snd (Hashtbl.find tbl v) with Not_found -> raise No_case_matched
     in
     match Binary_size.enum_size arr with
-    | `Uint30 -> uint30 Encoding.default_endianness state value
-    | `Uint16 -> uint16 Encoding.default_endianness state value
+    | `Uint30 -> uint30 TzEndian.default_endianness state value
+    | `Uint16 -> uint16 TzEndian.default_endianness state value
     | `Uint8 -> uint8 state value
 
   let fixed_kind_bytes length state s =
@@ -220,7 +220,7 @@ module Atom = struct
 
   let tag = function
     | `Uint8 -> uint8
-    | `Uint16 -> uint16 Encoding.default_endianness
+    | `Uint16 -> uint16 TzEndian.default_endianness
 end
 
 (** Main recursive writing function. *)
@@ -339,12 +339,12 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
           write_with_limit (Binary_size.max_int `N) e state value
       | #Binary_size.unsigned_integer as kind ->
           (* place holder for [size] *)
-          Atom.int kind Encoding.default_endianness state 0 ;
+          Atom.int kind TzEndian.default_endianness state 0 ;
           write_with_limit (Binary_size.max_int kind) e state value ;
           (* patch the written [size] *)
           Atom.set_int
             kind
-            Encoding.default_endianness
+            TzEndian.default_endianness
             state.buffer
             initial_offset
             (state.offset - initial_offset - Binary_size.integer_to_size kind))

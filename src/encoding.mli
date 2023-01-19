@@ -65,10 +65,6 @@ type case_tag_internal = Uint_option.t
 
 type string_json_repr = Hex | Plain
 
-type endianness = Big_endian | Little_endian [@@deriving hash]
-
-val default_endianness : endianness
-
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -77,16 +73,16 @@ type 'a desc =
   | Bool : bool desc
   | Int8 : int desc
   | Uint8 : int desc
-  | Int16 : endianness -> int desc
-  | Uint16 : endianness -> int desc
-  | Int31 : endianness -> int desc
-  | Int32 : endianness -> Int32.t desc
-  | Int64 : endianness -> Int64.t desc
+  | Int16 : TzEndian.endianness -> int desc
+  | Uint16 : TzEndian.endianness -> int desc
+  | Int31 : TzEndian.endianness -> int desc
+  | Int32 : TzEndian.endianness -> Int32.t desc
+  | Int64 : TzEndian.endianness -> Int64.t desc
   | N : Z.t desc  (** An arbitrary-precision natural number *)
   | Z : Z.t desc  (** An arbitrary-precision integer *)
   | RangedInt : {
       minimum : int;
-      endianness : endianness;
+      endianness : TzEndian.endianness;
       maximum : int;
     }
       -> int desc  (** Note: the encoding size is determined by range *)

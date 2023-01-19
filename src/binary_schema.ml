@@ -43,9 +43,9 @@ type field_descr =
 
 and layout =
   | Zero_width
-  | Int of integer_extended * Encoding.endianness
+  | Int of integer_extended * TzEndian.endianness
   | Bool
-  | RangedInt of int * Encoding.endianness * int
+  | RangedInt of int * TzEndian.endianness * int
   | RangedFloat of float * float
   | Float
   | Bytes
@@ -87,7 +87,7 @@ module Printer_ast = struct
     | `Variable -> Format.fprintf ppf "Variable"
     | `Dynamic -> Format.fprintf ppf "Determined from data"
 
-  let pp_int ppf ((int : integer_extended), (endianness : Encoding.endianness))
+  let pp_int ppf ((int : integer_extended), (endianness : TzEndian.endianness))
       =
     let is_single_byte =
       match int with
@@ -151,7 +151,7 @@ module Printer_ast = struct
           ppf
           "%a encoding an enumeration (see %s)"
           pp_int
-          ((size :> integer_extended), Encoding.default_endianness)
+          ((size :> integer_extended), TzEndian.default_endianness)
           reference
     | Seq (data, len) -> (
         Format.fprintf ppf "sequence of " ;
@@ -210,7 +210,7 @@ module Printer_ast = struct
               pp_size
               (`Fixed (Binary_size.integer_to_size size));
             string_of_layout
-              (Int ((size :> integer_extended), Encoding.default_endianness));
+              (Int ((size :> integer_extended), TzEndian.default_endianness));
           ]
     | Dynamic_size_field (None, 1, (#Binary_size.unsigned_integer as size)) ->
         Some
@@ -221,7 +221,7 @@ module Printer_ast = struct
               pp_size
               (`Fixed (Binary_size.integer_to_size size));
             string_of_layout
-              (Int ((size :> integer_extended), Encoding.default_endianness));
+              (Int ((size :> integer_extended), TzEndian.default_endianness));
           ]
     | Dynamic_size_field (_, i, (#Binary_size.unsigned_integer as size)) ->
         Some
@@ -232,7 +232,7 @@ module Printer_ast = struct
               pp_size
               (`Fixed (Binary_size.integer_to_size size));
             string_of_layout
-              (Int ((size :> integer_extended), Encoding.default_endianness));
+              (Int ((size :> integer_extended), TzEndian.default_endianness));
           ]
     | Anonymous_field (kind, desc) ->
         if not (is_zero_size_kind kind) then
@@ -295,7 +295,7 @@ module Printer_ast = struct
                 "%s (Enumeration: %a):"
                 descr.title
                 pp_int
-                ((size :> integer_extended), Encoding.default_endianness);
+                ((size :> integer_extended), TzEndian.default_endianness);
             description = descr.description;
           },
           Table
@@ -443,7 +443,7 @@ module Encoding = struct
 
   let endianness_encoding =
     string_enum
-      [("Big", Encoding.Big_endian); ("Little", Encoding.Little_endian)]
+      [("Big", TzEndian.Big_endian); ("Little", TzEndian.Little_endian)]
 
   let limit_enc =
     union
@@ -486,7 +486,7 @@ module Encoding = struct
                  (dft
                     "endianness"
                     endianness_encoding
-                    Encoding.default_endianness)
+                    TzEndian.default_endianness)
                  (req "kind" (constant "Int")))
               (function
                 | Int (integer, endianness) -> Some (integer, endianness, ())
@@ -506,7 +506,7 @@ module Encoding = struct
                  (dft
                     "endianness"
                     endianness_encoding
-                    Encoding.default_endianness)
+                    TzEndian.default_endianness)
                  (req "max" int31)
                  (req "kind" (constant "RangedInt")))
               (function

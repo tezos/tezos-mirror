@@ -202,8 +202,8 @@ module Atom = struct
     let read_index =
       match Binary_size.enum_size arr with
       | `Uint8 -> uint8
-      | `Uint16 -> uint16 Encoding.default_endianness
-      | `Uint30 -> uint30 Encoding.default_endianness
+      | `Uint16 -> uint16 TzEndian.default_endianness
+      | `Uint30 -> uint30 TzEndian.default_endianness
     in
     let index = read_index state in
     if index >= Array.length arr then raise_read_error No_case_matched ;
@@ -218,7 +218,7 @@ module Atom = struct
 
   let tag = function
     | `Uint8 -> uint8
-    | `Uint16 -> uint16 Encoding.default_endianness
+    | `Uint16 -> uint16 TzEndian.default_endianness
 end
 
 (** Main recursive reading function, in continuation passing style. *)
@@ -355,7 +355,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         match kind with
         | `N -> Atom.uint30_like_n state
         | #Binary_size.unsigned_integer as kind ->
-            Atom.int kind Encoding.default_endianness state
+            Atom.int kind TzEndian.default_endianness state
       in
       let remaining = check_remaining_bytes state sz in
       state.remaining_bytes <- sz ;

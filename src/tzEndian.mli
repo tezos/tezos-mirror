@@ -28,11 +28,15 @@
     assemble the end-user-intended module {!Data_encoding}. Refer to that module
     for doucmentation. *)
 
-val get_int32 : Encoding.endianness -> bytes -> int -> int32
+type endianness = Big_endian | Little_endian [@@deriving hash]
 
-val get_int32_string : Encoding.endianness -> string -> int -> int32
+val default_endianness : endianness
 
-val set_int32 : Encoding.endianness -> bytes -> int -> int32 -> unit
+val get_int32 : endianness -> bytes -> int -> int32
+
+val get_int32_string : endianness -> string -> int -> int32
+
+val set_int32 : endianness -> bytes -> int -> int32 -> unit
 
 val set_int8 : bytes -> int -> int -> unit
 
@@ -40,25 +44,25 @@ val get_int8 : bytes -> int -> int
 
 val get_int8_string : string -> int -> int
 
-val set_int16 : Encoding.endianness -> bytes -> int -> int -> unit
+val set_int16 : endianness -> bytes -> int -> int -> unit
 
-val get_int16 : Encoding.endianness -> bytes -> int -> int
+val get_int16 : endianness -> bytes -> int -> int
 
-val get_int16_string : Encoding.endianness -> string -> int -> int
+val get_int16_string : endianness -> string -> int -> int
 
-val set_int64 : Encoding.endianness -> bytes -> int -> int64 -> unit
+val set_int64 : endianness -> bytes -> int -> int64 -> unit
 
-val get_int64 : Encoding.endianness -> bytes -> int -> int64
+val get_int64 : endianness -> bytes -> int -> int64
 
-val get_int64_string : Encoding.endianness -> string -> int -> int64
+val get_int64_string : endianness -> string -> int -> int64
 
 val get_uint8 : bytes -> int -> int
 
 val get_uint8_string : string -> int -> int
 
-val get_uint16 : Encoding.endianness -> bytes -> int -> int
+val get_uint16 : endianness -> bytes -> int -> int
 
-val get_uint16_string : Encoding.endianness -> string -> int -> int
+val get_uint16_string : endianness -> string -> int -> int
 
 val set_double : bytes -> int -> float -> unit
 
