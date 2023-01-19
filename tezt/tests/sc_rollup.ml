@@ -41,6 +41,18 @@ let hooks = Tezos_regression.hooks
 
 *)
 
+let assert_some_client_command cmd ~__LOC__ ?hooks client =
+  let*! v_opt = cmd ?hooks client in
+  match v_opt with
+  | Some v -> return v
+  | None -> failwith (Format.asprintf "Unexpected [None] at %s" __LOC__)
+
+let get_last_stored_commitment =
+  assert_some_client_command Sc_rollup_client.last_stored_commitment
+
+let get_last_published_commitment =
+  assert_some_client_command Sc_rollup_client.last_published_commitment
+
 let hex_encode (input : string) : string =
   match Hex.of_string input with `Hex s -> s
 
@@ -306,21 +318,24 @@ let test_full_scenario ?regression ~kind ?boot_sector ?commitment_period
   in
   scenario protocol rollup_node rollup_client sc_rollup tezos_node tezos_client
 
-let stored_inbox_level (_hash, (commitment : Sc_rollup_client.commitment)) =
-  commitment.inbox_level
+let commitment_info_inbox_level
+    (commitment_info : Sc_rollup_client.commitment_info) =
+  commitment_info.commitment_and_hash.commitment.inbox_level
 
-let stored_number_of_ticks (_hash, (commitment : Sc_rollup_client.commitment)) =
-  commitment.number_of_ticks
+let commitment_info_predecessor
+    (commitment_info : Sc_rollup_client.commitment_info) =
+  commitment_info.commitment_and_hash.commitment.predecessor
 
-let published_inbox_level
-    (_hash, (commitment : Sc_rollup_client.commitment), _pub_level, _incl_level)
-    =
-  commitment.inbox_level
+let commitment_info_commitment
+    (commitment_info : Sc_rollup_client.commitment_info) =
+  commitment_info.commitment_and_hash.commitment
 
-let published_number_of_ticks
-    (_hash, (commitment : Sc_rollup_client.commitment), _pub_level, _incl_level)
-    =
-  commitment.number_of_ticks
+let commitment_info_hash (commitment_info : Sc_rollup_client.commitment_info) =
+  commitment_info.commitment_and_hash.hash
+
+let commitment_info_first_published_at_level
+    (commitment_info : Sc_rollup_client.commitment_info) =
+  commitment_info.first_published_at_level
 
 let last_cemented_commitment_hash_with_level ~sc_rollup client =
   let* json =
@@ -344,20 +359,6 @@ let get_staked_on_commitment ~sc_rollup ~staker client =
   match JSON.(json |-> "hash" |> as_string_opt) with
   | Some hash -> return hash
   | None -> failwith (Format.sprintf "hash is missing %s" __LOC__)
-
-let stored_hash (hash, (_ : Sc_rollup_client.commitment)) = hash
-
-let published_hash (hash, (_ : Sc_rollup_client.commitment), _level, _incl_level)
-    =
-  hash
-
-let first_published_at_level
-    (_hash, (_ : Sc_rollup_client.commitment), level, _incl_level) =
-  level
-
-let predecessor (_hash, {Sc_rollup_client.predecessor; _}, _level, _incl_level)
-    =
-  predecessor
 
 let cement_commitment ?(src = "bootstrap1") ?fail ~sc_rollup ~hash client =
   let p =
@@ -1246,11 +1247,11 @@ let check_published_commitment_in_l1 ?(allow_non_published = false)
         if not allow_non_published then
           Test.fail "No commitment has been published" ;
         Lwt.return_none
-    | Some (hash, _commitment, _pub_level, _incl_level) ->
+    | Some Sc_rollup_client.{commitment_and_hash = {hash; _}; _} ->
         tezos_client_get_commitment client sc_rollup hash
   in
   let published_commitment =
-    Option.map (fun (_, c, _, _) -> c) published_commitment
+    Option.map commitment_info_commitment published_commitment
   in
   check_commitment_eq
     (commitment_in_l1, "in L1")
@@ -1322,12 +1323,14 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
       sc_rollup_node
       store_commitment_level
   in
-  let*! stored_commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  let* {
+         commitment = {inbox_level = stored_inbox_level; _} as stored_commitment;
+         hash = _;
+       } =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-  let stored_inbox_level = Option.map stored_inbox_level stored_commitment in
-  Check.(stored_inbox_level = Some (levels_to_commitment + init_level))
-    (Check.option Check.int)
+  Check.(stored_inbox_level = levels_to_commitment + init_level)
+    Check.int
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   (* Bake one level for commitment to be included *)
@@ -1336,8 +1339,8 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   check_commitment_eq
-    (Option.map (fun (_, c) -> c) stored_commitment, "stored")
-    (Option.map (fun (_, c, _, _) -> c) published_commitment, "published") ;
+    (Option.some stored_commitment, "stored")
+    (Option.map commitment_info_commitment published_commitment, "published") ;
   check_published_commitment_in_l1 sc_rollup client published_commitment
 
 let mode_publish mode publishes _protocol sc_rollup_node sc_rollup_client
@@ -1454,19 +1457,20 @@ let commitment_not_published_if_non_final _protocol sc_rollup_node
       sc_rollup_node
       (store_commitment_level + levels_to_finalize)
   in
-  let*! commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  let* {commitment = {inbox_level = stored_inbox_level; _}; hash = _} =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-  let stored_inbox_level = Option.map stored_inbox_level commitment in
-  Check.(stored_inbox_level = Some store_commitment_level)
-    (Check.option Check.int)
+  Check.(stored_inbox_level = store_commitment_level)
+    Check.int
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   let*! commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
-  let published_inbox_level = Option.map published_inbox_level commitment in
-  Check.(published_inbox_level = None)
+  let commitment_info_inbox_level =
+    Option.map commitment_info_inbox_level commitment
+  in
+  Check.(commitment_info_inbox_level = None)
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been published at a level different than expected (%L = \
@@ -1524,19 +1528,23 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
       sc_rollup_node
       (init_level + (2 * levels_to_commitment) + block_finality_time)
   in
-  let*! stored_commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  let* {
+         commitment =
+           {
+             inbox_level = stored_inbox_level;
+             number_of_ticks = stored_number_of_ticks;
+             _;
+           } as stored_commitment;
+         hash = _;
+       } =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-  let stored_inbox_level = Option.map stored_inbox_level stored_commitment in
-  Check.(stored_inbox_level = Some (init_level + (2 * levels_to_commitment)))
-    (Check.option Check.int)
+  Check.(stored_inbox_level = init_level + (2 * levels_to_commitment))
+    Check.int
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   Log.info "levels_to_commitment: %d" levels_to_commitment ;
-  (let stored_number_of_ticks =
-     Option.map stored_number_of_ticks stored_commitment
-   in
-   let expected =
+  (let expected =
      match kind with
      | "arith" -> 3 * levels_to_commitment
      | "wasm_2_0_0" ->
@@ -1547,8 +1555,8 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
          * levels_to_commitment (* number of inboxes *)
      | _ -> failwith "incorrect kind"
    in
-   Check.(stored_number_of_ticks = Some expected)
-     (Check.option Check.int)
+   Check.(stored_number_of_ticks = expected)
+     Check.int
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
@@ -1558,8 +1566,8 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   check_commitment_eq
-    (Option.map (fun (_, c) -> c) stored_commitment, "stored")
-    (Option.map (fun (_, c, _, _) -> c) published_commitment, "published") ;
+    (Option.some stored_commitment, "stored")
+    (Option.map commitment_info_commitment published_commitment, "published") ;
   check_published_commitment_in_l1 sc_rollup client published_commitment
 
 let commitment_stored_robust_to_failures _protocol sc_rollup_node
@@ -1637,15 +1645,15 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node
       sc_rollup_node'
       level_commitment_is_stored
   in
-  let*! stored_commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  let* {commitment = stored_commitment; hash = _} =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-  let*! stored_commitment' =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client'
+  let* {commitment = stored_commitment'; hash = _} =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
   check_commitment_eq
-    (Option.map snd stored_commitment, "stored in first node")
-    (Option.map snd stored_commitment', "stored in second node") ;
+    (Some stored_commitment, "stored in first node")
+    (Some stored_commitment', "stored in second node") ;
   unit
 
 let commitments_reorgs ~kind _protocol sc_rollup_node sc_rollup_client sc_rollup
@@ -1748,19 +1756,23 @@ let commitments_reorgs ~kind _protocol sc_rollup_node sc_rollup_client sc_rollup
       sc_rollup_node
       (init_level + levels_to_commitment + block_finality_time)
   in
-  let*! stored_commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  let* {
+         commitment =
+           {
+             inbox_level = stored_inbox_level;
+             number_of_ticks = stored_number_of_ticks;
+             _;
+           } as stored_commitment;
+         hash = _;
+       } =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-  let stored_inbox_level = Option.map stored_inbox_level stored_commitment in
-  Check.(stored_inbox_level = Some (init_level + levels_to_commitment))
-    (Check.option Check.int)
+  Check.(stored_inbox_level = init_level + levels_to_commitment)
+    Check.int
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   let () = Log.info "init_level: %d" init_level in
-  (let stored_number_of_ticks =
-     Option.map stored_number_of_ticks stored_commitment
-   in
-   let expected_number_of_ticks =
+  (let expected_number_of_ticks =
      match kind with
      | "arith" ->
          1 (* boot sector *) + 1 (* metadata *) + (3 * levels_to_commitment)
@@ -1775,8 +1787,8 @@ let commitments_reorgs ~kind _protocol sc_rollup_node sc_rollup_client sc_rollup
          (* Number of inbox that are actually processed process *)
      | _ -> assert false
    in
-   Check.(stored_number_of_ticks = Some expected_number_of_ticks)
-     (Check.option Check.int)
+   Check.(stored_number_of_ticks = expected_number_of_ticks)
+     Check.int
      ~error_msg:
        "Number of ticks processed by commitment is different from the number \
         of ticks expected (%L = %R)") ;
@@ -1786,8 +1798,8 @@ let commitments_reorgs ~kind _protocol sc_rollup_node sc_rollup_client sc_rollup
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
   check_commitment_eq
-    (Option.map snd stored_commitment, "stored")
-    (Option.map (fun (_, c, _, _) -> c) published_commitment, "published") ;
+    (Option.some stored_commitment, "stored")
+    (Option.map commitment_info_commitment published_commitment, "published") ;
   check_published_commitment_in_l1 sc_rollup client published_commitment
 
 type balances = {liquid : int; frozen : int}
@@ -1882,17 +1894,17 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
       sc_rollup_node
       (Node.get_level node)
   in
-  let*! rollup_node1_stored_commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  let* {commitment = _; hash = rollup_node1_stored_hash} =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
-  let*! rollup_node1_published_commitment =
-    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
+  let* rollup_node1_published_commitment =
+    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
   in
   let () =
     Check.(
-      Option.map published_inbox_level rollup_node1_published_commitment
-      = Some commitment_inbox_level)
-      (Check.option Check.int)
+      commitment_info_inbox_level rollup_node1_published_commitment
+      = commitment_inbox_level)
+      Check.int
       ~error_msg:
         "Commitment has been published at a level different than expected (%L \
          = %R)"
@@ -1904,9 +1916,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
      the commitment can happen. *)
   let levels_to_cementation = challenge_window in
   let cemented_commitment_hash =
-    Option.map published_hash rollup_node1_published_commitment
-    |> Option.value
-         ~default:"src142qqoZP1iPSALZPSy7ip4StkiF5neWNWviQ8V6uRADsnvuegVH"
+    commitment_info_hash rollup_node1_published_commitment
   in
   let* () = bake_levels levels_to_cementation client in
   let* _ =
@@ -1969,7 +1979,9 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
   let rollup_node2_last_published_commitment_inbox_level =
-    Option.map published_inbox_level rollup_node2_last_published_commitment
+    Option.map
+      commitment_info_inbox_level
+      rollup_node2_last_published_commitment
   in
   let () =
     Check.(rollup_node2_last_published_commitment_inbox_level = None)
@@ -1978,14 +1990,12 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
   in
   (* Check that the commitment stored by the second rollup node
      is the same commmitment stored by the first rollup node. *)
-  let*! rollup_node2_stored_commitment =
-    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client'
+  let* {commitment = _; hash = rollup_node2_stored_hash} =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
   let () =
-    Check.(
-      Option.map stored_hash rollup_node1_stored_commitment
-      = Option.map stored_hash rollup_node2_stored_commitment)
-      (Check.option Check.string)
+    Check.(rollup_node1_stored_hash = rollup_node2_stored_hash)
+      Check.string
       ~error_msg:
         "Commitments stored by first (%L) and second (%R) rollup nodes differ"
   in
@@ -2000,26 +2010,26 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
       sc_rollup_node'
       (Node.get_level node)
   in
-  let*! rollup_node2_last_published_commitment =
-    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
+  let* rollup_node2_last_published_commitment =
+    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
   let rollup_node2_last_published_commitment_inbox_level =
-    Option.map published_inbox_level rollup_node2_last_published_commitment
+    commitment_info_inbox_level rollup_node2_last_published_commitment
   in
   let () =
     Check.(
       rollup_node2_last_published_commitment_inbox_level
-      = Some commitment_inbox_level)
-      (Check.option Check.int)
+      = commitment_inbox_level)
+      Check.int
       ~error_msg:
         "Commitment has been published at a level different than expected (%L \
          = %R)"
   in
   let () =
     Check.(
-      Option.map predecessor rollup_node2_last_published_commitment
-      = Some cemented_commitment_hash)
-      (Check.option Check.string)
+      commitment_info_predecessor rollup_node2_last_published_commitment
+      = cemented_commitment_hash)
+      Check.string
       ~error_msg:
         "Predecessor fo commitment published by rollup_node2 should be the \
          cemented commitment (%L = %R)"
@@ -2062,18 +2072,18 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
       sc_rollup_node
       (Node.get_level node)
   in
-  let*! rollup_node1_published_commitment =
-    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
+  let* rollup_node1_published_commitment =
+    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
   in
   Check.(
-    Option.map published_inbox_level rollup_node1_published_commitment
-    = Some commitment_inbox_level)
-    (Check.option Check.int)
+    commitment_info_inbox_level rollup_node1_published_commitment
+    = commitment_inbox_level)
+    Check.int
     ~error_msg:
       "Commitment has been published for a level %L different than expected %R" ;
   let commitment_publish_level = Node.get_level node in
   Check.(
-    Option.bind rollup_node1_published_commitment first_published_at_level
+    commitment_info_first_published_at_level rollup_node1_published_commitment
     = Some commitment_publish_level)
     (Check.option Check.int)
     ~error_msg:
@@ -2102,7 +2112,9 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
   in
   Check.(
-    Option.bind rollup_node2_published_commitment first_published_at_level
+    Option.bind
+      rollup_node2_published_commitment
+      commitment_info_first_published_at_level
     = None)
     (Check.option Check.int)
     ~error_msg:"Rollup node 2 cannot publish commitment without any new block." ;
@@ -2111,18 +2123,19 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup_client
   let* _ =
     Sc_rollup_node.wait_for_level sc_rollup_node' commitment_publish_level2
   in
-  let*! rollup_node2_published_commitment =
-    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
+  let* rollup_node2_published_commitment =
+    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
   check_commitment_eq
-    ( Option.map (fun (_, c, _, _) -> c) rollup_node1_published_commitment,
+    ( Option.some (commitment_info_commitment rollup_node1_published_commitment),
       "published by rollup node 1" )
-    ( Option.map (fun (_, c, _, _) -> c) rollup_node2_published_commitment,
+    ( Option.some (commitment_info_commitment rollup_node2_published_commitment),
       "published by rollup node 2" ) ;
   let () =
     Check.(
-      Option.bind rollup_node1_published_commitment first_published_at_level
-      = Option.bind rollup_node2_published_commitment first_published_at_level)
+      commitment_info_first_published_at_level rollup_node1_published_commitment
+      = commitment_info_first_published_at_level
+          rollup_node2_published_commitment)
       (Check.option Check.int)
       ~error_msg:
         "Rollup nodes do not agree on level when commitment was first \
@@ -3836,13 +3849,8 @@ let test_messages_processed_by_commitment ~kind =
       sc_rollup_node
       store_commitment_level
   in
-  let* _, {inbox_level; _} =
-    let*! stored_commitment_opt =
-      Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
-    in
-    match stored_commitment_opt with
-    | Some stored_commitment -> return stored_commitment
-    | None -> failwith "The rollup node should have stored a commitment by now"
+  let* {commitment = {inbox_level; _}; hash = _} =
+    get_last_stored_commitment ~__LOC__ ~hooks sc_rollup_client
   in
 
   let*! current_level =
