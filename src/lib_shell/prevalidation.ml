@@ -119,14 +119,14 @@ module type T = sig
     | Prevalidator_classification.error_classification ]
     Lwt.t
 
-  type replacement =
-    (Operation_hash.t * Prevalidator_classification.error_classification) option
+  type replacements =
+    (Operation_hash.t * Prevalidator_classification.error_classification) list
 
   type add_result =
     t
     * protocol_operation operation
     * Prevalidator_classification.classification
-    * replacement
+    * replacements
 
   val add_operation :
     t -> filter_config -> protocol_operation operation -> add_result Lwt.t
@@ -225,7 +225,9 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
 
   type replacement = (Operation_hash.t * error_classification) option
 
-  type add_result = t * operation * classification * replacement
+  type replacements = (Operation_hash.t * error_classification) list
+
+  type add_result = t * operation * classification * replacements
 
   let classification_of_trace trace =
     match classify_trace trace with
@@ -279,7 +281,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
       protocol's abstract [mempool].
 
       Return the updated [state] (containing the updated protocol
-      [mempool]) and [filter_state], and the final [replacement], which
+      [mempool]) and [filter_state], and the final [replacements], which
       may have been mandated either by the protocol's [add_operation]
       or by [Filter.Mempool.add_operation_and_enforce_mempool_bound]
       (but not both: if the protocol already causes a replacement, then
@@ -287,7 +289,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
       [full_mempool_replacement]. *)
   let enforce_mempool_bound_and_update_states state filter_config
       (mempool, proto_add_result) op :
-      (t * replacement, error_classification) result Lwt.t =
+      (t * replacements, error_classification) result Lwt.t =
     let open Lwt_result_syntax in
     let*? proto_replacement = translate_proto_add_result proto_add_result op in
     let* filter_state, full_mempool_replacement =
@@ -303,19 +305,19 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
       | `Replace (replace_oph, _) ->
           Proto.Mempool.remove_operation mempool replace_oph
     in
-    let replacement =
+    let replacements =
       match (proto_replacement, full_mempool_replacement) with
-      | _, `No_replace -> proto_replacement
-      | None, `Replace repl -> Some repl
+      | _, `No_replace -> Option.to_list proto_replacement
+      | None, `Replace repl -> [repl]
       | Some _, `Replace _ ->
           (* If there is a [proto_replacement], it gets removed from the
              mempool before adding [op] so the mempool cannot be full. *)
           assert false
     in
-    return ({state with mempool; filter_state}, replacement)
+    return ({state with mempool; filter_state}, replacements)
 
   let add_operation_result state filter_config op :
-      (t * operation * classification * replacement) tzresult Lwt.t =
+      (t * operation * classification * replacements) tzresult Lwt.t =
     let open Lwt_result_syntax in
     let conflict_handler = Filter.Mempool.conflict_handler filter_config in
     let* proto_output = proto_add_operation ~conflict_handler state op in
@@ -336,7 +338,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     in
     match res with
     | Ok (state, replacement) -> return (state, op, `Prechecked, replacement)
-    | Error err_class -> return (state, op, (err_class :> classification), None)
+    | Error err_class -> return (state, op, (err_class :> classification), [])
 
   let add_operation state filter_config op : add_result Lwt.t =
     let open Lwt_syntax in
@@ -345,7 +347,7 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     in
     match res with
     | Ok add_result -> return add_result
-    | Error trace -> return (state, op, classification_of_trace trace, None)
+    | Error trace -> return (state, op, classification_of_trace trace, [])
 
   let remove_operation state oph =
     let mempool = Proto.Mempool.remove_operation state.mempool oph in
