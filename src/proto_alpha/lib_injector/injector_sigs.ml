@@ -131,8 +131,8 @@ end
 
 (** Module type for parameter of functor {!Injector_functor.Make}. *)
 module type PARAMETERS = sig
-  (** The type of the state for the rollup node that the injector can access *)
-  type rollup_node_state
+  (** The type of the state that the injector can access *)
+  type state
 
   (** A module which contains the different tags for the injector *)
   module Tag : TAG
@@ -147,10 +147,7 @@ module type PARAMETERS = sig
   (** Action (see {!retry_action}) to be taken on unsuccessful operation (see
       {!unsuccessful_status}). *)
   val retry_unsuccessful_operation :
-    rollup_node_state ->
-    'a manager_operation ->
-    unsuccessful_status ->
-    retry_action Lwt.t
+    state -> 'a manager_operation -> unsuccessful_status -> retry_action Lwt.t
 
   (** The tag of a manager operation. This is used to send operations to the
       correct queue automatically (when signer is not provided) and to recover
@@ -161,12 +158,11 @@ module type PARAMETERS = sig
       operation, used to compute an upper bound on the size (in bytes) for this
       operation. *)
   val approximate_fee_bound :
-    rollup_node_state -> 'a manager_operation -> approximate_fee_bound
+    state -> 'a manager_operation -> approximate_fee_bound
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
       caps of fee and burn for each operation. *)
-  val fee_parameter :
-    rollup_node_state -> 'a manager_operation -> Injection.fee_parameter
+  val fee_parameter : state -> 'a manager_operation -> Injection.fee_parameter
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
@@ -182,7 +178,7 @@ end
 
 (** Output signature for functor {!Injector_functor.Make}. *)
 module type S = sig
-  type rollup_node_state
+  type state
 
   type tag
 
@@ -199,7 +195,7 @@ module type S = sig
     #Protocol_client_context.full ->
     data_dir:string ->
     ?retention_period:int ->
-    rollup_node_state ->
+    state ->
     signers:(public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 

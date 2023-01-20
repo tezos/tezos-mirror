@@ -25,11 +25,11 @@
 
 open Injector_worker_types
 
-module Make (Rollup : Injector_sigs.PARAMETERS) = struct
-  module Tags = Injector_tags.Make (Rollup.Tag)
+module Make (Parameters : Injector_sigs.PARAMETERS) = struct
+  module Tags = Injector_tags.Make (Parameters.Tag)
   include Internal_event.Simple
 
-  let section = Rollup.events_section
+  let section = Parameters.events_section
 
   let declare_1 ~name ~msg ~level ?pp1 enc1 =
     declare_3
