@@ -813,7 +813,7 @@ let test_bulk_noops () =
       )
     |}
   in
-  let* base_tree = initial_tree ~max_tick:500L module_ in
+  let* base_tree = initial_tree ~ticks_per_snapshot:500L module_ in
   let* base_tree = set_empty_inbox_step 0l base_tree in
 
   let rec goto_snapshot ticks tree_slow =
@@ -1476,7 +1476,9 @@ let test_inbox_cleanup () =
     |}
   in
   let max_tick = 1000L in
-  let* tree = initial_tree ~max_tick ~from_binary:false module_ in
+  let* tree =
+    initial_tree ~ticks_per_snapshot:max_tick ~from_binary:false module_
+  in
   let* tree = set_empty_inbox_step 0l tree in
   (* Before executing: EOL, Info_per_level and SOL. *)
   let* () = check_messages_count tree 3 in
@@ -1590,7 +1592,7 @@ let test_outboxes_at_each_level () =
 
   let* tree =
     initial_tree
-      ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
+      ~ticks_per_snapshot:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false
       (output_only_module output_message)
   in
@@ -1638,7 +1640,7 @@ let test_outbox_validity_period () =
 
   let* tree =
     initial_tree
-      ~max_tick:1000L (* This kernel takes about 838 ticks to run. *)
+      ~ticks_per_snapshot:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false
       ~outbox_validity_period
       (output_only_module output_message)

@@ -66,7 +66,9 @@ let test_looping_kernel () =
   let max_nb_ticks = 5000L in
 
   (* This module loops indefinitely. *)
-  let*! loop_module_tree = initial_tree ~max_tick:max_nb_ticks loop_module in
+  let*! loop_module_tree =
+    initial_tree ~ticks_per_snapshot:max_nb_ticks loop_module
+  in
   let*! loop_module_tree = eval_until_input_requested loop_module_tree in
   let*! tree_with_dummy_input = set_empty_inbox_step 0l loop_module_tree in
   let* stuck, _ = eval_until_stuck tree_with_dummy_input in
@@ -79,7 +81,9 @@ let test_noop_kernel () =
   let max_nb_ticks = 5000L in
 
   (* This module does a noop. *)
-  let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
+  let*! noop_module_tree =
+    initial_tree ~ticks_per_snapshot:max_nb_ticks noop_module
+  in
   (* Eval until snapshot, which shouldn't take any tick since the default state
      is Snapshot. *)
   let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
@@ -101,7 +105,9 @@ let test_stuck_in_decode_kernel () =
   let max_nb_ticks = 4L in
 
   (* This module does a noop. *)
-  let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
+  let*! noop_module_tree =
+    initial_tree ~ticks_per_snapshot:max_nb_ticks noop_module
+  in
   let*! noop_module_tree = eval_until_input_requested noop_module_tree in
   (* Collect an inbox. *)
   let*! tree_with_dummy_input = set_empty_inbox_step 0l noop_module_tree in
@@ -117,7 +123,9 @@ let test_stuck_in_init_kernel () =
   let max_nb_ticks = 1000L in
 
   (* This module does a noop. *)
-  let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
+  let*! noop_module_tree =
+    initial_tree ~ticks_per_snapshot:max_nb_ticks noop_module
+  in
   let*! noop_module_tree = eval_until_input_requested noop_module_tree in
   (* Adds one input tick, part of the maximum number of ticks per toplevel
      call. *)
