@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,68 +24,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+open Tezos_rpc
 
-(** This module manifests the proof format used by the Arith PVM as defined by
-    the Layer 1 implementation for it.
+(** This module defines subcontext type of the subdirectory and
+    the way to project it from Node_context and a path prefix. *)
+module type PARAM = sig
+  include Sc_rollup_services.PREFIX
 
-    It is imperative that this is aligned with the protocol's implementation.
-*)
-module Arith_proof_format =
-  Context.Proof
-    (struct
-      include Sc_rollup.State_hash
+  type context
 
-      let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
-    end)
-    (struct
-      let proof_encoding =
-        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
-        .tree_proof_encoding
-    end)
-
-module Impl : Pvm.S = struct
-  module PVM = Sc_rollup.ArithPVM.Make (Arith_proof_format)
-  include PVM
-
-  let kind = Sc_rollup.Kind.Example_arith
-
-  module State = Context.PVMState
-
-  module RPC = struct
-    let build_directory _node_ctxt = Tezos_rpc.Directory.empty
-  end
-
-  let new_dissection = Game_helpers.default_new_dissection
-
-  let string_of_status status =
-    match status with
-    | Halted -> "Halted"
-    | Waiting_for_input_message -> "Waiting for input message"
-    | Waiting_for_reveal -> "Waiting for reveal"
-    | Waiting_for_metadata -> "Waiting for metadata"
-    | Parsing -> "Parsing"
-    | Evaluating -> "Evaluating"
-
-  let eval_many ~reveal_builtins:_ ~write_debug:_ ?stop_at_snapshot ~max_steps
-      initial_state =
-    ignore stop_at_snapshot ;
-    let rec go state step =
-      let open Lwt.Syntax in
-      let* is_input_required = is_input_state state in
-
-      if is_input_required = No_input_required && step <= max_steps then
-        let open Lwt.Syntax in
-        (* Note: This is not an efficient implementation because the state is
-           decoded/encoded to/from the tree at each step but for Arith PVM
-           it doesn't matter
-        *)
-        let* next_state = eval state in
-        go next_state (Int64.succ step)
-      else Lwt.return (state, step)
-    in
-    go initial_state 0L
+  val context_of_prefix : Node_context.rw -> prefix -> context tzresult Lwt.t
 end
 
-include Impl
+(** This module is a helper to register your endpoints and
+    build a resulting subdirectory eventually. *)
+module Make_directory (S : PARAM) : sig
+  (** Register an endpoint with no parameters in the path. *)
+  val register0 :
+    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
+    (S.context -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
+
+  (** Register an endpoint with a single parameter in the path. *)
+  val register1 :
+    ( [< Resto.meth],
+      'prefix,
+      'prefix * 'param1,
+      'query,
+      'input,
+      'output )
+    Service.t ->
+    (S.context -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
+
+  (** Build directory with registered endpoints with respect to Node_context. *)
+  val build_directory : Node_context.rw -> unit Tezos_rpc.Directory.t
+end
+
+(** This module is a helper to extract a block hash
+    from block reference and Node_context *)
+module Block_directory_helpers : sig
+  val block_of_prefix :
+    Node_context.rw ->
+    [< `Cemented | `Finalized | `Hash of Block_hash.t | `Head | `Level of int32] ->
+    Block_hash.t tzresult Lwt.t
+end
