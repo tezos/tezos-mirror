@@ -16,6 +16,9 @@ depends: [
   "aches-lwt" { >= "1.0.0" }
   "tezos-stdlib-unix"
   "tezos-context"
+  "tezos-error-monad" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

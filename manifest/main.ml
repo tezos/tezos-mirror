@@ -3194,6 +3194,19 @@ let octez_layer2_store =
       ]
     ~linkall:true
 
+let _octez_layer2_indexed_store_test =
+  test
+    "test_indexed_store"
+    ~path:"src/lib_layer2_store/test/"
+    ~opam:"tezos-layer2-store"
+    ~deps:
+      [
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_layer2_store |> open_;
+        qcheck_alcotest;
+        alcotest_lwt;
+      ]
+
 let octez_dal_node_services =
   private_lib
     "tezos_dal_node_services"

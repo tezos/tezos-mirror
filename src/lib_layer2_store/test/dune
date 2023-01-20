@@ -1,0 +1,20 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_indexed_store)
+ (libraries
+  tezos-error-monad
+  tezos_layer2_store
+  qcheck-alcotest
+  alcotest-lwt)
+ (flags
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_layer2_store))
+
+(rule
+ (alias runtest)
+ (package tezos-layer2-store)
+ (action (run %{dep:./test_indexed_store.exe})))
