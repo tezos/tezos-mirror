@@ -166,14 +166,15 @@ let register_protocol_tests_that_use_supports_correctly () =
   Run_script.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
   Sapling.register ~protocols ;
+  Script_annotations.register ~protocols ;
   Script_chain_id.register ~protocols ;
   Script_execution_ordering.register ~protocols ;
   Script_hash_regression.register ~protocols ;
   Script_hash_multiple.register ~protocols ;
   Script_manager_contracts.register ~protocols ;
-  Self_address_transfer.register ~protocols ;
   Script_conversion.register ~protocols ;
   Script_illtyped.register ~protocols ;
+  Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols ;
   Stresstest_command.register ~protocols ;
   Synchronisation_heuristic.register ~protocols ;
