@@ -33,4 +33,4 @@ Describe how reviewers and approvers can test this MR. -->
 
 /assign_reviewer @yrg @lthms @picdc @sribaroud @vch9
 
-/label ~scoru
+/labels ~scoru ~proto
