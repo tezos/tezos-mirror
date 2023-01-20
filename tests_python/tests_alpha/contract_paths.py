@@ -4,9 +4,7 @@ from tools.paths import MichelsonScriptLocator, LogicalName, LogicalNameStrTz
 from client.client import Client
 from . import protocol
 
-michelson_script_locator = MichelsonScriptLocator(
-    protocol.HASH, protocol.NUMBER
-)
+michelson_script_locator = MichelsonScriptLocator(protocol.NUMBER)
 
 
 def all_contracts(
