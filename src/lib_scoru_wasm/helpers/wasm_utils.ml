@@ -126,7 +126,10 @@ let rec eval_to_snapshot ?(reveal_builtins = reveal_builtins) ?write_debug
   | Input_required | Reveal_required _ ->
       Stdlib.failwith "Cannot reach snapshot point"
 
-let rec eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
+(** [eval_until_input_requested tree] will either
+    - return tree if input is required
+    - or run compute_step_many to reach a point where input is required *)
+let eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
     ?write_debug ?after_fast_exec ?(fast_exec = false)
     ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
@@ -139,13 +142,7 @@ let rec eval_until_input_requested ?(reveal_builtins = Some reveal_builtins)
   match info.input_request with
   | No_input_required ->
       let* tree, _ = run ?reveal_builtins ?write_debug ~max_steps tree in
-      eval_until_input_requested
-        ~reveal_builtins
-        ?write_debug
-        ?after_fast_exec
-        ~fast_exec
-        ~max_steps
-        tree
+      return tree
   | Input_required | Reveal_required _ -> return tree
 
 let eval_until_input_or_reveal_requested =

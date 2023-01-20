@@ -37,13 +37,24 @@ open Tezos_scoru_wasm
 open Wasm_utils
 open Encodings_util
 
-let should_boot_unreachable_kernel ~max_steps kernel =
+let should_boot_unreachable_kernel ~batch_size kernel =
   let open Lwt_syntax in
+  (* we call recursively the eval function on given increment *)
+  let rec loop_until_input_required batch_size tree =
+    let* info = Wasm.get_info tree in
+    match info.input_request with
+    | No_input_required ->
+        let* tree =
+          eval_until_input_or_reveal_requested ~max_steps:batch_size tree
+        in
+        loop_until_input_required batch_size tree
+    | _ -> return tree
+  in
   let* tree = initial_tree ~from_binary:true kernel in
   (* Feeding it with one input *)
   let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
-  let* tree = eval_until_input_or_reveal_requested ~max_steps tree in
+  let* tree = loop_until_input_required batch_size tree in
   let* info_after_first_message = Wasm.get_info tree in
   (* The kernel is expected to fail, then ths PVM should
      have failed during the evaluation when evaluating a `Unreachable`
@@ -1642,19 +1653,19 @@ let tests =
       `Quick
       (test_with_kernel
          Kernels.unreachable_kernel
-         (should_boot_unreachable_kernel ~max_steps:1L));
+         (should_boot_unreachable_kernel ~batch_size:1L));
     tztest
       "Test unreachable kernel (10 ticks at a time)"
       `Quick
       (test_with_kernel
          Kernels.unreachable_kernel
-         (should_boot_unreachable_kernel ~max_steps:10L));
+         (should_boot_unreachable_kernel ~batch_size:10L));
     tztest
       "Test unreachable kernel (in one go)"
       `Quick
       (test_with_kernel
          Kernels.unreachable_kernel
-         (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
+         (should_boot_unreachable_kernel ~batch_size:Int64.max_int));
     tztest "Test write_debug kernel" `Quick should_run_debug_kernel;
     tztest "Test store-has kernel" `Quick should_run_store_has_kernel;
     tztest
