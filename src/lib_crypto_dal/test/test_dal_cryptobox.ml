@@ -65,6 +65,7 @@ module Test = struct
         "Slot size is expected to be a power of 2.";
         "Page size is expected to be a power of 2.";
         "Page size is expected to be greater than '32' and strictly less than";
+        "The number of shards must divide";
       ]
     |> List.mem true
 
