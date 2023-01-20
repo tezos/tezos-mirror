@@ -42,6 +42,8 @@ type 'a t = {
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
   rollup_address : Sc_rollup.t;  (** Smart rollup tracked by the rollup node. *)
+  mode : Configuration.mode;
+      (** Mode of the node, see {!Configuration.mode}. *)
   operators : Configuration.operators;
       (** Addresses of the rollup node operators by purposes. *)
   genesis_info : Sc_rollup.Commitment.genesis_info;
@@ -83,6 +85,10 @@ val get_operator :
 (** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
     operator for the node (for any purpose). *)
 val is_operator : _ t -> Signature.Public_key_hash.t -> bool
+
+(** [is_accuser node_ctxt] returns [true] if the rollup node runs in accuser
+    mode.  *)
+val is_accuser : _ t -> bool
 
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were

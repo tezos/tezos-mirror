@@ -62,35 +62,66 @@ module Make (PVM : Pvm.S) = struct
             }
         in
         return_unit
-    | ( Sc_rollup_publish {commitment; _},
-        Sc_rollup_publish_result {published_at_level; _} ) ->
+    | ( Sc_rollup_publish {commitment; rollup},
+        Sc_rollup_publish_result
+          {published_at_level; staked_hash = their_commitment_hash; _} ) ->
         (* Commitment published by someone else *)
-        let commitment_hash =
-          Sc_rollup.Commitment.hash_uncarbonated commitment
-        in
+        (* We first register the publication information *)
         let*! known_commitment =
-          Node_context.commitment_exists node_ctxt commitment_hash
+          Node_context.commitment_exists node_ctxt their_commitment_hash
         in
-        if not known_commitment then return_unit
-        else
-          let*! republication =
-            Node_context.commitment_was_published
-              node_ctxt
-              ~source:Anyone
-              commitment_hash
-          in
-          if republication then return_unit
+        let* () =
+          if not known_commitment then return_unit
           else
-            let*! () =
-              Node_context.set_commitment_published_at_level
+            let*! republication =
+              Node_context.commitment_was_published
                 node_ctxt
-                commitment_hash
-                {
-                  first_published_at_level = published_at_level;
-                  published_at_level = None;
-                }
+                ~source:Anyone
+                their_commitment_hash
             in
-            return_unit
+            if republication then return_unit
+            else
+              let*! () =
+                Node_context.set_commitment_published_at_level
+                  node_ctxt
+                  their_commitment_hash
+                  {
+                    first_published_at_level = published_at_level;
+                    published_at_level = None;
+                  }
+              in
+              return_unit
+        in
+        if Node_context.is_accuser node_ctxt then
+          (* We are seeing a commitment from someone else. We check if we agree
+             with it, otherwise the accuser publishes our commitment in order to
+             play the refutation game. *)
+          let* l2_block =
+            Node_context.get_l2_block_by_level
+              node_ctxt
+              (Raw_level.to_int32 commitment.inbox_level)
+          in
+          let our_commitment_hash = l2_block.header.commitment_hash in
+          match our_commitment_hash with
+          | Some our_commitment_hash
+            when Sc_rollup.Commitment.Hash.(
+                   their_commitment_hash <> our_commitment_hash) ->
+              let*! () =
+                Refutation_game_event.potential_conflict_detected
+                  ~our_commitment_hash
+                  ~their_commitment_hash
+                  ~level:commitment.inbox_level
+                  ~other:source
+              in
+              assert (Sc_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/4628
+                 Make the accuser node only publish directly refutable
+                 commitments. *)
+              Components.Commitment.publish_single_commitment
+                node_ctxt
+                our_commitment_hash
+          | _ -> return_unit
+        else return_unit
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)

@@ -25,7 +25,7 @@
 
 type 'a known = Unknown | Known of 'a
 
-type mode = Batcher | Custom | Maintenance | Observer | Operator
+type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
 
 module Parameters = struct
   type persistent_state = {
@@ -58,6 +58,7 @@ let string_of_mode = function
   | Maintenance -> "maintenance"
   | Operator -> "operator"
   | Custom -> "custom"
+  | Accuser -> "accuser"
 
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with

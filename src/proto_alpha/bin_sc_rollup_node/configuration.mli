@@ -27,6 +27,8 @@
 (** Mode for the rollup node *)
 type mode =
   | Observer  (** Only follows the chain and reconstructs inboxes *)
+  | Accuser
+      (** Only publishes commitments for conflicts and play refutation games *)
   | Batcher  (** Accept transactions in its queue and batches them on the L1 *)
   | Maintenance  (** Follows the chain and publishes commitments *)
   | Operator  (** Equivalent to maintenance + batcher  *)

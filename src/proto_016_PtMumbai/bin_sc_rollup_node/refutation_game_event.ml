@@ -68,6 +68,19 @@ module Simple = struct
       ("other", Sc_rollup.Staker.encoding)
       ("their_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
       ("parent_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
+
+  let potential_conflict_detected =
+    declare_4
+      ~name:"sc_rollup_node_potential_conflict_detected"
+      ~msg:
+        "A potential conflict has been found with our commitment \
+         {our_commitment_hash} at level {level} with staker {other} that hash \
+         issued commitment {their_commitment_hash}."
+      ~level:Notice
+      ("our_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
+      ("level", Raw_level.encoding)
+      ("other", Sc_rollup.Staker.encoding)
+      ("their_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
 end
 
 let timeout address = Simple.(emit timeout address)
@@ -92,3 +105,10 @@ let conflict_detected (conflict : Sc_rollup.Refutation_storage.conflict) =
         other,
         their_commitment_hash,
         parent_commitment_hash ))
+
+let potential_conflict_detected ~our_commitment_hash ~their_commitment_hash
+    ~other ~level =
+  Simple.(
+    emit
+      potential_conflict_detected
+      (our_commitment_hash, level, other, their_commitment_hash))
