@@ -113,6 +113,8 @@ let () =
             if divisor = 0. then (* in that case all values are null *) 0.
             else 100. *. diff /. divisor
           in
-          Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change
+          Printf.printf ",%f,%f,%f,%f\n" final_min final_max diff change ;
+          if change > 20. then
+            Printf.eprintf "%f%% regression for %s.\n" change name
       | _, _ -> Printf.printf ",,,,\n")
     all_param_names
