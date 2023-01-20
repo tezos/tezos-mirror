@@ -12,6 +12,16 @@ The actual script being run by Cron can be displayed with `crontab -l` from `mcl
 0 20 * * tue bash /data/tezos-benchmarks/cronjob.sh
 ```
 
+- Regressions are detected on another machine (163.172.34.197).
+- We use Cron to run the detection every 10 minutes.
+- The Cron detection process is setup for a dedicated user named `redbull`, whose password is not set. Any sudoer can modify this process by switching to `redbull` (for instance with `sudo su redbull`).
+- The regression detection relies on the [`gas_parameter_diff`](https://gitlab.com/tezos/tezos/-/tree/master/devtools/gas_parameter_diff) tool.
+
+The actual script being run by Cron can be displayed with `crontab -l` from `redbull`, and edited with `crontab -e`. Right now, it is:
+```
+*/10 * * * * cd /data/redbull/tezos && eval $(opam env) && /data/redbull/tezos/devtools/benchmarks-tools/watch_regressions.sh
+```
+
 ## Directory structure
 
 On the reference machine, the benchmarks directory should look like this:
