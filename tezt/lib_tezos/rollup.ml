@@ -891,7 +891,7 @@ module Dac = struct
              pagination_scheme)
       in
       let data : RPC_core.data = Data (JSON.unannotate preimage) in
-      make ~data PUT ["plugin"; "dac"; "store_preimage"] @@ fun json ->
+      make ~data PUT ["store_preimage"] @@ fun json ->
       JSON.
         ( json |-> "root_hash" |> as_string,
           json |-> "external_message" |> get_bytes_from_json_string_node )
@@ -903,7 +903,6 @@ module Dac = struct
             match Hex.of_string external_msg with `Hex s -> s );
         ]
       in
-      make ~query_string GET ["plugin"; "dac"; "verify_signature"]
-      @@ JSON.as_bool
+      make ~query_string GET ["verify_signature"] @@ JSON.as_bool
   end
 end
