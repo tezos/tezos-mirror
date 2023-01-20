@@ -27,7 +27,7 @@ type error += No_worker_for_source of Tezos_crypto.Signature.Public_key_hash.t
 
 let () =
   register_error_kind
-    ~id:"rollups.injector.no_worker_for_source"
+    ~id:"injector.no_worker_for_source"
     ~title:"No injecting queue for source"
     ~description:
       "An L1 operation could not be queued because its source has no worker."
@@ -47,7 +47,7 @@ type error += No_worker_for_tag of string
 
 let () =
   register_error_kind
-    ~id:"rollups.injector.no_worker_for_tag"
+    ~id:"injector.no_worker_for_tag"
     ~title:"No injecting queue for tag"
     ~description:
       "An L1 operation could not be queued because its tag has no worker."
@@ -61,7 +61,7 @@ type error += No_worker_for_operation of L1_operation.t
 
 let () =
   register_error_kind
-    ~id:"rollups.injector.no_worker_for_operation"
+    ~id:"injector.no_worker_for_operation"
     ~title:"This operation is not supported by injector"
     ~description:
       "An L1 operation could not be queued because the injector does not \
@@ -77,7 +77,7 @@ type error += Step_failed of string
 
 let () =
   register_error_kind
-    ~id:"rollups.injector.step_failed"
+    ~id:"injector.step_failed"
     ~title:"A step failed in the injector"
     ~description:"A step failed in the injector."
     ~pp:(fun ppf step ->

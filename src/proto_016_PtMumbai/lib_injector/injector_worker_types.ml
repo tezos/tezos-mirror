@@ -100,7 +100,7 @@ module Name = struct
 
   let encoding = Tezos_crypto.Signature.Public_key_hash.encoding
 
-  let base = ["tx_rollup_injector"]
+  let base = ["injector"]
 
   let pp = Tezos_crypto.Signature.Public_key_hash.pp_short
 
