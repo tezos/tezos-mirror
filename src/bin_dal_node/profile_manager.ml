@@ -27,6 +27,12 @@
    Node profiles should be stored into the memory as well
    so that we can cache them *)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4623
+
+   Extend the work done in https://gitlab.com/tezos/tezos/-/merge_requests/7344
+   for profiles as well.
+*)
+
 type error +=
   | Dal_attestor_not_in_committee of {
       attestor : Tezos_crypto.Signature.Public_key_hash.t;
@@ -70,12 +76,14 @@ let get_attestable_slots ctxt store cryptobox proto_parameters pkh
   let open Lwt_result_syntax in
   let* shard_indexes =
     Node_context.fetch_assigned_shard_indices ctxt ~pkh ~level:attested_level
+    |> Errors.other_lwt_result
   in
   let expected_number_of_shards = List.length shard_indexes in
   let* () =
     fail_when
       (expected_number_of_shards = 0)
       (Dal_attestor_not_in_committee {attestor = pkh; level = attested_level})
+    |> Errors.other_lwt_result
   in
   let published_level =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
@@ -92,15 +100,17 @@ let get_attestable_slots ctxt store cryptobox proto_parameters pkh
         ~slot_index
         store
     in
+    let open Errors in
     match r with
-    | Error (Ok `Not_found) -> return false
-    | Error (Error e) -> fail e
+    | Error `Not_found -> return false
+    | Error (#decoding as e) -> fail (e :> [Errors.decoding | Errors.other])
     | Ok commitment ->
         Shard_store.are_shards_available
           ~share_size
           store.shard_store
           commitment
           shard_indexes
+        |> Errors.other_lwt_result
   in
   let all_slot_indexes =
     Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
