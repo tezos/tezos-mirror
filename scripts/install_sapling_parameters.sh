@@ -17,11 +17,21 @@ SPEND_PARAMETERS_FILE=${ZCASH_PARAMS}/sapling-spend.params
 echo "Installing Sapling parameters in ${ZCASH_PARAMS}"
 mkdir -p "${ZCASH_PARAMS}"
 
-if ! echo "${sapling_output_parameters_sha256}  ${OUTPUT_PARAMETERS_FILE}" | shasum -a 256 --check  > /dev/null 2>&1 ; then
+if type sha256sum ; then
+    SHASUM=sha256sum
+elif type shasum ; then
+    SHASUM="shasum -a 256"
+else
+    echo "Utility to compute SHA2-256 digest is not found, tried sha256sum and shasum"
+    exit 1
+fi
+echo "Using ${SHASUM}"
+
+if ! echo "${sapling_output_parameters_sha256}  ${OUTPUT_PARAMETERS_FILE}" | ${SHASUM} --check  > /dev/null 2>&1 ; then
     echo "Downloading ${OUTPUT_PARAMETERS_URL}..."
     rm -f "${OUTPUT_PARAMETERS_FILE}"
     curl -s -o "${OUTPUT_PARAMETERS_FILE}" "${OUTPUT_PARAMETERS_URL}"
-    if ! echo "${sapling_output_parameters_sha256}  ${OUTPUT_PARAMETERS_FILE}" | shasum -a 256 --check  > /dev/null 2>&1 ; then
+    if ! echo "${sapling_output_parameters_sha256}  ${OUTPUT_PARAMETERS_FILE}" | ${SHASUM} --check  > /dev/null 2>&1 ; then
         echo "Unexpected sha256 for ${OUTPUT_PARAMETERS_FILE}."
         exit 1
     fi
@@ -29,11 +39,11 @@ else
     echo "File 'sapling-output.params' is already installed."
 fi
 
-if ! echo "${sapling_spend_parameters_sha256}  ${SPEND_PARAMETERS_FILE}" | shasum -a 256 --check  > /dev/null 2>&1 ; then
+if ! echo "${sapling_spend_parameters_sha256}  ${SPEND_PARAMETERS_FILE}" | ${SHASUM} --check  > /dev/null 2>&1 ; then
     echo "Downloading ${SPEND_PARAMETERS_URL}..."
     rm -f "${SPEND_PARAMETERS_FILE}"
     curl -s -o "${SPEND_PARAMETERS_FILE}" "${SPEND_PARAMETERS_URL}"
-    if ! echo "${sapling_spend_parameters_sha256}  ${SPEND_PARAMETERS_FILE}" | shasum -a 256 --check  > /dev/null 2>&1 ; then
+    if ! echo "${sapling_spend_parameters_sha256}  ${SPEND_PARAMETERS_FILE}" | ${SHASUM} --check  > /dev/null 2>&1 ; then
         echo "Unexpected sha256 for ${SPEND_PARAMETERS_FILE}."
         exit 1
     fi
