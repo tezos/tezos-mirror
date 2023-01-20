@@ -200,13 +200,15 @@ module type Hashes_Map_backend = functor () ->
 module Hashes_Map_backend () = struct
   open Environment.Error_monad
 
+  type t = unit
+
   type error +=
     | Page_already_saved of Sc_rollup_reveal_hash.t
     | Page_is_missing of Sc_rollup_reveal_hash.t
 
   let backend = ref Hashes_map.empty
 
-  let save_page (hash, bytes) =
+  let save_bytes () hash bytes =
     let open Lwt_result_syntax in
     match Hashes_map.find hash !backend with
     | None ->
@@ -216,7 +218,7 @@ module Hashes_Map_backend () = struct
         if Bytes.equal old_bytes bytes then return_unit
         else tzfail @@ Page_already_saved hash
 
-  let load_page hash =
+  let load_bytes () hash =
     let open Lwt_result_syntax in
     let bytes = Hashes_map.find hash !backend in
     match bytes with
@@ -236,34 +238,52 @@ let assert_fails_with ~loc k expected_err =
   Assert.error ~loc res (( = ) (Environment.wrap_tzerror expected_err))
 
 module Merkle_tree = struct
-  module V0 = struct
-    open Dac_pages_encoding.Merkle_tree.V0
+  open Dac_pages_encoding.Merkle_tree
 
+  module Make_V0_for_test
+      (C : Dac_pages_encoding.CONFIG)
+      (S : Dac_pages_encoding.Page_store
+             with type hash := Sc_rollup_reveal_hash.t) =
+    Internal_for_tests.Make
+      (Internal_for_tests.Make_buffered
+         (struct
+           include Sc_rollup_reveal_hash
+
+           let scheme = Sc_rollup_reveal_hash.Blake2B
+         end)
+         (S)
+         (struct
+           let contents_version = 0
+
+           let hashes_version = 0
+         end)
+         (C))
+
+  module V0 = struct
     let test_serialization_fails_with ~loc ~max_page_size ~payload ~error =
-      let module Backend = Hashes_Map_backend () in
-      let serialize_payload =
-        serialize_payload
-          ~max_page_size
-          payload
-          ~for_each_page:Backend.save_page
-      in
+      let open
+        Make_V0_for_test
+          (struct
+            let max_page_size = max_page_size
+          end)
+          (Hashes_Map_backend ()) in
+      let page_store = () in
+      let serialize_payload = serialize_payload ~page_store payload in
       assert_fails_with ~loc serialize_payload error
 
     let test_serialization_roundtrip ?expect_num_of_pages ~loc ~max_page_size
         payload =
-      let open Lwt_result_syntax in
       let module Backend = Hashes_Map_backend () in
-      let* hash =
-        lift
-        @@ serialize_payload
-             ~max_page_size
-             payload
-             ~for_each_page:Backend.save_page
-      in
-      let* retrieved_payload =
-        lift
-        @@ deserialize_payload hash ~retrieve_page_from_hash:Backend.load_page
-      in
+      let open
+        Make_V0_for_test
+          (struct
+            let max_page_size = max_page_size
+          end)
+          (Backend) in
+      let page_store = () in
+      let open Lwt_result_syntax in
+      let* hash = lift @@ serialize_payload ~page_store payload in
+      let* retrieved_payload = lift @@ deserialize_payload hash ~page_store in
       let* () =
         match expect_num_of_pages with
         | Some expected ->
@@ -401,7 +421,6 @@ module Merkle_tree = struct
       (* To ensure that the serialization and deserialization process work as
          expected, we test a roundtrip for a reasonably long text. We also
          increase the page size to allow for more than two hashes in a page. *)
-      let module Backend = Hashes_Map_backend () in
       (* The page size is set to 150. Of these, 5 bytes are used for the page
          preamble, and the reset will contain hashes which are 32 bytes long
          each. The number of hashes that can fit into a page is
@@ -516,13 +535,14 @@ module Hash_chain = struct
       let* root_hash =
         lwt_map_error Environment.wrap_tztrace
         @@ Pagination_scheme.serialize_payload
-             ~for_each_page:Backend.save_page
+             ~for_each_page:(fun (h, content) ->
+               Backend.save_bytes () h content)
              payload
       in
       let* () = Assert.equal_int ~loc:__LOC__ (Backend.number_of_pages ()) 2 in
       let* content =
         lwt_map_error Environment.wrap_tztrace
-        @@ retrieve_content ~get_page:Backend.load_page root_hash
+        @@ retrieve_content ~get_page:(Backend.load_bytes ()) root_hash
       in
       Assert.equal_string ~loc:__LOC__ long_payload content
 
@@ -531,7 +551,7 @@ module Hash_chain = struct
       let payload = Bytes.of_string "" in
       let result =
         Pagination_scheme.serialize_payload
-          ~for_each_page:Backend.save_page
+          ~for_each_page:(fun (h, content) -> Backend.save_bytes () h content)
           payload
       in
       assert_fails_with

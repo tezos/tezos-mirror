@@ -26,7 +26,9 @@
 open Protocol
 open Environment.Error_monad
 
-type error += Cannot_write_dac_page_to_disk of string
+type error +=
+  | Cannot_write_dac_page_to_disk of string
+  | Cannot_read_dac_page_from_disk of string
 
 let () =
   register_error_kind
@@ -44,6 +46,8 @@ let () =
 module type REVEAL_HASH = module type of Sc_rollup_reveal_hash
 
 module Make (Hash : REVEAL_HASH) = struct
+  type t = string
+
   let path data_dir hash =
     let hash = Hash.to_hex hash in
     Filename.(concat data_dir hash)
@@ -58,6 +62,17 @@ module Make (Hash : REVEAL_HASH) = struct
     match result with
     | Ok () -> return ()
     | Error _ -> tzfail @@ Cannot_write_dac_page_to_disk (Hash.to_hex hash)
+
+  let load_bytes data_dir hash =
+    let open Lwt_result_syntax in
+    let path = path data_dir hash in
+    let+ data =
+      Lwt.catch
+        (fun () -> Lwt.map Result.ok (Lwt_utils_unix.read_file path))
+        (fun _exn ->
+          tzfail @@ Cannot_read_dac_page_from_disk (Hash.to_hex hash))
+    in
+    Bytes.of_string data
 end
 
 module Reveal_hash = Make (Sc_rollup_reveal_hash)
