@@ -36,8 +36,8 @@ type forked_process = {pid : int; ch_in : Lwt_io.input_channel}
 
 type status =
   | Not_started
-  | Started of forked_process
-  | Finished of vdf_solution
+  | Started of vdf_setup * forked_process
+  | Finished of vdf_setup * vdf_solution
   | Injected
   | Invalid
 
@@ -48,7 +48,6 @@ type 'a state = {
   mutable stream_stopper : Tezos_rpc.Context.stopper option;
   mutable cycle : Cycle.t option;
   mutable computation_status : status;
-  mutable vdf_setup : vdf_setup option;
 }
 
 let init_block_stream_with_stopper cctxt chain =
@@ -116,27 +115,25 @@ let is_in_nonce_revelation_stage state (level_info : Level.t) =
 
 (* Checks if the VDF setup saved in the state is equal to the one computed
    from a seed *)
-let eq_vdf_setup state seed_discriminant seed_challenge =
+let eq_vdf_setup vdf_setup seed_discriminant seed_challenge =
   let open Environment.Vdf in
-  match state.vdf_setup with
-  | None -> assert false
-  | Some (saved_discriminant, saved_challenge) ->
-      let discriminant, challenge =
-        Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
-      in
-      Bytes.equal
-        (discriminant_to_bytes discriminant)
-        (discriminant_to_bytes saved_discriminant)
-      && Bytes.equal
-           (challenge_to_bytes challenge)
-           (challenge_to_bytes saved_challenge)
+  let saved_discriminant, saved_challenge = vdf_setup in
+  let discriminant, challenge =
+    Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
+  in
+  Bytes.equal
+    (discriminant_to_bytes discriminant)
+    (discriminant_to_bytes saved_discriminant)
+  && Bytes.equal
+       (challenge_to_bytes challenge)
+       (challenge_to_bytes saved_challenge)
 
 (* Forge the VDF revelation operation and inject it if:
  *   - it is correct wrt the VDF setup for the current cycle
  *   - we are still in the VDF revelation stage
  * If successful or if the seed no longer needs to be injected,
  * update the computation status. *)
-let inject_vdf_revelation cctxt state solution chain_id hash
+let inject_vdf_revelation cctxt state setup solution chain_id hash
     (level_info : Level.t) =
   let open Lwt_result_syntax in
   let chain = `Hash chain_id in
@@ -145,7 +142,7 @@ let inject_vdf_revelation cctxt state solution chain_id hash
   let* seed_computation = get_seed_computation cctxt chain_id hash in
   match seed_computation with
   | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
-      if eq_vdf_setup state seed_discriminant seed_challenge then (
+      if eq_vdf_setup setup seed_discriminant seed_challenge then (
         let* op_bytes =
           Plugin.RPC.Forge.vdf_revelation
             cctxt
@@ -186,11 +183,10 @@ let inject_vdf_revelation cctxt state solution chain_id hash
       let*! () = emit_with_level "Not injecting VDF: already injected" level in
       return_unit
 
-
 (* Launch the heavy VDF computation as a separate process. This is done in order
  * to not block the main process, allowing it to continue monitoring blocks and
  * to cancel or restart the VDF computation if needed. *)
-let fork_vdf_computation state discriminant challenge level =
+let fork_vdf_computation state ((discriminant, challenge) as setup) level =
   let open Lwt_syntax in
   let ch_in, forked_out = Lwt_io.pipe () in
   match Lwt_unix.fork () with
@@ -217,7 +213,7 @@ let fork_vdf_computation state discriminant challenge level =
       (* In the main process, change the computation status to [Started],
          record the forked process data, and continue. *)
       let* () = Lwt_io.close forked_out in
-      state.computation_status <- Started {pid; ch_in} ;
+      state.computation_status <- Started (setup, {pid; ch_in}) ;
       let* () =
         emit_with_level
           (Printf.sprintf "Started to compute VDF, pid: %d" pid)
@@ -227,7 +223,7 @@ let fork_vdf_computation state discriminant challenge level =
 
 (* Check whether the VDF computation process has exited and read the result.
  * Update the computation status accordingly. *)
-let get_vdf_solution_if_ready cctxt state proc chain_id hash
+let get_vdf_solution_if_ready cctxt state proc setup chain_id hash
     (level_info : Level.t) =
   let open Lwt_result_syntax in
   let level = level_info.level in
@@ -249,9 +245,16 @@ let get_vdf_solution_if_ready cctxt state proc chain_id hash
       with
       | Ok solution ->
           let*! () = Lwt_io.close proc.ch_in in
-          state.computation_status <- Finished solution ;
+          state.computation_status <- Finished (setup, solution) ;
           let*! () = emit_with_level "Finished VDF computation" level in
-          inject_vdf_revelation cctxt state solution chain_id hash level_info
+          inject_vdf_revelation
+            cctxt
+            state
+            setup
+            solution
+            chain_id
+            hash
+            level_info
       | Error _ ->
           let*! () = Events.(emit vdf_info) "Error decoding VDF solution" in
           state.computation_status <- Not_started ;
@@ -295,7 +298,7 @@ let check_new_cycle state (level_info : Level.t) =
         let* () =
           match state.computation_status with
           | Injected -> return_unit
-          | Started proc ->
+          | Started ((_ : vdf_setup), proc) ->
               let*! () = kill_running_vdf_computation proc in
               emit_revelation_not_injected cycle
           | Not_started | Finished _ | Invalid ->
@@ -359,14 +362,10 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
               (* The chain is in the VDF revelation stage and the computation
                * has not been started, so it is started here, in a separate
                * process. The computation status is updated to [Started]. *)
-              let vdf_setup =
+              let setup =
                 Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
               in
-              state.vdf_setup <- Some vdf_setup ;
-              let discriminant, challenge = vdf_setup in
-              let*! () =
-                fork_vdf_computation state discriminant challenge level
-              in
+              let*! () = fork_vdf_computation state setup level in
               return_unit
           | Computation_finished ->
               let*! () =
@@ -379,7 +378,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
               (* At this point the chain cannot be in the nonce revelation
                * stage. This is checked in [is_in_nonce_revelation_stage]. *)
               assert false)
-      | Started proc -> (
+      | Started (setup, proc) -> (
           let* seed_computation = get_seed_computation cctxt chain_id hash in
           match seed_computation with
           | Vdf_revelation_stage _ ->
@@ -392,6 +391,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
                   cctxt
                   state
                   proc
+                  setup
                   chain_id
                   hash
                   level_info
@@ -413,14 +413,21 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
               (* At this point the chain cannot be in the nonce revelation
                * stage. This is checked in [is_in_nonce_revelation_stage]. *)
               assert false)
-      | Finished solution ->
+      | Finished (setup, solution) ->
           (* VDF solution computed, but not injected. We are only in this case
            * if the first attempt to inject, right after getting the solution,
            * was unsuccessful. While the chain is in the VDF revelation stage,
            * and the solution has not been injected (computation status is
            * [Finished]), we try to inject. If successful, the computation
            * status is updated to [Injected]. *)
-          inject_vdf_revelation cctxt state solution chain_id hash level_info
+          inject_vdf_revelation
+            cctxt
+            state
+            setup
+            solution
+            chain_id
+            hash
+            level_info
       | Injected ->
           let*! () =
             emit_with_level "Skipping, VDF solution already injected" level
@@ -444,7 +451,6 @@ let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
       stream_stopper = Some stream_stopper;
       cycle = None;
       computation_status = Not_started;
-      vdf_setup = None;
     }
   in
   Lwt_canceler.on_cancel canceler (fun () ->
