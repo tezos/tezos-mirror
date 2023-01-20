@@ -324,29 +324,71 @@ module Inner = struct
      hence the + 1 to account for the remainder of the division. *)
   let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
 
-  let ensure_validity ~slot_size ~page_size ~n ~k ~number_of_shards ~shard_size
-      ~srs_g1_length ~srs_g2_length =
+  let ensure_validity ~slot_size ~page_size ~n ~k ~redundancy_factor
+      ~number_of_shards ~shard_size ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
-    if
-      not
-        (is_power_of_two slot_size && is_power_of_two page_size
-       && is_power_of_two n)
+    if not (is_power_of_two slot_size) then
+      (* According to the specification the length of a slot are in MiB *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Slot size is expected to be a power of 2. Given: %d"
+             slot_size))
+    else if not (is_power_of_two page_size) then
+      (* According to the specification the lengths of a page are in MiB *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Page size is expected to be a power of 2. Given: %d"
+             page_size))
+    else if not (is_power_of_two redundancy_factor && redundancy_factor >= 2)
     then
-      (* According to the specification the lengths of a slot page are
-         in MiB *)
-      fail (`Fail "Wrong slot size: expected MiB")
-    else if not (page_size >= 32 && page_size < slot_size) then
+      (* The redundancy factor should be a power of 2 so that n is a power of 2
+          for proper FFT sizing. The variable [k] is assumed to be a power of 2
+          as the output of [slot_as_polynomial_length]. *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Redundancy factor is expected to be a power of 2 and greater \
+              than 2. Given: %d"
+             redundancy_factor))
+    else if
+      (* At this point [n] is a power of 2, and [n > k]. *)
+      not (page_size >= 32 && page_size < slot_size)
+    then
       (* The size of a page must be greater than 31 bytes (32 > 31 is the next
          power of two), the size in bytes of a scalar element, and strictly less
-         than [t.slot_size]. *)
-      fail (`Fail "Wrong page size")
-    else if not (Z.(log2 (of_int n)) <= 32 && is_power_of_two k && n > k) then
-      (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
-         multiplicative group of Fr, because the FFTs operate on such groups. *)
-      fail (`Fail "Wrong computed size for n")
-    else if number_of_shards >= n then fail (`Fail "Too many shards")
-    else if 2 * shard_size >= k then fail (`Fail "Too few shards")
-    else if k <= 1 then fail (`Fail "Slot size too small")
+         than the slot size. *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Page size is expected to be greater than '32' and strictly less \
+              than the slot_size '%d'. Got: %d"
+             slot_size
+             page_size))
+    else if not (Z.(log2 (of_int n)) <= 32) then
+      (* n must be at most 2^32, the cardinal of the biggest subgroup of 2^i
+         roots of unity in the multiplicative group of Fr, because the FFTs
+         operate on such groups. *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Slot size is expected to be less than '%d'. Got: %d"
+             (1 lsl 36)
+             slot_size))
+    else if number_of_shards >= n then
+      fail
+        (`Fail
+          (Format.asprintf
+             "For the given parameters, the maximum number of shards is %d. \
+              Got: %d."
+             (number_of_shards / 2)
+             number_of_shards))
+    else if 2 * shard_size >= k then
+      fail
+        (`Fail
+          "For the given parameters, the minimum number of shards is %d. Got \
+           %d.")
     else if k > srs_g1_length then
       (* the committed polynomials have degree t.k - 1 at most,
          so t.k coefficients. *)
@@ -415,6 +457,7 @@ module Inner = struct
         ~page_size
         ~n
         ~k
+        ~redundancy_factor
         ~number_of_shards
         ~shard_size
         ~srs_g1_length:(Srs_g1.size raw.srs_g1)

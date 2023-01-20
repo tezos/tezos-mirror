@@ -56,13 +56,17 @@ module Test = struct
           (slot_size, page_size, redundancy_factor, number_of_shards))
         (tup4 int int int int))
 
-  let acceptable_errors =
-    [
-      "Too few shards";
-      "Too many shards";
-      "Slot size too small";
-      "Wrong page size";
-    ]
+  let is_in_acceptable_errors error_string =
+    List.map
+      (fun s -> Re.Str.(string_match (regexp s) error_string 0))
+      [
+        "For the given parameters, the minimum number of shards is";
+        "For the given parameters, the maximum number of shards is";
+        "Slot size is expected to be a power of 2.";
+        "Page size is expected to be a power of 2.";
+        "Page size is expected to be greater than '32' and strictly less than";
+      ]
+    |> List.mem true
 
   (* Tests that with a fraction 1/redundancy_factor of the shards
      the decoding succeeds. *)
@@ -99,7 +103,7 @@ module Test = struct
          return decoded_msg)
         |> function
         | Ok decoded_msg -> Bytes.equal msg decoded_msg
-        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
         | Error
             ( `Fail _ | `Invert_zero _ | `Not_enough_shards _
             | `Slot_wrong_size _ ) ->
@@ -161,7 +165,7 @@ module Test = struct
          Cryptobox.verify_page t cm ~page_index page pi)
         |> function
         | Ok check -> check
-        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
         | Error
             ( `Fail _ | `Slot_wrong_size _ | `Page_length_mismatch
             | `Segment_index_out_of_range ) ->
@@ -196,7 +200,7 @@ module Test = struct
                (Cryptobox.verify_shard t cm shard shard_proofs.(shard_index)))
         |> function
         | Ok check -> check
-        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
         | Error (`Fail _ | `Slot_wrong_size _) -> false)
 
   (* Tests that the slot behind the commitment has its size bounded
@@ -220,7 +224,7 @@ module Test = struct
             let pi = Cryptobox.prove_commitment t p in
             let check = Cryptobox.verify_commitment t cm pi in
             check
-        | Error (`Fail s) when List.mem s acceptable_errors -> true
+        | Error (`Fail s) when is_in_acceptable_errors s -> true
         | _ -> false)
 
   (* We can craft two slots whose commitments are equal for two different
@@ -302,7 +306,7 @@ let () =
   Alcotest.run
     "DAL cryptobox"
     [
-      ("DAL cryptobox", test);
+      ("Unit tests", test);
       ( "PBT",
         Tezos_test_helpers.Qcheck2_helpers.qcheck_wrap
           [
