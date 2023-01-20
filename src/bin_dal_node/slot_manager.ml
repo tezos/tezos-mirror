@@ -55,7 +55,7 @@ let polynomial_from_slot cryptobox slot =
       let open Cryptobox in
       let provided = Bytes.length slot in
       let {slot_size = expected; _} = parameters cryptobox in
-      tzfail @@ Invalid_slot_size {provided; expected}
+      Error (Errors.other [Invalid_slot_size {provided; expected}])
 
 let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in
@@ -90,7 +90,7 @@ let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
 
 let get_commitment_slot node_store cryptobox commitment =
   let open Lwt_result_syntax in
-  let*! slot_opt =
+  let* slot_opt =
     Store.Legacy.find_slot_by_commitment node_store cryptobox commitment
   in
   match slot_opt with

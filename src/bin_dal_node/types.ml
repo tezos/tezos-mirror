@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Event_legacy
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4621
 
-(** Storing a slot content event. The given parameter is the slot's commitment
-    hash. *)
-val stored_slot_content : Cryptobox.Commitment.t t
+   Move types from Services.Types to this module.
+*)
 
-(** Storing a slot's shards event. The given parameters are the slot's
-    commitment hash and the number of its shards. *)
-val stored_slot_shards : (string * int) t
+(** Data kind stored in DAL. *)
+type kind = Commitment | Header_status | Slot_id | Slot
 
-(** Decoding a value failed. See {!Types.kind} for kind of considered
-    values. *)
-val decoding_data_failed : Types.kind t
+let kind_encoding : kind Data_encoding.t =
+  Data_encoding.string_enum
+    [
+      ("commitment", Commitment);
+      ("header_status", Header_status);
+      ("slot_id", Slot_id);
+      ("slot", Slot);
+    ]
+
+let kind_to_string data_kind =
+  Data_encoding.Binary.to_string_exn kind_encoding data_kind

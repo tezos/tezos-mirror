@@ -39,6 +39,10 @@ module type COMMITMENT = sig
         representation. *)
   val of_b58check_opt : string -> t option
 
+  (** [of_b58check bytes] computes a commitment from its b58
+      representation. Returns [Error _] if it is not a valid representation. *)
+  val of_b58check : string -> t Error_monad.tzresult
+
   val pp : Format.formatter -> t -> unit
 
   val equal : t -> t -> bool

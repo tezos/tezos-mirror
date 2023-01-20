@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,16 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Event_legacy
+(** Data kind stored in DAL. *)
+type kind = Commitment | Header_status | Slot_id | Slot
 
-(** Storing a slot content event. The given parameter is the slot's commitment
-    hash. *)
-val stored_slot_content : Cryptobox.Commitment.t t
+(** Encoding for values of type {!kind}. *)
+val kind_encoding : kind Data_encoding.t
 
-(** Storing a slot's shards event. The given parameters are the slot's
-    commitment hash and the number of its shards. *)
-val stored_slot_shards : (string * int) t
-
-(** Decoding a value failed. See {!Types.kind} for kind of considered
-    values. *)
-val decoding_data_failed : Types.kind t
+(** Convert the given value of type {!kind} to a raw string. *)
+val kind_to_string : kind -> string

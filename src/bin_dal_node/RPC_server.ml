@@ -28,6 +28,11 @@ open Tezos_rpc_http
 open Tezos_rpc_http_server
 
 module Slots_handlers = struct
+  let to_option_tzresult r =
+    Errors.to_option_tzresult
+      ~none:(function `Not_found -> true | _ -> false)
+      r
+
   let call_handler handler ctxt =
     let open Lwt_result_syntax in
     let*? {cryptobox; _} = Node_context.get_ready ctxt in
@@ -35,28 +40,27 @@ module Slots_handlers = struct
     handler store cryptobox
 
   let post_commitment ctxt () slot =
-    call_handler (fun store -> Slot_manager.add_commitment store slot) ctxt
+    call_handler
+      (fun store cryptobox ->
+        Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult)
+      ctxt
 
   let patch_commitment ctxt commitment () slot_id =
     call_handler
       (fun store cryptobox ->
-        let open Lwt_result_syntax in
-        let*! r =
-          Slot_manager.associate_slot_id_with_commitment
-            store
-            cryptobox
-            commitment
-            slot_id
-        in
-        match r with Ok () -> return_some () | Error `Not_found -> return_none)
+        Slot_manager.associate_slot_id_with_commitment
+          store
+          cryptobox
+          commitment
+          slot_id
+        |> to_option_tzresult)
       ctxt
 
   let get_commitment_slot ctxt commitment () () =
     call_handler
       (fun store cryptobox ->
-        let open Lwt_result_syntax in
-        let*! r = Slot_manager.get_commitment_slot store cryptobox commitment in
-        match r with Ok s -> return_some s | Error `Not_found -> return_none)
+        Slot_manager.get_commitment_slot store cryptobox commitment
+        |> to_option_tzresult)
       ctxt
 
   let get_commitment_proof ctxt commitment () () =
@@ -65,12 +69,13 @@ module Slots_handlers = struct
         let open Lwt_result_syntax in
         (* This handler may be costly: We need to recompute the
            polynomial and then compute the proof. *)
-        let*! slot =
+        let* slot =
           Slot_manager.get_commitment_slot store cryptobox commitment
+          |> to_option_tzresult
         in
         match slot with
-        | Error `Not_found -> return_none
-        | Ok slot -> (
+        | None -> return_none
+        | Some slot -> (
             match Cryptobox.polynomial_from_slot cryptobox slot with
             | Error _ ->
                 (* Storage consistency ensures we can always compute the
@@ -83,17 +88,11 @@ module Slots_handlers = struct
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
     call_handler
       (fun store _cryptobox ->
-        let open Lwt_result_syntax in
-        let*! r =
-          Slot_manager.get_commitment_by_published_level_and_index
-            ~level
-            ~slot_index
-            store
-        in
-        match r with
-        | Ok s -> return_some s
-        | Error (Ok `Not_found) -> return_none
-        | Error (Error e) -> fail e)
+        Slot_manager.get_commitment_by_published_level_and_index
+          ~level
+          ~slot_index
+          store
+        |> to_option_tzresult)
       ctxt
 
   let get_commitment_headers ctxt commitment (slot_level, slot_index) () =
@@ -103,7 +102,8 @@ module Slots_handlers = struct
           commitment
           ?slot_level
           ?slot_index
-          store)
+          store
+        |> Errors.to_tzresult)
       ctxt
 
   let get_published_level_headers ctxt published_level header_status () =
@@ -112,7 +112,8 @@ module Slots_handlers = struct
         Slot_manager.get_published_level_headers
           ~published_level
           ?header_status
-          store)
+          store
+        |> Errors.to_tzresult)
       ctxt
 end
 
@@ -139,6 +140,7 @@ module Profile_handlers = struct
       proto_parameters
       pkh
       ~attested_level
+    |> Errors.to_tzresult
 end
 
 let add_service registerer service handler directory =
