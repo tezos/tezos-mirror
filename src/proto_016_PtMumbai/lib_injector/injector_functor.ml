@@ -38,9 +38,6 @@ let confirmations = 2
 
 type injection_strategy = [`Each_block | `Delay_block of float]
 
-(* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2755
-   Persist injector data on disk *)
-
 (** Builds a client context from another client context but uses logging instead
     of printing on stdout directly. This client context cannot make the injector
     exit. *)
@@ -477,7 +474,8 @@ module Make (Rollup : PARAMETERS) = struct
         ~src_pk:state.signer.pk
         ~src_sk:state.signer.sk
         ~successor_level:true
-          (* Needed to simulate tx_rollup operations in the next block *)
+          (* Operations are simulated in the next block, which is important for rollups
+             and ok for other applications. *)
         ~fee:Limit.unknown
         ~gas_limit:Limit.unknown
         ~storage_limit:Limit.unknown
@@ -831,7 +829,7 @@ module Make (Rollup : PARAMETERS) = struct
         state
         (List.map (fun o -> o.op.hash) revert_infos)
     in
-    (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2814
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2814
        maybe put at the front of the queue for re-injection. *)
     List.iter_es
       (fun {op; _} ->
@@ -1003,7 +1001,7 @@ module Make (Rollup : PARAMETERS) = struct
       Lwt.return_unit
   end
 
-  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2754
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Protocol_client_context.full) ~data_dir
       ?(retention_period = 0) rollup_node_state ~signers =

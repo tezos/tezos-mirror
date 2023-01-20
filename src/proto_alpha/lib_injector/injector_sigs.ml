@@ -89,7 +89,7 @@ type included_info = {
 type status =
   | Pending of L1_operation.t  (** The operation is pending injection. *)
   | Injected of injected_info
-      (** The operation has been injected successfully in the. node *)
+      (** The operation has been injected successfully in the node. *)
   | Included of included_info
       (** The operation has been included in a L1 block. *)
 
@@ -152,23 +152,12 @@ module type PARAMETERS = sig
     unsuccessful_status ->
     retry_action Lwt.t
 
-  (** [ignore_failing_operation op] specifies if the injector should
-      ignore this operation when its simulation fails when trying to inject.
-      Returns:
-      - [`Ignore_keep] if the operation should be ignored but kept in the
-        pending queue,
-      - [`Ignore_drop] if the operation should be ignored and dropped from the
-        pending queue,
-      - [`Don't_ignore] if the failing operation should not be ignored and the
-        failure reported.
-  *)
-
   (** The tag of a manager operation. This is used to send operations to the
       correct queue automatically (when signer is not provided) and to recover
       persistent information. *)
   val operation_tag : 'a manager_operation -> Tag.t option
 
-  (** Returns the {e appoximate upper-bounds} for the fee and limits of an
+  (** Returns the {e approximate upper-bounds} for the fee and limits of an
       operation, used to compute an upper bound on the size (in bytes) for this
       operation. *)
   val approximate_fee_bound :

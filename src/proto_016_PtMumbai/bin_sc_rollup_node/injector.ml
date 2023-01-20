@@ -81,11 +81,9 @@ module Parameters :
   (* Below are dummy values that are only used to approximate the
      size. It is thus important that they remain above the real
      values if we want the computed size to be an over_approximation
-     (without having to do a simulation first). *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3461
-     Fee parameter per operation.
+     (without having to do a simulation first).
 
-     See TORU issue: https://gitlab.com/tezos/tezos/-/issues/2812
+     TODO: https://gitlab.com/tezos/tezos/-/issues/2812
      check the size, or compute them wrt operation kind *)
   let approximate_fee_bound _ _ =
     {
