@@ -102,26 +102,34 @@ let display_answer (cctxt : #Configuration.sc_client_context) :
       cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
   | _ -> cctxt#error "Unexpected server answer\n%!"
 
+let find_string json key =
+  match Ezjsonm.find_opt json [key] with
+  | Some v -> Ezjsonm.get_string v
+  | None ->
+      invalid_arg ("Key %s was not found in: " ^ Ezjsonm.value_to_string json)
+
 let parse_transactions transactions =
   let json = Ezjsonm.from_string transactions in
   let open Ezjsonm in
   let open Sc_rollup.Outbox.Message in
   let open Lwt_result_syntax in
+  Error.trace_lwt_result_with
+    "Failed to parse JSON transactions: %s"
+    transactions
+  @@
   let transaction json =
     let destination =
-      find json ["destination"] |> get_string
-      |> Protocol.Contract_hash.of_b58check_exn
+      find_string json "destination" |> Protocol.Contract_hash.of_b58check_exn
     in
     let entrypoint =
-      try
-        find json ["entrypoint"] |> get_string
-        |> Entrypoint.of_string_strict_exn
-      with Not_found -> Entrypoint.default
+      match find_opt json ["entrypoint"] with
+      | None -> Entrypoint.default
+      | Some entrypoint ->
+          entrypoint |> get_string |> Entrypoint.of_string_strict_exn
     in
     let*? parameters =
       Tezos_micheline.Micheline_parser.no_parsing_error
-      @@ (find json ["parameters"] |> get_string
-        |> Michelson_v1_parser.parse_expression)
+      @@ (find_string json "parameters" |> Michelson_v1_parser.parse_expression)
     in
     let unparsed_parameters = parameters.expanded in
     return @@ {destination; entrypoint; unparsed_parameters}
