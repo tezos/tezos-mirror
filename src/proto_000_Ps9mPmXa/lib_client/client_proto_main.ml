@@ -49,25 +49,52 @@ let bake cctxt ?timestamp block command sk =
   Client_keys_v0.append cctxt sk ~watermark:(Block_header chain_id) blk
   >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
 
-let int64_parameter =
+let int32_parameter =
   Tezos_clic.parameter (fun _ p ->
-      try return (Int64.of_string p) with _ -> failwith "Cannot read int64")
+      match Int32.of_string p with
+      | i32 ->
+          if Compare.Int32.(i32 < 0l) then
+            failwith "Cannot provide a negative int32"
+          else return i32
+      | exception _ -> failwith "Cannot read int32")
 
 let file_parameter =
   Tezos_clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
       else return p)
 
-let fitness_from_int64 fitness =
-  (* definition taken from src/proto_003_PsddFKi3/lib_protocol/src/constants_repr.ml *)
-  let version_number = "\000" in
-  (* definitions taken from src/proto_003_PsddFKi3/lib_protocol/src/fitness_repr.ml *)
-  let int64_to_bytes i =
-    let b = Bytes.create 8 in
-    TzEndian.set_int64 b 0 i ;
+let fitness_from_uint32 fitness =
+  (* definition taken from src/proto_alpha/lib_protocol/src/constants_repr.ml *)
+  let version_number = "\002" in
+  let int32_to_bytes i =
+    let b = Bytes.create 4 in
+    TzEndian.set_int32 b 0 i ;
     b
   in
-  [Bytes.of_string version_number; int64_to_bytes fitness]
+  (* Tenderbake-compatible fitness format.
+
+     We encode the fitness using tenderbake's fitness format.
+     In order to do that, we need to select a tenderbake's fitness
+     field that won't break tenderbake invariants. When a tenderbake
+     protocol parses the fitness: [level], [locked_round], [round] and
+     [predecessor_round]. [level] cannot be used as tenderbake
+     protocols might not be able to produce higher fitness; if
+     present, [locked_round] must be lower or equal than [round],
+     [predecessor_round] starts at 0xffffffff which cannot be simply
+     incremented; [round] thus may be used but will impact block
+     delays. *)
+  (* We use (fitness - 1) as the most common way to call this command
+     is by providing a fitness of 1 and we don't want block
+     delays. Therefore, we want an argument of 1 to result in a round
+     0. *)
+  let fitness_to_round = Int32.(max 0l (pred fitness)) in
+  [
+    Bytes.of_string version_number (* version *);
+    int32_to_bytes 0l (* level *);
+    Bytes.empty (* locked-round *);
+    int32_to_bytes (-1l) (* predecessor round *);
+    int32_to_bytes fitness_to_round (* round *);
+  ]
 
 let timestamp_arg =
   Tezos_clic.arg
@@ -112,7 +139,7 @@ let commands () =
       @@ param
            ~name:"fitness"
            ~desc:"Hardcoded fitness of the first block (integer)"
-           int64_parameter
+           int32_parameter
       @@ prefixes ["and"; "key"]
       @@ Client_keys_v0.Secret_key.source_param
            ~name:"password"
@@ -129,7 +156,7 @@ let commands () =
            sk
            param_json_file
            (cctxt : Client_context.full) ->
-        let fitness = fitness_from_int64 fitness in
+        let fitness = fitness_from_uint32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =
