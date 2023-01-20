@@ -145,23 +145,78 @@ module Action (Key : GENERATABLE) (Value : GENERATABLE) = struct
     | Write (k, v) -> Format.fprintf fmt "+ %a -> %a" Key.pp k Value.pp v
     | Read k -> Format.fprintf fmt "%a ?" Key.pp k
     | Delete k -> Format.fprintf fmt "- %a" Key.pp k
+
+  let key (Write (k, _) | Read k | Delete k) = k
+
+  let parallelizable_with action parallel_actions =
+    match action with
+    | Read k ->
+        (* Can be in parallel with other reads, and writes on other keys than k *)
+        List.for_all
+          (function Read _ -> true | Write (k', _) | Delete k' -> k <> k')
+          parallel_actions
+    | Write (k, _) | Delete k ->
+        (* Can be in parallel with actions on other keys *)
+        List.for_all (fun a -> key a <> k) parallel_actions
 end
 
-(** A scenario is a list of actions. *)
+(** A scenario is a parallelizable list of sequence of actions. Sequential tests
+    have only a single list. *)
 module Scenario (Key : GENERATABLE) (Value : GENERATABLE) = struct
   module Action = Action (Key) (Value)
 
-  let gen ?no_delete keys =
+  module KeyMap = Map.Make (struct
+    type t = Key.t
+
+    let compare = Stdlib.compare
+  end)
+
+  let gen_sequence ?no_delete keys =
     let open QCheck2.Gen in
     let key_gen = oneofl keys in
     let size = frequency [(95, small_nat); (5, nat)] in
     list_size size (Action.gen ?no_delete key_gen)
 
+  let gen_sequential ?no_delete keys =
+    let open QCheck2.Gen in
+    let+ sequence = gen_sequence ?no_delete keys in
+    List.map (fun a -> [a]) sequence
+
+  let parallelize sequence =
+    let l =
+      List.fold_left
+        (fun acc action ->
+          match acc with
+          | parallel_actions :: previous
+            when Action.parallelizable_with action parallel_actions ->
+              (action :: parallel_actions) :: previous
+          | previous -> [action] :: previous)
+        []
+        sequence
+    in
+    List.rev_map List.rev l
+
+  let gen_parallel ?no_delete keys =
+    let open QCheck2.Gen in
+    let+ sequence = gen_sequence ?no_delete keys in
+    parallelize sequence
+
+  let gen ?no_delete keys kind =
+    match kind with
+    | `Sequential -> gen_sequential ?no_delete keys
+    | `Parallel -> gen_parallel ?no_delete keys
+
+  let pp_parallel fmt =
+    Format.fprintf fmt "[@[<hov 2> %a@ @]]"
+    @@ Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt " ||@ ")
+         Action.pp
+
   let pp fmt =
     Format.fprintf fmt "[@[<hov 2> %a@ @]]"
     @@ Format.pp_print_list
          ~pp_sep:(fun fmt () -> Format.fprintf fmt " ;@ ")
-         Action.pp
+         pp_parallel
 
   let print = Format.asprintf "%a" pp
 end
@@ -253,6 +308,15 @@ struct
   let check_store_agree_witness store witness keys =
     KeySet.iter_es (check_store_agree_witness store witness) keys
 
+  (** Always close loaded stores to avoid leak when some tests fail. *)
+  let with_store path f =
+    let open Lwt_result_syntax in
+    let* store = Store.load ~path in
+    Lwt.finalize (fun () -> f store) @@ fun () ->
+    let open Lwt_syntax in
+    let* _ = Store.close store in
+    return_unit
+
   let run scenario =
     let open Lwt_result_syntax in
     incr uid ;
@@ -265,7 +329,7 @@ struct
     (* Use use a hash table as a witness for the result of our scenario. Each
        action is performed both on the witness (in memory) and the real
        store. *)
-    (* Actions on the real witness. *)
+    (* Actions on the hash table witness. *)
     let witness = Stdlib.Hashtbl.create 9 in
     let last_witness_read = ref None in
     let run_witness_action = function
@@ -276,38 +340,46 @@ struct
       | Delete k -> Stdlib.Hashtbl.remove witness k
     in
     (* Actions on the real store. *)
-    let* store = Store.load ~path in
-    let last_store_read = ref None in
-    let run_store_action executed = function
-      | Scenario.Action.Write (k, v) -> Store.write store k v
-      | Read k ->
-          let* res = Store.read store k in
-          last_store_read := res ;
-          check_read_value_last_write k res executed
-      | Delete k -> Store.delete store k
+    let* keys =
+      with_store path @@ fun store ->
+      let last_store_read = ref None in
+      let run_store_action executed = function
+        | Scenario.Action.Write (k, v) -> Store.write store k v
+        | Read k ->
+            let* res = Store.read store k in
+            last_store_read := res ;
+            check_read_value_last_write k res executed
+        | Delete k -> Store.delete store k
+      in
+      (* Inner loop to run actions. It returns the keys of the scenario and the
+         executed actions. *)
+      let rec run_actions keys executed = function
+        | [] -> return (keys, executed)
+        | parallel_actions :: rest ->
+            List.iter run_witness_action parallel_actions ;
+            let* () =
+              List.iter_ep (run_store_action executed) parallel_actions
+            in
+            let keys =
+              KeySet.add_seq
+                (List.to_seq parallel_actions |> Seq.map Scenario.Action.key)
+                keys
+            in
+            run_actions keys (parallel_actions @ executed) rest
+      in
+      let* keys, executed = run_actions KeySet.empty [] scenario in
+      (* Check that the read value is the last write for all keys at the end. *)
+      let* () = KeySet.iter_es (check_read_last_write store executed) keys in
+      (* Check that the store and witness agree at the end. *)
+      let* () = check_store_agree_witness store witness keys in
+      return keys
     in
-    (* Inner loop to run actions. It returns the keys of the scenario and the
-       executed actions. *)
-    let rec run_actions keys executed = function
-      | [] -> return (keys, executed)
-      | a :: rest ->
-          run_witness_action a ;
-          let* () = run_store_action executed a in
-          let (Write (k, _) | Read k | Delete k) = a in
-          let keys = KeySet.add k keys in
-          run_actions keys (a :: executed) rest
-    in
-    let* keys, executed = run_actions KeySet.empty [] scenario in
-    (* Check that the read value is the last write for all keys at the end. *)
-    let* () = KeySet.iter_es (check_read_last_write store executed) keys in
-    (* Check that the store and witness agree at the end. *)
-    let* () = check_store_agree_witness store witness keys in
-    let* () = Store.close store in
-    (* To clear the caches (of the stores, etc.), we close and reopen it. We
+    (* Reload the store to clear the caches (of the stores, etc.). We
        then check that the version on disk still agrees with the witness. *)
-    let* store = Store.load ~path in
-    let* () = check_store_agree_witness store witness keys in
-    let* () = Store.close store in
+    let* () =
+      with_store path @@ fun store ->
+      check_store_agree_witness store witness keys
+    in
     return keys
 
   let check_run scenario =
@@ -322,7 +394,30 @@ struct
         QCheck2.Test.fail_reportf "%a@." Error_monad.pp_print_trace err
 end
 
-let test_singleton =
+let tests = ref []
+
+(** Small imperative helper to create test and register it, so we don't forget
+    one. *)
+let register_test ?if_assumptions_fail ?count ?long_factor ?max_gen ?max_fail
+    ?retries ?name ?print ?collect ?stats get prop =
+  let t =
+    QCheck2.Test.make
+      ?if_assumptions_fail
+      ?count
+      ?long_factor
+      ?max_gen
+      ?max_fail
+      ?retries
+      ?name
+      ?print
+      ?collect
+      ?stats
+      get
+      prop
+  in
+  tests := t :: !tests
+
+let () =
   let module Singleton_for_test = struct
     module S = Make_singleton (Value)
 
@@ -339,17 +434,16 @@ let test_singleton =
     let close _ = Lwt_result_syntax.return_unit
   end in
   let module R = Runner (NoKey) (Value) (Singleton_for_test) in
-  let open QCheck2 in
   let test_gen = R.Scenario.gen [()] in
-  Test.make
+  register_test
     ~print:R.Scenario.print
-    ~name:"singleton store"
+    ~name:"singleton store (sequential)"
     ~count:2_000
     ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
-    test_gen
+    (test_gen `Sequential)
     R.check_run
 
-let test_indexable =
+let () =
   let module Indexable_for_test = struct
     module S =
       Make_indexable
@@ -372,22 +466,28 @@ let test_indexable =
     let close = S.close
   end in
   let module R = Runner (SKey) (FixedValue) (Indexable_for_test) in
-  let open QCheck2 in
-  let test_gen =
-    let open Gen in
+  let test_gen kind =
+    let open QCheck2.Gen in
     let* n = int_range 2 10 in
     let* keys = SKey.gen_distinct n in
-    R.Scenario.gen ~no_delete:true keys
+    R.Scenario.gen ~no_delete:true keys kind
   in
-  Test.make
+  register_test
     ~print:R.Scenario.print
-    ~name:"indexable store"
+    ~name:"indexable store (sequential)"
     ~count:2_000
     ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
-    test_gen
+    (test_gen `Sequential)
+    R.check_run ;
+  register_test
+    ~print:R.Scenario.print
+    ~name:"indexable store (parallel)"
+    ~count:2_000
+    ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
+    (test_gen `Parallel)
     R.check_run
 
-let test_indexable_removable =
+let () =
   let module Indexable_for_test = struct
     module S =
       Make_indexable_removable
@@ -410,22 +510,28 @@ let test_indexable_removable =
     let close = S.close
   end in
   let module R = Runner (SKey) (FixedValue) (Indexable_for_test) in
-  let open QCheck2 in
-  let test_gen =
-    let open Gen in
+  let test_gen kind =
+    let open QCheck2.Gen in
     let* n = int_range 2 10 in
     let* keys = SKey.gen_distinct n in
-    R.Scenario.gen keys
+    R.Scenario.gen keys kind
   in
-  Test.make
+  register_test
     ~print:R.Scenario.print
-    ~name:"indexable removable store"
+    ~name:"indexable removable store (sequential)"
     ~count:2_000
     ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
-    test_gen
+    (test_gen `Sequential)
+    R.check_run ;
+  register_test
+    ~print:R.Scenario.print
+    ~name:"indexable removable store (parallel)"
+    ~count:2_000
+    ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
+    (test_gen `Parallel)
     R.check_run
 
-let test_indexed_file =
+let () =
   let module Indexed_file_for_test = struct
     module S =
       Make_simple_indexed_file
@@ -472,23 +578,25 @@ let test_indexed_file =
     let close = S.close
   end in
   let module R = Runner (SKey) (Value) (Indexed_file_for_test) in
-  let open QCheck2 in
-  let test_gen =
-    let open Gen in
+  let test_gen kind =
+    let open QCheck2.Gen in
     let* n = int_range 2 10 in
     let* keys = SKey.gen_distinct n in
-    R.Scenario.gen ~no_delete:true keys
+    R.Scenario.gen ~no_delete:true keys kind
   in
-  Test.make
+  register_test
     ~print:R.Scenario.print
-    ~name:"indexed file store"
+    ~name:"indexed file store (sequential)"
     ~count:2_000
     ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
-    test_gen
+    (test_gen `Sequential)
+    R.check_run ;
+  register_test
+    ~print:R.Scenario.print
+    ~name:"indexed file store (parallel)"
+    ~count:2_000
+    ~max_fail:1_000 (*to stop shrinking after [max_fail] failures. *)
+    (test_gen `Parallel)
     R.check_run
 
-let () =
-  QCheck_base_runner.run_tests_main
-    [
-      test_singleton; test_indexable; test_indexable_removable; test_indexed_file;
-    ]
+let () = QCheck_base_runner.run_tests_main (List.rev !tests)
