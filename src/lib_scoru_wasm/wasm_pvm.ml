@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -109,6 +109,9 @@ let tick_state_encoding =
 let durable_buffers_encoding =
   Tezos_tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
 
+let durable_storage_encoding =
+  Tezos_tree_encoding.(scope ["durable"] Durable.encoding)
+
 let default_buffers validity_period message_limit () =
   Tezos_webassembly_interpreter.Eval.
     {
@@ -194,7 +197,7 @@ let pvm_state_encoding =
        (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
        (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
        (value_option ["wasm"; "reboot_counter"] Data_encoding.n)
-       (scope ["durable"] Durable.encoding)
+       durable_storage_encoding
        (option durable_buffers_encoding)
        (scope ["wasm"] tick_state_encoding)
        (value ~default:Z.zero ["pvm"; "last_top_level_call"] Data_encoding.n)

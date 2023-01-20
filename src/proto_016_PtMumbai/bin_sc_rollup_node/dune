@@ -29,6 +29,7 @@
   tezos-smart-rollup-016-PtMumbai
   tezos-layer2-utils-016-PtMumbai
   tezos_layer2_store
+  tezos-tree-encoding
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -36,6 +37,7 @@
   aches
   aches-lwt
   tezos-injector-016-PtMumbai
+  tezos-scoru-wasm
   tezos-scoru-wasm-fast
   tezos-crypto-dal
   prometheus-app

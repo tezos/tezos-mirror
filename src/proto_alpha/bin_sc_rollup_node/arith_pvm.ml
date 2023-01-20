@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -51,6 +51,10 @@ module Impl : Pvm.S = struct
   let kind = Sc_rollup.Kind.Example_arith
 
   module State = Context.PVMState
+
+  module RPC = struct
+    let build_directory _node_ctxt = Tezos_rpc.Directory.empty
+  end
 
   let new_dissection = Game_helpers.default_new_dissection
 

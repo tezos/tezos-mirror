@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -500,6 +501,44 @@ module Global = struct
         ~query:state_value_query
         ~output:Data_encoding.bytes
         (path / "state")
+
+    let durable_state_value (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
+        =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Retrieve value by key from PVM durable storage. PVM state is taken \
+           with respect to the specified block level. Value returned in hex \
+           format."
+        ~query:state_value_query
+        ~output:Data_encoding.(option bytes)
+        (path / "durable"
+        / Protocol.Alpha_context.Sc_rollup.Kind.to_string pvm_kind
+        / "value")
+
+    let durable_state_length
+        (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Retrieve number of bytes in raw representation of value by key from \
+           PVM durable storage. PVM state is taken with respect to the \
+           specified block level."
+        ~query:state_value_query
+        ~output:Data_encoding.(option int64)
+        (path / "durable"
+        / Protocol.Alpha_context.Sc_rollup.Kind.to_string pvm_kind
+        / "length")
+
+    let durable_state_subkeys
+        (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Retrieve subkeys of the specified key from PVM durable storage. PVM \
+           state is taken with respect to the specified block level."
+        ~query:state_value_query
+        ~output:Data_encoding.(list string)
+        (path / "durable"
+        / Protocol.Alpha_context.Sc_rollup.Kind.to_string pvm_kind
+        / "subkeys")
 
     let status =
       Tezos_rpc.Service.get_service
