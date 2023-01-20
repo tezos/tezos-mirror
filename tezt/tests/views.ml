@@ -96,7 +96,6 @@ let test_regression =
 let deploy_lib_contract ?(amount = Tez.zero) ~protocol client =
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount
@@ -113,7 +112,6 @@ let test_run_view protocol ~contract ~init ~expected =
   let* lib_contract = deploy_lib_contract ~protocol client in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
@@ -169,7 +167,6 @@ let test_create_contract =
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
@@ -195,7 +192,6 @@ let test_create_contract =
   let addr = String.sub addr 5 @@ (String.length addr - 5) in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
@@ -236,7 +232,6 @@ let test_view_step_constant =
   in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
@@ -279,7 +274,6 @@ let test_consts_after_view ~contract ~expected protocol =
   let* lib_contract = deploy_lib_contract ~protocol client in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.one
@@ -354,7 +348,6 @@ let test_balance_after_view ~contract protocol =
   let transfer_amount = Tez.of_int 10 in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:contract_amount
@@ -403,7 +396,6 @@ let test_amount_after_view ~contract protocol =
   let* lib_contract = deploy_lib_contract ~protocol client in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.(of_int 1000)
@@ -453,7 +445,6 @@ let test_recursive_view =
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero
@@ -478,7 +469,6 @@ let test_typecheck ~contract ~error protocol =
   let* client = Client.init_mockup ~protocol () in
   let _alias, process =
     Client.spawn_originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.zero

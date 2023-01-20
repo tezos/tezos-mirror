@@ -45,7 +45,6 @@ let register262 =
   let* client = Client.init_mockup ~protocol () in
   let* _alias, contract =
     Client.originate_contract_at
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~hooks
       ~burn_cap:Tez.one
       ~amount:Tez.one
@@ -80,12 +79,7 @@ let register843 =
   let* client = Client.init_mockup ~protocol () in
   let addr = {|"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"|} in
   let bug843 =
-    Michelson_script.(
-      find
-        ~prefix:(pytest_prefix protocol)
-        ["non_regression"; "843_bug"]
-        protocol
-      |> path)
+    Michelson_script.(find ["non_regression"; "843_bug"] protocol |> path)
   in
   let* contract1 =
     Client.originate_contract

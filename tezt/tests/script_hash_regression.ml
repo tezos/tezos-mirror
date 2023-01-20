@@ -36,9 +36,9 @@ let test_script_hash_regression =
     ~title:"Test script hash regression"
     ~tags:["script"; "michelson"; "hash"]
   @@ fun protocol ->
-  let pytest_script_dir = Michelson_script.pytest_prefix protocol in
+  let script_dir = Michelson_script.default_prefix in
   let scrub_script_dirs output =
-    replace_string (rex pytest_script_dir) ~by:"[CONTRACT_PATH]" output
+    replace_string (rex script_dir) ~by:"[CONTRACT_PATH]" output
   in
   let hooks =
     let Process_hooks.{on_spawn = _; on_log} = Tezos_regression.hooks in
@@ -48,12 +48,9 @@ let test_script_hash_regression =
     let on_spawn _cmd _args = () in
     Process_hooks.{on_spawn; on_log}
   in
-  let all_pytest_scripts =
-    Michelson_script.(
-      find_all ~prefix:pytest_script_dir protocol |> List.map path)
-  in
+  let all_scripts = Michelson_script.(find_all protocol |> List.map path) in
   (* Sort scripts for more legible output *)
-  let scripts = all_pytest_scripts |> List.sort String.compare in
+  let scripts = all_scripts |> List.sort String.compare in
   let* client = Client.init_mockup ~protocol () in
   let* (_hashes : string list) =
     Client.hash_scripts ~hooks ~display_names:true scripts client

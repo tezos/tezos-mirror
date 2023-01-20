@@ -48,15 +48,16 @@ let test_origination_call =
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   Log.info "Contract origination" ;
-  let process =
-    Client.spawn_originate_contract
+  let _alias, process =
+    Client.spawn_originate_contract_at
       ~src:Constant.bootstrap1.alias
       ~alias:"foobar"
-      ~prg:(contract_path protocol "opcodes" "transfer_tokens.tz")
       ~amount:(Tez.of_int 1000)
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
+      ["opcodes"; "transfer_tokens"]
+      protocol
   in
   let* client_output = Process.check_and_read_stdout process in
   let* operation_hash =

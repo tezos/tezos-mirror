@@ -41,7 +41,6 @@ let test_bad_annot client protocol () =
   let* storage =
     Client.run_script_at
       ~storage:"None"
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       ~input
       client
       ["non_regression"; "bad_annot_contract"]

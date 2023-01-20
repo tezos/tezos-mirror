@@ -44,7 +44,6 @@ let test_big_map_to_self =
       ~src:"bootstrap5"
       ~init:"{}"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["opcodes"; "big_map_to_self"]
       protocol

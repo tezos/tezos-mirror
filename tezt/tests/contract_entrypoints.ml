@@ -51,7 +51,6 @@ let test_create_contract_rootname_originate ~contract protocol =
       ~src:Constant.bootstrap1.alias
       ~init:"None"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["opcodes"; contract]
       protocol
@@ -101,7 +100,6 @@ let originate_simple_entrypoints client ~protocol =
       ~src:"bootstrap5"
       ~init:"Unit"
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["entrypoints"; "simple_entrypoints"]
       protocol

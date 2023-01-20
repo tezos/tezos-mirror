@@ -807,14 +807,12 @@ let test_sapling_state_corruption =
     |> Process.check_error ~msg
   in
   Log.info "Make sure sapling state with id 0 exists" ;
-  let prefix = Michelson_script.pytest_prefix protocol in
   let* _alias, _address =
     Client.originate_contract_at
       ~burn_cap
       ~amount:Tez.zero
       ~src
       ~init:"{}"
-      ~prefix
       client
       ["opcodes"; "sapling_empty_state"]
       protocol
@@ -827,7 +825,6 @@ let test_sapling_state_corruption =
       ~amount:Tez.zero
       ~src
       ~init:"0"
-      ~prefix
       ~alias:"sapling_empty_state2"
       client
       ["opcodes"; "sapling_empty_state"]

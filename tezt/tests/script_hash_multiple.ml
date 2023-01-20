@@ -39,12 +39,7 @@ let test_script_hash_multiple =
     ~tags:["script"; "hash"; "multiple"]
   @@ fun protocol ->
   let id_script_path =
-    Michelson_script.(
-      find
-        ~prefix:(Michelson_script.pytest_prefix protocol)
-        ["attic"; "empty"]
-        protocol
-      |> path)
+    Michelson_script.(find ["attic"; "empty"] protocol |> path)
   in
   let id_script_literal = Base.read_file id_script_path in
   let id_script_hash =

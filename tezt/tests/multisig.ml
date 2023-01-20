@@ -52,21 +52,6 @@ let get_keys client (sig_alg0, sig_alg1, sig_alg2) =
   let* (_ : string) = Client.gen_keys ~alias:key2 ?sig_alg:sig_alg2 client in
   return keys
 
-let contract_path protocol kind contract =
-  sf
-    "tests_python/contracts_%s/%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    kind
-    contract
-
-let msig_path protocol msig_version =
-  contract_path
-    protocol
-    "mini_scenarios"
-    (show_msig_version msig_version ^ "_multisig.tz")
-
 type msig_storage = {counter : int; threshold : int; keys : string list}
 
 let msig_storage_typ =
@@ -165,15 +150,19 @@ let deploy_msig protocol client ~keys ~version ~by_address =
   let* initial_storage =
     build_msig_storage client {counter = 0; threshold = 2; keys}
   in
-  let* deployment =
-    Client.originate_contract
+  let* _alias, deployment =
+    let msig_script_name =
+      ["mini_scenarios"; show_msig_version version ^ "_multisig"]
+    in
+    Client.originate_contract_at
       ~alias:msig_alias
       ~src:"bootstrap1"
       ~amount:(Tez.of_int 100)
-      ~prg:(msig_path protocol version)
       ~init:initial_storage
       ~burn_cap:(Tez.of_int 100)
       client
+      msig_script_name
+      protocol
   in
   let handle = if by_address then deployment else msig_alias in
   return {handle; keys; version}
@@ -750,16 +739,16 @@ let test_unsupported_multisig =
   @@ fun protocol ->
   Log.info "Deploy nonmultisig" ;
   let* client = Client.init_mockup ~protocol () in
-  let contract = contract_path protocol "attic" "id.tz" in
-  let* _address =
-    Client.originate_contract
+  let* _alias, _address =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~alias:"id"
       ~src:"bootstrap1"
-      ~prg:contract
       ~burn_cap:(Tez.of_int 10)
       ~init:{|""|}
       client
+      ["attic"; "id"]
+      protocol
   in
   Client.spawn_from_multisig_transfer
     ~multisig:"id"

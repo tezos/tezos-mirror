@@ -59,10 +59,8 @@ let test_typecheck protocols =
     (fun protocol ->
       (* Type check regression tests for all well-typed contracts *)
       List.iter
-        (fun script -> test_typecheck_contract protocol script)
-        (Michelson_script.find_all_well_typed
-           ~prefix:(Michelson_script.pytest_prefix protocol)
-           protocol))
+        (test_typecheck_contract protocol)
+        (Michelson_script.find_all_well_typed protocol))
     protocols
 
 let register ~protocols = test_typecheck protocols

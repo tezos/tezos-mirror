@@ -39,7 +39,6 @@ let manager client ~protocol =
       ~amount:(Tez.of_int 1000)
       ~src:manager
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["entrypoints"; "manager"]
       protocol
@@ -54,7 +53,6 @@ let big_map_entrypoints client ~protocol =
       ~amount:(Tez.of_int 1000)
       ~src:Constant.bootstrap1.alias
       ~burn_cap:Tez.one
-      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
       ["entrypoints"; "big_map_entrypoints"]
       protocol
