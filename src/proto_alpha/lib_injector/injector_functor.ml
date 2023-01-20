@@ -281,7 +281,13 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       Event.(emit1 (if retry then retry_operation else add_pending)) state op
     in
-    Op_queue.replace state.queue op.L1_operation.hash op
+    let* () = Op_queue.replace state.queue op.L1_operation.hash op in
+    let*! () =
+      Event.(emit1 number_of_operations_in_queue)
+        state
+        (Op_queue.length state.queue)
+    in
+    return_unit
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state oph operations =
@@ -481,6 +487,11 @@ module Make (Parameters : PARAMETERS) = struct
     in
     match simulation_result with
     | Error trace ->
+        let*! () =
+          Event.(emit1 number_of_operations_in_queue)
+            state
+            (Op_queue.length state.queue)
+        in
         let exceeds_quota =
           TzTrace.fold
             (fun exceeds -> function

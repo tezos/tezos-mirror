@@ -136,6 +136,15 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
       (Format.pp_print_list L1_operation.Hash.pp)
       operations
 
+  let number_of_operations_in_queue =
+    declare_1
+      ~name:"number_of_operations_in_queue"
+      ~msg:
+        "injector's queue: there is currently {number_of_operations} \
+         operations waiting to be injected"
+      ~level:Info
+      ("number_of_operations", Data_encoding.int31)
+
   let simulating_operations =
     declare_2
       ~name:"simulating_operations"
