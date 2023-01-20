@@ -80,14 +80,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
      endorsements from him, nor preendorsements. It might be
      interesting at some point to distinguish these two cases. *)
   let couple_ops_to_rights ops rights =
-    let (items, missing) =
+    let items, missing =
       List.fold_left
         (fun (acc, remaining_rights) (slot, ops) ->
           match
             List.partition (fun right -> same_slot slot right) remaining_rights
           with
-          | (([] | _ :: _ :: _), _) -> assert false
-          | ([right], rights') ->
+          | ([] | _ :: _ :: _), _ -> assert false
+          | [right], rights' ->
               ((right.Consensus_ops.address, ops) :: acc, rights'))
         ([], rights)
         ops
@@ -132,7 +132,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     | _ -> None
 
   let consensus_operation_stream cctxt =
-    let* (ops_stream, stopper) =
+    let* ops_stream, stopper =
       Block_services.Mempool.monitor_operations
         cctxt
         ~chain:cctxt#chain

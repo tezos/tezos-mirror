@@ -39,7 +39,7 @@ let send_something ctx path body log_msg_prefix =
   in
   let headers = Cohttp.Header.add_authorization headers (`Basic ctx.auth) in
   let uri = Uri.with_path ctx.endpoint (Uri.path ctx.endpoint ^ "/" ^ path) in
-  let*! (resp, out) =
+  let*! resp, out =
     Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
   in
   let*! out = Cohttp_lwt.Body.to_string out in
@@ -90,7 +90,7 @@ type chunk =
   | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops
   | Rights of (Int32.t (* level *) * Consensus_ops.rights)
 
-let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
+let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
 let launch actx _source =
   Lwt_stream.iter_p

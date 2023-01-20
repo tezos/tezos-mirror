@@ -62,9 +62,9 @@ module Delegate_operations = struct
       (fun _ -> assert false)
       (fun (delegate, delegate_alias, reception_time, errors, block_inclusion) ->
         match (reception_time, block_inclusion) with
-        | (None, []) ->
+        | None, [] ->
             {delegate; delegate_alias; endorsing_power = 0; operations = []}
-        | (_, _) ->
+        | _, _ ->
             {
               delegate;
               delegate_alias;

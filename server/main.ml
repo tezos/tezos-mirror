@@ -25,16 +25,16 @@
 
 let rec find_in_ocamlres path dir =
   match (path, dir) with
-  | ([], _) | (_ :: _, []) -> None
-  | ([x], `File (y, a) :: t) ->
+  | [], _ | _ :: _, [] -> None
+  | [x], `File (y, a) :: t ->
       if String.equal x y then Some a else find_in_ocamlres path t
-  | (_ :: _ :: _, `File _ :: t) -> find_in_ocamlres path t
-  | ([_], _ :: t) -> find_in_ocamlres path t
-  | (x :: p, `Dir (y, a) :: t) ->
+  | _ :: _ :: _, `File _ :: t -> find_in_ocamlres path t
+  | [_], _ :: t -> find_in_ocamlres path t
+  | x :: p, `Dir (y, a) :: t ->
       if String.equal x y then find_in_ocamlres p a else find_in_ocamlres path t
 
-let mainnet_cycle_of_level level =
-  if level < 1_589_248 then level / 4096 else 388 + ((level - 1_589_248) / 8192)
+(*let mainnet_cycle_of_level level =*)
+(*if level < 1_589_248 then level / 4096 else 388 + ((level - 1_589_248) / 8192)*)
 
 let method_not_allowed_respond meths =
   let headers =
@@ -492,7 +492,7 @@ let callback rights db_pool _connection request body =
                           if pre <> "visualization" then
                             Cohttp_lwt_unix.Server.respond_not_found ~uri ()
                           else
-                            let (path, subpath) =
+                            let path, subpath =
                               match subpath with
                               | [] | [""] -> ("index.html", ["index.html"])
                               | _ -> (path, subpath)
@@ -564,7 +564,7 @@ let () =
         Lwt.bind (maybe_create_tables pool) (function
             | Error e -> Lwt_io.eprintl (Caqti_error.show e)
             | Ok () ->
-                let (stop, paf) = Lwt.task () in
+                let stop, paf = Lwt.task () in
                 let shutdown _ = Lwt.wakeup paf () in
                 let _ = Sys.signal Sys.sigint (Sys.Signal_handle shutdown) in
                 let servers =

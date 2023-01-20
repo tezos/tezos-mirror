@@ -67,7 +67,7 @@ let to_received_ops ctx endpoint auth level data =
     Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
   in
   let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
-  let*! (resp, out) =
+  let*! resp, out =
     Cohttp_lwt_unix.Client.post
       ~ctx
       ~body
@@ -134,7 +134,7 @@ let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
   Lwt.join
     (List.map
        (fun body ->
-         let*! (resp, out) =
+         let*! resp, out =
            Cohttp_lwt_unix.Client.post
              ~ctx
              ~body

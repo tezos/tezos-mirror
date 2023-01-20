@@ -1,5 +1,12 @@
+fmt:
+  image: ocaml/opam:ubuntu-22.10-ocaml-4.14
+  script:
+    - opam install ocamlformat.0.21.0
+    - eval $(opam env)
+    - dune build @fmt
+
 build:
-  image: ocaml/opam:debian-ocaml-4.14
+  image: ocaml/opam:ubuntu-22.10-ocaml-4.14
   before_script:
     - sudo apt update
   script:

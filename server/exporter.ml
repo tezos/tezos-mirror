@@ -70,8 +70,8 @@ module Op_key = struct
     let c = Option.compare Int32.compare op1.round op2.round in
     if c = 0 then
       match (op1.kind, op2.kind) with
-      | (Preendorsement, Endorsement) -> -1
-      | (Endorsement, Preendorsement) -> 1
+      | Preendorsement, Endorsement -> -1
+      | Endorsement, Preendorsement -> 1
       | _ -> 0
     else c
 end
@@ -186,11 +186,11 @@ let select_ops db_pool level =
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
   let cb_missing r info =
-    let (delegate, alias, power) = parse_missing_row r in
+    let delegate, alias, power = parse_missing_row r in
     Ops.add delegate (alias, power, Pkh_ops.empty) info
   in
   let cb_included r info =
-    let (delegate, alias, power, kind, round, block_hash) =
+    let delegate, alias, power, kind, round, block_hash =
       parse_included_row r
     in
     match Ops.find_opt delegate info with
@@ -211,7 +211,7 @@ let select_ops db_pool level =
         Ops.add delegate (alias, power, ops) info
   in
   let cb_received r info =
-    let (delegate, alias, power, reception_time, errors, kind, round) =
+    let delegate, alias, power, reception_time, errors, kind, round =
       parse_received_row r
     in
     let received_info = {reception_time; errors} in
@@ -253,7 +253,7 @@ let translate_ops info =
   let translate pkh_ops =
     List.map
       (fun (Op_key.{kind; round}, op_info) ->
-        let (reception_time, errors) =
+        let reception_time, errors =
           if op_info.received = [] then (None, None)
           else
             let ordered =
@@ -298,9 +298,9 @@ let anomalies level ops =
       (fun Op_key.{kind; round} {received; included} acc ->
         let problem =
           match (received, included) with
-          | ([], []) -> Some Data.Anomaly.Missed
-          | ([], _) -> Some Data.Anomaly.Sequestered
-          | (_, []) -> Some Data.Anomaly.Forgotten
+          | [], [] -> Some Data.Anomaly.Missed
+          | [], _ -> Some Data.Anomaly.Sequestered
+          | _, [] -> Some Data.Anomaly.Forgotten
           | _ -> None
         in
         match problem with

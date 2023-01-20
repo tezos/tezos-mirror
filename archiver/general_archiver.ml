@@ -135,7 +135,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
   let endorsements_recorder (module A : Archiver.S) cctx current_level =
     let*! wallet = wallet cctx in
     let cctx' = Services.wrap_full cctx in
-    let* (op_stream, _stopper) = Services.consensus_operation_stream cctx' in
+    let* op_stream, _stopper = Services.consensus_operation_stream cctx' in
     let*! out =
       Lwt_stream.fold
         (fun ((hash, ((block, level, kind, round), slot)), errors) acc ->
@@ -157,7 +157,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         let* rights =
           Services.endorsing_rights cctx' ~reference_level:current_level level
         in
-        let (items, missing) =
+        let items, missing =
           Services.couple_ops_to_rights endorsements rights
         in
         let full = Compare.Int32.(current_level = level) in
@@ -249,7 +249,7 @@ module Loops (Archiver : Archiver.S) = struct
         let*! _ =
           Lwt_stream.fold_s
             (fun (hash, header) acc ->
-              let*! (endorsements_recorder, acc') =
+              let*! endorsements_recorder, acc' =
                 match acc with
                 | Some (f, proto_level)
                   when proto_level
@@ -312,7 +312,7 @@ module Loops (Archiver : Archiver.S) = struct
         let*! _ =
           Lwt_stream.fold_s
             (fun ((_chain_id, hash), header) acc ->
-              let*! (block_recorder, acc') =
+              let*! block_recorder, acc' =
                 match acc with
                 | Some (f, proto_level)
                   when proto_level

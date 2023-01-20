@@ -85,7 +85,7 @@ type chunk =
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
   | Rights of (Int32.t (* level *) * Consensus_ops.rights * Wallet.t)
 
-let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
+let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
 let launch db source =
   Lwt_stream.iter_p

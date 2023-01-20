@@ -141,7 +141,7 @@ let extract_anomalies path level infos =
                   :: acc
               | None | Some [] -> (
                   match (kind, reception_time, block_inclusion) with
-                  | (Endorsement, None, []) ->
+                  | Endorsement, None, [] ->
                       {
                         level;
                         round;
@@ -151,7 +151,7 @@ let extract_anomalies path level infos =
                         problem = Data.Anomaly.Missed;
                       }
                       :: acc
-                  | (Endorsement, Some _, []) ->
+                  | Endorsement, Some _, [] ->
                       {
                         level;
                         round;
@@ -161,7 +161,7 @@ let extract_anomalies path level infos =
                         problem = Data.Anomaly.Forgotten;
                       }
                       :: acc
-                  | (Endorsement, None, _ :: _) ->
+                  | Endorsement, None, _ :: _ ->
                       {
                         level;
                         round;
@@ -171,8 +171,8 @@ let extract_anomalies path level infos =
                         problem = Data.Anomaly.Sequestered;
                       }
                       :: acc
-                  | (Endorsement, Some _, _ :: _) -> acc
-                  | (Preendorsement, _, _) -> acc))
+                  | Endorsement, Some _, _ :: _ -> acc
+                  | Preendorsement, _, _ -> acc))
             acc
             operations)
         []
@@ -193,8 +193,8 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
         kind = ops_kind
         &&
         match (round, ops_round) with
-        | (None, None) -> true
-        | (Some round, Some round') -> Int32.equal round round'
+        | None, None -> true
+        | Some round, Some round' -> Int32.equal round round'
         | _ -> assert false)
       operations
   with
@@ -211,7 +211,7 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
           block_inclusion = block_hash :: block_inclusion;
         }
       :: operations'
-  | ([], _) ->
+  | [], _ ->
       {
         kind = ops_kind;
         round = ops_round;
@@ -224,7 +224,7 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
 (* [validators] are those delegates whose operations (either preendorsements or
    endorsements) have been included in the given block.*)
 let add_inclusion_in_block aliases block_hash validators delegate_operations =
-  let (updated_known, unknown) =
+  let updated_known, unknown =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
@@ -236,7 +236,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
               Signature.Public_key_hash.equal op.Consensus_ops.delegate delegate)
             missing
         with
-        | (op :: other_ops_by_same_delegate, missing') ->
+        | op :: other_ops_by_same_delegate, missing' ->
             assert (other_ops_by_same_delegate = []) ;
             ( Data.Delegate_operations.
                 {
@@ -252,7 +252,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
                 }
               :: acc,
               missing' )
-        | ([], _) -> (delegate_ops :: acc, missing))
+        | [], _ -> (delegate_ops :: acc, missing))
       ([], validators)
       delegate_operations
   in
@@ -392,8 +392,8 @@ let merge_operations =
               block_inclusion;
             }
           :: acc'
-      | (_ :: _, _) -> acc
-      | ([], _) ->
+      | _ :: _, _ -> acc
+      | [], _ ->
           {
             kind;
             round;
@@ -409,7 +409,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
   let*! out =
     Lwt_mutex.with_lock mutex (fun () ->
         let* infos = load filename Data.encoding Data.empty in
-        let (updated_known, unknown) =
+        let updated_known, unknown =
           List.fold_left
             (fun (acc, missing)
                  Data.Delegate_operations.(
@@ -420,7 +420,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                   (fun (pkh, _) -> Signature.Public_key_hash.equal pkh delegate)
                   missing
               with
-              | ((_, new_operations) :: other_ops_by_same_delegate, missing') ->
+              | (_, new_operations) :: other_ops_by_same_delegate, missing' ->
                   assert (other_ops_by_same_delegate = []) ;
                   ( Data.Delegate_operations.
                       {
@@ -431,7 +431,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                       }
                     :: acc,
                     missing' )
-              | ([], _) -> (delegate_ops :: acc, missing))
+              | [], _ -> (delegate_ops :: acc, missing))
             ([], received_ops)
             infos.Data.delegate_operations
         in
@@ -499,7 +499,7 @@ type chunk =
       * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
-let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
+let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
 let launch cctxt prefix =
   Lwt_stream.iter_p

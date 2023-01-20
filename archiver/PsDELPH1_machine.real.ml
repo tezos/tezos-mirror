@@ -63,7 +63,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   module BlockIdMap = Block_hash.Map
 
   let couple_ops_to_rights ops rights =
-    let (items, missing) =
+    let items, missing =
       List.fold_left
         (fun (acc, rights) (slot, ops) ->
           match
@@ -71,8 +71,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
               (fun right -> Int.equal slot right.Consensus_ops.first_slot)
               rights
           with
-          | (([] | _ :: _ :: _), _) -> assert false
-          | ([right], rights') ->
+          | ([] | _ :: _ :: _), _ -> assert false
+          | [right], rights' ->
               ((right.Consensus_ops.address, ops) :: acc, rights'))
         ([], rights)
         ops
@@ -101,7 +101,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     None
 
   let consensus_operation_stream cctxt =
-    let* (ops_stream, stopper) =
+    let* ops_stream, stopper =
       Block_services.Mempool.monitor_operations
         cctxt
         ~chain:cctxt#chain

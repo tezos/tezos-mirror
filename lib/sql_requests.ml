@@ -177,7 +177,7 @@ let maybe_insert_operations level extractor op_extractor l =
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f x ->
-         let (delegate, ops) = extractor x in
+         let delegate, ops = extractor x in
          Format.pp_print_list
            ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
            (fun f y ->
