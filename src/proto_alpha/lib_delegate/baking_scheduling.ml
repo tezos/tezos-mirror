@@ -460,13 +460,14 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   let wait_baking_time_next_level (next_baking_time, next_baking_round) =
     let now = Time.System.now () in
     let delay = Ptime.diff (Time.System.of_protocol_exn next_baking_time) now in
-    Events.(emit waiting_time_to_bake (delay, next_baking_time)) >>= fun () ->
     match sleep_until next_baking_time with
     | None ->
         Events.(emit no_need_to_wait_for_proposal ()) >>= fun () ->
         return
           (Lwt.return (Time_to_bake_next_level {at_round = next_baking_round}))
     | Some t ->
+        Events.(emit waiting_time_to_bake (delay, next_baking_time))
+        >>= fun () ->
         return
           ( t >>= fun () ->
             Lwt.return (Time_to_bake_next_level {at_round = next_baking_round})
