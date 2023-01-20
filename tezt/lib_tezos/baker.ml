@@ -115,7 +115,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
   on_stdout baker (handle_raw_stdout baker) ;
   baker
 
-let run ?event_level (baker : t) =
+let run ?event_level ?event_sections_levels (baker : t) =
   (match baker.status with
   | Not_running -> ()
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
@@ -171,7 +171,14 @@ let run ?event_level (baker : t) =
     trigger_ready baker None ;
     unit
   in
-  run ?event_level baker {ready = false} arguments ~on_terminate ?runner
+  run
+    ?event_level
+    ?event_sections_levels
+    baker
+    {ready = false}
+    arguments
+    ~on_terminate
+    ?runner
 
 let check_event ?where baker name promise =
   let* result = promise in
@@ -189,8 +196,9 @@ let wait_for_ready baker =
         resolver :: baker.persistent_state.pending_ready ;
       check_event baker "Baker started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
-    ?liquidity_baking_toggle_vote ?operations_pool ?dal_node node client =
+let init ~protocol ?name ?color ?event_pipe ?runner ?event_sections_levels
+    ?(delegates = []) ?votefile ?liquidity_baking_toggle_vote ?operations_pool
+    ?dal_node node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -207,6 +215,6 @@ let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) ?votefile
       node
       client
   in
-  let* () = run baker in
+  let* () = run ?event_sections_levels baker in
   let* () = wait_for_ready baker in
   return baker
