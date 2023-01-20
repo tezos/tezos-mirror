@@ -359,6 +359,17 @@ let show_outbox tree level =
 (* [show_durable] prints the durable storage from the tree. *)
 let show_durable tree = Repl_helpers.print_durable ~depth:10 tree
 
+let show_value kind value =
+  let printable = Repl_helpers.print_wasm_encoded_value kind value in
+  match printable with
+  | Ok s -> s
+  | Error err ->
+      Format.asprintf
+        "Error: %s. Defaulting to hexadecimal value\n%a"
+        err
+        Hex.pp
+        (Hex.of_string value)
+
 (* [show_key_gen tree key] looks for the given [key] in the durable storage and
    print its value in hexadecimal format. *)
 let show_key_gen tree key =
@@ -370,7 +381,7 @@ let show_key_gen tree key =
       return_unit
   | Some v ->
       let+ str_value = Tezos_lazy_containers.Chunked_byte_vector.to_string v in
-      Format.printf "%a\n%!" Hex.pp (Hex.of_string str_value)
+      Format.printf "%s\n%!" @@ show_value `Hex str_value
 
 (* [show_key tree key] looks for the given [key] in the durable storage and
    print its value in hexadecimal format. Prints errors in case the key is
@@ -417,8 +428,7 @@ let show_memory tree address length =
       let* value =
         Tezos_webassembly_interpreter.Memory.load_bytes memory address length
       in
-      Lwt_io.printf "%s\n%!"
-      @@ Format.asprintf "%a" Hex.pp (Hex.of_string value))
+      Lwt_io.printf "%s\n%!" @@ show_value `Hex value)
     (function
       | Cannot_inspect_memory state ->
           Lwt_io.printf
