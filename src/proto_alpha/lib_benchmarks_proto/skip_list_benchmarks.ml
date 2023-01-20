@@ -142,8 +142,8 @@ module Hash_cell = struct
       ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
       ~model:
         (Model.affine
-           ~intercept:(Free_variable.of_string "cost_hash_skip_list_cell")
-           ~coeff:(Free_variable.of_string "cost_hash_skip_list_cell_coef"))
+           ~intercept:(fv "cost_hash_skip_list_cell")
+           ~coeff:(fv "cost_hash_skip_list_cell_coef"))
 
   let models = [("skip_list_hash", hash_skip_list_cell_model)]
 
