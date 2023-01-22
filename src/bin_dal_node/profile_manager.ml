@@ -27,12 +27,6 @@
    Node profiles should be stored into the memory as well
    so that we can cache them *)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4623
-
-   Extend the work done in https://gitlab.com/tezos/tezos/-/merge_requests/7344
-   for profiles as well.
-*)
-
 type error +=
   | Dal_attestor_not_in_committee of {
       attestor : Tezos_crypto.Signature.Public_key_hash.t;

@@ -74,6 +74,49 @@ let init config =
   let*! () = Event.(emit store_is_ready ()) in
   return {shard_store; store; slots_watcher}
 
+let trace_decoding_error ~data_kind ~tztrace_of_error r =
+  let open Result_syntax in
+  match r with
+  | Ok r -> return r
+  | Error err ->
+      let tztrace = tztrace_of_error err in
+      fail @@ `Decoding_failed (data_kind, tztrace)
+
+let tztrace_of_read_error read_err =
+  [Exn (Data_encoding.Binary.Read_error read_err)]
+
+let encode_commitment = Cryptobox.Commitment.to_b58check
+
+let decode_commitment v =
+  trace_decoding_error
+    ~data_kind:Types.Commitment
+    ~tztrace_of_error:(fun tztrace -> tztrace)
+  @@ Cryptobox.Commitment.of_b58check v
+
+let encode_header_status =
+  Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
+
+let decode_header_status v =
+  trace_decoding_error
+    ~data_kind:Types.Header_status
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string Services.Types.header_status_encoding v
+
+let decode_slot_id v =
+  trace_decoding_error
+    ~data_kind:Types.Slot_id
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string Services.Types.slot_id_encoding v
+
+let encode_slot slot_size =
+  Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
+
+let decode_slot slot_size v =
+  trace_decoding_error
+    ~data_kind:Types.Slot
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
+
 module Legacy = struct
   module Path : sig
     type t = string list
@@ -209,49 +252,6 @@ module Legacy = struct
       let profile profile = root / encode_profile profile
     end
   end
-
-  let trace_decoding_error ~data_kind ~tztrace_of_error r =
-    let open Result_syntax in
-    match r with
-    | Ok r -> return r
-    | Error err ->
-        let tztrace = tztrace_of_error err in
-        fail @@ `Decoding_failed (data_kind, tztrace)
-
-  let tztrace_of_read_error read_err =
-    [Exn (Data_encoding.Binary.Read_error read_err)]
-
-  let encode_commitment = Cryptobox.Commitment.to_b58check
-
-  let decode_commitment v =
-    trace_decoding_error
-      ~data_kind:Types.Commitment
-      ~tztrace_of_error:(fun tztrace -> tztrace)
-    @@ Cryptobox.Commitment.of_b58check v
-
-  let encode_header_status =
-    Data_encoding.Binary.to_string_exn Services.Types.header_status_encoding
-
-  let decode_header_status v =
-    trace_decoding_error
-      ~data_kind:Types.Header_status
-      ~tztrace_of_error:tztrace_of_read_error
-    @@ Data_encoding.Binary.of_string Services.Types.header_status_encoding v
-
-  let decode_slot_id v =
-    trace_decoding_error
-      ~data_kind:Types.Slot_id
-      ~tztrace_of_error:tztrace_of_read_error
-    @@ Data_encoding.Binary.of_string Services.Types.slot_id_encoding v
-
-  let encode_slot slot_size =
-    Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
-
-  let decode_slot slot_size v =
-    trace_decoding_error
-      ~data_kind:Types.Slot
-      ~tztrace_of_error:tztrace_of_read_error
-    @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
 
   let add_slot_by_commitment node_store cryptobox slot commitment =
     let open Lwt_syntax in
