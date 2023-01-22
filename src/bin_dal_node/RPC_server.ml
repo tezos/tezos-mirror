@@ -27,17 +27,17 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
+let call_handler handler ctxt =
+  let open Lwt_result_syntax in
+  let*? {cryptobox; _} = Node_context.get_ready ctxt in
+  let store = Node_context.get_store ctxt in
+  handler store cryptobox
+
 module Slots_handlers = struct
   let to_option_tzresult r =
     Errors.to_option_tzresult
       ~none:(function `Not_found -> true | _ -> false)
       r
-
-  let call_handler handler ctxt =
-    let open Lwt_result_syntax in
-    let*? {cryptobox; _} = Node_context.get_ready ctxt in
-    let store = Node_context.get_store ctxt in
-    handler store cryptobox
 
   let post_commitment ctxt () slot =
     call_handler
@@ -119,12 +119,15 @@ end
 
 module Profile_handlers = struct
   let patch_profile ctxt () profile =
-    let store = Node_context.get_store ctxt in
-    Profile_manager.add_profile store profile
+    call_handler
+      (fun store _cryptobox -> Profile_manager.add_profile store profile)
+      ctxt
 
   let get_profiles ctxt () () =
-    let store = Node_context.get_store ctxt in
-    Profile_manager.get_profiles store |> Errors.to_tzresult
+    call_handler
+      (fun store _cryptobox ->
+        Profile_manager.get_profiles store |> Errors.to_tzresult)
+      ctxt
 
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
