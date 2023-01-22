@@ -121,7 +121,10 @@ let encode_profile profile =
   Data_encoding.Binary.to_string_exn Services.Types.profile_encoding profile
 
 let decode_profile profile =
-  Data_encoding.Binary.of_string_exn Services.Types.profile_encoding profile
+  trace_decoding_error
+    ~data_kind:Types.Profile
+    ~tztrace_of_error:tztrace_of_read_error
+  @@ Data_encoding.Binary.of_string Services.Types.profile_encoding profile
 
 module Legacy = struct
   module Path : sig
@@ -427,7 +430,7 @@ module Legacy = struct
     let open Lwt_syntax in
     let path = Path.Profile.profiles in
     let* profiles = list node_store.store path in
-    return @@ List.map (fun (p, _) -> decode_profile p) profiles
+    return @@ List.map_e (fun (p, _) -> decode_profile p) profiles
 
   let add_profile node_store profile =
     let path = Path.Profile.profile profile in

@@ -124,7 +124,7 @@ module Profile_handlers = struct
 
   let get_profiles ctxt () () =
     let store = Node_context.get_store ctxt in
-    Profile_manager.get_profiles store
+    Profile_manager.get_profiles store |> Errors.to_tzresult
 
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh

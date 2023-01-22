@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Data kind stored in DAL. *)
-type kind = Commitment | Header_status | Slot_id | Slot
+type kind = Commitment | Header_status | Slot_id | Slot | Profile
 
 (** Encoding for values of type {!kind}. *)
 val kind_encoding : kind Data_encoding.t
