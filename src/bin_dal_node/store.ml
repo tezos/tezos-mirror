@@ -117,6 +117,12 @@ let decode_slot slot_size v =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
 
+let encode_profile profile =
+  Data_encoding.Binary.to_string_exn Services.Types.profile_encoding profile
+
+let decode_profile profile =
+  Data_encoding.Binary.of_string_exn Services.Types.profile_encoding profile
+
 module Legacy = struct
   module Path : sig
     type t = string list
@@ -243,11 +249,6 @@ module Legacy = struct
       let root = ["profiles"]
 
       let profiles = root
-
-      let encode_profile profile =
-        Data_encoding.Binary.to_string_exn
-          Services.Types.profile_encoding
-          profile
 
       let profile profile = root / encode_profile profile
     end
@@ -421,9 +422,6 @@ module Legacy = struct
       ~none:(fail `Not_found)
       ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
-
-  let decode_profile profile =
-    Data_encoding.Binary.of_string_exn Services.Types.profile_encoding profile
 
   let get_profiles node_store =
     let open Lwt_syntax in
