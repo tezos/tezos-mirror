@@ -212,15 +212,6 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
       ~level:Notice
       ("level", Data_encoding.int32)
 
-  let confirmed_operations =
-    declare_2
-      ~name:"confirmed_operations"
-      ~msg:"Confirmed operations of level {level}: {operations}"
-      ~level:Notice
-      ("level", Data_encoding.int32)
-      ("operations", Data_encoding.list L1_operation.Hash.encoding)
-      ~pp2:pp_operations_hash_list
-
   let loaded_from_disk =
     declare_2
       ~name:"loaded_from_disk"
