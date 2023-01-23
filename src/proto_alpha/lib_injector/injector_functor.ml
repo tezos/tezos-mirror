@@ -735,6 +735,9 @@ module Make (Parameters : PARAMETERS) = struct
             add_injected_operations state oph injected_operations
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
+            let*! () =
+              Event.(emit1 dropped_operations) state operations_to_drop
+            in
             let* () =
               List.iter_es
                 (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
