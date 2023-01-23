@@ -1623,10 +1623,10 @@ let create ?block_cache_limit chain_dir ~genesis_block =
   return block_store
 
 let register_gc_callback block_store gc_callback =
-  block_store.gc_callback <- Some gc_callback
+  block_store.gc_callback <- gc_callback
 
 let register_split_callback block_store split_callback =
-  block_store.split_callback <- Some split_callback
+  block_store.split_callback <- split_callback
 
 let pp_merge_status fmt status =
   match status with
