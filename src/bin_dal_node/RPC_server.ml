@@ -27,7 +27,9 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-let call_handler ctxt handler =
+let call_handler1 ctxt handler = handler (Node_context.get_store ctxt)
+
+let call_handler2 ctxt handler =
   let open Lwt_result_syntax in
   let*? ready_ctxt = Node_context.get_ready ctxt in
   let store = Node_context.get_store ctxt in
@@ -40,11 +42,11 @@ module Slots_handlers = struct
       r
 
   let post_commitment ctxt () slot =
-    call_handler ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store {cryptobox; _} ->
         Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult)
 
   let patch_commitment ctxt commitment () slot_id =
-    call_handler ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store {cryptobox; _} ->
         Slot_manager.associate_slot_id_with_commitment
           store
           cryptobox
@@ -53,12 +55,12 @@ module Slots_handlers = struct
         |> to_option_tzresult)
 
   let get_commitment_slot ctxt commitment () () =
-    call_handler ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store {cryptobox; _} ->
         Slot_manager.get_commitment_slot store cryptobox commitment
         |> to_option_tzresult)
 
   let get_commitment_proof ctxt commitment () () =
-    call_handler ctxt (fun store {cryptobox; _} ->
+    call_handler2 ctxt (fun store {cryptobox; _} ->
         let open Lwt_result_syntax in
         (* This handler may be costly: We need to recompute the
            polynomial and then compute the proof. *)
@@ -78,7 +80,7 @@ module Slots_handlers = struct
                 return_some (Cryptobox.prove_commitment cryptobox polynomial)))
 
   let get_commitment_by_published_level_and_index ctxt level slot_index () () =
-    call_handler ctxt (fun store _ready_ctxt ->
+    call_handler1 ctxt (fun store ->
         Slot_manager.get_commitment_by_published_level_and_index
           ~level
           ~slot_index
@@ -86,7 +88,7 @@ module Slots_handlers = struct
         |> to_option_tzresult)
 
   let get_commitment_headers ctxt commitment (slot_level, slot_index) () =
-    call_handler ctxt (fun store _ready_ctxt ->
+    call_handler1 ctxt (fun store ->
         Slot_manager.get_commitment_headers
           commitment
           ?slot_level
@@ -95,7 +97,7 @@ module Slots_handlers = struct
         |> Errors.to_tzresult)
 
   let get_published_level_headers ctxt published_level header_status () =
-    call_handler ctxt (fun store _ready_ctxt ->
+    call_handler1 ctxt (fun store ->
         Slot_manager.get_published_level_headers
           ~published_level
           ?header_status
@@ -105,18 +107,17 @@ end
 
 module Profile_handlers = struct
   let patch_profile ctxt () profile =
-    call_handler ctxt (fun store _cryptobox ->
-        Profile_manager.add_profile store profile)
+    call_handler1 ctxt (fun store -> Profile_manager.add_profile store profile)
 
   let get_profiles ctxt () () =
-    call_handler ctxt (fun store _ready_ctxt ->
+    call_handler1 ctxt (fun store ->
         Profile_manager.get_profiles store |> Errors.to_tzresult)
 
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
   let get_attestable_slots ctxt pkh attested_level () () =
-    call_handler ctxt (fun store {cryptobox; proto_parameters; _} ->
+    call_handler2 ctxt (fun store {cryptobox; proto_parameters; _} ->
         Profile_manager.get_attestable_slots
           ctxt
           store
