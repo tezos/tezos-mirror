@@ -122,10 +122,16 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
         mode = operating_mode;
         fee_parameters;
         loser_mode;
+        l2_blocks_cache_size;
         _;
       } as configuration) =
   let open Lwt_result_syntax in
-  let* store = Store.load mode Configuration.(default_storage_dir data_dir) in
+  let* store =
+    Store.load
+      mode
+      ~l2_blocks_cache_size
+      Configuration.(default_storage_dir data_dir)
+  in
   let*! context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in

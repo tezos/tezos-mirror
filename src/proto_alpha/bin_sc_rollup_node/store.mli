@@ -160,12 +160,18 @@ type ro = Store_sigs.ro t
 (** [close store] closes the store. *)
 val close : _ t -> unit tzresult Lwt.t
 
-(** [load mode directory] loads a store from the data persisted in
-    [directory]. If [mode] is {!Store_sigs.Read_only}, then the indexes and
-    irmin store will be opened in readonly mode and only read operations will be
-    permitted. This allows to open a store for read access that is already
-    opened in {!Store_sigs.Read_write} mode in another process. *)
-val load : 'a Store_sigs.mode -> string -> 'a store tzresult Lwt.t
+(** [load mode ~l2_blocks_cache_size directory] loads a store from the data
+    persisted in [directory]. If [mode] is {!Store_sigs.Read_only}, then the
+    indexes and irmin store will be opened in readonly mode and only read
+    operations will be permitted. This allows to open a store for read access
+    that is already opened in {!Store_sigs.Read_write} mode in another
+    process. [l2_blocks_cache_size] is the number of L2 blocks the rollup node
+    will keep in memory. *)
+val load :
+  'a Store_sigs.mode ->
+  l2_blocks_cache_size:int ->
+  string ->
+  'a store tzresult Lwt.t
 
 (** [readonly store] returns a read-only version of [store]. *)
 val readonly : _ t -> ro
