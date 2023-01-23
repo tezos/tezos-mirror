@@ -68,27 +68,23 @@ end
 module Block_directory_helpers = struct
   let get_head store =
     let open Lwt_result_syntax in
-    let*! head = Node_context.last_processed_head_opt store in
+    let* head = Node_context.last_processed_head_opt store in
     match head with
     | None -> failwith "No head"
     | Some {header = {block_hash; _}; _} -> return block_hash
 
   let get_finalized node_ctxt =
     let open Lwt_result_syntax in
-    let*! head = Node_context.get_finalized_head_opt node_ctxt in
+    let* head = Node_context.get_finalized_head_opt node_ctxt in
     match head with
     | None -> failwith "No finalized head"
     | Some {header = {block_hash; _}; _} -> return block_hash
 
   let get_last_cemented (node_ctxt : _ Node_context.t) =
-    let open Lwt_result_syntax in
     protect @@ fun () ->
-    let* lcc_hash =
-      Node_context.hash_of_level
-        node_ctxt
-        (Alpha_context.Raw_level.to_int32 node_ctxt.lcc.level)
-    in
-    return lcc_hash
+    Node_context.hash_of_level
+      node_ctxt
+      (Alpha_context.Raw_level.to_int32 node_ctxt.lcc.level)
 
   let block_of_prefix node_ctxt block =
     match block with

@@ -125,7 +125,7 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
         _;
       } as configuration) =
   let open Lwt_result_syntax in
-  let*! store = Store.load mode Configuration.(default_storage_dir data_dir) in
+  let* store = Store.load mode Configuration.(default_storage_dir data_dir) in
   let*! context =
     Context.load mode (Configuration.default_context_dir data_dir)
   in
@@ -161,24 +161,26 @@ let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir mode
     }
 
 let close {cctxt; store; context; l1_ctxt; _} =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let message = cctxt#message in
-  let* () = message "Shutting down L1@." in
-  let* () = Layer1.shutdown l1_ctxt in
-  let* () = message "Closing context@." in
-  let* () = Context.close context in
-  let* () = message "Closing store@." in
+  let*! () = message "Shutting down L1@." in
+  let*! () = Layer1.shutdown l1_ctxt in
+  let*! () = message "Closing context@." in
+  let*! () = Context.close context in
+  let*! () = message "Closing store@." in
   let* () = Store.close store in
   return_unit
 
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
-  let*! l2_block = Store.L2_blocks.find node_ctxt.store block_hash in
+  let* l2_header =
+    Store.L2_blocks.header node_ctxt.store.l2_blocks block_hash
+  in
   let*? context_hash =
-    match l2_block with
+    match l2_header with
     | None ->
         error (Sc_rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some {header = {context; _}; _} -> ok context
+    | Some {context; _} -> ok context
   in
   let*! ctxt = Context.checkout node_ctxt.context context_hash in
   match ctxt with
@@ -218,161 +220,188 @@ let trace_lwt_result_with x =
     x
 
 let hash_of_level_opt {store; cctxt; _} level =
-  let open Lwt_syntax in
-  let* hash = Store.Levels_to_hashes.find store level in
+  let open Lwt_result_syntax in
+  let* hash = Store.Levels_to_hashes.find store.levels_to_hashes level in
   match hash with
   | Some hash -> return_some hash
   | None ->
-      let+ hash =
+      let*! hash =
         Tezos_shell_services.Shell_services.Blocks.hash
           cctxt
           ~chain:cctxt#chain
           ~block:(`Level level)
           ()
       in
-      Result.to_option hash
+      return (Result.to_option hash)
 
 let hash_of_level node_ctxt level =
   let open Lwt_result_syntax in
-  let*! hash = hash_of_level_opt node_ctxt level in
+  let* hash = hash_of_level_opt node_ctxt level in
   match hash with
   | Some h -> return h
   | None -> failwith "Cannot retrieve hash of level %ld" level
 
 let level_of_hash {l1_ctxt; store; _} hash =
   let open Lwt_result_syntax in
-  let*! block = Store.L2_blocks.find store hash in
-  match block with
-  | Some {header = {level; _}; _} -> return (Raw_level.to_int32 level)
+  let* l2_header = Store.L2_blocks.header store.l2_blocks hash in
+  match l2_header with
+  | Some {level; _} -> return (Raw_level.to_int32 level)
   | None ->
       let+ {level; _} = Layer1.fetch_tezos_shell_header l1_ctxt hash in
       level
 
 let save_level {store; _} Layer1.{hash; level} =
-  Store.Levels_to_hashes.add store level hash
+  Store.Levels_to_hashes.add store.levels_to_hashes level hash
 
 let save_l2_head {store; _} (head : Sc_rollup_block.t) =
-  let open Lwt_syntax in
-  let* () = Store.L2_blocks.add store head.header.block_hash head in
-  Store.L2_head.set store head
+  let open Lwt_result_syntax in
+  let head_info = {head with header = (); content = ()} in
+  let* () =
+    Store.L2_blocks.append
+      store.l2_blocks
+      ~key:head.header.block_hash
+      ~header:head.header
+      ~value:head_info
+  in
+  Store.L2_head.write store.l2_head head
 
-let is_processed {store; _} head = Store.L2_blocks.mem store head
+let is_processed {store; _} head = Store.L2_blocks.mem store.l2_blocks head
 
-let last_processed_head_opt {store; _} = Store.L2_head.find store
+let last_processed_head_opt {store; _} = Store.L2_head.read store.l2_head
 
 let mark_finalized_head {store; _} head_hash =
-  let open Lwt_syntax in
-  let* block = Store.L2_blocks.find store head_hash in
+  let open Lwt_result_syntax in
+  let* block = Store.L2_blocks.read store.l2_blocks head_hash in
   match block with
   | None -> return_unit
-  | Some block -> Store.Last_finalized_head.set store block
+  | Some (block_info, header) ->
+      let block = {block_info with header} in
+      Store.Last_finalized_head.write store.last_finalized_head block
 
-let get_finalized_head_opt {store; _} = Store.Last_finalized_head.find store
+let get_finalized_head_opt {store; _} =
+  Store.Last_finalized_head.read store.last_finalized_head
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4532
    Make this logarithmic, by storing pointers to muliple predecessor and
    by dichotomy. *)
 let block_before {store; _} tick =
   let open Lwt_result_syntax in
-  let*! head = Store.L2_head.find store in
+  let* head = Store.L2_head.read store.l2_head in
   match head with
   | None -> return_none
   | Some head ->
       let rec search block_hash =
-        let*! block = Store.L2_blocks.find store block_hash in
+        let* block = Store.L2_blocks.read store.l2_blocks block_hash in
         match block with
         | None -> failwith "Missing block %a" Block_hash.pp block_hash
-        | Some block ->
-            if Sc_rollup.Tick.(block.initial_tick <= tick) then
-              return_some block
-            else search block.header.predecessor
+        | Some (info, header) ->
+            if Sc_rollup.Tick.(info.initial_tick <= tick) then
+              return_some {info with header}
+            else search header.predecessor
       in
       search head.header.block_hash
 
 let get_l2_block {store; _} block_hash =
-  trace_lwt_with "Could not retrieve L2 block for %a" Block_hash.pp block_hash
-  @@ Store.L2_blocks.get store block_hash
+  let open Lwt_result_syntax in
+  let* block = Store.L2_blocks.read store.l2_blocks block_hash in
+  match block with
+  | None ->
+      failwith "Could not retrieve L2 block for %a" Block_hash.pp block_hash
+  | Some (info, header) -> return {info with Sc_rollup_block.header}
 
-let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
+let find_l2_block {store; _} block_hash =
+  let open Lwt_result_syntax in
+  let+ block = Store.L2_blocks.read store.l2_blocks block_hash in
+  Option.map (fun (info, header) -> {info with Sc_rollup_block.header}) block
 
 let get_l2_block_by_level node_ctxt level =
   let open Lwt_result_syntax in
   trace_lwt_result_with "Could not retrieve L2 block at level %ld" level
   @@ let* block_hash = hash_of_level node_ctxt level in
-     let*! block = Store.L2_blocks.get node_ctxt.store block_hash in
-     return block
+     get_l2_block node_ctxt block_hash
 
 let find_l2_block_by_level node_ctxt level =
-  let open Lwt_option_syntax in
+  let open Lwt_result_syntax in
   let* block_hash = hash_of_level_opt node_ctxt level in
-  Store.L2_blocks.find node_ctxt.store block_hash
-
-let get_full_l2_block {store; _} block_hash =
-  let open Lwt_syntax in
-  let* block = Store.L2_blocks.get store block_hash in
-  let* inbox = Store.Inboxes.get store block.header.inbox_hash
-  and* {messages; _} = Store.Messages.get store block.header.inbox_witness
-  and* commitment =
-    Option.map_s (Store.Commitments.get store) block.header.commitment_hash
-  in
-  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
+  match block_hash with
+  | None -> return_none
+  | Some block_hash -> find_l2_block node_ctxt block_hash
 
 let get_commitment {store; _} commitment_hash =
-  trace_lwt_with
-    "Could not retrieve commitment %a"
-    Sc_rollup.Commitment.Hash.pp
-    commitment_hash
-  @@ Store.Commitments.get store commitment_hash
+  let open Lwt_result_syntax in
+  let* commitment = Store.Commitments.find store.commitments commitment_hash in
+  match commitment with
+  | None ->
+      failwith
+        "Could not retrieve commitment %a"
+        Sc_rollup.Commitment.Hash.pp
+        commitment_hash
+  | Some c -> return c
 
-let find_commitment {store; _} hash = Store.Commitments.find store hash
+let find_commitment {store; _} hash =
+  Store.Commitments.find store.commitments hash
 
-let commitment_exists {store; _} hash = Store.Commitments.mem store hash
+let commitment_exists {store; _} hash =
+  Store.Commitments.mem store.commitments hash
 
 let save_commitment {store; _} commitment =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
-  let+ () = Store.Commitments.add store hash commitment in
+  let+ () = Store.Commitments.add store.commitments hash commitment in
   hash
 
 let commitment_published_at_level {store; _} commitment =
-  Store.Commitments_published_at_level.find store commitment
+  Store.Commitments_published_at_level.find
+    store.commitments_published_at_level
+    commitment
 
 let set_commitment_published_at_level {store; _} =
-  Store.Commitments_published_at_level.add store
+  Store.Commitments_published_at_level.add store.commitments_published_at_level
 
 type commitment_source = Anyone | Us
 
 let commitment_was_published {store; _} ~source commitment_hash =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   match source with
-  | Anyone -> Store.Commitments_published_at_level.mem store commitment_hash
+  | Anyone ->
+      Store.Commitments_published_at_level.mem
+        store.commitments_published_at_level
+        commitment_hash
   | Us -> (
       let+ info =
-        Store.Commitments_published_at_level.find store commitment_hash
+        Store.Commitments_published_at_level.find
+          store.commitments_published_at_level
+          commitment_hash
       in
       match info with
       | Some {published_at_level = Some _; _} -> true
       | _ -> false)
 
 let get_inbox {store; _} inbox_hash =
-  trace_lwt_with
-    "Could not retrieve inbox %a"
-    Sc_rollup.Inbox.Hash.pp
-    inbox_hash
-  @@ Store.Inboxes.get store inbox_hash
+  let open Lwt_result_syntax in
+  let* inbox = Store.Inboxes.read store.inboxes inbox_hash in
+  match inbox with
+  | None ->
+      failwith "Could not retrieve inbox %a" Sc_rollup.Inbox.Hash.pp inbox_hash
+  | Some (i, ()) -> return i
 
-let find_inbox {store; _} hash = Store.Inboxes.find store hash
+let find_inbox {store; _} hash =
+  let open Lwt_result_syntax in
+  let+ inbox = Store.Inboxes.read store.inboxes hash in
+  Option.map fst inbox
 
 let save_inbox {store; _} inbox =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let hash = Sc_rollup.Inbox.hash inbox in
-  let+ () = Store.Inboxes.add store hash inbox in
+  let+ () = Store.Inboxes.append store.inboxes ~key:hash ~value:inbox in
   hash
 
-let find_inbox_by_block_hash {store; _} block_hash =
-  let open Lwt_option_syntax in
-  let* l2_block = Store.L2_blocks.find store block_hash in
-  Store.Inboxes.find store l2_block.header.inbox_hash
+let find_inbox_by_block_hash ({store; _} as node_ctxt) block_hash =
+  let open Lwt_result_syntax in
+  let* header = Store.L2_blocks.header store.l2_blocks block_hash in
+  match header with
+  | None -> return_none
+  | Some {inbox_hash; _} -> find_inbox node_ctxt inbox_hash
 
 let genesis_inbox node_ctxt =
   let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
@@ -382,7 +411,7 @@ let genesis_inbox node_ctxt =
 
 let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
   let open Lwt_result_syntax in
-  let*! possible_inbox = find_inbox_by_block_hash node_ctxt block_hash in
+  let* possible_inbox = find_inbox_by_block_hash node_ctxt block_hash in
   (* Pre-condition: forall l. (l > genesis_level) => inbox[l] <> None. *)
   match possible_inbox with
   | None ->
@@ -413,16 +442,49 @@ let get_inbox_by_block_hash node_ctxt hash =
   let* level = level_of_hash node_ctxt hash in
   inbox_of_head node_ctxt {hash; level}
 
+type messages_info = {
+  predecessor : Block_hash.t;
+  predecessor_timestamp : Timestamp.t;
+  messages : Sc_rollup.Inbox_message.t list;
+}
+
 let get_messages {store; _} messages_hash =
-  trace_lwt_with
-    "Could not retrieve messages with payloads merkelized hash %a"
-    Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
-    messages_hash
-  @@ Store.Messages.get store messages_hash
+  let open Lwt_result_syntax in
+  let* msg = Store.Messages.read store.messages messages_hash in
+  match msg with
+  | None ->
+      failwith
+        "Could not retrieve messages with payloads merkelized hash %a"
+        Sc_rollup.Inbox_merkelized_payload_hashes.Hash.pp
+        messages_hash
+  | Some (messages, (predecessor, predecessor_timestamp)) ->
+      return {predecessor; predecessor_timestamp; messages}
 
-let find_messages {store; _} hash = Store.Messages.find store hash
+let find_messages {store; _} hash =
+  let open Lwt_result_syntax in
+  let+ msgs = Store.Messages.read store.messages hash in
+  Option.map
+    (fun (messages, (predecessor, predecessor_timestamp)) ->
+      {predecessor; predecessor_timestamp; messages})
+    msgs
 
-let save_messages {store; _} = Store.Messages.add store
+let save_messages {store; _} key {predecessor; predecessor_timestamp; messages}
+    =
+  Store.Messages.append
+    store.messages
+    ~key
+    ~header:(predecessor, predecessor_timestamp)
+    ~value:messages
+
+let get_full_l2_block node_ctxt block_hash =
+  let open Lwt_result_syntax in
+  let* block = get_l2_block node_ctxt block_hash in
+  let* inbox = get_inbox node_ctxt block.header.inbox_hash
+  and* {messages; _} = get_messages node_ctxt block.header.inbox_witness
+  and* commitment =
+    Option.map_es (get_commitment node_ctxt) block.header.commitment_hash
+  in
+  return {block with content = {Sc_rollup_block.inbox; messages; commitment}}
 
 let get_slot_header {store; _} ~published_in_block_hash slot_index =
   trace_lwt_with
@@ -432,47 +494,49 @@ let get_slot_header {store; _} ~published_in_block_hash slot_index =
     Block_hash.pp
     published_in_block_hash
   @@ Store.Dal_slots_headers.get
-       store
+       store.irmin_store
        ~primary_key:published_in_block_hash
        ~secondary_key:slot_index
 
 let get_all_slot_headers {store; _} ~published_in_block_hash =
-  Store.Dal_slots_headers.list_values store ~primary_key:published_in_block_hash
+  Store.Dal_slots_headers.list_values
+    store.irmin_store
+    ~primary_key:published_in_block_hash
 
 let get_slot_indexes {store; _} ~published_in_block_hash =
   Store.Dal_slots_headers.list_secondary_keys
-    store
+    store.irmin_store
     ~primary_key:published_in_block_hash
 
 let save_slot_header {store; _} ~published_in_block_hash
     (slot_header : Dal.Slot.Header.t) =
   Store.Dal_slots_headers.add
-    store
+    store.irmin_store
     ~primary_key:published_in_block_hash
     ~secondary_key:slot_header.id.index
     slot_header
 
 let processed_slot {store; _} ~confirmed_in_block_hash slot_index =
   Store.Dal_processed_slots.find
-    store
+    store.irmin_store
     ~primary_key:confirmed_in_block_hash
     ~secondary_key:slot_index
 
 let list_slot_pages {store; _} ~confirmed_in_block_hash =
   Store.Dal_slot_pages.list_secondary_keys_with_values
-    store
+    store.irmin_store
     ~primary_key:confirmed_in_block_hash
 
 let find_slot_page {store; _} ~confirmed_in_block_hash ~slot_index ~page_index =
   Store.Dal_slot_pages.find
-    store
+    store.irmin_store
     ~primary_key:confirmed_in_block_hash
     ~secondary_key:(slot_index, page_index)
 
 let save_unconfirmed_slot {store; _} current_block_hash slot_index =
   (* No page is actually saved *)
   Store.Dal_processed_slots.add
-    store
+    store.irmin_store
     ~primary_key:current_block_hash
     ~secondary_key:slot_index
     `Unconfirmed
@@ -485,26 +549,26 @@ let save_confirmed_slot {store; _} current_block_hash slot_index pages =
     List.iteri_s
       (fun page_number page ->
         Store.Dal_slot_pages.add
-          store
+          store.irmin_store
           ~primary_key:current_block_hash
           ~secondary_key:(slot_index, page_number)
           page)
       pages
   in
   Store.Dal_processed_slots.add
-    store
+    store.irmin_store
     ~primary_key:current_block_hash
     ~secondary_key:slot_index
     `Confirmed
 
 let find_confirmed_slots_history {store; _} =
-  Store.Dal_confirmed_slots_history.find store
+  Store.Dal_confirmed_slots_history.find store.irmin_store
 
 let save_confirmed_slots_history {store; _} =
-  Store.Dal_confirmed_slots_history.add store
+  Store.Dal_confirmed_slots_history.add store.irmin_store
 
 let find_confirmed_slots_histories {store; _} =
-  Store.Dal_confirmed_slots_histories.find store
+  Store.Dal_confirmed_slots_histories.find store.irmin_store
 
 let save_confirmed_slots_histories {store; _} =
-  Store.Dal_confirmed_slots_histories.add store
+  Store.Dal_confirmed_slots_histories.add store.irmin_store
