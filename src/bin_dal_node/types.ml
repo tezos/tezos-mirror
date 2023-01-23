@@ -29,7 +29,7 @@
 *)
 
 (** Data kind stored in DAL. *)
-type kind = Commitment | Header_status | Slot_id | Slot
+type kind = Commitment | Header_status | Slot_id | Slot | Profile
 
 let kind_encoding : kind Data_encoding.t =
   Data_encoding.string_enum
@@ -38,6 +38,7 @@ let kind_encoding : kind Data_encoding.t =
       ("header_status", Header_status);
       ("slot_id", Slot_id);
       ("slot", Slot);
+      ("profile", Profile);
     ]
 
 let kind_to_string data_kind =

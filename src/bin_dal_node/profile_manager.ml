@@ -27,12 +27,6 @@
    Node profiles should be stored into the memory as well
    so that we can cache them *)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4623
-
-   Extend the work done in https://gitlab.com/tezos/tezos/-/merge_requests/7344
-   for profiles as well.
-*)
-
 type error +=
   | Dal_attestor_not_in_committee of {
       attestor : Tezos_crypto.Signature.Public_key_hash.t;
@@ -66,10 +60,7 @@ let add_profile node_store profile =
   let*! () = Store.Legacy.add_profile node_store profile in
   return_unit
 
-let get_profiles node_store =
-  let open Lwt_result_syntax in
-  let*! profiles = Store.Legacy.get_profiles node_store in
-  return profiles
+let get_profiles node_store = Store.Legacy.get_profiles node_store
 
 let get_attestable_slots ctxt store cryptobox proto_parameters pkh
     ~attested_level =

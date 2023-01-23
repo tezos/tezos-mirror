@@ -32,7 +32,8 @@ val add_profile :
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles :
-  Store.node_store -> Services.Types.profile list tzresult Lwt.t
+  Store.node_store ->
+  (Services.Types.profile list, Errors.decoding) result Lwt.t
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
