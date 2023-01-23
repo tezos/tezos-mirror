@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_gossipsub)
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-gossipsub
+  tezt)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_gossipsub))
+
+(rule
+ (alias runtest)
+ (package tezos-gossipsub-test)
+ (action (run %{dep:./test_gossipsub.exe})))

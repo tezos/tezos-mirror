@@ -1800,6 +1800,37 @@ let _octez_p2p_tests =
               ];
         ])
 
+let octez_gossipsub =
+  public_lib
+    "tezos-gossipsub"
+    ~path:"src/lib_gossipsub"
+    ~synopsis:"Tezos: An implementation of gossipsub"
+    ~deps:
+      [
+        ringo;
+        aches;
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix |> open_;
+        octez_stdlib_unix |> open_;
+        octez_stdlib |> open_;
+        octez_version;
+      ]
+
+let _octez_gossipsub_test =
+  test
+    "test_gossipsub"
+    ~path:"src/lib_gossipsub/test"
+    ~opam:"tezos-gossipsub-test"
+    ~synopsis:"Tests for the gossipsub algorithm"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_gossipsub |> open_;
+        tezt_lib;
+      ]
+
 let octez_wasmer =
   public_lib
     "tezos-wasmer"

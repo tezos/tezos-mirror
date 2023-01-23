@@ -840,6 +840,10 @@ opam:tezos-event-logging-test-helpers:
 
 # Ignoring unreleased package tezos-expect-helper.
 
+# Ignoring unreleased package tezos-gossipsub.
+
+# Ignoring unreleased package tezos-gossipsub-test.
+
 opam:tezos-hacl:
   extends:
     - .opam_template
