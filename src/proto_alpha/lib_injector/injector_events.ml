@@ -145,6 +145,16 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
       ~level:Info
       ("number_of_operations", Data_encoding.int31)
 
+  let considered_operations_info =
+    declare_1
+      ~name:"considered_operations_info"
+      ~msg:
+        "injector's queue: the following operations are being considered for \
+         injection {operations}"
+      ~level:Debug
+      ("operations", Data_encoding.list L1_operation.encoding)
+      ~pp1:pp_operations_list
+
   let simulating_operations =
     declare_2
       ~name:"simulating_operations"

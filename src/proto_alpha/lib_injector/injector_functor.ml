@@ -701,6 +701,9 @@ module Make (Parameters : PARAMETERS) = struct
     let open Lwt_result_syntax in
     (* Retrieve and remove operations from pending *)
     let operations_to_inject = get_operations_from_queue ~size_limit state in
+    let*! () =
+      Event.(emit1 considered_operations_info) state operations_to_inject
+    in
     match operations_to_inject with
     | [] -> return_unit
     | _ -> (
