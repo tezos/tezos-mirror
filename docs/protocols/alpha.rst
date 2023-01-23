@@ -34,6 +34,8 @@ Smart Rollups
 
 - Fix error raised when no commitment can be cemented. (MR :gl:`!7286`)
 
+- Use ``Ticket_transfer`` module in ``sc_rollup_operations``. (MR :gl:`!7438`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
