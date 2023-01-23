@@ -23,55 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let resolve_plugin
-    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) =
-  let open Lwt_syntax in
-  let plugin_opt =
-    Option.either
-      (Dal_plugin.get protocols.current_protocol)
-      (Dal_plugin.get protocols.next_protocol)
-  in
-  Option.map_s
-    (fun dal_plugin ->
-      let (module Dal_plugin : Dal_plugin.T) = dal_plugin in
-      let* () = Event.emit_protocol_plugin_resolved Dal_plugin.Proto.hash in
-      return dal_plugin)
-    plugin_opt
-
 type error +=
-  | Cryptobox_initialisation_failed of string
   | Reveal_data_path_not_a_directory of string
   | Cannot_create_reveal_data_dir of string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.cryptobox.initialisation_failed"
-    ~title:"Cryptobox initialisation failed"
-    ~description:"Unable to initialise the cryptobox parameters"
-    ~pp:(fun ppf msg ->
-      Format.fprintf
-        ppf
-        "Unable to initialise the cryptobox parameters. Reason: %s"
-        msg)
-    Data_encoding.(obj1 (req "error" string))
-    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
-    (fun str -> Cryptobox_initialisation_failed str)
-
-let init_cryptobox unsafe_srs (proto_parameters : Dal_plugin.proto_parameters) =
-  let open Lwt_result_syntax in
-  let* () =
-    let use_mock_srs_for_testing : Cryptobox.parameters option =
-      if unsafe_srs then Some proto_parameters.cryptobox_parameters else None
-    in
-    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-    Cryptobox.Config.init_dal
-      ~find_srs_files
-      Cryptobox.Config.{activated = true; use_mock_srs_for_testing}
-  in
-  match Cryptobox.make proto_parameters.cryptobox_parameters with
-  | Ok cryptobox -> return cryptobox
-  | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
 module Handler = struct
   (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
@@ -100,8 +54,8 @@ module Handler = struct
     in
     return (go (), stopper)
 
-  let resolve_plugin_and_set_ready config ctxt cctxt =
-    (* Monitor heads and try resolve the DAL protocol plugin corresponding to
+  let resolve_plugin_and_set_ready ctxt cctxt =
+    (* Monitor heads and try resolve the DAC protocol plugin corresponding to
        the protocol of the targeted node. *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
        Handle situtation where plugin is not found *)
@@ -113,21 +67,14 @@ module Handler = struct
       in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4627
          Register only one plugin according to mode of operation. *)
-      let*! plugin_opt = resolve_plugin protocols in
-      match plugin_opt with
-      | Some plugin ->
-          let (module Dal_plugin : Dal_plugin.T) = plugin in
-          let* proto_parameters =
-            Dal_plugin.get_constants cctxt#chain cctxt#block cctxt
-          in
-          let* cryptobox =
-            init_cryptobox config.Configuration.use_unsafe_srs proto_parameters
-          in
-          Node_context.set_ready ctxt plugin cryptobox proto_parameters ;
+      let*! dac_plugin = Dac_manager.resolve_plugin protocols in
+      match dac_plugin with
+      | Some dac_plugin ->
+          Node_context.set_ready ctxt ~dac_plugin ;
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
-      | _ -> return_unit
+      | None -> return_unit
     in
     let handler stopper el =
       match Node_context.get_status ctxt with
@@ -145,38 +92,8 @@ module Handler = struct
     let handler _stopper (block_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
-      | Ready {plugin = (module Dal_plugin); proto_parameters; _} ->
+      | Ready _ ->
           let block_level = header.shell.level in
-          let* block_info =
-            Dal_plugin.block_info
-              cctxt
-              ~block:(`Hash (block_hash, 0))
-              ~metadata:`Always
-          in
-          let* slot_headers =
-            Dal_plugin.get_published_slot_headers block_info
-          in
-          let*! () =
-            Slot_manager.store_slot_headers
-              ~block_level
-              ~block_hash
-              slot_headers
-              (Node_context.get_store ctxt)
-          in
-          let*? attested_slots =
-            Dal_plugin.attested_slot_headers
-              block_hash
-              block_info
-              ~number_of_slots:proto_parameters.number_of_slots
-          in
-          let*! () =
-            Slot_manager.update_selected_slot_headers_statuses
-              ~block_level
-              ~attestation_lag:proto_parameters.attestation_lag
-              ~number_of_slots:proto_parameters.number_of_slots
-              attested_slots
-              (Node_context.get_store ctxt)
-          in
           let*! () =
             Event.(emit layer1_node_new_head (block_hash, block_level))
           in
@@ -188,42 +105,6 @@ module Handler = struct
     make_stream_daemon
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
-
-  let new_slot_header ctxt =
-    (* Monitor neighbor DAL nodes and download published slots as shards. *)
-    let open Lwt_result_syntax in
-    let handler n_cctxt Node_context.{cryptobox; _} slot_header =
-      let dal_parameters = Cryptobox.parameters cryptobox in
-      let downloaded_shard_ids =
-        0
-        -- ((dal_parameters.number_of_shards / dal_parameters.redundancy_factor)
-           - 1)
-      in
-      let* shards =
-        RPC_server_legacy.shards_rpc n_cctxt slot_header downloaded_shard_ids
-      in
-      let shards = List.to_seq shards in
-      let* () =
-        Slot_manager.save_shards
-          (Node_context.get_store ctxt).shard_store
-          (Node_context.get_store ctxt).slots_watcher
-          cryptobox
-          slot_header
-          shards
-      in
-      return_unit
-    in
-    let handler n_cctxt _stopper slot_header =
-      match Node_context.get_status ctxt with
-      | Starting -> return_unit
-      | Ready ready_ctxt -> handler n_cctxt ready_ctxt slot_header
-    in
-    List.map
-      (fun n_cctxt ->
-        make_stream_daemon
-          (handler n_cctxt)
-          (RPC_server_legacy.monitor_slot_headers_rpc n_cctxt))
-      (Node_context.get_neighbors_cctxts ctxt)
 end
 
 let daemonize handlers =
@@ -249,16 +130,28 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
-  let* store = Store.init config in
-  let ctxt = Node_context.init config store cctxt in
-  let* rpc_server = RPC_server.(start config ctxt) in
+  let* () =
+    Dac_manager.Storage.ensure_reveal_data_dir_exists config.dac.reveal_data_dir
+  in
+  let* dac_accounts = Dac_manager.Keys.get_keys cctxt config in
+  let dac_pks_opt, dac_sk_uris =
+    dac_accounts
+    |> List.map (fun account_opt ->
+           match account_opt with
+           | None -> (None, None)
+           | Some (_pkh, pk_opt, sk_uri) -> (pk_opt, Some sk_uri))
+    |> List.split
+  in
+  let ctxt = Node_context.init config cctxt in
+
+  let* rpc_server =
+    RPC_server.(start config cctxt ctxt dac_pks_opt dac_sk_uris)
+  in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
   in
   (* Start daemon to resolve current protocol plugin *)
-  let* () =
-    daemonize [Handler.resolve_plugin_and_set_ready config ctxt cctxt]
-  in
+  let* () = daemonize [Handler.resolve_plugin_and_set_ready ctxt cctxt] in
   (* Start never-ending monitoring daemons *)
-  daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
+  daemonize [Handler.new_head ctxt cctxt]

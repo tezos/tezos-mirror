@@ -245,6 +245,8 @@ opam:octez-codec:
   variables:
     package: octez-codec
 
+# Ignoring unreleased package octez-dac-node.
+
 # Ignoring unreleased package octez-dal-node.
 
 opam:octez-node:
@@ -606,6 +608,8 @@ opam:tezos-crypto-dal:
     package: tezos-crypto-dal
 
 # Ignoring unreleased package tezos-dac-alpha.
+
+# Ignoring unreleased package tezos-dac-node-lib.
 
 # Ignoring unreleased package tezos-dal-016-PtMumbai.
 

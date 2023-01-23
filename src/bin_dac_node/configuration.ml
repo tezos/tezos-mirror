@@ -23,17 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
-
-type t = {
-  use_unsafe_srs : bool;
-  data_dir : string;
-  rpc_addr : string;
-  rpc_port : int;
-  neighbors : neighbor list;
+type dac = {
+  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+  threshold : int;
+  reveal_data_dir : string;
 }
 
-let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
+type t = {data_dir : string; rpc_addr : string; rpc_port : int; dac : dac}
+
+let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dac-node"
 
 let data_dir_path config subpath = Filename.concat config.data_dir subpath
 
@@ -43,32 +41,46 @@ let filename config = relative_filename config.data_dir
 
 let default_rpc_addr = "127.0.0.1"
 
-let default_rpc_port = 10732
+let default_rpc_port = 10832
 
-let default_neighbors = []
+let default_dac_threshold = 0
 
-let default_use_unsafe_srs = false
+let default_dac_addresses = []
 
-let neighbor_encoding : neighbor Data_encoding.t =
+let default_reveal_data_dir =
+  Filename.concat
+    (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
+    "wasm_2_0_0"
+
+let default_dac =
+  {
+    addresses = default_dac_addresses;
+    threshold = default_dac_threshold;
+    reveal_data_dir = default_reveal_data_dir;
+  }
+
+let dac_encoding : dac Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {addr; port} -> (addr, port))
-    (fun (addr, port) -> {addr; port})
-    (obj2 (req "rpc-addr" string) (req "rpc-port" int16))
+    (fun {addresses; threshold; reveal_data_dir} ->
+      (addresses, threshold, reveal_data_dir))
+    (fun (addresses, threshold, reveal_data_dir) ->
+      {addresses; threshold; reveal_data_dir})
+    (obj3
+       (req
+          "addresses"
+          (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding))
+       (req "threshold" uint8)
+       (req "reveal-data-dir" string))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors})
-    (obj5
-       (dft
-          "use_unsafe_srs"
-          ~description:"use unsafe srs for tests"
-          bool
-          default_use_unsafe_srs)
+    (fun {data_dir; rpc_addr; rpc_port; dac} ->
+      (data_dir, rpc_addr, rpc_port, dac))
+    (fun (data_dir, rpc_addr, rpc_port, dac) ->
+      {data_dir; rpc_addr; rpc_port; dac})
+    (obj4
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -77,16 +89,16 @@ let encoding : t Data_encoding.t =
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
        (dft
-          "neighbors"
-          ~description:"DAL Neighbors"
-          (list neighbor_encoding)
-          default_neighbors))
+          "dac"
+          ~description:"Data Availability Committee"
+          dac_encoding
+          default_dac))
 
-type error += DAL_node_unable_to_write_configuration_file of string
+type error += DAC_node_unable_to_write_configuration_file of string
 
 let () =
   register_error_kind
-    ~id:"dal.node.unable_to_write_configuration_file"
+    ~id:"dac.node.unable_to_write_configuration_file"
     ~title:"Unable to write configuration file"
     ~description:"Unable to write configuration file"
     ~pp:(fun ppf file ->
@@ -94,9 +106,9 @@ let () =
     `Permanent
     Data_encoding.(obj1 (req "file" string))
     (function
-      | DAL_node_unable_to_write_configuration_file path -> Some path
+      | DAC_node_unable_to_write_configuration_file path -> Some path
       | _ -> None)
-    (fun path -> DAL_node_unable_to_write_configuration_file path)
+    (fun path -> DAC_node_unable_to_write_configuration_file path)
 
 let save config =
   let open Lwt_syntax in
@@ -111,7 +123,7 @@ let save config =
   in
   Lwt.return
     (Result.map_error
-       (fun _ -> [DAL_node_unable_to_write_configuration_file file])
+       (fun _ -> [DAC_node_unable_to_write_configuration_file file])
        v)
 
 let load ~data_dir =

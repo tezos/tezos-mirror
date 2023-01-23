@@ -3257,6 +3257,22 @@ let _octez_dal_node_lib_tests =
         alcotest_lwt;
       ]
 
+let octez_dac_node_lib =
+  private_lib
+    "tezos_dac_node_lib"
+    ~path:"src/lib_dac_node"
+    ~opam:"tezos-dac-node-lib"
+    ~synopsis:"Tezos: `tezos-dac-node` library"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_client_base |> open_;
+        octez_protocol_updater |> open_;
+        octez_client_base_unix |> open_;
+        octez_stdlib_unix |> open_;
+      ]
+
 let octez_node_config =
   public_lib
     "octez-node-config"
@@ -5096,7 +5112,7 @@ module Protocol = Protocol
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
-            octez_dal_node_lib |> open_;
+            octez_dac_node_lib |> open_;
             client |> if_some |> open_;
             embedded |> open_;
             layer2_utils |> if_some |> open_;
@@ -6039,9 +6055,7 @@ let _octez_dal_node =
             (* Other protocols are optional. *)
             true
       in
-      let targets =
-        List.filter_map Fun.id [Protocol.dal protocol; Protocol.dac protocol]
-      in
+      let targets = List.filter_map Fun.id [Protocol.dal protocol] in
       if is_optional then List.map optional targets else targets
     in
     List.map deps_for_protocol Protocol.all |> List.flatten
@@ -6070,6 +6084,56 @@ let _octez_dal_node =
          octez_dal_node_services |> open_;
          octez_layer2_store |> open_;
          octez_crypto_dal |> open_;
+         irmin_pack;
+         irmin_pack_unix;
+         irmin;
+       ]
+      @ protocol_deps)
+
+let _octez_dac_node =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | _, V 000 ->
+            (* The node always needs to be linked with this protocol for Mainnet. *)
+            false
+        | Active, V _ ->
+            (* Active protocols cannot be optional because of a bug
+               that results in inconsistent hashes. Once this bug is fixed,
+               this exception can be removed. *)
+            false
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+            (* Other protocols are optional. *)
+            true
+      in
+      let targets = List.filter_map Fun.id [Protocol.dac protocol] in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
+  public_exe
+    "octez-dac-node"
+    ~path:"src/bin_dac_node"
+    ~internal_name:"main_dac"
+    ~synopsis:"Tezos: `octez-dac-node` binary"
+    ~release_status:Experimental
+    ~deps:
+      ([
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_base_unix;
+         octez_clic;
+         octez_client_base |> open_;
+         octez_client_base_unix |> open_;
+         octez_client_commands |> open_;
+         octez_rpc_http |> open_;
+         octez_rpc_http_server;
+         octez_protocol_updater;
+         octez_rpc_http_client_unix;
+         octez_stdlib_unix |> open_;
+         octez_stdlib |> open_;
+         octez_dac_node_lib |> open_;
+         octez_layer2_store |> open_;
          irmin_pack;
          irmin_pack_unix;
          irmin;

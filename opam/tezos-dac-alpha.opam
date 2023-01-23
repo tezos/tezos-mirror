@@ -13,7 +13,7 @@ depends: [
   "tezos-base"
   "octez-protocol-compiler"
   "tezos-stdlib-unix"
-  "tezos-dal-node-lib"
+  "tezos-dac-node-lib"
   "tezos-client-alpha"
   "tezos-embedded-protocol-alpha"
   "tezos-layer2-utils-alpha"

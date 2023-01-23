@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+exception Status_already_ready
+
+type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
+
+type status = Ready of ready_ctxt | Starting
 
 type t = {
-  use_unsafe_srs : bool;
-      (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : string;  (** The address the DAL node listens to *)
-  rpc_port : int;  (** The port the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
+  mutable status : status;
+  config : Configuration.t;
+  tezos_node_cctxt : Client_context.full;
 }
 
-(** [filename config] gets the path to config file *)
-val filename : t -> string
+let init config cctxt = {status = Starting; config; tezos_node_cctxt = cctxt}
 
-(** [data_dir_path config subpath] builds a subpath relatively to the
-    [config] *)
-val data_dir_path : t -> string -> string
+let set_ready ctxt ~dac_plugin =
+  match ctxt.status with
+  | Starting -> ctxt.status <- Ready {dac_plugin}
+  | Ready _ -> raise Status_already_ready
 
-val default_data_dir : string
+type error += Node_not_ready
 
-val default_rpc_addr : string
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dac.node.not.ready"
+    ~title:"DAC Node not ready"
+    ~description:"DAC node is starting. It's not ready to respond to RPCs."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "DAC node is starting. It's not ready to respond to RPCs.")
+    Data_encoding.(unit)
+    (function Node_not_ready -> Some () | _ -> None)
+    (fun () -> Node_not_ready)
 
-val default_rpc_port : int
+let get_ready ctxt =
+  let open Result_syntax in
+  match ctxt.status with
+  | Ready ctxt -> Ok ctxt
+  | Starting -> fail [Node_not_ready]
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
+let get_config ctxt = ctxt.config
 
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+let get_status ctxt = ctxt.status
+
+let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt

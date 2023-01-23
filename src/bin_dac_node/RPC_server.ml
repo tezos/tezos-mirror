@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,31 +24,59 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+open Tezos_rpc_http
+open Tezos_rpc_http_server
 
-type t = {
-  use_unsafe_srs : bool;
-      (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : string;  (** The address the DAL node listens to *)
-  rpc_port : int;  (** The port the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
-}
+let start configuration cctxt ctxt dac_pks_opt dac_sk_uris =
+  let open Lwt_syntax in
+  let Configuration.
+        {rpc_addr; rpc_port; dac = {reveal_data_dir; threshold; _}; _} =
+    configuration
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4558
+     Rename "plugin" prefix to "dac".
+  *)
+  let plugin_prefix = Tezos_rpc.Path.(open_root / "plugin") in
+  let dir =
+    Tezos_rpc.Directory.register_dynamic_directory
+      Tezos_rpc.Directory.empty
+      plugin_prefix
+      (fun () ->
+        match Node_context.get_status ctxt with
+        | Ready {dac_plugin = (module Dac_plugin); _} ->
+            Lwt.return
+              (Dac_plugin.RPC.rpc_services
+                 ~reveal_data_dir
+                 cctxt
+                 dac_pks_opt
+                 dac_sk_uris
+                 threshold)
+        | Starting -> Lwt.return Tezos_rpc.Directory.empty)
+  in
+  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string rpc_addr in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.default rpc_addr in
+  let server =
+    RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
+  in
+  Lwt.catch
+    (fun () ->
+      let* () =
+        RPC_server.launch
+          ~host
+          server
+          ~callback:(RPC_server.resto_callback server)
+          node
+      in
+      return_ok server)
+    fail_with_exn
 
-(** [filename config] gets the path to config file *)
-val filename : t -> string
+let shutdown = RPC_server.shutdown
 
-(** [data_dir_path config subpath] builds a subpath relatively to the
-    [config] *)
-val data_dir_path : t -> string -> string
-
-val default_data_dir : string
-
-val default_rpc_addr : string
-
-val default_rpc_port : int
-
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
-
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+let install_finalizer rpc_server =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = shutdown rpc_server in
+  let* () = Event.(emit shutdown_node exit_status) in
+  Tezos_base_unix.Internal_event_unix.close ()
