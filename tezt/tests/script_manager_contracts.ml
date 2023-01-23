@@ -33,13 +33,6 @@
 let test_manager_contracts =
   Protocol.register_test ~__FILE__ ~title:"Manager" ~tags:["manager"]
   @@ fun protocol ->
-  let prefix =
-    sf
-      "tests_python/contracts_%s"
-      (match protocol with
-      | Protocol.Alpha -> "alpha"
-      | _ -> sf "%03d" @@ Protocol.number protocol)
-  in
   let* client = Client.init_mockup ~protocol () in
   let check_delegate ~__LOC__ src expected_delegate =
     let* delegate = Client.get_delegate ~src client in
@@ -62,7 +55,9 @@ let test_manager_contracts =
   let bootstrap1 = Constant.bootstrap1.alias in
   Log.info "Manager origination" ;
   let path =
-    Michelson_script.(find ~prefix ["entrypoints"; "manager"] protocol |> path)
+    Michelson_script.(
+      find ~prefix:(pytest_prefix protocol) ["entrypoints"; "manager"] protocol
+      |> path)
   in
   let pubkey = Constant.bootstrap2.public_key_hash in
   let* _contract =
@@ -89,7 +84,11 @@ let test_manager_contracts =
   Log.info "Delegatable origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "delegatable_target"] protocol |> path)
+      find
+        ~prefix:(pytest_prefix protocol)
+        ["entrypoints"; "delegatable_target"]
+        protocol
+      |> path)
   in
   let pubkey = Constant.bootstrap2.public_key_hash in
   let* _contract =
@@ -105,7 +104,11 @@ let test_manager_contracts =
   Log.info "Target with entrypoints origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "big_map_entrypoints"] protocol |> path)
+      find
+        ~prefix:(pytest_prefix protocol)
+        ["entrypoints"; "big_map_entrypoints"]
+        protocol
+      |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -120,7 +123,11 @@ let test_manager_contracts =
   Log.info "Target without entrypoints origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "no_entrypoint_target"] protocol |> path)
+      find
+        ~prefix:(pytest_prefix protocol)
+        ["entrypoints"; "no_entrypoint_target"]
+        protocol
+      |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -135,7 +142,11 @@ let test_manager_contracts =
   Log.info "Target without default origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "no_default_target"] protocol |> path)
+      find
+        ~prefix:(pytest_prefix protocol)
+        ["entrypoints"; "no_default_target"]
+        protocol
+      |> path)
   in
   let* _contract =
     Client.originate_contract
@@ -150,7 +161,11 @@ let test_manager_contracts =
   Log.info "Target with root origination" ;
   let path =
     Michelson_script.(
-      find ~prefix ["entrypoints"; "rooted_target"] protocol |> path)
+      find
+        ~prefix:(pytest_prefix protocol)
+        ["entrypoints"; "rooted_target"]
+        protocol
+      |> path)
   in
   let* _contract =
     Client.originate_contract

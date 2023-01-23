@@ -34,18 +34,16 @@ let random_iterations = 10
 
 let hooks = Tezos_regression.hooks
 
-let contract_path protocol contract =
-  sf
-    "file:./tests_python/contracts_%s/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    contract
-
 let check_contract protocol client ~contract ~input ~expected_storage =
-  let prg = contract_path protocol contract in
   let* actual_storage =
-    Client.run_script ~hooks ~prg ~storage:"None" ~input client
+    Client.run_script_at
+      ~hooks
+      ~storage:"None"
+      ~prefix:(Michelson_script.pytest_prefix protocol)
+      ~input
+      client
+      contract
+      protocol
   in
   Check.(
     (actual_storage = Format.asprintf "(Some %s)" expected_storage)
@@ -131,7 +129,7 @@ end) : CLASS with type t = M.t = struct
     check_contract
       protocol
       client
-      ~contract:("opcodes/store_" ^ bls name ^ ".tz")
+      ~contract:["opcodes"; "store_" ^ bls name]
       ~input
       ~expected_storage:input
 
@@ -142,7 +140,7 @@ end) : CLASS with type t = M.t = struct
     check_binop
       protocol
       client
-      ~contract:("opcodes/add_" ^ bls name ^ ".tz")
+      ~contract:["opcodes"; "add_" ^ bls name]
       ~expected_storage
       ~arg0
       ~arg1
@@ -155,7 +153,7 @@ end) : CLASS with type t = M.t = struct
     check_binop
       protocol
       client
-      ~contract:("opcodes/mul_" ^ bls name ^ ".tz")
+      ~contract:["opcodes"; "mul_" ^ bls name]
       ~expected_storage
       ~arg0
       ~arg1
@@ -166,7 +164,7 @@ end) : CLASS with type t = M.t = struct
     check_contract
       protocol
       client
-      ~contract:("opcodes/neg_" ^ bls name ^ ".tz")
+      ~contract:["opcodes"; "neg_" ^ bls name]
       ~input
       ~expected_storage
 end
@@ -209,7 +207,7 @@ let check_pairing_check protocol client args =
   check_contract
     protocol
     client
-    ~contract:"opcodes/pairing_check.tz"
+    ~contract:["opcodes"; "pairing_check"]
     ~input
     ~expected_storage
 
@@ -390,8 +388,16 @@ let register ~protocols =
       let proof = sf "Pair (Pair %s %s) %s" proof_a proof_b proof_c in
       let input = sf "Pair (%s) (%s)" inputs proof in
 
-      let prg = contract_path protocol "mini_scenarios/groth16.tz" in
-      let* _res = Client.run_script ~hooks ~prg ~storage:"Unit" ~input client in
+      let* _res =
+        Client.run_script_at
+          ~hooks
+          ~storage:"Unit"
+          ~input
+          ~prefix:(Michelson_script.pytest_prefix protocol)
+          client
+          ["mini_scenarios"; "groth16"]
+          protocol
+      in
       unit)
     protocols ;
   Protocol.register_regression_test
@@ -407,14 +413,15 @@ let register ~protocols =
         "0xf7ef66f95c90b2f953eb0555af65f22095d4f54b40ea8c6dcc2014740e8662c16bb8786723"
       in
 
-      let prg = contract_path protocol "mini_scenarios/groth16.tz" in
       let* () =
-        Client.spawn_run_script
+        Client.spawn_run_script_at
           ~hooks
-          ~prg
           ~storage:"0"
           ~input:random_bytes
+          ~prefix:(Michelson_script.pytest_prefix protocol)
           client
+          ["mini_scenarios"; "groth16"]
+          protocol
         |> Process.check_error ~msg:(rex "error running script")
       in
       unit)

@@ -30,51 +30,34 @@
    Subject: Tests the multiple tranfers function of the client
 *)
 
-let contract_prefix protocol =
-  sf
-    "tests_python/contracts_%s/"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-
 (* Originate and return the alias of a manager script *)
 let manager client ~protocol =
   let manager = Constant.bootstrap2.public_key_hash in
-  let alias = "manager" in
-  let prg =
-    Michelson_script.(
-      find ~prefix:(contract_prefix protocol) ["entrypoints"; alias] protocol
-      |> path)
-  in
-  let* _ =
-    Client.originate_contract
+  let* alias, _address =
+    Client.originate_contract_at
       ~init:(sf {|"%s"|} manager)
       ~amount:(Tez.of_int 1000)
       ~src:manager
       ~burn_cap:Tez.one
-      ~alias
-      ~prg
+      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
+      ["entrypoints"; "manager"]
+      protocol
   in
   return alias
 
 (** Originate and return the alias of a big_map_entrypoints contract *)
 let big_map_entrypoints client ~protocol =
-  let alias = "big_map_entrypoints" in
-  let prg =
-    Michelson_script.(
-      find ~prefix:(contract_prefix protocol) ["entrypoints"; alias] protocol
-      |> path)
-  in
-  let* _ =
-    Client.originate_contract
+  let* alias, _address =
+    Client.originate_contract_at
       ~init:(sf {|Pair {} {Elt "Hello" 42}|})
       ~amount:(Tez.of_int 1000)
       ~src:Constant.bootstrap1.alias
       ~burn_cap:Tez.one
-      ~alias
-      ~prg
+      ~prefix:(Michelson_script.pytest_prefix protocol)
       client
+      ["entrypoints"; "big_map_entrypoints"]
+      protocol
   in
   return alias
 

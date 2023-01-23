@@ -46,14 +46,6 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
     ~tags:["michelson"; "crypto"; "contract"; "hash"; hash_fun_name]
     (fun protocol ->
       let state = Random.State.make [||] in
-      let prg =
-        sf
-          "file:./tests_python/contracts_%s/opcodes/%s.tz"
-          (match protocol with
-          | Protocol.Alpha -> "alpha"
-          | _ -> sf "%03d" @@ Protocol.number protocol)
-          hash_fun_name
-      in
       let bytes_random n =
         Bytes.init n (fun _ -> Random.State.int state 256 |> Char.chr)
       in
@@ -66,7 +58,13 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
             let hashed = hash_fun bytes_to_hash in
             let input = bytes_to_hex_string bytes_to_hash in
             let* actual_storage =
-              Client.run_script ~prg ~storage:"None" ~input client
+              Client.run_script_at
+                ~storage:"None"
+                ~input
+                ~prefix:(Michelson_script.pytest_prefix protocol)
+                client
+                ["opcodes"; hash_fun_name]
+                protocol
             in
             let expected_storage = bytes_to_hex_string hashed in
             Check.(

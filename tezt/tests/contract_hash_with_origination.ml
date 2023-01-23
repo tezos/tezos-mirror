@@ -32,17 +32,16 @@
                  same value as directly hashing the script.
 *)
 
-let contract_path protocol contract =
-  sf
-    "tests_python/contracts_%s/opcodes/%s"
-    (match protocol with
-    | Protocol.Alpha -> "alpha"
-    | _ -> sf "%03d" @@ Protocol.number protocol)
-    contract
-
 let test_contract_hash_with_origination ~protocol () =
   let* client = Client.init_mockup ~protocol () in
-  let prg = contract_path protocol "noop.tz" in
+  let prg =
+    Michelson_script.(
+      find
+        ~prefix:(Michelson_script.pytest_prefix protocol)
+        ["opcodes"; "noop"]
+        protocol
+      |> path)
+  in
   let script = read_file prg in
   let* contract =
     Client.originate_contract
