@@ -788,6 +788,10 @@ module Dal = struct
         ["levels"; string_of_int published_level; "headers"]
         slot_headers_of_json
 
+    type slot_set = bool list
+
+    type attestable_slots = Not_in_committee | Attestable_slots of slot_set
+
     let get_attestable_slots ~attestor ~attested_level =
       make
         GET
@@ -798,7 +802,14 @@ module Dal = struct
           string_of_int attested_level;
           "attestable_slots";
         ]
-        (fun json -> JSON.(json |> as_list |> List.map as_bool))
+        (fun json ->
+          JSON.(
+            match get "kind" json |> as_string with
+            | "not_in_committee" -> Not_in_committee
+            | "attestable_slots_set" ->
+                let json = get "attestable_slots_set" json in
+                Attestable_slots (json |> as_list |> List.map as_bool)
+            | _ -> failwith "invalid case"))
   end
 
   let make

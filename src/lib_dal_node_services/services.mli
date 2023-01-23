@@ -59,6 +59,10 @@ module Types : sig
       instance to record which slots are deemed available by an attestor. *)
   type slot_set = bool list
 
+  (** The set of attestable slots of an attestor (which may not necessarily be
+      in the committee for a given level). *)
+  type attestable_slots = Attestable_slots of slot_set | Not_in_committee
+
   (** An index of a DAL shard *)
   type shard_index = int
 
@@ -231,7 +235,7 @@ val get_assigned_shard_indices :
 val get_attestable_slots :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.slot_set
+  ; output : Types.attestable_slots
   ; prefix : unit
   ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
   ; query : unit >
