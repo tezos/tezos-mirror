@@ -109,7 +109,7 @@ val assert_feature_enabled : t -> unit tzresult
 (** [originate ~ctxt_before_op ~ctxt ~public_parameters ~transcript
                ~circuits_info ~init_state ~nb_ops]
     applies the origination operation for a ZK rollup.
-    See {!Zk_rollup_storage:originate}.
+    See {!Zk_rollup_storage.originate}.
 
     May fail with:
     {ul
@@ -199,7 +199,7 @@ val publish :
       {li [Zk_rollup.Errors.Ticket_payload_size_limit_exceeded] if the ticket
         found in the [parameters] exceeds the maximum ticket size.
       }
-u      {li [Script_tc_errors.Forbidden_zero_ticket_quantity] if the ticket
+      {li [Script_tc_errors.Forbidden_zero_ticket_quantity] if the ticket
         amount is zero.
       }
       {li [Zk_rollup.Errors.Invalid_deposit_amount] if the amount of the ticket

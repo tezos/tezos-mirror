@@ -25,7 +25,7 @@
 
 (** To verify the proof of a page membership in its associated slot, the
      Cryptobox module needs the following Dal parameters. These are part of the
-     protocol's parameters. See {!Default_parameters.default_dal}. *)
+     protocol's parameters. See {!Dal.Config.default}. *)
 type parameters = Dal.parameters = {
   redundancy_factor : int;
   page_size : int;
@@ -85,17 +85,17 @@ module Header : sig
       and the slot's index. *)
   type id = {published_level : Raw_level_repr.t; index : Dal_slot_index_repr.t}
 
-  (** For Layer-1, a slot is described by its slot {!id} and the
+  (** For Layer-1, a slot is described by its slot {!type-id} and the
      slot's commitment. *)
   type t = {id : id; commitment : Commitment.t}
 
-  (** encoding for values of type {!id}. *)
+  (** encoding for values of type {!type-id}. *)
   val id_encoding : id Data_encoding.t
 
   (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
 
-  (** pretty-printer for values of type {!id}. *)
+  (** pretty-printer for values of type {!type-id}. *)
   val pp_id : Format.formatter -> id -> unit
 
   (** pretty-printer for values of type {!t}. *)
@@ -188,17 +188,17 @@ module Slot_market : sig
   val candidates : t -> Header.t list
 end
 
-(** This module provides an abstract data structure (type {!t}) that represents
-    a skip list used to store successive DAL slots confirmed/attested on
-    L1. There is one slot per cell in the skip list. The slots are sorted in
+(** This module provides an abstract data structure (type {!History.t}) that
+    represents a skip list used to store successive DAL slots confirmed/attested
+    on L1. There is one slot per cell in the skip list. The slots are sorted in
     increasing order by level, and by slot index, for the slots of the same
     level.
 
-    This module also defines a bounded history cache (type {History_cache.t})
-    that allows to remember recent values of a skip list of type {!t}
-    (indexed by the skip lists' hashes). This structure is meant to be
-    maintained and used by the rollup node to produce refutation proofs
-    involving DAL slot inputs.
+    This module also defines a bounded history cache (type
+    {!type-History.History_cache.t}) that allows to remember recent values of a
+    skip list of type {!History.t} (indexed by the skip lists' hashes). This
+    structure is meant to be maintained and used by the rollup node to produce
+    refutation proofs involving DAL slot inputs.
 
     Note on terminology: "confirmed slot" is another name for "attested slot".
 *)

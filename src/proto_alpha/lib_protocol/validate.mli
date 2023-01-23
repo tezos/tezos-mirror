@@ -204,7 +204,7 @@ val begin_application :
     The partial validation mode is intended for quickly assessing a
     series of blocks in a cousin branch (multipass
     validation). Therefore, it is the only mode in which the given
-    {!type:context} may be based on any recent ancestor block of the
+    {!type-context} may be based on any recent ancestor block of the
     block to validate, instead of only its predecessor (where recent
     means having a greater level than the [last_allowed_fork_level] of
     the current head). *)
@@ -296,7 +296,8 @@ val finalize_block : validation_state -> unit tzresult Lwt.t
     However, this function does not check for conflicts with
     previously validated operations, nor global block properties such
     as the respect of the block gas limit. This allows the function to
-    only take an {!info} as input rather than a full {!validation_state}.
+    only take an {!type-info} as input rather than a full
+    {!type-validation_state}.
 
     This function is intended for {!Mempool_validation} exclusively. *)
 val check_operation :

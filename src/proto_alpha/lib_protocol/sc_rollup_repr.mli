@@ -77,7 +77,7 @@ end
     about the state of the PVM, which can be disputed as part of a commitment
     dispute.
 
-    See also {!Commitment_repr.}. *)
+    See also {!Commitment_repr}. *)
 module Number_of_ticks : sig
   include Bounded.S with type ocaml_type := int64
 

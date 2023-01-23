@@ -89,23 +89,24 @@ val validate_operation :
 
     Optional arguments allow to override defaults:
 
-    {ul {li [?expect_failure:(error list -> unit tzresult Lwt.t)]:
+    @param expect_failure
     validation of [op] is expected to fail and [expect_failure] should
     handle the error. In case validate does not fail and
-    [expect_failure] is provided, [validate_operation] fails.}}
+    [expect_failure] is provided, [validate_operation] fails.
 
-    {ul {li [?expect_apply_failure:(error list -> unit tzresult
-    Lwt.t)]: application of [op] is expected to fail and
+    @param expect_apply_failure
+    application of [op] is expected to fail and
     [expect_apply_failure] should handle the errror. In case the
     application of [op] does not fail and [expect_apply_failure] is
-    provided, [add_operation] fails.}}
+    provided, [add_operation] fails.
 
-    {ul {li [?allow_manager_failure] marks that manager operation
-    failures after fee taken are ignored.}}
+    @param allow_manager_failure
+    marks that manager operation failures after fee taken are ignored.
 
-    {li [?check_size:bool]: enable the check that an operation size
-    should not exceed [Constants_repr.max_operation_data_length].
-    Enabled (set to [true]) by default. } *)
+    @param check_size
+    enable the check that an operation size should not exceed
+    [Constants_repr.max_operation_data_length]. Enabled (set to [true]) by
+    default. *)
 val add_operation :
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->

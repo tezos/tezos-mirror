@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** A reveal provides what is necessary to recompute a
-    {!Tx_rollup_withdrawal.t} message. *)
+    {!Tx_rollup_withdrawal_repr.t} message. *)
 type t = {
   contents : Script_repr.lazy_expr;
   ty : Script_repr.lazy_expr;

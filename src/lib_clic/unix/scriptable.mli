@@ -31,10 +31,10 @@ open Error_monad
 (** A representation of the output format. *)
 type output_format
 
-(** Command line argument for {!Tezos_clic.command} (and the [Tezos_clic.args*]
-    functions). Not that this is the only way to obtain a value of type
-    {!output_format}. On the command line, it appears as [--for-script] with
-    values [TSV] or [CSV]. *)
+(** Command line argument for {!type-Tezos_clic.command} (and the
+    [Tezos_clic.args*] functions). Not that this is the only way to obtain a
+    value of type {!output_format}. On the command line, it appears as
+    [--for-script] with values [TSV] or [CSV]. *)
 val clic_arg : unit -> (output_format option, _) Tezos_clic.arg
 
 (** [output fmt_opt ~for_human ~for_script] behaves in one of two ways.

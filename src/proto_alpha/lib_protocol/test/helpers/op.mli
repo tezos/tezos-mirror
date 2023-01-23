@@ -212,7 +212,7 @@ val increase_paid_storage :
     hashing [pkh]. Useful for forging non-honest reveal operations}
 
     {li [?storage_limit:Z.t]: forces a storage limit, otherwise
-    set to [Z.zero]}
+    set to [Z.zero]}}
 *)
 val revelation :
   ?fee:Tez.t ->

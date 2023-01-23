@@ -29,7 +29,8 @@ open Script_typed_ir
 (** Flag that drives unparsing of typed values to nodes.
     - [Optimized_legacy] must be kept backward-compatible in order to compute
       valid hashes (of big map keys).
-    - [Optimized] may be used as long as the result can be read by {!Script_translator.parse_data}.
+    - [Optimized] may be used as long as the result can be read by
+      {!Script_ir_translator.parse_data}.
     - [Readable] produces with [string] values instead of [bytes] when feasible.
 *)
 type unparsing_mode = Optimized | Readable | Optimized_legacy

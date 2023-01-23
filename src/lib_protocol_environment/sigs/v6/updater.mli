@@ -204,7 +204,7 @@ module type PROTOCOL = sig
      mempool.
 
      When [protocol_data] is provided, it is not expected to be the
-     final value of the field of the same name in the {!block_header}
+     final value of the field of the same name in the {!type-block_header}
      of the block eventually being baked. Instead, it is expected to
      construct a protocol-specific, good enough, "prototype" of its
      final value. For instance, if the economic protocol specifies

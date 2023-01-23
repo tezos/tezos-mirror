@@ -44,12 +44,12 @@ type error += Invalid_slot_index of {given : t; min : t; max : t}
 val check_is_in_range : t -> unit tzresult
 
 (** [of_int n] constructs a value of type {!t} from [n]. Returns
-      {!Invalid_slot_index} in case the given value is not in the interval [zero,
-      max_value]. *)
+      {!Invalid_slot_index} in case the given value is not in the interval
+      [[zero, max_value]]. *)
 val of_int : int -> t tzresult
 
-(** [of_int_opt n] constructs a value of type {!t} from [n]. Returns {!None}
-      in case the given value is not in the interval [zero, max_value]. *)
+(** [of_int_opt n] constructs a value of type {!t} from [n]. Returns [None]
+      in case the given value is not in the interval [[zero, max_value]]. *)
 val of_int_opt : int -> t option
 
 val to_int : t -> int
@@ -68,5 +68,5 @@ val equal : t -> t -> bool
 val slots_range : lower:int -> upper:int -> t list tzresult
 
 (** [slots_range_opt ~lower ~upper] is similar to {!slots_range}, but return
-      {None} instead of an error. *)
+    [None] instead of an error. *)
 val slots_range_opt : lower:int -> upper:int -> t list option

@@ -1543,11 +1543,11 @@ module Compact : sig
 
       @param i32_title is used as a prefix to each of the int32 cases' title.
 
-      @param alt_title is used as the title of the alt case. (See {!case} and
+      @param alt_title is used as the title of the alt case. (See {!val-case} and
       {!union} for details.)
 
       @param alt_description is used as the description of the alternate case.
-      (See {!case} and {!union} for details.) *)
+      (See {!val-case} and {!union} for details.) *)
   val or_int32 :
     int32_title:string ->
     alt_title:string ->
@@ -1617,7 +1617,7 @@ module Compact : sig
         of a value is [M.(partial_encoding (layout v) v)].
 
         It is the user's responsibility to ensure that all the values of [M]
-        follow the invariants documented in {!S}. *)
+        follow the invariants documented in {!module-type-S}. *)
     val make : (module S with type input = 'a) -> 'a t
   end
 end

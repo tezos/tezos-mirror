@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {2 [Storage_functors] benchmarks}.
+(** {2 [Storage_functors] benchmarks}
 
     This module registers a benchmark [List_key_values_benchmark].  Its result
     is used to fill in the corresponding value, [list_key_values_step]

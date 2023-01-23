@@ -54,7 +54,7 @@ val of_result : ('a, 'trace) result -> ('a, 'trace) t
 
 (** [consume_gas c] consumes c amounts of gas. It's a wrapper around
     [Gas.consume]. If that fails, the whole computation within the gas-monad
-    returns an error. See the {!Alpha_context.Gas module} for details.*)
+    returns an error. See the {!Alpha_context.Gas} module for details.*)
 val consume_gas : Alpha_context.Gas.cost -> (unit, 'trace) t
 
 (** [run ctxt m] runs [m] using the given context and returns the result along

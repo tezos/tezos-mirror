@@ -101,8 +101,8 @@ val pp :
 (** [destruct x] returns either the index or the (unwrapped) value
     contained in [x].
 
-    {b Note:} If you want to manipulate a value of type ['a value],
-    you can use {!value}. *)
+    {b Note:} If you want to manipulate a value of type {!type-value},
+    you can use {!val-value}. *)
 val destruct : ('state, 'a) t -> ('a index, 'a) Either.t
 
 (** [forget x] returns an indexable value whose kind of contents has

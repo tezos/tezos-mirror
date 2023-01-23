@@ -29,7 +29,7 @@
     It is responsible for maintaining the following tables:
     - {!Storage.Stake.Selected_distribution_for_cycle}
     - {!Storage.Stake.Staking_balance}
-    - {!Storage.Stake.Active_delegate_with_one_roll}
+    - {!Storage.Stake.Active_delegates_with_minimal_stake}
     - {!Storage.Stake.Last_snapshot}
     - {!Storage.Stake.Total_active_stake}
 *)

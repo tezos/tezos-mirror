@@ -54,7 +54,7 @@
     - ["fee"]: the trivial fees circuit, since this RU has no concept of fees.
 
     NB: the "op" circuit does not add any constraints over the operation's
-    [exit_validity] other than it being in {0, 1}. This means that the dummy
+    [exit_validity] other than it being in [{0, 1}]. This means that the dummy
     rollup can be used to test deposits/withdrawals, but the rollup will not
     perform any monetary bookkeeping.
 *)

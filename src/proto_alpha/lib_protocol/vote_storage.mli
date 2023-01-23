@@ -83,8 +83,8 @@ val pp_ballots : Format.formatter -> ballots -> unit
 val has_recorded_ballot :
   Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
 
-(** Records a vote for a delegate, returns a {!Storage_error Existing_key} if
-    the vote was already registered *)
+(** Records a vote for a delegate, returns a
+    [Error (Storage_error Existing_key)] if the vote was already registered *)
 val record_ballot :
   Raw_context.t ->
   Signature.Public_key_hash.t ->

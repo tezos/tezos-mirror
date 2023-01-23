@@ -216,7 +216,7 @@ module V1 : sig
       will show that the next message available in [inbox_snapshot] is
       at [level], so shouldn't be included in this commitment.
 
-    - [game_state], the current state of the game, see {!game_state}
+    - [game_state], the current state of the game, see {!type-game_state}
       for more information.
 
     Invariants:

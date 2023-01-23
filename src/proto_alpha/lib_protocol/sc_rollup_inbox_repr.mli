@@ -40,7 +40,7 @@ type error += Inbox_level_reached_messages_limit
    correspond to two distinct interpretations of the same inbox ; or,
    these two claims differ on their views about the contents of the
    inbox itself. {!Sc_rollup_PVM_sig} is meant to arbitrate the first
-   kind of conflicts while {!Sc_rollup_inbox} focuses on the second
+   kind of conflicts while {!Sc_rollup_inbox_repr} focuses on the second
    kind of conflicts.
 
    {1 Inbox messages}
@@ -354,8 +354,8 @@ val finalize_inbox_level_no_history :
   t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t -> t tzresult
 
 (** [genesis ~timestamp ~predecessor level] initializes the inbox at some
-    given [level] with: SOL, Info_per_level {timestamp; predecessor} and EOL
-    inside. *)
+    given [level] with: [SOL], [Info_per_level {timestamp; predecessor}] and
+    [EOL] inside. *)
 val genesis :
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->

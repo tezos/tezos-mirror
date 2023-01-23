@@ -227,7 +227,7 @@ module Voting : sig
      @param period An index that identifies the targeted voting
      period.
 
-     @params protocol_hashes A list of candidate protocol hashes. *)
+     @param protocol_hashes A list of candidate protocol hashes. *)
   val proposals : Account.key -> int -> string list -> t
 
   (** Contruct a voting operation from its representation.

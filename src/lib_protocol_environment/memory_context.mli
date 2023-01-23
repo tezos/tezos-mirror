@@ -35,8 +35,8 @@
     this API is highly polymorphic, thanks to {!Environment_context.Context.ops}.
 
     As such, a {!Memory_context} value is an instance of {!Environment_context}
-    whose {!Environment_context.Context.kind} is the one declared below in this file,
-    i.e. {!Context}.
+    whose {!Environment_context.Context.kind} is the one declared below in this
+    file, i.e. {!extension-Context}.
 
     Instances of {!t} are easier to obtain than {!Shell_context} (which
     are used by nodes), because they don't require access to a disk: they
