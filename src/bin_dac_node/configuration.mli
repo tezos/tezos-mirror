@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Module that implements Dac related functionalities. *)
+type dac = {
+  addresses : Tezos_crypto.Aggregate_signature.public_key_hash list;
+  threshold : int;
+      (** The number of signature needed on root page hashes for the
+          corresponding reveal preimages to be available. *)
+  reveal_data_dir : string;
+      (** The directory where the dac node saves pages computed
+          from reveal preimages. If the dac node saves the data
+          directly into the rollup node, this should be
+          {ROLLUP_NODE_DATA_DIR}/{PVM_NAME}. *)
+}
 
-type error +=
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
+type t = {
+  data_dir : string;  (** The path to the DAC node data directory *)
+  rpc_addr : string;  (** The address the DAC node listens to *)
+  rpc_port : int;  (** The port the DAC node listens to *)
+  dac : dac;
+      (** The aggregate account aliases that constitute the Data availability
+          Committee. *)
+}
 
-module Keys : sig
-  (** [get_keys cctxt config] returns the aliases and keys associated with the
-     aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)
-  val get_keys :
-    #Client_context.wallet ->
-    Configuration.t ->
-    (Tezos_crypto.Aggregate_signature.public_key_hash
-    * Tezos_crypto.Aggregate_signature.public_key option
-    * Client_keys.aggregate_sk_uri)
-    option
-    list
-    tzresult
-    Lwt.t
-end
+(** [filename config] gets the path to config file *)
+val filename : t -> string
 
-module Storage : sig
-  (** [ensure_reveal_data_dir_exists reveal_data_dir] checks that the
-      path at [reveal_data_dir] exists and is a directory. If
-      the path does not exist, it is created as a directory.
-      Parent directories are recursively created when they do not
-      exist.
+(** [data_dir_path config subpath] builds a subpath relatively to the
+    [config] *)
+val data_dir_path : t -> string -> string
 
-      This function may fail with
-      {ul
-        {li [Reveal_data_path_not_a_directory reveal_data_dir] if the
-          path exists and is not a directory,
+val default_data_dir : string
 
-        {li [Cannot_create_reveal_data_dir reveal_data_dir] If the
-            creation of the directory fails.}}
-      }
-  *)
-  val ensure_reveal_data_dir_exists : string -> unit tzresult Lwt.t
-end
+val default_reveal_data_dir : string
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4626
-   Unify this function and resolve_dal_plugin in Dal node daemon. *)
-val resolve_plugin :
-  Tezos_shell_services.Chain_services.Blocks.protocols ->
-  (module Dac_plugin.T) option Lwt.t
+val default_rpc_addr : string
+
+val default_rpc_port : int
+
+(** Default configuration for the data availability committee. *)
+val default_dac : dac
+
+(** [save config] writes config file in [config.data_dir] *)
+val save : t -> unit tzresult Lwt.t
+
+val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t

@@ -3510,7 +3510,7 @@ let test_refutation_reward_and_punishment ~kind =
    We then deposit a ticket into the tx kernel, and verify that we are
    able to withdraw.
 *)
-let prepare_installer_kernel ~dal_node installee =
+let prepare_installer_kernel ~dac_node installee =
   let installer_dummy_hash =
     "1acaa995ef84bc24cc8bb545dd986082fbbec071ed1c3e9954abea5edc441ccd3a"
   in
@@ -3518,8 +3518,8 @@ let prepare_installer_kernel ~dal_node installee =
   let installee = load_kernel_file (installee ^ ".wasm") in
   let* root_hash, _ =
     RPC.call
-      dal_node
-      (Rollup.Dal.RPC.dac_store_preimage
+      dac_node
+      (Rollup.Dac.RPC.dac_store_preimage
          ~payload:installee
          ~pagination_scheme:"Merkle_tree_V0")
   in
@@ -3628,33 +3628,32 @@ let test_tx_kernel_e2e protocol =
   let commitment_period = 2 and challenge_window = 5 in
   Dal.with_layer1 ~protocol ~commitment_period ~challenge_window
   @@ fun _parameters _cryptobox node client ->
-  Dal.with_dal_node node client @@ fun bootstrap1_key dal_node ->
+  Dac.with_dac_node node client @@ fun bootstrap1_key dac_node ->
   (* Start a rollup node *)
   let sc_rollup_node =
     Sc_rollup_node.create
       ~protocol
-      ~dal_node
       Operator
       node
       client
       ~default_operator:bootstrap1_key
   in
   (* Prepare DAL/DAC: put reveal data in rollup node directory. *)
-  let* () = Dal_node.terminate dal_node in
+  let* () = Dac_node.terminate dac_node in
   let reveal_data_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
-  let* () = Dal_node.Dac.set_parameters ~reveal_data_dir dal_node in
-  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* () = Dac_node.Dac.set_parameters ~reveal_data_dir dac_node in
+  let* () = Dac_node.run dac_node ~wait_ready:true in
   let* dac_member = Client.bls_gen_keys ~alias:"dac_member" client in
   let* dac_member_info = Client.bls_show_address ~alias:dac_member client in
   let dac_member_address = dac_member_info.aggregate_public_key_hash in
-  let* _dir = Dal_node.init_config dal_node in
+  let* _dir = Dac_node.init_config dac_node in
   let* () =
-    Dal_node.Dac.add_committee_member ~address:dac_member_address dal_node
+    Dac_node.Dac.add_committee_member ~address:dac_member_address dac_node
   in
   (* We can now produce our installer *)
-  let* installer_kernel = prepare_installer_kernel ~dal_node "tx-kernel" in
+  let* installer_kernel = prepare_installer_kernel ~dac_node "tx-kernel" in
   let boot_sector = hex_encode installer_kernel in
   (* Initialise the sc rollup *)
   let* sc_rollup_address =

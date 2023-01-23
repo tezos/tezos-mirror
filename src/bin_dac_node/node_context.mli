@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,31 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+(** A [ready_ctx] value contains globally needed informations for a running dac
+    node. It is available when the DAC plugin has been loaded. *)
+type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
 
-type t = {
-  use_unsafe_srs : bool;
-      (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : string;  (** The address the DAL node listens to *)
-  rpc_port : int;  (** The port the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach withing the DAL *)
-}
+(** The status of the dac node. *)
+type status = Ready of ready_ctxt | Starting
 
-(** [filename config] gets the path to config file *)
-val filename : t -> string
+(** A [t] value contains both the status and the dac node configuration. Its
+    fields are available through accessors. *)
+type t
 
-(** [data_dir_path config subpath] builds a subpath relatively to the
-    [config] *)
-val data_dir_path : t -> string -> string
+(** [init config cctx] creates a [t] with a status set to [Starting]
+    using the given dac node configuration [config],
+    and tezos node client context [cctx]. *)
+val init : Configuration.t -> Client_context.full -> t
 
-val default_data_dir : string
+(** Raised by [set_ready] when the status is already [Ready _] *)
+exception Status_already_ready
 
-val default_rpc_addr : string
+(** [set_ready ctxt ~dac_plugin] updates
+    in place the status value to [Ready], and initializes the inner
+    [ready_ctxt] value with the given parameters.
 
-val default_rpc_port : int
+    @raise Status_already_ready when the status is already [Ready _] *)
+val set_ready : t -> dac_plugin:(module Tezos_dac_node_lib.Dac_plugin.T) -> unit
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
+type error += Node_not_ready
 
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+(** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
+    propagates [Node_not_ready] if status is not ready yet. If called multiple
+    times, it replaces current values for [ready_ctxt] with new one. *)
+val get_ready : t -> ready_ctxt tzresult
+
+(** [get_config ctxt] returns the dac node configuration. *)
+val get_config : t -> Configuration.t
+
+(** [get_status ctxt] returns the dac node status. *)
+val get_status : t -> status
+
+(** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
+val get_tezos_node_cctxt : t -> Client_context.full

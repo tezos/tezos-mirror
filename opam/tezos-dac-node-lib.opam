@@ -10,30 +10,14 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tezos-clic"
   "tezos-client-base"
-  "tezos-client-base-unix"
-  "tezos-client-commands"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
   "tezos-protocol-updater"
-  "tezos-rpc-http-client-unix"
+  "tezos-client-base-unix"
   "tezos-stdlib-unix"
-  "tezos-stdlib"
-  "tezos-dal-node-lib"
-  "tezos-dal-node-services"
-  "tezos-layer2-store"
-  "tezos-crypto-dal"
-  "irmin-pack" { >= "3.5.1" & < "3.6.0" }
-  "irmin" { >= "3.5.1" & < "3.6.0" }
-  "tezos-dal-016-PtMumbai"
-]
-depopts: [
-  "tezos-dal-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `octez-dal-node` binary"
+synopsis: "Tezos: `tezos-dac-node` library"

@@ -664,31 +664,6 @@ module Dal = struct
       in
       make ~data POST ["shards"; slot_header] (fun json ->
           JSON.(json |> as_list |> List.map encode))
-
-    let dac_store_preimage ~payload ~pagination_scheme =
-      let preimage =
-        JSON.parse
-          ~origin:"dal_node_dac_store_preimage_rpc"
-          (Format.sprintf
-             {|{"payload":%s,"pagination_scheme":"%s"}|}
-             (encode_bytes_to_hex_string payload)
-             pagination_scheme)
-      in
-      let data : RPC_core.data = Data (JSON.unannotate preimage) in
-      make ~data PUT ["plugin"; "dac"; "store_preimage"] @@ fun json ->
-      JSON.
-        ( json |-> "root_hash" |> as_string,
-          json |-> "external_message" |> get_bytes_from_json_string_node )
-
-    let dac_verify_signature external_msg =
-      let query_string =
-        [
-          ( "external_message",
-            match Hex.of_string external_msg with `Hex s -> s );
-        ]
-      in
-      make ~query_string GET ["plugin"; "dac"; "verify_signature"]
-      @@ JSON.as_bool
   end
 
   module RPC = struct
@@ -878,5 +853,51 @@ module Dal = struct
       let open Check in
       let sort = List.sort compare in
       convert sort (list profile_typ)
+  end
+end
+
+module Dac = struct
+  module RPC = struct
+    let make ?data ?query_string =
+      RPC.make
+        ?data
+        ?query_string
+        ~get_host:Dac_node.rpc_host
+        ~get_port:Dac_node.rpc_port
+        ~get_scheme:(Fun.const "http")
+
+    (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
+    let encode_bytes_to_hex_string raw =
+      "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
+
+    let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
+
+    let get_bytes_from_json_string_node json =
+      JSON.as_string json |> decode_hex_string_to_bytes
+
+    let dac_store_preimage ~payload ~pagination_scheme =
+      let preimage =
+        JSON.parse
+          ~origin:"dal_node_dac_store_preimage_rpc"
+          (Format.sprintf
+             {|{"payload":%s,"pagination_scheme":"%s"}|}
+             (encode_bytes_to_hex_string payload)
+             pagination_scheme)
+      in
+      let data : RPC_core.data = Data (JSON.unannotate preimage) in
+      make ~data PUT ["plugin"; "dac"; "store_preimage"] @@ fun json ->
+      JSON.
+        ( json |-> "root_hash" |> as_string,
+          json |-> "external_message" |> get_bytes_from_json_string_node )
+
+    let dac_verify_signature external_msg =
+      let query_string =
+        [
+          ( "external_message",
+            match Hex.of_string external_msg with `Hex s -> s );
+        ]
+      in
+      make ~query_string GET ["plugin"; "dac"; "verify_signature"]
+      @@ JSON.as_bool
   end
 end

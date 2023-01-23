@@ -2,9 +2,9 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_dal)
- (public_name octez-dal-node)
- (package octez-dal-node)
+ (name main_dac)
+ (public_name octez-dac-node)
+ (package octez-dac-node)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -19,17 +19,14 @@
   tezos-rpc-http-client-unix
   tezos-stdlib-unix
   tezos-stdlib
-  tezos_dal_node_lib
-  tezos_dal_node_services
+  tezos_dac_node_lib
   tezos_layer2_store
-  tezos-crypto-dal
   irmin-pack
   irmin-pack.unix
   irmin
-  tezos-dal-016-PtMumbai
-  (select void_for_linking-tezos-dal-alpha from
-   (tezos-dal-alpha -> void_for_linking-tezos-dal-alpha.empty)
-   (-> void_for_linking-tezos-dal-alpha.empty)))
+  (select void_for_linking-tezos-dac-alpha from
+   (tezos-dac-alpha -> void_for_linking-tezos-dac-alpha.empty)
+   (-> void_for_linking-tezos-dac-alpha.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
@@ -42,9 +39,7 @@
   -open Tezos_rpc_http
   -open Tezos_stdlib_unix
   -open Tezos_stdlib
-  -open Tezos_dal_node_lib
-  -open Tezos_dal_node_services
-  -open Tezos_layer2_store
-  -open Tezos_crypto_dal))
+  -open Tezos_dac_node_lib
+  -open Tezos_layer2_store))
 
-(rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))
+(rule (action (progn (write-file void_for_linking-tezos-dac-alpha.empty ""))))

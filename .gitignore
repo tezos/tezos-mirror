@@ -53,6 +53,7 @@ __pycache__
 /octez-smart-rollup-wasm-*
 /tezos-dal-node
 /octez-dal-node
+/octez-dac-node
 /octez-binaries
 
 /src/proto_*/parameters/*-parameters.json

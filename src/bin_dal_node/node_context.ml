@@ -28,8 +28,7 @@ exception Status_already_ready
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  dal_plugin : (module Dal_plugin.T);
-  dac_plugin : (module Dac_plugin.T);
+  plugin : (module Dal_plugin.T);
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -60,10 +59,9 @@ let init config store cctxt =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
   }
 
-let set_ready ctxt ~dal_plugin ~dac_plugin cryptobox proto_parameters =
+let set_ready ctxt plugin cryptobox proto_parameters =
   match ctxt.status with
-  | Starting ->
-      ctxt.status <- Ready {dac_plugin; dal_plugin; cryptobox; proto_parameters}
+  | Starting -> ctxt.status <- Ready {plugin; cryptobox; proto_parameters}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready
@@ -105,7 +103,7 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
     match Committee_cache.find cache ~level with
     | Some committee -> return committee
     | None ->
-        let*? {dal_plugin = (module Plugin); _} = get_ready ctxt in
+        let*? {plugin = (module Plugin); _} = get_ready ctxt in
         let+ committee = Plugin.get_committee cctxt ~level in
         let committee =
           Tezos_crypto.Signature.Public_key_hash.Map.map
