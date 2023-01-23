@@ -889,6 +889,7 @@ let _octez_crypto_dal_tests =
         alcotest;
         qcheck_alcotest;
         bls12_381_polynomial;
+        octez_test_helpers;
       ]
 
 let octez_event_logging =

@@ -74,18 +74,15 @@ let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
   let* () = Node.config_init node [] in
   let* dal_parameters = Rollup.Dal.Parameters.from_client client in
   Node.Config_file.update node (fun json ->
-      let value =
-        JSON.annotate
-          ~origin:"dal_initialisation"
-          (`O
-            [
-              ( "srs_size",
-                `Float (float_of_int dal_parameters.cryptobox.slot_size) );
-              ("activated", `Bool true);
-            ])
+      let config : Cryptobox.Config.t =
+        {
+          activated = true;
+          use_mock_srs_for_testing = Some dal_parameters.cryptobox;
+        }
       in
-      let json = JSON.put ("dal", value) json in
-      json) ;
+      JSON.put
+        ("dal", Rollup.Dal.Parameters.cryptobox_config_to_json config)
+        json) ;
   let* () = Node.run node ~event_sections_levels node_arguments in
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in

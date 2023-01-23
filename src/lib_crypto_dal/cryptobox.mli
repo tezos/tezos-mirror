@@ -195,12 +195,10 @@ val prove_shards : t -> polynomial -> shard_proof array
 module Internal_for_tests : sig
   (** The initialisation parameters can be too large for testing
      purposes. This function creates an unsafe initialisation
-     parameters using some specified length (expected to be
-     positive). The running time of this function is linear with
-     respect to the size given. Order of magnitude can be around 1
-     minute for a size of 1MiB. *)
-  val initialisation_parameters_from_slot_size :
-    slot_size:int -> initialisation_parameters
+     parameters using [parameters]. The running time of this function
+     is linear with respect to [parameters.slot_size]. Order of magnitude can
+     be around 1 minute for a size of 1MiB. *)
+  val parameters_initialisation : parameters -> initialisation_parameters
 
   (** Same as {!val:load_parameters} except it erase parameters if
      they were already loaded. This is used to circumvent limitation
@@ -220,28 +218,31 @@ end
 module Config : sig
   type t = {
     activated : bool;
-        (** [true] if the DAL is activated ([false] by default). This may have
+        (** [true] if the DAL is activated. This may have
         an impact on the loading time of the node. *)
-    srs_size : int option;
-        (** If [None] (the default), the srs is read from the srs
-        files. This is the value expected for production. For testing
+    use_mock_srs_for_testing : parameters option;
+        (** If [None], the srs is read from the srs files.
+        This is the value expected for production. For testing
         purposes, we may want to compute the srs instead but this is
-        unsafe. In that case, a size must be specified. *)
+        not secure. In this case, the size of a slot, page, the
+        erasure code redundancy factor and number of shards must be
+        specified. *)
   }
 
   val encoding : t Data_encoding.t
 
-  (** The default configuration is [{activated = false; srs_size = None}]. *)
+  (** The default configuration is
+      [{activated = false; use_mock_srs_for_testing = None}]. *)
   val default : t
 
   (** [init_dal find_trusted_setup_files config] initializes the DAL
      according to the dal configuration [config].
 
-      When [config.srs_size = None], [init_dal] loads
-     [initialisation_parameters] from the files at the paths provided
-     by [find_trusted_setup_files ()]. It is important that every time
-     the primitives above are used, they are used with the very same
-     initialization parameters. (To ensure this property, an integrity
+      When [config.use_mock_srs_for_testing = None],
+     [init_dal] loads [initialisation_parameters] from the files at the
+     paths provided by [find_trusted_setup_files ()]. It is important that
+     every time the primitives above are used, they are used with the very
+     same initialization parameters. (To ensure this property, an integrity
      check is run.) In this case, [init_dal] can take several seconds
      to run. *)
   val init_dal :

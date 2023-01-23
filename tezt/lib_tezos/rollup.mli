@@ -229,6 +229,10 @@ module Dal : sig
     val parameter_file : Protocol.t -> string Lwt.t
 
     val from_client : Client.t -> t Lwt.t
+
+    (** [cryptobox_config_to_json config] returns the Json encoding of
+     the record {!type:Cryptobox.Config.t}. *)
+    val cryptobox_config_to_json : Cryptobox.Config.t -> JSON.t
   end
 
   (** Abstract version of a slot to deal with messages content which

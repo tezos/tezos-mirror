@@ -309,52 +309,112 @@ module Inner = struct
     srs : srs;
   }
 
-  let ensure_validity t =
+  let is_power_of_two n = n <> 0 && n land (n - 1) = 0
+
+  let slot_as_polynomial_length ~slot_size =
+    1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
+
+  let evaluations_per_proof_log ~n ~number_of_shards =
+    (* [n / number_of_shard] is an integer if [n] and [number_of_shards]
+       were validated by [ensure_validity]. *)
+    Z.log2up (Z.of_int (n / number_of_shards))
+
+  (* The page size is a power of two and thus not a multiple of [scalar_bytes_amount],
+     hence the + 1 to account for the remainder of the division. *)
+  let page_length ~page_size = Int.div page_size scalar_bytes_amount + 1
+
+  let ensure_validity ~slot_size ~page_size ~n ~k ~redundancy_factor
+      ~number_of_shards ~shard_size ~srs_g1_length ~srs_g2_length =
     let open Result_syntax in
-    let srs_size = Srs_g1.size t.srs.raw.srs_g1 in
-    let srs_size_g2 = Srs_g2.size t.srs.raw.srs_g2 in
-    let is_pow_of_two x =
-      let logx = Z.(log2 (of_int x)) in
-      1 lsl logx = x
-    in
-    if
-      not
-        (is_pow_of_two t.slot_size && is_pow_of_two t.page_size
-       && is_pow_of_two t.n)
+    if not (is_power_of_two slot_size) then
+      (* According to the specification the length of a slot are in MiB *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Slot size is expected to be a power of 2. Given: %d"
+             slot_size))
+    else if not (is_power_of_two page_size) then
+      (* According to the specification the lengths of a page are in MiB *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Page size is expected to be a power of 2. Given: %d"
+             page_size))
+    else if not (is_power_of_two redundancy_factor && redundancy_factor >= 2)
     then
-      (* According to the specification the lengths of a slot page are
-         in MiB *)
-      fail (`Fail "Wrong slot size: expected MiB")
-    else if not (t.page_size >= 32 && t.page_size <= t.slot_size) then
+      (* The redundancy factor should be a power of 2 so that n is a power of 2
+          for proper FFT sizing. The variable [k] is assumed to be a power of 2
+          as the output of [slot_as_polynomial_length]. *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Redundancy factor is expected to be a power of 2 and greater \
+              than 2. Given: %d"
+             redundancy_factor))
+    else if
+      (* At this point [n] is a power of 2, and [n > k]. *)
+      not (page_size >= 32 && page_size < slot_size)
+    then
       (* The size of a page must be greater than 31 bytes (32 > 31 is the next
-         power of two), the size in bytes of a scalar element, and less than
-         [t.slot_size]. *)
-      fail (`Fail "Wrong page size")
-    else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
-    then
-      (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
-         multiplicative group of Fr, because the FFTs operate on such groups. *)
-      fail (`Fail "Wrong computed size for n")
-    else if t.k > srs_size then
+         power of two), the size in bytes of a scalar element, and strictly less
+         than the slot size. *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Page size is expected to be greater than '32' and strictly less \
+              than the slot_size '%d'. Got: %d"
+             slot_size
+             page_size))
+    else if not (Z.(log2 (of_int n)) <= 32) then
+      (* n must be at most 2^32, the cardinal of the biggest subgroup of 2^i
+         roots of unity in the multiplicative group of Fr, because the FFTs
+         operate on such groups. *)
+      fail
+        (`Fail
+          (Format.asprintf
+             "Slot size is expected to be less than '%d'. Got: %d"
+             (1 lsl 36)
+             slot_size))
+    else if number_of_shards >= n then
+      fail
+        (`Fail
+          (Format.asprintf
+             "For the given parameters, the maximum number of shards is %d. \
+              Got: %d."
+             (number_of_shards / 2)
+             number_of_shards))
+    else if n mod number_of_shards <> 0 then
+      fail (`Fail (Format.asprintf "The number of shards must divide %d" n))
+    else if 2 * shard_size >= k then
+      fail
+        (`Fail
+          "For the given parameters, the minimum number of shards is %d. Got \
+           %d.")
+    else if k > srs_g1_length then
       (* the committed polynomials have degree t.k - 1 at most,
          so t.k coefficients. *)
       fail
         (`Fail
           (Format.asprintf
              "SRS on G1 size is too small. Expected more than %d. Got %d"
-             t.k
-             srs_size))
-    else if t.k > Srs_g2.size t.srs.raw.srs_g2 then
+             k
+             srs_g1_length))
+    else if
+      let evaluations_per_proof_log =
+        evaluations_per_proof_log ~n ~number_of_shards
+      in
+      let srs_g2_expected_length =
+        max k (1 lsl evaluations_per_proof_log) + 1
+      in
+      srs_g2_expected_length > srs_g2_length
+    then
       fail
         (`Fail
           (Format.asprintf
              "SRS on G2 size is too small. Expected more than %d. Got %d"
-             t.k
-             srs_size_g2))
-    else return t
-
-  let slot_as_polynomial_length ~slot_size =
-    1 lsl Z.(log2up (succ (of_int slot_size / of_int scalar_bytes_amount)))
+             k
+             srs_g2_length))
+    else return_unit
 
   type parameters = {
     redundancy_factor : int;
@@ -387,23 +447,38 @@ module Inner = struct
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
     let shard_size = n / number_of_shards in
-    let evaluations_log = Z.(log2 (of_int n)) in
-    let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
-    let page_length = Int.div page_size scalar_bytes_amount + 1 in
-    let* srs =
+    let* raw =
       match !initialisation_parameters with
       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
-      | Some raw ->
-          return
-            {
-              raw;
-              kate_amortized_srs_g2_shards =
-                Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
-              kate_amortized_srs_g2_pages =
-                Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
-            }
+      | Some srs -> return srs
     in
-    let t =
+    let* () =
+      ensure_validity
+        ~slot_size
+        ~page_size
+        ~n
+        ~k
+        ~redundancy_factor
+        ~number_of_shards
+        ~shard_size
+        ~srs_g1_length:(Srs_g1.size raw.srs_g1)
+        ~srs_g2_length:(Srs_g2.size raw.srs_g2)
+    in
+    let evaluations_log = Z.(log2 (of_int n)) in
+    let evaluations_per_proof_log =
+      evaluations_per_proof_log ~n ~number_of_shards
+    in
+    let page_length = page_length ~page_size in
+    let srs =
+      {
+        raw;
+        kate_amortized_srs_g2_shards =
+          Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
+        kate_amortized_srs_g2_pages =
+          Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
+      }
+    in
+    return
       {
         redundancy_factor;
         slot_size;
@@ -423,8 +498,6 @@ module Inner = struct
         proofs_log = evaluations_log - evaluations_per_proof_log;
         srs;
       }
-    in
-    ensure_validity t
 
   let parameters
       ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
@@ -615,7 +688,10 @@ module Inner = struct
 
       (* 6. Computing Lagrange interpolation polynomial P(x). *)
       let p = fft_mul t.domain_2k [a_poly; b] in
-      let p = Polynomials.copy ~len:t.k p in
+      let len =
+        if Polynomials.is_zero p then 1 else min t.k (Polynomials.degree p + 1)
+      in
+      let p = Polynomials.copy ~len p in
       Polynomials.opposite_inplace p ;
       Ok p
 
@@ -677,10 +753,6 @@ module Inner = struct
     let logx = Z.log2 (Z.of_int x) in
     if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
 
-  let is_pow_of_two x =
-    let logx = Z.log2 (Z.of_int x) in
-    1 lsl logx = x
-
   (* Implementation of fast amortized Kate proofs
      https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf). *)
 
@@ -721,9 +793,8 @@ module Inner = struct
       ~preprocess:(domain2m, precomputed_srs_part) coefs =
     let open Bls12_381 in
     let n = chunk_len + chunk_count in
-    assert (2 <= chunk_len) ;
     assert (chunk_len < n) ;
-    assert (is_pow_of_two degree) ;
+    assert (is_power_of_two degree) ;
     assert (1 lsl chunk_len < degree) ;
     assert (degree <= 1 lsl n) ;
     let l = 1 lsl chunk_len in
@@ -742,7 +813,7 @@ module Inner = struct
             if i <= quotient + (padding / 2) then Scalar.(copy zero)
             else Scalar.copy coefs.(rest + ((i - (quotient + padding)) * l)))
       in
-      if j <> 0 then points.(0) <- Scalar.copy coefs.(degree - j) ;
+      points.(0) <- Scalar.copy coefs.(degree - j) ;
       Scalar.fft_inplace ~domain:domain2m ~points ;
       Array.map2 G1.mul precomputed_srs_part.(j) points
     in
@@ -819,12 +890,16 @@ module Inner = struct
 
   let prove_shards t p =
     let preprocess = precompute_shards_proofs t in
+    let p' = Array.init (t.k + 1) (fun _ -> Scalar.(copy zero)) in
+    let p_length = Polynomials.degree p + 1 in
+    let p = Polynomials.to_dense_coefficients p in
+    Array.blit p 0 p' 0 p_length ;
     multiple_multi_reveals
       ~chunk_len:t.evaluations_per_proof_log
       ~chunk_count:t.proofs_log
       ~degree:t.k
       ~preprocess
-      (Polynomials.to_dense_coefficients p)
+      p'
 
   let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
     let d_n = Domains.build_power_of_two t.evaluations_log in
@@ -917,43 +992,75 @@ include Inner
 module Verifier = Inner
 
 module Internal_for_tests = struct
-  let initialisation_parameters_from_slot_size ~slot_size =
-    let size = slot_as_polynomial_length ~slot_size in
+  let parameters_initialisation parameters =
+    let length = slot_as_polynomial_length ~slot_size:parameters.slot_size in
     let secret =
       Bls12_381.Fr.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let srs_g1 = Srs_g1.generate_insecure (size + 1) secret in
-    let srs_g2 = Srs_g2.generate_insecure (size + 1) secret in
+    let srs_g1 = Srs_g1.generate_insecure length secret in
+    (* The error is caught during the instantiation through [make]. *)
+    let evaluations_per_proof_log =
+      match
+        evaluations_per_proof_log
+          ~n:(parameters.redundancy_factor * length)
+          ~number_of_shards:parameters.number_of_shards
+      with
+      | exception Invalid_argument _ -> 0
+      | x -> x
+    in
+    (* The cryptobox will read at indices `size`, `1 lsl evaluations_per_proof_log`
+       and `page_length` so we take the max + 1. Since `page_length < size`, we
+       can remove the `page_length from the max. *)
+    let srs_g2 =
+      Srs_g2.generate_insecure
+        (max length (1 lsl evaluations_per_proof_log) + 1)
+        secret
+    in
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
 end
 
 module Config = struct
-  type t = {activated : bool; srs_size : int option}
+  type t = {activated : bool; use_mock_srs_for_testing : parameters option}
+
+  let parameters_encoding : parameters Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {slot_size; page_size; redundancy_factor; number_of_shards} ->
+        (slot_size, page_size, redundancy_factor, number_of_shards))
+      (fun (slot_size, page_size, redundancy_factor, number_of_shards) ->
+        {slot_size; page_size; redundancy_factor; number_of_shards})
+      (obj4
+         (req "slot_size" int31)
+         (req "page_size" int31)
+         (req "redundancy_factor" int31)
+         (req "number_of_shards" int31))
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun {activated; srs_size} -> (activated, srs_size))
-      (fun (activated, srs_size) -> {activated; srs_size})
-      (obj2 (req "activated" bool) (req "srs_size" (option int31)))
+      (fun {activated; use_mock_srs_for_testing} ->
+        (activated, use_mock_srs_for_testing))
+      (fun (activated, use_mock_srs_for_testing) ->
+        {activated; use_mock_srs_for_testing})
+      (obj2
+         (req "activated" bool)
+         (req "use_mock_srs_for_testing" (option parameters_encoding)))
 
-  let default = {activated = false; srs_size = None}
+  let default = {activated = false; use_mock_srs_for_testing = None}
 
   let init_dal ~find_srs_files dal_config =
     let open Lwt_result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
-        match dal_config.srs_size with
+        match dal_config.use_mock_srs_for_testing with
+        | Some parameters ->
+            return (Internal_for_tests.parameters_initialisation parameters)
         | None ->
             let*? g1_path, g2_path = find_srs_files () in
             initialisation_parameters_from_files ~g1_path ~g2_path
-        | Some slot_size ->
-            return
-              (Internal_for_tests.initialisation_parameters_from_slot_size
-                 ~slot_size)
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit

@@ -543,6 +543,29 @@ module Dal = struct
           attestation_lag;
           blocks_per_epoch;
         }
+
+    let cryptobox_config_to_json (t : Cryptobox.Config.t) =
+      let parameters =
+        match t.use_mock_srs_for_testing with
+        | Some parameters ->
+            `O
+              [
+                ("slot_size", `Float (float_of_int parameters.slot_size));
+                ("page_size", `Float (float_of_int parameters.page_size));
+                ( "redundancy_factor",
+                  `Float (float_of_int parameters.redundancy_factor) );
+                ( "number_of_shards",
+                  `Float (float_of_int parameters.number_of_shards) );
+              ]
+        | None -> `Null
+      in
+      JSON.annotate
+        ~origin:"dal_initialisation"
+        (`O
+          [
+            ("activated", `Bool t.activated);
+            ("use_mock_srs_for_testing", parameters);
+          ])
   end
 
   module Committee = struct
@@ -813,8 +836,7 @@ module Dal = struct
         fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
       parameters =
     let initialisation_parameters =
-      Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-        ~slot_size:parameters.Cryptobox.slot_size
+      Cryptobox.Internal_for_tests.parameters_initialisation parameters
     in
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
     match Cryptobox.make parameters with
