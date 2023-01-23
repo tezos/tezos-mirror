@@ -270,23 +270,6 @@ module Dal : sig
         slot header *)
     val shards :
       slot_header:string -> int list -> (Dal_node.t, string list) RPC_core.t
-
-    (** [dac_store_preimage ~payload ~pagination_scheme] posts a [payload] to
-        dac/store_preimage using a given [pagination_scheme]. It returnst the
-        base58 encoded root page hash, and the raw bytes that can
-        be used as contents of a rollup message to trigger the request of
-        the payload in a Wasm rollup. *)
-    val dac_store_preimage :
-      payload:string ->
-      pagination_scheme:string ->
-      (Dal_node.t, string * string) RPC_core.t
-
-    (** [dac_verify_signature data] requests the dal node to verify
-         the signature of the external message [data] via
-         the plugin/dac/verify_signature endpoint. The DAC committee
-         of the dal node must be the same that was used to produce the
-         [data]. *)
-    val dac_verify_signature : string -> (Dal_node.t, bool) RPC_core.t
   end
 
   module RPC : sig
@@ -410,5 +393,26 @@ module Dal : sig
     type profiles = RPC.profile list
 
     val profiles_typ : profiles Check.typ
+  end
+end
+
+module Dac : sig
+  module RPC : sig
+    (** [dac_store_preimage ~payload ~pagination_scheme] posts a [payload] to
+        dac/store_preimage using a given [pagination_scheme]. It returnst the
+        base58 encoded root page hash, and the raw bytes that can
+        be used as contents of a rollup message to trigger the request of
+        the payload in a Wasm rollup. *)
+    val dac_store_preimage :
+      payload:string ->
+      pagination_scheme:string ->
+      (Dac_node.t, string * string) RPC_core.t
+
+    (** [dac_verify_signature data] requests the dal node to verify
+         the signature of the external message [data] via
+         the plugin/dac/verify_signature endpoint. The DAC committee
+         of the dal node must be the same that was used to produce the
+         [data]. *)
+    val dac_verify_signature : string -> (Dac_node.t, bool) RPC_core.t
   end
 end

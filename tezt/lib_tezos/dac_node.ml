@@ -35,7 +35,7 @@ module Parameters = struct
 
   type session_state = {mutable ready : bool}
 
-  let base_default_name = "octez-dal-node"
+  let base_default_name = "octez-dac-node"
 
   let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
 end
@@ -43,70 +43,102 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
-let wait dal_node =
-  match dal_node.status with
+let wait dac_node =
+  match dac_node.status with
   | Not_running ->
       Test.fail
-        "DAL node %s is not running, cannot wait for it to terminate"
-        (name dal_node)
+        "DAC node %s is not running, cannot wait for it to terminate"
+        (name dac_node)
   | Running {process; _} -> Process.wait process
 
-let is_running_not_ready dal_node =
-  match dal_node.status with
+let is_running_not_ready dac_node =
+  match dac_node.status with
   | Running {session_state = {ready}; _} when not ready -> true
   | _ -> false
 
-let name dal_node = dal_node.name
+let name dac_node = dac_node.name
 
-let rpc_host dal_node = dal_node.persistent_state.rpc_host
+let rpc_host dac_node = dac_node.persistent_state.rpc_host
 
-let rpc_port dal_node = dal_node.persistent_state.rpc_port
+let rpc_port dac_node = dac_node.persistent_state.rpc_port
 
-let layer1_addr dal_node = Node.rpc_host dal_node.persistent_state.node
+let layer1_addr dac_node = Node.rpc_host dac_node.persistent_state.node
 
-let layer1_port dal_node = Node.rpc_port dal_node.persistent_state.node
+let layer1_port dac_node = Node.rpc_port dac_node.persistent_state.node
 
-let endpoint dal_node =
-  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
+let endpoint dac_node =
+  Printf.sprintf "http://%s:%d" (rpc_host dac_node) (rpc_port dac_node)
 
-let data_dir dal_node = dal_node.persistent_state.data_dir
+let data_dir dac_node = dac_node.persistent_state.data_dir
 
-let spawn_command dal_node =
-  Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
+let spawn_command dac_node =
+  Process.spawn ~name:dac_node.name ~color:dac_node.color dac_node.path
 
-let spawn_config_init ?(use_unsafe_srs = true) dal_node =
-  spawn_command dal_node
-  @@ List.filter_map
-       Fun.id
-       [
-         Some "init-config";
-         Some "--data-dir";
-         Some (data_dir dal_node);
-         Some "--rpc-port";
-         Some (string_of_int (rpc_port dal_node));
-         Some "--rpc-addr";
-         Some (rpc_host dal_node);
-         (if use_unsafe_srs then Some "--use-unsafe-srs-for-tests" else None);
-       ]
+let spawn_config_init dac_node =
+  spawn_command dac_node
+  @@ [
+       "init-config";
+       "--data-dir";
+       data_dir dac_node;
+       "--rpc-port";
+       string_of_int (rpc_port dac_node);
+       "--rpc-addr";
+       rpc_host dac_node;
+     ]
 
-let init_config ?use_unsafe_srs dal_node =
-  let process = spawn_config_init ?use_unsafe_srs dal_node in
+let init_config dac_node =
+  let process = spawn_config_init dac_node in
   let* output = Process.check_and_read_stdout process in
-  match output =~* rex "DAL node configuration written in ([^\n]*)" with
-  | None -> failwith "DAL node configuration initialization failed"
+  match output =~* rex "DAC node configuration written in ([^\n]*)" with
+  | None -> failwith "DAC node configuration initialization failed"
   | Some filename -> return filename
 
-module Config_file = struct
-  let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
+module Dac = struct
+  let spawn_set_parameters ?threshold ?reveal_data_dir dac_node =
+    let threshold_arg =
+      match threshold with
+      | None -> []
+      | Some threshold -> ["--threshold"; Int.to_string threshold]
+    in
+    let reveal_data_dir_arg =
+      match reveal_data_dir with
+      | None -> []
+      | Some reveal_data_dir -> ["--reveal-data-dir"; reveal_data_dir]
+    in
+    let data_dir_arg = ["--data-dir"; data_dir dac_node] in
+    spawn_command dac_node
+    @@ ["set"; "dac"; "parameters"]
+    @ threshold_arg @ reveal_data_dir_arg @ data_dir_arg
 
-  let read dal_node = JSON.parse_file (filename dal_node)
+  let set_parameters ?threshold ?reveal_data_dir dac_node =
+    spawn_set_parameters ?threshold ?reveal_data_dir dac_node |> Process.check
 
-  let write dal_node config = JSON.encode_to_file (filename dal_node) config
+  let spawn_add_committee_member ~address dac_node =
+    let base_dir_argument =
+      ["--base-dir"; Client.base_dir dac_node.persistent_state.client]
+    in
+    spawn_command
+      dac_node
+      (base_dir_argument
+      @ ["add"; "data"; "availability"; "committee"; "member"]
+      @ [address]
+      @ ["--data-dir"; dac_node.persistent_state.data_dir])
 
-  let update dal_node update = read dal_node |> update |> write dal_node
+  let add_committee_member ~address dac_node =
+    spawn_add_committee_member ~address dac_node |> Process.check
 end
 
-let check_event ?timeout ?where dal_node name promise =
+module Config_file = struct
+  let filename dac_node = sf "%s/config.json" @@ data_dir dac_node
+
+  let read dac_node = JSON.parse_file (filename dac_node)
+
+  let write dac_node config = JSON.encode_to_file (filename dac_node) config
+
+  let update dac_node update = read dac_node |> update |> write dac_node
+end
+
+let check_event ?timeout ?where dac_node name promise =
   let* result =
     match timeout with
     | None -> promise
@@ -121,33 +153,33 @@ let check_event ?timeout ?where dal_node name promise =
   match result with
   | None ->
       raise
-        (Terminated_before_event {daemon = dal_node.name; event = name; where})
+        (Terminated_before_event {daemon = dac_node.name; event = name; where})
   | Some x -> return x
 
-let trigger_ready dal_node value =
-  let pending = dal_node.persistent_state.pending_ready in
-  dal_node.persistent_state.pending_ready <- [] ;
+let trigger_ready dac_node value =
+  let pending = dac_node.persistent_state.pending_ready in
+  dac_node.persistent_state.pending_ready <- [] ;
   List.iter (fun pending -> Lwt.wakeup_later pending value) pending
 
-let set_ready dal_node =
-  (match dal_node.status with
+let set_ready dac_node =
+  (match dac_node.status with
   | Not_running -> ()
   | Running status -> status.session_state.ready <- true) ;
-  trigger_ready dal_node (Some ())
+  trigger_ready dac_node (Some ())
 
-let wait_for_ready dal_node =
-  match dal_node.status with
+let wait_for_ready dac_node =
+  match dac_node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       let promise, resolver = Lwt.task () in
-      dal_node.persistent_state.pending_ready <-
-        resolver :: dal_node.persistent_state.pending_ready ;
-      check_event dal_node "dal_node_is_ready.v0" promise
+      dac_node.persistent_state.pending_ready <-
+        resolver :: dac_node.persistent_state.pending_ready ;
+      check_event dac_node "dac_node_is_ready.v0" promise
 
-let handle_event dal_node {name; value = _; timestamp = _} =
-  match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
+let handle_event dac_node {name; value = _; timestamp = _} =
+  match name with "dac_node_is_ready.v0" -> set_ready dac_node | _ -> ()
 
-let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
+let create ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ~node ~client () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
@@ -156,7 +188,7 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let dal_node =
+  let dac_node =
     create
       ~path
       ~name
@@ -164,8 +196,8 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
       ?event_pipe
       {data_dir; rpc_host; rpc_port; pending_ready = []; node; client}
   in
-  on_event dal_node (handle_event dal_node) ;
-  dal_node
+  on_event dac_node (handle_event dac_node) ;
+  dac_node
 
 let make_arguments node =
   let base_dir_args =
@@ -181,7 +213,7 @@ let make_arguments node =
 
 let do_runlike_command ?env node arguments =
   if node.status <> Not_running then
-    Test.fail "DAL node %s is already running" node.name ;
+    Test.fail "DAC node %s is already running" node.name ;
   let on_terminate _status =
     trigger_ready node None ;
     unit

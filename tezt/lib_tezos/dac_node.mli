@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Spawn Data-availability-layer (DAL) nodes and control them *)
+(** Spawn Data-availability-committee (DAC) nodes and control them. *)
 
-(** DAL Node state *)
+(** DAC Node state *)
 type t
 
-(** Creates a DAL node *)
+(** Creates a DAC node *)
 
 val create :
   ?path:string ->
@@ -43,25 +43,25 @@ val create :
   unit ->
   t
 
-(** Get the name of an dal node. *)
+(** Get the name of an dac node. *)
 val name : t -> string
 
-(** Get the RPC host given as [--rpc-addr] to an dal node. *)
+(** Get the RPC host given as [--rpc-addr] to an dac node. *)
 val rpc_host : t -> string
 
-(** Get the RPC port given as [--rpc-addr] to an dal node. *)
+(** Get the RPC port given as [--rpc-addr] to an dac node. *)
 val rpc_port : t -> int
 
-(** Return the endpoint of the dal node, i.e., http://rpc_host:rpc_port. *)
+(** Return the endpoint of the dac node, i.e., http://rpc_host:rpc_port. *)
 val endpoint : t -> string
 
-(** Get the data-dir of an dal node. *)
+(** Get the data-dir of an dac node. *)
 val data_dir : t -> string
 
-(** [run ?wait_ready ?env node] launches the given dal
+(** [run ?wait_ready ?env node] launches the given dac
     node where env is a map of environment variable.
 
-    If [wait_ready] is [true], the promise waits for the dal node to be ready.
+    If [wait_ready] is [true], the promise waits for the dac node to be ready.
     [true] by default.
 *)
 val run : ?wait_ready:bool -> ?env:string String_map.t -> t -> unit Lwt.t
@@ -80,7 +80,7 @@ val log_events : t -> unit
 (** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** [is_running_not_ready dal_node] returns true if the given node is
+(** [is_running_not_ready dac_node] returns true if the given node is
     running but its status is not ready *)
 val is_running_not_ready : t -> bool
 
@@ -88,28 +88,41 @@ val is_running_not_ready : t -> bool
     running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Run [octez-dal-node init-config]. Returns the name of the resulting
+(** Run [octez-dac-node init-config]. Returns the name of the resulting
     configuration file.
-
-    If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
-    allowing tests to run faster, without the need of large file. Default is
-    [true] in tezt.
 *)
-val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
+val init_config : t -> string Lwt.t
+
+(** DAC related functions. *)
+module Dac : sig
+  (** [set_parameters ?threshold dac_node] Runs
+    [octez-dac-node set dac parameters --data-dir data_dir], where
+    [data_dir = dac_node.persistent_state.data_dir]. If the optional integer
+    parameter [~threshold] is passed, then the dac node configuration file is
+    updated with the dac threshold indicated. If the [~reveal_data_dir]
+    optional argument is passed, then the dac node configuration file is
+    updated with the corresponding reveal_data_dir. If no optional arguments are
+    passed, the configuration file of the dac node is left unchanged.
+*)
+  val set_parameters :
+    ?threshold:int -> ?reveal_data_dir:string -> t -> unit Lwt.t
+
+  (** [add_committee_member dac_node] runs
+    [octez-dac-node add data availability committee member alias --data-dir data-dir],
+    where [data-dir = dac_node.persistent_state.data_dir]. *)
+  val add_committee_member : address:string -> t -> unit Lwt.t
+end
 
 module Config_file : sig
-  (** DAL node configuration files. *)
+  (** C node configuration files. *)
 
-  (** Read the configuration file ([config.json]) of a DAL node. *)
+  (** Read the configuration file ([config.json]) of a DAC node. *)
   val read : t -> JSON.t
 
-  (** Write the configuration file of a DAL node, replacing the existing one. *)
+  (** Write the configuration file of a DAC node, replacing the existing one. *)
   val write : t -> JSON.t -> unit
 
-  (** Update the configuration file of a DAL node. If the DAL node is already
-      running, it needs to be restarted manually.
-
-      Example:
-        [Node.Config_file.update node (JSON.put ("use_unsafe_srs", "true"))] *)
+  (** Update the configuration file of a DAC node. If the DAC node is already
+      running, it needs to be restarted manually. *)
   val update : t -> (JSON.t -> JSON.t) -> unit
 end

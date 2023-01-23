@@ -40,6 +40,8 @@ let tezos_protocol_compiler = "./octez-protocol-compiler"
 
 let dal_node = "./octez-dal-node"
 
+let dac_node = "./octez-dac-node"
+
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)
 let activator : Account.key =

@@ -190,6 +190,7 @@ let register_protocol_tests_that_use_supports_correctly () =
 let register_protocol_specific_because_regression_tests () =
   Consensus_key.register ~protocols:[Mumbai; Alpha] ;
   Dal.register ~protocols:[Alpha] ;
+  Dac.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Mumbai; Alpha] ;
   Increase_paid_storage.register ~protocols:[Mumbai; Alpha] ;
   Sc_rollup.register ~protocols:[Mumbai; Alpha] ;
