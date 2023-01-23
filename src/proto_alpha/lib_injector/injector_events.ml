@@ -136,14 +136,6 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
       (Format.pp_print_list L1_operation.Hash.pp)
       operations
 
-  let injecting_operations =
-    declare_1
-      ~name:"injecting_operations"
-      ~msg:"Injecting operations: {operations}"
-      ~level:Notice
-      ("operations", Data_encoding.list L1_operation.encoding)
-      ~pp1:pp_operations_list
-
   let simulating_operations =
     declare_2
       ~name:"simulating_operations"
