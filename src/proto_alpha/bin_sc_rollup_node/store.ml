@@ -444,10 +444,11 @@ let close
   and+ () = Irmin_store.close irmin_store |> Lwt_result.ok in
   ()
 
-let load (type a) (mode : a mode) data_dir : a store tzresult Lwt.t =
+let load (type a) (mode : a mode) ~l2_blocks_cache_size data_dir :
+    a store tzresult Lwt.t =
   let open Lwt_result_syntax in
   let path name = Filename.concat data_dir name in
-  let cache_size = 10_000 in
+  let cache_size = l2_blocks_cache_size in
   let* l2_blocks = L2_blocks.load mode ~path:(path "l2_blocks") ~cache_size in
   let* messages = Messages.load mode ~path:(path "messages") ~cache_size in
   let* inboxes = Inboxes.load mode ~path:(path "inboxes") ~cache_size in
