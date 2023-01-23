@@ -45,6 +45,10 @@ let make_bool_parameter name = function
   | None -> []
   | Some value -> [(name, `Bool value)]
 
+let make_string_parameter name = function
+  | None -> []
+  | Some value -> [(name, `String value)]
+
 let test ~__FILE__ ?(tags = []) ?supports title f =
   let tags = "dal" :: tags in
   Protocol.register_test ~__FILE__ ~title ~tags ?supports f
@@ -59,7 +63,8 @@ let dal_enable_param dal_enable =
 (* Some initialization functions to start needed nodes. *)
 
 let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
-    ?(event_sections_levels = []) ?(node_arguments = []) () =
+    ?activation_timestamp ?(event_sections_levels = []) ?(node_arguments = [])
+    () =
   (* Temporary setup to initialise the node. *)
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
@@ -99,17 +104,23 @@ let setup_node ?(additional_bootstrap_accounts = 5) ~parameters ~protocol
       parameters
   in
   let* () =
-    Client.activate_protocol_and_wait ~parameter_file ~protocol client
+    Client.activate_protocol_and_wait
+      ?timestamp:activation_timestamp
+      ~parameter_file
+      ~protocol
+      client
   in
   return (node, client, dal_parameters)
 
-let with_layer1 ?additional_bootstrap_accounts ?(attestation_lag = 1)
-    ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
-    ?node_arguments f ~protocol =
+let with_layer1 ?additional_bootstrap_accounts ?minimal_block_delay
+    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
+    ?dal_enable ?event_sections_levels ?node_arguments ?activation_timestamp f
+    ~protocol =
   let parameters =
-    make_int_parameter
-      ["dal_parametric"; "attestation_lag"]
-      (Some attestation_lag)
+    make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter
+        ["dal_parametric"; "attestation_threshold"]
+        attestation_threshold
     @ make_int_parameter
         ["smart_rollup_commitment_period_in_blocks"]
         commitment_period
@@ -120,12 +131,14 @@ let with_layer1 ?additional_bootstrap_accounts ?(attestation_lag = 1)
        hence the value from the protocol constants will be used. *)
     @ dal_enable_param dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
+    @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
   in
   let* node, client, dal_parameters =
     setup_node
       ?additional_bootstrap_accounts
       ?event_sections_levels
       ?node_arguments
+      ?activation_timestamp
       ~parameters
       ~protocol
       ()
@@ -171,7 +184,8 @@ let with_dal_node tezos_node tezos_client f key =
    writing tests. *)
 let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
     ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?event_sections_levels ?node_arguments variant scenario =
+    ?event_sections_levels ?node_arguments ?activation_timestamp variant
+    scenario =
   let description = "Testing DAL L1 integration" in
   test
     ~__FILE__
@@ -184,14 +198,16 @@ let scenario_with_layer1_node ?(tags = ["dal"; "layer1"]) ?attestation_lag
         ?challenge_window
         ?event_sections_levels
         ?node_arguments
+        ?activation_timestamp
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
 let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
-    ?attestation_lag ?commitment_period ?challenge_window ?(dal_enable = true)
-    variant scenario =
+    ?minimal_block_delay ?attestation_lag ?attestation_threshold
+    ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?activation_timestamp variant scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
@@ -199,9 +215,12 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ?minimal_block_delay
         ?attestation_lag
+        ?attestation_threshold
         ?commitment_period
         ?challenge_window
+        ?activation_timestamp
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
@@ -209,14 +228,21 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["dal"; "layer1"])
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?(tags = ["dal"; "dal_node"]) ?(pvm_name = "arith")
-    ?(dal_enable = true) ?commitment_period ?challenge_window variant scenario =
+    ?(dal_enable = true) ?commitment_period ?challenge_window
+    ?minimal_block_delay ?activation_timestamp variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
-      with_layer1 ?commitment_period ?challenge_window ~protocol ~dal_enable
+      with_layer1
+        ?commitment_period
+        ?challenge_window
+        ?minimal_block_delay
+        ?activation_timestamp
+        ~protocol
+        ~dal_enable
       @@ fun parameters _cryptobox node client ->
       with_dal_node node client @@ fun key dal_node ->
       ( with_fresh_rollup ~protocol ~pvm_name ~dal_node

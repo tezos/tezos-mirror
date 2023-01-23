@@ -223,6 +223,7 @@ module Dal : sig
       cryptobox : Cryptobox.parameters;
       number_of_slots : int;
       attestation_lag : int;
+      attestation_threshold : int;
       blocks_per_epoch : int;
     }
 
