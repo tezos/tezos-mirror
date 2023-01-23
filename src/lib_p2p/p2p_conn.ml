@@ -186,6 +186,8 @@ let local_metadata t = P2p_socket.local_metadata t.conn
 let remote_metadata t = P2p_socket.remote_metadata t.conn
 
 let disconnect ?(wait = false) t =
+  let open Lwt_syntax in
+  let* () = Events.(emit disconnect) t.peer_id in
   t.wait_close <- wait ;
   shutdown t
 

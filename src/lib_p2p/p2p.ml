@@ -235,7 +235,8 @@ module Real = struct
   let maintain {maintenance; _} () = P2p_maintenance.maintain maintenance
 
   let activate t () =
-    Events.(emit__dont_wait__use_with_care activate_network) () ;
+    Events.(emit__dont_wait__use_with_care activate_network)
+      t.config.identity.peer_id ;
     (match t.welcome with None -> () | Some w -> P2p_welcome.activate w) ;
     P2p_maintenance.activate t.maintenance ;
     ()
