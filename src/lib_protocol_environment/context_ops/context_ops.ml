@@ -208,6 +208,11 @@ let wait_gc_completion context_index =
   | Disk_index index -> Context.wait_gc_completion index
   | Memory_index index -> Tezos_context_memory.Context.wait_gc_completion index
 
+let is_gc_allowed context_index =
+  match context_index with
+  | Disk_index index -> Context.is_gc_allowed index
+  | Memory_index index -> Tezos_context_memory.Context.is_gc_allowed index
+
 let split context_index =
   match context_index with
   | Disk_index index -> Context.split index
