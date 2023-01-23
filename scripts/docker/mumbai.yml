@@ -1,7 +1,7 @@
 version: "3"
 services:
   octez-node:
-    container_name: octez-node-kathmandu
+    container_name: octez-node-mumbai
     image: tezos/tezos:latest
     hostname: octez-node
     command: octez-node
@@ -10,20 +10,20 @@ services:
       - 8732:8732
     environment:
       NODE_HOST: octez-node
-      PROTOCOL: PtKathma
+      PROTOCOL: PtMumbai
     volumes:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
     restart: on-failure
 
   octez-baker:
-    container_name: octez-baker-kathmandu
+    container_name: octez-baker-mumbai
     image: tezos/tezos:latest
     hostname: octez-baker
     command: octez-baker --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
     environment:
       NODE_HOST: octez-node
-      PROTOCOL: PtKathma
+      PROTOCOL: PtMumbai
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
@@ -31,13 +31,13 @@ services:
 
 
   octez-accuser:
-    container_name: octez-accuser-kathmandu
+    container_name: octez-accuser-mumbai
     image: tezos/tezos:latest
     hostname: octez-accuser
     command: octez-accuser
     environment:
       NODE_HOST: octez-node
-      PROTOCOL: PtKathma
+      PROTOCOL: PtMumbai
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
