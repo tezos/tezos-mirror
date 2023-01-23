@@ -30,7 +30,9 @@
         only once in a while, e.g. every minutes or when a point
         or the associated peer_id is blacklisted. *)
 
-(* TODO allow to track "requested peer_ids" when we reconnect to a point. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4658
+
+   allow to track "requested peer_ids" when we reconnect to a point. *)
 
 module Event = P2p_events.P2p_pool
 
