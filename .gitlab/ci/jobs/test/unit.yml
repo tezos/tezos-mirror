@@ -175,7 +175,19 @@ unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64_coverage
   variables:
-    MAKE_TARGETS: test-nonproto-unit test-webassembly
+    MAKE_TARGETS: test-nonproto-unit
+
+unit:webassembly-x86_64:
+  extends:
+  - .unit_test_template_x86_64
+  variables:
+    MAKE_TARGETS: test-webassembly
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/4663
+  # This test takes around 2 to 4min to complete, but it sometimes
+  # hangs. We use a timeout to retry the test in this case. The
+  # underlying issue should be fixed eventually, turning this timeout
+  # unnecessary.
+  timeout: 20 min
 
 unit:non-proto-arm64:
   extends: .unit_test_template_arm64
