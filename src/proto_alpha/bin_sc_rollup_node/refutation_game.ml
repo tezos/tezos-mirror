@@ -224,9 +224,18 @@ module Make (Interpreter : Interpreter.S) :
         let inbox = snapshot
 
         let get_history inbox_hash =
-          let open Lwt_option_syntax in
+          let open Lwt_syntax in
           let+ inbox = Node_context.find_inbox node_ctxt inbox_hash in
-          Sc_rollup.Inbox.take_snapshot inbox
+          match inbox with
+          | Error err ->
+              Format.kasprintf
+                Stdlib.failwith
+                "Refutation game: Cannot get inbox history for %a, %a"
+                Sc_rollup.Inbox.Hash.pp
+                inbox_hash
+                pp_print_trace
+                err
+          | Ok inbox -> Option.map Sc_rollup.Inbox.take_snapshot inbox
 
         let get_payloads_history witness =
           Lwt.map

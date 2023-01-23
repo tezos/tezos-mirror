@@ -167,7 +167,7 @@ let process_head (node_ctxt : _ Node_context.t)
     in
     Metrics.Inbox.Stats.head_messages_list :=
       messages_with_protocol_internal_messages ;
-    let*! () =
+    let* () =
       Node_context.save_messages
         node_ctxt
         witness_hash
@@ -178,7 +178,7 @@ let process_head (node_ctxt : _ Node_context.t)
         }
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
-    let*! inbox_hash = Node_context.save_inbox node_ctxt inbox in
+    let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
     return
       ( inbox_hash,
         inbox,
