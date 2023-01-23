@@ -780,7 +780,7 @@ module type TEZOS_CONTEXT = sig
       partially needed data. This is not an issue, but it should be
       avoided to prevent storing unnecessary data and thus, to
       minimize the disk footprint. *)
-  val split : index -> unit
+  val split : index -> unit Lwt.t
 
   (** [export_snapshot index context_hash ~path] exports the context
       corresponding to [context_hash], if found in [index], into the

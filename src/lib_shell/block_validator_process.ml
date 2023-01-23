@@ -385,7 +385,7 @@ module Internal_validator_process = struct
 
   let context_split _validator context_index =
     let open Lwt_result_syntax in
-    let () = Context_ops.split context_index in
+    let*! () = Context_ops.split context_index in
     return_unit
 
   let commit_genesis validator ~chain_id =

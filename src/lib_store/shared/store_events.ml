@@ -220,6 +220,15 @@ let start_context_gc =
     ~pp1:pp_block_descriptor
     ("block", block_descriptor_encoding)
 
+let start_context_split =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"start_context_split"
+    ~msg:"splitting context into a new chunk at level {level}"
+    ~pp1:pp_int32
+    ("level", Data_encoding.int32)
+
 let context_gc_is_not_allowed =
   declare_0
     ~section

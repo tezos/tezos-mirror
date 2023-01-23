@@ -533,7 +533,7 @@ let run ~readonly input output =
         loop cache None
     | External_validation.Context_split ->
         let*! () = Events.(emit context_split_request) () in
-        let () = Context.split context_index in
+        let*! () = Context.split context_index in
         let*! () =
           External_validation.send
             output
