@@ -3183,13 +3183,29 @@ let octez_layer2_store =
     ~synopsis:"Tezos: layer2 storage utils"
     ~deps:
       [
+        index;
         octez_base |> open_ ~m:"TzPervasives";
         irmin_pack;
         irmin_pack_unix;
         irmin;
+        aches_lwt;
+        octez_stdlib_unix |> open_;
         octez_context_encoding;
       ]
     ~linkall:true
+
+let _octez_layer2_indexed_store_test =
+  test
+    "test_indexed_store"
+    ~path:"src/lib_layer2_store/test/"
+    ~opam:"tezos-layer2-store"
+    ~deps:
+      [
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_layer2_store |> open_;
+        qcheck_alcotest;
+        alcotest_lwt;
+      ]
 
 let octez_dal_node_services =
   private_lib
