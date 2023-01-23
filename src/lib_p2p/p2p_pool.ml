@@ -26,9 +26,11 @@
 
 (* TODO Test cancellation of a (pending) connection *)
 
-(* TODO do not recompute list_known_points at each requests... but
-        only once in a while, e.g. every minutes or when a point
-        or the associated peer_id is blacklisted. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4657
+
+   Do not recompute list_known_points at each requests... but only
+   once in a while, e.g. every minutes or when a point or the
+   associated peer_id is blacklisted. *)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4658
 
