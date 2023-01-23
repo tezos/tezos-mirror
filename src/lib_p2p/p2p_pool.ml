@@ -24,13 +24,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO Test cancellation of a (pending) connection *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4656
 
-(* TODO do not recompute list_known_points at each requests... but
-        only once in a while, e.g. every minutes or when a point
-        or the associated peer_id is blacklisted. *)
+   Test cancellation of a (pending) connection *)
 
-(* TODO allow to track "requested peer_ids" when we reconnect to a point. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4657
+
+   Do not recompute list_known_points at each requests... but only
+   once in a while, e.g. every minutes or when a point or the
+   associated peer_id is blacklisted. *)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4658
+
+   allow to track "requested peer_ids" when we reconnect to a point. *)
 
 module Event = P2p_events.P2p_pool
 
@@ -79,8 +85,10 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
       let current_size = P2p_point.Table.length known_points in
       if current_size > target then (
         let to_remove_target = current_size - target in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4659
+
+           Maybe use the time of discovery? *)
         let now = Time.System.now () in
-        (* TODO: maybe time of discovery? *)
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter
           (fun p point_info ->
