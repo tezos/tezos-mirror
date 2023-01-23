@@ -113,7 +113,10 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
     [--liquidity-baking-toggle-vote] is [None], then
     [--liquidity-baking-toggle-vote]
     is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
-    passed. The default value is [Some Pass]. *)
+    passed. The default value is [Some Pass].
+
+    [operations_pool] is passed to the baker daemon through the flag
+    [--operations-pool]. *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -123,6 +126,7 @@ val create :
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?operations_pool:string ->
   Node.t ->
   Client.t ->
   t
@@ -157,8 +161,10 @@ val create :
     baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [votefile] and [liquidity_baking_toggle_vote] are passed to the baker daemon
-    through the flags [--votefile] and [--liquidity-baking-toggle-vote]. *)
+    [votefile], [liquidity_baking_toggle_vote] respectively
+    [operations_pool] are passed to the baker daemon through the flags
+    [--votefile], [--liquidity-baking-toggle-vote] respectively
+    [--operations-pool]. *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
@@ -168,6 +174,7 @@ val init :
   ?delegates:string list ->
   ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?operations_pool:string ->
   Node.t ->
   Client.t ->
   t Lwt.t

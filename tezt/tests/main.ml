@@ -100,6 +100,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
+  Baker_operations_cli_options.register ~protocols ;
   Baking.register ~protocols ;
   Baking.register_operations_pool ~protocols ;
   Basic.register ~protocols ;
