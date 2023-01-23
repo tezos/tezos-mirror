@@ -24,7 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO Test cancellation of a (pending) connection *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4656
+
+   Test cancellation of a (pending) connection *)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4657
 
