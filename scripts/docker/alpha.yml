@@ -9,7 +9,6 @@ services:
       - 9732:9732
       - 8732:8732
     environment:
-      NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
       PROTOCOL: alpha
     volumes:
@@ -23,7 +22,6 @@ services:
     hostname: octez-baker
     command: octez-baker --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
     environment:
-      NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
       PROTOCOL: alpha
     volumes:
@@ -38,7 +36,6 @@ services:
     hostname: octez-accuser
     command: octez-accuser
     environment:
-      NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
       PROTOCOL: alpha
     volumes:
