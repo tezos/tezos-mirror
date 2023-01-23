@@ -117,15 +117,15 @@ let polynomial_from_shards cryptobox shards =
   | Error (`Invert_zero msg | `Not_enough_shards msg) ->
       Error [Merging_failed msg]
 
-let save_shards store cryptobox slot_header shards =
+let save_shards store cryptobox commitment shards =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
-  let rebuilt_slot_header = Cryptobox.commit cryptobox polynomial in
+  let rebuilt_commitment = Cryptobox.commit cryptobox polynomial in
   let*? () =
-    if Cryptobox.Commitment.equal slot_header rebuilt_slot_header then Ok ()
+    if Cryptobox.Commitment.equal commitment rebuilt_commitment then Ok ()
     else Result_syntax.fail [Invalid_shards_slot_header_association]
   in
-  Store.Legacy.save_shards store slot_header shards |> Errors.to_tzresult
+  Store.Legacy.save_shards store commitment shards |> Errors.to_tzresult
 
 let get_shard dal_constants store slot_header shard_id =
   let open Lwt_result_syntax in

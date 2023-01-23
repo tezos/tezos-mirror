@@ -711,8 +711,7 @@ module Dal = struct
         get_bytes_from_json_string_node
 
     let put_commitment_shards ?(with_proof = false) commitment =
-      let data = Client.Data (`Bool with_proof) in
-      (* make is not perfect, some methods do require data, but data is always optional. *)
+      let data : RPC_core.data = Data (`O [("with_proof", `Bool with_proof)]) in
       make
         ~data
         PUT
