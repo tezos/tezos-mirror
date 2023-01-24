@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_015/opcodes/get_and_update_big_map.tz --details
+./octez-client --protocol PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/opcodes/get_and_update_big_map.tz --details
 Well typed
 Gas remaining: 1039994.790 units remaining
 { parameter string ;
