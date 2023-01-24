@@ -120,11 +120,11 @@ code { CAR; CONTRACT %s %s;
 let test_simple_entrypoints client ~contract_annotation ~contract_type ~param
     ~expected_storage =
   let prg = script contract_annotation contract_type in
-  let* actual_storage =
+  let* {storage; _} =
     Client.run_script client ~prg ~storage:"None" ~input:param
   in
   Check.(
-    (actual_storage = expected_storage)
+    (storage = expected_storage)
       ~__LOC__
       string
       ~error_msg:"Expected results %R, got %L") ;

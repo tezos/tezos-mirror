@@ -61,7 +61,7 @@ let register_opcode_tests ?supports parameterization protocols =
     let script_path =
       Michelson_script.(find ["opcodes"; script] protocol |> path)
     in
-    let* run_script_res_storage =
+    let* {storage; _} =
       Client.run_script
         ~protocol_hash:(Protocol.hash protocol)
         ~no_base_dir_warnings:true
@@ -79,7 +79,7 @@ let register_opcode_tests ?supports parameterization protocols =
       "Expected storage %R, got %L when executing"
       ^ sf " %s with input %s and storage %s" script_path input storage
     in
-    Check.((run_script_res_storage = expected) string ~__LOC__ ~error_msg) ;
+    Check.((storage = expected) string ~__LOC__ ~error_msg) ;
     unit )
     protocols
 

@@ -1230,6 +1230,9 @@ val stresstest_fund_accounts_from_source :
   t ->
   unit Lwt.t
 
+(** The result of a [octez-client run script .. on storage .. and input ..] call. *)
+type run_script_result = {storage : string; big_map_diff : string list}
+
 (** Run [octez-client run script .. on storage .. and input ..].
 
     Returns the new storage as a string.
@@ -1252,7 +1255,7 @@ val run_script :
   storage:string ->
   input:string ->
   t ->
-  string Lwt.t
+  run_script_result Lwt.t
 
 (** Same as [run_script] but do not wait for the process to exit. *)
 val spawn_run_script :
@@ -1294,7 +1297,7 @@ val run_script_at :
   t ->
   string list ->
   Protocol.t ->
-  string Lwt.t
+  run_script_result Lwt.t
 
 (** Same as [run_script_at] but do not wait for the process to exit. *)
 val spawn_run_script_at :

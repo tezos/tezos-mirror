@@ -44,7 +44,7 @@ let test_macros_tests parameterization protocols =
       ~tags:["michelson"; "macros"]
   @@ fun protocol ->
     let client = Client.create_with_mode Mockup in
-    let* run_script_res_storage =
+    let* {storage = run_script_res_storage; _} =
       Client.run_script_at
         ~protocol_hash:(Protocol.hash protocol)
         ~storage

@@ -57,7 +57,7 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
           (fun bytes_to_hash ->
             let hashed = hash_fun bytes_to_hash in
             let input = bytes_to_hex_string bytes_to_hash in
-            let* actual_storage =
+            let* {storage; _} =
               Client.run_script_at
                 ~storage:"None"
                 ~input
@@ -67,7 +67,7 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
             in
             let expected_storage = bytes_to_hex_string hashed in
             Check.(
-              (actual_storage = sf "(Some %s)" expected_storage)
+              (storage = sf "(Some %s)" expected_storage)
                 ~__LOC__
                 string
                 ~error_msg:"Expected results %R, got %L") ;

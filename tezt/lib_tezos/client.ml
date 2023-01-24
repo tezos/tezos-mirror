@@ -1648,6 +1648,8 @@ let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
         initial_amount)
   |> Process.check
 
+type run_script_result = {storage : string; big_map_diff : string list}
+
 let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
     ?self_address ?source ?payer ?gas ?trace_stack ?level ~prg ~storage ~input
     client =
@@ -1669,21 +1671,58 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
       client
     |> Process.check_and_read_stdout
   in
-  (* Extract the final storage, which is between the 'storage' and
-     'emitted operations' line in [client_output] *)
+  (* Extract the final storage and the big_map diff
+     from [client_output].
+
+     The [client_ouput] has the following format:
+     storage
+       <final storage>
+     emitted operations
+       <operations>
+     big_map diff
+       <big_map diff>
+     trace
+       <trace>
+
+     But the trace is only present if `--trace-stack`
+     was given. *)
   let client_output_lines = String.split_on_char '\n' client_output in
   let _header, tail =
     span (fun line -> not (String.equal "storage" line)) client_output_lines
   in
-  let storage, _tail =
+  let storage, tail =
     span (fun line -> not (String.equal "emitted operations" line)) tail
   in
-  match storage with
-  | "storage" :: storage -> return @@ String.trim (String.concat "\n" storage)
-  | _ ->
-      Test.fail
-        "Cannot extract new storage from client_output: %s"
-        client_output
+  let storage =
+    match storage with
+    | "storage" :: storage -> String.trim (String.concat "\n" storage)
+    | _ ->
+        Test.fail
+          "Cannot extract new storage from client_output: %s"
+          client_output
+  in
+  let _emitted_operations, tail =
+    span (fun line -> not (String.equal "big_map diff" line)) tail
+  in
+  let big_map_diff =
+    let diff =
+      match trace_stack with
+      | Some true ->
+          let big_map_diff, _tail =
+            span (fun line -> not (String.equal "trace" line)) tail
+          in
+          big_map_diff
+      | _ -> tail
+    in
+    match diff with
+    | ["big_map diff"; s] when String.(equal (trim s) "") -> []
+    | "big_map diff" :: diff -> List.map String.trim diff
+    | _ ->
+        Test.fail
+          "Cannot extract big_map diff from client_output: %s"
+          client_output
+  in
+  return {storage; big_map_diff}
 
 let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
     ?prefix ~storage ~input client name protocol =
