@@ -49,7 +49,7 @@ let register_protocol_independent_tests () =
   Client_keys.register_protocol_independent () ;
   Client_chain_id.register_protocol_independent () ;
   Config.register () ;
-  Demo_counter.register () ;
+  Demo_protocols.register () ;
   Injection.register_protocol_independent () ;
   Forge_block.register_protocol_independent () ;
   Light.register_protocol_independent () ;
