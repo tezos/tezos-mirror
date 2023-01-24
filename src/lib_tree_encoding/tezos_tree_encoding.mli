@@ -228,6 +228,10 @@ val chunk : Tezos_lazy_containers.Chunked_byte_vector.Chunk.t t
 (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
 val chunked_byte_vector : Tezos_lazy_containers.Chunked_byte_vector.t t
 
+(** [immutable_chunked_byte_vector] is an encoder for [immutable_chunked_byte_vector]. *)
+val immutable_chunked_byte_vector :
+  Tezos_lazy_containers.Immutable_chunked_byte_vector.t t
+
 (** [case tag enc inj proj] returns a partial encoder that represents a case
     in a sum-type. The encoder hides the (existentially bound) type of the
     parameter to the specific case, provided converter functions [inj] and

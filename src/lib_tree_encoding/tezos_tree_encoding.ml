@@ -283,6 +283,31 @@ let chunked_byte_vector =
   in
   {encode; decode}
 
+let immutable_chunk =
+  let open Immutable_chunked_byte_vector.Chunk in
+  conv of_bytes to_bytes (raw [])
+
+let immutable_chunked_byte_vector =
+  let open Immutable_chunked_byte_vector in
+  let to_key k = [Int64.to_string k] in
+  let encode =
+    E.contramap
+      (fun vector -> ((origin vector, loaded_chunks vector), length vector))
+      (E.tup2
+         (E.scope ["contents"] @@ E.lazy_mapping to_key immutable_chunk.encode)
+         (E.value ["length"] Data_encoding.int64))
+  in
+  let decode =
+    D.map
+      (fun ((origin, get_chunk), len) -> create ?origin ~get_chunk len)
+      (let open D.Syntax in
+      let+ x =
+        D.scope ["contents"] @@ D.lazy_mapping to_key immutable_chunk.decode
+      and+ y = D.value ["length"] Data_encoding.int64 in
+      (x, y))
+  in
+  {encode; decode}
+
 type ('tag, 'a) case =
   | Case : {
       tag : 'tag;
