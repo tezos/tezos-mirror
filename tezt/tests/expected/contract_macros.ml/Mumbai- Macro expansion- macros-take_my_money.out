@@ -1,5 +1,3 @@
-tests_016/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/take_my_money.tz]
-
 { parameter key_hash ;
   storage unit ;
   code { CAR ;
@@ -12,3 +10,4 @@ tests_016/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macr
          SWAP ;
          CONS ;
          PAIR } }
+

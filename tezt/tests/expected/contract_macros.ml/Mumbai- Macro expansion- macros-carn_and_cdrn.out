@@ -1,5 +1,3 @@
-tests_016/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/carn_and_cdrn.tz]
-
 { parameter (pair nat nat nat unit) ;
   storage unit ;
   code { CAR ;
@@ -27,3 +25,4 @@ tests_016/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macr
          UNIT ;
          NIL operation ;
          PAIR } }
+
