@@ -193,11 +193,6 @@ Typical use cases:
    ``pytest-regtest``.
 
 Example tests:
- - Detecting unintended changes in the behavior of the node's Michelson
-   interpreter (in
-   :src:`tests_python/tests_alpha/test_contract_opcodes.py`).  To execute it
-   locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
-   in the Octez root.
  - Setting up networks of nodes and ensuring their connection
    (in :src:`tests_python/tests_alpha/test_p2p.py`).
    To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
