@@ -143,7 +143,15 @@ let add_operation st (op : Operation.packed) =
       let validation_state, application_state = st.state in
       let oph = Operation.hash_packed op in
       let** validation_state =
-        Protocol.validate_operation validation_state oph op
+        Protocol.validate_operation
+          ~check_signature:false
+            (* We assume that the operation has already been validated in the
+               node, therefore the signature has already been checked, but we
+               still need to validate it again because the context may be
+               different. *)
+          validation_state
+          oph
+          op
       in
       let** application_state, receipt =
         match application_state with
