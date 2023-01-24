@@ -1251,6 +1251,7 @@ val run_script :
   ?gas:int ->
   ?trace_stack:bool ->
   ?level:int ->
+  ?now:string ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1269,6 +1270,7 @@ val spawn_run_script :
   ?gas:int ->
   ?trace_stack:bool ->
   ?level:int ->
+  ?now:string ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1292,6 +1294,9 @@ val run_script_at :
   ?source:string ->
   ?payer:string ->
   ?prefix:string ->
+  ?now:string ->
+  ?trace_stack:bool ->
+  ?level:int ->
   storage:string ->
   input:string ->
   t ->
@@ -1308,6 +1313,9 @@ val spawn_run_script_at :
   ?source:string ->
   ?payer:string ->
   ?prefix:string ->
+  ?now:string ->
+  ?trace_stack:bool ->
+  ?level:int ->
   storage:string ->
   input:string ->
   t ->

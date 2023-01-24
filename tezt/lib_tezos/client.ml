@@ -1584,7 +1584,7 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
   |> Process.check
 
 let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ~prg
+    ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level ?now ~prg
     ~storage ~input client =
   spawn_command ?hooks ?protocol_hash ?no_base_dir_warnings client
   @@ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
@@ -1595,9 +1595,11 @@ let spawn_run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
   @ optional_arg "gas" (fun gas -> string_of_int gas) gas
   @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
+  @ optional_arg "now" Fun.id now
 
 let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
-    ?payer ?prefix ~storage ~input client script_name protocol =
+    ?payer ?prefix ?now ?trace_stack ?level ~storage ~input client script_name
+    protocol =
   let prg =
     Michelson_script.find ?prefix script_name protocol |> Michelson_script.path
   in
@@ -1608,6 +1610,9 @@ let spawn_run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source
     ?self_address
     ?source
     ?payer
+    ?now
+    ?trace_stack
+    ?level
     ~prg
     ~storage
     ~input
@@ -1651,8 +1656,8 @@ let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
 type run_script_result = {storage : string; big_map_diff : string list}
 
 let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?trace_stack ?level ~prg ~storage ~input
-    client =
+    ?self_address ?source ?payer ?gas ?trace_stack ?level ?now ~prg ~storage
+    ~input client =
   let* client_output =
     spawn_run_script
       ?hooks
@@ -1665,6 +1670,7 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
       ?gas
       ?trace_stack
       ?level
+      ?now
       ~prg
       ~storage
       ~input
@@ -1725,7 +1731,7 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
   return {storage; big_map_diff}
 
 let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
-    ?prefix ~storage ~input client name protocol =
+    ?prefix ?now ?trace_stack ?level ~storage ~input client name protocol =
   let prg =
     Michelson_script.find name ?prefix protocol |> Michelson_script.path
   in
@@ -1736,6 +1742,9 @@ let run_script_at ?hooks ?protocol_hash ?balance ?self_address ?source ?payer
     ?self_address
     ?source
     ?payer
+    ?now
+    ?trace_stack
+    ?level
     ~storage
     ~input
     ~prg
