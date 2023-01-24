@@ -115,6 +115,10 @@ val find_all_res :
   Protocol.t ->
   (t list, string * string) result
 
+(** [find_all_in protocol dirs] returns all scripts in the folders [dirs] for the given protocol. *)
+val find_all_in :
+  ?prefix:string -> ?maxdepth:int -> Protocol.t -> string list -> t list
+
 (** Returns all scripts in the [legacy] directory for the given protocol. *)
 val find_all_legacy : ?prefix:string -> ?maxdepth:int -> Protocol.t -> t list
 
