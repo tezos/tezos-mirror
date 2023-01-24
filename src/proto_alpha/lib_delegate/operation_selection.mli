@@ -28,8 +28,8 @@ open Alpha_context
 open Tezos_protocol_environment
 
 type simulation_result = {
-  validation_result : validation_result;
-  block_header_metadata : Apply_results.block_metadata;
+  validation_result : validation_result option;
+  block_header_metadata : Apply_results.block_metadata option;
   operations : packed_operation list list;
   operations_hash : Operation_list_list_hash.t;
 }

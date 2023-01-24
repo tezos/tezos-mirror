@@ -301,10 +301,12 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     ~chain_id
     ~pred_info:predecessor
     ~timestamp
+    ~round
     ~seed_nonce_hash
     ~payload_round
     ~liquidity_baking_toggle_vote
     ~user_activated_upgrades
+    ~force_apply:state.global_state.config.force_apply
     state.global_state.config.fees
     simulation_mode
     simulation_kind

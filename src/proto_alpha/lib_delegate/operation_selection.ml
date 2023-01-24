@@ -160,8 +160,8 @@ let prioritize_managers ~hard_gas_limit_per_block ~minimal_fees
 (** Simulation *)
 
 type simulation_result = {
-  validation_result : Tezos_protocol_environment.validation_result;
-  block_header_metadata : block_header_metadata;
+  validation_result : Tezos_protocol_environment.validation_result option;
+  block_header_metadata : block_header_metadata option;
   operations : packed_operation list list;
   operations_hash : Operation_list_list_hash.t;
 }
@@ -171,7 +171,10 @@ let validate_operation inc op =
   | Error errs ->
       Events.(emit invalid_operation_filtered) (Operation.hash_packed op, errs)
       >>= fun () -> Lwt.return_none
-  | Ok (resulting_state, receipt) -> (
+  | Ok (resulting_state, None) ->
+      (* No receipt if force_apply is not set *)
+      Lwt.return_some resulting_state
+  | Ok (resulting_state, Some receipt) -> (
       (* Check that the metadata are serializable/deserializable *)
       let encoding_result =
         let enc = Protocol.operation_receipt_encoding in
@@ -255,9 +258,23 @@ let filter_operations_with_simulation initial_inc fees_config
          operations)
   in
   let inc = {inc with header = {inc.header with operations_hash}} in
-  Baking_simulator.finalize_construction inc
-  >>=? fun (validation_result, block_header_metadata) ->
-  return {validation_result; block_header_metadata; operations; operations_hash}
+  Baking_simulator.finalize_construction inc >>=? function
+  | Some (validation_result, block_header_metadata) ->
+      return
+        {
+          validation_result = Some validation_result;
+          block_header_metadata = Some block_header_metadata;
+          operations;
+          operations_hash;
+        }
+  | None ->
+      return
+        {
+          validation_result = None;
+          block_header_metadata = None;
+          operations;
+          operations_hash;
+        }
 
 let filter_valid_operations_up_to_quota_without_simulation (ops, quota) =
   let {Tezos_protocol_environment.max_size; max_op} = quota in

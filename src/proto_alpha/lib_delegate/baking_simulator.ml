@@ -54,7 +54,7 @@ let () =
 type incremental = {
   predecessor : Baking_state.block_info;
   context : Tezos_protocol_environment.Context.t;
-  state : Protocol.validation_state * Protocol.application_state;
+  state : Protocol.validation_state * Protocol.application_state option;
   rev_operations : Operation.packed list;
   header : Tezos_base.Block_header.shell_header;
 }
@@ -76,7 +76,7 @@ let check_context_consistency (abstract_index : Abstract_context_index.t)
           | true -> return_unit
           | false -> fail Invalid_context))
 
-let begin_construction ~timestamp ~protocol_data
+let begin_construction ~timestamp ~protocol_data ~force_apply
     (abstract_index : Abstract_context_index.t) predecessor chain_id =
   protect (fun () ->
       let {
@@ -119,12 +119,15 @@ let begin_construction ~timestamp ~protocol_data
             ~predecessor:pred_shell
             ~cache:`Lazy
           >>=? fun validation_state ->
-          Lifted_protocol.begin_application
-            context
-            chain_id
-            mode
-            ~predecessor:pred_shell
-            ~cache:`Lazy
+          (if force_apply then
+           Lifted_protocol.begin_application
+             context
+             chain_id
+             mode
+             ~predecessor:pred_shell
+             ~cache:`Lazy
+           >>=? return_some
+          else return_none)
           >>=? fun application_state ->
           let state = (validation_state, application_state) in
           return {predecessor; context; state; rev_operations = []; header})
@@ -143,7 +146,12 @@ let add_operation st (op : Operation.packed) =
         Protocol.validate_operation validation_state oph op
       in
       let** application_state, receipt =
-        Protocol.apply_operation application_state oph op
+        match application_state with
+        | Some application_state ->
+            Protocol.apply_operation application_state oph op
+            >>=? fun (application_state, receipt) ->
+            return (Some application_state, Some receipt)
+        | None -> return (None, None)
       in
       let state = (validation_state, application_state) in
       return ({st with state; rev_operations = op :: st.rev_operations}, receipt))
@@ -153,6 +161,10 @@ let finalize_construction inc =
       let validation_state, application_state = inc.state in
       let** () = Protocol.finalize_validation validation_state in
       let** result =
-        Protocol.finalize_application application_state (Some inc.header)
+        match application_state with
+        | Some application_state ->
+            Protocol.finalize_application application_state (Some inc.header)
+            >>=? return_some
+        | None -> return_none
       in
       return result)
