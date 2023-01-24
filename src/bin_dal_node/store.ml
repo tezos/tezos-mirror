@@ -32,8 +32,6 @@
 (* Relative path to store directory from base-dir *)
 let path = "store"
 
-let slot_header_store = "slot_header_store"
-
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
