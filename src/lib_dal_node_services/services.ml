@@ -61,8 +61,6 @@ module Types = struct
     status : header_status;
   }
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4442
-     Add missing profiles. *)
   type profile = Attestor of Tezos_crypto.Signature.public_key_hash
 
   type with_proof = {with_proof : bool}
