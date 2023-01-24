@@ -1,5 +1,5 @@
-tests_016/test_contract_opcodes.py::TestContractOpcodes::test_packunpack
 
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/packunpack.tz on storage Unit and input '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f020000000800030007000900010200000006000100020003)' --trace-stack
 storage
   Unit
 emitted operations
@@ -56,7 +56,9 @@ trace
   - location: 50 (just consumed gas: 0.010)
     [ (Pair {} Unit) ]
 
-Runtime error in contract [CONTRACT_HASH]:
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/packunpack.tz on storage Unit and input '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) 0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004)' --trace-stack
+Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
   1: parameter (pair (pair (pair string (list int)) (set nat)) bytes) ;
   2: storage unit ;
   3: code { CAR ; UNPAIR ; DIP { DUP } ;
