@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_016/entrypoints/manager.tz --details
+./octez-client --protocol PtMumbaiiFFEGbew1rRjzSPyzRbA51Tm3RVZL5suHPxSZYDhCEc --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/entrypoints/manager.tz --details
 Well typed
 Gas remaining: 1039984.397 units remaining
 { parameter (or (lambda %do unit (list operation)) (unit %default)) ;
