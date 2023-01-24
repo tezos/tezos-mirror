@@ -1,0 +1,126 @@
+
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/mini_scenarios/tickets_create_and_send_015.tz --details
+Well typed
+Gas remaining: 1039960.905 units remaining
+{ parameter (pair address address) ;
+  storage (list (ticket string)) ;
+  code { CAR
+         /* [ pair address address ] */ ;
+         UNPAIR
+         /* [ address : address ] */ ;
+         PUSH nat 1
+         /* [ nat : address : address ] */ ;
+         PUSH string "red"
+         /* [ string : nat : address : address ] */ ;
+         TICKET
+         /* [ option (ticket string) : address : address ] */ ;
+         ASSERT_SOME ;
+         PUSH nat 1
+         /* [ nat : ticket string : address : address ] */ ;
+         PUSH string "green"
+         /* [ string : nat : ticket string : address : address ] */ ;
+         TICKET
+         /* [ option (ticket string) : ticket string : address : address ] */ ;
+         ASSERT_SOME ;
+         PUSH nat 1
+         /* [ nat : ticket string : ticket string : address : address ] */ ;
+         PUSH string
+              "green"
+         /* [ string : nat : ticket string : ticket string : address : address ] */ ;
+         TICKET
+         /* [ option (ticket string) : ticket string : ticket string : address
+            : address ] */ ;
+         ASSERT_SOME ;
+         PUSH nat
+              1
+         /* [ nat : ticket string : ticket string : ticket string : address : address ] */ ;
+         PUSH string
+              "blue"
+         /* [ string : nat : ticket string : ticket string : ticket string : address
+            : address ] */ ;
+         TICKET
+         /* [ option (ticket string) : ticket string : ticket string : ticket string
+            : address : address ] */ ;
+         ASSERT_SOME ;
+         PUSH nat
+              1
+         /* [ nat : ticket string : ticket string : ticket string : ticket string
+            : address : address ] */ ;
+         PUSH string
+              "blue"
+         /* [ string : nat : ticket string : ticket string : ticket string
+            : ticket string : address : address ] */ ;
+         TICKET
+         /* [ option (ticket string) : ticket string : ticket string : ticket string
+            : ticket string : address : address ] */ ;
+         ASSERT_SOME ;
+         DIG 5
+         /* [ address : ticket string : ticket string : ticket string : ticket string
+            : ticket string : address ] */ ;
+         CONTRACT
+           (pair (pair (ticket string) (ticket string)) address)
+         /* [ option (contract (pair (pair (ticket string) (ticket string)) address))
+            : ticket string : ticket string : ticket string : ticket string
+            : ticket string : address ] */ ;
+         IF_NONE
+           { PUSH string
+                  "option is None"
+             /* [ string : ticket string : ticket string : ticket string : ticket string
+                : ticket string : address ] */ ;
+             FAILWITH
+             /* [] */ }
+           { /* [ contract (pair (pair (ticket string) (ticket string)) address)
+                : ticket string : ticket string : ticket string : ticket string
+                : ticket string : address ] */ } ;
+         PUSH mutez
+              0
+         /* [ mutez : contract (pair (pair (ticket string) (ticket string)) address)
+            : ticket string : ticket string : ticket string : ticket string
+            : ticket string : address ] */ ;
+         DIG 7
+         /* [ address : mutez
+            : contract (pair (pair (ticket string) (ticket string)) address)
+            : ticket string : ticket string : ticket string : ticket string
+            : ticket string ] */ ;
+         DIG 3
+         /* [ ticket string : address : mutez
+            : contract (pair (pair (ticket string) (ticket string)) address)
+            : ticket string : ticket string : ticket string : ticket string ] */ ;
+         DIG 4
+         /* [ ticket string : ticket string : address : mutez
+            : contract (pair (pair (ticket string) (ticket string)) address)
+            : ticket string : ticket string : ticket string ] */ ;
+         PAIR
+         /* [ pair (ticket string) (ticket string) : address : mutez
+            : contract (pair (pair (ticket string) (ticket string)) address)
+            : ticket string : ticket string : ticket string ] */ ;
+         PAIR
+         /* [ pair (pair (ticket string) (ticket string)) address : mutez
+            : contract (pair (pair (ticket string) (ticket string)) address)
+            : ticket string : ticket string : ticket string ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation : ticket string : ticket string : ticket string ] */ ;
+         NIL (ticket string)
+         /* [ list (ticket string) : operation : ticket string : ticket string
+            : ticket string ] */ ;
+         DIG 2
+         /* [ ticket string : list (ticket string) : operation : ticket string
+            : ticket string ] */ ;
+         CONS
+         /* [ list (ticket string) : operation : ticket string : ticket string ] */ ;
+         DIG 2
+         /* [ ticket string : list (ticket string) : operation : ticket string ] */ ;
+         CONS
+         /* [ list (ticket string) : operation : ticket string ] */ ;
+         DIG 2
+         /* [ ticket string : list (ticket string) : operation ] */ ;
+         CONS
+         /* [ list (ticket string) : operation ] */ ;
+         NIL operation
+         /* [ list operation : list (ticket string) : operation ] */ ;
+         DIG 2
+         /* [ operation : list operation : list (ticket string) ] */ ;
+         CONS
+         /* [ list operation : list (ticket string) ] */ ;
+         PAIR
+         /* [ pair (list operation) (list (ticket string)) ] */ } }
