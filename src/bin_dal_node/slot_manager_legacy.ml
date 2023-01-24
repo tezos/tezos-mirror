@@ -27,7 +27,6 @@
 module Event = Event_legacy
 
 type error +=
-  | Splitting_failed of string
   | Merging_failed of string
   | Invalid_slot_header of string * string
   | Missing_shards of {provided : int; required : int}
@@ -37,15 +36,6 @@ type error +=
   | Invalid_shards_slot_header_association
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.split_failed"
-    ~title:"Split failed"
-    ~description:"Splitting the slot failed"
-    ~pp:(fun ppf msg -> Format.fprintf ppf "%s" msg)
-    Data_encoding.(obj1 (req "msg" string))
-    (function Splitting_failed parameter -> Some parameter | _ -> None)
-    (fun parameter -> Splitting_failed parameter) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.merge_failed"
@@ -121,47 +111,21 @@ let () =
 
 type slot = bytes
 
-let save store watcher slot_header shards =
-  let open Lwt_result_syntax in
-  let* () = Shard_store.write_shards store slot_header shards in
-  let*! () =
-    let slot_header_b58 = Cryptobox.Commitment.to_b58check slot_header in
-    Event.(emit stored_slot_shards (slot_header_b58, Seq.length shards))
-  in
-  Lwt_watcher.notify watcher slot_header ;
-  return_unit
-
-let split_and_store watcher cryptobox store slot =
-  let r =
-    let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot cryptobox slot in
-    let commitment = Cryptobox.commit cryptobox polynomial in
-    let proof = Cryptobox.prove_commitment cryptobox polynomial in
-    return (polynomial, commitment, proof)
-  in
-  let open Lwt_result_syntax in
-  match r with
-  | Ok (polynomial, commitment, commitment_proof) ->
-      let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-      let* () = save store watcher commitment shards in
-      Lwt.return_ok (commitment, commitment_proof)
-  | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
-
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
   | Ok p -> Ok p
   | Error (`Invert_zero msg | `Not_enough_shards msg) ->
       Error [Merging_failed msg]
 
-let save_shards store watcher cryptobox slot_header shards =
+let save_shards store cryptobox commitment shards =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
-  let rebuilt_slot_header = Cryptobox.commit cryptobox polynomial in
+  let rebuilt_commitment = Cryptobox.commit cryptobox polynomial in
   let*? () =
-    if Cryptobox.Commitment.equal slot_header rebuilt_slot_header then Ok ()
+    if Cryptobox.Commitment.equal commitment rebuilt_commitment then Ok ()
     else Result_syntax.fail [Invalid_shards_slot_header_association]
   in
-  save store watcher slot_header shards
+  Store.Legacy.save_shards store commitment shards |> Errors.to_tzresult
 
 let get_shard dal_constants store slot_header shard_id =
   let open Lwt_result_syntax in

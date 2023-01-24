@@ -93,11 +93,17 @@ module Types : sig
     status : header_status;
   }
 
+  (** The [with_proof] flag is associated to shards computation. It indicates
+      whether we also compute shards' proofs or not. *)
+  type with_proof = {with_proof : bool}
+
   val slot_id_encoding : slot_id Data_encoding.t
 
   val header_status_encoding : header_status Data_encoding.t
 
   val profile_encoding : profile Data_encoding.t
+
+  val with_proof_encoding : with_proof Data_encoding.t
 
   val equal_profile : profile -> profile -> bool
 end
@@ -140,6 +146,18 @@ val get_commitment_proof :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.commitment_proof
+  ; prefix : unit
+  ; params : unit * Cryptobox.commitment
+  ; query : unit >
+  service
+
+(** Compute and save the shards of the slot associated to the given
+    commitment. If the input's flag is true, the proofs associated with each
+    given shards are also computed. *)
+val put_commitment_shards :
+  < meth : [`PUT]
+  ; input : Types.with_proof
+  ; output : unit
   ; prefix : unit
   ; params : unit * Cryptobox.commitment
   ; query : unit >

@@ -36,18 +36,6 @@
 
 type slot = bytes
 
-(** [split_and_store watcher dal_constants store slot] splits [slot] in shards,
-    stores it onto the [store] and returns the corresponding [slot_header],
-    using [dal_constants].
-
-    [watcher] is notified when the slot is added to the store. *)
-val split_and_store :
-  Cryptobox.commitment Lwt_watcher.input ->
-  Cryptobox.t ->
-  Shard_store.t ->
-  slot ->
-  (Cryptobox.Commitment.t * Cryptobox.commitment_proof) tzresult Lwt.t
-
 (** [get_shard dal_constants store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id]. *)
 val get_shard :
@@ -66,12 +54,6 @@ val get_shards :
   int list ->
   Cryptobox.shard list tzresult Lwt.t
 
-(** [get_slot dal_constants store slot_header] fetches from
-    disk the shards associated to [slot_header], gathers them, rebuilds and
-    returns the [slot]. *)
-val get_slot :
-  Cryptobox.t -> Shard_store.t -> Cryptobox.commitment -> slot tzresult Lwt.t
-
 (** [get_slot_pages] behaves as [get_slot], except that it also
     splits the slot into pages before returning them.
 
@@ -88,8 +70,7 @@ val get_slot_pages :
 (** [save_shards store slot_header shards] stores [shards] onto the [store]
     associated to the given [slot_header] *)
 val save_shards :
-  Shard_store.t ->
-  Cryptobox.commitment Lwt_watcher.input ->
+  Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   Cryptobox.shard Seq.t ->

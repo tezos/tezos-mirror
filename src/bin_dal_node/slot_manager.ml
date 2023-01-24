@@ -97,6 +97,15 @@ let get_commitment_slot node_store cryptobox commitment =
   | None -> fail `Not_found
   | Some slot_content -> return slot_content
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+   handle with_proof flag. *)
+let add_commitment_shards node_store cryptobox commitment _with_proof =
+  let open Lwt_result_syntax in
+  let* slot = get_commitment_slot node_store cryptobox commitment in
+  let*? polynomial = polynomial_from_slot cryptobox slot in
+  let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  Store.Legacy.save_shards node_store commitment shards
+
 let store_slot_headers ~block_level ~block_hash slot_headers node_store =
   Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store
 

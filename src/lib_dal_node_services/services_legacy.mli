@@ -23,24 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val split_slot :
-  ( [`POST],
-    unit,
-    unit,
-    unit,
-    Tezos_crypto_dal.Cryptobox.slot,
-    string * Tezos_crypto_dal.Cryptobox.commitment_proof )
-  Tezos_rpc.Service.service
-
-val slot :
-  ( [`GET],
-    unit,
-    unit * Tezos_crypto_dal.Cryptobox.commitment,
-    unit,
-    unit,
-    Tezos_crypto_dal.Cryptobox.slot )
-  Tezos_rpc.Service.service
-
 val slot_pages :
   ( [`GET],
     unit,

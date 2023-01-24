@@ -51,6 +51,9 @@ let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 type node_store = {
   store : t;
   shard_store : Shard_store.t;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4665
+
+     Rename slots_watcher to shards_watcher. *)
   slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
@@ -264,7 +267,6 @@ module Legacy = struct
     let encoded_slot = encode_slot slot_size slot in
     let* () = set ~msg:"Slot stored" node_store.store path encoded_slot in
     let* () = Event.(emit stored_slot_content commitment) in
-    Lwt_watcher.notify node_store.slots_watcher commitment ;
     return_unit
 
   let associate_slot_id_with_commitment node_store commitment slot_id =
@@ -594,4 +596,15 @@ module Legacy = struct
           (fun header ->
             if header.Services.Types.status = hs then Some header else None)
           accu
+
+  let save_shards store commitment shards =
+    let open Lwt_result_syntax in
+    let* () =
+      Shard_store.write_shards store.shard_store commitment shards
+      |> Errors.other_lwt_result
+    in
+    let*! () =
+      Event.(emit stored_slot_shards (commitment, Seq.length shards))
+    in
+    return @@ Lwt_watcher.notify store.slots_watcher commitment
 end

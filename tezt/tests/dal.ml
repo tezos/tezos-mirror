@@ -857,16 +857,23 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   unit
 
-let split_slot node client content =
+let split_slot dal_node client content =
   let* slot = Rollup.Dal.make_slot content client in
-  RPC.call node (Rollup.Dal.RPC.split_slot slot)
+  let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
+  let* () =
+    RPC.call dal_node @@ Rollup.Dal.RPC.put_commitment_shards commitment
+  in
+  let* proof =
+    RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof commitment
+  in
+  return (commitment, proof)
 
 let test_dal_node_slot_management _protocol _parameters _cryptobox _node client
     dal_node =
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
   let* slot_commitment, _proof = split_slot dal_node client slot_content in
   let* received_slot =
-    RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_commitment)
+    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot slot_commitment)
   in
   let received_slot_content = Rollup.Dal.content_of_slot received_slot in
   Check.(
@@ -895,9 +902,12 @@ let publish_and_store_slot ?level ?(fee = 1_200) node client dal_node source
   let slot_level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
-  let* slot_commitment0 =
+  let* slot_commitment =
     let* slot = Rollup.Dal.make_slot content client in
     let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+    let* () =
+      RPC.call dal_node @@ Rollup.Dal.RPC.put_commitment_shards commit
+    in
     let* () =
       RPC.call
         dal_node
@@ -905,14 +915,12 @@ let publish_and_store_slot ?level ?(fee = 1_200) node client dal_node source
     in
     return commit
   in
-  let* slot_commitment, proof = split_slot dal_node client content in
-  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/7294
-     This assert as well as split_slot above will be removed in MR 7294.
-  *)
-  assert (String.equal slot_commitment0 slot_commitment) ;
   let commitment =
     Cryptobox.Commitment.of_b58check_opt slot_commitment
     |> mandatory "The b58check-encoded slot commitment is not valid"
+  in
+  let* proof =
+    RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof slot_commitment
   in
   let proof =
     Data_encoding.Json.destruct
