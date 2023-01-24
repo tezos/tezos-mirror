@@ -1,5 +1,5 @@
 
-./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script tests_python/contracts_alpha/macros/big_map_mem.tz --details
+./octez-client --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --mode mockup --no-base-dir-warnings typecheck script michelson_test_scripts/macros/big_map_mem.tz --details
 Well typed
 Gas remaining: 1039984.191 units remaining
 { parameter (pair int bool) ;
