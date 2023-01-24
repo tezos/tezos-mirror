@@ -51,6 +51,9 @@ let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 type node_store = {
   store : t;
   shard_store : Shard_store.t;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4665
+
+     Rename slots_watcher to shards_watcher. *)
   slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
