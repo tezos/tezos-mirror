@@ -1,5 +1,5 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_level
 
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/level.tz on storage 9999999 and input Unit --level 10 --trace-stack
 storage
   10
 emitted operations
