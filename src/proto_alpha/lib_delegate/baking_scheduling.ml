@@ -653,13 +653,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     }
   in
   (if synchronize then
-   let round_durations =
-     Stdlib.Option.get
-     @@ Round.Durations.create_opt
-          ~first_round_duration:constants.parametric.minimal_block_delay
-          ~delay_increment_per_round:
-            constants.parametric.delay_increment_per_round
-   in
+   create_round_durations constants >>? fun round_durations ->
    Baking_actions.compute_round current_proposal round_durations
    >>? fun current_round -> ok {current_round; current_phase = Idle}
   else ok {Baking_state.current_round = Round.zero; current_phase = Idle})
