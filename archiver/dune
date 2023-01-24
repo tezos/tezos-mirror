@@ -81,7 +81,6 @@
    from
    (tezos-client-015-PtLimaPt -> PtLimaPt_machine.real.ml)
    (-> PtLimaPt_machine.no.ml)))
- (modules_without_implementation archiver)
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base -open Tezos_client_base_unix

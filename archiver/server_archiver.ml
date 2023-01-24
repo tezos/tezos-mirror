@@ -25,11 +25,13 @@
 
 open Lwt_result_syntax
 
-type t = {
+type ctx = {
   cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
   auth : string * string;
   endpoint : Uri.t;
 }
+
+type t = ctx
 
 let name = "remote-archiver"
 
