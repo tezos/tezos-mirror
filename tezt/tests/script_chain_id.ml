@@ -91,10 +91,8 @@ let test_chain_id_authentication =
     let typ =
       {|pair (pair chain_id address) (pair (lambda unit (list operation)) nat)|}
     in
-    let* res = Client.hash_data client ~data ~typ in
-    match res with
-    | [] -> failwith "packed not found"
-    | (_, packed) :: _ -> return packed
+    let* hashes = Client.hash_data client ~data ~typ in
+    return hashes.packed
   in
   let* signature =
     Client.sign_bytes client ~signer:Constant.bootstrap1.alias ~data:packed

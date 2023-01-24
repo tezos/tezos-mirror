@@ -1816,14 +1816,22 @@ let hash_scripts ?hooks ?display_names ?for_script scripts client =
     | "" -> []
     | output -> String.split_on_char '\n' output)
 
+type hash_data_result = {
+  packed : string;
+  script_expr_hash : string;
+  raw_script_expr_hash : string;
+  ledger_blake2b_hash : string;
+  raw_sha256_hash : string;
+  raw_sha512_hash : string;
+}
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd
 
-let hash_data ?expect_failure ?hooks ~data ~typ client =
+let hash_data ?hooks ~data ~typ client =
   let* output =
-    spawn_hash_data ?hooks ~data ~typ client
-    |> Process.check_and_read_stdout ?expect_failure
+    spawn_hash_data ?hooks ~data ~typ client |> Process.check_and_read_stdout
   in
   let parse_line line =
     match line =~** rex "(.*): (.*)" with
@@ -1840,7 +1848,27 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
      We don't want to produce a warning about an empty line. *)
   let lines = String.split_on_char '\n' output |> List.filter (( <> ) "") in
   let key_value_list = List.map parse_line lines |> List.filter_map Fun.id in
-  Lwt.return key_value_list
+  let get hash_typ =
+    match List.assoc_opt hash_typ key_value_list with
+    | None ->
+        Test.fail
+          "Unparsable output line of `hash data %s of type %s`. Could not find \
+           hash type %s in output: %s"
+          data
+          typ
+          hash_typ
+          output
+    | Some hash -> hash
+  in
+  Lwt.return
+    {
+      packed = get "Raw packed data";
+      script_expr_hash = get "Script-expression-ID-Hash";
+      raw_script_expr_hash = get "Raw Script-expression-ID-Hash";
+      ledger_blake2b_hash = get "Ledger Blake2b hash";
+      raw_sha256_hash = get "Raw Sha256 hash";
+      raw_sha512_hash = get "Raw Sha512 hash";
+    }
 
 let normalize_mode_to_string = function
   | Readable -> "Readable"

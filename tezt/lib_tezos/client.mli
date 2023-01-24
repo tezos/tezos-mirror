@@ -1342,37 +1342,39 @@ val spawn_register_global_constant :
   t ->
   Process.t
 
-(** Run [octez-client hash data .. of type ...]
+(** Represents the result of a [octez-client hash data .. of type ...] call.
 
-    Given that the output of [octez-client] is:
+    Given the output:
+{v
+    $ ./tezos-client hash data Unit of type unit
+    Raw packed data: 0x05030b
+    Script-expression-ID-Hash: expruaDPoTWXcTR6fiQPy4KZSW72U6Swc1rVmMiP...
+    Raw Script-expression-ID-Hash: 0x8b456a4530fb6d0fea9a0dcd0e9d6ff6b3...
+    Ledger Blake2b hash: ANf4YSkDc71Uy14uWg3wL8u49LUAHdVVnVHbSwNKyEJo
+    Raw Sha256 hash: 0x5f6d1c5a35306dc8be3a54058774f9cb8f1bc71a6a743a25...
+    Raw Sha512 hash: 0xe89c39b714a041046cf421532526b466a8ad29a89a4f0279...
+    Gas remaining: 1039999.624 units remaining
+v}
 
-    [Raw packed data: 0x050303
-     Script-expression-ID-Hash: exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E
-     Raw Script-expression-ID-Hash: 0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245
-     Ledger Blake2b hash: G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4
-     Raw Sha256 hash: 0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66
-     Raw Sha512 hash: 0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698
-     Gas remaining: 1039991.350 units remaining]
+    we obtain a [hash_data_result] record with each field filled from
+    the corresponding line above (omitting the last [Gas remaining
+    line]). *)
+type hash_data_result = {
+  packed : string;
+  script_expr_hash : string;
+  raw_script_expr_hash : string;
+  ledger_blake2b_hash : string;
+  raw_sha256_hash : string;
+  raw_sha512_hash : string;
+}
 
-    this function returns the list:
-
-    [("Raw packed data"; "0x050303")
-     ("Script-expression-ID-Hash"; "exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E")
-     ("Raw Script-expression-ID-Hash"; "0xe0978ddc9329cbd84d25fd15a161a7d2e7e555da91e2a335ece8c8bc11ade245")
-     ("Ledger Blake2b hash"; "G7iMrYNckCFRujDLFgtj3cDMCnfeSQ2cmhnDtkh9REc4")
-     ("Raw Sha256 hash"; "0x35ef99f7718e7d1f065bae635780f41c0cd201e9ffb3390ba6ef428c2815fa66")
-     ("Raw Sha512 hash"; "0x2c9ca967bf47f6cc76861693379b7397f65e6a1b6e633df28cf02be0b0d18319ae783b4c199fd61115e000a15a5ba8a292a3b1468c2cfe2b3e3a9fa08d419698")
-     ("Gas remaining"; "1039991.350 units remaining")]
-
-    If some lines cannot be parsed, warnings are emitted in output and
-    the corresponding lines are omitted from the result. *)
+(** Run [octez-client hash data .. of type ...] *)
 val hash_data :
-  ?expect_failure:bool ->
   ?hooks:Process.hooks ->
   data:string ->
   typ:string ->
   t ->
-  (string * string) list Lwt.t
+  hash_data_result Lwt.t
 
 (** Same as [hash_data], but do not wait for the process to exit. *)
 val spawn_hash_data :
