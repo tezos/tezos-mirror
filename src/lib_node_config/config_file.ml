@@ -851,7 +851,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
     ?(metrics_addr = []) ?operation_metadata_size_limit ?(private_mode = false)
-    ?(disable_mempool = false)
+    ?(disable_p2p_maintenance = false) ?(disable_mempool = false)
     ?(disable_mempool_precheck =
       Shell_limits.default_limits.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
@@ -895,6 +895,9 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       max_known_peer_ids =
         Option.either peer_table_size cfg.p2p.limits.max_known_peer_ids;
       binary_chunks_size = Option.map (fun x -> x lsl 10) binary_chunks_size;
+      maintenance_idle_time =
+        (if disable_p2p_maintenance then None
+        else cfg.p2p.limits.maintenance_idle_time);
     }
   in
   let acl =

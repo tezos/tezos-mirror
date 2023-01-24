@@ -50,6 +50,7 @@ type t = {
   discovery_addr : string option;
   rpc_listen_addrs : string list;
   private_mode : bool;
+  disable_p2p_maintenance : bool;
   disable_mempool : bool;
   disable_mempool_precheck : bool;
   enable_testchain : bool;
@@ -150,11 +151,11 @@ let load_net_config =
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
     advertised_net_port discovery_addr peers no_bootstrap_peers
-    bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
-    enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
-    cors_headers log_output history_mode synchronisation_threshold latency
-    disable_config_validation allow_all_rpc media_type metrics_addr
-    operation_metadata_size_limit =
+    bootstrap_threshold private_mode disable_p2p_maintenance disable_mempool
+    disable_mempool_precheck enable_testchain expected_pow rpc_listen_addrs
+    rpc_tls cors_origins cors_headers log_output history_mode
+    synchronisation_threshold latency disable_config_validation allow_all_rpc
+    media_type metrics_addr operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Config_file.default_data_dir data_dir
   in
@@ -183,6 +184,7 @@ let wrap data_dir config_file network connections max_download_speed
     discovery_addr;
     rpc_listen_addrs;
     private_mode;
+    disable_p2p_maintenance;
     disable_mempool;
     disable_mempool_precheck;
     enable_testchain;
@@ -546,6 +548,15 @@ module Term = struct
     in
     Arg.(value & flag & info ~docs ~doc ["private-mode"])
 
+  let disable_p2p_maintenance =
+    let doc =
+      "Disable the p2p maintenance. This option should be used for testing \
+       purposes only. The node will not try to establish or close connections \
+       by itself. It will accept incoming connections, and outgoing connection \
+       can be initiated by using the RPC 'POST /network/connections'."
+    in
+    Arg.(value & flag & info ~docs ~doc ["disable-p2p-maintenance"])
+
   let disable_mempool =
     let doc =
       "If set to [true], the node will not participate in the propagation of \
@@ -668,11 +679,11 @@ module Term = struct
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size $ listen_addr $ advertised_net_port $ discovery_addr
     $ peers $ no_bootstrap_peers $ bootstrap_threshold $ private_mode
-    $ disable_mempool $ disable_mempool_precheck $ enable_testchain
-    $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
-    $ log_output $ history_mode $ synchronisation_threshold $ latency
-    $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
-    $ operation_metadata_size_limit
+    $ disable_p2p_maintenance $ disable_mempool $ disable_mempool_precheck
+    $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
+    $ cors_origins $ cors_headers $ log_output $ history_mode
+    $ synchronisation_threshold $ latency $ disable_config_validation
+    $ allow_all_rpc $ media_type $ metrics_addr $ operation_metadata_size_limit
 end
 
 let read_config_file args =
@@ -785,6 +796,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     advertised_net_port;
     private_mode;
     discovery_addr;
+    disable_p2p_maintenance;
     disable_mempool;
     disable_mempool_precheck;
     enable_testchain;
@@ -946,6 +958,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~metrics_addr
     ?operation_metadata_size_limit
     ~private_mode
+    ~disable_p2p_maintenance
     ~disable_mempool
     ~disable_mempool_precheck
     ~enable_testchain

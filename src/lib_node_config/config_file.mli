@@ -120,6 +120,7 @@ val update :
   ?metrics_addr:string list ->
   ?operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   ?private_mode:bool ->
+  ?disable_p2p_maintenance:bool ->
   ?disable_mempool:bool ->
   ?disable_mempool_precheck:bool ->
   ?enable_testchain:bool ->
