@@ -486,6 +486,14 @@ let post_chain_block_helpers_forge_operations ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
     Fun.id
 
+let post_chain_block_helpers_forge_block_header ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "forge_block_header"]
+    Fun.id
+
 let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
     ?(block = "head") ~data () =
   make
