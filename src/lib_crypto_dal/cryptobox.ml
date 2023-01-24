@@ -386,10 +386,21 @@ module Inner = struct
     else if n mod number_of_shards <> 0 then
       fail (`Fail (Format.asprintf "The number of shards must divide %d" n))
     else if 2 * shard_size >= k then
+      (* Since shard_size = n / number_of_shards, we obtain
+         (all quantities are positive integers):
+         2 * shard_size < k
+         => 2 (n / number_of_shards) < k
+         => 2 * n / k < number_of_shards
+         => 2 * redundancy_factor < number_of_shards
+         since number_of_shards is a power of 2 the minimum value for
+         number_of_shards is 4 * redundancy_factor *)
       fail
         (`Fail
-          "For the given parameters, the minimum number of shards is %d. Got \
-           %d.")
+          (Format.asprintf
+             "For the given parameters, the minimum number of shards is %d. \
+              Got %d."
+             (redundancy_factor * 4)
+             shard_size))
     else if k > srs_g1_length then
       (* the committed polynomials have degree t.k - 1 at most,
          so t.k coefficients. *)
