@@ -33,7 +33,7 @@ let request_failed =
   declare_3
     ~section
     ~name:"request_failed"
-    ~msg:"request {view} failed ({worker_status}): {errors}"
+    ~msg:"request {view} failed {worker_status}: {errors}"
     ~level:Notice
     ~pp1:Request.pp
     ~pp2:Worker_types.pp_status
@@ -113,10 +113,10 @@ let request_completed_notice =
   declare_2
     ~section
     ~name:"request_completed_notice"
-    ~msg:"{view} {worker_status}"
+    ~msg:"{view} in {worker_status}"
     ~level:Notice
     ~pp1:Request.pp
-    ~pp2:Worker_types.pp_status
+    ~pp2:Worker_types.pp_status_completed
     ("view", Request.encoding)
     ("worker_status", Worker_types.request_status_encoding)
 

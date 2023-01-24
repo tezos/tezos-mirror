@@ -28,6 +28,10 @@ General
 Node
 ----
 
+- **Breaking Changes**: Improved a few lib_shell logs in default level by
+  shortening the display to completion time only instead of the full status of
+  the operation.
+
 Client
 ------
 
