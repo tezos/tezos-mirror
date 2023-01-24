@@ -221,7 +221,7 @@ module Handler = struct
       (fun n_cctxt ->
         make_stream_daemon
           (handler n_cctxt)
-          (RPC_server_legacy.monitor_slot_headers_rpc n_cctxt))
+          (RPC_server_legacy.monitor_shards_rpc n_cctxt))
       (Node_context.get_neighbors_cctxts ctxt)
 end
 

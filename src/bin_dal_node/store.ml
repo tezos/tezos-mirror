@@ -49,22 +49,19 @@ let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 type node_store = {
   store : t;
   shard_store : Shard_store.t;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4665
-
-     Rename slots_watcher to shards_watcher. *)
-  slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+  shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
 }
 
-(** [open_slots_watcher node_store] opens a stream that should be notified when
-    the storage is updated with a new slot. *)
-let open_slots_stream {slots_watcher; _} =
-  Lwt_watcher.create_stream slots_watcher
+(** [open_shards_stream node_store] opens a stream that should be notified when
+    the storage is updated with new shards. *)
+let open_shards_stream {shards_watcher; _} =
+  Lwt_watcher.create_stream shards_watcher
 
 (** [init config] inits the store on the filesystem using the given [config]. *)
 let init config =
   let open Lwt_result_syntax in
   let dir = Configuration.data_dir_path config path in
-  let slots_watcher = Lwt_watcher.create_input () in
+  let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config dir) in
   let*! store = main repo in
   let* shard_store =
@@ -73,7 +70,7 @@ let init config =
       (Filename.concat dir shard_store_path)
   in
   let*! () = Event.(emit store_is_ready ()) in
-  return {shard_store; store; slots_watcher}
+  return {shard_store; store; shards_watcher}
 
 let trace_decoding_error ~data_kind ~tztrace_of_error r =
   let open Result_syntax in
@@ -604,5 +601,5 @@ module Legacy = struct
     let*! () =
       Event.(emit stored_slot_shards (commitment, Seq.length shards))
     in
-    return @@ Lwt_watcher.notify store.slots_watcher commitment
+    return @@ Lwt_watcher.notify store.shards_watcher commitment
 end

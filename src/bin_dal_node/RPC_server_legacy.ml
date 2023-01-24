@@ -52,8 +52,10 @@ let handle_shards ctxt (_, commitment) () shards =
     commitment
     shards
 
-let handle_monitor_slot_headers ctxt () () () =
-  let stream, stopper = Store.open_slots_stream (Node_context.get_store ctxt) in
+let handle_monitor_shards ctxt () () () =
+  let stream, stopper =
+    Store.open_shards_stream (Node_context.get_store ctxt)
+  in
   let shutdown () = Lwt_watcher.shutdown stopper in
   let next () = Lwt_stream.get stream in
   Tezos_rpc.Answer.return_stream {next; shutdown}
@@ -88,18 +90,11 @@ let shard_rpc ctxt commitment shard =
     ()
     ()
 
-let monitor_slot_headers_service = Services.monitor_slot_headers
-
-let register_monitor_slot_headers ctxt dir =
+let register_monitor_shards ctxt dir =
   Tezos_rpc.Directory.gen_register
     dir
-    monitor_slot_headers_service
-    (handle_monitor_slot_headers ctxt)
+    Services.monitor_shards
+    (handle_monitor_shards ctxt)
 
-let monitor_slot_headers_rpc ctxt =
-  Tezos_rpc.Context.make_streamed_call
-    monitor_slot_headers_service
-    ctxt
-    ()
-    ()
-    ()
+let monitor_shards_rpc ctxt =
+  Tezos_rpc.Context.make_streamed_call Services.monitor_shards ctxt () () ()

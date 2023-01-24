@@ -50,7 +50,7 @@ val shards :
     Tezos_crypto_dal.Cryptobox.shard list )
   Tezos_rpc.Service.service
 
-val monitor_slot_headers :
+val monitor_shards :
   ( [`GET],
     unit,
     unit,

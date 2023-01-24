@@ -193,7 +193,7 @@ let register_legacy ctxt =
   let open RPC_server_legacy in
   Tezos_rpc.Directory.empty |> register_shard ctxt |> register_shards ctxt
   |> register_show_slot_pages ctxt
-  |> register_monitor_slot_headers ctxt
+  |> register_monitor_shards ctxt
 
 let register ctxt = register_new ctxt (register_legacy ctxt)
 
