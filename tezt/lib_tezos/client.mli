@@ -1283,6 +1283,7 @@ val spawn_run_script :
     Fails if the new storage cannot be extracted from the output. *)
 val run_script_at :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?balance:Tez.t ->
   ?self_address:string ->
   ?source:string ->
@@ -1298,6 +1299,7 @@ val run_script_at :
 (** Same as [run_script_at] but do not wait for the process to exit. *)
 val spawn_run_script_at :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?balance:Tez.t ->
   ?self_address:string ->
   ?source:string ->
