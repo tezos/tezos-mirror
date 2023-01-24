@@ -1,5 +1,3 @@
-tests_015/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/map_caddaadr.tz]
-
 { parameter unit ;
   storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
   code { { DUP ;
@@ -38,3 +36,4 @@ tests_015/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macr
          NIL operation ;
          SWAP ;
          { CDR @%% ; SWAP ; PAIR % %@ } } }
+
