@@ -220,32 +220,20 @@ let compute_next_round_time state =
            repropose a block at next level. *)
         None
     | None -> (
-        let first_round_duration =
-          state.global_state.constants.parametric.minimal_block_delay
-        in
-        let delay_increment_per_round =
-          state.global_state.constants.parametric.delay_increment_per_round
-        in
+        let round_durations = state.global_state.round_durations in
+        let predecessor_timestamp = proposal.predecessor.shell.timestamp in
+        let predecessor_round = proposal.predecessor.round in
+        let next_round = Round.succ state.round_state.current_round in
         match
-          Round.Durations.create_opt
-            ~first_round_duration
-            ~delay_increment_per_round
+          timestamp_of_round
+            state.global_state.cache.known_timestamps
+            round_durations
+            ~predecessor_timestamp
+            ~predecessor_round
+            ~round:next_round
         with
-        | Some round_durations -> (
-            let predecessor_timestamp = proposal.predecessor.shell.timestamp in
-            let predecessor_round = proposal.predecessor.round in
-            let next_round = Round.succ state.round_state.current_round in
-            match
-              timestamp_of_round
-                state.global_state.cache.known_timestamps
-                round_durations
-                ~predecessor_timestamp
-                ~predecessor_round
-                ~round:next_round
-            with
-            | Ok timestamp -> Some (timestamp, next_round)
-            | _ -> assert false)
-        | None -> assert false)
+        | Ok timestamp -> Some (timestamp, next_round)
+        | _ -> assert false)
 
 (** [first_potential_round_at_next_level state ~earliest_round] yields
     an optional pair of the earliest possible round (at or after
