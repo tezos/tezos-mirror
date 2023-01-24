@@ -9,7 +9,10 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
 : "${NODE_HOST:="node"}"
 : "${NODE_RPC_PORT:="8732"}"
-: "${NODE_RPC_ADDR:="localhost"}"
+# This is the bind address INSIDE the docker so as long as there
+# is no explicit port redirection, it is not exposed to the
+# outside world.
+: "${NODE_RPC_ADDR:="[::]"}"
 
 : "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
 

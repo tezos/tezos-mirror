@@ -198,9 +198,9 @@ environment variables:
 
 - ``DATA_DIR``: The directory to store the node's data (defaults to ``/var/run/tezos``).
 - ``NODE_HOST``: The name of the node container (defaults to ``node``).
-- ``NODE_RPC_PORT``: The RPC port to listen to (defaults to ``8732``).
-- ``NODE_RPC_ADDR``: The RPC address that the node will listen to (defaults to ``localhost``).
-- ``PROTOCOL``: The protocol that will be used.
+- ``NODE_RPC_PORT``: The RPC port **inside the container** the node listens to (defaults to ``8732``).
+- ``NODE_RPC_ADDR``: The RPC address **inside the container** the node binds to (defaults to ``[::]``).
+- ``PROTOCOL``: The protocol used.
 
 These variables can be set in the docker-compose file, as demonstrated in ``alpha.yml``::
 
