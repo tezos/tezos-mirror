@@ -68,9 +68,9 @@ let find_in_known_round_intervals known_round_intervals ~predecessor_timestamp
       {predecessor_timestamp; predecessor_round; time_interval = (now, now)})
 
 (** Memoization wrapper for [Round.timestamp_of_round]. *)
-let timestamp_of_round known_timestamps round_durations ~predecessor_timestamp
-    ~predecessor_round ~round =
+let timestamp_of_round state ~predecessor_timestamp ~predecessor_round ~round =
   let open Baking_cache in
+  let known_timestamps = state.global_state.cache.known_timestamps in
   match
     Timestamp_of_round_cache.find_opt
       known_timestamps
@@ -79,7 +79,7 @@ let timestamp_of_round known_timestamps round_durations ~predecessor_timestamp
   (* Compute and register the timestamp if not already existing. *)
   | None ->
       Protocol.Alpha_context.Round.timestamp_of_round
-        round_durations
+        state.global_state.round_durations
         ~predecessor_timestamp
         ~predecessor_round
         ~round
@@ -220,14 +220,12 @@ let compute_next_round_time state =
            repropose a block at next level. *)
         None
     | None -> (
-        let round_durations = state.global_state.round_durations in
         let predecessor_timestamp = proposal.predecessor.shell.timestamp in
         let predecessor_round = proposal.predecessor.round in
         let next_round = Round.succ state.round_state.current_round in
         match
           timestamp_of_round
-            state.global_state.cache.known_timestamps
-            round_durations
+            state
             ~predecessor_timestamp
             ~predecessor_round
             ~round:next_round
@@ -375,8 +373,7 @@ let compute_next_potential_baking_time_at_next_level state =
                           >>= fun () -> Lwt.return_none
                       | None | Some _ -> (
                           timestamp_of_round
-                            state.global_state.cache.known_timestamps
-                            round_durations
+                            state
                             ~predecessor_timestamp
                             ~predecessor_round
                             ~round:first_potential_round
