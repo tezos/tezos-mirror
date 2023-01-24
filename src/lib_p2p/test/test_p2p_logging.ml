@@ -236,7 +236,7 @@ module P2p_net = struct
         authentication_timeout = Ptime.Span.of_int_s 60;
         (* can't be 0 *)
         greylist_timeout = Ptime.Span.zero;
-        maintenance_idle_time = Ptime.Span.zero;
+        maintenance_idle_time = Some Ptime.Span.zero;
         min_connections = 0;
         expected_connections = 0;
         max_connections = 0;

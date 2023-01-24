@@ -848,6 +848,16 @@ module P2p = struct
 
   let section = ["p2p"]
 
+  let maintenance_disabled =
+    declare_0
+      ~section
+      ~name:"maintenance_disabled"
+      ~level:Warning
+      ~msg:
+        "the maintenance is disabled, this should be used for testing purposes \
+         only"
+      ()
+
   let activate_layer =
     declare_0
       ~section

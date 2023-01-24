@@ -147,7 +147,7 @@ val activate : ('msg, 'peer_meta, 'conn_meta) net -> unit
 val peer_id : ('msg, 'peer_meta, 'conn_meta) net -> P2p_peer.Id.t
 
 (** A maintenance operation : try and reach the ideal number of peers *)
-val maintain : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
+val maintain : ('msg, 'peer_meta, 'conn_meta) net -> unit tzresult Lwt.t
 
 (** Voluntarily drop some peers and replace them by new buddies *)
 val roll : ('msg, 'peer_meta, 'conn_meta) net -> unit Lwt.t
