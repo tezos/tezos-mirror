@@ -860,6 +860,9 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
 let split_slot dal_node client content =
   let* slot = Rollup.Dal.make_slot content client in
   let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
+  let* () =
+    RPC.call dal_node @@ Rollup.Dal.RPC.put_commitment_shards commitment
+  in
   let* proof =
     RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof commitment
   in
@@ -902,6 +905,9 @@ let publish_and_store_slot ?level ?(fee = 1_200) node client dal_node source
   let* slot_commitment =
     let* slot = Rollup.Dal.make_slot content client in
     let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+    let* () =
+      RPC.call dal_node @@ Rollup.Dal.RPC.put_commitment_shards commit
+    in
     let* () =
       RPC.call
         dal_node
