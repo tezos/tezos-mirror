@@ -82,6 +82,15 @@ module Simple = struct
       ~level:Notice
       ("level", Raw_level.encoding)
 
+  let publish_commitment =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_publish_commitment"
+      ~msg:"Publishing commitment {hash} for inbox level {level}"
+      ~level:Notice
+      ("hash", Sc_rollup.Commitment.Hash.encoding)
+      ("level", Raw_level.encoding)
+
   let commitment_parent_is_not_lcc =
     declare_3
       ~section
@@ -143,6 +152,9 @@ let last_cemented_commitment_updated head level =
   Simple.(emit last_cemented_commitment_updated (head, level))
 
 let compute_commitment level = Simple.(emit compute_commitment level)
+
+let publish_commitment head level =
+  Simple.(emit publish_commitment (head, level))
 
 let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
   Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))

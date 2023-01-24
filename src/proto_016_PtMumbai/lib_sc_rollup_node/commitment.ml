@@ -244,6 +244,11 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let publish_operation =
       Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
     in
+    let*! () =
+      Commitment_event.publish_commitment
+        (Sc_rollup.Commitment.hash_uncarbonated commitment)
+        commitment.inbox_level
+    in
     let* _hash = Injector.add_pending_operation ~source publish_operation in
     return_unit
 
