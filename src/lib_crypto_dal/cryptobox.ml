@@ -381,7 +381,7 @@ module Inner = struct
           (Format.asprintf
              "For the given parameters, the maximum number of shards is %d. \
               Got: %d."
-             (number_of_shards / 2)
+             (n / 2)
              number_of_shards))
     else if n mod number_of_shards <> 0 then
       fail (`Fail (Format.asprintf "The number of shards must divide %d" n))
