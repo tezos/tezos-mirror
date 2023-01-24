@@ -1058,6 +1058,461 @@ let test_bitwise =
       ("bytes_of_int", "Unit", "Unit", "Unit");
     ]
 
+let iter l f = Lwt_list.iter_s f l
+
+let run_script_and_check ?(trace_stack = true) ?balance ?now ?level ~storage
+    ~input ?expected_big_map_diff client script_name protocol ~expected_storage
+    =
+  let* {storage; big_map_diff} =
+    Client.run_script_at
+      ~hooks
+      ~trace_stack
+      ?balance
+      ?now
+      ?level
+      ~storage
+      ~input
+      client
+      script_name
+      protocol
+  in
+  Check.(
+    (storage = expected_storage)
+      string
+      ~__LOC__
+      ~error_msg:"Expected %R, got %L") ;
+  Option.iter
+    (fun expected_big_map_diff ->
+      Check.(
+        (big_map_diff = expected_big_map_diff)
+          (list string)
+          ~__LOC__
+          ~error_msg:"Expected %R, got %L"))
+    expected_big_map_diff ;
+  unit
+
+(* Test that the [--balance] option of [run script] and the Michelson
+   [BALANCE] instruction agree. *)
+let test_balance protocol client =
+  iter [0; 1; 500_000; 1_000_000; 5_000_000; 1000_000_000; 8_000_000_000_000]
+  @@ fun balance ->
+  run_script_and_check
+    ~balance:(Tez.of_mutez_int balance)
+    ~storage:"0"
+    ~input:"Unit"
+    client
+    ["opcodes"; "balance"]
+    protocol
+    ~expected_storage:(string_of_int balance)
+
+let quote s = sf "%S" s
+
+(* Test that the --now flag of 'octez-client run script' affects the value
+   returned by the NOW instruction. See also contract_onchain_opcodes.ml
+   for a complementary test of the NOW instruction. *)
+let test_now protocol client =
+  let now = "2021-10-13T10:16:52Z" in
+  run_script_and_check
+    ~storage:{|"2017-07-13T09:19:01Z"|}
+    ~now
+    ~input:"Unit"
+    client
+    ["opcodes"; "store_now"]
+    protocol
+    ~expected_storage:(quote now)
+
+(* Test that the --level flag of 'octez-client run script' affects the value
+   returned by the LEVEL instruction. See also contract_onchain_opcodes.ml
+   for a complementary test of the LEVEL instuction. *)
+let test_level protocol client =
+  let level = 10 in
+  run_script_and_check
+    ~storage:"9999999"
+    ~level
+    ~input:"Unit"
+    client
+    ["opcodes"; "level"]
+    protocol
+    ~expected_storage:(string_of_int level)
+
+(* Test big map io: adding, removing, and updating values *)
+let test_big_map_contract_io protocol client =
+  Lwt_list.iter_s
+    (fun (script_name, storage, input, expected_storage, expected_big_map_diff) ->
+      run_script_and_check
+        ~storage
+        ~input
+        client
+        script_name
+        protocol
+        ~expected_big_map_diff
+        ~expected_storage)
+    [
+      ( ["opcodes"; "get_big_map_value"],
+        {|(Pair { Elt "hello" "hi" } None)|},
+        {|"hello"|},
+        {|(Pair 4 (Some "hi"))|},
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["hello"] to "hi"|};
+        ] );
+      ( ["opcodes"; "get_big_map_value"],
+        {|(Pair { Elt "hello" "hi" } None)|},
+        {|""|},
+        "(Pair 4 None)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["hello"] to "hi"|};
+        ] );
+      ( ["opcodes"; "get_big_map_value"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } None)|},
+        {|"1"|},
+        {|(Pair 4 (Some "one"))|},
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+          {|Set map(4)["1"] to "one"|};
+        ] );
+      (* Test updating big maps *)
+      ( ["opcodes"; "update_big_map"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)|},
+        "{}",
+        "(Pair 4 Unit)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+          {|Set map(4)["1"] to "one"|};
+        ] );
+      ( ["opcodes"; "update_big_map"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)|},
+        {|{ Elt "1" (Some "two") }|},
+        "(Pair 4 Unit)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+          {|Set map(4)["1"] to "two"|};
+        ] );
+      ( ["opcodes"; "update_big_map"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)|},
+        {|{ Elt "3" (Some "three") }|},
+        "(Pair 4 Unit)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+          {|Set map(4)["3"] to "three"|};
+          {|Set map(4)["1"] to "one"|};
+        ] );
+      ( ["opcodes"; "update_big_map"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)|},
+        {|{ Elt "3" None }|},
+        "(Pair 4 Unit)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+          {|Unset map(4)["3"]|};
+          {|Set map(4)["1"] to "one"|};
+        ] );
+      ( ["opcodes"; "update_big_map"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)|},
+        {|{ Elt "2" None }|},
+        "(Pair 4 Unit)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Unset map(4)["2"]|};
+          {|Set map(4)["1"] to "one"|};
+        ] );
+      ( ["opcodes"; "update_big_map"],
+        {|(Pair { Elt "1" "one" ; Elt "2" "two" } Unit)|},
+        {|{ Elt "1" (Some "two") }|},
+        "(Pair 4 Unit)",
+        [
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+          {|Set map(4)["1"] to "two"|};
+        ] );
+      (* test the GET_AND_UPDATE instruction on big maps *)
+      (* Get and update the value stored at the given key in the map *)
+      ( ["opcodes"; "get_and_update_big_map"],
+        "(Pair None {})",
+        {|"hello"|},
+        "(Pair None 4)",
+        ["New map(4) of type (big_map string nat)"; {|Unset map(4)["hello"]|}]
+      );
+      ( ["opcodes"; "get_and_update_big_map"],
+        "(Pair (Some 4) {})",
+        {|"hello"|},
+        "(Pair None 4)",
+        [
+          "New map(4) of type (big_map string nat)"; {|Set map(4)["hello"] to 4|};
+        ] );
+      ( ["opcodes"; "get_and_update_big_map"],
+        {|(Pair None { Elt "hello" 4 })|},
+        {|"hello"|},
+        "(Pair (Some 4) 4)",
+        ["New map(4) of type (big_map string nat)"; {|Unset map(4)["hello"]|}]
+      );
+      ( ["opcodes"; "get_and_update_big_map"],
+        {|(Pair (Some 5) { Elt "hello" 4 })|},
+        {|"hello"|},
+        "(Pair (Some 4) 4)",
+        [
+          "New map(4) of type (big_map string nat)"; {|Set map(4)["hello"] to 5|};
+        ] );
+      ( ["opcodes"; "get_and_update_big_map"],
+        {|(Pair (Some 5) { Elt "hello" 4 })|},
+        {|"hi"|},
+        "(Pair None 4)",
+        [
+          "New map(4) of type (big_map string nat)";
+          {|Set map(4)["hello"] to 4|};
+          {|Set map(4)["hi"] to 5|};
+        ] );
+      ( ["opcodes"; "get_and_update_big_map"],
+        {|(Pair None { Elt "1" 1 ; Elt "2" 2 })|},
+        {|"1"|},
+        "(Pair (Some 1) 4)",
+        [
+          "New map(4) of type (big_map string nat)";
+          {|Set map(4)["2"] to 2|};
+          {|Unset map(4)["1"]|};
+        ] );
+      ( ["opcodes"; "get_and_update_big_map"],
+        {|(Pair None { Elt "1" 1 ; Elt "2" 2 })|},
+        {|"1"|},
+        "(Pair (Some 1) 4)",
+        [
+          "New map(4) of type (big_map string nat)";
+          {|Set map(4)["2"] to 2|};
+          {|Unset map(4)["1"]|};
+        ] );
+      (* Test big_map_magic *)
+      ( ["mini_scenarios"; "big_map_magic"],
+        {|(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))|},
+        "(Left Unit)",
+        "(Left (Pair 4 5))",
+        [
+          "New map(5) of type (big_map string string)";
+          {|Set map(5)["1"] to "one"|};
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["2"] to "two"|};
+        ] );
+      (* test reset with new map *)
+      ( ["mini_scenarios"; "big_map_magic"],
+        {|(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))|},
+        {|(Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))|},
+        "(Left (Pair 4 5))",
+        [
+          "New map(5) of type (big_map string string)";
+          {|Set map(5)["4"] to "four"|};
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["3"] to "three"|};
+        ] );
+      (* test reset to unit *)
+      ( ["mini_scenarios"; "big_map_magic"],
+        {|(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))|},
+        "(Right (Left (Right Unit)))",
+        "(Right Unit)",
+        [] );
+      (* test import to big_map *)
+      ( ["mini_scenarios"; "big_map_magic"],
+        "(Right Unit)",
+        {|(Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }) )))|},
+        "(Left (Pair 4 5))",
+        [
+          "New map(5) of type (big_map string string)";
+          {|Set map(5)["gaz"] to "baz"|};
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["foo"] to "bar"|};
+        ] );
+      (* test add to big_map *)
+      ( ["mini_scenarios"; "big_map_magic"],
+        {|(Left (Pair { Elt "1" "one" } { Elt "2" "two" }) )|},
+        {|(Right (Right (Right (Left { Pair "3" "three" }))))|},
+        "(Left (Pair 4 5))",
+        [
+          "New map(5) of type (big_map string string)";
+          {|Set map(5)["2"] to "two"|};
+          "New map(4) of type (big_map string string)";
+          {|Set map(4)["3"] to "three"|};
+          {|Set map(4)["1"] to "one"|};
+        ] );
+      (* test remove from big_map *)
+      ( ["mini_scenarios"; "big_map_magic"],
+        {|(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))|},
+        {|(Right (Right (Right (Right { "1" }))))|},
+        "(Left (Pair 4 5))",
+        [
+          "New map(5) of type (big_map string string)";
+          {|Set map(5)["2"] to "two"|};
+          "New map(4) of type (big_map string string)";
+          {|Unset map(4)["1"]|};
+        ] );
+    ]
+
+(* Tests the [PACK]/[UNPACK] instructions.
+
+   The [packunpack] script, when called with the parameter [Pair A B]
+   will pack [A], and fail unless it is equal [B]. Then, it unpacks
+   [B] and fails unless it is equal to [A]. *)
+let test_pack_unpack protocol client =
+  let build_input to_pack expected_serialization =
+    sf "(Pair %s %s)" to_pack expected_serialization
+  in
+  let* (_ : Client.run_script_result) =
+    Client.run_script_at
+      ~hooks
+      ~trace_stack:true
+      ~storage:"Unit"
+      ~input:
+        (build_input
+           {|(Pair (Pair "toto" {3;7;9;1}) {1;2;3})|}
+           "0x05070707070100000004746f746f020000000800030007000900010200000006000100020003")
+      client
+      ["opcodes"; "packunpack"]
+      protocol
+  in
+  let* () =
+    Client.spawn_run_script_at
+      ~hooks
+      ~trace_stack:true
+      ~storage:"Unit"
+      ~input:
+        (build_input
+           {|(Pair (Pair "toto" {3;7;9;1}) {1;2;3})|}
+           "0x05070707070100000004746f746f0200000008000300070009000102000000060001000200030004")
+      client
+      ["opcodes"; "packunpack"]
+      protocol
+    |> Process.check_error ~msg:(rex "script reached FAILWITH instruction")
+  in
+  unit
+
+(* Test the Michelson [CHECK_SIGNATURE] instruction.
+
+   The [check_signature] scripts, when called with the parameter [KEY]
+   and the storage [Pair SIG MSG], fails unless [SIG] is a signature
+   of [MSG] serialized produced by [KEY]. *)
+let test_check_signature protocol client =
+  let build_storage signature message =
+    sf {|(Pair "%s" "%s")|} signature message
+  in
+  let signature =
+    "edsigu3QszDjUpeqYqbvhyRxMpVFamEnvm9FYnt7YiiNt9nmjYfh8ZTbsybZ5WnBkhA7zfHsRVyuTnRsGLR6fNHt1Up1FxgyRtF"
+  in
+  let public_key = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" in
+  let* (_ : Client.run_script_result) =
+    Client.run_script_at
+      ~hooks
+      ~trace_stack:true
+      ~storage:(build_storage signature "hello")
+      ~input:(quote public_key)
+      client
+      ["opcodes"; "check_signature"]
+      protocol
+  in
+  let* () =
+    Client.spawn_run_script_at
+      ~hooks
+      ~trace_stack:true
+      ~storage:(build_storage signature "abcd")
+      ~input:(quote public_key)
+      client
+      ["opcodes"; "check_signature"]
+      protocol
+    |> Process.check_error ~msg:(rex "script reached FAILWITH instruction")
+  in
+  unit
+
+(* Test the consistency of Michelson's [BLAKE2B] instruction
+   with the output of the clients [hash data] command. *)
+let test_hash_consistency protocol client =
+  let data = {|(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))|} in
+  let* {raw_script_expr_hash; _} =
+    Client.hash_data
+      ~hooks
+      ~data
+      ~typ:"(pair mutez (pair timestamp int))"
+      client
+  in
+  let* () =
+    run_script_and_check
+      ~storage:"0x00"
+      ~input:data
+      client
+      ["opcodes"; "hash_consistency_checker"]
+      protocol
+      ~expected_storage:raw_script_expr_hash
+  in
+  unit
+
+(* Test that the Michelson instructions [LSL], [LSR] throw [unexpected
+   arithmetic overflow] if the operand is larger than [256]. Test
+   that the Michelson instructions [MUL] over [mutez] throw
+   [unexpected arithmetic overflow] when its result does not fit the
+   bounds of [mutez]. *)
+let test_arithmetic_overflow protocol client =
+  Lwt_list.iter_s
+    (fun (script_name, storage, input) ->
+      Client.spawn_run_script_at
+        ~hooks
+        ~trace_stack:true
+        ~storage
+        ~input
+        client
+        ["opcodes"; script_name]
+        protocol
+      |> Process.check_error ~msg:(rex "unexpected arithmetic overflow"))
+    [
+      ("shifts", "None", "(Left (Pair 1 257))");
+      ("shifts", "None", "(Left (Pair 123 257))");
+      ("shifts", "None", "(Right (Pair 1 257))");
+      ("shifts", "None", "(Right (Pair 123 257))");
+      ("mul_overflow", "Unit", "Left Unit");
+      ("mul_overflow", "Unit", "Right Unit");
+    ]
+
+(* Tests that mapping over a Michelson [map] with the [MAP]
+   instruction preserves side effects to the stack under the [MAP]'s
+   body. *)
+let test_map_map_side_effect protocol client =
+  Lwt_list.iter_s
+    (fun (storage, input, expected_storage) ->
+      run_script_and_check
+        ~storage
+        ~input
+        client
+        ["opcodes"; "map_map_sideeffect"]
+        protocol
+        ~expected_storage)
+    [
+      ("(Pair {} 0)", "10", "(Pair {} 0)");
+      ({|(Pair { Elt "foo" 1 } 1)|}, "10", {|(Pair { Elt "foo" 11 } 11)|});
+      ( {|(Pair { Elt "bar" 5 ; Elt "foo" 1 } 6)|},
+        "15",
+        {|(Pair { Elt "bar" 20 ; Elt "foo" 16 } 36)|} );
+    ]
+
 let register ~protocols =
   test_protocol_independent protocols ;
-  test_bitwise protocols
+  test_bitwise protocols ;
+  List.iter
+    (fun (test_opcode_name, test_function) ->
+      Protocol.register_regression_test
+        ~__FILE__
+        ~title:("test Michelson opcodes: " ^ test_opcode_name)
+        ~tags:["michelson"]
+        (fun protocol ->
+          let* client = Client.init_mockup ~protocol () in
+          test_function protocol client)
+        protocols)
+    [
+      ("BALANCE", test_balance);
+      ("NOW", test_now);
+      ("LEVEL", test_level);
+      ("big_map_contract_io", test_big_map_contract_io);
+      ("pack_unpack", test_pack_unpack);
+      ("check_signature", test_check_signature);
+      ("hash_consistency", test_hash_consistency);
+      ("arithmetic_overflow", test_arithmetic_overflow);
+      ("map_map_side_effect", test_map_map_side_effect);
+    ]
