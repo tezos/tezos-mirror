@@ -38,15 +38,15 @@ let hooks =
     ~replace_variables:Fun.id
     ()
 
-let test_typecheck_contract protocol contract =
+let test_typecheck_contract protocol script =
   Protocol.register_regression_test
     ~__FILE__
-    ~title:(sf "Tc %s" contract)
+    ~title:(sf "Tc %s" (Michelson_script.name_s script))
     ~tags:["client"; "michelson"; "typechecking"]
     (fun _protocol ->
       let client = Client.create_with_mode Mockup in
       Client.typecheck_script
-        ~script:contract
+        ~script:(Michelson_script.path script)
         ~protocol_hash:(Protocol.hash protocol)
         ~hooks
         ~no_base_dir_warnings:true
@@ -59,8 +59,7 @@ let test_typecheck protocols =
     (fun protocol ->
       (* Type check regression tests for all well-typed contracts *)
       List.iter
-        (fun script ->
-          test_typecheck_contract protocol (Michelson_script.path script))
+        (fun script -> test_typecheck_contract protocol script)
         (Michelson_script.find_all_well_typed
            ~prefix:(Michelson_script.pytest_prefix protocol)
            protocol))
