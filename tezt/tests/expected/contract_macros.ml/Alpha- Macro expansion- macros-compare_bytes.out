@@ -1,6 +1,4 @@
-tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/compare.tz]
-
-{ parameter (pair mutez mutez) ;
+{ parameter (pair bytes bytes) ;
   storage (list bool) ;
   code { CAR ;
          DUP ;
@@ -20,3 +18,4 @@ tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[ma
          CONS ;
          NIL operation ;
          PAIR } }
+

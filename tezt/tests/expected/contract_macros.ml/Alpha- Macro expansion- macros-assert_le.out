@@ -1,5 +1,3 @@
-tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/assert_lt.tz]
-
 { parameter (pair int int) ;
   storage unit ;
   code { CAR ;
@@ -7,7 +5,8 @@ tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[ma
          CAR ;
          DIP { CDR } ;
          COMPARE ;
-         { LT ; IF {} { { UNIT ; FAILWITH } } } ;
+         { LE ; IF {} { { UNIT ; FAILWITH } } } ;
          UNIT ;
          NIL operation ;
          PAIR } }
+

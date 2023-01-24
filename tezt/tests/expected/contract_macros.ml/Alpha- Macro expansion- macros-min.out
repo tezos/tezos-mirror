@@ -1,5 +1,3 @@
-tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/min.tz]
-
 { parameter (pair int int) ;
   storage int ;
   code { CAR ;
@@ -11,3 +9,4 @@ tests_alpha/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[ma
          IF { CAR } { CDR } ;
          NIL operation ;
          PAIR } }
+
