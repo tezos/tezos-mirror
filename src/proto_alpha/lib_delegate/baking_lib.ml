@@ -301,7 +301,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     | Some _ -> propose_at_next_level ~minimal_timestamp state
     | None -> (
         match endorsement_quorum state with
-        | Some (voting_power, endorsement_qc) ->
+        | Some (_voting_power, endorsement_qc) ->
             let state =
               {
                 state with
@@ -323,8 +323,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             let* state =
               State_transitions.step
                 state
-                (Baking_state.Quorum_reached
-                   (candidate, voting_power, endorsement_qc))
+                (Baking_state.Quorum_reached (candidate, endorsement_qc))
               >>= do_action
               (* this will register the elected block *)
             in
