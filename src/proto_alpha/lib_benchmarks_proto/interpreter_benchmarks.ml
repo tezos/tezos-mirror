@@ -1927,7 +1927,6 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IEdiv_teznat
-        ~intercept_stack:(Alpha_context.Tez.zero, (Script_int.zero_n, eos))
         ~stack_type:(mutez @$ nat @$ bot)
         ~kinstr:(IEdiv_teznat (dummy_loc, halt))
         ~stack_sampler:(fun cfg rng_state ->
