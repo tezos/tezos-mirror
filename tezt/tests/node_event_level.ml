@@ -370,8 +370,8 @@ let test_event_levels =
   Log.info
     "Step 5: Bake from node 3. Witness flush request (level notice) from all \
      nodes, and set_head event (level info) from nodes 1 and 2." ;
-  let wait1b = wait_for_flush node_3 in
-  let wait2b = wait_for_flush node_3 in
+  let wait1b = wait_for_flush node_1 in
+  let wait2b = wait_for_flush node_2 in
   let wait3b = wait_for_flush node_3 in
   let wait1c = wait_for_set_head node_1 in
   let wait2c = wait_for_set_head node_2 in
