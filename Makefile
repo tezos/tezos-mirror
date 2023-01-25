@@ -254,18 +254,6 @@ test-unit: test-nonproto-unit test-proto-unit
 test-unit-alpha:
 	@dune build --profile=$(PROFILE) @src/proto_alpha/lib_protocol/runtest
 
-.PHONY: test-python
-test-python: all
-	@$(MAKE) -C tests_python all
-
-.PHONY: test-python-alpha
-test-python-alpha: all
-	@$(MAKE) -C tests_python alpha
-
-.PHONY: test-python-tenderbake
-test-python-tenderbake: all
-	@$(MAKE) -C tests_python tenderbake
-
 # TODO: https://gitlab.com/tezos/tezos/-/issues/3018
 # Disable verbose once the log file bug in Alcotest is fixed.
 .PHONY: test-js
@@ -297,7 +285,7 @@ test-tezt-coverage:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
 
 .PHONY: test-code
-test-code: test-protocol-compile test-unit test-python test-tezt
+test-code: test-protocol-compile test-unit test-tezt
 
 # This is as `make test-code` except we allow failure (prefix "-")
 # because we still want the coverage report even if an individual
@@ -306,13 +294,11 @@ test-code: test-protocol-compile test-unit test-python test-tezt
 test-coverage:
 	-@$(MAKE) test-protocol-compile
 	-@$(MAKE) test-unit
-	-@$(MAKE) test-python
 	-@$(MAKE) test-tezt
 
 .PHONY: test-coverage-tenderbake
 test-coverage-tenderbake:
 	-@$(MAKE) test-unit-alpha
-	-@$(MAKE) test-python-tenderbake
 
 .PHONY: test-webassembly
 test-webassembly:
@@ -373,7 +359,6 @@ check-linting:
 	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:
-	@$(MAKE) -C tests_python lint
 	@$(MAKE) -C docs lint
 
 check-python-typecheck:
@@ -390,7 +375,6 @@ fmt-ocaml:
 	@dune build --profile=$(PROFILE) @fmt --auto-promote
 
 fmt-python:
-	@$(MAKE) -C tests_python fmt
 	@$(MAKE) -C docs fmt
 
 .PHONY: build-deps
@@ -486,7 +470,6 @@ clean: coverage-clean clean-old-names
 	@-dune clean
 	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
 	@-${MAKE} -C docs clean
-	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
 
 .PHONY: build-kernels
