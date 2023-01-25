@@ -369,6 +369,10 @@ check-python-linting:
 	@$(MAKE) -C tests_python lint
 	@$(MAKE) -C docs lint
 
+check-python-typecheck:
+	@$(MAKE) -C tests_python typecheck
+	@$(MAKE) -C docs typecheck
+
 check-ocaml-linting:
 	@./scripts/semgrep/lint-all-ocaml-sources.sh
 
