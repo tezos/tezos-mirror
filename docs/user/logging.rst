@@ -106,6 +106,12 @@ Options available only for the ``file-descriptor-path://`` case:
 -  ``chmod=<int>`` sets the access-rights of the file at creation time
    (default is ``0o600``, provided
    `Umask <https://en.wikipedia.org/wiki/Umask>`__ allows it).
+- ``daily-logs=<int>`` sets up a rotation for log files, creating a file for
+  each day. The parameter is the number of days these logs should be kept, and
+  hence the number of files. The day of the year with format ["yyyymmdd"] is
+  added as a suffix to the filename, prefixed by a dash. We recomend not to put
+  your tezos logs in ``/var/log`` if you use this option, as you system would
+  use ``logrotate`` automatically.
 
 Examples:
 
@@ -122,6 +128,10 @@ Examples:
 -  ``file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"``
    → Write only sections validator and rpc at debug level but exclude all
    other sections from the stream.
+- ``"file-descriptor-path:///tmp/node.log?daily-logs=5&section-prefix=:info"``
+   sets up daily log files with a history of up to 5 days and verbosity level
+   ``info`` for all logs. Files will be named ``node-19700101.log`` in an
+   example of a file produced in 1970, January, the 1st.
 
 The format of the events is (usually minified):
 
@@ -139,7 +149,19 @@ Additionally, the ``"hostname"`` field can be customized with environment
 variable ``TEZOS_EVENT_HOSTNAME``; Its default value is the hostname of the
 device the node is running on.
 
+To store rotated logs, there is the ``daily-logs`` option to create logs files on
+a daily basis. However, it is also possible to use ``logrotate`` by putting the
+log file in ``/var/log/tezos/sink.log``, for exemple. The following
+configuration can then be put in ``/etc/logrotate.d/tezos/sink.log``:
 
+.. code::
+
+  /var/log/tezos/sink.log {
+          daily
+          copytruncate
+          rotate 4
+          compress
+  }
 
 File-Tree Sink
 ~~~~~~~~~~~~~~

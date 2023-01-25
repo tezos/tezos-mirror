@@ -32,6 +32,9 @@ Node
   shortening the display to completion time only instead of the full status of
   the operation.
 
+- Added an option ``daily-logs`` to file-descriptor sinks, enabling
+  log rotation based on a daily frequency.
+
 Client
 ------
 
