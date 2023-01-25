@@ -84,6 +84,7 @@ type t = {
   dal_node_port : int;
   batcher : batcher;
   injector_retention_period : int;
+  l2_blocks_cache_size : int;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -144,6 +145,10 @@ val default_batcher : batcher
 (** [default_injector_retention_period] is the default number of blocks the
     injector will keep in memory. *)
 val default_injector_retention_period : int
+
+(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
+    cached by the rollup node *)
+val default_l2_blocks_cache_size : int
 
 (** [max_injector_retention_period] is the maximum allowed value for
     [injector_retention_period]. *)

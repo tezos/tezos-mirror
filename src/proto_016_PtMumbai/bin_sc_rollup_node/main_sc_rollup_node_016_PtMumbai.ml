@@ -293,6 +293,7 @@ let config_init_command =
           loser_mode;
           batcher = Configuration.default_batcher;
           injector_retention_period;
+          l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size;
         }
       in
       let*? config = check_mode config in
