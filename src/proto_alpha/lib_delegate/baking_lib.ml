@@ -371,18 +371,18 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
-let bake_using_automaton config state block_stream =
+let bake_using_automaton config state heads_stream =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
   let loop_state =
     Baking_scheduling.create_loop_state
-      block_stream
+      ~heads_stream
       state.global_state.operation_worker
   in
   let stop_on_next_level_block = function
-    | New_proposal proposal ->
+    | New_head_proposal proposal ->
         Compare.Int32.(proposal.block.shell.level >= Int32.succ current_level)
     | _ -> false
   in
@@ -394,7 +394,7 @@ let bake_using_automaton config state block_stream =
     state
     initial_event
   >>=? function
-  | Some (New_proposal proposal) ->
+  | Some (New_head_proposal proposal) ->
       let*! () =
         cctxt#message
           "Block %a (%ld) injected"

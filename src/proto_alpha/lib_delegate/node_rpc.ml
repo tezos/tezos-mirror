@@ -253,7 +253,7 @@ let monitor_heads cctxt ~chain ?cache () =
   let* block_stream, stopper =
     Monitor_services.heads cctxt ~next_protocols chain
   in
-  let stream, stopper =
+  let stream =
     let map (block_hash, block_header) =
       let*! map_result = proposal cctxt ?cache ~chain block_hash block_header in
       match map_result with
@@ -262,7 +262,7 @@ let monitor_heads cctxt ~chain ?cache () =
           let*! () = Events.(emit error_while_monitoring_heads err) in
           Lwt.return_none
     in
-    (Lwt_stream.filter_map_s map block_stream, stopper)
+    Lwt_stream.filter_map_s map block_stream
   in
   return (stream, stopper)
 

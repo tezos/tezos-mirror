@@ -357,7 +357,8 @@ let timeout_kind_encoding =
     ]
 
 type event =
-  | New_proposal of proposal
+  | New_valid_proposal of proposal
+  | New_head_proposal of proposal
   | Prequorum_reached of
       Operation_worker.candidate * Kind.preendorsement operation list
   | Quorum_reached of
@@ -370,12 +371,18 @@ let event_encoding =
     [
       case
         (Tag 0)
-        ~title:"New_proposal"
+        ~title:"New_valid_proposal"
         proposal_encoding
-        (function New_proposal p -> Some p | _ -> None)
-        (fun p -> New_proposal p);
+        (function New_valid_proposal p -> Some p | _ -> None)
+        (fun p -> New_valid_proposal p);
       case
         (Tag 1)
+        ~title:"New_head_proposal"
+        proposal_encoding
+        (function New_head_proposal p -> Some p | _ -> None)
+        (fun p -> New_head_proposal p);
+      case
+        (Tag 2)
         ~title:"Prequorum_reached"
         (tup2
            Operation_worker.candidate_encoding
@@ -388,7 +395,7 @@ let event_encoding =
           Prequorum_reached
             (candidate, Operation_pool.filter_preendorsements ops));
       case
-        (Tag 2)
+        (Tag 3)
         ~title:"Quorum_reached"
         (tup2
            Operation_worker.candidate_encoding
@@ -400,7 +407,7 @@ let event_encoding =
         (fun (candidate, ops) ->
           Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
       case
-        (Tag 3)
+        (Tag 4)
         ~title:"Timeout"
         timeout_kind_encoding
         (function Timeout tk -> Some tk | _ -> None)
@@ -844,10 +851,16 @@ let pp_timeout_kind fmt = function
       Format.fprintf fmt "time to bake next level at round %a" Round.pp at_round
 
 let pp_event fmt = function
-  | New_proposal proposal ->
+  | New_valid_proposal proposal ->
       Format.fprintf
         fmt
-        "new proposal received: %a"
+        "new valid proposal received: %a"
+        pp_block_info
+        proposal.block
+  | New_head_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new applied proposal received: %a"
         pp_block_info
         proposal.block
   | Prequorum_reached (candidate, preendos) ->

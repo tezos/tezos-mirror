@@ -159,7 +159,8 @@ type timeout_kind =
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 
 type event =
-  | New_proposal of proposal
+  | New_valid_proposal of proposal
+  | New_head_proposal of proposal
   | Prequorum_reached of
       Operation_worker.candidate * Kind.preendorsement operation list
   | Quorum_reached of
