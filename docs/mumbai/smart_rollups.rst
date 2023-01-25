@@ -511,7 +511,7 @@ Second, the configured rollup node can be run:
 
 .. code:: sh
 
-   octez-smart-rollup-node-PtMumbai" -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
+   octez-smart-rollup-node-PtMumbai -d "${OCLIENT_DIR}" run --data-dir ${ROLLUP_NODE_DIR}
 
 The log should show that the rollup node follows the Layer 1 chain and
 processes the inbox of each level.
