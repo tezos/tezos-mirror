@@ -3,7 +3,7 @@
 [tool.poetry]
 name = "tezos"
 version = "0.1.0"
-description = "Python tests suites & scripts for Tezos"
+description = "Python documentation & scripts for Tezos"
 
 readme = "README.md"
 
@@ -26,15 +26,8 @@ pycodestyle = "2.7.0"
 pylint = "2.11.1"
 black = "22.3.0"
 
-# tests_python/ python testing and execution framework dependencies
+# pytest is used by scripts/ci/coverage.py and scripts/b58_prefix
 pytest = "6.2.5"
-pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", rev="fc5bd9b2" }
-pytest-timeout = "1.4.2"
-# tests_python/tests_*/test_openapi.py dependencies
-requests = "2.26.0"
-types-requests = "^2.27.16"
-openapi-spec-validator = "0.2.9"
-# tests_python/tests_*/test_crypto.py dependencies
 
 # docs/ dependencies
 sphinx = "4.2.0"
