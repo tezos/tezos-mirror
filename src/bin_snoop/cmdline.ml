@@ -96,7 +96,16 @@ type command =
       matching : string;
       codegen_options : codegen_options;
     }
-  | Codegen_inferred of {solution : string; codegen_options : codegen_options}
+  | Codegen_inferred of {
+      solution : string;
+      codegen_options : codegen_options;
+      exclusions : String.Set.t;
+    }
+  | Codegen_for_solutions of {
+      solutions : string list;
+      codegen_options : codegen_options;
+      exclusions : String.Set.t;
+    }
   | Solution_print of string list
   | No_command
 

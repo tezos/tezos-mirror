@@ -97,10 +97,10 @@ let () =
        (Model.Model model)
        solution
        (module Costlang.Identity)
-       "blake2b_model"
+       (Namespace.of_string "blake2b_model")
    with
   | None -> assert false
-  | Some code -> Format.printf "%a@." Codegen.pp_model code) ;
+  | Some code -> Format.printf "%a@." Codegen.pp_code code) ;
   let module FPT = Fixed_point_transform.Apply (struct
     let options = {Fixed_point_transform.default_options with precision = 5}
   end) in
@@ -109,7 +109,7 @@ let () =
       (Model.Model model)
       solution
       (module FPT)
-      "blake2b_model_fixed_point"
+      (Namespace.of_string "blake2b_model_fixed_point")
   with
   | None -> assert false
-  | Some code -> Format.printf "%a@." Codegen.pp_model code
+  | Some code -> Format.printf "%a@." Codegen.pp_code code
