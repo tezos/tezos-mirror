@@ -108,6 +108,17 @@ module Slots_handlers = struct
           ?header_status
           store
         |> Errors.to_tzresult)
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4338
+
+     Re-consider this implementation/interface when the issue above is
+     tackeled. *)
+  let monitor_shards ctxt () () () =
+    call_handler1 ctxt (fun store ->
+        let stream, stopper = Store.open_shards_stream store in
+        let shutdown () = Lwt_watcher.shutdown stopper in
+        let next () = Lwt_stream.get stream in
+        Tezos_rpc.Answer.return_stream {next; shutdown})
 end
 
 module Profile_handlers = struct
@@ -188,12 +199,15 @@ let register_new :
        Tezos_rpc.Directory.register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register
+       Services.monitor_shards
+       (Slots_handlers.monitor_shards ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
   Tezos_rpc.Directory.empty |> register_shard ctxt |> register_shards ctxt
   |> register_show_slot_pages ctxt
-  |> register_monitor_shards ctxt
 
 let register ctxt = register_new ctxt (register_legacy ctxt)
 
@@ -230,3 +244,6 @@ let install_finalizer rpc_server =
   let* () = shutdown rpc_server in
   let* () = Event.(emit shutdown_node exit_status) in
   Tezos_base_unix.Internal_event_unix.close ()
+
+let monitor_shards_rpc ctxt =
+  Tezos_rpc.Context.make_streamed_call Services.monitor_shards ctxt () () ()

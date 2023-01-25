@@ -50,11 +50,3 @@ let shards =
     ~output:(Data_encoding.list Cryptobox.shard_encoding)
     ~input:Data_encoding.(list int31)
     Tezos_rpc.Path.(open_root / "shards" /: Cryptobox.Commitment.rpc_arg)
-
-let monitor_shards =
-  Tezos_rpc.Service.get_service
-    ~description:"Monitor stored shards"
-    ~query:Tezos_rpc.Query.empty
-    ~output:
-      Data_encoding.(obj1 (req "commitment" Cryptobox.Commitment.encoding))
-    Tezos_rpc.Path.(open_root / "monitor_shards")

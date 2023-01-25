@@ -49,12 +49,3 @@ val shards :
     int trace,
     Tezos_crypto_dal.Cryptobox.shard list )
   Tezos_rpc.Service.service
-
-val monitor_shards :
-  ( [`GET],
-    unit,
-    unit,
-    unit,
-    unit,
-    Tezos_crypto_dal.Cryptobox.commitment )
-  Tezos_rpc.Service.service
