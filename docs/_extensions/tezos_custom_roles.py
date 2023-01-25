@@ -135,8 +135,8 @@ def package_api_role(
     ):
         # odoc was run but did not generate the page => path is wrong
         # (this is probably a user error)
-        err = 'package_role: no API  ' + path
-        msg = inliner.reporter.error(format(err), line=lineno)
+        error = 'package_role: no API  ' + path
+        msg = inliner.reporter.error(format(error), line=lineno)
         prb = inliner.problematic(rawtext, rawtext, msg)
         return [prb], [msg]
     url = url_prefix + "api/odoc/_html/" + path

@@ -26,6 +26,7 @@
 import os
 import sys
 import datetime
+from typing import Dict
 
 sys.path.insert(0, os.path.abspath('.') + '/_extensions')
 
@@ -148,7 +149,7 @@ htmlhelp_basename = 'Tezosdoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_elements = {
+latex_elements: Dict[str, str] = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
