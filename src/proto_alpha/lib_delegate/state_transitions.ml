@@ -81,7 +81,7 @@ let make_consensus_list state proposal =
   SlotMap.fold
     (fun _slot (consensus_key_and_delegate, slots) acc ->
       ( consensus_key_and_delegate,
-        {slot = Stdlib.List.hd slots.slots; level; round; block_payload_hash} )
+        {slot = slots.first_slot; level; round; block_payload_hash} )
       :: acc)
     state.level_state.delegate_slots.own_delegate_slots
     []
