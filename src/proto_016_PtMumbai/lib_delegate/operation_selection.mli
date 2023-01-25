@@ -34,6 +34,15 @@ type simulation_result = {
   operations_hash : Operation_list_list_hash.t;
 }
 
+(** [filter_operations_with_simulation incremental fees_config
+    ~hard_gas_limit_per_block ops] tries to validate prioritized operations (and
+    apply them if [incremental] has been initialised with an
+    [application_state]) and filter them regarding the quota of each validation
+    pass. Manager operations are prioritized based on a weight computed from
+    their fees/gas/bytes. [filter_operations_with_simulation] function returns a
+    [simulation_result], containing the validated operation, their resulting
+    [operations_hash], optional [validation_result] and [block_header_metadata]
+    if the operations were applied. *)
 val filter_operations_with_simulation :
   Baking_simulator.incremental ->
   Baking_configuration.fees_config ->
@@ -41,12 +50,21 @@ val filter_operations_with_simulation :
   Operation_pool.Prioritized.t ->
   simulation_result tzresult Lwt.t
 
+(** [filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
+    ops] is similar to [filter_operations_with_simulation] but does not validate
+    (and apply) operations from [ops] and returns only the operations instead of
+    a [simulation_result].
+
+    Hypothesis: operations from [ops] have previously been validated. *)
 val filter_operations_without_simulation :
   Baking_configuration.fees_config ->
   hard_gas_limit_per_block:Gas.Arith.integral ->
   Operation_pool.Prioritized.t ->
   packed_operation list list
 
+(** [filter_consensus_operations_only incremental ops] is similar to
+    [filter_operations_with_simulation] but only filters consensus operations
+    from [ops]. *)
 val filter_consensus_operations_only :
   Baking_simulator.incremental ->
   Operation_pool.ordered_pool ->
