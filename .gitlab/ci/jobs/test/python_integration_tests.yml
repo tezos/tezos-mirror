@@ -4,17 +4,6 @@
 
 include: .gitlab/ci/jobs/test/common.yml
 
-integration:static-binaries:
-  extends:
-    - .pytest_template
-  allow_failure: true
-  needs:
-    - build:static-x86_64-linux-binaries
-  dependencies:
-    - build:static-x86_64-linux-binaries
-  script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-static-binaries
-
 integration:pytest:
   extends:
     - .pytest_integration
