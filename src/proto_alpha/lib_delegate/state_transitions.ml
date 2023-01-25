@@ -699,7 +699,7 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
       time_to_bake state at_round
-  | Idle, New_proposal block_info ->
+  | Idle, New_head_proposal block_info ->
       Events.(
         emit
           new_head
@@ -707,8 +707,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
             block_info.block.shell.level,
             block_info.block.round ))
       >>= fun () -> handle_new_proposal state block_info
-  | Awaiting_endorsements, New_proposal block_info
-  | Awaiting_preendorsements, New_proposal block_info ->
+  | Awaiting_endorsements, New_head_proposal block_info
+  | Awaiting_preendorsements, New_head_proposal block_info ->
       Events.(
         emit
           new_head
@@ -731,4 +731,7 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | Awaiting_preendorsements, Quorum_reached _
   | Awaiting_endorsements, Prequorum_reached _ ->
       (* This cannot/should not happen *)
+      do_nothing state
+  | _, New_valid_proposal _p ->
+      (* TODO: actually do something *)
       do_nothing state

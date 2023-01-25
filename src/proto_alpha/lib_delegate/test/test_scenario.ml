@@ -24,7 +24,7 @@ let test_level_5 () =
     include Default_hooks
 
     let stop_on_event = function
-      | Baking_state.New_proposal {block; _} ->
+      | Baking_state.New_head_proposal {block; _} ->
           (* Stop the node as soon as we receive a proposal with a level
              higher than [level_to_reach]. *)
           block.shell.level > level_to_reach
@@ -649,7 +649,7 @@ let test_scenario_m1 () =
       return (op_hash, op, propagation_vector)
 
     let stop_on_event = function
-      | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+      | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
       | _ -> false
   end in
   let config = {default_config with timeout = 60} in
@@ -679,7 +679,7 @@ let test_scenario_m2 () =
     include Default_hooks
 
     let stop_on_event = function
-      | Baking_state.New_proposal {block; _} -> block.shell.level > 5l
+      | Baking_state.New_head_proposal {block; _} -> block.shell.level > 5l
       | _ -> false
   end in
   let module Missing_node : Hooks = struct
@@ -742,7 +742,7 @@ Scenario M3
 
 let test_scenario_m3 () =
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} ->
+    | Baking_state.New_head_proposal {block; _} ->
         block.shell.level = 1l
         && Protocol.Alpha_context.Round.to_int32 block.round = 6l
     | _ -> false
@@ -917,7 +917,7 @@ Scenario M5
 
 let test_scenario_m5 () =
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level >= 2l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level >= 2l
     | _ -> false
   in
   let module Node_a_hooks : Hooks = struct
@@ -1004,7 +1004,7 @@ Scenario M6
 let test_scenario_m6 () =
   let b_proposal_2_1 = ref None in
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let module Node_a_hooks : Hooks = struct
@@ -1134,7 +1134,7 @@ let test_scenario_m7 () =
   let c_received_2_1 = ref false in
   let d_received_2_1 = ref false in
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let check_chain_on_success0 node_label ~chain =
@@ -1338,7 +1338,7 @@ Scenario M8
 let test_scenario_m8 () =
   let b_proposal_2_0 = ref None in
   let stop_on_event0 = function
-    | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
+    | Baking_state.New_head_proposal {block; _} -> block.shell.level > 4l
     | _ -> false
   in
   let on_inject_operation0 ~op_hash ~op =
