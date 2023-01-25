@@ -10,18 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tezos-clic"
   "tezos-protocol-016-PtMumbai"
   "tezos-client-commands"
   "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-client-016-PtMumbai"
   "tezos-smart-rollup-016-PtMumbai"
-  "octez-smart-rollup-node-PtMumbai"
+  "tezos-clic"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: `octez-smart-rollup-client-alpha` client binary"
+synopsis: "Tezos/Protocol: Smart rollup client"
