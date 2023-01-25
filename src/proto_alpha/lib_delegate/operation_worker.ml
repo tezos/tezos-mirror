@@ -162,12 +162,9 @@ let candidate_encoding =
        (req "round_watched" Round.encoding)
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
-type voting_power = int
-
 type event =
-  | Prequorum_reached of
-      candidate * voting_power * Kind.preendorsement operation list
-  | Quorum_reached of candidate * voting_power * Kind.endorsement operation list
+  | Prequorum_reached of candidate * Kind.preendorsement operation list
+  | Quorum_reached of candidate * Kind.endorsement operation list
 
 type pqc_watched = {
   candidate_watched : candidate;
@@ -310,7 +307,6 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Prequorum_reached
                 ( candidate_watched,
-                  proposal_watched.current_voting_power,
                   List.rev proposal_watched.preendorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
@@ -370,7 +366,6 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Quorum_reached
                 ( candidate_watched,
-                  proposal_watched.current_voting_power,
                   List.rev proposal_watched.endorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;

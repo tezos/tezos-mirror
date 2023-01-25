@@ -719,14 +719,13 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       >>= fun () ->
       Events.(emit new_head_while_waiting_for_qc ()) >>= fun () ->
       handle_new_proposal state block_info
-  | ( Awaiting_preendorsements,
-      Prequorum_reached (candidate, _voting_power, preendorsement_qc) ) ->
+  | Awaiting_preendorsements, Prequorum_reached (candidate, preendorsement_qc)
+    ->
       prequorum_reached_when_awaiting_preendorsements
         state
         candidate
         preendorsement_qc
-  | ( Awaiting_endorsements,
-      Quorum_reached (candidate, _voting_power, endorsement_qc) ) ->
+  | Awaiting_endorsements, Quorum_reached (candidate, endorsement_qc) ->
       quorum_reached_when_waiting_endorsements state candidate endorsement_qc
   (* Unreachable cases *)
   | Idle, (Prequorum_reached _ | Quorum_reached _)
