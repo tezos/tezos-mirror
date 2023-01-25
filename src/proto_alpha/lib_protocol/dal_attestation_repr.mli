@@ -53,6 +53,8 @@ type operation = {
   level : Raw_level_repr.t;
       (** The level at which the operation is valid. It should be equal to the
           attested slot's published level plus the DAL attestation lag. *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4672
+         consider renaming to [attested_level] *)
 }
 
 val encoding : t Data_encoding.t
