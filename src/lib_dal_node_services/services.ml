@@ -61,8 +61,6 @@ module Types = struct
     status : header_status;
   }
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4442
-     Add missing profiles. *)
   type profile = Attestor of Tezos_crypto.Signature.public_key_hash
 
   type with_proof = {with_proof : bool}
@@ -379,3 +377,17 @@ let get_attestable_slots :
     Tezos_rpc.Path.(
       open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")
+
+let monitor_shards :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Cryptobox.Commitment.t
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:"Monitor put shards"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Cryptobox.Commitment.encoding
+    Tezos_rpc.Path.(open_root / "monitor_shards")
