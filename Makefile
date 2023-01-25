@@ -391,6 +391,7 @@ fmt-ocaml:
 
 fmt-python:
 	@$(MAKE) -C tests_python fmt
+	@$(MAKE) -C docs fmt
 
 .PHONY: build-deps
 build-deps:
