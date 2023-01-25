@@ -23,9 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
+type error += Mode_not_supported of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dac.node.operating_mode_not_supported"
+    ~title:"Operating mode not supported"
+    ~description:"Operating mode not supported"
+    ~pp:(fun ppf mode_string ->
+      Format.fprintf ppf "DAC node cannot run in %s operating mode" mode_string)
+    Data_encoding.(obj1 (req "mode" string))
+    (function Mode_not_supported mode -> Some mode | _ -> None)
+    (fun mode -> Mode_not_supported mode)
 
 module Handler = struct
   (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
@@ -65,8 +75,6 @@ module Handler = struct
       let* protocols =
         Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
       in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4627
-         Register only one plugin according to mode of operation. *)
       let*! dac_plugin = Dac_manager.resolve_plugin protocols in
       match dac_plugin with
       | Some dac_plugin ->
@@ -128,12 +136,21 @@ let daemonize handlers =
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let* config = Configuration.load ~data_dir in
-  let config = {config with data_dir} in
-  let* () =
-    Dac_manager.Storage.ensure_reveal_data_dir_exists config.dac.reveal_data_dir
+  let* ({rpc_address; rpc_port; reveal_data_dir; mode; _} as config) =
+    Configuration.load ~data_dir
   in
-  let* dac_accounts = Dac_manager.Keys.get_keys cctxt config in
+  let* () = Dac_manager.Storage.ensure_reveal_data_dir_exists reveal_data_dir in
+  let* addresses, threshold =
+    match mode with
+    | Configuration.Legacy {dac_members_addresses; threshold} ->
+        return (dac_members_addresses, threshold)
+    | Configuration.Coordinator _ -> tzfail @@ Mode_not_supported "coordinator"
+    | Configuration.Dac_member _ -> tzfail @@ Mode_not_supported "dac_member"
+    | Configuration.Observer _ -> tzfail @@ Mode_not_supported "observer"
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
+     Stop DAC node when in Legacy mode, if threshold is not reached. *)
+  let* dac_accounts = Dac_manager.Keys.get_keys ~addresses ~threshold cctxt in
   let dac_pks_opt, dac_sk_uris =
     dac_accounts
     |> List.map (fun account_opt ->
@@ -143,13 +160,21 @@ let run ~data_dir cctxt =
     |> List.split
   in
   let ctxt = Node_context.init config cctxt in
-
   let* rpc_server =
-    RPC_server.(start config cctxt ctxt dac_pks_opt dac_sk_uris)
+    RPC_server.(
+      start_legacy
+        ~rpc_address
+        ~rpc_port
+        ~reveal_data_dir
+        ~threshold
+        cctxt
+        ctxt
+        dac_pks_opt
+        dac_sk_uris)
   in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
-    Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
+    Event.(emit rpc_server_is_ready (config.rpc_address, config.rpc_port))
   in
   (* Start daemon to resolve current protocol plugin *)
   let* () = daemonize [Handler.resolve_plugin_and_set_ready ctxt cctxt] in

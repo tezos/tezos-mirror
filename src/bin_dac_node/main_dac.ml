@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,8 +39,8 @@ let data_dir_arg =
     ~default
     (Client_config.string_parameter ())
 
-let rpc_addr_arg =
-  let default = Configuration.default_rpc_addr in
+let rpc_address_arg =
+  let default = Configuration.default_rpc_address in
   Tezos_clic.default_arg
     ~long:"rpc-addr"
     ~placeholder:"rpc-address|ip"
@@ -78,11 +79,19 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure DAC node."
-    (args3 data_dir_arg rpc_addr_arg rpc_port_arg)
+    (args3 data_dir_arg rpc_address_arg rpc_port_arg)
     (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_addr, rpc_port) cctxt ->
+    (fun (data_dir, rpc_address, rpc_port) cctxt ->
       let open Configuration in
-      let config = {data_dir; rpc_addr; rpc_port; dac = default_dac} in
+      let config =
+        {
+          data_dir;
+          rpc_address;
+          rpc_port;
+          mode = Legacy {threshold = 0; dac_members_addresses = []};
+          reveal_data_dir = default_reveal_data_dir;
+        }
+      in
       let* () = save config in
       let*! _ =
         cctxt#message "DAC node configuration written in %s" (filename config)
@@ -133,15 +142,20 @@ module Dac_client = struct
       (args1 data_dir_arg)
       (prefixes ["add"; "data"; "availability"; "committee"; "member"]
       @@ tz4_address_param @@ stop)
-      (fun data_dir address cctxt ->
+      (fun data_dir dac_member_address cctxt ->
         let open Configuration in
         let* config = load ~data_dir in
-        let old_addresses = config.dac.addresses in
+        let* ({dac_members_addresses = old_dac_members_addresses; _} as
+             legacy_config) =
+          match config.mode with
+          | Legacy config -> return config
+          | _ -> failwith "Configuration is not in legacy mode"
+        in
         if
           List.mem
             ~equal:Tezos_crypto.Aggregate_signature.Public_key_hash.equal
-            address
-            old_addresses
+            dac_member_address
+            old_dac_members_addresses
         then
           let*! _ =
             cctxt#message
@@ -150,9 +164,11 @@ module Dac_client = struct
           in
           return_unit
         else
-          let addresses = old_addresses @ [address] in
-          let dac = {config.dac with addresses} in
-          let* () = save {config with dac} in
+          let dac_members_addresses =
+            old_dac_members_addresses @ [dac_member_address]
+          in
+          let mode = Legacy {legacy_config with dac_members_addresses} in
+          let* () = save {config with mode} in
           let*! _ =
             cctxt#message
               "DAC address added to configuration in %s"
@@ -173,12 +189,19 @@ module Dac_client = struct
       (fun (data_dir, threshold, reveal_data_dir) cctxt ->
         let open Configuration in
         let* config = load ~data_dir in
-        let threshold = Option.value threshold ~default:config.dac.threshold in
-        let reveal_data_dir =
-          Option.value reveal_data_dir ~default:config.dac.reveal_data_dir
+        let* legacy_config =
+          match config.mode with
+          | Legacy config -> return config
+          | _ -> failwith "Only legacy mode supported."
         in
-        let dac = {config.dac with threshold; reveal_data_dir} in
-        let config = {config with dac} in
+        let threshold =
+          Option.value threshold ~default:legacy_config.threshold
+        in
+        let reveal_data_dir =
+          Option.value reveal_data_dir ~default:config.reveal_data_dir
+        in
+        let mode = Legacy {legacy_config with threshold} in
+        let config = {config with reveal_data_dir; mode} in
         let* () = save config in
         let*! _ =
           cctxt#message

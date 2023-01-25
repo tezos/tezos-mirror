@@ -30,11 +30,12 @@ type error +=
   | Cannot_create_reveal_data_dir of string
 
 module Keys : sig
-  (** [get_keys cctxt config] returns the aliases and keys associated with the
+  (** [get_keys ~addresses ~threshold cctxt config] returns the aliases and keys associated with the
      aggregate signature addresses in [config] pkh in the tezos wallet of [cctxt]. *)
   val get_keys :
+    addresses:Tezos_crypto.Aggregate_signature.public_key_hash trace ->
+    threshold:int ->
     #Client_context.wallet ->
-    Configuration.t ->
     (Tezos_crypto.Aggregate_signature.public_key_hash
     * Tezos_crypto.Aggregate_signature.public_key option
     * Client_keys.aggregate_sk_uri)

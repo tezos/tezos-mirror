@@ -78,7 +78,7 @@ module Keys = struct
                 return_none
             | Some sk_uri -> return_some (pkh, pk, sk_uri)))
 
-  let get_keys cctxt {Configuration.dac = {addresses; threshold; _}; _} =
+  let get_keys ~addresses ~threshold cctxt =
     let open Lwt_result_syntax in
     let* keys = List.map_es (get_address_keys cctxt) addresses in
     let recovered_keys = List.length @@ List.filter Option.is_some keys in
