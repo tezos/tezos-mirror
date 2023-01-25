@@ -251,7 +251,7 @@ end) : Internal_event.SINK with type t = t = struct
           in
           (* See https://tools.ietf.org/html/rfc5424#section-6 *)
           Format.asprintf
-            "%a [%s%s] %s\n"
+            "%a [%s.%s] %s\n"
             (Ptime.pp_rfc3339 ~frac_s:3 ())
             (match Ptime.of_float_s wrapped_event.time_stamp with
             | Some s -> s
