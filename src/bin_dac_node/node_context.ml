@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2023 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +25,10 @@
 
 exception Status_already_ready
 
-type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
+type ready_ctxt = {
+  dac_plugin : (module Dac_plugin.T);
+  data_streamer : (module Data_streamer.S);
+}
 
 type status = Ready of ready_ctxt | Starting
 
@@ -39,7 +42,15 @@ let init config cctxt = {status = Starting; config; tezos_node_cctxt = cctxt}
 
 let set_ready ctxt ~dac_plugin =
   match ctxt.status with
-  | Starting -> ctxt.status <- Ready {dac_plugin}
+  | Starting ->
+      let (module Dac_plugin : Dac_plugin.T) = dac_plugin in
+
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4681
+         Currently, Dac only supports coordinator functionalities but we might
+         want to filter this capability out depending on the profile.
+      *)
+      let module Data_streamer = Data_streamer.Make (Dac_plugin) in
+      ctxt.status <- Ready {dac_plugin; data_streamer = (module Data_streamer)}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready

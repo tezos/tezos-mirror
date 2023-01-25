@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech, <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
-  type hash = Protocol.Sc_rollup_reveal_hash.t
+(* Component for streaming published root page hashes to subscribers. *)
 
-  module Proto = Registerer.Registered
-  module RPC = RPC
+module type S = sig
+  (* Protocol hash type used for reveal_preimage. *)
+  type hash
+
+  (* [publish hash] publishes a root page [hash] to all attached subscribers. *)
+  val publish : hash -> unit tzresult Lwt.t
+
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4680
+     Access Dac coordinator details via some [Dac_client.cctx].
+  *)
+
+  (* [subscribe coordinator_host coordinator_port] returns an Lwt_stream of hashes and
+     a function to close the stream.
+  *)
+  val subscribe :
+    coordinator_host:string ->
+    coordinator_port:int ->
+    hash Lwt_stream.t * Lwt_watcher.stopper
 end
 
-let () = Dac_plugin.register (module Plugin)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4510
+   Implement useful streaming.
+*)
+module Make (P : Dac_plugin.T) : S = struct
+  type hash = P.hash
+
+  let publish _hash = Lwt_result_syntax.return_unit
+
+  let subscribe ~coordinator_host ~coordinator_port =
+    let _unused = (coordinator_host, coordinator_port) in
+    Lwt_watcher.create_fake_stream ()
+end
