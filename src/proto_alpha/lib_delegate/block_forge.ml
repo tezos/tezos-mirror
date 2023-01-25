@@ -70,7 +70,7 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
   }
 
 (* [finalize_block_header ~shell_header ~validation_result ~operations_hash
-   ~pred_info ~round ~locked_round cctxt] updates the [shell_header] that was created
+   ~pred_info ~round ~locked_round] updates the [shell_header] that was created
    with dummy fields at the beginning of the block construction. It increments
    the [level] and sets the actual [operations_hash], [fitness],
    [validation_passes], and [context] (the predecessor resulting context hash).
@@ -78,67 +78,12 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
    When the operations from the block have been applied, the [fitness] is simply
    retrieved from the [validation_result]. Otherwise, the [fitness] is computed
    from the [round] and [locked_round] arguments. *)
-let finalize_block_header ~chain ~shell_header ~timestamp ~validation_result
-    ~operations_hash ~(pred_info : Baking_state.block_info) ~round ~locked_round
-    cctxt =
+let finalize_block_header ~shell_header ~validation_result ~operations_hash
+    ~(pred_info : Baking_state.block_info) ~round ~locked_round =
   let open Lwt_result_syntax in
   let* fitness =
     match validation_result with
-    | Some {Tezos_protocol_environment.context; fitness; message; _} ->
-        let*! test_chain = Context_ops.get_test_chain context in
-        let* context =
-          match test_chain with
-          | Not_running -> return context
-          | Running {expiration; _} ->
-              if Time.Protocol.(expiration <= timestamp) then
-                let*! context =
-                  Context_ops.add_test_chain context Not_running
-                in
-                return context
-              else return context
-          | Forking _ -> assert false
-        in
-        let* context =
-          protect
-            ~on_error:(fun _ -> return context)
-            (fun () ->
-              let* predecessor_block_metadata_hash =
-                Shell_services.Blocks.metadata_hash
-                  cctxt
-                  ~block:(`Hash (pred_info.hash, 0))
-                  ~chain
-                  ()
-              in
-              Lwt.map
-                Result.ok
-                (Context_ops.add_predecessor_block_metadata_hash
-                   context
-                   predecessor_block_metadata_hash))
-        in
-        let* context =
-          protect
-            ~on_error:(fun _ -> return context)
-            (fun () ->
-              let* predecessor_ops_metadata_hash =
-                Shell_services.Blocks.Operation_metadata_hashes.root
-                  cctxt
-                  ~block:(`Hash (pred_info.hash, 0))
-                  ~chain
-                  ()
-              in
-              Lwt.map
-                Result.ok
-                (Context_ops.add_predecessor_ops_metadata_hash
-                   context
-                   predecessor_ops_metadata_hash))
-        in
-        let context = Context_ops.hash ~time:timestamp ?message context in
-        (* For the time being, we still fully build the block while we build
-           confidence to fully unplug the baker validation. The resulting
-           context hash is ignored as it is not necessary to craft a block.
-           See: https://gitlab.com/tezos/tezos/-/issues/4285 *)
-        ignore context ;
-        return fitness
+    | Some {Tezos_protocol_environment.fitness; _} -> return fitness
     | None ->
         let*? level =
           Environment.wrap_tzresult @@ Raw_level.of_int32
@@ -261,7 +206,6 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
     ~(pred_info : Baking_state.block_info) ~force_apply ~round ~context_index
     ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
-  let chain = `Hash chain_id in
   let* incremental =
     Baking_simulator.begin_construction
       ~timestamp
@@ -300,15 +244,12 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
   else
     let* shell_header =
       finalize_block_header
-        ~chain
         ~shell_header:incremental.header
-        ~timestamp
         ~validation_result
         ~operations_hash
         ~pred_info
         ~round
         ~locked_round:None
-        cctxt
     in
     let operations = List.map (List.map convert_operation) operations in
     let payload_hash =
@@ -350,7 +291,6 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
     ~timestamp ~(pred_info : Baking_state.block_info) ~force_apply ~round
     ~ordered_pool ~context_index ~payload_hash cctxt =
   let open Lwt_result_syntax in
-  let chain = `Hash chain_id in
   let* incremental =
     Baking_simulator.begin_construction
       ~timestamp
@@ -414,15 +354,12 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
     in
     let* shell_header =
       finalize_block_header
-        ~chain
         ~shell_header:incremental.header
-        ~timestamp
         ~validation_result
         ~operations_hash
         ~pred_info
         ~round
         ~locked_round:locked_round_when_no_validation_result
-        cctxt
     in
     let operations = List.map (List.map convert_operation) operations in
     return (shell_header, operations, payload_hash)
