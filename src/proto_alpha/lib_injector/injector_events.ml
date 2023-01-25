@@ -118,7 +118,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let injecting_pending =
     declare_1
       ~name:"injecting_pending"
-      ~msg:"Injecting {count} pending operations"
+      ~msg:"injecting {count} pending operations"
       ~level:Notice
       ("count", Data_encoding.int31)
 
@@ -167,7 +167,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let simulating_operations =
     declare_2
       ~name:"simulating_operations"
-      ~msg:"Simulating operations (force = {force}): {operations}"
+      ~msg:"simulating operations (force = {force}): {operations}"
       ~level:Debug
       ("operations", Data_encoding.list L1_operation.encoding)
       ("force", Data_encoding.bool)
@@ -176,7 +176,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let dropping_operation =
     declare_2
       ~name:"dropping_operation"
-      ~msg:"Dropping operation {operation} failing with {error}"
+      ~msg:"dropping operation {operation} failing with {error}"
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
@@ -186,7 +186,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let injected =
     declare_2
       ~name:"injected"
-      ~msg:"Injected {nb} operations in {oph}"
+      ~msg:"injected {nb} operations in {oph}"
       ~level:Notice
       ("nb", Data_encoding.int31)
       ("oph", Operation_hash.encoding)
@@ -194,7 +194,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let add_pending =
     declare_1
       ~name:"add_pending"
-      ~msg:"Add {operation} to pending"
+      ~msg:"add {operation} to pending"
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
@@ -202,7 +202,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let retry_operation =
     declare_1
       ~name:"retry_operation"
-      ~msg:"Retry {operation}"
+      ~msg:"retry {operation}"
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
@@ -210,7 +210,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let included =
     declare_3
       ~name:"included"
-      ~msg:"Included operations of {block} at level {level}: {operations}"
+      ~msg:"included operations of {block} at level {level}: {operations}"
       ~level:Notice
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
@@ -220,7 +220,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let revert_operations =
     declare_1
       ~name:"revert_operations"
-      ~msg:"Reverting operations: {operations}"
+      ~msg:"reverting operations: {operations}"
       ~level:Notice
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp1:pp_operations_hash_list
@@ -228,14 +228,14 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let confirmed_level =
     declare_1
       ~name:"confirmed_level"
-      ~msg:"Confirmed Tezos level {level}"
+      ~msg:"confirmed Tezos level {level}"
       ~level:Notice
       ("level", Data_encoding.int32)
 
   let loaded_from_disk =
     declare_2
       ~name:"loaded_from_disk"
-      ~msg:"Loaded {nb} elements in {kind} from disk"
+      ~msg:"loaded {nb} elements in {kind} from disk"
       ~level:Notice
       ("nb", Data_encoding.int31)
       ("kind", Data_encoding.string)
@@ -243,7 +243,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let corrupted_operation_on_disk =
     declare_2
       ~name:"corrupted_operation_on_disk"
-      ~msg:"Ignoring unreadable file {file} on disk: {error}"
+      ~msg:"ignoring unreadable file {file} on disk: {error}"
       ~level:Warning
       ("file", Data_encoding.string)
       ("error", Error_monad.trace_encoding)
@@ -253,7 +253,7 @@ module Make (Parameters : Injector_sigs.PARAMETERS) = struct
   let inject_wait =
     declare_1
       ~name:"inject_wait"
-      ~msg:"Waiting {delay} seconds to trigger injection"
+      ~msg:"waiting {delay} seconds to trigger injection"
       ~level:Notice
       ("delay", Data_encoding.float)
 end
