@@ -257,7 +257,7 @@ module Forge = struct
         timestamp;
         fitness;
         operations_hash;
-        proto_level = 0;
+        proto_level = 1;
         validation_passes = 0;
         context = Context_hash.zero;
       }

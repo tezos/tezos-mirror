@@ -44,6 +44,8 @@ val forge :
   #Protocol_client_context.full ->
   chain_id:Chain_id.t ->
   pred_info:Baking_state.block_info ->
+  pred_resulting_context_hash:Context_hash.t ->
+  pred_live_blocks:Block_hash.Set.t ->
   timestamp:Time.Protocol.t ->
   round:Round.t ->
   liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->

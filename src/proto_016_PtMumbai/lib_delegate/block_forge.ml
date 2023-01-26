@@ -69,17 +69,19 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
         op.protocol_data;
   }
 
-(* [finalize_block_header ~shell_header ~validation_result ~operations_hash
-   ~pred_info ~round ~locked_round] updates the [shell_header] that was created
-   with dummy fields at the beginning of the block construction. It increments
-   the [level] and sets the actual [operations_hash], [fitness],
-   [validation_passes], and [context] (the predecessor resulting context hash).
+(* [finalize_block_header] updates the [shell_header] that was created
+   with dummy fields at the beginning of the block construction. It
+   increments the [level] and sets the actual [operations_hash],
+   [fitness], [validation_passes], and [context] (the predecessor
+   resulting context hash).
 
-   When the operations from the block have been applied, the [fitness] is simply
-   retrieved from the [validation_result]. Otherwise, the [fitness] is computed
-   from the [round] and [locked_round] arguments. *)
+   When the operations from the block have been applied, the [fitness]
+   is simply retrieved from the [validation_result]. Otherwise, the
+   [fitness] is computed from the [round] and [locked_round]
+   arguments. *)
 let finalize_block_header ~shell_header ~validation_result ~operations_hash
-    ~(pred_info : Baking_state.block_info) ~round ~locked_round =
+    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash ~round
+    ~locked_round =
   let open Lwt_result_syntax in
   let* fitness =
     match validation_result with
@@ -108,7 +110,7 @@ let finalize_block_header ~shell_header ~validation_result ~operations_hash
         validation_passes;
         operations_hash;
         fitness;
-        context = pred_info.resulting_context_hash;
+        context = pred_resulting_context_hash;
       }
   in
   return header
@@ -203,14 +205,15 @@ let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
    [filter_via_node] is called to return these values. *)
 let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
     ~faked_protocol_data ~user_activated_upgrades ~timestamp
-    ~(pred_info : Baking_state.block_info) ~force_apply ~round ~context_index
-    ~payload_round ~operation_pool cctxt =
+    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
+    ~force_apply ~round ~context_index ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
   let* incremental =
     Baking_simulator.begin_construction
       ~timestamp
       ~protocol_data:faked_protocol_data
       ~force_apply
+      ~pred_resulting_context_hash
       context_index
       pred_info
       chain_id
@@ -248,6 +251,7 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
         ~validation_result
         ~operations_hash
         ~pred_info
+        ~pred_resulting_context_hash
         ~round
         ~locked_round:None
     in
@@ -288,14 +292,16 @@ let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
    consensus operations only from an [ordered_pool] via
    {!Operation_selection.filter_consensus_operations_only}. *)
 let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
-    ~timestamp ~(pred_info : Baking_state.block_info) ~force_apply ~round
-    ~ordered_pool ~context_index ~payload_hash cctxt =
+    ~timestamp ~(pred_info : Baking_state.block_info)
+    ~pred_resulting_context_hash ~force_apply ~round ~ordered_pool
+    ~context_index ~payload_hash cctxt =
   let open Lwt_result_syntax in
   let* incremental =
     Baking_simulator.begin_construction
       ~timestamp
       ~protocol_data:faked_protocol_data
       ~force_apply
+      ~pred_resulting_context_hash
       context_index
       pred_info
       chain_id
@@ -358,6 +364,7 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
         ~validation_result
         ~operations_hash
         ~pred_info
+        ~pred_resulting_context_hash
         ~round
         ~locked_round:locked_round_when_no_validation_result
     in
@@ -367,10 +374,10 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
 let forge (cctxt : #Protocol_client_context.full) ~chain_id
-    ~(pred_info : Baking_state.block_info) ~timestamp ~round
-    ~liquidity_baking_toggle_vote ~user_activated_upgrades fees_config
-    ~force_apply ~seed_nonce_hash ~payload_round simulation_mode simulation_kind
-    constants =
+    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
+    ~pred_live_blocks ~timestamp ~round ~liquidity_baking_toggle_vote
+    ~user_activated_upgrades fees_config ~force_apply ~seed_nonce_hash
+    ~payload_round simulation_mode simulation_kind constants =
   let open Lwt_result_syntax in
   let hard_gas_limit_per_block =
     constants.Constants.Parametric.hard_gas_limit_per_block
@@ -382,7 +389,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
            to our predecessor otherwise the node would reject the block. *)
         let filtered_pool =
           retain_live_operations_only
-            ~live_blocks:pred_info.live_blocks
+            ~live_blocks:pred_live_blocks
             operation_pool
         in
         Filter filtered_pool
@@ -441,6 +448,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
           ~user_activated_upgrades
           ~timestamp
           ~pred_info
+          ~pred_resulting_context_hash
           ~force_apply
           ~round
           ~context_index
@@ -462,6 +470,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
           ~user_activated_upgrades
           ~timestamp
           ~pred_info
+          ~pred_resulting_context_hash
           ~force_apply
           ~round
           ~ordered_pool
