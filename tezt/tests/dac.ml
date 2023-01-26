@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Trili Tech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -408,7 +409,8 @@ let test_dac_node_handles_dac_store_preimage_hash_chain_V0 _protocol dac_node
   unit
 
 let test_dac_node_handles_dac_retrieve_preimage_merkle_V0 _protocol dac_node
-    sc_rollup_node _sc_rollup_address _node _client pvm_name =
+    sc_rollup_node _sc_rollup_address _node _client pvm_name _threshold
+    _dac_members =
   let payload = "test" in
   let* actual_rh, _l1_operation =
     RPC.call
@@ -863,6 +865,8 @@ let register ~protocols =
     protocols ;
   scenario_with_all_nodes
     ~tags:["dac"; "dac_node"]
+    ~threshold:0
+    ~dac_members:0
     "dac_retrieve_preimage"
     test_dac_node_handles_dac_retrieve_preimage_merkle_V0
     protocols ;
