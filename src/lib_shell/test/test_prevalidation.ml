@@ -255,25 +255,29 @@ let () =
     (function Refused_error -> Some () | _ -> None)
     (fun () -> Refused_error)
 
+type proto_replacement = Replacement | No_replacement
+
 (** Possible outcomes of protocol's [Mempool.add_operation] that we
     want to test. *)
-type proto_add_outcome =
-  | Proto_added  (** Return [Proto.Mempool.Added]. *)
-  | Proto_replaced  (** Return [Proto.Mempool.Replaced]. *)
+type proto_outcome =
+  | Proto_success of proto_replacement
+      (** Return either [Proto.Mempool.Added] (when [proto_replacement] is
+          [No_replacement]) or [Proto.Mempool.Replaced] (when it is
+          [Replacement]. *)
   | Proto_unchanged  (** Return [Proto.Mempool.Unchanged]. *)
   | Proto_branch_delayed  (** Fail with a [`Temporary] error. *)
   | Proto_branch_refused  (** Fail with a [`Branch] error. *)
   | Proto_refused  (** Fail with a [`Permanent] error. *)
   | Proto_crash  (** Raise an exception. *)
 
-let proto_add_outcome_gen =
+let proto_outcome_gen =
   (* We try to give higher weights to more usual outcomes, and in
-     particular to [Proto_added] so that the number of operations in
-     the mempool can grow. *)
+     particular to [Proto_success No_replacement] so that the number
+     of operations in the mempool can grow. *)
   QCheck2.Gen.frequencyl
     [
-      (4, Proto_added);
-      (2, Proto_replaced);
+      (8, Proto_success No_replacement);
+      (2, Proto_success Replacement);
       (2, Proto_unchanged);
       (1, Proto_branch_delayed);
       (1, Proto_branch_refused);
@@ -288,7 +292,7 @@ let random_oph_from_map ophmap =
 
 (** Mock protocol with a toy mempool that has an adjustable
     [add_operation] function: it behaves as instructed by the provided
-    [proto_add_outcome].
+    [proto_outcome].
 
     Unlike in [Mock_protocol], here [Mempool.t] is an actual state
     that keeps track of validated operations and can be retrieved with
@@ -298,7 +302,7 @@ module Toy_proto :
   Tezos_protocol_environment.PROTOCOL
     with type operation_data = unit
      and type operation = Mock_protocol.operation
-     and type Mempool.validation_info = proto_add_outcome = struct
+     and type Mempool.validation_info = proto_outcome = struct
   include Mock_protocol
 
   module Mempool = struct
@@ -308,7 +312,7 @@ module Toy_proto :
 
     (* We use this type as a hack to tell [add_operation] which
        outcome we want. *)
-    type validation_info = proto_add_outcome
+    type validation_info = proto_outcome
 
     let init _ctxt _chain_id ~head_hash:_ ~head:_ ~cache:_ =
       Lwt_result.return (Proto_crash, Operation_hash.Map.empty)
@@ -327,16 +331,17 @@ module Toy_proto :
         QCheck2.Test.fail_reportf
           "Prevalidation should always call [Proto.Mempool.add_operation] with \
            an explicit [conflict_handler]." ;
-      match (info : proto_add_outcome) with
+      match (info : proto_outcome) with
       (* To be able to replace an operation, we need the mempool to be
-         non-empty. If it is empty, then [Proto_replaced] falls back
-         to the behavior of [Proto_added]. *)
-      | Proto_replaced when not (Operation_hash.Map.is_empty state) ->
+         non-empty. If it is empty, then [Proto_success Replacement] falls back
+         to the behavior of [Proto_success No_replacement]. *)
+      | Proto_success Replacement when not (Operation_hash.Map.is_empty state)
+        ->
           let removed = random_oph_from_map state in
           let state = Operation_hash.Map.remove removed state in
           let state = Operation_hash.Map.add oph op state in
           Lwt_result.return (state, Replaced {removed})
-      | Proto_added | Proto_replaced ->
+      | Proto_success (No_replacement | Replacement) ->
           let state = Operation_hash.Map.add oph op state in
           Lwt_result.return (state, Added)
       | Proto_unchanged -> Lwt_result.return (state, Unchanged)
@@ -378,7 +383,7 @@ let filter_add_outcome_encoding =
 
 let filter_add_outcome_gen =
   (* We try to give higher weights to more usual outcomes, and in
-     particular to [Proto_added] so that the number of operations in
+     particular to [F_no_replace] so that the number of operations in
      the mempool can grow. *)
   QCheck2.Gen.frequencyl
     [
@@ -488,28 +493,27 @@ let () =
     in
     (* Check the classification. *)
     (match (proto_outcome, filter_outcome) with
-    | (Proto_added | Proto_replaced), (F_no_replace | F_replace) ->
+    | Proto_success _, (F_no_replace | F_replace) ->
         check_classification __LOC__ ~expected:`Prechecked classification
     | (Proto_unchanged | Proto_branch_delayed), _
-    | (Proto_added | Proto_replaced), F_branch_delayed ->
+    | Proto_success _, F_branch_delayed ->
         check_classification __LOC__ ~expected:`Branch_delayed classification
-    | Proto_branch_refused, _ | (Proto_added | Proto_replaced), F_branch_refused
-      ->
+    | Proto_branch_refused, _ | Proto_success _, F_branch_refused ->
         check_classification __LOC__ ~expected:`Branch_refused classification
-    | Proto_refused, _ | (Proto_added | Proto_replaced), F_refused ->
+    | Proto_refused, _ | Proto_success _, F_refused ->
         check_classification __LOC__ ~expected:`Refused classification
-    | Proto_crash, _ | (Proto_added | Proto_replaced), F_crash ->
+    | Proto_crash, _ | Proto_success _, F_crash ->
         check_classification_is_exn __LOC__ classification) ;
     (* Check whether the new operation has been added, whether there
        is a replacement, and when there is one, whether it has been removed. *)
     let valid_ops = P.Internal_for_tests.get_valid_operations state in
     let filter_state = P.Internal_for_tests.get_filter_state state in
     (match (proto_outcome, filter_outcome) with
-    | (Proto_added | Proto_replaced), (F_no_replace | F_replace) -> (
+    | Proto_success proto_replacement, (F_no_replace | F_replace) -> (
         assert (Operation_hash.Map.mem op.hash valid_ops) ;
         assert (Operation_hash.Set.mem op.hash filter_state) ;
-        match (proto_outcome, filter_outcome) with
-        | (Proto_replaced, _ | _, F_replace)
+        match (proto_replacement, filter_outcome) with
+        | (Replacement, _ | _, F_replace)
           when not (Operation_hash.Map.is_empty valid_ops_before) -> (
             match replacements with
             | [] | _ :: _ :: _ -> assert false
@@ -531,7 +535,7 @@ let () =
   let ops = mk_ops nb_ops in
   let outcomes =
     QCheck2.Gen.(
-      generate ~n:nb_ops (pair proto_add_outcome_gen filter_add_outcome_gen))
+      generate ~n:nb_ops (pair proto_outcome_gen filter_add_outcome_gen))
   in
   let ops_and_outcomes, leftovers = List.combine_with_leftovers ops outcomes in
   assert (Option.is_none leftovers) ;
@@ -578,7 +582,7 @@ let () =
   assert (Operation_hash.Map.is_empty (get_valid_operations state)) ;
   assert (Operation_hash.Set.is_empty (get_filter_state state)) ;
   (* Prepare the initial state. *)
-  let state = set_validation_info state Proto_added in
+  let state = set_validation_info state (Proto_success No_replacement) in
   let*! initial_state =
     List.fold_left_s
       (fun state op ->
