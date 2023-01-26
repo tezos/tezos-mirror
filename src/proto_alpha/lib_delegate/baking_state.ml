@@ -280,6 +280,9 @@ type elected_block = {
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
+  is_latest_proposal_applied : bool;
+  delayed_prequorum :
+    (Operation_worker.candidate * Kind.preendorsement operation list) option;
   (* Last proposal received where we injected an endorsement (thus we
      have seen 2f+1 preendorsements) *)
   locked_round : locked_round option;
@@ -292,7 +295,11 @@ type level_state = {
   next_level_proposed_round : Round.t option;
 }
 
-type phase = Idle | Awaiting_preendorsements | Awaiting_endorsements
+type phase =
+  | Idle
+  | Awaiting_preendorsements
+  | Awaiting_application
+  | Awaiting_endorsements
 
 let phase_encoding =
   let open Data_encoding in
@@ -312,8 +319,14 @@ let phase_encoding =
         (function Awaiting_preendorsements -> Some () | _ -> None)
         (fun () -> Awaiting_preendorsements);
       case
-        ~title:"Awaiting_endorsements"
+        ~title:"Awaiting_application"
         (Tag 2)
+        unit
+        (function Awaiting_application -> Some () | _ -> None)
+        (fun () -> Awaiting_application);
+      case
+        ~title:"Awaiting_endorsements"
+        (Tag 3)
         unit
         (function Awaiting_endorsements -> Some () | _ -> None)
         (fun () -> Awaiting_endorsements);
@@ -790,6 +803,8 @@ let pp_level_state fmt
     {
       current_level;
       latest_proposal;
+      is_latest_proposal_applied;
+      delayed_prequorum;
       locked_round;
       endorsable_payload;
       elected_block;
@@ -799,11 +814,13 @@ let pp_level_state fmt
     } =
   Format.fprintf
     fmt
-    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal:@ %a@]@ locked \
-     round: %a@ endorsable payload: %a@ elected block: %a@ @[<v 2>own delegate \
-     slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ next level \
-     proposed round: %a@]"
+    "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b, \
+     delayed prequorum:%b):@ %a@]@ locked round: %a@ endorsable payload: %a@ \
+     elected block: %a@ @[<v 2>own delegate slots:@ %a@]@ @[<v 2>next level \
+     own delegate slots:@ %a@]@ next level proposed round: %a@]"
     current_level
+    is_latest_proposal_applied
+    (Option.is_some delayed_prequorum)
     pp_proposal
     latest_proposal
     (pp_option pp_locked_round)
@@ -822,6 +839,7 @@ let pp_level_state fmt
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"
   | Awaiting_preendorsements -> Format.fprintf fmt "awaiting preendorsements"
+  | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_endorsements -> Format.fprintf fmt "awaiting endorsements"
 
 let pp_round_state fmt {current_round; current_phase} =
@@ -860,7 +878,7 @@ let pp_event fmt = function
   | New_head_proposal proposal ->
       Format.fprintf
         fmt
-        "new applied proposal received: %a"
+        "new head proposal received: %a"
         pp_block_info
         proposal.block
   | Prequorum_reached (candidate, preendos) ->

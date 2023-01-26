@@ -734,7 +734,7 @@ Scenario M3
    from other nodes only go to A.
 3. The chain should not make progress. Since we have both bootstrap1 and
    bootstrap2 in delegate selection they have equal voting power. Therefore
-   it is necessary to have 2 votes for pre-quorums (which is achieved when A
+   it is necessary to have 2 votes for prequorums (which is achieved when A
    is proposing) and 2 votes for quorums (impossible because B has no way to
    obtain PQC and thus cannot send endorsements).
 

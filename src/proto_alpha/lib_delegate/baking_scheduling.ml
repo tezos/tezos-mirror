@@ -690,6 +690,9 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     {
       current_level = current_proposal.block.shell.level;
       latest_proposal = current_proposal;
+      is_latest_proposal_applied =
+        true (* this proposal is expected to be the current head *);
+      delayed_prequorum = None;
       locked_round = None;
       endorsable_payload = None;
       elected_block;
