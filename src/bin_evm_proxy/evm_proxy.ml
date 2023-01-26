@@ -40,7 +40,7 @@ let start {rpc_addr; rpc_port} =
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
-  let directory = Tezos_rpc.Directory.(empty) in
+  let directory = Services.directory in
   let server =
     RPC_server.init_server
       ~acl
