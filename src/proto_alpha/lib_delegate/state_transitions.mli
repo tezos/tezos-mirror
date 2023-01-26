@@ -43,14 +43,16 @@ val make_consensus_list :
 
 val make_preendorse_action : state -> proposal -> action
 
-val may_update_proposal : state -> proposal -> state Lwt.t
+val may_update_proposal :
+  is_proposal_applied:bool -> state -> proposal -> state Lwt.t
 
 val preendorse : state -> proposal -> (state * action) Lwt.t
 
 val extract_pqc :
   state -> proposal -> (Kind.preendorsement operation list * Round.t) option
 
-val handle_new_proposal : state -> proposal -> (state * action) Lwt.t
+val handle_proposal :
+  is_proposal_applied:bool -> state -> proposal -> (state * action) Lwt.t
 
 val round_proposer :
   state ->

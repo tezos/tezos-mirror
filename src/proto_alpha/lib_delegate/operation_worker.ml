@@ -23,13 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO:
-   add events +
-   running state introspection to recover/restart on failure
-
-   Do we need a mutex ?
-*)
-
 open Protocol_client_context
 open Protocol
 open Alpha_context
@@ -64,7 +57,7 @@ module Events = struct
       ~name:"pqc_reached"
       ~level:Debug
       ~msg:
-        "pre-quorum reached (voting power: {voting_power}, {preendorsements} \
+        "prequorum reached (voting power: {voting_power}, {preendorsements} \
          preendorsements)"
       ~pp1:pp_int
       ("voting_power", Data_encoding.int31)
