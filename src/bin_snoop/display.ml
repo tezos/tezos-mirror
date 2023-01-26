@@ -237,7 +237,7 @@ let plot_scatter opts title input_columns outputs =
       Format.kasprintf
         Result.error
         "Display.plot_scatter (%s): empty scatter data"
-        title
+        (Str.global_replace (Str.regexp {|\\n|}) " " title)
   | [column] ->
       let plot = scatterplot_2d opts title column outputs in
       return [plot]
@@ -370,6 +370,14 @@ let column_to_array (m : Maths.matrix) =
 
 let vector_to_array = Maths.vector_to_array
 
+let scores_to_string scores =
+  Format.sprintf
+    "R2-score = %s, RMSE-score = %.3f"
+    (match scores.Inference.r2_score with
+    | None -> "None"
+    | Some f -> Format.sprintf "%3f" f)
+    scores.Inference.rmse_score
+
 let validator opts (problem : Inference.problem) (solution : Inference.solution)
     =
   let open Result_syntax in
@@ -400,7 +408,7 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
           opts
           (Format.sprintf
              "Validation (chosen basis)\\n%s"
-             (Inference.scores_to_string solution.scores))
+             (scores_to_string solution.scores))
           columns
           [timings; predicted]
       in
@@ -469,7 +477,7 @@ let validator_empirical opts workload_data (problem : Inference.problem)
       opts
       (Format.sprintf
          "Validation (raw)\\n%s"
-         (Inference.scores_to_string solution.scores))
+         (scores_to_string solution.scores))
       columns
       [timings; predicted |> Array.map (fun x -> [|x|])]
   in

@@ -45,14 +45,6 @@ type problem =
    We use `None` for the R2 score of such models. *)
 type scores = {r2_score : float option; rmse_score : float}
 
-let scores_to_string scores =
-  Format.sprintf
-    "R2-score = %s, RMSE-score = %.3f"
-    (match scores.r2_score with
-    | None -> "None"
-    | Some f -> Format.sprintf "%3f" f)
-    scores.rmse_score
-
 let scores_to_csv_column (model_name, bench_name) scores =
   let name = model_name ^ "-" ^ Namespace.to_string bench_name in
   let table =
