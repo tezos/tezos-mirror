@@ -13,20 +13,6 @@ test-protocol-compiles:
 	cd ${CI_PROJECT_DIR} && \
 		dune build @runtest_compile_protocol
 
-.PHONY: test-pytest
-test-pytest:
-ifndef TESTS
-	$(error TESTS is undefined)
-endif
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		poetry run pytest --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/report.xml" --timeout 1800 ${TESTS} && \
-		./../scripts/ci/merge_coverage.sh
-
-.PHONY: test-pytest-check-regression-files
-test-pytest-check-regression-files:
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		poetry run pytest --on-unknown-regression-files check
-
 .PHONY: test-tezt
 test-tezt:
 	cd ${CI_PROJECT_DIR} && \
@@ -50,12 +36,6 @@ test-tezt-build-long:
 test-tezt-self-test:
 	cd ${CI_PROJECT_DIR} && \
 		dune runtest tezt/self_tests/
-
-.PHONY: test-pytest-example
-test-pytest-example:
-	cd ${CI_PROJECT_DIR}/tests_python && \
-		PYTHONPATH=${PYTHONPATH}:./ poetry run python examples/example.py && \
-		PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
 
 .PHONY: integration-test-compiler-rejections
 integration-test-compiler-rejections:
