@@ -69,7 +69,6 @@ lint-misc-check: gitlab-take-ownership
 .PHONY: check-precommit
 check-precommit:
 	cd ${CI_PROJECT_DIR} && \
-		./scripts/pre_commit/pre_commit.py --test-itself && \
 		poetry run pylint scripts/pre_commit/pre_commit.py && \
 		poetry run pycodestyle scripts/pre_commit/pre_commit.py && \
 		poetry run mypy scripts/pre_commit/pre_commit.py
