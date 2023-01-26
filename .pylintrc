@@ -61,7 +61,6 @@ confidence=
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
 
-# pytest causes redefined-outer-name and no-self-use
 disable=missing-docstring,
         print-statement,
         parameter-unpacking,
@@ -82,7 +81,6 @@ disable=missing-docstring,
         deprecated-pragma,
         use-symbolic-message-instead,
         c-extension-no-member,
-        no-self-use,
         duplicate-code,
         too-many-instance-attributes,
         too-few-public-methods,
@@ -90,7 +88,6 @@ disable=missing-docstring,
         too-many-arguments,
         too-many-locals,
         fixme,
-        redefined-outer-name,
         apply-builtin,
         basestring-builtin,
         buffer-builtin,
