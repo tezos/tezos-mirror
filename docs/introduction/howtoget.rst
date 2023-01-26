@@ -431,7 +431,7 @@ The following sections describe the individual steps above in more detail.
 
 .. note::
 
-  Besides compiling the sources, it is recommended to also :ref:`install Python and some related tools <install_python>`, which are needed, among others, to build the documentation and execute some of the tests.
+  Besides compiling the sources, it is recommended to also :ref:`install Python and some related tools <install_python>`, which are needed, among others, to build the documentation and to use the Git :doc:`pre-commit hook <../developer/pre_commit_hook>`.
 
 .. _setup_rust:
 

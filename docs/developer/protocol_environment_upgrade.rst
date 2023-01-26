@@ -99,7 +99,7 @@ To activate the environment you will need to change the following files, adding 
 * ``src/lib_protocol_updater/registered_protocol.ml[i]``
 * ``src/lib_protocol_compiler/registerer/tezos_protocol_registerer.ml[i]``
 
-Bump environment version in ``src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL`` and in the embedded ``TEZOS_PROTOCOL`` found in ``tezt/tests/voting.ml``. Update the corresponding test in the multiple ``tests_python/tests_*/test_injection.py`` accordingly.
+Bump environment version in ``src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL`` and in the embedded ``TEZOS_PROTOCOL`` found in ``tezt/tests/voting.ml``.
 
 And finally, bump environment version in ``src/proto_alpha/lib_protocol/TEZOS_PROTOCOL``, and run ``make -C manifest``.
 

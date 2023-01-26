@@ -57,8 +57,8 @@ Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Be sure you first read the :doc:`introduction on the testing ecosystem for Tezos <testing>`.
-In addition to system tests written in Python or written in OCaml with :doc:`Tezt <tezt>`,
-unit tests and integration tests for the protocol in OCaml can be found in `src/proto_alpha/lib_protocol/test`.
+In addition to system tests written with :doc:`Tezt <tezt>`,
+unit tests and integration tests for the protocol can be found in `src/proto_alpha/lib_protocol/test`.
 It is strongly recommended to write unit tests and integration tests in addition to the
 system tests.
 To test a new component, create a new file in this directory and add the module in ``main.ml``.

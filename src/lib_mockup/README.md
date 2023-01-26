@@ -53,18 +53,7 @@ the local mockup implementation
 
 ## Testing 
 
-Tests for mockup mode use both the `pytest` and the `tezt` testing frameworks.
-
-### Pytest
-
-For the former kind of tests, run at toplevel:
-```
-    (cd tests_python && poetry run pytest tests_alpha/test_mockup.py)
-```
-
-Replace `tests_alpha` by `tests_008` if needed.
-
-### Tezt
+Tests for mockup mode use the `tezt` testing framework.
 
 Run at toplevel
 
