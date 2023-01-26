@@ -24,6 +24,9 @@
 (*****************************************************************************)
 
 module type T = sig
+  (* Protocol's reveal_hash type. Usually [Protocol.Sc_rollup_reveal_hash.t]. *)
+  type hash
+
   module Proto : Registered_protocol.T
 
   module RPC : sig

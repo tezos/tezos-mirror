@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022-2023 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +25,10 @@
 
 (** A [ready_ctx] value contains globally needed informations for a running dac
     node. It is available when the DAC plugin has been loaded. *)
-type ready_ctxt = {dac_plugin : (module Dac_plugin.T)}
+type ready_ctxt = {
+  dac_plugin : (module Dac_plugin.T);
+  data_streamer : (module Data_streamer.S);
+}
 
 (** The status of the dac node. *)
 type status = Ready of ready_ctxt | Starting
