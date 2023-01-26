@@ -74,7 +74,7 @@ function shellcheck_script () {
 
 check_scripts () {
     # Gather scripts
-    scripts=$(find "${source_directories[@]}" tests_python/ scripts/ docs/ -name "*.sh" -type f -print)
+    scripts=$(find "${source_directories[@]}" scripts/ docs/ -name "*.sh" -type f -print)
     exit_code=0
 
     # Check scripts do not contain the tab character
