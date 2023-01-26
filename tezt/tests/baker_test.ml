@@ -30,7 +30,7 @@
    Subject:      Run the baker while performing a lot of transfers
 *)
 
-let baker_test protocol ~keys =
+let baker_test ?force_apply protocol ~keys =
   let* parameter_file =
     Protocol.write_parameter_file
       ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
@@ -48,7 +48,7 @@ let baker_test protocol ~keys =
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* baker = Baker.init ~protocol node client in
+  let* baker = Baker.init ?force_apply ~protocol node client in
   Log.info "Wait for new head." ;
   Baker.log_events baker ;
   let* _ = level_2_promise in
@@ -79,6 +79,23 @@ let baker_stresstest =
   (* Use a large tps, to have failing operations too *)
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
   Lwt.return_unit
+
+(* Force the baker to apply operations after validating them *)
+let baker_stresstest_apply =
+  Protocol.register_test
+    ~__FILE__
+    ~supports:Protocol.(From_protocol (number Mumbai))
+    ~title:"baker stresstest with forced application"
+    ~tags:["node"; "baker"; "stresstest"; "apply"]
+  @@ fun protocol ->
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
+  in
+  let* _ = Baker.init ~force_apply:true ~protocol node client in
+  let* _ = Node.wait_for_level node 3 in
+  (* Use a large tps, to have failing operations too *)
+  let* () = Client.stresstest ~tps:25 ~transfers:100 client in
+  unit
 
 let baker_bls_test =
   Protocol.register_test
@@ -124,4 +141,5 @@ let baker_bls_test =
 let register ~protocols =
   baker_simple_test protocols ;
   baker_stresstest protocols ;
+  baker_stresstest_apply protocols ;
   baker_bls_test protocols
