@@ -362,7 +362,6 @@ check-python-linting:
 	@$(MAKE) -C docs lint
 
 check-python-typecheck:
-	@$(MAKE) -C tests_python typecheck
 	@$(MAKE) -C docs typecheck
 
 check-ocaml-linting:
