@@ -143,12 +143,12 @@ module Block_seen_event = struct
   module Event = Internal_event.Make (Definition)
 end
 
-let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
-  Monitor_services.valid_blocks cctxt ?chains ?protocols ?next_protocols ()
+let monitor_applied_blocks cctxt ?chains ?protocols ~next_protocols () =
+  Monitor_services.applied_blocks cctxt ?chains ?protocols ?next_protocols ()
   >>=? fun (block_stream, stop) ->
   return
     ( Lwt_stream.map_s
-        (fun ((chain, block), header) ->
+        (fun (chain, block, header, _ops) ->
           Block_seen_event.(
             Event.emit (make block header (`Valid_blocks chain)))
           >>=? fun () ->

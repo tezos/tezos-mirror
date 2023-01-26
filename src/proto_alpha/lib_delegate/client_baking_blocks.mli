@@ -45,7 +45,7 @@ val info :
   Block_services.block ->
   block_info tzresult Lwt.t
 
-val monitor_valid_blocks :
+val monitor_applied_blocks :
   #Protocol_client_context.rpc_context ->
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
