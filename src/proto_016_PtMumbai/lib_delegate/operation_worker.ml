@@ -23,13 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO:
-   add events +
-   running state introspection to recover/restart on failure
-
-   Do we need a mutex ?
-*)
-
 open Protocol_client_context
 open Protocol
 open Alpha_context
@@ -64,7 +57,7 @@ module Events = struct
       ~name:"pqc_reached"
       ~level:Debug
       ~msg:
-        "pre-quorum reached (voting power: {voting_power}, {preendorsements} \
+        "prequorum reached (voting power: {voting_power}, {preendorsements} \
          preendorsements)"
       ~pp1:pp_int
       ("voting_power", Data_encoding.int31)
@@ -162,12 +155,9 @@ let candidate_encoding =
        (req "round_watched" Round.encoding)
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
-type voting_power = int
-
 type event =
-  | Prequorum_reached of
-      candidate * voting_power * Kind.preendorsement operation list
-  | Quorum_reached of candidate * voting_power * Kind.endorsement operation list
+  | Prequorum_reached of candidate * Kind.preendorsement operation list
+  | Quorum_reached of candidate * Kind.endorsement operation list
 
 type pqc_watched = {
   candidate_watched : candidate;
@@ -257,6 +247,21 @@ let is_valid_consensus_content (candidate : candidate) consensus_content =
 
 let cancel_monitoring state = state.proposal_watched <- None
 
+let reset_monitoring state =
+  Lwt_mutex.with_lock state.lock @@ fun () ->
+  match state.proposal_watched with
+  | None -> Lwt.return_unit
+  | Some (Pqc_watch pqc_watched) ->
+      pqc_watched.current_voting_power <- 0 ;
+      pqc_watched.preendorsements_count <- 0 ;
+      pqc_watched.preendorsements_received <- [] ;
+      Lwt.return_unit
+  | Some (Qc_watch qc_watched) ->
+      qc_watched.current_voting_power <- 0 ;
+      qc_watched.endorsements_count <- 0 ;
+      qc_watched.endorsements_received <- [] ;
+      Lwt.return_unit
+
 let update_monitoring ?(should_lock = true) state ops =
   (if should_lock then Lwt_mutex.with_lock state.lock else fun f -> f ())
   @@ fun () ->
@@ -310,7 +315,6 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Prequorum_reached
                 ( candidate_watched,
-                  proposal_watched.current_voting_power,
                   List.rev proposal_watched.preendorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
@@ -370,7 +374,6 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Quorum_reached
                 ( candidate_watched,
-                  proposal_watched.current_voting_power,
                   List.rev proposal_watched.endorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
@@ -496,11 +499,10 @@ let create ?(monitor_node_operations = true)
           Lwt_stream.get operation_stream >>= function
           | None ->
               (* When the stream closes, it means a new head has been set,
-                 we cancel the monitoring and flush current operations *)
+                 we reset the monitoring and flush current operations *)
               Events.(emit end_of_stream ()) >>= fun () ->
               op_stream_stopper () ;
-              cancel_monitoring state ;
-              worker_loop ()
+              reset_monitoring state >>= fun () -> worker_loop ()
           | Some ops ->
               state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops ;

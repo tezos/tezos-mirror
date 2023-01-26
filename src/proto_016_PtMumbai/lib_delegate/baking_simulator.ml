@@ -77,17 +77,11 @@ let check_context_consistency (abstract_index : Abstract_context_index.t)
           | false -> fail Invalid_context))
 
 let begin_construction ~timestamp ~protocol_data ~force_apply
-    (abstract_index : Abstract_context_index.t) predecessor chain_id =
+    ~pred_resulting_context_hash (abstract_index : Abstract_context_index.t)
+    pred_block chain_id =
   protect (fun () ->
-      let {
-        Baking_state.shell = pred_shell;
-        hash = pred_hash;
-        resulting_context_hash;
-        _;
-      } =
-        predecessor
-      in
-      abstract_index.checkout_fun resulting_context_hash >>= function
+      let {Baking_state.shell = pred_shell; hash = pred_hash; _} = pred_block in
+      abstract_index.checkout_fun pred_resulting_context_hash >>= function
       | None -> fail Failed_to_checkout_context
       | Some context ->
           let header : Tezos_base.Block_header.shell_header =
@@ -107,7 +101,7 @@ let begin_construction ~timestamp ~protocol_data ~force_apply
           let mode =
             Lifted_protocol.Construction
               {
-                predecessor_hash = predecessor.hash;
+                predecessor_hash = pred_hash;
                 timestamp;
                 block_header_data = protocol_data;
               }
@@ -130,7 +124,14 @@ let begin_construction ~timestamp ~protocol_data ~force_apply
           else return_none)
           >>=? fun application_state ->
           let state = (validation_state, application_state) in
-          return {predecessor; context; state; rev_operations = []; header})
+          return
+            {
+              predecessor = pred_block;
+              context;
+              state;
+              rev_operations = [];
+              header;
+            })
 
 let ( let** ) x k =
   let open Lwt_result_syntax in
