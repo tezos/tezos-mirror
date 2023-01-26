@@ -28,10 +28,7 @@
    -------
    Component: Client - mockup mode
    Invocation: dune exec tezt/tests/main.exe -- --file mockup.ml
-   Subject: Unexhaustive tests of the client's --mode mockup. Unexhaustive,
-            because most tests of the mockup are written with the python
-            framework for now. It was important, though, to provide the
-            mockup's API in tezt; for other tests that use the mockup.
+   Subject: Tests of the client's --mode mockup.
 *)
 
 (* Test.
