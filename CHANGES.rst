@@ -38,12 +38,6 @@ Node
 - Fixed a bug while reconstructing the storage after a snapshot import
   that would result in wrong context hash mapping for some blocks.
 
-- **Breaking Change**: disabled snapshot export support for storage
-  that was created with Octez v13 (or earlier).
-
-- Fixed a bug raising an error when a context split was called on a
-  context that was created with Octez v13 (or earlier).
-
 - Deprecated the RPC ``GET /monitor/valid_blocks`` and introduced
   ``GET /monitor/validated_blocks`` and ``GET /monitor/applied_blocks``
   which respectively returns validated blocks, which are not yet applied

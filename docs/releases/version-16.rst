@@ -46,4 +46,5 @@ new switch with ``opam switch create 4.14.1`` before you run ``opam install tezo
 Changelog
 ---------
 
+- `Version 16.0~rc2 <../CHANGES.html#version-16-0-rc2>`_
 - `Version 16.0~rc1 <../CHANGES.html#version-16-0-rc1>`_

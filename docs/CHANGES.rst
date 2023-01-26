@@ -3,6 +3,26 @@
 Changelog
 '''''''''
 
+Version 16.0-rc2
+================
+
+Node
+----
+
+- Fixed a bug raising an error when a context split was called on a
+  context that was created with Octez v13 (or earlier).
+
+- **Breaking Change**: disabled snapshot export support for storage
+  that was created with Octez v13 (or earlier).
+
+  After upgrading to v16, if you have the following warning message, you won't be able to restore an up-to-date storage, without using either a recent third-party snapshot or bootstrapping from scratch::
+
+    Warning: garbage collection is not fully enabled on this data directory: context cannot be garbage collected
+
+  Please refer to the :doc:`Snapshots entry<../user/snapshots>` for further detail.
+
+
+
 Version 16.0~rc1
 ================
 
