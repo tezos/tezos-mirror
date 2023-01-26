@@ -1,14 +1,14 @@
 fmt:
-  image: ocaml/opam:ubuntu-22.10-ocaml-4.14
+  image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   script:
     - opam install ocamlformat.0.21.0
     - eval $(opam env)
     - dune build @fmt
 
 build:
-  image: ocaml/opam:ubuntu-22.10-ocaml-4.14
+  image: ocaml/opam:ubuntu-22.04-ocaml-4.14
   before_script:
     - sudo apt update
   script:
-    - opam-2.1 install --deps-only -y ./teztale.opam
+    - OPAMJOBS=`nproc` opam-2.1 install --deps-only -y ./teztale-full.opam
     - dune build
