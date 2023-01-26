@@ -1,7 +1,0 @@
-; This file was automatically generated, do not edit.
-; Edit file manifest/main.ml instead.
-
-(executable
- (name michelson_script_locator)
- (libraries
-  tezt-tezos))
