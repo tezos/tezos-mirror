@@ -125,7 +125,7 @@ module Accuser = struct
         Protocol_hash.pp_short
         Protocol.hash
       >>= fun () ->
-      Client_baking_blocks.monitor_valid_blocks
+      Client_baking_blocks.monitor_applied_blocks
         ~next_protocols:(Some [Protocol.hash])
         cctxt
         ~chains:[chain]

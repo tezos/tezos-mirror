@@ -84,7 +84,7 @@ module S = struct
            (req "timestamp" Time.Protocol.encoding))
       Tezos_rpc.Path.(path / "bootstrapped")
 
-  let valid_blocks_query =
+  let validated_or_apply_blocks_query =
     let open Tezos_rpc.Query in
     query (fun protocols next_protocols chains ->
         object
@@ -100,12 +100,12 @@ module S = struct
     |+ multi_field "chain" Chain_services.chain_arg (fun t -> t#chains)
     |> seal
 
-  let valid_blocks =
+  let legacy_valid_blocks =
     Tezos_rpc.Service.get_service
       ~description:
-        "Monitor all blocks that are successfully validated by the node, \
-         disregarding whether they were selected as the new head or not."
-      ~query:valid_blocks_query
+        "(Deprecated) Monitor all blocks that are successfully applied by the \
+         node, disregarding whether they were selected as the new head or not."
+      ~query:validated_or_apply_blocks_query
       ~output:
         (merge_objs
            (obj2
@@ -113,6 +113,20 @@ module S = struct
               (req "hash" Block_hash.encoding))
            Block_header.encoding)
       Tezos_rpc.Path.(path / "valid_blocks")
+
+  let applied_blocks =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Monitor all blocks that are successfully applied and stored by the \
+         node, disregarding whether they were selected as the new head or not."
+      ~query:evaluated_blocks_query
+      ~output:
+        (obj4
+           (req "chain_id" Chain_id.encoding)
+           (req "hash" Block_hash.encoding)
+           (req "header" (dynamic_size Block_header.encoding))
+           (req "operations" (list (list (dynamic_size Operation.encoding)))))
+      Tezos_rpc.Path.(path / "applied_blocks")
 
   let heads_query =
     let open Tezos_rpc.Query in
@@ -167,10 +181,25 @@ open Tezos_rpc.Context
 
 let bootstrapped ctxt = make_streamed_call S.bootstrapped ctxt () () ()
 
-let valid_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
+let legacy_valid_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
     ?(next_protocols = []) () =
   make_streamed_call
-    S.valid_blocks
+    S.legacy_valid_blocks
+    ctxt
+    ()
+    (object
+       method chains = chains
+
+       method protocols = protocols
+
+       method next_protocols = next_protocols
+    end)
+    ()
+
+let applied_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
+    ?(next_protocols = []) () =
+  make_streamed_call
+    S.applied_blocks
     ctxt
     ()
     (object
