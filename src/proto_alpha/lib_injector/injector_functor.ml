@@ -54,9 +54,9 @@ let injector_context (cctxt : #Protocol_client_context.full) =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
-module Make (Rollup : PARAMETERS) = struct
-  module Tags = Injector_tags.Make (Rollup.Tag)
-  module Tags_table = Hashtbl.Make (Rollup.Tag)
+module Make (Parameters : PARAMETERS) = struct
+  module Tags = Injector_tags.Make (Parameters.Tag)
+  module Tags_table = Hashtbl.Make (Parameters.Tag)
 
   module Op_queue =
     Disk_persistence.Make_queue
@@ -162,15 +162,14 @@ module Make (Rollup : PARAMETERS) = struct
         (** The information about included operations. {b Note}: Operations which
           are confirmed are simply removed from the state and do not appear
           anymore. *)
-    rollup_node_state : Rollup.rollup_node_state;
-        (** The state of the rollup node. *)
+    state : Parameters.state;
     retention_period : int;
         (** Number of blocks for which the injector keeps the included
             information. *)
   }
 
   module Event = struct
-    include Injector_events.Make (Rollup)
+    include Injector_events.Make (Parameters)
 
     let emit1 e state x = emit e (state.signer.pkh, state.tags, x)
 
@@ -179,15 +178,15 @@ module Make (Rollup : PARAMETERS) = struct
     let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
-  let init_injector cctxt constants ~data_dir rollup_node_state
-      ~retention_period ~signer strategy tags =
+  let init_injector cctxt constants ~data_dir state ~retention_period ~signer
+      strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
     let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
     let filter op_proj op =
       let {L1_operation.manager_operation = Manager op; _} = op_proj op in
-      match Rollup.operation_tag op with
+      match Parameters.operation_tag op with
       | None -> false
       | Some t -> Tags.mem t tags
     in
@@ -212,7 +211,7 @@ module Make (Rollup : PARAMETERS) = struct
     (* Very coarse approximation for the number of operation we expect for each
        block *)
     let n =
-      Tags.fold (fun t acc -> acc + Rollup.table_estimated_size t) tags 0
+      Tags.fold (fun t acc -> acc + Parameters.table_estimated_size t) tags 0
     in
     let* injected_operations =
       Injected_operations.load_from_disk
@@ -271,7 +270,7 @@ module Make (Rollup : PARAMETERS) = struct
         queue;
         injected = {injected_operations; injected_ophs};
         included = {included_operations; included_in_blocks};
-        rollup_node_state;
+        state;
         retention_period;
       }
 
@@ -282,7 +281,13 @@ module Make (Rollup : PARAMETERS) = struct
     let*! () =
       Event.(emit1 (if retry then retry_operation else add_pending)) state op
     in
-    Op_queue.replace state.queue op.L1_operation.hash op
+    let* () = Op_queue.replace state.queue op.L1_operation.hash op in
+    let*! () =
+      Event.(emit1 number_of_operations_in_queue)
+        state
+        (Op_queue.length state.queue)
+    in
+    return_unit
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state oph operations =
@@ -387,7 +392,7 @@ module Make (Rollup : PARAMETERS) = struct
   let fee_parameter_of_operations state ops =
     List.fold_left
       (fun acc {L1_operation.manager_operation = Manager op; _} ->
-        let param = Rollup.fee_parameter state op in
+        let param = Parameters.fee_parameter state op in
         Injection.
           {
             minimal_fees = Tez.max acc.minimal_fees param.minimal_fees;
@@ -446,9 +451,7 @@ module Make (Rollup : PARAMETERS) = struct
           match must_succeed with `All -> false | `At_least_one -> true)
     in
     let*! () = Event.(emit2 simulating_operations) state operations force in
-    let fee_parameter =
-      fee_parameter_of_operations state.rollup_node_state operations
-    in
+    let fee_parameter = fee_parameter_of_operations state.state operations in
     let annotated_operations =
       List.map
         (fun {L1_operation.manager_operation = Manager operation; _} ->
@@ -484,6 +487,11 @@ module Make (Rollup : PARAMETERS) = struct
     in
     match simulation_result with
     | Error trace ->
+        let*! () =
+          Event.(emit1 number_of_operations_in_queue)
+            state
+            (Op_queue.length state.queue)
+        in
         let exceeds_quota =
           TzTrace.fold
             (fun exceeds -> function
@@ -608,7 +616,7 @@ module Make (Rollup : PARAMETERS) = struct
         (fun (op : L1_operation.t) ->
           let (Manager operation) = op.manager_operation in
           let {fee; counter; gas_limit; storage_limit} =
-            Rollup.approximate_fee_bound state.rollup_node_state operation
+            Parameters.approximate_fee_bound state.state operation
           in
           let contents =
             Manager_operation
@@ -670,8 +678,8 @@ module Make (Rollup : PARAMETERS) = struct
             (fun to_drop op ->
               let (Manager operation) = op.L1_operation.manager_operation in
               let*! retry =
-                Rollup.retry_unsuccessful_operation
-                  state.rollup_node_state
+                Parameters.retry_unsuccessful_operation
+                  state.state
                   operation
                   (Failed err)
               in
@@ -693,6 +701,9 @@ module Make (Rollup : PARAMETERS) = struct
     let open Lwt_result_syntax in
     (* Retrieve and remove operations from pending *)
     let operations_to_inject = get_operations_from_queue ~size_limit state in
+    let*! () =
+      Event.(emit1 considered_operations_info) state operations_to_inject
+    in
     match operations_to_inject with
     | [] -> return_unit
     | _ -> (
@@ -702,7 +713,7 @@ module Make (Rollup : PARAMETERS) = struct
             (List.length operations_to_inject)
         in
         let must_succeed =
-          Rollup.batch_must_succeed
+          Parameters.batch_must_succeed
           @@ List.map
                (fun op -> op.L1_operation.manager_operation)
                operations_to_inject
@@ -724,6 +735,9 @@ module Make (Rollup : PARAMETERS) = struct
             add_injected_operations state oph injected_operations
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
+            let*! () =
+              Event.(emit1 dropped_operations) state operations_to_drop
+            in
             let* () =
               List.iter_es
                 (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
@@ -774,8 +788,8 @@ module Make (Rollup : PARAMETERS) = struct
                     | Failed (_, err) -> Failed (Environment.wrap_tztrace err)
                   in
                   let*! retry =
-                    Rollup.retry_unsuccessful_operation
-                      state.rollup_node_state
+                    Parameters.retry_unsuccessful_operation
+                      state.state
                       op
                       status
                   in
@@ -835,10 +849,7 @@ module Make (Rollup : PARAMETERS) = struct
       (fun {op; _} ->
         let {L1_operation.manager_operation = Manager mop; _} = op in
         let*! requeue =
-          Rollup.retry_unsuccessful_operation
-            state.rollup_node_state
-            mop
-            Other_branch
+          Parameters.retry_unsuccessful_operation state.state mop Other_branch
         in
         match requeue with
         | Retry -> add_pending_operation ~retry:true state op
@@ -910,7 +921,7 @@ module Make (Rollup : PARAMETERS) = struct
       cctxt : Protocol_client_context.full;
       constants : Constants.t;
       data_dir : string;
-      rollup_node_state : Rollup.rollup_node_state;
+      state : Parameters.state;
       retention_period : int;
       strategy : injection_strategy;
       tags : Tags.t;
@@ -950,21 +961,14 @@ module Make (Rollup : PARAMETERS) = struct
 
     let on_launch _w signer
         Types.
-          {
-            cctxt;
-            constants;
-            data_dir;
-            rollup_node_state;
-            retention_period;
-            strategy;
-            tags;
-          } =
+          {cctxt; constants; data_dir; state; retention_period; strategy; tags}
+        =
       trace (Step_failed "initialization")
       @@ init_injector
            cctxt
            constants
            ~data_dir
-           rollup_node_state
+           state
            ~retention_period
            ~signer
            strategy
@@ -1004,7 +1008,7 @@ module Make (Rollup : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Protocol_client_context.full) ~data_dir
-      ?(retention_period = 0) rollup_node_state ~signers =
+      ?(retention_period = 0) state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     let signers_map =
@@ -1043,7 +1047,7 @@ module Make (Rollup : PARAMETERS) = struct
               cctxt = (cctxt :> Protocol_client_context.full);
               constants;
               data_dir;
-              rollup_node_state;
+              state;
               retention_period;
               strategy;
               tags;
@@ -1067,7 +1071,7 @@ module Make (Rollup : PARAMETERS) = struct
         Format.kasprintf
           (fun s -> error (No_worker_for_tag s))
           "%a"
-          Rollup.Tag.pp
+          Parameters.Tag.pp
           tag
     | Some worker -> ok worker
 
@@ -1078,7 +1082,7 @@ module Make (Rollup : PARAMETERS) = struct
       match source with
       | Some source -> worker_of_signer source
       | None -> (
-          match Rollup.operation_tag op with
+          match Parameters.operation_tag op with
           | None -> error (No_worker_for_operation l1_operation)
           | Some tag -> worker_of_tag tag)
     in

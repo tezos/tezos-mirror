@@ -28,9 +28,9 @@ open Injector_sigs
 
 module Parameters :
   PARAMETERS
-    with type rollup_node_state = Node_context.ro
+    with type state = Node_context.ro
      and type Tag.t = Configuration.purpose = struct
-  type rollup_node_state = Node_context.ro
+  type state = Node_context.ro
 
   let events_section = ["sc_rollup.injector"]
 

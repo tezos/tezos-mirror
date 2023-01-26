@@ -25,11 +25,11 @@
 
 open Injector_worker_types
 
-module Make (Rollup : Injector_sigs.PARAMETERS) = struct
-  module Tags = Injector_tags.Make (Rollup.Tag)
+module Make (Parameters : Injector_sigs.PARAMETERS) = struct
+  module Tags = Injector_tags.Make (Parameters.Tag)
   include Internal_event.Simple
 
-  let section = Rollup.events_section
+  let section = Parameters.events_section
 
   let declare_1 ~name ~msg ~level ?pp1 enc1 =
     declare_3
@@ -118,7 +118,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let injecting_pending =
     declare_1
       ~name:"injecting_pending"
-      ~msg:"Injecting {count} pending operations"
+      ~msg:"injecting {count} pending operations"
       ~level:Notice
       ("count", Data_encoding.int31)
 
@@ -136,18 +136,38 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       (Format.pp_print_list L1_operation.Hash.pp)
       operations
 
-  let injecting_operations =
+  let number_of_operations_in_queue =
     declare_1
-      ~name:"injecting_operations"
-      ~msg:"Injecting operations: {operations}"
-      ~level:Notice
+      ~name:"number_of_operations_in_queue"
+      ~msg:
+        "injector's queue: there is currently {number_of_operations} \
+         operations waiting to be injected"
+      ~level:Info
+      ("number_of_operations", Data_encoding.int31)
+
+  let considered_operations_info =
+    declare_1
+      ~name:"considered_operations_info"
+      ~msg:
+        "injector's queue: the following operations are being considered for \
+         injection {operations}"
+      ~level:Debug
+      ("operations", Data_encoding.list L1_operation.encoding)
+      ~pp1:pp_operations_list
+
+  let dropped_operations =
+    declare_1
+      ~name:"dropped_operations"
+      ~msg:
+        "dropping operations: the following operations are dropped {operations}"
+      ~level:Debug
       ("operations", Data_encoding.list L1_operation.encoding)
       ~pp1:pp_operations_list
 
   let simulating_operations =
     declare_2
       ~name:"simulating_operations"
-      ~msg:"Simulating operations (force = {force}): {operations}"
+      ~msg:"simulating operations (force = {force}): {operations}"
       ~level:Debug
       ("operations", Data_encoding.list L1_operation.encoding)
       ("force", Data_encoding.bool)
@@ -156,7 +176,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let dropping_operation =
     declare_2
       ~name:"dropping_operation"
-      ~msg:"Dropping operation {operation} failing with {error}"
+      ~msg:"dropping operation {operation} failing with {error}"
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
@@ -166,7 +186,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let injected =
     declare_2
       ~name:"injected"
-      ~msg:"Injected {nb} operations in {oph}"
+      ~msg:"injected {nb} operations in {oph}"
       ~level:Notice
       ("nb", Data_encoding.int31)
       ("oph", Operation_hash.encoding)
@@ -174,7 +194,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let add_pending =
     declare_1
       ~name:"add_pending"
-      ~msg:"Add {operation} to pending"
+      ~msg:"add {operation} to pending"
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
@@ -182,7 +202,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let retry_operation =
     declare_1
       ~name:"retry_operation"
-      ~msg:"Retry {operation}"
+      ~msg:"retry {operation}"
       ~level:Notice
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
@@ -190,7 +210,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let included =
     declare_3
       ~name:"included"
-      ~msg:"Included operations of {block} at level {level}: {operations}"
+      ~msg:"included operations of {block} at level {level}: {operations}"
       ~level:Notice
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
@@ -200,7 +220,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let revert_operations =
     declare_1
       ~name:"revert_operations"
-      ~msg:"Reverting operations: {operations}"
+      ~msg:"reverting operations: {operations}"
       ~level:Notice
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp1:pp_operations_hash_list
@@ -208,23 +228,14 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let confirmed_level =
     declare_1
       ~name:"confirmed_level"
-      ~msg:"Confirmed Tezos level {level}"
+      ~msg:"confirmed Tezos level {level}"
       ~level:Notice
       ("level", Data_encoding.int32)
-
-  let confirmed_operations =
-    declare_2
-      ~name:"confirmed_operations"
-      ~msg:"Confirmed operations of level {level}: {operations}"
-      ~level:Notice
-      ("level", Data_encoding.int32)
-      ("operations", Data_encoding.list L1_operation.Hash.encoding)
-      ~pp2:pp_operations_hash_list
 
   let loaded_from_disk =
     declare_2
       ~name:"loaded_from_disk"
-      ~msg:"Loaded {nb} elements in {kind} from disk"
+      ~msg:"loaded {nb} elements in {kind} from disk"
       ~level:Notice
       ("nb", Data_encoding.int31)
       ("kind", Data_encoding.string)
@@ -232,7 +243,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let corrupted_operation_on_disk =
     declare_2
       ~name:"corrupted_operation_on_disk"
-      ~msg:"Ignoring unreadable file {file} on disk: {error}"
+      ~msg:"ignoring unreadable file {file} on disk: {error}"
       ~level:Warning
       ("file", Data_encoding.string)
       ("error", Error_monad.trace_encoding)
@@ -242,7 +253,7 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
   let inject_wait =
     declare_1
       ~name:"inject_wait"
-      ~msg:"Waiting {delay} seconds to trigger injection"
+      ~msg:"waiting {delay} seconds to trigger injection"
       ~level:Notice
       ("delay", Data_encoding.float)
 end
