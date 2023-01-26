@@ -81,7 +81,7 @@ module Make (PVM : Pvm.S) = struct
           in
           if republication then return_unit
           else
-            let*! () =
+            let* () =
               Node_context.set_commitment_published_at_level
                 node_ctxt
                 commitment_hash

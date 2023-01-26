@@ -255,7 +255,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         (* Configured to not publish commitments *)
         return_unit
     | Some source ->
-        let*! commitments = missing_commitments node_ctxt in
+        let* commitments = missing_commitments node_ctxt in
         List.iter_es (publish_commitment node_ctxt ~source) commitments
 
   (* Commitments can only be cemented after [sc_rollup_challenge_window] has

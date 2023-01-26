@@ -29,14 +29,14 @@ open Protocol
 
 let get_head store =
   let open Lwt_result_syntax in
-  let*! head = Node_context.last_processed_head_opt store in
+  let* head = Node_context.last_processed_head_opt store in
   match head with
   | None -> failwith "No head"
   | Some {header = {block_hash; _}; _} -> return block_hash
 
 let get_finalized node_ctxt =
   let open Lwt_result_syntax in
-  let*! head = Node_context.get_finalized_head_opt node_ctxt in
+  let* head = Node_context.get_finalized_head_opt node_ctxt in
   match head with
   | None -> failwith "No finalized head"
   | Some {header = {block_hash; _}; _} -> return block_hash
