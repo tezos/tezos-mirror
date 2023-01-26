@@ -23,10 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type config = {rpc_addr : string; rpc_port : int}
+
+let default_config = {rpc_addr = "127.0.0.1"; rpc_port = 8545}
+
+let install_finalizer server =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let+ () = Tezos_rpc_http_server.RPC_server.shutdown server in
+  Format.printf "Server exited with code %d\n%!" exit_status
+
+let start {rpc_addr; rpc_port} =
+  let open Lwt_syntax in
+  let open Tezos_rpc_http_server in
+  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string rpc_addr in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.allow_all in
+  let directory = Tezos_rpc.Directory.(empty) in
+  let server =
+    RPC_server.init_server
+      ~acl
+      ~media_types:Media_type.all_media_types
+      directory
+  in
+  Lwt.catch
+    (fun () ->
+      let* () =
+        RPC_server.launch
+          ~host
+          server
+          ~callback:(RPC_server.resto_callback server)
+          node
+      in
+      return server)
+    (fun _ -> return server)
+
 let main_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command ~desc:"Start the RPC server" no_options stop (fun () () ->
+      Format.printf "Starting server\n%!" ;
+      let*! server = start default_config in
+      let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
+      let wait, _resolve = Lwt.wait () in
+      let* () = wait in
       return_unit)
 
 (* List of program commands *)
