@@ -1786,25 +1786,42 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
     else
       let attestor = Account.Bootstrap.keys.(i) in
       (* Note: we assume that the key has at least an assigned shard index. *)
-      let* slots =
+      let* res =
         RPC.call
           dal_node
           (Rollup.Dal.RPC.get_attestable_slots ~attestor ~attested_level)
       in
-      Check.(
-        (number_of_slots = List.length slots)
-          int
-          ~error_msg:"Expected %L slots (got %R)") ;
-      (match slots with
-      | true :: rest when List.for_all (fun b -> not b) rest ->
-          (* 1st slot is attestable; the rest are not: the 2nd is not because
-             the shards are not available; the rest are not because they are not
-             published *)
-          ()
-      | _ -> Test.fail "Unexpected result") ;
-      iter (i - 1)
+      match res with
+      | Not_in_committee ->
+          Test.fail "attestor %s not in committee" attestor.alias
+      | Attestable_slots slots ->
+          Check.(
+            (number_of_slots = List.length slots)
+              int
+              ~error_msg:"Expected %L slots (got %R)") ;
+          (match slots with
+          | true :: rest when List.for_all (fun b -> not b) rest ->
+              (* 1st slot is attestable; the rest are not: the 2nd is not because
+                 the shards are not available; the rest are not because they are not
+                 published *)
+              ()
+          | _ -> Test.fail "Unexpected result") ;
+          iter (i - 1)
   in
-  iter (Array.length Account.Bootstrap.keys - 1)
+  let* () = iter (Array.length Account.Bootstrap.keys - 1) in
+  Log.info "Check case when pkh not in the DAL committee." ;
+  let* new_account = Client.gen_and_show_keys client in
+  let* res =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.get_attestable_slots
+         ~attestor:new_account
+         ~attested_level)
+  in
+  match res with
+  | Not_in_committee -> return ()
+  | Attestable_slots _ ->
+      Test.fail "attestor %s is in committee!" new_account.alias
 
 let register ~protocols =
   (* Tests with Layer1 node only *)

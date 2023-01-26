@@ -353,17 +353,22 @@ module Dal : sig
     val get_published_level_headers :
       ?status:string -> int -> (Dal_node.t, slot_header list) RPC_core.t
 
+    type slot_set = bool list
+
+    type attestable_slots = Not_in_committee | Attestable_slots of slot_set
+
     (** Call RPC "GET
         /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots" to
         get the slots currently attestable by the given public key hash at the
-        given attested level. The result is as a boolean list of length
+        given attested level. The result is either a [Not_in_committee] or a
+        [Attestable_slots flags], where [flags] is a boolean list of length
         [num_slots]. A slot is attestable if it is published at level [level -
         attestation_lag]) and all the shards assigned to the given attestor at
         level [level] are available in the DAL node's store. *)
     val get_attestable_slots :
       attestor:Account.key ->
       attested_level:int ->
-      (Dal_node.t, bool list) RPC_core.t
+      (Dal_node.t, attestable_slots) RPC_core.t
   end
 
   val make :

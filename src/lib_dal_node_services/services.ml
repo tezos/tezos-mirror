@@ -50,6 +50,8 @@ module Types = struct
       by an attestor. *)
   type slot_set = bool list
 
+  type attestable_slots = Attestable_slots of slot_set | Not_in_committee
+
   type header_status =
     [`Waiting_attestation | `Attested | `Unattested | `Not_selected | `Unseen]
 
@@ -79,6 +81,26 @@ module Types = struct
       (obj2 (req "slot_level" int32) (req "slot_index" uint8))
 
   let slot_encoding = Data_encoding.bytes
+
+  let attestable_slots_encoding : attestable_slots Data_encoding.t =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"attestable_slots_set"
+          (Tag 0)
+          (obj2
+             (req "kind" (constant "attestable_slots_set"))
+             (req "attestable_slots_set" Data_encoding.(list bool)))
+          (function Attestable_slots slots -> Some ((), slots) | _ -> None)
+          (function (), slots -> Attestable_slots slots);
+        case
+          ~title:"not_in_committee"
+          (Tag 1)
+          (obj1 (req "kind" (constant "not_in_committee")))
+          (function Not_in_committee -> Some () | _ -> None)
+          (function () -> Not_in_committee);
+      ]
 
   let header_status_encoding : header_status Data_encoding.t =
     let open Data_encoding in
@@ -360,7 +382,7 @@ let get_assigned_shard_indices :
 let get_attestable_slots :
     < meth : [`GET]
     ; input : unit
-    ; output : Types.slot_set
+    ; output : Types.attestable_slots
     ; prefix : unit
     ; params : (unit * Tezos_crypto.Signature.public_key_hash) * Types.level
     ; query : unit >
@@ -373,7 +395,7 @@ let get_attestable_slots :
        at level [l] to the given public key hash are available in the DAL \
        node's store."
     ~query:Tezos_rpc.Query.empty
-    ~output:Data_encoding.(list bool)
+    ~output:Types.attestable_slots_encoding
     Tezos_rpc.Path.(
       open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")

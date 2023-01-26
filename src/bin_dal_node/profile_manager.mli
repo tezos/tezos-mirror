@@ -43,4 +43,5 @@ val get_attestable_slots :
   Dal_plugin.proto_parameters ->
   Tezos_crypto.Signature.public_key_hash ->
   attested_level:int32 ->
-  (bool list, [Errors.decoding | Errors.other]) result Lwt.t
+  (Services.Types.attestable_slots, [Errors.decoding | Errors.other]) result
+  Lwt.t
