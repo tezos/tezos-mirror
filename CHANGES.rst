@@ -200,6 +200,10 @@ Baker
   greater than 0. Application-dependent checks are re-enabled for
   re-proposal and fresh blocks at round greater than 0.
 
+- Reduced the preendorsement injection delay by making the baker
+  preendorse as soon as the node considers a block as valid instead of
+  waiting for the node to fully apply it. (MR :gl:`!7516`)
+
 Accuser
 -------
 
