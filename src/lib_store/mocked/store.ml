@@ -74,6 +74,7 @@ and chain_store = {
   (* Genesis is only on-disk: read-only except at creation *)
   genesis_block_data : block Stored_data.t;
   block_watcher : block Lwt_watcher.input;
+  validated_block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
     (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
     Protocol_hash.Table.t;
@@ -1473,6 +1474,7 @@ module Chain = struct
     in
     let chain_state = Shared.create chain_state in
     let block_watcher = Lwt_watcher.create_input () in
+    let validated_block_watcher = Lwt_watcher.create_input () in
     let block_rpc_directories = Protocol_hash.Table.create 7 in
     let chain_store : chain_store =
       {
@@ -1484,6 +1486,7 @@ module Chain = struct
         genesis_block_data;
         block_store;
         block_watcher;
+        validated_block_watcher;
         block_rpc_directories;
       }
     in
@@ -1664,6 +1667,9 @@ module Chain = struct
   let all_protocol_levels chain_store =
     Shared.use chain_store.chain_state (fun {protocol_levels_data; _} ->
         Stored_data.get protocol_levels_data)
+
+  let validated_watcher chain_store =
+    Lwt_watcher.create_stream chain_store.validated_block_watcher
 
   let watcher chain_store = Lwt_watcher.create_stream chain_store.block_watcher
 
