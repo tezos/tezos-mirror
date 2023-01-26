@@ -350,17 +350,17 @@ val load :
    that may be triggered during a block store merge in order to
    garbage-collect old contexts. *)
 val register_gc_callback :
-  block_store -> (Block_hash.t -> unit tzresult Lwt.t) -> unit
+  block_store -> (Block_hash.t -> unit tzresult Lwt.t) option -> unit
 
 (** [register_split_callback chain_store callback] installs a
     [callback] that may be triggered during a [set_head] in order to
     split the context into a new chunk. *)
 val register_split_callback :
-  block_store -> (unit -> unit tzresult Lwt.t) -> unit
+  block_store -> (unit -> unit tzresult Lwt.t) option -> unit
 
-(** [split_context block_store] calls the callback registered by
-    [register_split_callback] if any. *)
-val split_context : t -> unit tzresult Lwt.t
+(** [split_context block_store new_head_lafl] calls the callback
+    registered by [register_split_callback] if any. *)
+val split_context : t -> Int32.t -> unit tzresult Lwt.t
 
 (** [close block_store] closes the [block_store] and every underlying
     opened stores.

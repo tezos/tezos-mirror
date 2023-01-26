@@ -1316,11 +1316,13 @@ let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
         let*! () = Store_events.(emit start_context_gc new_savepoint) in
         gc savepoint_hash
 
-let split_context block_store =
+let split_context block_store new_head_lafl =
   let open Lwt_result_syntax in
   match block_store.split_callback with
   | None -> return_unit
-  | Some split -> split ()
+  | Some split ->
+      let*! () = Store_events.(emit start_context_split new_head_lafl) in
+      split ()
 
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
     ~finalizer ~history_mode ~new_head ~new_head_metadata
@@ -1621,10 +1623,10 @@ let create ?block_cache_limit chain_dir ~genesis_block =
   return block_store
 
 let register_gc_callback block_store gc_callback =
-  block_store.gc_callback <- Some gc_callback
+  block_store.gc_callback <- gc_callback
 
 let register_split_callback block_store split_callback =
-  block_store.split_callback <- Some split_callback
+  block_store.split_callback <- split_callback
 
 let pp_merge_status fmt status =
   match status with

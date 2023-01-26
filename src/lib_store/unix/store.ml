@@ -1393,7 +1393,7 @@ module Chain = struct
                (Block.last_allowed_fork_level previous_head_metadata))
         then
           let block_store = chain_store.block_store in
-          Block_store.split_context block_store
+          Block_store.split_context block_store new_head_lafl
         else return_unit
 
   let set_head chain_store new_head =
