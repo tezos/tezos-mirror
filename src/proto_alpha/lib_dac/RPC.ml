@@ -117,23 +117,18 @@ module DAC = struct
       (data, pagination_scheme) =
     let open Lwt_result_syntax in
     let open Dac_pages_encoding in
-    let for_each_page (hash, page_contents) =
-      Dac_manager.Reveal_hash.Storage.save_bytes
-        reveal_data_dir
-        hash
-        page_contents
-    in
+    let page_store = reveal_data_dir in
     let* root_hash =
       match pagination_scheme with
-      | Merkle_tree_V0 ->
-          let size =
-            Protocol.Alpha_context.Constants.sc_rollup_message_size_limit
-          in
-          Merkle_tree.V0.serialize_payload
-            ~max_page_size:size
+      | Merkle_tree_V0 -> Merkle_tree.V0.serialize_payload ~page_store data
+      | Hash_chain_V0 ->
+          Hash_chain.V0.serialize_payload
+            ~for_each_page:(fun (hash, content) ->
+              Dac_preimage_data_manager.Reveal_hash.save_bytes
+                page_store
+                hash
+                content)
             data
-            ~for_each_page
-      | Hash_chain_V0 -> Hash_chain.V0.serialize_payload ~for_each_page data
     in
     let* signature, witnesses =
       Dac_manager.Reveal_hash.Signatures.sign_root_hash

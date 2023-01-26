@@ -1,0 +1,227 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2023 TriliTech  <contact@trili.tech>                       *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** DAC pages encoding schemes *)
+
+open Environment.Error_monad
+
+type error +=
+  | Payload_cannot_be_empty
+  | Cannot_serialize_page_payload
+  | Cannot_deserialize_page
+  | Non_positive_size_of_payload
+  | Merkle_tree_branching_factor_not_high_enough
+  | Cannot_combine_pages_data_of_different_type
+  | Hashes_page_repr_expected_single_element
+
+type pagination_scheme = Merkle_tree_V0 | Hash_chain_V0
+
+val pagination_scheme_encoding : pagination_scheme Data_encoding.t
+
+(* Encoding scheme configuration. *)
+module type CONFIG = sig
+  val max_page_size : int
+end
+
+type version = int
+
+(* Versioning to configure content and hash serialization. *)
+module type VERSION = sig
+  val contents_version : version
+
+  val hashes_version : version
+end
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4651
+   Use proper page store interface.*)
+
+(** Temporary bare-bone Page_store interface. Represents the minimal behaviour
+    required for a working encoding scheme. 
+*)
+module type Page_store = sig
+  type t
+
+  (* Hash type used to represent pages *)
+  type hash
+
+  (** [save_bytes page_store hash page] saves a [page] of data to file named [hash] 
+      using [page_store] 
+  *)
+  val save_bytes : t -> hash -> bytes -> unit tzresult Lwt.t
+
+  (** [load_bytes page_store hash] loads and returns [page] of data from a file
+      named [hash] using [page_store] 
+  *)
+  val load_bytes : t -> hash -> bytes tzresult Lwt.t
+end
+
+module type Hashing_scheme = sig
+  include Dac_preimage_data_manager.REVEAL_HASH
+
+  val scheme : supported_hashes
+end
+
+(** [Dac_codec] is a module for encoding a payload as a whole and returnining
+    the calculated root hash. 
+*)
+module type Dac_codec = sig
+  (* Hash type used to represent pages *)
+  type hash
+
+  (* Page store type *)
+  type page_store
+
+  (** [serialize_payload page_store payload] serializes a [payload] into pages
+      suitable to be read by a PVM's `reveal_preimage` and stores it into 
+      [page_store]. The serialization scheme  is some hash-based encoding 
+      scheme such that a root hash is produced that represents the payload.
+  *)
+  val serialize_payload : page_store:page_store -> bytes -> hash tzresult Lwt.t
+
+  (** [deserialize_payload page_store hash] deserializes a payload from [hash]
+      using some hash-based encoding scheme. Any payload serialized by
+      [serialize_payload] can de deserialized from its root hash by 
+      [deserialize_payload], that is, these functions are inverses of each 
+      other.
+  *)
+  val deserialize_payload :
+    page_store:page_store -> hash -> bytes tzresult Lwt.t
+end
+
+(** [Buffered_dac_codec] partially constructs a Dac external message payload by
+    aggregating  messages one message at a time. [add] maintains partially 
+    constructed pages in a buffer [t] and persist full pages to [page_store]. 
+    [finalize] is called to end the aggeragation process and calculate the 
+    resulting root hash.
+*)
+module type Buffered_dac_codec = sig
+  (* Buffer type *)
+  type t
+
+  (* Hash type used to represent pages *)
+  type hash
+
+  (* Page store type *)
+  type page_store
+
+  (* Returns an empty buffer *)
+  val empty : unit -> t
+
+  (** [add page_store buffer message] adds a [message] to [buffer]. The 
+      [buffer] is serialized to [page_store] when it is full. Serialization
+      logic is dependent on the encoding scheme.  
+  *)
+  val add : page_store:page_store -> t -> bytes -> unit tzresult Lwt.t
+
+  (** [finalize page_store buffer] serializes the [buffer] to [page_store] and
+      returns a root hash that represents the final payload. The serialization
+      logic is dependent on the encoding scheme. [buffer] is emptied after 
+      this call.  
+  *)
+  val finalize : page_store:page_store -> t -> hash tzresult Lwt.t
+
+  (** [deserialize_payload page_store hash] deserializes a payload from [hash]
+      using some hash-based encoding scheme. Any payload serialized by [add] +
+      [finalize] can be deserialized by this function.
+  *)
+  val deserialize_payload :
+    page_store:page_store -> hash -> bytes tzresult Lwt.t
+end
+
+(** Encoding of DAC payload as a Merkle tree with an arbitrary branching
+    factor greater or equal to 2. The serialization process works as follows:
+    {ul
+      {li A large sequence of bytes, the payload, is split into several pages
+          of fixed size, each of which is prefixed with a small sequence
+          of bytes (also of fixed size), which is referred to as the preamble
+          of the page. Pages obtained directly from the original payload
+          are referred to as `Contents pages`. Contents pages constitute the
+          leaves of the Merkle tree being built,
+      }
+      {li Each contents page (each of which is a sequence of bytes consisting
+        of the preamble followed by the actual contents from the original
+        payload) is then hashed. The size of each hash is fixed. The hashes are
+        concatenated together, and the resulting sequence of bytes is split
+        into pages of the same size of `Hashes pages`, each of which is
+        prefixed with a preamble whose size is the same as in Contents pages.
+        Hashes pages correspond to nodes of the Merkle tree being built, and
+        the children of a hash page are the (either Payload or Hashes) pages
+        whose hash appear into the former,
+      }
+      {li Hashes pages are hashed using the same process described above, leading
+        to a smaller list of hashes pages. To guarantee that the list of hashes
+        pages is actually smaller than the original list of pages being hashed,
+        we require the size of pages to be large enough to contain at least two
+        hashes.
+      }
+    }
+
+    Merkle tree encodings of DAC pages are versioned, to allow for multiple
+    hashing schemes to be used.
+ *)
+module Merkle_tree : sig
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4662
+     Remove `page_store = string` when Hash_chain is removed
+     Context https://gitlab.com/tezos/tezos/-/merge_requests/7465#note_1247831273
+  *)
+  module V0 :
+    Dac_codec
+      with type page_store = string
+       and type hash = Protocol.Sc_rollup_reveal_hash.t
+
+  (**/**)
+
+  module Internal_for_tests : sig
+    module Make_buffered
+        (H : Hashing_scheme)
+        (S : Page_store with type hash := H.t)
+        (V : VERSION)
+        (C : CONFIG) :
+      Buffered_dac_codec with type hash = H.t and type page_store = S.t
+
+    module Make (B : Buffered_dac_codec) :
+      Dac_codec with type hash := B.hash and type page_store := B.page_store
+  end
+end
+
+(** Encoding of DAC payload as a Hash Chain/Merkle List. The encoding implementation 
+    is specific to the Arith PVM. 
+ *)
+module Hash_chain : sig
+  module V0 : sig
+    type h = Protocol.Sc_rollup_reveal_hash.t
+
+    val serialize_payload :
+      for_each_page:(h * bytes -> unit tzresult Lwt.t) ->
+      bytes ->
+      h tzresult Lwt.t
+
+    val make_hash_chain : bytes -> ((h * bytes) list, 'a) result
+
+    val to_hex : h -> string
+
+    val hash : bytes -> h
+  end
+end
