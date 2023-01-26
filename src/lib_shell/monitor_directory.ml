@@ -172,6 +172,73 @@ let build_rpc_directory validator mainchain_validator =
       in
       let next () = Lwt_stream.get stream in
       Tezos_rpc.Answer.return_stream {next; shutdown}) ;
+  gen_register0 Monitor_services.S.validated_blocks (fun q () ->
+      let* chains =
+        match q#chains with
+        | [] ->
+            let* all_chain_stores = Store.all_chain_stores store in
+            Lwt.return
+              (List.map (fun cs -> Store.Chain.chain_id cs) all_chain_stores)
+        | l ->
+            List.map_s (fun chain -> Chain_directory.get_chain_id store chain) l
+      in
+      let* block_streams, stoppers =
+        List.fold_left_s
+          (fun (block_streams, stoppers) chain_id ->
+            let* r = Store.get_chain_store store chain_id in
+            match r with
+            | Error _ -> Lwt.fail Not_found
+            | Ok chain_store ->
+                let block_stream, stopper =
+                  Store.Chain.validated_watcher chain_store
+                in
+                let bs =
+                  Lwt_stream.map
+                    (fun b -> (chain_id, chain_store, b))
+                    block_stream
+                in
+                return (bs :: block_streams, stopper :: stoppers))
+          ([], [])
+          chains
+      in
+      let block_stream = Lwt_stream.choose block_streams in
+      let shutdown () = List.iter Lwt_watcher.shutdown stoppers in
+      let in_next_protocols chain_store block =
+        match q#next_protocols with
+        | [] -> Lwt.return_true
+        | protocols -> (
+            let* block_protocol_opt =
+              Store.Chain.find_protocol
+                chain_store
+                ~protocol_level:(Store.Block.proto_level block)
+            in
+            match block_protocol_opt with
+            | None ->
+                (* If we do not know the protocol hash associated to the
+                   proto level, it means either that it is a transition
+                   block for which we do not know the protocol yet, or
+                   that something really bad occurred. In both cases, we
+                   do not advertise it. *)
+                Lwt.return_false
+            | Some next_protocol ->
+                Lwt.return
+                  (List.exists (Protocol_hash.equal next_protocol) protocols))
+      in
+      let stream =
+        Lwt_stream.filter_map_s
+          (fun (chain_id, chain_store, block) ->
+            let* in_next_protocols = in_next_protocols chain_store block in
+            if in_next_protocols then
+              Lwt.return_some
+                ( chain_id,
+                  Store.Block.hash block,
+                  Store.Block.header block,
+                  Store.Block.operations block )
+            else Lwt.return_none)
+          block_stream
+      in
+      let next () = Lwt_stream.get stream in
+      Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register1 Monitor_services.S.heads (fun chain q () ->
       (* TODO: when `chain = `Test`, should we reset then stream when
          the `testnet` change, or dias we currently do ?? *)

@@ -915,6 +915,11 @@ module Chain : sig
       [chain_store]. *)
   val watcher : chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
 
+  (** [validated_watcher chain_store] instantiates a new validated block
+      watcher for [chain_store]. *)
+  val validated_watcher :
+    chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
+
   (** [get_rpc_directory chain_store block] returns the RPC directory
       associated to the [block]. *)
   val get_rpc_directory :

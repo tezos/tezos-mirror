@@ -114,12 +114,27 @@ module S = struct
            Block_header.encoding)
       Tezos_rpc.Path.(path / "valid_blocks")
 
+  let validated_blocks =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Monitor all blocks that were successfully validated by the node but \
+         are not applied nor stored yet, disregarding whether they are going \
+         to be selected as the new head or not."
+      ~query:validated_or_apply_blocks_query
+      ~output:
+        (obj4
+           (req "chain_id" Chain_id.encoding)
+           (req "hash" Block_hash.encoding)
+           (req "header" (dynamic_size Block_header.encoding))
+           (req "operations" (list (list (dynamic_size Operation.encoding)))))
+      Tezos_rpc.Path.(path / "validated_blocks")
+
   let applied_blocks =
     Tezos_rpc.Service.get_service
       ~description:
         "Monitor all blocks that are successfully applied and stored by the \
          node, disregarding whether they were selected as the new head or not."
-      ~query:evaluated_blocks_query
+      ~query:validated_or_apply_blocks_query
       ~output:
         (obj4
            (req "chain_id" Chain_id.encoding)
@@ -141,8 +156,8 @@ module S = struct
   let heads =
     Tezos_rpc.Service.get_service
       ~description:
-        "Monitor all blocks that are successfully validated by the node and \
-         selected as the new head of the given chain."
+        "Monitor all blocks that are successfully validated and applied by the \
+         node and selected as the new head of the given chain."
       ~query:heads_query
       ~output:
         (merge_objs
@@ -185,6 +200,21 @@ let legacy_valid_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
     ?(next_protocols = []) () =
   make_streamed_call
     S.legacy_valid_blocks
+    ctxt
+    ()
+    (object
+       method chains = chains
+
+       method protocols = protocols
+
+       method next_protocols = next_protocols
+    end)
+    ()
+
+let validated_blocks ctxt ?(chains = [`Main]) ?(protocols = [])
+    ?(next_protocols = []) () =
+  make_streamed_call
+    S.validated_blocks
     ctxt
     ()
     (object
