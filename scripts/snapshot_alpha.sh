@@ -66,12 +66,6 @@ git archive HEAD docs/alpha/ | tar -x -C /tmp/tezos_proto_doc_snapshot
 mv /tmp/tezos_proto_doc_snapshot/docs/alpha docs/${label}
 rm -rf /tmp/tezos_proto_doc_snapshot
 
-echo "Copying tests_python/tests_alpha to tests_python/tests_${version}"
-mkdir /tmp/tezos_proto_tests_python_snapshot
-git archive HEAD tests_python/tests_alpha | tar -x -C /tmp/tezos_proto_tests_python_snapshot
-mv /tmp/tezos_proto_tests_python_snapshot/tests_python/tests_alpha tests_python/tests_${version}
-rm -rf /tmp/tezos_proto_tests_python_snapshot
-
 # set current version
 echo "Setting current version in raw_context and proxy"
 sed -i.old.old -e 's/let version_value = "alpha_current"/let version_value = "'${current}'"/' \
@@ -142,47 +136,6 @@ doc_index="docs/index.rst"
 ) > "${doc_index}.tmp"
 mv "${doc_index}.tmp" "$doc_index"
 
-
-# fix paths and comments in python tests and regtest outputs
-echo "Fixing python tests"
-cd tests_python/tests_${version}
-sed -i.old -e "s,tezos\.gitlab\.io/alpha/,tezos.gitlab.io/${version}_${label}/,g" \
-           -e "s/proto_alpha/proto_${version}_${short_hash}/g" \
-           -e "s/_alpha\b/_${version}/g" \
-           -e "s/\balpha\b/${version}/g" \
-    $(find . -name \*.py)
-cd ..
-
-echo "Fixing python protocol constants"
-
-# update tests_python/tools/constants.py
-crt_line='TEZOS_CRT = """'
-constants_file='tools/constants.py'
-(
-    grep -B9999 -F "$crt_line" "$constants_file" \
-      | head -n-1
-
-    cat <<EOF
-${upcased_label} = "$long_hash"
-${upcased_label}_DAEMON = "${version}-${short_hash}"
-${upcased_label}_FOLDER = "proto_${version}_${short_hash}"
-${upcased_label}_PARAMETERS = get_parameters(${upcased_label}_FOLDER)
-
-EOF
-    grep -A9999 -F "$crt_line" "$constants_file" \
-) > "${constants_file}.tmp"
-mv "${constants_file}.tmp" $constants_file
-
-# update pytests/tests_${current - 1}/protocol.py
-
-prev_upcased_label=$(grep '^PREV_HASH = constants.*' "tests_alpha/protocol.py" | cut -d. -f2)
-if [ -z "$prev_upcased_label" ]; then
-    echo "Error: Could not read the label of the predecessor protocol in tests_alpha/protocol.py"
-    exit 1
-fi
-
-sed -i.old -e "s/constants\.ALPHA/constants\.${upcased_label}/" "tests_${version}/protocol.py"
-cd ../
 
 # move daemons to a tmp directory to avoid editing lib_protocol
 cd src/proto_${version}_${short_hash}
