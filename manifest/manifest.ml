@@ -3040,7 +3040,9 @@ let check_circular_opam_deps () =
   in
   while not (Queue.is_empty to_visit) do
     let elt = Queue.take to_visit in
-    let elt_path = Hashtbl.find shortest_path elt.kind in
+    let elt_path =
+      Option.value ~default:[] (Hashtbl.find_opt shortest_path elt.kind)
+    in
     list_iter (deps_of elt) (fun (dep : Target.internal) ->
         if not (Hashtbl.mem shortest_path dep.kind) then (
           let path = dep :: elt_path in
