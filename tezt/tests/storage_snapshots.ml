@@ -418,6 +418,83 @@ let test_drag_after_rolling_import =
   in
   unit
 
+(* Checks that the hash, level and version contained in the snapshot
+   is consistent with regard to the exported data. *)
+let test_info_command =
+  Protocol.register_test
+    ~__FILE__
+    ~title:(Format.asprintf "storage snapshot info command")
+    ~tags:["storage"; "snapshot"; "info"; "command"]
+  @@ fun protocol ->
+  let* node = Node.init ~name:"node" node_arguments in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol_and_wait ~protocol ~node client in
+  let blocks_to_bake = 8 in
+  let* () = bake_blocks node client ~blocks_to_bake in
+  let* head = RPC.call node @@ RPC.get_chain_block () in
+  let head_level = JSON.(head |-> "header" |-> "level" |> as_int) in
+  let snapshot_dir = Temp.dir "snapshots_exports" in
+  let* filename =
+    export_snapshot
+      node
+      ~export_level:head_level
+      ~snapshot_dir
+      ~history_mode:Node.Rolling_history
+      ~export_format:Node.Tar
+  in
+  let expected_hash = JSON.(head |-> "hash" |> as_string) in
+  let expected_level = head_level in
+  let expected_version = 5 in
+  Log.info "Checks the human formatted output" ;
+  (* Get the info line, which is the second line. *)
+  let* () =
+    let p = Node.spawn_snapshot_info node (snapshot_dir // filename) in
+    let* human_output = Process.check_and_read_stdout p in
+    let human_output = List.nth (String.split_on_char '\n' human_output) 1 in
+    let re =
+      rex
+        "chain \\w+, block hash (\\w+) at level (\\d+),.* \\(snapshot version \
+         (\\d+)\\)"
+    in
+    match human_output =~*** re with
+    | Some (hash, level, version) ->
+        Check.(
+          (hash = expected_hash)
+            string
+            ~error_msg:"expected block hash %R, got %L" ;
+          (int_of_string level = expected_level)
+            int
+            ~error_msg:"expected block level %R, got %L" ;
+          (int_of_string version = expected_version)
+            int
+            ~error_msg:"expected version \"%R\", got %L") ;
+        unit
+    | None -> Test.fail "Could not parse output %s" human_output
+  in
+  Log.info "Checks the JSON formatted output" ;
+  let* () =
+    let p =
+      Node.spawn_snapshot_info ~json:true node (snapshot_dir // filename)
+    in
+    let* json_output = Process.check_and_read_stdout p in
+    let json_output =
+      JSON.parse ~origin:"node snapshot info --json" json_output
+    in
+    let json_snapshot_header = JSON.(json_output |-> "snapshot_header") in
+    let hash = JSON.(json_snapshot_header |-> "block_hash" |> as_string) in
+    let level = JSON.(json_snapshot_header |-> "level" |> as_int) in
+    let version = JSON.(json_snapshot_header |-> "version" |> as_int) in
+    Check.((hash = expected_hash) string)
+      ~error_msg:"expected block hash %R not found" ;
+    Check.((level = expected_level) int)
+      ~error_msg:"expected block level %R not found" ;
+    Check.((version = expected_version) int)
+      ~error_msg:"expected version \"%R\" not found" ;
+    unit
+  in
+  unit
+
 let register ~protocols =
   test_export_import_snapshots protocols ;
-  test_drag_after_rolling_import protocols
+  test_drag_after_rolling_import protocols ;
+  test_info_command protocols
