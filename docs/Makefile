@@ -186,6 +186,8 @@ PYCODESTYLE_OPTIONS=\
 	--ignore=E121,E123,E126,E226,E24,E704,W503,E203,E231 \
 	--max-line-length=80
 
+TYPECHECK=poetry run mypy
+
 PYTHON_SRCS?=conf.py _extensions/*.py scripts/*.py
 
 pylint:
@@ -201,7 +203,11 @@ pycodestyle:
 	@echo "Linting with pycodestyle version `poetry run pycodestyle --version` (`poetry run which pycodestyle`)"
 	$(PYCODESTYLE) $(PYCODESTYLE_OPTIONS) $(PYTHON_SRCS)
 
-lint: pylint pycodestyle lint_black
+typecheck:
+	@echo "Typechecking with mypy version `poetry run mypy --version`"
+	$(TYPECHECK) $(PYTHON_SRCS)
+
+lint: pylint pycodestyle lint_black typecheck
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
