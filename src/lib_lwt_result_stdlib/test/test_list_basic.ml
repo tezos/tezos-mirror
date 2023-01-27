@@ -65,7 +65,26 @@ module Nth = struct
     assert (nth (up 0) (-100) = None) ;
     ()
 
-  let tests = [Alcotest.test_case "nth" `Quick nth]
+  let hd _ =
+    assert (hd [] = None) ;
+    assert (hd [0] = Some 0) ;
+    assert (hd [0; 1] = Some 0) ;
+    assert (hd [1; 2] = Some 1) ;
+    ()
+
+  let tl _ =
+    assert (tl [] = None) ;
+    assert (tl [0] = Some []) ;
+    assert (tl [0; 1] = Some [1]) ;
+    assert (tl [1; 2] = Some [2]) ;
+    ()
+
+  let tests =
+    [
+      Alcotest.test_case "nth" `Quick nth;
+      Alcotest.test_case "hd" `Quick hd;
+      Alcotest.test_case "tl" `Quick tl;
+    ]
 end
 
 module Last = struct
