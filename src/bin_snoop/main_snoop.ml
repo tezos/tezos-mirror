@@ -502,6 +502,17 @@ let codegen_infer_cmd solution codegen_options =
   in
   Codegen.pp_module Format.std_formatter generated_code
 
+let solution_print_cmd solution_fns =
+  List.iter
+    (fun solution_fn ->
+      let solution = Codegen.load_solution solution_fn in
+      Format.printf
+        "@[<2>%s:@ @[%a@]@]@."
+        solution_fn
+        Codegen.pp_solution
+        solution)
+    solution_fns
+
 (* -------------------------------------------------------------------------- *)
 (* Entrypoint *)
 
@@ -523,14 +534,15 @@ let () =
   | None -> ()
   | Some outcome -> (
       match outcome with
-      | Cmdline.No_command -> exit 0
-      | Cmdline.Benchmark {bench_name; bench_opts} ->
+      | No_command -> exit 0
+      | Benchmark {bench_name; bench_opts} ->
           benchmark_cmd bench_name bench_opts
-      | Cmdline.Infer {model_name; workload_data; solver; infer_opts} ->
+      | Infer {model_name; workload_data; solver; infer_opts} ->
           infer_cmd model_name workload_data solver infer_opts
-      | Cmdline.Codegen {solution; model_name; codegen_options} ->
+      | Codegen {solution; model_name; codegen_options} ->
           codegen_cmd solution model_name codegen_options
-      | Cmdline.Codegen_all {solution; matching; codegen_options} ->
+      | Codegen_all {solution; matching; codegen_options} ->
           codegen_all_cmd solution matching codegen_options
-      | Cmdline.Codegen_inferred {solution; codegen_options} ->
-          codegen_infer_cmd solution codegen_options)
+      | Codegen_inferred {solution; codegen_options} ->
+          codegen_infer_cmd solution codegen_options
+      | Solution_print solutions -> solution_print_cmd solutions)

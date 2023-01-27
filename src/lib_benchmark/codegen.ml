@@ -207,6 +207,27 @@ type solution = {
   scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
+let pp_solution ppf solution =
+  let open Format in
+  fprintf ppf "inference_model_name: %s@;" solution.inference_model_name ;
+  let alist =
+    List.sort (fun (fv1, _) (fv2, _) -> Free_variable.compare fv1 fv2)
+    @@ List.of_seq
+    @@ Free_variable.Map.to_seq solution.map
+  in
+  fprintf
+    ppf
+    "@[<2>free_variables:@ @[%a@]@]@;"
+    (pp_print_list (fun ppf (fv, float) ->
+         fprintf ppf "%a = %.12g" Free_variable.pp fv float))
+    alist ;
+  fprintf
+    ppf
+    "@[<2>scores:@ @[%a@]@]@;"
+    (pp_print_list (fun ppf ((s, ns), scores) ->
+         fprintf ppf "%s %a : %a" s Namespace.pp ns Inference.pp_scores scores))
+    (List.sort (fun (k1, _) (k2, _) -> compare k1 k2) solution.scores_list)
+
 let load_solution (fn : string) : solution =
   In_channel.with_open_bin fn Marshal.from_channel
 
