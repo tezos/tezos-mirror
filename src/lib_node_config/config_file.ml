@@ -202,6 +202,34 @@ let blockchain_network_limanet =
         "limanet.stakenow.de:9733";
       ]
 
+let blockchain_network_mumbainet =
+  make_blockchain_network
+    ~alias:"mumbainet"
+    {
+      time = Time.Protocol.of_notation_exn "2023-01-19T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BMVeyjhT4yd421XJAYcB54hm54CwGqkV6tCzkJ8VpHPVch6Mkx6";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_MUMBAINET_2023-01-19T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:
+      ["mumbainet.teztnets.xyz"; "mumbainet.visualtez.com"]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -302,6 +330,7 @@ let builtin_blockchain_networks_with_tags =
     (4, blockchain_network_mainnet);
     (19, blockchain_network_ghostnet);
     (21, blockchain_network_limanet);
+    (22, blockchain_network_mumbainet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
