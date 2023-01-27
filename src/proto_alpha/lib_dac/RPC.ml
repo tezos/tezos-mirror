@@ -101,7 +101,7 @@ module DAC = struct
         ~query:RPC_query.empty
         ~input:store_preimage_request_encoding
         ~output:store_preimage_response_encoding
-        RPC_path.(open_root / "dac" / "store_preimage")
+        RPC_path.(open_root / "store_preimage")
 
     (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4263
        remove this endpoint once end-to-end tests are in place. *)
@@ -110,7 +110,7 @@ module DAC = struct
         ~description:"Verify signature of an external message to inject in L1"
         ~query:external_message_query
         ~output:Data_encoding.bool
-        RPC_path.(open_root / "dac" / "verify_signature")
+        RPC_path.(open_root / "verify_signature")
   end
 
   let handle_serialize_dac_store_preimage cctxt dac_sk_uris reveal_data_dir
