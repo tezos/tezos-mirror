@@ -82,3 +82,93 @@ module JSONRPC : sig
     'b Data_encoding.t ->
     ('a, 'b) response Data_encoding.t
 end
+
+(* Errors returned by the RPC server, to be embedded as data to the JSON-RPC
+   error object. *)
+module Error : sig
+  type t = unit
+
+  val encoding : unit Data_encoding.t
+end
+
+(** Extensible variant representing the possible input requests extended by the
+    application of the method generator. *)
+type input = ..
+
+(** Extensible variant representing the possible outputs extended by the
+    application of the method generator. *)
+type output = ..
+
+type 'result rpc_result = ('result, Error.t JSONRPC.error) result
+
+(** API of an Ethereum method. *)
+module type METHOD_DEF = sig
+  (** Method name in the specification. *)
+  val method_ : string
+
+  (** Type of expected input, if any. *)
+  type input
+
+  (** Type of the value returned by the RPC. *)
+  type output
+
+  val input_encoding : input Data_encoding.t
+
+  val output_encoding : output Data_encoding.t
+end
+
+(** Interface of a generated method. *)
+module type METHOD = sig
+  (** Input type of the method, if any. *)
+  type m_input
+
+  (** Output type of the method. *)
+  type m_output
+
+  (** Variant representing the method's request. *)
+  type input += Input of m_input option
+
+  (** Variant representing the method's response. *)
+  type output += Output of m_output rpc_result
+
+  (** See {METHOD_DEF.method_}. *)
+  val method_ : string
+
+  val request_encoding : m_input JSONRPC.request Data_encoding.t
+
+  (** [request input] builds a request object of the current method. *)
+  val request : m_input option -> m_input JSONRPC.request
+
+  val response_encoding : (m_output, Error.t) JSONRPC.response Data_encoding.t
+
+  (** [response output] returns a response object for the method. *)
+  val response :
+    (m_output, Error.t JSONRPC.error) result ->
+    (m_output, Error.t) JSONRPC.response
+
+  (** [response_ok output] is a shortcut for [response (Ok output)]. *)
+  val response_ok : m_output -> (m_output, Error.t) JSONRPC.response
+end
+
+(** Builds a full Method module out of a method description. *)
+module MethodMaker : functor (M : METHOD_DEF) ->
+  METHOD with type m_input = M.input and type m_output = M.output
+
+(** [methods] is the list of currently defined methods. *)
+val methods : (module METHOD) list
+
+(** [Input] defines the input encoding matching the defined methods in
+    {methods}. *)
+module Input : sig
+  type t = input
+
+  val encoding : input Data_encoding.t
+end
+
+(** [Output] defines the output encoding matching the defined methods in
+    {methods}. *)
+module Output : sig
+  type nonrec 'a result = ('a, error JSONRPC.error) result
+
+  val encoding : output Data_encoding.t
+end

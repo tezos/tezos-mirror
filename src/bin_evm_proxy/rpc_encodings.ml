@@ -111,3 +111,114 @@ module JSONRPC = struct
            (opt "error" (error_encoding error_data_encoding))
            (req "id" (option id_encoding))))
 end
+
+type input = ..
+
+type output = ..
+
+module Error = struct
+  type t = unit
+
+  let encoding = Data_encoding.unit
+end
+
+type 'result rpc_result = ('result, Error.t JSONRPC.error) result
+
+module type METHOD_DEF = sig
+  val method_ : string
+
+  type input
+
+  type output
+
+  val input_encoding : input Data_encoding.t
+
+  val output_encoding : output Data_encoding.t
+end
+
+module type METHOD = sig
+  type m_input
+
+  type m_output
+
+  (* The parameters MAY be omitted. See JSONRPC Specification. *)
+  type input += Input of m_input option
+
+  type output += Output of m_output rpc_result
+
+  val method_ : string
+
+  val request_encoding : m_input JSONRPC.request Data_encoding.t
+
+  val request : m_input option -> m_input JSONRPC.request
+
+  val response_encoding : (m_output, Error.t) JSONRPC.response Data_encoding.t
+
+  val response :
+    (m_output, Error.t JSONRPC.error) result ->
+    (m_output, Error.t) JSONRPC.response
+
+  val response_ok : m_output -> (m_output, Error.t) JSONRPC.response
+end
+
+module MethodMaker (M : METHOD_DEF) :
+  METHOD with type m_input = M.input and type m_output = M.output = struct
+  type m_input = M.input
+
+  type m_output = M.output
+
+  type input += Input of m_input option
+
+  type output += Output of m_output rpc_result
+
+  let method_ = M.method_
+
+  let request_encoding = JSONRPC.request_encoding M.method_ M.input_encoding
+
+  let request parameters = JSONRPC.{method_; parameters; id = None}
+
+  let response_encoding =
+    JSONRPC.response_encoding M.output_encoding Error.encoding
+
+  let response value = JSONRPC.{value; id = None}
+
+  let response_ok result = response (Ok result)
+end
+
+let methods : (module METHOD) list = []
+
+module Input = struct
+  type t = input
+
+  let case_maker tag_id (module M : METHOD) =
+    let open Data_encoding in
+    case
+      ~title:M.method_
+      (Tag tag_id)
+      M.request_encoding
+      (function M.Input input -> Some (M.request input) | _ -> None)
+      (fun {parameters; _} -> M.Input parameters)
+
+  let encoding =
+    let open Data_encoding in
+    union @@ List.mapi case_maker methods
+end
+
+module Output = struct
+  type nonrec 'a result = ('a, error JSONRPC.error) result
+
+  let case_maker tag_id (module M : METHOD) =
+    let open Data_encoding in
+    case
+      ~title:M.method_
+      (Tag tag_id)
+      M.response_encoding
+      (function
+        | M.Output accounts -> Some JSONRPC.{value = accounts; id = None}
+        | _ -> None)
+      (fun {value = req; _} -> M.Output req)
+
+  let encoding =
+    let open Data_encoding in
+    union @@ List.mapi case_maker methods
+end

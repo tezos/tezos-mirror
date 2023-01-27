@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_rpc
+open Rpc_encodings
 
 let version_service =
   Service.get_service
@@ -37,4 +38,15 @@ let version dir =
       Format.printf "Version\n%!" ;
       Lwt.return_ok Tezos_version.Bin_version.version_string)
 
-let directory = Directory.empty |> version
+let dispatch_service =
+  Service.post_service
+    ~query:Query.empty
+    ~input:Input.encoding
+    ~output:Output.encoding
+    Path.(root)
+
+let dispatch dir =
+  Directory.register0 dir dispatch_service (fun () input ->
+      match input with _ -> Error_monad.failwith "Unsupported method\n%!")
+
+let directory = Directory.empty |> version |> dispatch
