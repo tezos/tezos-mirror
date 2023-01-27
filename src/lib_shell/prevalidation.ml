@@ -43,8 +43,6 @@ module type T = sig
 
   type validation_state
 
-  type filter_state
-
   type filter_config
 
   type chain_store
@@ -109,7 +107,6 @@ module MakeAbstract
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
      and type chain_store = Chain_store.chain_store
      and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
@@ -120,22 +117,20 @@ module MakeAbstract
 
   type validation_state = Proto.validation_state
 
-  type filter_state = Filter.Mempool.state
-
   type filter_config = Filter.Mempool.config
 
   type chain_store = Chain_store.chain_store
 
   type operation = protocol_operation Shell_operation.operation
 
-  type create_aux_t = {
+  type t = {
     validation_info : Proto.Mempool.validation_info;
     mempool : Proto.Mempool.t;
-    head : Block_header.shell_header;
-    context : Tezos_protocol_environment.Context.t;
+    bounding_state : Bounding.state;
+    filter_info : Filter.Mempool.filter_info;
   }
 
-  let create_aux chain_store head timestamp =
+  let create_aux ?old_state chain_store head timestamp =
     let open Lwt_result_syntax in
     let* context = Chain_store.context chain_store head in
     let head_hash = Store.Block.hash head in
@@ -150,38 +145,22 @@ module MakeAbstract
     let* validation_info, mempool =
       Proto.Mempool.init context chain_id ~head_hash ~head ~cache:`Lazy
     in
-    return {validation_info; mempool; head; context}
-
-  type t = {
-    validation_info : Proto.Mempool.validation_info;
-    mempool : Proto.Mempool.t;
-    bounding_state : Bounding.state;
-    filter_state : Filter.Mempool.state;
-  }
+    let* filter_info =
+      match old_state with
+      | None -> Filter.Mempool.init context ~head
+      | Some old_state -> Filter.Mempool.flush old_state.filter_info ~head
+    in
+    return
+      {validation_info; mempool; bounding_state = Bounding.empty; filter_info}
 
   let create chain_store ~head ~timestamp =
-    let open Lwt_result_syntax in
-    let* {validation_info; mempool; head; context} =
-      create_aux chain_store head timestamp
-    in
-    let* filter_state = Filter.Mempool.init context ~head in
-    return
-      {validation_info; mempool; bounding_state = Bounding.empty; filter_state}
+    create_aux chain_store head timestamp
 
   let flush chain_store ~head ~timestamp old_state =
-    let open Lwt_result_syntax in
-    let* {validation_info; mempool; head; context = _} =
-      create_aux chain_store head timestamp
-    in
-    let* filter_state = Filter.Mempool.flush old_state.filter_state ~head in
-    return
-      {validation_info; mempool; bounding_state = Bounding.empty; filter_state}
+    create_aux ~old_state chain_store head timestamp
 
   let pre_filter state filter_config op =
-    Filter.Mempool.pre_filter
-      ~filter_state:state.filter_state
-      filter_config
-      op.protocol
+    Filter.Mempool.pre_filter state.filter_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 
@@ -341,7 +320,6 @@ module Make (Filter : Shell_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store =
   MakeAbstract (Production_chain_store) (Filter)

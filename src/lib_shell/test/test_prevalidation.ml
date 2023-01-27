@@ -123,7 +123,6 @@ module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
   Shell_plugin.FILTER
     with type Proto.operation_data = Proto.operation_data
      and type Proto.operation = Proto.operation
-     and type Mempool.state = unit
      and type Proto.Mempool.t = Proto.Mempool.t = Shell_plugin.No_filter (struct
   let hash = Protocol_hash.zero
 

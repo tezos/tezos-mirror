@@ -165,9 +165,6 @@ let mk_chain_tools (chain_db : Distributed_db.chain_db) :
 
 (** Module type used both in production and in tests. *)
 module type S = sig
-  (** Type instantiated by {!Filter.Mempool.state}. *)
-  type filter_state
-
   (** Type instantiated by {!Filter.Mempool.config}. *)
   type filter_config
 
@@ -254,16 +251,12 @@ module Make_s
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                            Filter.Proto.validation_state
-                          and type filter_state = Filter.Mempool.state
                           and type filter_config = Filter.Mempool.config
                           and type protocol_operation = Filter.Proto.operation) :
   S
-    with type filter_state = Filter.Mempool.state
-     and type filter_config = Filter.Mempool.config
+    with type filter_config = Filter.Mempool.config
      and type protocol_operation = Filter.Proto.operation
      and type prevalidation_t = Prevalidation_t.t = struct
-  type filter_state = Filter.Mempool.state
-
   type filter_config = Filter.Mempool.config
 
   type protocol_operation = Filter.Proto.operation
@@ -869,7 +862,6 @@ module Make
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                            Filter.Proto.validation_state
-                          and type filter_state = Filter.Mempool.state
                           and type filter_config = Filter.Mempool.config
                           and type protocol_operation = Filter.Proto.operation
                           and type chain_store = Store.chain_store) : T = struct

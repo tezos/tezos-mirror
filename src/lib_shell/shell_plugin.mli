@@ -35,85 +35,57 @@ module type FILTER = sig
 
     val default_config : config
 
-    (** Internal state of the prevalidator filter *)
-    type state
+    (** Static internal information needed by {!pre_filter}.
 
-    (** Create an empty [state].
+        It depends on the [head] block upon which a mempool is built. *)
+    type filter_info
 
-        Called only once when a prevalidator starts. *)
+    (** Create a {!filter_info} based on the [head] block.
+
+        Should be called only once when a new prevalidator is started
+        for a new protocol. Subsequent {!filter_info}s should be
+        created using {!flush}. *)
     val init :
       Tezos_protocol_environment.Context.t ->
       head:Tezos_base.Block_header.shell_header ->
-      state tzresult Lwt.t
+      filter_info tzresult Lwt.t
 
-    (** Create a new empty [state] based on [head].
+    (** Create a new {!filter_info} based on the [head] block.
 
-        Parts of the old [state] are recycled, so that this function
-        is more efficient than [init] and does not need a
-        [Tezos_protocol_environment.Context.t] argument. *)
+        Parts of the old {!filter_info} (which may have been built on
+        a different block) are recycled, so that this function is more
+        efficient than {!init} and does not need a
+        {!Tezos_protocol_environment.Context.t} argument. *)
     val flush :
-      state -> head:Tezos_base.Block_header.shell_header -> state tzresult Lwt.t
+      filter_info ->
+      head:Tezos_base.Block_header.shell_header ->
+      filter_info tzresult Lwt.t
 
-    (** [remove ~filter_state oph] removes the operation manager linked to
-        [oph] from the state of the filter *)
-    val remove : filter_state:state -> Operation_hash.t -> state
+    (** Perform some light preliminary checks on the operation.
 
-    (** [pre_filter config ~filter_state operation_data]
-        is called on arrival of an operation and after a flush of
-        the prevalidator. This function calls the [pre_filter] in the protocol
-        plugin and returns [`Passed_prefilter priority] if no error occurs during
-        checking of the [operation_data], where priority is the priority computed by
-        the protocol filter plug-in. More tests are done using the
-        [filter_state]. We classify an operation that passes the prefilter as
-        [`Passed_prefilter] since we do not know yet if the operation is
-        applicable or not. If an error occurs during the checks, this function
-        returns an error corresponding to the kind of the error returned by the
-        protocol. *)
+        If successful, return [`Passed_prefilter] with the priority of the
+        operation, based on the operation kind and potentially its
+        fee, gas, and size. If not, return a classification containing
+        the encountered error.
+
+        Should be called on arrival of an operation and after a flush
+        of the prevalidator. *)
     val pre_filter :
+      filter_info ->
       config ->
-      filter_state:state ->
       Proto.operation ->
       [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
       Lwt.t
 
-    (** Add an operation to the filter {!state}.
-
-        The operation should have been previously validated by the protocol.
-
-        This function is responsible for bounding the number of
-        manager operations in the mempool. If the mempool is full and
-        the input operation is a manager operation, then it is compared
-        with the already present operation with minimal weight. Then
-        either the minimal operation is replaced, or the new operation
-        is rejected.
-
-        If successful, return the updated state and possibly the
-        replaced minimal operation, otherwise return the error
-        classification for the new operation.
-
-        If [replace] is provided, then it is removed from the state
-        before processing the new operation (in which case the mempool
-        can no longer be full, so this function will succeed and return
-        [`No_replace]). *)
-    val add_operation_and_enforce_mempool_bound :
-      ?replace:Operation_hash.t ->
-      config ->
-      state ->
-      Operation_hash.t * Proto.operation ->
-      ( state
-        * [ `No_replace
-          | `Replace of
-            Operation_hash.t * Prevalidator_classification.error_classification
-          ],
-        Prevalidator_classification.error_classification )
-      result
-      Lwt.t
-
     (** Return a conflict handler for [Proto.Mempool.add_operation].
 
         See the documentation of type [Mempool.conflict_handler] in
-        e.g. [lib_protocol_environment/sigs/v8/updater.mli]. *)
+        e.g. [lib_protocol_environment/sigs/v8/updater.mli].
+
+        Precondition: both operations must be individually valid
+        (required by the protocol's operation comparison on which the
+        implementation of this function relies). *)
     val conflict_handler : config -> Proto.Mempool.conflict_handler
   end
 end
@@ -128,7 +100,7 @@ end
 
 (** Dummy filter that does nothing *)
 module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto and type Mempool.state = unit
+  FILTER with module Proto = Proto
 
 (** This is a protocol specific module that is used to collect all the
    * protocol-specific metrics. This module

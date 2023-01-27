@@ -38,9 +38,6 @@ module type T = sig
       see {!Tezos_protocol_environment.PROTOCOL} *)
   type validation_state
 
-  (** Type {!Shell_plugin.FILTER.Mempool.state}. *)
-  type filter_state
-
   (** Type {!Shell_plugin.FILTER.Mempool.config}. *)
   type filter_config
 
@@ -152,7 +149,6 @@ module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
      and type validation_state = Filter.Proto.validation_state
-     and type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store
 
@@ -187,7 +183,6 @@ module Internal_for_tests : sig
     T
       with type protocol_operation = Filter.Proto.operation
        and type validation_state = Filter.Proto.validation_state
-       and type filter_state = Filter.Mempool.state
        and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
        and type Internal_for_tests.mempool = Filter.Proto.Mempool.t

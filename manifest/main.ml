@@ -5549,15 +5549,8 @@ let hash = Protocol.hash
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if active @@ fun () ->
-      tezt
-        [
-          "test_consensus_filter";
-          "test_filter_state";
-          "test_plugin";
-          "test_conflict_handler";
-          "test_utils";
-          "generators";
-        ]
+      tests
+        ["test_conflict_handler"; "test_consensus_filter"]
         ~path:(path // "lib_plugin/test")
         ~with_macos_security_framework:true
         ~synopsis:"Tezos/Protocol: protocol plugin tests"

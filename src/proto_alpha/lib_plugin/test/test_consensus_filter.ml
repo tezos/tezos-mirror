@@ -34,7 +34,6 @@
 open Qcheck2_helpers
 open Plugin.Mempool
 open Alpha_context
-open Test_utils
 
 (** {2. Conversion helpers} *)
 
@@ -48,8 +47,13 @@ module Generator = struct
     prefix ^ printer d ^ suffix
 
   let config =
-    let+ x = opt small_nat in
-    config x
+    let* drift_int_opt = opt small_nat in
+    let clock_drift =
+      Option.map
+        (fun drift_int -> Period.of_seconds_exn (Int64.of_int drift_int))
+        drift_int_opt
+    in
+    return {default_config with clock_drift}
 
   let print_config =
     decorate ~prefix:"clock_drift " (fun config ->
