@@ -166,7 +166,7 @@ let get_predecessor state ({hash; _} as head) =
   | None -> tzfail (Cannot_find_predecessor hash)
   | Some pred -> return pred
 
-let rec connect ?(count = 0) ~delay cctxt genesis_info store =
+let rec connect ?(count = 0) ~delay cctxt genesis_info =
   let open Lwt_syntax in
   let* () =
     if count = 0 then return_unit
@@ -197,9 +197,9 @@ let rec connect ?(count = 0) ~delay cctxt genesis_info store =
       return_ok (heads, stopper)
   | Error e ->
       let* () = Event.cannot_connect ~count e in
-      connect ~delay ~count:(count + 1) cctxt genesis_info store
+      connect ~delay ~count:(count + 1) cctxt genesis_info
 
-let start configuration (cctxt : Protocol_client_context.full) store =
+let start configuration (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
   let* kind =
@@ -217,12 +217,12 @@ let start configuration (cctxt : Protocol_client_context.full) store =
       configuration.sc_rollup_address
   in
   let+ heads, stopper =
-    connect ~delay:configuration.reconnection_delay cctxt genesis_info store
+    connect ~delay:configuration.reconnection_delay cctxt genesis_info
   in
   ( {cctxt; heads; blocks_cache = Blocks_cache.create 32; stopper; genesis_info},
     kind )
 
-let reconnect configuration l1_ctxt store =
+let reconnect configuration l1_ctxt =
   let open Lwt_result_syntax in
   let* heads, stopper =
     connect
@@ -230,7 +230,6 @@ let reconnect configuration l1_ctxt store =
       ~delay:configuration.reconnection_delay
       l1_ctxt.cctxt
       l1_ctxt.genesis_info
-      store
   in
   return {l1_ctxt with heads; stopper}
 

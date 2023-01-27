@@ -31,60 +31,6 @@ open Alpha_context
 
 let lift promise = Lwt.map Environment.wrap_tzresult promise
 
-let genesis_inbox node_ctxt =
-  let genesis_level =
-    Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-  in
-  Plugin.RPC.Sc_rollup.inbox
-    node_ctxt.cctxt
-    (node_ctxt.cctxt#chain, `Level genesis_level)
-
-module State = struct
-  let add_messages = Store.Messages.add
-
-  let add_inbox = Store.Inboxes.add
-
-  let level_of_hash = State.level_of_hash
-
-  (** [inbox_of_head node_ctxt store block] returns the latest inbox at the
-      given [block]. This function always returns [Some inbox] for all levels
-      at and after the rollup genesis. *)
-  let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
-    let open Lwt_result_syntax in
-    let open Node_context in
-    let*! possible_inbox =
-      let open Lwt_option_syntax in
-      let* l2_block = Store.L2_blocks.find node_ctxt.store block_hash in
-      Store.Inboxes.find node_ctxt.store l2_block.header.inbox_hash
-    in
-    (* Pre-condition: forall l. (l > genesis_level) => inbox[l] <> None. *)
-    match possible_inbox with
-    | None ->
-        (* The inbox exists for each tezos block the rollup should care about.
-           That is, every block after the origination level. We then join
-           the bandwagon and build the inbox on top of the protocol's inbox
-           at the end of the origination level. *)
-        let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
-        if block_level = genesis_level then
-          let+ inbox = genesis_inbox node_ctxt in
-          inbox
-        else if block_level > genesis_level then
-          (* Invariant broken, the inbox for this level should exist. *)
-          failwith
-            "The inbox for block hash %a (level = %ld) is missing."
-            Block_hash.pp
-            block_hash
-            block_level
-        else
-          (* The rollup node should not care about levels before the genesis
-             level. *)
-          failwith
-            "Asking for the inbox before the genesis level (i.e. %ld), out of \
-             the scope of the rollup's node"
-            block_level
-    | Some inbox -> return inbox
-end
-
 let get_messages Node_context.{l1_ctxt; _} head =
   let open Lwt_result_syntax in
   let* block = Layer1.fetch_tezos_block l1_ctxt head in
@@ -168,11 +114,9 @@ let add_messages ~predecessor_timestamp ~predecessor inbox messages =
      let witness_hash =
        Sc_rollup.Inbox_merkelized_payload_hashes.hash witness
      in
-     let inbox_hash = Sc_rollup.Inbox.hash inbox in
      return
        ( messages_history,
          witness_hash,
-         inbox_hash,
          inbox,
          messages_with_protocol_internal_messages )
 
@@ -191,7 +135,7 @@ let process_head (node_ctxt : _ Node_context.t)
 
     *)
     let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
-    let* inbox = State.inbox_of_head node_ctxt predecessor in
+    let* inbox = Node_context.inbox_of_head node_ctxt predecessor in
     let inbox_metrics = Metrics.Inbox.metrics in
     Prometheus.Gauge.set inbox_metrics.head_inbox_level @@ Int32.to_float level ;
     let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
@@ -213,7 +157,6 @@ let process_head (node_ctxt : _ Node_context.t)
     in
     let* ( _messages_history,
            witness_hash,
-           inbox_hash,
            inbox,
            messages_with_protocol_internal_messages ) =
       add_messages
@@ -225,8 +168,8 @@ let process_head (node_ctxt : _ Node_context.t)
     Metrics.Inbox.Stats.head_messages_list :=
       messages_with_protocol_internal_messages ;
     let*! () =
-      State.add_messages
-        node_ctxt.store
+      Node_context.save_messages
+        node_ctxt
         witness_hash
         {
           predecessor = predecessor_hash;
@@ -235,7 +178,7 @@ let process_head (node_ctxt : _ Node_context.t)
         }
     in
     let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
-    let*! () = State.add_inbox node_ctxt.store inbox_hash inbox in
+    let*! inbox_hash = Node_context.save_inbox node_ctxt inbox in
     return
       ( inbox_hash,
         inbox,
@@ -243,20 +186,13 @@ let process_head (node_ctxt : _ Node_context.t)
         messages_with_protocol_internal_messages,
         ctxt ))
   else
-    let* inbox = genesis_inbox node_ctxt in
+    let* inbox = Node_context.genesis_inbox node_ctxt in
     return
       ( Sc_rollup.Inbox.hash inbox,
         inbox,
         Sc_rollup.Inbox.current_witness inbox,
         [],
         Context.empty node_ctxt.context )
-
-let inbox_of_hash node_ctxt hash =
-  let open Lwt_result_syntax in
-  let* level = State.level_of_hash node_ctxt hash in
-  State.inbox_of_head node_ctxt {hash; level}
-
-let inbox_of_head = State.inbox_of_head
 
 let start () = Inbox_event.starting ()
 

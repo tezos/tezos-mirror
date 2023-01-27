@@ -148,21 +148,6 @@ module Commitments =
       let encoding = Sc_rollup.Commitment.encoding
     end)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
-   Use file. *)
-module Last_stored_commitment_level =
-  Make_mutable_value
-    (struct
-      let path = ["commitments"; "last_stored_level"]
-    end)
-    (struct
-      type value = Raw_level.t
-
-      let name = "raw_level"
-
-      let encoding = Raw_level.encoding
-    end)
-
 module Commitments_published_at_level = struct
   type element = {
     first_published_at_level : Raw_level.t;
@@ -198,6 +183,55 @@ module Commitments_published_at_level = struct
         let encoding = element_encoding
       end)
 end
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
+   Use file. *)
+module L2_head =
+  Make_mutable_value
+    (struct
+      let path = ["l2_head"]
+    end)
+    (struct
+      type value = Sc_rollup_block.t
+
+      let name = "l2_block"
+
+      let encoding = Sc_rollup_block.encoding
+    end)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4392
+   Use file. *)
+module Last_finalized_head =
+  Make_mutable_value
+    (struct
+      let path = ["finalized_head"]
+    end)
+    (struct
+      type value = Sc_rollup_block.t
+
+      let name = "l2_block"
+
+      let encoding = Sc_rollup_block.encoding
+    end)
+
+(** Table from L1 levels to blocks hashes. *)
+module Levels_to_hashes =
+  Make_updatable_map
+    (struct
+      let path = ["tezos"; "levels"]
+    end)
+    (struct
+      type key = int32
+
+      let to_path_representation = Int32.to_string
+    end)
+    (struct
+      type value = Block_hash.t
+
+      let name = "block_hash"
+
+      let encoding = Block_hash.encoding
+    end)
 
 (* Published slot headers per block hash,
    stored as a list of bindings from `Dal_slot_index.t`
