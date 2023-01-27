@@ -430,6 +430,8 @@ module Known_Points_GC = struct
 end
 
 module Connect_handler = struct
+  (* Try to connect two nodes from different networks
+     and check that the p2p handshake is rejected. *)
   let connected_peers_with_different_chain_name_test () =
     Test.register
       ~__FILE__
