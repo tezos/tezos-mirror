@@ -41,6 +41,9 @@ Node
 - **Breaking Change**: disabled snapshot export support for storage
   that was created with Octez v13 (or earlier).
 
+- Fixed a bug raising an error when a context split was called on a
+  context that was created with Octez v13 (or earlier).
+
 Client
 ------
 
