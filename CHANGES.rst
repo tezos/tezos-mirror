@@ -138,6 +138,8 @@ Node
 - Fixed a bug while reconstructing the storage after a snapshot import
   that would result in wrong context hash mapping for some blocks.
 
+- Fixed a bug that caused a context corruption when using an old context.
+
 Client
 ------
 
