@@ -171,16 +171,7 @@ let init_node () =
   return node
 
 let init_node_client_with_protocol number_of_additional_bootstrap protocol =
-  let parameter_file protocol =
-    let args =
-      [
-        (["hard_gas_limit_per_block"], `String "5_200_000");
-        (["hard_gas_limit_per_operation"], `String "1_000_000");
-      ]
-    in
-    Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
-  in
-  let* parameter_file = parameter_file protocol in
+  let parameter_file = Protocol.parameter_file protocol in
   let* node = init_node () in
   let client = Client.create_with_mode (Client (Some (Node node), None)) in
   (* Add additional_bootstrap_account to the client *)
