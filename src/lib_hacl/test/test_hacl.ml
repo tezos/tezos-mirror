@@ -319,11 +319,31 @@ let test_public_ed25519 () =
   Alcotest.(check bytes "public" pk' ppk) ;
   Alcotest.(check bytes "public" pk' psk)
 
+(** Checks that Ed25519 makes the expected choices in the scope allowed by
+    RFC-8032. See [Vectors_ed25519] for more details. *)
+let test_speccheck_ed25519 () =
+  let open Vectors_ed25519 in
+  List.iter
+    (fun case ->
+      match Ed25519.pk_of_bytes (hex case.pub_key) with
+      | Some pk ->
+          let msg = hex case.message in
+          let signature = hex case.signature in
+          Alcotest.(
+            check
+              bool
+              "ed25519-speccheck"
+              (Hacl.Ed25519.verify ~pk ~msg ~signature)
+              case.expected)
+      | None -> Alcotest.fail "pk_of_bytes")
+    cases
+
 let ed25519 =
   [
     ("keypair", `Quick, test_keypair_ed25519);
     ("sign", `Quick, test_sign_ed25519);
     ("public", `Quick, test_public_ed25519);
+    ("ed25519-speccheck", `Quick, test_speccheck_ed25519);
   ]
 
 open P256
