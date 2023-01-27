@@ -172,3 +172,14 @@ module Output : sig
 
   val encoding : output Data_encoding.t
 end
+
+module Network_id :
+  METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
+
+module Chain_id :
+  METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
+
+module Accounts :
+  METHOD
+    with type m_input = unit
+     and type m_output = Ethereum_types.address list

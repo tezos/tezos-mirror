@@ -185,7 +185,44 @@ module MethodMaker (M : METHOD_DEF) :
   let response_ok result = response (Ok result)
 end
 
-let methods : (module METHOD) list = []
+module Network_id = MethodMaker (struct
+  type input = unit
+
+  type output = Ethereum_types.quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Ethereum_types.quantity_encoding
+
+  let method_ = "net_version"
+end)
+
+module Chain_id = MethodMaker (struct
+  type input = unit
+
+  type output = Ethereum_types.quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Ethereum_types.quantity_encoding
+
+  let method_ = "eth_chainId"
+end)
+
+module Accounts = MethodMaker (struct
+  type input = unit
+
+  type output = Ethereum_types.address list
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.list Ethereum_types.address_encoding
+
+  let method_ = "eth_accounts"
+end)
+
+let methods : (module METHOD) list =
+  [(module Network_id); (module Chain_id); (module Accounts)]
 
 module Input = struct
   type t = input

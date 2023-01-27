@@ -23,45 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
-open Rpc_encodings
+(** Ethereum address (20 bytes) *)
+type address = Address of string [@@ocaml.unboxed]
 
-let version_service =
-  Service.get_service
-    ~description:"version"
-    ~query:Query.empty
-    ~output:Data_encoding.string
-    Path.(root / "version")
+let address_of_string s = Address s
 
-let version dir =
-  Directory.register0 dir version_service (fun () () ->
-      Format.printf "Version\n%!" ;
-      Lwt.return_ok Tezos_version.Bin_version.version_string)
+let address_encoding =
+  Data_encoding.(conv (fun (Address a) -> a) (fun a -> Address a) string)
 
-let dispatch_service =
-  Service.post_service
-    ~query:Query.empty
-    ~input:Input.encoding
-    ~output:Output.encoding
-    Path.(root)
+(** Ethereum generic quantity, always encoded in hexadecimal. *)
+type quantity = Qty of Z.t [@@ocaml.unboxed]
 
-(** Mocked values used until we can retrieve the specific values from an EVM kernel. *)
-module Mock = struct
-  open Ethereum_types
+let quantity_of_z z = Qty z
 
-  let qty_f = quantity_of_z
+let z_to_hexa = Z.format "#x"
 
-  (* Default chain_id for ethereum custom networks with Ganache. *)
-  let chain_id = qty_f (Z.of_int 1337)
-end
-
-let dispatch dir =
-  Directory.register0 dir dispatch_service (fun () input ->
-      match input with
-      | Accounts.Input _ -> Lwt.return_ok (Accounts.Output (Ok []))
-      | Network_id.Input _ ->
-          Lwt.return_ok (Network_id.Output (Ok Mock.chain_id))
-      | Chain_id.Input _ -> Lwt.return_ok (Chain_id.Output (Ok Mock.chain_id))
-      | _ -> Error_monad.failwith "Unsupported method\n%!")
-
-let directory = Directory.empty |> version |> dispatch
+let quantity_encoding =
+  Data_encoding.conv
+    (fun (Qty q) -> z_to_hexa q)
+    (fun q -> Qty (Z.of_string q))
+    Data_encoding.string
