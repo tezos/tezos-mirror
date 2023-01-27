@@ -333,6 +333,17 @@ let pp_module fmtr items =
   pp_print_list ~pp_sep:(fun fmtr () -> fprintf fmtr "@;@;") pp_code fmtr items ;
   fprintf fmtr "@]@;"
 
+let pp_module fmtr items =
+  let s = Format.asprintf "%a" pp_module items in
+  let s =
+    match Ocamlformat.impl s with
+    | Ok s -> s
+    | Error e ->
+        Format.eprintf "ocamlformat failed: %s@." (Printexc.to_string e) ;
+        s
+  in
+  Format.pp_print_string fmtr s
+
 let make_toplevel_module structure_items =
   let open Ast_helper in
   let open Codegen_helpers in
@@ -378,11 +389,8 @@ let make_toplevel_module structure_items =
 let comment ss = Comment ss
 
 let function_name model_name =
-  "cost_" ^
-  String.map (function
-      | '.' -> '_'
-      | c -> c)
-    (Namespace.basename model_name)
+  "cost_"
+  ^ String.map (function '.' -> '_' | c -> c) (Namespace.basename model_name)
 
 let codegen (Model.Model model) (sol : solution)
     (transform : Costlang.transform) model_name =
@@ -551,11 +559,12 @@ let%expect_test "module_generation" =
     [@@@warning "-33"]
 
     module S = Saturation_repr
-
     open S.Syntax
 
     (* comment *)
-    let func_name x = let x = S.safe_int x in x |}]
+    let func_name x =
+      let x = S.safe_int x in
+      x |}]
 
 (* Module to get the name of cost functions manually/automatically defined
    in a source file *)
