@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type config = {rpc_addr : string; rpc_port : int}
+type config = {rpc_addr : string; rpc_port : int; debug : bool}
 
-let default_config = {rpc_addr = "127.0.0.1"; rpc_port = 8545}
+let default_config = {rpc_addr = "127.0.0.1"; rpc_port = 8545; debug = true}
 
 let install_finalizer server =
   let open Lwt_syntax in
@@ -33,7 +33,26 @@ let install_finalizer server =
   let+ () = Tezos_rpc_http_server.RPC_server.shutdown server in
   Format.printf "Server exited with code %d\n%!" exit_status
 
-let start {rpc_addr; rpc_port} =
+let callback_log server conn req body =
+  let open Cohttp in
+  let open Lwt_syntax in
+  let uri = req |> Request.uri |> Uri.to_string in
+  let meth = req |> Request.meth |> Code.string_of_method in
+  let headers = req |> Request.headers |> Header.to_string in
+  let* body_str = body |> Cohttp_lwt.Body.to_string in
+  Format.printf
+    "Uri: %s\nMethod: %s\nHeaders\nHeaders: %s\nBody: %s\n%!"
+    uri
+    meth
+    headers
+    body_str ;
+  Tezos_rpc_http_server.RPC_server.resto_callback
+    server
+    conn
+    req
+    (Cohttp_lwt.Body.of_string body_str)
+
+let start {rpc_addr; rpc_port; debug} =
   let open Lwt_syntax in
   let open Tezos_rpc_http_server in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
@@ -53,7 +72,9 @@ let start {rpc_addr; rpc_port} =
         RPC_server.launch
           ~host
           server
-          ~callback:(RPC_server.resto_callback server)
+          ~callback:
+            (if debug then callback_log server
+            else RPC_server.resto_callback server)
           node
       in
       return server)
