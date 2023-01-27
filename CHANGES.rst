@@ -113,8 +113,11 @@ Docker Images
 
 - Change Python versions to 3.10.10.
 
-Rollups
--------
+Smart Rollup node
+-----------------
+
+Smart Rollup client
+-------------------
 
 Miscellaneous
 -------------
