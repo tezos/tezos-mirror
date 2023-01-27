@@ -617,3 +617,15 @@ let conflict_handler config : Mempool.conflict_handler =
     | Ok _ | Error _ -> `Keep
   else if Operation.compare existing_operation new_operation < 0 then `Replace
   else `Keep
+
+module Internal_for_tests = struct
+  let default_config_with_clock_drift clock_drift =
+    {default_config with clock_drift}
+
+  let default_config_with_replace_factor replace_by_fee_factor =
+    {default_config with replace_by_fee_factor}
+
+  let get_clock_drift {clock_drift; _} = clock_drift
+
+  let acceptable_op = acceptable_op
+end

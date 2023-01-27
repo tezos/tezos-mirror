@@ -32,8 +32,8 @@
 *)
 
 open Qcheck2_helpers
-open Plugin.Mempool
 open Alpha_context
+open Plugin.Mempool.Internal_for_tests
 
 (** {2. Conversion helpers} *)
 
@@ -53,14 +53,14 @@ module Generator = struct
         (fun drift_int -> Period.of_seconds_exn (Int64.of_int drift_int))
         drift_int_opt
     in
-    return {default_config with clock_drift}
+    return (default_config_with_clock_drift clock_drift)
 
   let print_config =
     decorate ~prefix:"clock_drift " (fun config ->
         Option.fold
           ~none:"round_0 duration"
           ~some:(fun drift -> Int64.to_string @@ Period.to_seconds drift)
-          config.clock_drift)
+          (get_clock_drift config))
 
   let of_result = Result.value_f ~default:(fun _ -> assert false)
 
@@ -286,7 +286,7 @@ let test_acceptable_current_level =
             ~proposal_round
             ~round:op_round
         >>? fun expected_time ->
-          max_ts config.clock_drift proposal_timestamp now_timestamp
+          max_ts (get_clock_drift config) proposal_timestamp now_timestamp
           >>? fun max_timestamp -> ok Timestamp.(expected_time <= max_timestamp)
         )
       ==> no_error
@@ -325,7 +325,7 @@ let test_not_acceptable_current_level =
             ~proposal_round
             ~round:op_round
         >>? fun expected_time ->
-          max_ts config.clock_drift proposal_timestamp now_timestamp
+          max_ts (get_clock_drift config) proposal_timestamp now_timestamp
           >>? fun max_timestamp ->
           ok
             Timestamp.(
@@ -374,7 +374,7 @@ let test_acceptable_next_level =
             ~predecessor_round:Round.zero
             ~round:op_round
           >>? fun expected_time ->
-          max_ts config.clock_drift proposal_timestamp now_timestamp
+          max_ts (get_clock_drift config) proposal_timestamp now_timestamp
           >>? fun max_timestamp -> ok Timestamp.(expected_time <= max_timestamp)
         )
       ==> no_error
@@ -425,7 +425,7 @@ let test_not_acceptable_next_level =
                proposal_timestamp
                +? Round.round_duration round_durations proposal_round)
              >>? fun next_level_ts ->
-             max_ts config.clock_drift next_level_ts now_timestamp
+             max_ts (get_clock_drift config) next_level_ts now_timestamp
              >>? fun max_timestamp ->
              ok Timestamp.(expected_time > max_timestamp) ) ;
       no_error
