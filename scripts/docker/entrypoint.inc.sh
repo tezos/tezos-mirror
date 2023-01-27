@@ -23,6 +23,7 @@ configure_client() {
                   config init --output "$_client_config" >/dev/null 2>&1
     else
         "$client" --base-dir "$client_dir" \
+                  --config-file "$_client_config" \
                   --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
                   config update >/dev/null 2>&1
     fi
