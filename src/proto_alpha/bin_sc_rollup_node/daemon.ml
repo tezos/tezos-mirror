@@ -42,12 +42,12 @@ module Make (PVM : Pvm.S) = struct
         Sc_rollup_publish_result {published_at_level; _} )
       when Node_context.is_operator node_ctxt source ->
         (* Published commitment --------------------------------------------- *)
-        let is_newest_lpc =
+        let save_lpc =
           match node_ctxt.lpc with
           | None -> true
-          | Some lpc -> Raw_level.(commitment.inbox_level > lpc.inbox_level)
+          | Some lpc -> Raw_level.(commitment.inbox_level >= lpc.inbox_level)
         in
-        if is_newest_lpc then node_ctxt.lpc <- Some commitment ;
+        if save_lpc then node_ctxt.lpc <- Some commitment ;
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
@@ -55,12 +55,64 @@ module Make (PVM : Pvm.S) = struct
           Store.Commitments_published_at_level.add
             node_ctxt.store
             commitment_hash
-            published_at_level
+            {
+              first_published_at_level = published_at_level;
+              published_at_level =
+                Some (Raw_level.of_int32_exn head.Layer1.level);
+            }
         in
         return_unit
+    | ( Sc_rollup_publish {commitment; _},
+        Sc_rollup_publish_result {published_at_level; _} ) ->
+        (* Commitment published by someone else *)
+        let commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment
+        in
+        let*! known_commitment =
+          Store.Commitments.mem node_ctxt.store commitment_hash
+        in
+        if not known_commitment then return_unit
+        else
+          let*! republication =
+            Store.Commitments_published_at_level.mem
+              node_ctxt.store
+              commitment_hash
+          in
+          if republication then return_unit
+          else
+            let*! () =
+              Store.Commitments_published_at_level.add
+                node_ctxt.store
+                commitment_hash
+                {
+                  first_published_at_level = published_at_level;
+                  published_at_level = None;
+                }
+            in
+            return_unit
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
+        let* inbox_block_hash =
+          State.hash_of_level node_ctxt (Raw_level.to_int32 inbox_level)
+        in
+        let*! inbox_block =
+          Store.L2_blocks.get node_ctxt.store inbox_block_hash
+        in
+        let*? () =
+          (* We stop the node if we disagree with a cemented commitment *)
+          error_unless
+            (Option.equal
+               Sc_rollup.Commitment.Hash.( = )
+               inbox_block.header.commitment_hash
+               (Some commitment))
+            (Sc_rollup_node_errors.Disagree_with_cemented
+               {
+                 inbox_level;
+                 ours = inbox_block.header.commitment_hash;
+                 on_l1 = commitment;
+               })
+        in
         let*! () =
           if Raw_level.(inbox_level > node_ctxt.lcc.level) then (
             node_ctxt.lcc <- {commitment; level = inbox_level} ;
@@ -92,7 +144,7 @@ module Make (PVM : Pvm.S) = struct
         let*! () =
           Store.Dal_slots_headers.add
             node_ctxt.store
-            ~primary_key:head
+            ~primary_key:head.Layer1.hash
             ~secondary_key:slot_header.id.index
             slot_header
         in
@@ -147,14 +199,15 @@ module Make (PVM : Pvm.S) = struct
           (* No action for non successful operations  *)
           return_unit
 
-  let process_l1_block_operations ~finalized node_ctxt Layer1.{hash; _} =
+  let process_l1_block_operations ~finalized node_ctxt
+      (Layer1.{hash; _} as head) =
     let open Lwt_result_syntax in
     let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
         result =
       let open Lwt_result_syntax in
       let* () = accu in
-      process_l1_operation ~finalized node_ctxt hash ~source operation result
+      process_l1_operation ~finalized node_ctxt head ~source operation result
     in
     let apply_internal (type kind) accu ~source:_
         (_operation : kind Apply_internal_results.internal_operation)
@@ -179,7 +232,7 @@ module Make (PVM : Pvm.S) = struct
     let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
     let already_finalized =
       match last_finalized with
-      | Some Layer1.{level = finalized_level; _} -> level <= finalized_level
+      | Some finalized -> level <= Raw_level.to_int32 finalized.header.level
       | None -> false
     in
     unless (already_finalized || before_origination node_ctxt block)
@@ -190,7 +243,7 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
-    let*! () = State.mark_finalized_head node_ctxt.store block in
+    let*! () = State.mark_finalized_head node_ctxt.store hash in
     return_unit
 
   let process_head (node_ctxt : _ Node_context.t) Layer1.({hash; level} as head)
@@ -259,12 +312,6 @@ module Make (PVM : Pvm.S) = struct
     in
     let* () = processed_finalized_block node_ctxt finalized_block in
     let*! () = State.save_l2_block node_ctxt.store l2_block in
-    (* Publishing a commitment when one is available does not depend on the
-       state of the current head. *)
-    let* () = Components.Commitment.publish_commitment node_ctxt in
-    let* () =
-      Components.Commitment.cement_commitment_if_possible node_ctxt head
-    in
     let*! () =
       Daemon_event.new_head_processed hash (Raw_level.to_int32 level)
     in
@@ -331,6 +378,8 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
+    let* () = Components.Commitment.publish_commitments node_ctxt in
+    let* () = Components.Commitment.cement_commitments node_ctxt in
     let* () = notify_injector node_ctxt new_head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let* () = Components.Refutation_game.process head node_ctxt in

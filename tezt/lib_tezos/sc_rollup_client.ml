@@ -59,17 +59,27 @@ let commitment_from_json json =
     let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
     Some {compressed_state; inbox_level; predecessor; number_of_ticks}
 
-let commitment_with_hash_and_level_from_json json =
-  let hash, commitment_json, published_at_level =
+let commitment_with_hash_from_json json =
+  let hash, commitment_json =
+    (JSON.get "hash" json, JSON.get "commitment" json)
+  in
+  Option.map
+    (fun commitment -> (JSON.as_string hash, commitment))
+    (commitment_from_json commitment_json)
+
+let commitment_with_hash_and_levels_from_json json =
+  let hash, commitment_json, first_published_at_level, included_at_level =
     ( JSON.get "hash" json,
       JSON.get "commitment" json,
-      JSON.get "published_at_level" json )
+      JSON.get "first_published_at_level" json,
+      JSON.get "included_at_level" json )
   in
   Option.map
     (fun commitment ->
       ( JSON.as_string hash,
         commitment,
-        published_at_level |> JSON.as_opt |> Option.map JSON.as_int ))
+        first_published_at_level |> JSON.as_opt |> Option.map JSON.as_int,
+        included_at_level |> JSON.as_opt |> Option.map JSON.as_int ))
     (commitment_from_json commitment_json)
 
 let next_name = ref 1
@@ -250,11 +260,11 @@ let outbox ?hooks ?(block = "cemented") ~outbox_level sc_client =
 
 let last_stored_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]
-  |> Runnable.map commitment_with_hash_and_level_from_json
+  |> Runnable.map commitment_with_hash_from_json
 
 let last_published_commitment ?hooks sc_client =
   rpc_get ?hooks sc_client ["local"; "last_published_commitment"]
-  |> Runnable.map commitment_with_hash_and_level_from_json
+  |> Runnable.map commitment_with_hash_and_levels_from_json
 
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
   rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
