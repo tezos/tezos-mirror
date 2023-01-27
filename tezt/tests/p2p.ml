@@ -429,11 +429,73 @@ module Known_Points_GC = struct
     test_non_trusted_removal ()
 end
 
+module Connect_handler = struct
+  (* Try to connect two nodes from different networks
+     and check that the p2p handshake is rejected. *)
+  let connected_peers_with_different_chain_name_test () =
+    Test.register
+      ~__FILE__
+      ~title:"peers with different chain name"
+      ~tags:["p2p"; "connect_handler"]
+    @@ fun () ->
+    let addr_of_port port = "127.0.0.1:" ^ string_of_int port in
+    let create_node ?chain_name ?peer_port port =
+      let peer_arg =
+        Option.map (fun p -> Node.Peer (addr_of_port p)) peer_port
+        |> Option.to_list
+      in
+      let node = Node.create ~net_port:port (Connections 1 :: peer_arg) in
+      let* () = Node.identity_generate node in
+      let* () = Node.config_init node [] in
+      Option.iter
+        (fun name ->
+          Node.Config_file.update node (fun json ->
+              (* Loads a full unsugared "ghostnet" configuration,
+                 so that we can update the chain_name separately
+                 without depending on a network alias. *)
+              Node.Config_file.set_ghostnet_sandbox_network () json
+              |> JSON.update
+                   "network"
+                   (JSON.put
+                      ( "chain_name",
+                        JSON.annotate ~origin:__LOC__ (`String name) ))))
+        chain_name ;
+      Lwt.return node
+    in
+    let run_node node = Node.run ~event_level:`Debug node [] in
+    let wait_for_nack node port =
+      let open JSON in
+      Node.wait_for node "authenticate_status.v0" (fun json ->
+          let typ = json |-> "type" |> as_string in
+          let point = json |-> "point" |> as_string in
+          if typ = "nack" && point = addr_of_port port then Some () else None)
+    in
+
+    let port1, port2 = (Port.fresh (), Port.fresh ()) in
+    let* node1 = create_node port1 in
+    let* node2 = create_node ~chain_name:"__dummy__" ~peer_port:port1 port2 in
+
+    let ready1_event = Node.wait_for_ready node1 in
+    let ready2_event = Node.wait_for_ready node2 in
+    let nack1_event = wait_for_nack node1 port2 in
+    let nack2_event = wait_for_nack node2 port1 in
+
+    let* () = run_node node1 in
+    let* () = ready1_event in
+    let* () = run_node node2 in
+    let* () = ready2_event in
+    let* () = nack1_event and* () = nack2_event in
+    unit
+
+  let tests () = connected_peers_with_different_chain_name_test ()
+end
+
 let register_protocol_independent () =
   Maintenance.tests () ;
   ACL.tests () ;
   test_advertised_port () ;
-  Known_Points_GC.tests ()
+  Known_Points_GC.tests () ;
+  Connect_handler.tests ()
 
 let register ~(protocols : Protocol.t list) =
   check_peer_option protocols ;
