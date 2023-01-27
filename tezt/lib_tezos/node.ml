@@ -459,6 +459,14 @@ let snapshot_export ?history_mode ?export_level ?export_format node file =
   spawn_snapshot_export ?history_mode ?export_level ?export_format node file
   |> Process.check
 
+let spawn_snapshot_info ?(json = false) node file =
+  spawn_command
+    node
+    (["snapshot"; "info"] @ (if json then ["--json"] else []) @ [file])
+
+let snapshot_info ?json node file =
+  spawn_snapshot_info ?json node file |> Process.check
+
 let spawn_snapshot_import ?(reconstruct = false) node file =
   spawn_command
     node
