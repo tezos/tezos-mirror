@@ -44,6 +44,21 @@
 open Protocol
 open Alpha_context
 
+module Lwt_result_option_syntax = struct
+  let ( let** ) a f =
+    let open Lwt_result_syntax in
+    let* a = a in
+    match a with None -> return_none | Some a -> f a
+end
+
+module Lwt_result_option_list_syntax = struct
+  (** A small monadic combinator to return an empty list on None results. *)
+  let ( let*& ) x f =
+    let open Lwt_result_syntax in
+    let* x = x in
+    match x with None -> return_nil | Some x -> f x
+end
+
 let add_level level increment =
   (* We only use this function with positive increments so it is safe *)
   if increment < 0 then invalid_arg "Commitment.add_level negative increment" ;
@@ -161,13 +176,13 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     match commitment with
     | None -> return_none
     | Some commitment ->
-        let*! commitment_hash =
+        let* commitment_hash =
           Node_context.save_commitment node_ctxt commitment
         in
         return_some commitment_hash
 
   let missing_commitments (node_ctxt : _ Node_context.t) =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let lpc_level =
       match node_ctxt.lpc with
       | None -> node_ctxt.genesis_info.level
@@ -240,17 +255,18 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         (* Configured to not publish commitments *)
         return_unit
     | Some source ->
-        let*! commitments = missing_commitments node_ctxt in
+        let* commitments = missing_commitments node_ctxt in
         List.iter_es (publish_commitment node_ctxt ~source) commitments
 
   (* Commitments can only be cemented after [sc_rollup_challenge_window] has
      passed since they were first published. *)
   let earliest_cementing_level node_ctxt commitment_hash =
-    let open Lwt_option_syntax in
-    let+ {first_published_at_level; _} =
+    let open Lwt_result_option_syntax in
+    let** {first_published_at_level; _} =
       Node_context.commitment_published_at_level node_ctxt commitment_hash
     in
-    add_level first_published_at_level (sc_rollup_challenge_window node_ctxt)
+    return_some
+    @@ add_level first_published_at_level (sc_rollup_challenge_window node_ctxt)
 
   (** [latest_cementable_commitment node_ctxt head] is the most recent commitment
       hash that could be cemented in [head]'s successor if:
@@ -262,15 +278,17 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       start the search for cementable commitments. *)
   let latest_cementable_commitment (node_ctxt : _ Node_context.t)
       (head : Sc_rollup_block.t) =
-    let open Lwt_option_syntax in
+    let open Lwt_result_option_syntax in
     let commitment_hash = Sc_rollup_block.most_recent_commitment head.header in
-    let* commitment = Node_context.find_commitment node_ctxt commitment_hash in
-    let*? cementable_level_bound =
-      sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
+    let** commitment = Node_context.find_commitment node_ctxt commitment_hash in
+    let** cementable_level_bound =
+      return
+      @@ sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
     in
-    if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then fail
+    if Raw_level.(cementable_level_bound <= node_ctxt.lcc.level) then
+      return_none
     else
-      let* cementable_bound_block =
+      let** cementable_bound_block =
         Node_context.find_l2_block_by_level
           node_ctxt
           (Raw_level.to_int32 cementable_level_bound)
@@ -278,20 +296,14 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let cementable_commitment =
         Sc_rollup_block.most_recent_commitment cementable_bound_block.header
       in
-      return cementable_commitment
+      return_some cementable_commitment
 
   let cementable_commitments (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
-    let ( let*& ) x f =
-      (* A small monadic combinator to return an empty list of cementable
-         commitments on None results. *)
-      let*! x = x in
-      match x with None -> return_nil | Some x -> f x
-    in
+    let open Lwt_result_option_list_syntax in
     let*& head = Node_context.last_processed_head_opt node_ctxt in
     let head_level = head.header.level in
     let rec gather acc (commitment_hash : Sc_rollup.Commitment.Hash.t) =
-      let open Lwt_syntax in
       let* commitment =
         Node_context.find_commitment node_ctxt commitment_hash
       in
@@ -325,7 +337,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let*& latest_cementable_commitment =
       latest_cementable_commitment node_ctxt head
     in
-    let*! cementable = gather [] latest_cementable_commitment in
+    let* cementable = gather [] latest_cementable_commitment in
     match cementable with
     | [] -> return_nil
     | first_cementable :: _ ->
