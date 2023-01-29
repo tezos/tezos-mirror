@@ -40,6 +40,7 @@ module Parameters = struct
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
+    runner : Runner.t option;
   }
 
   type session_state = {mutable ready : bool; mutable level : int known}
@@ -111,7 +112,11 @@ let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
 let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 
 let spawn_command sc_node args =
-  Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
+  Process.spawn
+    ?runner:sc_node.persistent_state.runner
+    ~name:sc_node.name
+    ~color:sc_node.color
+    sc_node.path
   @@ ["--base-dir"; base_dir sc_node]
   @ args
 
@@ -247,7 +252,7 @@ let handle_event sc_node {name; value; timestamp = _} =
       update_level sc_node level
   | _ -> ()
 
-let create ~protocol ?name ?color ?data_dir ?event_pipe
+let create ~protocol ?runner ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
     ?(dal_node : Dal_node.t option) mode (node : Node.t) (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
@@ -262,6 +267,7 @@ let create ~protocol ?name ?color ?data_dir ?event_pipe
     create
       ~path
       ~name
+      ?runner
       ?color
       ?event_pipe
       {
@@ -276,6 +282,7 @@ let create ~protocol ?name ?color ?data_dir ?event_pipe
         dal_node;
         pending_ready = [];
         pending_level = [];
+        runner;
       }
   in
   on_event sc_node (handle_event sc_node) ;
@@ -299,7 +306,12 @@ let do_runlike_command node arguments =
     unit
   in
   let arguments = make_arguments node @ arguments in
-  run node {ready = false; level = Unknown} arguments ~on_terminate
+  run
+    ?runner:node.persistent_state.runner
+    node
+    {ready = false; level = Unknown}
+    arguments
+    ~on_terminate
 
 let run node arguments =
   do_runlike_command
