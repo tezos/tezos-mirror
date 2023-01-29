@@ -197,15 +197,22 @@ module Curl : sig
 
       Fails if [curl] is not found in path.
   *)
-  val get : ?args:string list -> string -> JSON.t Runnable.process
+  val get :
+    ?runner:Runner.t -> ?args:string list -> string -> JSON.t Runnable.process
 
   (** Same as [get] but does not parse the returned value *)
-  val get_raw : ?args:string list -> string -> string Runnable.process
+  val get_raw :
+    ?runner:Runner.t -> ?args:string list -> string -> string Runnable.process
 
   (** [post url data] returns a runnable posting [data] to [url] with curl.
 
       The response is parsed and returned as JSON.
 
       Fails if [curl] is not found in path. *)
-  val post : ?args:string list -> string -> JSON.t -> JSON.t Runnable.process
+  val post :
+    ?runner:Runner.t ->
+    ?args:string list ->
+    string ->
+    JSON.t ->
+    JSON.t Runnable.process
 end
