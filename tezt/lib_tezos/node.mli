@@ -74,6 +74,7 @@ type argument =
   | Sync_latency of int  (** [--sync-latency] *)
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
+  | Disable_p2p_maintenance  (** [--disable-p2p-maintenance] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
@@ -164,6 +165,10 @@ val get_peers : t -> string list
     Same as [add_argument node (Peer "127.0.0.1:<PORT>#<ID>")]
     where [<PORT>] is the P2P port and [<ID>] is the identity of [peer]. *)
 val add_peer_with_id : t -> t -> unit Lwt.t
+
+(** Removes the file peers.json that is at the root of data-dir.
+    This file contains the list of peers known by the node. *)
+val remove_peers_json_file : t -> unit
 
 (** Get the P2P point and id for a node.
 

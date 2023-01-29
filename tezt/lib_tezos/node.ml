@@ -46,6 +46,7 @@ type argument =
   | Sync_latency of int
   | Connections of int
   | Private_mode
+  | Disable_p2p_maintenance
   | Peer of string
   | No_bootstrap_peers
   | Disable_operations_precheck
@@ -72,6 +73,7 @@ let make_argument = function
   | Sync_latency x -> ["--sync-latency"; string_of_int x]
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
+  | Disable_p2p_maintenance -> ["--disable-p2p-maintenance"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
   | Disable_operations_precheck -> ["--disable-mempool-precheck"]
@@ -97,6 +99,7 @@ let is_redundant = function
   | Sync_latency _, Sync_latency _
   | Connections _, Connections _
   | Private_mode, Private_mode
+  | Disable_p2p_maintenance, Disable_p2p_maintenance
   | No_bootstrap_peers, No_bootstrap_peers
   | Disable_operations_precheck, Disable_operations_precheck
   | Media_type _, Media_type _
@@ -113,6 +116,7 @@ let is_redundant = function
   | Sync_latency _, _
   | Connections _, _
   | Private_mode, _
+  | Disable_p2p_maintenance, _
   | No_bootstrap_peers, _
   | Disable_operations_precheck, _
   | Media_type _, _
@@ -685,6 +689,11 @@ let get_peers node =
   List.filter_map
     (fun arg -> match arg with Peer s -> Some s | _ -> None)
     node.persistent_state.arguments
+
+let remove_peers_json_file node =
+  let filename = sf "%s/peers.json" (data_dir node) in
+  Log.info "Removing file %s" filename ;
+  Sys.remove filename
 
 (** [runlike_command_arguments node command arguments]
     evaluates in a list of strings containing all command
