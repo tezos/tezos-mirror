@@ -184,9 +184,7 @@ server obtained its data by reading the node's data-dir, instead of performing R
 Additional arguments
 ~~~~~~~~~~~~~~~~~~~~
 
-We describe the entire list of arguments of the proxy server. This
-documentation is also available with ``./octez-proxy-server --help``.
-Here is the list of possible options:
+We describe the entire list of options and arguments of the proxy server, also available in more concise form in the :ref:`proxy_server_manual`:
 
 * ``-c`` and ``--config`` specify the JSON file to use an input
   for the configuration. This JSON file is an object like this:
