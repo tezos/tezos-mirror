@@ -175,7 +175,6 @@ Core developers are also provided reference materials for internal APIs of Octez
    user/versioning
    user/setup-client
    user/setup-node
-   user/proxy-server
    user/multisig
    user/fa12
    user/logging
