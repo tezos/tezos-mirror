@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -26,7 +26,7 @@
 
 (* Testing
    -------
-   Component:    Smart Contract Optimistic Rollups
+   Component:    Smart Optimistic Rollups
    Invocation:   dune exec tezt/tests/main.exe -- --file sc_rollup.ml
 *)
 
@@ -698,21 +698,6 @@ let get_inbox_from_tezos_node client =
 let get_inbox_from_sc_rollup_node sc_rollup_node =
   let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
   parse_inbox inbox
-
-let fetch_messages_from_block client =
-  let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
-  let messages =
-    ops |> JSON.as_list
-    |> List.concat_map JSON.as_list
-    |> List.concat_map (fun op -> JSON.(op |-> "contents" |> as_list))
-    |> List.filter_map (fun op ->
-           if JSON.(op |-> "kind" |> as_string) = "smart_rollup_add_messages"
-           then Some JSON.(op |-> "message" |> as_list)
-           else None)
-    |> List.hd
-    |> List.map (fun message -> JSON.(message |> as_string))
-  in
-  return messages
 
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
