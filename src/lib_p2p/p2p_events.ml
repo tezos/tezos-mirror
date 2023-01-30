@@ -456,13 +456,101 @@ module P2p_maintainance = struct
 
   let section = ["p2p"; "maintenance"]
 
+  type maintenance_trigger_motive =
+    | Activation
+    | Last_maintenance
+    | External
+    | Timer of Ptime.span
+    | Too_few_connections
+    | Too_many_connections
+
+  let motive_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"activation"
+          ~description:
+            "This maintenance step was triggered by its initial activation"
+          (Tag 0)
+          (obj1 (req "kind" (constant "activation")))
+          (function Activation -> Some () | _ -> None)
+          (fun () -> Activation);
+        case
+          ~title:"last_maintenance"
+          ~description:"This maintenance step was triggered by the previous one"
+          (Tag 1)
+          (obj1 (req "kind" (constant "last_maintenance")))
+          (function Last_maintenance -> Some () | _ -> None)
+          (fun () -> Last_maintenance);
+        case
+          ~title:"timer"
+          ~description:
+            "This maintenance step was triggered by periodically checks."
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "timer"))
+             (req "idle_time" Time.System.Span.encoding))
+          (function Timer span -> Some ((), span) | _ -> None)
+          (fun ((), span) -> Timer span);
+        case
+          ~title:"external_event"
+          ~description:
+            "This maintenance step was triggered by an external event"
+          (Tag 3)
+          (obj1 (req "kind" (constant "external_event")))
+          (function External -> Some () | _ -> None)
+          (fun () -> External);
+        case
+          ~title:"too_few_connections"
+          ~description:
+            "This maintenance step was urgently triggered by a lack of \
+             connections"
+          (Tag 4)
+          (obj1 (req "kind" (constant "too_few_connections")))
+          (function Too_few_connections -> Some () | _ -> None)
+          (fun () -> Too_few_connections);
+        case
+          ~title:"too_many_connections"
+          ~description:
+            "This maintenance step was urgently triggered by an excess of \
+             connections"
+          (Tag 5)
+          (obj1 (req "kind" (constant "too_many_connections")))
+          (function Too_many_connections -> Some () | _ -> None)
+          (fun () -> Too_many_connections);
+      ]
+
+  let motive_pp fmt = function
+    | Activation -> Format.pp_print_string fmt "activation"
+    | Last_maintenance -> Format.pp_print_string fmt "last maintenance"
+    | External -> Format.pp_print_string fmt "external"
+    | Timer span ->
+        Format.fprintf
+          fmt
+          "periodically checks every %a."
+          Time.System.Span.pp_hum
+          span
+    | Too_few_connections -> Format.pp_print_string fmt "too few connections"
+    | Too_many_connections -> Format.pp_print_string fmt "too many connections"
+
+  let maintenance_started =
+    declare_1
+      ~section
+      ~name:"maintenance_started"
+      ~msg:"maintenance step started (triggered by:{motive})"
+      ~level:Info
+      ~pp1:motive_pp
+      ("motive", motive_encoding)
+
   let maintenance_ended =
-    declare_0
+    declare_1
       ~section
       ~name:"maintenance_ended"
-      ~msg:"maintenance step ended"
+      ~msg:"maintenance step ended after {duration}"
       ~level:Info
-      ()
+      ~pp1:Time.System.Span.pp_hum
+      ("duration", Time.System.Span.encoding)
 
   let too_few_connections =
     declare_1
