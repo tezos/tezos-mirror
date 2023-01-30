@@ -100,3 +100,8 @@ Sapling, etc), and some details about its implementation.
    :maxdepth: 2
 
    validation
+
+.. toctree::
+   :maxdepth: 2
+
+   tickets
