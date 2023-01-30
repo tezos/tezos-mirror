@@ -57,18 +57,18 @@ let test_simple_balances () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
-  let src = `Contract (Contract.Implicit pkh) in
+  let giver = `Contract (Contract.Implicit pkh) in
   let pkh, _pk, _sk = Signature.generate_key () in
   let dest = `Contract (Contract.Implicit pkh) in
   let amount = Tez.one in
-  wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
-  wrap (Token.balance ctxt src) >>=? fun (ctxt, bal_src) ->
-  wrap (Token.balance ctxt' src) >>=? fun (ctxt', bal_src') ->
+  wrap (Token.transfer ctxt giver dest amount) >>=? fun (ctxt', _) ->
+  wrap (Token.balance ctxt giver) >>=? fun (ctxt, bal_giver) ->
+  wrap (Token.balance ctxt' giver) >>=? fun (ctxt', bal_giver') ->
   wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
   wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
-  bal_src' +? amount >>?= fun add_bal_src'_amount ->
+  bal_giver' +? amount >>?= fun add_bal_giver'_amount ->
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
-  Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount >>=? fun () ->
+  Assert.equal_tez ~loc:__LOC__ bal_giver add_bal_giver'_amount >>=? fun () ->
   Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
 
 (** Check balance updates for a simple transfer from [bootstrap] to new
@@ -77,19 +77,19 @@ let test_simple_balance_updates () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
-  let src = Contract.Implicit pkh in
+  let giver = Contract.Implicit pkh in
   let pkh, _pk, _sk = Signature.generate_key () in
   let dest = Contract.Implicit pkh in
   let amount = Tez.one in
-  wrap (Token.transfer ctxt (`Contract src) (`Contract dest) amount)
+  wrap (Token.transfer ctxt (`Contract giver) (`Contract dest) amount)
   >>=? fun (_, bal_updates) ->
   Alcotest.(
     check
       bool
-      "Missing balance update for source contract."
+      "Missing balance update for giver contract."
       (List.mem
          ~equal:( = )
-         Receipt.(Contract src, Debited amount, Block_application)
+         Receipt.(Contract giver, Debited amount, Block_application)
          bal_updates)
       true) ;
   Alcotest.(
@@ -304,21 +304,21 @@ let test_transferring_to_sink () =
   test_transferring_to_burned ctxt >>=? fun () ->
   test_transferring_to_frozen_bonds ctxt
 
-let check_src_balances ctxt ctxt' src amount =
+let check_giver_balances ctxt ctxt' giver amount =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.balance ctxt src) >>=? fun (_, bal_src) ->
-  wrap (Token.balance ctxt' src) >>=? fun (_, bal_src') ->
-  bal_src' +? amount >>?= fun add_bal_src'_amount ->
-  Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount
+  wrap (Token.balance ctxt giver) >>=? fun (_, bal_giver) ->
+  wrap (Token.balance ctxt' giver) >>=? fun (_, bal_giver') ->
+  bal_giver' +? amount >>?= fun add_bal_giver'_amount ->
+  Assert.equal_tez ~loc:__LOC__ bal_giver add_bal_giver'_amount
 
-let test_transferring_from_unbounded_source ctxt src expected_bupds =
+let test_transferring_from_infinite_source ctxt giver expected_bupds =
   let open Lwt_result_wrap_syntax in
   (* Transferring zero must not return balance updates. *)
-  wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (_, bupds) ->
+  wrap (Token.transfer ctxt giver `Burned Tez.zero) >>=? fun (_, bupds) ->
   Assert.equal_bool ~loc:__LOC__ (bupds = []) true >>=? fun () ->
   (* Test transferring a non null amount. *)
   let amount = random_amount () in
-  wrap (Token.transfer ctxt src `Burned amount) >>=? fun (_, bupds) ->
+  wrap (Token.transfer ctxt giver `Burned amount) >>=? fun (_, bupds) ->
   let expected_bupds =
     expected_bupds amount
     @ Receipt.[(Burned, Credited amount, Block_application)]
@@ -334,14 +334,14 @@ let balance_no_fail ctxt account =
   if allocated then wrap (Token.balance ctxt account)
   else return (ctxt, Tez.zero)
 
-let test_transferring_from_bounded_source ctxt src amount expected_bupds =
+let test_transferring_from_container ctxt giver amount expected_bupds =
   let open Lwt_result_wrap_syntax in
-  balance_no_fail ctxt src >>=? fun (ctxt, balance) ->
+  balance_no_fail ctxt giver >>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
   (* Test transferring from an empty account. *)
-  wrap (Token.transfer ctxt src `Burned Tez.one) >>= fun res ->
+  wrap (Token.transfer ctxt giver `Burned Tez.one) >>= fun res ->
   let error_title =
-    match src with
+    match giver with
     | `Contract _ -> "Balance too low"
     | `Delegate_balance _ | `Frozen_deposits _ | `Frozen_bonds _ ->
         "Storage error (fatal internal error)"
@@ -349,36 +349,36 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   in
   Assert.proto_error_with_info ~loc:__LOC__ res error_title >>=? fun () ->
   (* Transferring zero must be a noop, and must not return balance updates. *)
-  wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
+  wrap (Token.transfer ctxt giver `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun () ->
   (* Force the allocation of [dest] if need be. *)
-  force_allocation_if_need_be ctxt src >>=? fun ctxt ->
+  force_allocation_if_need_be ctxt giver >>=? fun ctxt ->
   (* Test transferring everything. *)
-  wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
-  wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
-  check_src_balances ctxt ctxt' src amount >>=? fun () ->
+  wrap (Token.transfer ctxt `Minted giver amount) >>=? fun (ctxt, _) ->
+  wrap (Token.transfer ctxt giver `Burned amount) >>=? fun (ctxt', bupds) ->
+  check_giver_balances ctxt ctxt' giver amount >>=? fun () ->
   let expected_bupds =
     expected_bupds @ Receipt.[(Burned, Credited amount, Block_application)]
   in
   Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true >>=? fun () ->
   (* Test transferring a smaller amount. *)
-  wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
-  (match src with
+  wrap (Token.transfer ctxt `Minted giver amount) >>=? fun (ctxt, _) ->
+  (match giver with
   | `Frozen_bonds _ ->
-      wrap (Token.transfer ctxt src `Burned amount) >>= fun res ->
+      wrap (Token.transfer ctxt giver `Burned amount) >>= fun res ->
       let error_title = "Partial spending of frozen bonds" in
       Assert.proto_error_with_info ~loc:__LOC__ res error_title
   | _ ->
-      wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
-      check_src_balances ctxt ctxt' src amount >>=? fun () ->
+      wrap (Token.transfer ctxt giver `Burned amount) >>=? fun (ctxt', bupds) ->
+      check_giver_balances ctxt ctxt' giver amount >>=? fun () ->
       Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true)
   >>=? fun () ->
   (* Test transferring more than available. *)
-  wrap (Token.balance ctxt src) >>=? fun (ctxt, balance) ->
-  wrap (Token.transfer ctxt src `Burned (balance +! Tez.one)) >>= fun res ->
+  wrap (Token.balance ctxt giver) >>=? fun (ctxt, balance) ->
+  wrap (Token.transfer ctxt giver `Burned (balance +! Tez.one)) >>= fun res ->
   let error_title =
-    match src with
+    match giver with
     | `Contract _ -> "Balance too low"
     | `Frozen_bonds _ -> "Partial spending of frozen bonds"
     | _ -> "Underflowing tez subtraction"
@@ -387,18 +387,18 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
 
 let test_transferring_from_contract ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
-  let src = Contract.Implicit pkh in
+  let giver = Contract.Implicit pkh in
   let amount = random_amount () in
-  test_transferring_from_bounded_source
+  test_transferring_from_container
     ctxt
-    (`Contract src)
+    (`Contract giver)
     amount
-    [(Contract src, Debited amount, Block_application)]
+    [(Contract giver, Debited amount, Block_application)]
 
 let test_transferring_from_collected_commitments ctxt =
   let amount = random_amount () in
   let bpkh = Blinded_public_key_hash.zero in
-  test_transferring_from_bounded_source
+  test_transferring_from_container
     ctxt
     (`Collected_commitments bpkh)
     amount
@@ -407,17 +407,17 @@ let test_transferring_from_collected_commitments ctxt =
 let test_transferring_from_delegate_balance ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
-  let src = Contract.Implicit pkh in
-  test_transferring_from_bounded_source
+  let giver = Contract.Implicit pkh in
+  test_transferring_from_container
     ctxt
     (`Delegate_balance pkh)
     amount
-    [(Contract src, Debited amount, Block_application)]
+    [(Contract giver, Debited amount, Block_application)]
 
 let test_transferring_from_frozen_deposits ctxt =
   let pkh, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
-  test_transferring_from_bounded_source
+  test_transferring_from_container
     ctxt
     (`Frozen_deposits pkh)
     amount
@@ -425,7 +425,7 @@ let test_transferring_from_frozen_deposits ctxt =
 
 let test_transferring_from_collected_fees ctxt =
   let amount = random_amount () in
-  test_transferring_from_bounded_source
+  test_transferring_from_container
     ctxt
     `Block_fees
     amount
@@ -437,46 +437,46 @@ let test_transferring_from_frozen_bonds ctxt =
   let sc_rollup = sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
   let amount = random_amount () in
-  test_transferring_from_bounded_source
+  test_transferring_from_container
     ctxt
     (`Frozen_bonds (contract, bond_id))
     amount
     [(Frozen_bonds (contract, bond_id), Debited amount, Block_application)]
 
-let test_transferring_from_source () =
+let test_transferring_from_giver () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, _) ->
-  test_transferring_from_unbounded_source ctxt `Invoice (fun am ->
+  test_transferring_from_infinite_source ctxt `Invoice (fun am ->
       [(Invoice, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Bootstrap (fun am ->
+  test_transferring_from_infinite_source ctxt `Bootstrap (fun am ->
       [(Bootstrap, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Initial_commitments (fun am ->
+  test_transferring_from_infinite_source ctxt `Initial_commitments (fun am ->
       [(Initial_commitments, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Revelation_rewards (fun am ->
+  test_transferring_from_infinite_source ctxt `Revelation_rewards (fun am ->
       [(Nonce_revelation_rewards, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source
+  test_transferring_from_infinite_source
     ctxt
     `Double_signing_evidence_rewards
     (fun am ->
       [(Double_signing_evidence_rewards, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Endorsing_rewards (fun am ->
+  test_transferring_from_infinite_source ctxt `Endorsing_rewards (fun am ->
       [(Endorsing_rewards, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Baking_rewards (fun am ->
+  test_transferring_from_infinite_source ctxt `Baking_rewards (fun am ->
       [(Baking_rewards, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Baking_bonuses (fun am ->
+  test_transferring_from_infinite_source ctxt `Baking_bonuses (fun am ->
       [(Baking_bonuses, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source ctxt `Minted (fun am ->
+  test_transferring_from_infinite_source ctxt `Minted (fun am ->
       [(Minted, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_unbounded_source
+  test_transferring_from_infinite_source
     ctxt
     `Liquidity_baking_subsidies
     (fun am -> [(Liquidity_baking_subsidies, Debited am, Block_application)])
@@ -538,7 +538,7 @@ let build_test_cases () =
   let bond_id2 = Bond_id.Sc_rollup_bond_id sc_rollup2 in
   let user1ic = Contract.Implicit user1 in
   let baker2ic = Contract.Implicit baker2 in
-  let src_list =
+  let giver_list =
     [
       (`Invoice, random_amount ());
       (`Bootstrap, random_amount ());
@@ -572,54 +572,54 @@ let build_test_cases () =
       `Burned;
     ]
   in
-  return (ctxt, List.product src_list dest_list)
+  return (ctxt, List.product giver_list dest_list)
 
-let check_src_balances ctxt ctxt' src amount =
-  match cast_to_container_type src with
+let check_giver_balances ctxt ctxt' giver amount =
+  match cast_to_container_type giver with
   | None -> return_unit
-  | Some src -> check_src_balances ctxt ctxt' src amount
+  | Some giver -> check_giver_balances ctxt ctxt' giver amount
 
 let check_sink_balances ctxt ctxt' dest amount =
   match cast_to_container_type dest with
   | None -> return_unit
   | Some dest -> check_sink_balances ctxt ctxt' dest amount
 
-let rec check_balances ctxt ctxt' src dest amount =
+let rec check_balances ctxt ctxt' giver dest amount =
   let open Lwt_result_wrap_syntax in
-  match (cast_to_container_type src, cast_to_container_type dest) with
+  match (cast_to_container_type giver, cast_to_container_type dest) with
   | None, None -> return_unit
   | ( Some (`Delegate_balance d),
       Some (`Contract (Contract.Implicit c) as contract) )
   | ( Some (`Contract (Contract.Implicit c) as contract),
       Some (`Delegate_balance d) )
     when d = c ->
-      (* src and dest are in fact referring to the same contract *)
+      (* giver and dest are in fact referring to the same contract *)
       check_balances ctxt ctxt' contract contract amount
-  | Some src, Some dest when src = dest ->
-      (* src and dest are the same contract *)
+  | Some giver, Some dest when giver = dest ->
+      (* giver and dest are the same contract *)
       wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
       wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
       Assert.equal_tez ~loc:__LOC__ bal_dest bal_dest'
-  | Some src, None -> check_src_balances ctxt ctxt' src amount
+  | Some giver, None -> check_giver_balances ctxt ctxt' giver amount
   | None, Some dest -> check_sink_balances ctxt ctxt' dest amount
-  | Some src, Some dest ->
-      check_src_balances ctxt ctxt' src amount >>=? fun () ->
+  | Some giver, Some dest ->
+      check_giver_balances ctxt ctxt' giver amount >>=? fun () ->
       check_sink_balances ctxt ctxt' dest amount
 
-let test_all_combinations_of_sources_and_sinks () =
+let test_all_combinations_of_givers_and_sinks () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   build_test_cases () >>=? fun (ctxt, cases) ->
   List.iter_es
-    (fun ((src, amount), dest) ->
-      (match cast_to_container_type src with
+    (fun ((giver, amount), dest) ->
+      (match cast_to_container_type giver with
       | None -> return ctxt
-      | Some src ->
-          wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
+      | Some giver ->
+          wrap (Token.transfer ctxt `Minted giver amount) >>=? fun (ctxt, _) ->
           return ctxt)
       >>=? fun ctxt ->
-      wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
-      check_balances ctxt ctxt' src dest amount)
+      wrap (Token.transfer ctxt giver dest amount) >>=? fun (ctxt', _) ->
+      check_balances ctxt ctxt' giver dest amount)
     cases
 
 (** [coalesce (account, Credited am1, origin) (account, Credited am2, origin)
@@ -662,16 +662,16 @@ let check_balances_are_consistent ctxt1 ctxt2 elt =
       return_unit
 
 (** Test that [transfer_n] is equivalent to n debits followed by n credits. *)
-let test_transfer_n ctxt src dest =
+let test_transfer_n ctxt giver dest =
   (* Run transfer_n. *)
-  Token.transfer_n ctxt src dest >>=? fun (ctxt1, bal_updates1) ->
-  (* Debit all sources. *)
+  Token.transfer_n ctxt giver dest >>=? fun (ctxt1, bal_updates1) ->
+  (* Debit all givers. *)
   List.fold_left_es
-    (fun (ctxt, bal_updates) (src, am) ->
-      Token.transfer ctxt src `Burned am >>=? fun (ctxt, debit_logs) ->
+    (fun (ctxt, bal_updates) (giver, am) ->
+      Token.transfer ctxt giver `Burned am >>=? fun (ctxt, debit_logs) ->
       return (ctxt, bal_updates @ debit_logs))
     (ctxt, [])
-    src
+    giver
   >>=? fun (ctxt, debit_logs) ->
   (* remove burning balance updates *)
   let debit_logs =
@@ -679,13 +679,13 @@ let test_transfer_n ctxt src dest =
       (fun b -> match b with Receipt.Burned, _, _ -> false | _ -> true)
       debit_logs
   in
-  (* Credit the sink for each source. *)
+  (* Credit the sink for each giver. *)
   List.fold_left_es
     (fun (ctxt, bal_updates) (_, am) ->
       Token.transfer ctxt `Minted dest am >>=? fun (ctxt, credit_logs) ->
       return (ctxt, bal_updates @ credit_logs))
     (ctxt, [])
-    src
+    giver
   >>=? fun (ctxt2, credit_logs) ->
   (* remove minting balance updates *)
   let credit_logs =
@@ -701,10 +701,10 @@ let test_transfer_n ctxt src dest =
   in
   assert (bal_updates1 = debit_logs @ credit_logs) ;
   (* Check balances are the same in ctxt1 and ctxt2. *)
-  List.(iter_es (check_balances_are_consistent ctxt1 ctxt2) (map fst src))
+  List.(iter_es (check_balances_are_consistent ctxt1 ctxt2) (map fst giver))
   >>=? fun () -> check_balances_are_consistent ctxt1 ctxt2 dest
 
-let test_transfer_n_with_empty_source () =
+let test_transfer_n_with_no_giver () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
@@ -712,7 +712,7 @@ let test_transfer_n_with_empty_source () =
   let dest = `Delegate_balance pkh in
   wrap (test_transfer_n ctxt [] dest)
 
-let test_transfer_n_with_non_empty_source () =
+let test_transfer_n_with_several_givers () =
   let open Lwt_result_wrap_syntax in
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
@@ -734,15 +734,15 @@ let test_transfer_n_with_non_empty_source () =
   wrap (Token.transfer ctxt origin user3c amount) >>=? fun (ctxt, _) ->
   wrap (Token.transfer ctxt origin user4c (random_amount ()))
   >>=? fun (ctxt, _) ->
-  let sources =
+  let givers =
     [
       (user2c, random_amount ());
       (user3c, random_amount ());
       (user4c, random_amount ());
     ]
   in
-  wrap (test_transfer_n ctxt sources user1c) >>=? fun () ->
-  wrap (test_transfer_n ctxt ((user1c, random_amount ()) :: sources) user1c)
+  wrap (test_transfer_n ctxt givers user1c) >>=? fun () ->
+  wrap (test_transfer_n ctxt ((user1c, random_amount ()) :: givers) user1c)
 
 let tests =
   Tztest.
@@ -752,19 +752,19 @@ let tests =
       tztest "transfer - test allocated" `Quick test_allocated;
       tztest "transfer - test transfer to sink" `Quick test_transferring_to_sink;
       tztest
-        "transfer - test transfer from source"
+        "transfer - test transfer from giver"
         `Quick
-        test_transferring_from_source;
+        test_transferring_from_giver;
       tztest
-        "transfer - test all (sources x sinks)"
+        "transfer - test all (givers x sinks)"
         `Quick
-        test_all_combinations_of_sources_and_sinks;
+        test_all_combinations_of_givers_and_sinks;
       tztest
-        "transfer - test from empty sources to a destination"
+        "transfer - test from no giver to a destination"
         `Quick
-        test_transfer_n_with_empty_source;
+        test_transfer_n_with_no_giver;
       tztest
-        "transfer - test from n sources to a destination"
+        "transfer - test from n givers to a destination"
         `Quick
-        test_transfer_n_with_non_empty_source;
+        test_transfer_n_with_several_givers;
     ]

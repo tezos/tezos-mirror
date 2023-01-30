@@ -45,7 +45,7 @@ type infinite_source =
   | `Tx_rollup_rejection_rewards
   | `Sc_rollup_refutation_rewards ]
 
-type source = [infinite_source | container]
+type giver = [infinite_source | container]
 
 type infinite_sink =
   [ `Storage_fees
@@ -158,9 +158,9 @@ let credit ctxt dest amount origin =
           >>=? fun ctxt -> return (ctxt, Frozen_bonds (contract, bond_id))))
   >|=? fun (ctxt, balance) -> (ctxt, (balance, Credited amount, origin))
 
-let spend ctxt src amount origin =
+let spend ctxt giver amount origin =
   let open Receipt_repr in
-  (match src with
+  (match giver with
   | #infinite_source as infinite_source ->
       let src =
         match infinite_source with
@@ -180,9 +180,9 @@ let spend ctxt src amount origin =
       return (ctxt, src)
   | #container as container -> (
       match container with
-      | `Contract src ->
-          Contract_storage.spend_only_call_from_token ctxt src amount
-          >|=? fun ctxt -> (ctxt, Contract src)
+      | `Contract giver ->
+          Contract_storage.spend_only_call_from_token ctxt giver amount
+          >|=? fun ctxt -> (ctxt, Contract giver)
       | `Collected_commitments bpkh ->
           Commitment_storage.decrease_commitment_only_call_from_token
             ctxt
@@ -214,21 +214,21 @@ let spend ctxt src amount origin =
           >>=? fun ctxt -> return (ctxt, Frozen_bonds (contract, bond_id))))
   >|=? fun (ctxt, balance) -> (ctxt, (balance, Debited amount, origin))
 
-let transfer_n ?(origin = Receipt_repr.Block_application) ctxt src dest =
-  let sources = List.filter (fun (_, am) -> Tez_repr.(am <> zero)) src in
-  match sources with
+let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers dest =
+  let givers = List.filter (fun (_, am) -> Tez_repr.(am <> zero)) givers in
+  match givers with
   | [] ->
       (* Avoid accessing context data when there is nothing to transfer. *)
       return (ctxt, [])
   | _ :: _ ->
-      (* Withdraw from sources. *)
+      (* Withdraw from givers. *)
       List.fold_left_es
-        (fun (ctxt, total, debit_logs) (source, amount) ->
-          spend ctxt source amount origin >>=? fun (ctxt, debit_log) ->
+        (fun (ctxt, total, debit_logs) (giver, amount) ->
+          spend ctxt giver amount origin >>=? fun (ctxt, debit_log) ->
           Tez_repr.(amount +? total) >>?= fun total ->
           return (ctxt, total, debit_log :: debit_logs))
         (ctxt, Tez_repr.zero, [])
-        sources
+        givers
       >>=? fun (ctxt, amount, debit_logs) ->
       credit ctxt dest amount origin >>=? fun (ctxt, credit_log) ->
       (* Deallocate implicit contracts with no stake. This must be done after
@@ -236,18 +236,18 @@ let transfer_n ?(origin = Receipt_repr.Block_application) ctxt src dest =
          balance from (`Contract c) to (`Frozen_bonds (c,_)) would leave the
          contract c unallocated. *)
       List.fold_left_es
-        (fun ctxt (source, _amount) ->
-          match source with
+        (fun ctxt (giver, _amount) ->
+          match giver with
           | `Contract contract | `Frozen_bonds (contract, _) ->
               Contract_storage.ensure_deallocated_if_empty ctxt contract
-          | #source -> return ctxt)
+          | #giver -> return ctxt)
         ctxt
-        sources
+        givers
       >|=? fun ctxt ->
       (* Make sure the order of balance updates is : debit logs in the order of
-         of the parameter [src], and then the credit log. *)
+         of the parameter [givers], and then the credit log. *)
       let balance_updates = List.rev (credit_log :: debit_logs) in
       (ctxt, balance_updates)
 
-let transfer ?(origin = Receipt_repr.Block_application) ctxt src dest amount =
-  transfer_n ~origin ctxt [(src, amount)] dest
+let transfer ?(origin = Receipt_repr.Block_application) ctxt giver dest amount =
+  transfer_n ~origin ctxt [(giver, amount)] dest
