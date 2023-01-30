@@ -177,6 +177,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Script_illtyped.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols ;
+  Storage_reconstruction.register ~protocols ;
   Stresstest_command.register ~protocols ;
   Synchronisation_heuristic.register ~protocols ;
   Tenderbake.register ~protocols ;
