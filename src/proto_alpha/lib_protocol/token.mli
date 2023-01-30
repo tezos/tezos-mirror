@@ -76,7 +76,7 @@ type container =
     (** Frozen tokens of a contract for bond deposits (currently used by rollups) *)
   ]
 
-(** [infinite_source] defines types of tokens provides which are considered to be
+(** [infinite_source] defines types of tokens providers which are considered to be
  ** of infinite capacity. *)
 type infinite_source =
   [ `Invoice
