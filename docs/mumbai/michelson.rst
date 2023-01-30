@@ -2098,7 +2098,8 @@ Operations on tickets
 
 The following operations deal with tickets. Tickets are a way for smart-contracts
 to authenticate data with respect to a Tezos address. This authentication can
-then be used to build composable permission systems.
+then be used to build composable permission systems. For a high-level explanation of
+tickets in Tezos, see :doc: `Tickets <tickets>`.
 
 A contract can create a ticket from a value and an amount. The ticket, when
 inspected reveals the value, the amount, and the address of the ticketer (the contract that created the ticket). It is
